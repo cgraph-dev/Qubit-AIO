@@ -161,3 +161,36 @@ def test_summarize_extractive():
     assert "request id" in s
     assert "```" not in s
     assert _strip_markdown("a `code` b") == "a code b"
+
+
+# --------------------------------------------------------------------------- frame splitter
+def test_frame_splitter_accumulates_partial_blocks():
+    """Regression: 480 samples @48k -> 160 samples @16k per block < FRAME_SIZE(480).
+    Without buffering, n_full==0 every block and no audio is ever captured."""
+    import numpy as np
+    from voicebridge.audio.vad import FrameSplitter, FRAME_SIZE, resample_linear
+    splitter = FrameSplitter()
+    # simulate 3 blocks of 480 samples @48k (160 @16k each)
+    src = np.zeros(480, dtype=np.float32)
+    src[::2] = 0.5  # non-silent tone-ish
+    out = []
+    for _ in range(3):
+        mono16 = resample_linear(src, 48000, 16000)
+        assert len(mono16) == 160
+        out.extend(splitter.feed(mono16))
+    # 3 blocks * 160 samples = 480 samples = exactly one 30ms frame
+    assert len(out) == 1, f"expected 1 complete frame, got {len(out)}"
+    assert len(out[0]) == FRAME_SIZE * 2  # int16 bytes
+
+
+def test_frame_splitter_multiple_frames():
+    import numpy as np
+    from voicebridge.audio.vad import FrameSplitter, FRAME_SIZE, resample_linear
+    splitter = FrameSplitter()
+    src = np.full(1440, 0.25, dtype=np.float32)  # 30ms @48k -> one frame per block
+    out = []
+    for _ in range(2):
+        mono16 = resample_linear(src, 48000, 16000)
+        out.extend(splitter.feed(mono16))
+    assert len(out) == 2
+    assert len(out[0]) == FRAME_SIZE * 2

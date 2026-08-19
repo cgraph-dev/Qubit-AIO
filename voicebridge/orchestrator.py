@@ -28,7 +28,7 @@ import sounddevice as sd
 
 from .audio.mic import MicCapture
 from .audio.playback import Playback
-from .audio.vad import BargeInDetector, Endpointer
+from .audio.vad import BargeInDetector, Endpointer, FrameSplitter
 from .config import Config
 from .hotkeys import HotkeyListener
 from .intent.classifier import Classifier, Intent
@@ -179,13 +179,17 @@ class VoiceOrchestrator:
         mic_cfg = self.cfg.section("mic")
         self._mic = MicCapture(device=mic_cfg.get("device"),
                                sample_rate=mic_cfg.get("sample_rate", 48000),
-                               channels=mic_cfg.get("channels", 1),
+                               channels=mic_cfg.get("channels", 2),
                                blocksize=mic_cfg.get("blocksize", 480),
                                endpointer=Endpointer(
-                                   aggressiveness=self.cfg.get("vad", "aggressiveness", default=2),
-                                   speech_start_ms=self.cfg.get("vad", "speech_start_ms", default=220),
+                                   aggressiveness=self.cfg.get("vad", "aggressiveness", default=1),
+                                   speech_start_ms=self.cfg.get("vad", "speech_start_ms", default=180),
                                    silence_timeout_s=self.cfg.get("vad", "silence_timeout_s", default=1.2),
-                                   max_utterance_s=self.cfg.get("vad", "max_utterance_s", default=30.0)))
+                                   max_utterance_s=self.cfg.get("vad", "max_utterance_s", default=30.0)),
+                               gain=float(mic_cfg.get("gain", 4.0)),
+                               min_rms=float(mic_cfg.get("min_rms", 0.0008)))
+        self._beep_start = self._make_beep(880.0, 0.08)
+        self._beep_end = self._make_beep(660.0, 0.06)
         self._barge = BargeInDetector(trigger_ms=int(self.cfg.get("vad", "barge_in", default=True)) and 150 or 999999)
         self._barge_stream = None
         if self.cfg.get("vad", "barge_in", default=True):
@@ -259,6 +263,7 @@ class VoiceOrchestrator:
             return self.playback.play(path, name=name)
         # monitor the always-open barge-in stream while playing
         stop = threading.Event()
+        splitter = FrameSplitter()
 
         def _monitor():
             while not stop.is_set():
@@ -267,11 +272,10 @@ class VoiceOrchestrator:
                     if self._barge_stream.channels > 1:
                         data = data.mean(axis=1, keepdims=True)
                     mono = data[:, 0]
-                    from .audio.vad import FRAME_RATE, FRAME_SIZE, pcm16, resample_linear
+                    from .audio.vad import FRAME_RATE, resample_linear
                     mono16 = resample_linear(mono, self._barge_stream.samplerate, FRAME_RATE)
-                    for i in range(len(mono16) // FRAME_SIZE):
-                        frame = mono16[i * FRAME_SIZE:(i + 1) * FRAME_SIZE]
-                        if self._barge.add_frame(pcm16(frame)):
+                    for raw in splitter.feed(mono16):
+                        if self._barge.add_frame(raw):
                             stop.set()
                             return
                 except Exception:
@@ -756,6 +760,39 @@ class VoiceOrchestrator:
         if res is not None:
             self._process_utterance(res)
 
+    @staticmethod
+    def _make_beep(freq: float = 880.0, dur_s: float = 0.08) -> Path:
+        """Generate a short sine beep WAV (cached) for capture start/end feedback."""
+        import struct
+        path = Path("/tmp/openclaw-voice-bridge") / f"beep-{int(freq)}-{int(dur_s*1000)}.wav"
+        if path.exists():
+            return path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        sr = 22050
+        n = int(sr * dur_s)
+        fade = int(sr * 0.01)
+        t = np.arange(n) / sr
+        sig = np.sin(2 * np.pi * freq * t) * 0.25
+        env = np.ones(n)
+        env[:fade] = np.linspace(0, 1, fade)
+        env[-fade:] = np.linspace(1, 0, fade)
+        pcm = (sig * env * 32767).astype(np.int16)
+        with wave.open(str(path), "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(sr)
+            wf.writeframes(pcm.tobytes())
+        return path
+
+    def _play_beep(self, which: str) -> None:
+        if not self.cfg.get("feedback", "beeps", default=True):
+            return
+        path = self._beep_start if which == "start" else self._beep_end
+        try:
+            self.playback.play(path, name=f"beep-{which}", interruptible=False)
+        except Exception:
+            pass
+
     def _capture_utterance(self) -> Optional[str]:
         """Record one utterance (PTT start..release or manual). Returns wav path or None."""
         if self._mic is None:
@@ -772,6 +809,7 @@ class VoiceOrchestrator:
                         return
                     time.sleep(0.05)
             threading.Thread(target=_release_watcher, daemon=True).start()
+        self._play_beep("start")
         try:
             with self._mic.open():
                 res = self._mic.record_utterance(stop_req, barge_in=None)
@@ -779,11 +817,18 @@ class VoiceOrchestrator:
             log_event("mic.capture.error", error=str(exc)[:160])
             self.speak("I couldn't hear you. Check the microphone.")
             return None
+        self._play_beep("end")
         if res.wav_path is None:
-            log_event("mic.utterance.empty", ended_by=res.ended_by)
+            log_event("mic.utterance.empty", ended_by=res.ended_by,
+                      peak_rms=round(res.peak_rms, 5),
+                      hint="no audible speech (level below min_rms)")
+            if not self.muted:
+                self.speak("I didn't hear anything. Speak up, or check the "
+                           "microphone gain — then try again.")
             return None
-        log_event("mic.utterance", wav=str(res.wav_path), duration_s=round(res.duration_s, 2),
-                  ended_by=res.ended_by)
+        log_event("mic.utterance", wav=str(res.wav_path),
+                  duration_s=round(res.duration_s, 2),
+                  ended_by=res.ended_by, peak_rms=round(res.peak_rms, 5))
         return str(res.wav_path)
 
     def _process_utterance(self, wav_path: str) -> None:

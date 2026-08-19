@@ -126,21 +126,26 @@ def _cmd_mic_test(cfg) -> int:
     from .audio.mic import MicCapture
     mic_cfg = cfg.section("mic")
     print("Recording 5 seconds. Speak now...")
-    mic = MicCapture(device=mic_cfg.get("device"), sample_rate=mic_cfg.get("sample_rate", 48000),
-                     channels=mic_cfg.get("channels", 1), blocksize=mic_cfg.get("blocksize", 480),
-                     endpointer=Endpointer(aggressiveness=2))
+    mic = MicCapture(device=mic_cfg.get("device"),
+                     sample_rate=mic_cfg.get("sample_rate", 48000),
+                     channels=mic_cfg.get("channels", 2),
+                     blocksize=mic_cfg.get("blocksize", 480),
+                     endpointer=Endpointer(aggressiveness=mic_cfg.get("aggressiveness", 1)),
+                     gain=float(mic_cfg.get("gain", 4.0)),
+                     min_rms=float(mic_cfg.get("min_rms", 0.0008)))
     import threading, time
-    stop = threading.Event()
     samples = []
     with mic.open():
         t0 = time.time()
         while time.time() - t0 < 5:
             data, _ = mic._stream.read(mic.blocksize)
-            peak = float(np.abs(data).max()) if data.size else 0.0
+            mono = MicCapture._mono(data) * mic.gain
+            peak = float(np.abs(mono).max()) if mono.size else 0.0
             samples.append(peak)
     peak_avg = float(np.mean(samples)) if samples else 0.0
-    print(f"peak RMS avg: {peak_avg:.4f} (above ~0.005 = audible signal)")
-    print("If this is ~0, check the input device / gain (Focusrite: turn gain to ~12 o'clock).")
+    print(f"peak RMS avg (with gain x{mic.gain}): {peak_avg:.4f}  (min_rms floor: {mic.min_rms})")
+    print("Above the floor = the bridge will capture. If this is ~0, check the input")
+    print("device / gain (Focusrite: turn gain knob to ~12 o'clock, speak 6-12 in away).")
     return 0
 
 

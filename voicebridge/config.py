@@ -31,16 +31,22 @@ DEFAULTS: Dict[str, Any] = {
     "mic": {
         "device": None,        # None = system default input
         "sample_rate": 48000,  # device rate; resampled to 16k for ASR
-        "channels": 1,
+        "channels": 2,         # capture N channels, use the loudest
         "blocksize": 480,      # ~10ms at 48k
+        "gain": 4.0,           # pre-amplify quiet interfaces (Focusrite needs this)
+        "min_rms": 0.0008,     # below this RMS the capture is treated as silence
     },
     "vad": {
         "enabled": True,
-        "aggressiveness": 2,        # webrtcvad 0-3
-        "speech_start_ms": 220,     # frames of speech to consider "started"
+        "aggressiveness": 1,        # webrtcvad 0-3 (1 = lenient for quiet mics)
+        "speech_start_ms": 180,     # frames of speech to consider "started"
         "silence_timeout_s": 1.2,   # trailing silence ends the utterance
         "max_utterance_s": 30.0,
+        "rms_gate": 0.004,          # frame RMS floor for "voiced" (after gain); lowers false VAD on hiss
         "barge_in": True,           # speech while TTS is speaking -> cancel output
+    },
+    "feedback": {
+        "beeps": True,              # short beep when recording starts/stops
     },
     "asr": {
         "provider": "whisper",      # whisper | personaplex

@@ -1,16 +1,17 @@
 """Microphone capture with hold-to-talk semantics + VAD endpointing.
 
-Records from the configured input device (or system default), resamples to
-16 kHz mono float32, and returns utterance WAVs. The hotkey/PTT state machine
-lives in the orchestrator; this module provides the raw capture primitive:
+Design notes (hard-won on the Focusrite Scarlett 2i2 4th Gen / PipeWire):
 
-    mic = MicCapture(device=None)
-    with mic.open():
-        wav_path = mic.record_utterance(stop_requested, barge_in=None)
-
-`stop_requested` is a threading.Event the caller sets to end capture early
-(hotkey release). `barge_in`, when given, is a BargeInDetector fed the same
-frames so speech during assistant playback can be detected.
+  * The interface's default PipeWire profile is 4-channel ("analog-surround-40")
+    and the mic lands on channel 0 with a *quiet* level unless the gain knob is
+    up. webrtcvad at aggressiveness 2 will happily declare a whole utterance
+    "silence" if the level is low — and the old code then DISCARDED the audio.
+  * So push-to-talk must NOT be VAD-gated: press→release audio is always kept
+    (if RMS is above a floor), VAD only trims pre-roll and provides
+    hands-free endpointing (silence timeout) when the key is held. ASR is the
+    final judge of whether anything was said.
+  * A `gain` multiplier is applied before VAD and saving so quiet interfaces
+    work; levels are logged so a silent mic is diagnosable in seconds.
 """
 from __future__ import annotations
 
@@ -18,14 +19,14 @@ import queue
 import threading
 import time
 import wave
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
 import sounddevice as sd
 
-from .vad import FRAME_RATE, FRAME_SIZE, Endpointer, pcm16, resample_linear
+from .vad import FRAME_MS, FRAME_RATE, FRAME_SIZE, Endpointer, FrameSplitter, pcm16, resample_linear
 
 
 @dataclass
@@ -34,17 +35,23 @@ class CaptureResult:
     duration_s: float
     frames: int
     ended_by: str  # "silence" | "stop_requested" | "max_duration" | "cancelled"
+    peak_rms: float = 0.0
 
 
 class MicCapture:
     def __init__(self, device: Optional[int] = None, sample_rate: int = 48000,
-                 channels: int = 1, blocksize: int = 480,
-                 endpointer: Optional[Endpointer] = None) -> None:
+                 channels: int = 2, blocksize: int = 480,
+                 endpointer: Optional[Endpointer] = None,
+                 gain: float = 4.0, min_rms: float = 0.0008,
+                 min_speech_s: float = 0.25) -> None:
         self.device = device
         self.sample_rate = sample_rate
         self.channels = channels
         self.blocksize = blocksize
         self.endpointer = endpointer or Endpointer()
+        self.gain = gain
+        self.min_rms = min_rms
+        self.min_speech_s = min_speech_s
         self._stream: Optional[sd.InputStream] = None
 
     def open(self) -> "MicCapture":
@@ -72,10 +79,22 @@ class MicCapture:
     def __exit__(self, *exc) -> None:
         self.close()
 
+    @staticmethod
+    def _mono(data: np.ndarray) -> np.ndarray:
+        """Downmix to mono taking the loudest channel (robust to channel maps)."""
+        if data.ndim == 1 or data.shape[1] == 1:
+            return data[:, 0] if data.ndim == 2 else data
+        return np.max(np.abs(data), axis=1) * np.sign(data[:, 0] if data.shape[1] else data)
+
     def record_utterance(self, stop_requested: threading.Event,
                          barge_in=None, out_dir: Optional[Path] = None,
                          pre_roll_ms: int = 200) -> CaptureResult:
-        """Record until silence endpoint, stop_requested, or max duration."""
+        """Record until silence endpoint, stop_requested, or max duration.
+
+        The audio from press→release is ALWAYS saved when it has any audible
+        energy (RMS >= min_rms) — VAD is only used to trim silence and to end
+        hands-free captures via the silence timeout.
+        """
         if self._stream is None:
             raise RuntimeError("mic not open; call open() first")
         ep = self.endpointer
@@ -83,55 +102,59 @@ class MicCapture:
         if barge_in is not None:
             barge_in.reset()
 
-        buf16: list[bytes] = []      # 30 ms int16 frames (final mix for ASR)
-        voiced_buf16: list[bytes] = []  # frames while in 'speech' state
+        buf16: list[bytes] = []           # 30 ms int16 frames (full capture)
+        recent: list[bytes] = []          # rolling pre-roll (idle frames only)
+        splitter = FrameSplitter()
         pre_roll_frames = max(1, pre_roll_ms // 30)
-        recent: list[bytes] = []
         ended_by = "silence"
         t0 = time.time()
+        peak_rms = 0.0
+        first_voice_idx: Optional[int] = None   # buf16 index where speech began
 
         while True:
             data, _ = self._stream.read(self.blocksize)  # float32 (n, ch)
-            if self.channels > 1:
-                data = data.mean(axis=1, keepdims=True)
-            mono = data[:, 0]
+            mono = self._mono(data)
+            mono = np.clip(mono * self.gain, -1.0, 1.0)
             mono16 = resample_linear(mono, self.sample_rate, FRAME_RATE)
-            # split into 30 ms frames
-            n_full = len(mono16) // FRAME_SIZE
-            for i in range(n_full):
-                frame = mono16[i * FRAME_SIZE:(i + 1) * FRAME_SIZE]
-                raw = pcm16(frame)
+            for raw in splitter.feed(mono16):
+                frame = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32767.0
                 if barge_in is not None:
                     barge_in.add_frame(raw)
                 if stop_requested.is_set():
-                    if ep.state == "speech":
-                        # Hotkey released mid-speech: allow a short tail for the
-                        # last word, then finish.
-                        ended_by = "stop_requested"
-                        break
-                    if ep.state == "idle":
-                        ended_by = "cancelled"
-                        break
-                recent.append(raw)
-                if len(recent) > pre_roll_frames:
-                    recent.pop(0)
+                    ended_by = "stop_requested" if ep.state == "speech" else (
+                        "stop_requested" if peak_rms >= self.min_rms else "cancelled")
+                    break
                 state = ep.add_frame(raw)
                 buf16.append(raw)
-                if state == "speech":
-                    voiced_buf16.append(raw)
-            if stop_requested.is_set() and ended_by != "":
+                if state == "idle":
+                    recent.append(raw)
+                    if len(recent) > pre_roll_frames:
+                        recent.pop(0)
+                if first_voice_idx is None and ep.state == "speech":
+                    first_voice_idx = len(buf16) - 1
+                rms = float(np.sqrt((frame ** 2).mean()))
+                if rms > peak_rms:
+                    peak_rms = rms
+            if stop_requested.is_set():
                 break
             if ep.state == "done":
                 break
             if time.time() - t0 > ep.max_utterance_s + 1.0:
-                ended_by = "max_duration"
+                ended_by = "max_duration" if peak_rms >= self.min_rms else "cancelled"
                 break
 
-        if ended_by == "cancelled" or not voiced_buf16:
-            return CaptureResult(None, 0.0, 0, ended_by)
+        voiced_s = ep.voiced_frames * FRAME_MS / 1000.0
+        if not buf16 or (ended_by == "cancelled" and peak_rms < self.min_rms) \
+                or voiced_s < self.min_speech_s:
+            return CaptureResult(None, 0.0, 0, ended_by, peak_rms)
 
-        # Keep pre-roll context before the first voiced frame for ASR stability.
-        start = max(0, len(buf16) - len(voiced_buf16) - pre_roll_frames)
+        # Include pre-roll context before the first voiced frame for ASR stability.
+        # If VAD never entered 'speech' (missed quiet speech), keep the whole
+        # capture — ASR is the final judge.
+        if first_voice_idx is not None:
+            start = max(0, first_voice_idx - pre_roll_frames)
+        else:
+            start = 0
         payload = b"".join(buf16[start:])
         duration = len(payload) / FRAME_RATE / 2  # int16 = 2 bytes
 
@@ -143,4 +166,4 @@ class MicCapture:
             wf.setsampwidth(2)
             wf.setframerate(FRAME_RATE)
             wf.writeframes(payload)
-        return CaptureResult(wav_path, duration, len(voiced_buf16), ended_by)
+        return CaptureResult(wav_path, duration, len(recent), ended_by, peak_rms)
