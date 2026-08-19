@@ -194,7 +194,11 @@ three sources before giving up (parent history → child sessions via
 `parentSessionKey` → gateway task ledger via `childSessionKey`), and if all are
 empty it says so honestly instead of pretending. `openclaw.request` /
 `openclaw.result` journal entries carry the `runId` so you can find the work in
-the Control UI (`http://localhost:18789`).
+the Control UI (`http://localhost:18789`). Tasks that outlive
+`openclaw.task_timeout_s` get a spoken "still running" and a background
+**reaper** keeps polling until completion, then delivers the final summary
+anyway — so a 20-minute job still gets its spoken result without blocking the
+conversation.
 
 ## Upgrade path to a 4090 / 12 GB+ GPU
 
