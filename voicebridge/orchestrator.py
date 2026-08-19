@@ -89,6 +89,7 @@ class VoiceOrchestrator:
         self.safety = SafetyPolicy(config.section("safety"))
         self.gateway_info = None
         self._route: str = ""   # 'gateway' | 'cli' | 'offline'
+        self.blocking_tasks = True   # False in the interactive hotkey loop
         self._duplex: Optional[PersonaPlexDuplex] = None
         self._hermes: Optional[HermesBackend] = None
         self._memory_context: str = ""
@@ -436,93 +437,75 @@ class VoiceOrchestrator:
                                name="progress", barge=False)
                     self.task.last_progress_spoken = time.time()
 
-    def _await_run(self, session_key: str, run_id: str, task_text: str) -> None:
-        """Wait for the run (polling up to task_timeout_s); speak summary when done."""
-        import threading
+    def _await_run(self, session_key: str, run_id: str, task_text: str,
+                   blocking: Optional[bool] = None) -> None:
+        """Track a gateway run; speak the summary when it completes.
+
+        Non-blocking by default in the interactive loop (the PTT loop must stay
+        responsive). `blocking=True` (CLI task/once/roundtrip) waits for the
+        terminal state before returning.
+        """
+        if blocking is None:
+            blocking = self.blocking_tasks
         t0 = time.time()
-        task_timeout = int(self.cfg.get("openclaw", "task_timeout_s", default=900))
-        poll_window_ms = 60_000  # agent.wait window per call
-        result_holder: Dict[str, Any] = {}
+        self._spawn_waiter(session_key, run_id, t0)
+        if blocking:
+            while self.task.active and not self._stop.is_set():
+                time.sleep(0.5)
+
+    def _spawn_waiter(self, session_key: str, run_id: str, t0: float) -> None:
+        """Background poller (waiter + reaper in one).
+
+        Polls agent.wait with 60 s windows up to task_timeout_s, then switches
+        to 5-minute reaper windows indefinitely while the task is still active.
+        On completion it fetches the reply (layered lookup), speaks the summary,
+        and clears the task. Checks the voice-cancel flag between windows.
+        """
+        import threading
 
         def _waiter():
-            waited_s = 0.0
-            while waited_s < task_timeout:
-                window_ms = min(poll_window_ms, int((task_timeout - waited_s) * 1000))
+            task_timeout = int(self.cfg.get("openclaw", "task_timeout_s", default=900))
+            timeout_spoken = False
+            while self.task.active and not self._stop.is_set():
+                if self._cancel.is_set():
+                    self._cancel.clear()
+                    if self._gateway is not None:
+                        try:
+                            self._gateway.abort(session_key, timeout=20.0)
+                        except Exception:
+                            pass
+                    log_event("openclaw.abort", session_key=session_key, run_id=run_id,
+                              why="voice cancel")
+                    self.task.clear()
+                    self.speak("Stopped.")
+                    return
+                remaining = task_timeout - (time.time() - t0)
+                window_ms = 60_000 if remaining > 0 else 300_000
                 try:
                     res = self._gateway.wait_run(run_id, timeout_ms=window_ms)
                 except GatewayError as exc:
-                    result_holder["status"] = "failed"
-                    result_holder["error"] = exc.message
+                    log_event("openclaw.result", session_key=session_key, run_id=run_id,
+                              status="failed", error=exc.message,
+                              elapsed_s=round(time.time() - t0, 2))
+                    self.task.clear()
+                    self.speak("OpenClaw failed the task. Check the logs.")
                     return
                 except Exception as exc:
-                    result_holder["status"] = "failed"
-                    result_holder["error"] = str(exc)[:200]
+                    log_event("openclaw.result", session_key=session_key, run_id=run_id,
+                              status="failed", error=str(exc)[:200],
+                              elapsed_s=round(time.time() - t0, 2))
+                    self.task.clear()
+                    self.speak("OpenClaw failed the task. Check the logs.")
                     return
                 st = res.get("status", "ok")
                 if st == "timeout":
-                    waited_s += poll_window_ms / 1000.0
-                    continue
-                result_holder["status"] = st
-                return
-            result_holder["status"] = "timeout"
-
-        th = threading.Thread(target=_waiter, daemon=True)
-        th.start()
-        while th.is_alive():
-            if self._cancel.is_set() or self._stop.is_set():
-                try:
-                    self._gateway.abort(session_key, timeout=20.0)
-                except Exception:
-                    pass
-                log_event("openclaw.abort", session_key=session_key)
-                self.speak("Stopped.")
-                self._cancel.clear()
-                self.task.clear()
-                return
-            time.sleep(0.25)
-        status = result_holder.get("status", "timeout")
-        if status in ("failed",):
-            log_event("openclaw.result", session_key=session_key, run_id=run_id,
-                      status="failed", error=result_holder.get("error", ""),
-                      elapsed_s=round(time.time() - t0, 2))
-            self.speak("OpenClaw failed the task. Check the logs.")
-            self.task.clear()
-            return
-        if status in ("timeout", "aborted"):
-            # The run is (or was) still going on the gateway. Keep the task
-            # tracked so "status" / "cancel" still work; don't pretend it failed.
-            log_event("openclaw.result", session_key=session_key, run_id=run_id,
-                      status=status, elapsed_s=round(time.time() - t0, 2))
-            if status == "aborted":
-                self.speak("Task stopped.")
-                self.task.clear()
-            else:
-                self.speak("The task is still running in OpenClaw. "
-                           "I'll keep tracking it and let you know when it's done.")
-                self.task.last_progress_spoken = time.time()
-                self._spawn_reaper(session_key, run_id)
-            return
-        # status == ok
-        reply = self._fetch_final_reply(session_key, run_id)
-        self.task.clear()
-        self._handle_agent_result(session_key, reply, "ok", time.time() - t0)
-
-    def _spawn_reaper(self, session_key: str, run_id: str) -> None:
-        """Background poller: keeps watching a long run after the spoken timeout
-        and delivers the final summary when it eventually completes."""
-        import threading
-        t0 = time.time()
-
-        def _reaper():
-            while self.task.active and not self._stop.is_set():
-                try:
-                    res = self._gateway.wait_run(run_id, timeout_ms=300_000)  # 5-min window
-                except Exception as exc:
-                    log_event("openclaw.reaper.error", error=str(exc)[:160])
-                    time.sleep(30)
-                    continue
-                st = res.get("status", "ok")
-                if st == "timeout":
+                    if remaining <= 0 and not timeout_spoken:
+                        timeout_spoken = True
+                        log_event("openclaw.result", session_key=session_key, run_id=run_id,
+                                  status="timeout", elapsed_s=round(time.time() - t0, 2))
+                        self.speak("The task is still running in OpenClaw. "
+                                   "I'll keep tracking it and let you know when it's done.")
+                        self.task.last_progress_spoken = time.time()
                     continue  # still going; poll again
                 if st == "ok":
                     reply = self._fetch_final_reply(session_key, run_id)
@@ -533,13 +516,12 @@ class VoiceOrchestrator:
                     log_event("openclaw.result", session_key=session_key, run_id=run_id,
                               status=st, elapsed_s=round(time.time() - t0, 2))
                     self.task.clear()
-                    self.speak("OpenClaw finished the task with status "
-                               f"{st}. Check the logs.")
+                    self.speak(f"OpenClaw finished the task with status {st}. Check the logs.")
                 return
             self.task.clear()
 
-        threading.Thread(target=_reaper, daemon=True, name="task-reaper").start()
-        log_event("openclaw.reaper.started", session_key=session_key, run_id=run_id)
+        threading.Thread(target=_waiter, daemon=True, name="task-waiter").start()
+        log_event("openclaw.waiter.started", session_key=session_key, run_id=run_id)
 
     def _extract_assistant_reply(self, messages: list) -> str:
         """Pull the last meaningful assistant text from a transcript."""
@@ -936,18 +918,21 @@ class VoiceOrchestrator:
                         self._unduck_pp()
 
     def _run_hotkey_loop(self) -> None:
-        self._ptt_started.clear()
+        """Hold-to-talk loop. LEVEL-based on _ptt_hold (not one-shot flags):
+        a press that arrives while the loop is busy is dropped cleanly instead
+        of racing with flag clears and starting a 30s silent capture."""
         while not self._stop.is_set():
-            # wait for PTT start
-            while not self._stop.is_set() and not self._ptt_started.wait(0.2):
-                pass
+            # wait for a genuine hold
+            while not self._stop.is_set() and not self._ptt_hold:
+                time.sleep(0.02)
             if self._stop.is_set():
                 break
-            self._ptt_started.clear()
-            self._ptt_released.clear()
             res = self._capture_utterance()
             if res is not None:
                 self._process_utterance(res)
+            # drain: don't instantly re-trigger if the key is still held
+            while not self._stop.is_set() and self._ptt_hold:
+                time.sleep(0.02)
 
     def _run_manual_loop(self) -> None:
         print("Manual mode: press Enter to start recording, Enter again to stop.")
@@ -1007,14 +992,14 @@ class VoiceOrchestrator:
             return None
         stop_req = threading.Event()
         if self._ptt_supported:
+            held = self._ptt_hold  # snapshot at capture start
+
             def _release_watcher():
-                while not self._stop.is_set():
-                    if self._ptt_released.is_set():
-                        # brief tail after release (finish last word)
-                        time.sleep(0.6)
-                        stop_req.set()
-                        return
-                    time.sleep(0.05)
+                # wait until the key is actually released (level, not one-shot)
+                while held and self._ptt_hold and not self._stop.is_set():
+                    time.sleep(0.02)
+                time.sleep(0.6)  # brief tail to catch the last word
+                stop_req.set()
             threading.Thread(target=_release_watcher, daemon=True).start()
         self._play_beep("start")
         try:

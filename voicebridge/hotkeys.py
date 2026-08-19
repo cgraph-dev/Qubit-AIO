@@ -85,4 +85,6 @@ class HotkeyListener:
                 self.on_event(event, key)
             except Exception:
                 log.exception("hotkey callback failed")
-        log_event("hotkey", event=event, key=key)
+        # note: 'action' not 'event' — log_event uses the 'event' key for its
+        # own record name; using it here would clobber the journal field.
+        log_event("hotkey", action=event, key=key)

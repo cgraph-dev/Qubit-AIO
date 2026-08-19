@@ -79,6 +79,7 @@ def main(argv=None) -> int:
 
     try:
         if command == "run":
+            orch.blocking_tasks = False   # PTT loop must stay responsive
             orch.run()
         elif command == "once":
             orch.mic_only = True
