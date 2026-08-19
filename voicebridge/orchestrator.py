@@ -31,13 +31,16 @@ from .audio.mic import MicCapture
 from .audio.playback import Playback
 from .audio.vad import BargeInDetector, Endpointer, FrameSplitter
 from .config import Config
+from .hermes import HermesBackend
 from .hotkeys import HotkeyListener
 from .intent.classifier import Classifier, Intent
 from .intent.state import ConfirmationState, ConversationState, TaskState
+from .local import actions as local_actions
 from .logging_setup import get_logger, log_event
 from .openclaw.cli_backend import CliBackend
 from .openclaw.discovery import discover_gateway, discover_cuda_libs
 from .openclaw.gateway_ws import GatewaySync, GatewayError
+from .personaplex import PersonaPlexDuplex
 from .safety.policy import SafetyPolicy, SafetyVerdict
 from .summarizer import summarize, trim_spoken
 
@@ -86,6 +89,9 @@ class VoiceOrchestrator:
         self.safety = SafetyPolicy(config.section("safety"))
         self.gateway_info = None
         self._route: str = ""   # 'gateway' | 'cli' | 'offline'
+        self._duplex: Optional[PersonaPlexDuplex] = None
+        self._hermes: Optional[HermesBackend] = None
+        self._memory_context: str = ""
 
     # ------------------------------------------------------------------ setup
     def _make_asr(self):
@@ -179,6 +185,38 @@ class VoiceOrchestrator:
         # classifier
         self.classifier = Classifier(self.cfg.section("intent"),
                                      self.confirmations, self.conversation)
+
+        # memory context (loaded from the OpenClaw workspace on THIS PC — the
+        # Vast.ai box is disposable and never owns state)
+        self._memory_context = self._load_memory_context()
+
+        # Hermes backend (optional second executor, same machine)
+        hermes_cfg = self.cfg.section("hermes")
+        if hermes_cfg.get("enabled", False):
+            self._hermes = HermesBackend(
+                cmd=hermes_cfg.get("cmd", "hermes"),
+                resume_session=hermes_cfg.get("resume_session", "voice"),
+                timeout_s=float(hermes_cfg.get("timeout_s", 600)),
+                model=hermes_cfg.get("model"))
+            if self._hermes.available():
+                log_event("hermes.active")
+            else:
+                log_event("hermes.unavailable")
+                self._hermes = None
+
+        # PersonaPlex full-duplex lane (remote GPU over Tailscale). Persona
+        # prompt = configured persona + memory context loaded above.
+        pp_cfg = self.cfg.section("personaplex")
+        if pp_cfg.get("enabled", False):
+            if self._memory_context:
+                self.cfg.data.setdefault("personaplex", {})["text_prompt"] = (
+                    f"{pp_cfg.get('text_prompt', '')}\n\n"
+                    f"Things you remember about the user (from their notes):\n"
+                    f"{self._memory_context}")
+            self._duplex = PersonaPlexDuplex(self.cfg, on_transcript=self._on_duplex_transcript)
+            ok = self._duplex.start()
+            log_event("personaplex.lane", started=ok)
+
         # mic
         mic_cfg = self.cfg.section("mic")
         self._mic = MicCapture(device=mic_cfg.get("device"),
@@ -244,6 +282,10 @@ class VoiceOrchestrator:
             except Exception:
                 pass
             self._barge_stream = None
+        if self._duplex:
+            self._duplex.stop()
+        if self.cfg.get("memory", "save_notes", default=True):
+            self._save_session_note("voice bridge session ended")
         if self._gateway:
             self._gateway.disconnect()
         if hasattr(self, "hotkey"):
@@ -593,7 +635,9 @@ class VoiceOrchestrator:
         if cmd == "status":
             route = self._route
             model = self.cfg.get("openclaw", "model") or (self.gateway_info.default_model if self.gateway_info else "unknown")
-            self.speak(f"Voice bridge is running. Route: {route}. Agent model: {model}.")
+            duplex = self._duplex.state if self._duplex else "off"
+            self.speak(f"Voice bridge is running. Route: {route}. "
+                       f"PersonaPlex: {duplex}. Agent model: {model}.")
         elif cmd == "mute":
             self.muted = True
             self.playback.stop()
@@ -708,11 +752,137 @@ class VoiceOrchestrator:
             log_event("conversation.ollama.failed", error=str(exc)[:160])
             return ""
 
+    # ------------------------------------------- extra backends (duplex/local/hermes)
+    def _duck_pp(self) -> None:
+        if self._duplex:
+            self._duplex.duck()
+
+    def _unduck_pp(self) -> None:
+        if self._duplex:
+            self._duplex.unduck()
+
+    def _handle_local(self, intent: Intent, text: str) -> None:
+        """Whitelisted direct PC action (volume, apps, screenshot, ...)."""
+        if not self.cfg.get("local", "enabled", default=True):
+            self.speak("Local actions are disabled; routing to OpenClaw.")
+            self._dispatch_coding(text)
+            return
+        name = intent.params.get("action")
+        params = intent.params.get("action_params") or {}
+        if not name:
+            # LLM said "local" but no action matched — ask for the direct phrasing
+            self.speak("That sounds like a PC action. Try a direct command, "
+                       "like: mute the microphone, or open the terminal.")
+            return
+        m = local_actions.ActionMatch(name=name, params=params, text=text)
+        msg = local_actions.execute(m)
+        self.speak(msg)
+
+    def _handle_hermes(self, task: str) -> None:
+        """Explicit Hermes delegation (ask Hermes to ...)."""
+        if self._hermes is None:
+            self.speak("Hermes is not enabled; routing to OpenClaw instead.")
+            self._dispatch_coding(task)
+            return
+        self.speak("Asking Hermes.", name="ack", barge=False)
+        try:
+            reply = self._hermes.run_task(task)
+        except TimeoutError:
+            self.speak("Hermes timed out. Try again, or ask me instead.")
+            return
+        except Exception as exc:
+            self.speak(f"Hermes failed: {str(exc)[:120]}")
+            return
+        summary = summarize(reply, self.cfg.section("summarizer"))
+        self.speak(summary)
+
+    def _route_intent(self, intent: Intent, text: str) -> None:
+        """Shared dispatcher used by mic, typed input, and the duplex tap."""
+        if intent.kind == "system":
+            self._handle_system(intent)
+        elif intent.kind == "confirm":
+            self._handle_confirm()
+        elif intent.kind == "cancel":
+            self._handle_cancel_utterance()
+        elif intent.kind == "coding":
+            self._dispatch_coding(intent.task_text or text)
+        elif intent.kind == "local":
+            self._handle_local(intent, text)
+        elif intent.kind == "hermes":
+            self._handle_hermes(intent.task_text or text)
+        elif intent.kind == "clarify":
+            self.speak("Could you be more specific about what you'd like me to do?")
+        else:
+            self._handle_conversation(text)
+
+    def _on_duplex_transcript(self, text: str, confidence: float) -> None:
+        """A tapped utterance while the PersonaPlex lane is live."""
+        if self._stop.is_set():
+            return
+        log_event("routing.input", text=text, confidence=round(confidence, 3),
+                  source="duplex-tap")
+        intent = self.classifier.classify(text)
+        log_event("routing.decision", text=text[:200], kind=intent.kind,
+                  confidence=round(intent.confidence, 2), reason=intent.reason,
+                  source=intent.source)
+        self.conversation.add("user", text)
+        if intent.kind == "conversation":
+            # PersonaPlex is already answering in character — stay out of the way.
+            return
+        # Everything else: duck PersonaPlex so it can't answer for work it
+        # cannot do, route the task, then resume the voice lane.
+        self._duck_pp()
+        try:
+            self._route_intent(intent, text)
+        finally:
+            self._unduck_pp()
+
+    # ----------------------------------------------------------------- memory
+    def _load_memory_context(self) -> str:
+        """Read MEMORY.md + recent daily notes from the OpenClaw workspace."""
+        try:
+            ws = Path(self.cfg.get("memory", "workspace",
+                                   default="~/.openclaw/workspace")).expanduser()
+            budget = int(self.cfg.get("memory", "context_chars", default=1500))
+            parts: list[str] = []
+            mem = ws / "MEMORY.md"
+            if mem.exists():
+                parts.append(f"<MEMORY.md>\n{mem.read_text(errors='replace')[:budget]}")
+            daily_dir = ws / "memory"
+            if daily_dir.exists():
+                recent = sorted(daily_dir.glob("*.md"))[-2:]
+                for p in recent:
+                    parts.append(f"<{p.name}>\n{p.read_text(errors='replace')[:budget]}")
+            ctx = "\n\n".join(parts)
+            if ctx:
+                log_event("memory.loaded", chars=len(ctx))
+            return ctx
+        except Exception as exc:
+            log_event("memory.load.error", error=str(exc)[:160])
+            return ""
+
+    def _save_session_note(self, note: str) -> None:
+        try:
+            ws = Path(self.cfg.get("memory", "workspace",
+                                   default="~/.openclaw/workspace")).expanduser()
+            day = time.strftime("%Y-%m-%d")
+            d = ws / "memory"
+            d.mkdir(parents=True, exist_ok=True)
+            path = d / f"{day}.md"
+            stamp = time.strftime("%H:%M")
+            with open(path, "a") as fh:
+                fh.write(f"\n- {stamp} [voice-bridge] {note}\n")
+            log_event("memory.note.saved", path=str(path))
+        except Exception as exc:
+            log_event("memory.note.error", error=str(exc)[:160])
+
     # ------------------------------------------------------------------ loop
     def run(self) -> None:
         self.start()
         print("=" * 60)
         print("OpenClaw Voice Bridge — push-to-talk")
+        if self._duplex is not None:
+            print("  PersonaPlex full-duplex lane: talk naturally; tasks are routed.")
         if self._ptt_supported:
             hold = self.cfg.get("hotkey", "hold_key", default="ctrl_r")
             print(f"  Hold {hold} and speak. Esc cancels. Ctrl+C to quit.")
@@ -720,6 +890,10 @@ class VoiceOrchestrator:
             print("  Hotkeys unavailable (no X). Press Enter to start/stop recording.")
         print(f"  ASR: {self._asr.name}  |  TTS: {self._tts.name}  |  OpenClaw route: {self._route}")
         print("=" * 60)
+
+        if self._duplex is not None:
+            self._run_duplex_loop()
+            return
 
         if self.mic_only:
             self._record_once_interactive()
@@ -730,6 +904,36 @@ class VoiceOrchestrator:
             self._run_hotkey_loop()
         else:
             self._run_manual_loop()
+
+    def _run_duplex_loop(self) -> None:
+        """Passive loop while the PersonaPlex lane owns conversation."""
+        print("Full-duplex PersonaPlex active — say tasks naturally, e.g.")
+        print('  "open the current project and inspect the Stripe webhook validation"')
+        print('  "what do you think about this marketplace idea?"')
+        print("Type 'status' for health, 'quit' to exit.")
+        while not self._stop.is_set():
+            try:
+                line = input().strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                break
+            if line in ("q", "quit", "exit"):
+                break
+            if line in ("status", "s", "health"):
+                self._handle_system(Intent("system", params={"command": "status"}))
+            elif line == "duck":
+                self._duck_pp()
+                print("PersonaPlex ducked")
+            elif line == "unduck":
+                self._unduck_pp()
+                print("PersonaPlex resumed")
+            elif line.startswith("task "):
+                text = line[5:].strip()
+                if text:
+                    self._duck_pp()
+                    try:
+                        self._route_intent(self.classifier.classify(text), text)
+                    finally:
+                        self._unduck_pp()
 
     def _run_hotkey_loop(self) -> None:
         self._ptt_started.clear()
@@ -856,18 +1060,7 @@ class VoiceOrchestrator:
                   confidence=round(intent.confidence, 2), reason=intent.reason,
                   source=intent.source)
         self.conversation.add("user", transcript.text)
-        if intent.kind == "system":
-            self._handle_system(intent)
-        elif intent.kind == "confirm":
-            self._handle_confirm()
-        elif intent.kind == "cancel":
-            self._handle_cancel_utterance()
-        elif intent.kind == "coding":
-            self._dispatch_coding(intent.task_text or transcript.text)
-        elif intent.kind == "clarify":
-            self.speak("Could you be more specific about what you'd like OpenClaw to do?")
-        else:
-            self._handle_conversation(transcript.text)
+        self._route_intent(intent, transcript.text)
         log_event("orchestrator.turn_done", total_ms=round((time.time() - t0) * 1000, 1))
 
     # -------------------------------------------------------------- external
@@ -882,15 +1075,4 @@ class VoiceOrchestrator:
         log_event("routing.decision", text=text[:200], kind=intent.kind,
                   confidence=round(intent.confidence, 2), reason=intent.reason,
                   source=intent.source)
-        if intent.kind == "system":
-            self._handle_system(intent)
-        elif intent.kind == "confirm":
-            self._handle_confirm()
-        elif intent.kind == "cancel":
-            self._handle_cancel_utterance()
-        elif intent.kind == "coding":
-            self._dispatch_coding(intent.task_text or text)
-        elif intent.kind == "clarify":
-            self.speak("Could you be more specific about what you'd like OpenClaw to do?")
-        else:
-            self._handle_conversation(text)
+        self._route_intent(intent, text)

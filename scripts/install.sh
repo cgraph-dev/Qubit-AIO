@@ -21,7 +21,12 @@ if [ ! -x "$VENV/bin/python" ]; then
 fi
 echo "==> installing python deps"
 uv pip install --python "$VENV/bin/python" \
-  faster-whisper sounddevice numpy webrtcvad websockets pyyaml piper-tts setuptools
+  faster-whisper sounddevice numpy webrtcvad websockets pyyaml piper-tts setuptools sphn
+# sphn (PersonaPlex duplex Opus streaming) needs libopus at runtime:
+if ! ldconfig -p 2>/dev/null | grep -q libopus; then
+  echo "==> NOTE: libopus missing — for PersonaPlex duplex mode run:"
+  echo "    sudo apt install libopus-dev"
+fi
 # webrtcvad needs the legacy pkg_resources API (removed in setuptools 81+)
 "$VENV/bin/python" -m pip install 'setuptools<81' -q 2>/dev/null || true
 # hotkey support (needs X11 session)

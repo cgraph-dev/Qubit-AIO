@@ -1,0 +1,359 @@
+"""Full-duplex PersonaPlex lane: continuous mic -> PersonaPlex server -> speakers.
+
+This is the "PersonaPlex front-end" mode of the bridge:
+
+    mic (continuous) ──► PersonaPlex on Vast.ai ──► speakers
+          │                    (full duplex,         ▲
+          │                     natural barge-in)    │
+          └─► whisper tap ──► intent classifier ────┘ (task lane takes over
+                                                     via TTS when needed)
+
+PersonaPlex handles conversation end-to-end (chat, small talk, persona). The
+bridge taps the same mic stream with a local whisper ASR so it can *also* see
+what was said, classify it, and route tasks to OpenClaw / Hermes / local tools.
+
+Threading model
+---------------
+- sounddevice callback thread: pushes mic PCM into an asyncio queue and feeds
+  the VAD tap (never blocks on network or models).
+- send thread (owns the asyncio loop): connects to PersonaPlex, pumps the mic
+  queue to the WebSocket, runs the recv loop (audio -> speakers, text -> log).
+- tap worker threads: when the local VAD ends an utterance, a short-lived
+  worker transcribes it (whisper) and fires `on_transcript` off the audio
+  thread so the orchestrator can run long tasks without glitching audio.
+
+Ducking: while a task runs (or a confirmation is pending) the lane stops
+feeding PersonaPlex and mutes its output, so the model cannot hallucinate
+answers about work it cannot do. `duck()` persists until `unduck()`.
+"""
+from __future__ import annotations
+
+import asyncio
+import threading
+import time
+import wave
+from pathlib import Path
+from typing import Any, Callable, Dict, Optional
+
+import numpy as np
+
+from ..audio.vad import Endpointer, FRAME_SIZE, resample_linear
+from ..config import Config
+from ..logging_setup import get_logger, log_event
+from .client import DuplexClient, DuplexError, PersonaPlexUnavailable
+
+log = get_logger()
+
+TAP_FRAME_BYTES = FRAME_SIZE * 2  # 30 ms @16k int16 = 960 bytes
+
+# A transcript tap is emitted whenever the local VAD ends an utterance.
+TranscriptCallback = Callable[[str, float], None]  # (text, confidence)
+
+
+class PersonaPlexDuplex:
+    """Owns one continuous duplex session + the local routing tap."""
+
+    def __init__(
+        self,
+        cfg: Config,
+        on_transcript: Optional[TranscriptCallback] = None,
+        on_state: Optional[Callable[[str], None]] = None,
+    ) -> None:
+        self.cfg = cfg
+        self.on_transcript = on_transcript
+        self.on_state = on_state  # state changes: connecting|live|ducked|down
+
+        pp = cfg.section("personaplex")
+        self.url: str = pp.get("url", "wss://personaplex:8998/api/chat")
+        self.voice_prompt: str = pp.get("voice_prompt", "NATF2.pt")
+        self.text_prompt: str = pp.get("text_prompt", "")
+        self.ssl_insecure: bool = bool(pp.get("ssl_insecure", True))
+        self.reconnect_s: float = float(pp.get("reconnect_s", 5.0))
+        self.whisper_tap: bool = bool(pp.get("whisper_tap", True))
+        self.sample_rate: int = int(pp.get("sample_rate", DuplexClient.SAMPLE_RATE))
+        self._duck_seconds = 3600.0  # persistent until explicit unduck()
+
+        mic = cfg.section("mic")
+        self.mic_device = mic.get("device")
+        self.mic_rate: int = int(mic.get("sample_rate", 48000))
+        self.mic_channels: int = int(mic.get("channels", 2))
+        self.mic_blocksize: int = int(mic.get("blocksize", 480))
+        self.mic_gain: float = float(mic.get("gain", 4.0))
+
+        # state
+        self._stop = threading.Event()
+        self._duck_until = 0.0
+        self._lock = threading.RLock()
+        self._state = "down"
+        self._mic_queue: "asyncio.Queue[np.ndarray]" = asyncio.Queue(maxsize=64)
+        self._queue_ref = self._mic_queue  # keep a stable ref across loop restarts
+
+        # threads
+        self._send_thread: Optional[threading.Thread] = None
+        self._tap_busy = threading.Event()
+
+        # streaming objects (owned by send thread)
+        self._client: Optional[DuplexClient] = None
+        self._stream = None  # sounddevice InputStream
+        self._out = None     # sounddevice OutputStream (24k mono)
+
+        # tap state
+        self._tap_frame_buf = bytearray()
+        self._tap_pcm = np.zeros(0, np.float32)
+        self._tap_endpointer: Optional[Endpointer] = None
+        self._tap_started = False
+
+        # whisper tap (lazy)
+        self._whisper = None
+
+        # stats
+        self.bytes_sent = 0
+        self.bytes_recv = 0
+
+    # ------------------------------------------------------------------ props
+    @property
+    def state(self) -> str:
+        return self._state
+
+    @property
+    def live(self) -> bool:
+        return self._state == "live"
+
+    def _set_state(self, s: str) -> None:
+        if self._state != s:
+            self._state = s
+            log_event("personaplex.state", state=s)
+            if self.on_state:
+                try:
+                    self.on_state(s)
+                except Exception:
+                    pass
+
+    # ------------------------------------------------------------------ tap
+    def _make_whisper(self):
+        if self._whisper is None:
+            from ..asr.whisper import FasterWhisperASR
+            asr_cfg = self.cfg.section("asr")
+            self._whisper = FasterWhisperASR(
+                model=asr_cfg.get("model", "base"),
+                device=asr_cfg.get("device", "auto"))
+            self._whisper.load()
+        return self._whisper
+
+    def _feed_tap(self, mono24: np.ndarray) -> None:
+        """Downsample to 16k, run 30 ms VAD frames, collect utterance PCM."""
+        if not self.whisper_tap or self._tap_endpointer is None:
+            return
+        mono16 = resample_linear(mono24, self.sample_rate, 16000).astype(np.float32)
+        pcm16 = np.clip(mono16 * 32767, -32768, 32767).astype(np.int16)
+        if self._tap_started:
+            self._tap_pcm = np.concatenate([self._tap_pcm, pcm16.astype(np.float32) / 32767.0]) \
+                if self._tap_pcm.size else pcm16.astype(np.float32) / 32767.0
+        self._tap_frame_buf += pcm16.tobytes()
+        while len(self._tap_frame_buf) >= TAP_FRAME_BYTES:
+            frame = bytes(self._tap_frame_buf[:TAP_FRAME_BYTES])
+            del self._tap_frame_buf[:TAP_FRAME_BYTES]
+            verdict = self._tap_endpointer.add_frame(frame)
+            if verdict == "speech" and not self._tap_started:
+                self._tap_started = True
+                # re-seed the utterance buffer with the frames that started speech
+                self._tap_pcm = np.zeros(0, np.float32)
+            elif verdict == "done" and self._tap_started:
+                self._tap_started = False
+                self._tap_endpointer.reset()
+                self._flush_tap()
+
+    def _flush_tap(self) -> None:
+        if self._tap_pcm.size < FRAME_SIZE * 4:  # < 120 ms -> noise, skip
+            self._tap_pcm = np.zeros(0, np.float32)
+            return
+        if self._tap_busy.is_set():
+            log.debug("tap worker busy; dropping utterance")
+            self._tap_pcm = np.zeros(0, np.float32)
+            return
+        pcm = self._tap_pcm
+        self._tap_pcm = np.zeros(0, np.float32)
+        self._tap_busy.set()
+
+        def _work():
+            try:
+                tmp = Path(self.cfg.state_dir()) / "tap-utterance.wav"
+                with wave.open(str(tmp), "wb") as wf:
+                    wf.setnchannels(1)
+                    wf.setsampwidth(2)
+                    wf.setframerate(16000)
+                    wf.writeframes(np.clip(pcm * 32767, -32768, 32767).astype(np.int16).tobytes())
+                tr = self._make_whisper().transcribe(tmp)
+                if tr.text and tr.text.strip():
+                    log_event("personaplex.tap", text=tr.text[:300], confidence=tr.confidence)
+                    if self.on_transcript:
+                        try:
+                            self.on_transcript(tr.text.strip(), float(tr.confidence))
+                        except Exception as exc:
+                            log.warning("transcript callback failed: %s", exc)
+            except Exception as exc:
+                log_event("personaplex.tap.error", error=str(exc)[:160])
+            finally:
+                self._tap_busy.clear()
+
+        threading.Thread(target=_work, daemon=True, name="pp-tap").start()
+
+    # ------------------------------------------------------------------ duck
+    def duck(self, seconds: Optional[float] = None) -> None:
+        """Stop feeding PersonaPlex + mute its output.
+
+        Defaults to a long window; call `unduck()` to resume explicitly.
+        """
+        with self._lock:
+            self._duck_until = time.time() + (seconds if seconds is not None else self._duck_seconds)
+            if self.live:
+                self._set_state("ducked")
+
+    def unduck(self) -> None:
+        with self._lock:
+            self._duck_until = 0.0
+            if self._state == "ducked" and not self._stop.is_set():
+                self._set_state("live")
+
+    def _is_ducked(self) -> bool:
+        return time.time() < self._duck_until
+
+    # ------------------------------------------------------------------ io
+    def _audio_cb(self, indata: np.ndarray, frames: int, t_info, status) -> None:
+        if status:
+            log.debug("mic status: %s", status)
+        try:
+            mono = np.asarray(indata, dtype=np.float32)
+            if mono.ndim > 1:
+                mono = mono.mean(axis=1)
+            mono = mono * self.mic_gain
+            try:
+                self._queue_ref.put_nowait(mono)
+            except asyncio.QueueFull:
+                pass
+            self._feed_tap(mono)
+        except Exception as exc:
+            log.warning("audio cb error: %s", exc)
+
+    def _on_pp_audio(self, pcm: np.ndarray) -> None:
+        with self._lock:
+            if self._is_ducked() or self._out is None or self._stop.is_set():
+                return
+            try:
+                self._out.write(pcm.astype(np.float32, copy=False))
+                self.bytes_recv += pcm.nbytes
+            except Exception as exc:
+                log.debug("output write: %s", exc)
+
+    def _on_pp_text(self, delta: str) -> None:
+        log_event("personaplex.text", delta=delta[:120])
+
+    def _on_pp_close(self, reason: Optional[str]) -> None:
+        log_event("personaplex.disconnected", reason=reason or "closed")
+
+    # ------------------------------------------------------------------ run
+    def start(self) -> bool:
+        try:
+            import sounddevice  # noqa: F401
+        except Exception as exc:
+            log_event("personaplex.start.error", error=f"sounddevice unavailable: {exc}")
+            return False
+        self._stop.clear()
+        self._tap_endpointer = Endpointer(
+            aggressiveness=int(self.cfg.get("vad", "aggressiveness", default=1)),
+            speech_start_ms=int(self.cfg.get("vad", "speech_start_ms", default=180)),
+            silence_timeout_s=float(self.cfg.get("vad", "silence_timeout_s", default=1.2)),
+            max_utterance_s=float(self.cfg.get("vad", "max_utterance_s", default=30.0)),
+        )
+        self._tap_started = False
+        self._tap_frame_buf = bytearray()
+        self._tap_pcm = np.zeros(0, np.float32)
+        self._mic_queue = asyncio.Queue(maxsize=64)
+        self._queue_ref = self._mic_queue
+        self._send_thread = threading.Thread(target=self._send_loop, daemon=True,
+                                             name="pp-duplex-send")
+        self._send_thread.start()
+        self._set_state("connecting")
+        return True
+
+    def _send_loop(self) -> None:
+        while not self._stop.is_set():
+            try:
+                asyncio.run(self._pump_once())
+            except PersonaPlexUnavailable as exc:
+                log_event("personaplex.retry", error=str(exc)[:160])
+                self._set_state("down")
+            except Exception as exc:
+                log_event("personaplex.retry", error=str(exc)[:160])
+                self._set_state("down")
+            finally:
+                self._close_streams()
+                self._client = None
+            if self._stop.wait(self.reconnect_s):
+                break
+        self._set_state("down")
+
+    async def _pump_once(self) -> None:
+        import sounddevice as sd
+        client = DuplexClient(
+            url=self.url, voice_prompt=self.voice_prompt,
+            text_prompt=self.text_prompt, ssl_insecure=self.ssl_insecure,
+            on_audio=self._on_pp_audio, on_text=self._on_pp_text,
+            on_close=self._on_pp_close)
+        await client.connect(timeout_s=15.0)
+        self._client = client
+        self._open_streams(sd)
+        with self._lock:
+            if not self._stop.is_set() and not self._is_ducked():
+                self._set_state("live")
+        try:
+            while not self._stop.is_set() and client.connected:
+                try:
+                    pcm = await asyncio.wait_for(self._mic_queue.get(), timeout=0.5)
+                except asyncio.TimeoutError:
+                    continue
+                if self._is_ducked():
+                    continue
+                try:
+                    await client.send_pcm_async(pcm)
+                    self.bytes_sent += pcm.nbytes
+                except DuplexError:
+                    break
+        finally:
+            with self._lock:
+                self._client = None
+            try:
+                await client.close()
+            except Exception:
+                pass
+
+    def _open_streams(self, sd) -> None:
+        if self._stream is None:
+            self._stream = sd.InputStream(
+                device=self.mic_device, samplerate=self.mic_rate,
+                channels=self.mic_channels, blocksize=self.mic_blocksize,
+                dtype="float32", callback=self._audio_cb)
+            self._stream.start()
+        if self._out is None:
+            self._out = sd.OutputStream(samplerate=self.sample_rate,
+                                        channels=1, dtype="float32")
+            self._out.start()
+
+    def _close_streams(self) -> None:
+        for s in (self._stream, self._out):
+            if s is not None:
+                try:
+                    s.stop()
+                    s.close()
+                except Exception:
+                    pass
+        self._stream = None
+        self._out = None
+
+    def stop(self) -> None:
+        self._stop.set()
+        self._close_streams()
+        if self._send_thread and self._send_thread.is_alive():
+            self._send_thread.join(timeout=3.0)
+        self._send_thread = None
+        self._set_state("down")

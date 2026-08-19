@@ -58,9 +58,39 @@ DEFAULTS: Dict[str, Any] = {
         "min_confidence": 0.15,     # below -> ask to repeat (whisper logprob is conservative)
     },
     "personaplex": {
-        "url": "ws://127.0.0.1:8765",   # PersonaPlex realtime server (12GB+ GPU)
+        # Full-duplex lane: when enabled and reachable, PersonaPlex is the
+        # front-facing voice (mic -> remote GPU -> speakers); the bridge keeps
+        # a whisper tap for intent routing and speaks task results via TTS.
+        "enabled": False,               # set True once a Vast.ai instance is up
+        "url": "wss://personaplex:8998/api/chat",  # Tailscale MagicDNS name or IP
+        "ssl_insecure": True,           # self-signed cert on the Vast box
+        "voice_prompt": "NATF2.pt",    # persona voice (NATF*/NATM*/VARF*/VARM*)
+        "text_prompt": "You are a friendly, sharp personal assistant named Sage. "
+                        "You enjoy good conversation and are curious about the "
+                        "user's projects. Keep answers concise and natural.",
+        "sample_rate": 24000,           # Mimi codec rate (matches the server)
+        "whisper_tap": True,            # local ASR tap for intent routing
+        "duck_on_task_s": 8.0,          # mute PP + stop feeding it while a task runs
+        "reconnect_s": 5.0,             # reconnect/backoff interval
+        # legacy (pre-duplex) adapter knobs kept for compatibility
         "timeout_s": 5,
-        "auto_start": False,            # never auto-start on this box; set when viable
+        "auto_start": False,
+    },
+    "hermes": {
+        "enabled": False,               # route "ask Hermes ..." tasks to `hermes chat -q`
+        "cmd": "hermes",
+        "resume_session": "voice",      # continuity under a fixed session name
+        "timeout_s": 600,
+        "model": None,                  # None = hermes default (deepseek-v4-flash)
+    },
+    "local": {
+        "enabled": True,                # whitelisted direct PC actions (volume, apps, ...)
+    },
+    "memory": {
+        "enabled": True,                # load OpenClaw memory into the persona prompt;
+        "workspace": "~/.openclaw/workspace",  # save session notes here
+        "context_chars": 1500,          # max memory chars injected into text_prompt
+        "save_notes": True,             # append session summary to memory/YYYY-MM-DD.md
     },
     "tts": {
         "provider": "piper",        # piper | edge | gateway
@@ -76,6 +106,9 @@ DEFAULTS: Dict[str, Any] = {
         "ollama_model": "qwen3-vl:8b",
         "classify_timeout_s": 8.0,
         "conversation_backend": "ollama",  # ollama (fast chat) | agent (OpenClaw memory)
+        # In duplex mode PersonaPlex answers conversation directly; this backend
+        # is only used when the PersonaPlex lane is down.
+        "duplex_conversation_fallback": True,
     },
     "openclaw": {
         "gateway_url": None,     # auto-discovered: ws://127.0.0.1:18789

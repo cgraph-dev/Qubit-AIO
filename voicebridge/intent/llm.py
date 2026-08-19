@@ -18,11 +18,16 @@ OpenClaw coding agent. Classify the user's spoken utterance into EXACTLY ONE kin
 - "system": control of the voice assistant itself (status, mute, stop, help, model switch)
 - "confirm": a clear yes/affirmative answer to a pending confirmation
 - "cancel": a clear no/negative, or a request to stop/abort current work
-- "coding": a task for the coding agent (open/inspect/patch/test/fix/refactor/run/review/commit/deploy...)
-- "conversation": casual chat, questions, small talk — NOT a coding task
+- "coding": a task for the OpenClaw coding agent (open/inspect/patch/test/fix/refactor/run/review/commit/deploy...)
+- "local": a direct PC/local action from the whitelist (volume, mute, open an app,
+  screenshot, media play/pause, clipboard, lock screen) — never file/system surgery
+- "hermes": the user explicitly asks Hermes to do something ("ask Hermes to ...", "Hermes, ...")
+- "conversation": casual chat, questions, small talk — NOT a task
 - "clarify": the user asks for clarification or the request is too vague to act on
 
 Rules:
+- Volume/sound/mute/app-launch/screenshot/media/clipboard/lock phrases are "local".
+- "ask Hermes to ...", "Hermes, ..." are "hermes".
 - Commands that touch files, code, repos, terminals, browsers, or servers are "coding".
 - Questions about code ("why does X fail?", "how does Y work?") are "coding" when
   they need inspecting a project; pure general knowledge questions are "conversation".
@@ -54,7 +59,8 @@ def classify_with_ollama(text: str, url: str = "http://127.0.0.1:11434",
         raw = body.get("response", "")
         parsed = json.loads(raw)
         kind = parsed.get("kind")
-        if kind not in ("system", "confirm", "cancel", "coding", "conversation", "clarify"):
+        if kind not in ("system", "confirm", "cancel", "coding", "conversation", "clarify",
+                        "local", "hermes"):
             return None
         parsed.setdefault("task", "" if kind != "coding" else text)
         log_event("intent.llm", kind=kind, confidence=parsed.get("confidence"),

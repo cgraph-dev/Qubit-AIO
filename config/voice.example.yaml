@@ -48,12 +48,46 @@ asr:
   min_confidence: 0.15    # below this -> "didn't catch that, repeat please"
                           # (whisper's avg_logprob is conservative; 0.3+ is normal)
 
-# PersonaPlex — NOT active on this 8 GB GPU (see README). Pluggable adapter:
-# on a 12 GB+ machine, run the PersonaPlex server and switch provider above.
+# PersonaPlex — full-duplex voice lane (remote GPU on Vast.ai over Tailscale).
+# The local bridge becomes the router: PersonaPlex answers conversation directly;
+# tasks are tapped by local whisper, classified, and delegated to OpenClaw / Hermes /
+# local PC actions. Memory stays on this PC (OpenClaw workspace).
 personaplex:
-  url: ws://127.0.0.1:8765
-  timeout_s: 5
-  auto_start: false
+  enabled: false            # set true once the Vast.ai instance is up
+  url: wss://personaplex:8998/api/chat   # Tailscale MagicDNS name or <tailnet-ip>
+  ssl_insecure: true        # self-signed cert on the Vast box (tailnet-encrypted anyway)
+  voice_prompt: NATF2.pt    # NATF*/NATM*/VARF*/VARM* — pick the persona voice
+  text_prompt: >
+    You are Sage, a friendly, sharp personal assistant. You enjoy good conversation
+    and are curious about the user's projects. Keep answers concise and natural.
+    If the user asks you to DO something on a computer (open files, run commands,
+    check code, etc.), acknowledge it briefly and note that the action will be
+    performed for them.
+  whisper_tap: true         # local ASR tap for intent routing
+  reconnect_s: 5.0          # reconnect/backoff interval (s)
+
+# Hermes — optional second executor ("ask Hermes to ..."). Same machine as the
+# bridge; sessions resume under a fixed name. Never owns memory for this system.
+hermes:
+  enabled: false
+  cmd: hermes
+  resume_session: voice
+  timeout_s: 600
+  model: null               # null = hermes default (deepseek-v4-flash)
+
+# Local PC actions — whitelisted, safe, reversible. Risky actions (rm, git reset
+# --hard, installs, browser logins/payments, file deletion, service restarts)
+# are NOT here; they go to OpenClaw where the safety policy + confirmations apply.
+local:
+  enabled: true
+
+# Memory — loaded from the OpenClaw workspace on this PC into the persona prompt;
+# session notes are appended to memory/YYYY-MM-DD.md. The Vast.ai box stores nothing.
+memory:
+  enabled: true
+  workspace: ~/.openclaw/workspace
+  context_chars: 1500
+  save_notes: true
 
 # ---------------------------------------------------------------------------
 # Text-to-speech
@@ -77,6 +111,8 @@ intent:
   classify_timeout_s: 8.0
   # conversation backend: "ollama" (fast local chat, ~2-5 s) or
   #                      "agent"  (through OpenClaw: full memory/tools, 30-90 s)
+  # In duplex mode PersonaPlex answers conversation directly; this backend is
+  # only the fallback when the PersonaPlex lane is down.
   conversation_backend: ollama
 
 # ---------------------------------------------------------------------------

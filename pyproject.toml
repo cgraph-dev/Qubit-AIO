@@ -11,6 +11,7 @@ dependencies = [
     "websockets>=12",
     "pyyaml>=6",
     "piper-tts>=1.2",
+    "sphn>=0.1.4",   # PersonaPlex duplex: streaming Opus (needs libopus-dev)
 ]
 
 [project.optional-dependencies]

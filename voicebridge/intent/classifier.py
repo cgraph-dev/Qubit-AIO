@@ -15,6 +15,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
+from ..local import actions as local_actions
 from ..logging_setup import get_logger, log_event
 from .llm import classify_with_ollama
 from .state import ConfirmationState, ConversationState
@@ -45,6 +46,14 @@ CANCEL_PATTERNS = [
     r"^\s*(no|nope|nah|cancel|abort|stop|don'?t|never ?mind|forget (it|that)|not now|skip|negative|no thanks|no way|wrong|reject)\s*[,.]?\s*(cancel|stop|don'?t|please)?\s*[.!]*$",
 ]
 
+# Explicit Hermes delegation ("ask Hermes to ...", "Hermes, ...").
+HERMES_PATTERNS = [
+    r"\b(ask|tell|have|let|get)\s+hermes\b",
+    r"^\s*hermes[,:]?\s+",
+    r"\broute (this|it) (to|through) hermes\b",
+    r"\b(delegate|hand off|handoff)\s+(this|it)?\s*to\s+hermes\b",
+]
+
 # Task-ish verbs/domains that strongly suggest a coding request.
 TASK_HINTS = [
     r"\b(open|inspect|look (at|into)|check|patch|fix|create|write|add|edit|modify|update|refactor|"
@@ -63,12 +72,13 @@ SYSTEM_STOP_WORDS = {"the", "a", "an", "is", "are", "to", "of", "in", "on", "for
 
 @dataclass
 class Intent:
-    kind: str                       # system|confirm|cancel|conversation|coding|clarify
+    kind: str                       # system|confirm|cancel|conversation|coding|clarify|local|hermes|status
     confidence: float = 0.5
     task_text: str = ""
     params: Dict[str, Any] = field(default_factory=dict)
     reason: str = ""
     source: str = "heuristic"       # heuristic | llm
+    backend: str = "openclaw"       # openclaw | hermes | local | chat | system
 
 
 class Classifier:
@@ -94,6 +104,9 @@ class Classifier:
         for name, spec in SYSTEM_COMMANDS.items():
             for pat in spec["patterns"]:
                 if re.search(pat, low):
+                    # "mute" alone = bridge output; "mute the microphone" = local action
+                    if name in ("mute", "unmute") and re.search(r"\bmic(rophone)?\b", low):
+                        continue
                     params: Dict[str, Any] = {"command": name}
                     if name == "model":
                         m = re.search(r"(turbo|normal|slow|hard|pro|fast|deepseek|default)", low)
@@ -121,6 +134,18 @@ class Classifier:
                 score += 0.5
         return min(score, 1.5)
 
+    def _hermes_request(self, text: str) -> Optional[Intent]:
+        low = text.lower().strip()
+        for pat in HERMES_PATTERNS:
+            if re.search(pat, low):
+                # strip the "ask hermes to" / "hermes," prefix so the task is clean
+                task = re.sub(r"^\s*hermes[,:]?\s*", "", low, flags=re.I)
+                task = re.sub(r"^(ask|tell|have|let|get)\s+hermes\s+(to\s+)?", "", task, flags=re.I)
+                task = task.strip(" .,;:") or text
+                return Intent("hermes", confidence=0.9, task_text=task,
+                              backend="hermes", reason="hermes delegation")
+        return None
+
     # ---- main entry -----------------------------------------------------------
     def classify(self, text: str) -> Intent:
         text = text.strip()
@@ -134,6 +159,18 @@ class Classifier:
         cc = self._confirm_cancel(text)
         if cc:
             return cc
+
+        # Direct PC action (whitelist) beats everything except system/confirm.
+        local_match = local_actions.match(text)
+        if local_match:
+            return Intent("local", confidence=0.95, task_text=text,
+                          params={"action": local_match.name,
+                                  "action_params": local_match.params},
+                          backend="local", reason=f"local:{local_match.name}")
+
+        hermes_i = self._hermes_request(text)
+        if hermes_i:
+            return hermes_i
 
         task_score = self._task_hint_score(text)
         # Strong task signal -> coding without a model round-trip.
@@ -155,6 +192,14 @@ class Classifier:
                     task = llm.get("task") or text
                     return Intent("coding", confidence=conf, task_text=task,
                                   reason=llm.get("reason", ""), source="llm")
+                if kind == "local":
+                    return Intent("local", confidence=conf, task_text=text,
+                                  params={"llm_suggestion": llm.get("task", "")},
+                                  backend="local", reason=llm.get("reason", ""), source="llm")
+                if kind == "hermes":
+                    task = llm.get("task") or text
+                    return Intent("hermes", confidence=conf, task_text=task,
+                                  backend="hermes", reason=llm.get("reason", ""), source="llm")
                 if kind in ("conversation", "clarify", "system", "confirm", "cancel"):
                     params = {}
                     if kind == "system" and llm.get("task"):

@@ -37,6 +37,9 @@ def build_parser() -> argparse.ArgumentParser:
     task.add_argument("--model", default=None, help="model override (provider/model or tier)")
     asr = add("asr-test", help="transcribe a WAV file (diagnostic)")
     asr.add_argument("file", type=Path)
+    pp = add("personaplex-check", help="probe a PersonaPlex /api/chat server (connectivity test)")
+    pp.add_argument("url", nargs="?", default=None,
+                    help="e.g. wss://personaplex:8998/api/chat (default: config)")
     tts = add("tts-test", help="synthesize text to WAV and play it (diagnostic)")
     tts.add_argument("text", nargs="+")
     tts.add_argument("--out", type=Path, default=None)
@@ -65,6 +68,8 @@ def main(argv=None) -> int:
         return _cmd_mic_test(cfg)
     if command == "asr-test":
         return _cmd_asr_test(cfg, args.file)
+    if command == "personaplex-check":
+        return _cmd_personaplex_check(cfg, args.url)
     if command == "tts-test":
         return _cmd_tts_test(cfg, " ".join(args.text), args.out)
 
@@ -112,6 +117,11 @@ def _cmd_status(cfg) -> int:
         print(f"ASR              : whisper/{asr.model_name} on {asr._actual_device}")
     except Exception as exc:
         print(f"ASR              : FAILED ({str(exc)[:120]})")
+    # PersonaPlex / Hermes / local
+    pp_cfg = cfg.section("personaplex")
+    print(f"personaplex lane : {'enabled -> ' + str(pp_cfg.get('url', '')) if pp_cfg.get('enabled') else 'disabled'}")
+    print(f"hermes backend   : {'enabled' if cfg.get('hermes', 'enabled', default=False) else 'disabled'}")
+    print(f"local actions    : {'enabled' if cfg.get('local', 'enabled', default=True) else 'disabled'}")
     # TTS
     from .tts.piper import PiperTTS
     tts = PiperTTS(model_dir=cfg.model_dir(), voice=cfg.get("tts", "voice", default="en_US-amy-medium"))
@@ -160,6 +170,28 @@ def _cmd_asr_test(cfg, file: Path) -> int:
     tr = asr.transcribe(file)
     print(f"[{tr.provider}/{asr._actual_device}] conf={tr.confidence:.2f} dur={tr.duration_s:.1f}s")
     print(tr.text)
+    return 0
+
+
+def _cmd_personaplex_check(cfg, url: str | None) -> int:
+    """Connectivity test for a PersonaPlex /api/chat server (handshake only)."""
+    from .personaplex.client import PersonaPlexUnavailable, probe_sync
+    pp = cfg.section("personaplex")
+    target = url or pp.get("url", "wss://personaplex:8998/api/chat")
+    print(f"probing {target} ...")
+    try:
+        rtt = probe_sync(target,
+                         voice_prompt=pp.get("voice_prompt", "NATF2.pt"),
+                         text_prompt=pp.get("text_prompt", "hi"),
+                         ssl_insecure=bool(pp.get("ssl_insecure", True)))
+    except PersonaPlexUnavailable as exc:
+        print(f"FAIL: {exc}")
+        return 1
+    except Exception as exc:
+        print(f"FAIL: {exc}")
+        return 1
+    print(f"OK: PersonaPlex handshake succeeded in {rtt * 1000:.0f} ms")
+    print("    voice_prompt, text_prompt and seed query params accepted")
     return 0
 
 
