@@ -20,6 +20,7 @@ import queue
 import threading
 import time
 import uuid
+import wave
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
@@ -77,6 +78,9 @@ class VoiceOrchestrator:
         self._cli: Optional[CliBackend] = None
         self._mic: Optional[MicCapture] = None
         self._barge: Optional[BargeInDetector] = None
+        self._barge_stream = None
+        self._beep_start = None
+        self._beep_end = None
         self.playback = Playback()
         self.classifier: Optional[Classifier] = None
         self.safety = SafetyPolicy(config.section("safety"))
@@ -763,7 +767,6 @@ class VoiceOrchestrator:
     @staticmethod
     def _make_beep(freq: float = 880.0, dur_s: float = 0.08) -> Path:
         """Generate a short sine beep WAV (cached) for capture start/end feedback."""
-        import struct
         path = Path("/tmp/openclaw-voice-bridge") / f"beep-{int(freq)}-{int(dur_s*1000)}.wav"
         if path.exists():
             return path
