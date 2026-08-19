@@ -11,7 +11,7 @@ dependencies = [
     "websockets>=12",
     "pyyaml>=6",
     "piper-tts>=1.2",
-    "sphn>=0.1.4",   # PersonaPlex duplex: streaming Opus (needs libopus-dev)
+    "sphn>=0.1.4,<0.2",   # PersonaPlex duplex: streaming ogg/opus (needs libopus-dev); 0.2.x changed the API
 ]
 
 [project.optional-dependencies]

@@ -129,14 +129,25 @@ class DuplexClient:
         self._reader = None
 
     # ------------------------------------------------------------------ send
-    def send_pcm(self, pcm: np.ndarray) -> None:
-        """Encode + send one chunk of 24 kHz mono PCM (float or int16)."""
-        if not self.connected or self._writer is None:
-            raise DuplexError("not connected")
+    # sphn accepts only specific frame sizes (120/240/480/960/1920/2880 @24k).
+    _FRAME = 480  # 20 ms @ 24 kHz
+
+    def _chunk(self, pcm: np.ndarray) -> np.ndarray:
         pcm = np.asarray(pcm, dtype=np.float32)
         if pcm.ndim > 1:
             pcm = pcm.mean(axis=1)
-        self._writer.append_pcm(pcm)  # type: ignore[union-attr]
+        n = (len(pcm) + self._FRAME - 1) // self._FRAME * self._FRAME
+        if n > len(pcm):
+            pcm = np.pad(pcm, (0, n - len(pcm)))
+        return pcm
+
+    def send_pcm(self, pcm: np.ndarray) -> None:
+        """Encode + send 24 kHz mono PCM (float or int16), chunked to 20 ms."""
+        if not self.connected or self._writer is None:
+            raise DuplexError("not connected")
+        pcm = self._chunk(pcm)
+        for i in range(0, len(pcm), self._FRAME):
+            self._writer.append_pcm(pcm[i:i + self._FRAME])  # type: ignore[union-attr]
         while True:
             chunk = self._writer.read_bytes()  # type: ignore[union-attr]
             if not chunk:
@@ -154,10 +165,9 @@ class DuplexClient:
     async def send_pcm_async(self, pcm: np.ndarray) -> None:
         if not self.connected or self._writer is None:
             raise DuplexError("not connected")
-        pcm = np.asarray(pcm, dtype=np.float32)
-        if pcm.ndim > 1:
-            pcm = pcm.mean(axis=1)
-        self._writer.append_pcm(pcm)  # type: ignore[union-attr]
+        pcm = self._chunk(pcm)
+        for i in range(0, len(pcm), self._FRAME):
+            self._writer.append_pcm(pcm[i:i + self._FRAME])  # type: ignore[union-attr]
         while True:
             chunk = self._writer.read_bytes()  # type: ignore[union-attr]
             if not chunk:
@@ -177,13 +187,27 @@ class DuplexClient:
                 if kind == 1:  # audio
                     if self._reader is not None:
                         self._reader.append_bytes(payload)  # type: ignore[union-attr]
-                        while True:
+                        # sphn decodes on a worker thread and can deliver in
+                        # bursts; keep draining until a quiet streak (bounded).
+                        empty_streak = 0
+                        t_drain = time.monotonic()
+                        while time.monotonic() - t_drain < 0.1:
                             pcm = self._reader.read_pcm()  # type: ignore[union-attr]
-                            if pcm.shape[-1] == 0:
+                            if pcm is None:  # stream closed
                                 break
+                            if pcm.shape[-1] == 0:
+                                empty_streak += 1
+                                if empty_streak >= 3:
+                                    break
+                                await asyncio.sleep(0.002)
+                                continue
+                            empty_streak = 0
+                            pcm = np.asarray(pcm, dtype=np.float32)
+                            if pcm.ndim > 1:
+                                pcm = pcm.mean(axis=1)
                             if self.on_audio:
                                 try:
-                                    self.on_audio(np.asarray(pcm[0], dtype=np.float32))
+                                    self.on_audio(pcm)
                                 except Exception as exc:
                                     log.warning("on_audio callback failed: %s", exc)
                 elif kind == 2:  # assistant text delta
