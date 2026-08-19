@@ -888,27 +888,97 @@ class VoiceOrchestrator:
             self._run_manual_loop()
 
     def _run_duplex_loop(self) -> None:
-        """Passive loop while the PersonaPlex lane owns conversation."""
+        """Passive loop while the PersonaPlex lane owns conversation.
+
+        State-aware: when the lane is live the bridge stays passive (PersonaPlex
+        answers chat; the whisper tap routes tasks). When the lane is down or
+        reconnecting, the bridge falls back to the local push-to-talk pipeline
+        so the mic keeps working even with the Vast.ai box powered off.
+        """
+        hold = self.cfg.get("hotkey", "hold_key", default="ctrl_r")
         print("Full-duplex PersonaPlex active — say tasks naturally, e.g.")
         print('  "open the current project and inspect the Stripe webhook validation"')
         print('  "what do you think about this marketplace idea?"')
         print("Type 'status' for health, 'quit' to exit.")
+        stdin_q: "queue.Queue[str]" = queue.Queue()
+
+        def _stdin_reader():
+            while not self._stop.is_set():
+                try:
+                    line = input().strip().lower()
+                except (EOFError, KeyboardInterrupt):
+                    return
+                stdin_q.put(line)
+
+        threading.Thread(target=_stdin_reader, daemon=True, name="pp-stdin").start()
+        fallback = False
         while not self._stop.is_set():
-            try:
-                line = input().strip().lower()
-            except (EOFError, KeyboardInterrupt):
-                break
-            if line in ("q", "quit", "exit"):
-                break
-            if line in ("status", "s", "health"):
-                self._handle_system(Intent("system", params={"command": "status"}))
-            elif line == "duck":
+            lane_live = self._duplex is not None and self._duplex.live
+            if lane_live and fallback:
+                fallback = False
+                print("\n[PersonaPlex is back — full-duplex mode resumed]")
+                self.speak("PersonaPlex is back.")
+            if not lane_live and not fallback:
+                fallback = True
+                print(f"\n[PersonaPlex offline — local push-to-talk fallback active. "
+                      f"Hold {hold} (or press Enter) to talk.]")
+                self.speak("PersonaPlex is offline. Using the local voice model.")
+            if lane_live:
+                try:
+                    line = stdin_q.get(timeout=1.0)
+                except queue.Empty:
+                    continue
+                self._duplex_typed_command(line)
+            else:
+                self._duplex_fallback_tick(stdin_q)
+
+    def _duplex_typed_command(self, line: str) -> None:
+        if line in ("q", "quit", "exit"):
+            self._stop.set()
+        elif line in ("status", "s", "health"):
+            self._handle_system(Intent("system", params={"command": "status"}))
+        elif line == "duck":
+            self._duck_pp()
+            print("PersonaPlex ducked")
+        elif line == "unduck":
+            self._unduck_pp()
+            print("PersonaPlex resumed")
+        elif line.startswith("task "):
+            text = line[5:].strip()
+            if text:
                 self._duck_pp()
-                print("PersonaPlex ducked")
-            elif line == "unduck":
-                self._unduck_pp()
-                print("PersonaPlex resumed")
-            elif line.startswith("task "):
+                try:
+                    self._route_intent(self.classifier.classify(text), text)
+                finally:
+                    self._unduck_pp()
+
+    def _duplex_fallback_tick(self, stdin_q: "queue.Queue[str]") -> None:
+        """One local-PTT utterance (or typed command), watching for lane recovery."""
+        while not self._stop.is_set() and (self._duplex is None or not self._duplex.live):
+            if self._ptt_supported and self._ptt_started.is_set():
+                self._ptt_started.clear()
+                self._ptt_released.clear()
+                res = self._capture_utterance()
+                if res is not None:
+                    self._process_utterance(res)
+                return
+            try:
+                line = stdin_q.get(timeout=0.5)
+            except queue.Empty:
+                continue
+            if line == "":  # Enter = manual PTT toggle (no-hotkey mode)
+                self._ptt_released.clear()
+                res = self._capture_utterance()
+                if res is not None:
+                    self._process_utterance(res)
+                return
+            if line in ("q", "quit", "exit"):
+                self._stop.set()
+                return
+            if line in ("status", "s"):
+                self._handle_system(Intent("system", params={"command": "status"}))
+                return
+            if line.startswith("task "):
                 text = line[5:].strip()
                 if text:
                     self._duck_pp()
@@ -916,6 +986,7 @@ class VoiceOrchestrator:
                         self._route_intent(self.classifier.classify(text), text)
                     finally:
                         self._unduck_pp()
+                return
 
     def _run_hotkey_loop(self) -> None:
         """Hold-to-talk loop. LEVEL-based on _ptt_hold (not one-shot flags):
