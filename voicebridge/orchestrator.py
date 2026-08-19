@@ -84,6 +84,10 @@ class VoiceOrchestrator:
         self._barge_stream = None
         self._beep_start = None
         self._beep_end = None
+        # PTT state: tap-to-toggle + hold-to-talk
+        self._press_time = 0.0
+        self._toggle_armed = False       # a tap started a toggle capture
+        self._toggle_stop = threading.Event()
         self.playback = Playback()
         self.classifier: Optional[Classifier] = None
         self.safety = SafetyPolicy(config.section("safety"))
@@ -257,21 +261,27 @@ class VoiceOrchestrator:
             if self._ptt_supported:
                 log_event("hotkey.active", hold=self.cfg.get("hotkey", "hold_key", default="ctrl_r"))
             self.hotkey = hk
-
     def _emit_hotkey(self, event: str, key: str) -> None:
         if event == "ptt_start":
+            self._press_time = time.time()
             self._ptt_hold = True
             self._ptt_started.set()
             self._ptt_released.clear()
         elif event == "ptt_end":
             self._ptt_hold = False
             self._ptt_released.set()
+            if self._toggle_armed:
+                # second tap during a toggle capture -> stop listening
+                self._toggle_stop.set()
         elif event == "cancel":
             self._cancel.set()
-            self.playback.stop()
+            self._toggle_stop.set()
+            try:
+                self.playback.stop()
+            except Exception:
+                pass
             if self.task.active:
                 self._abort_task("cancelled by hotkey")
-
     def stop(self) -> None:
         self._stop.set()
         if self._mic:
@@ -1061,15 +1071,43 @@ class VoiceOrchestrator:
         if self._mic is None:
             log.error("mic not initialized")
             return None
+        mic = self._mic
         stop_req = threading.Event()
         if self._ptt_supported:
             held = self._ptt_hold  # snapshot at capture start
+            press_t = self._press_time
+            tap_ms = int(self.cfg.get("hotkey", "tap_ms", default=300))
+            toggle_no_speech_s = float(self.cfg.get("hotkey", "toggle_no_speech_s", default=5.0))
+            # reset per-capture toggle state
+            self._toggle_armed = False
+            self._toggle_stop.clear()
 
             def _release_watcher():
                 # wait until the key is actually released (level, not one-shot)
                 while held and self._ptt_hold and not self._stop.is_set():
                     time.sleep(0.02)
-                time.sleep(0.6)  # brief tail to catch the last word
+                held_s = time.time() - press_t
+                if held_s < tap_ms / 1000.0:
+                    # TAP -> toggle mode: keep listening until a second tap,
+                    # the silence endpoint, or a no-speech timeout.
+                    self._toggle_armed = True
+                    log_event("hotkey.toggle", on=True)
+                    no_speech_t0 = time.time()
+                    while not self._stop.is_set():
+                        if self._toggle_stop.is_set():
+                            log_event("hotkey.toggle", on=False, why="second tap")
+                            break
+                        if mic.endpointer.state == "done":
+                            break
+                        if mic.endpointer.state == "idle" and \
+                                time.time() - no_speech_t0 > toggle_no_speech_s:
+                            log_event("hotkey.toggle", on=False, why="no speech")
+                            break
+                        time.sleep(0.05)
+                    stop_req.set()
+                    return
+                # HOLD -> stop shortly after release (catch the last word)
+                time.sleep(0.6)
                 stop_req.set()
             threading.Thread(target=_release_watcher, daemon=True).start()
         self._play_beep("start")

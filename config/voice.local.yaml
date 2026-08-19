@@ -3,10 +3,13 @@
 # Every value here is optional; the bridge has sane defaults.
 
 # ---------------------------------------------------------------------------
-# Push-to-talk hotkey
+# Push-to-talk hotkeys
 hotkey:
-  enabled: true
-  hold_key: ctrl_r        # hold this key to talk (X11). Other options: ctrl_l, alt_r, f8
+  hold_key: ctrl_r        # hold to talk (ends on release)
+  toggle_key: "`"         # tap to toggle listening (talk, tap again or pause to stop)
+  tap_toggle: true        # quick tap of hold_key = toggle too; hold = classic PTT
+  tap_ms: 300             # press shorter than this counts as a tap
+  toggle_no_speech_s: 5.0 # toggle stops itself if you don't speak
   alt_hold_key: ""        # optional second hold key
   tap_cancel: esc         # tap while assistant speaks -> stop speech / cancel task
 
@@ -50,37 +53,40 @@ asr:
                           # Real "didn't catch" cases are handled by empty text + filler words.
 
 # PersonaPlex — full-duplex voice lane (remote GPU on Vast.ai over Tailscale).
-# enabled: false until the Vast instance is up; then flip to true.
+# The local bridge becomes the router: PersonaPlex answers conversation directly;
+# tasks are tapped by local whisper, classified, and delegated to OpenClaw / Hermes /
+# local PC actions. Memory stays on this PC (OpenClaw workspace).
 personaplex:
-  enabled: false
-  url: wss://personaplex:8998/api/chat   # Tailscale MagicDNS name (or tailnet IP)
-  ssl_insecure: true
-  voice_prompt: NATF2.pt
+  enabled: false            # set true once the Vast.ai instance is up
+  url: wss://personaplex:8998/api/chat   # Tailscale MagicDNS name or <tailnet-ip>
+  ssl_insecure: true        # self-signed cert on the Vast box (tailnet-encrypted anyway)
+  voice_prompt: NATF2.pt    # NATF*/NATM*/VARF*/VARM* — pick the persona voice
   text_prompt: >
     You are Sage, a friendly, sharp personal assistant. You enjoy good conversation
     and are curious about the user's projects. Keep answers concise and natural.
     If the user asks you to DO something on a computer (open files, run commands,
     check code, etc.), acknowledge it briefly and note that the action will be
     performed for them.
-  whisper_tap: true
-  reconnect_s: 5.0
-  timeout_s: 5
-  auto_start: false
+  whisper_tap: true         # local ASR tap for intent routing
+  reconnect_s: 5.0          # reconnect/backoff interval (s)
 
-# Hermes — optional second executor ("ask Hermes to ...")
+# Hermes — optional second executor ("ask Hermes to ..."). Same machine as the
+# bridge; sessions resume under a fixed name. Never owns memory for this system.
 hermes:
-  enabled: true
+  enabled: false
   cmd: hermes
   resume_session: voice
   timeout_s: 600
-  model: null
+  model: null               # null = hermes default (deepseek-v4-flash)
 
-# Local PC actions — whitelisted, safe, reversible
+# Local PC actions — whitelisted, safe, reversible. Risky actions (rm, git reset
+# --hard, installs, browser logins/payments, file deletion, service restarts)
+# are NOT here; they go to OpenClaw where the safety policy + confirmations apply.
 local:
   enabled: true
 
-# Memory — loaded from the OpenClaw workspace into the persona prompt;
-# session notes are appended to memory/YYYY-MM-DD.md. Vast box stores nothing.
+# Memory — loaded from the OpenClaw workspace on this PC into the persona prompt;
+# session notes are appended to memory/YYYY-MM-DD.md. The Vast.ai box stores nothing.
 memory:
   enabled: true
   workspace: ~/.openclaw/workspace
@@ -109,6 +115,8 @@ intent:
   classify_timeout_s: 8.0
   # conversation backend: "ollama" (fast local chat, ~2-5 s) or
   #                      "agent"  (through OpenClaw: full memory/tools, 30-90 s)
+  # In duplex mode PersonaPlex answers conversation directly; this backend is
+  # only the fallback when the PersonaPlex lane is down.
   conversation_backend: ollama
 
 # ---------------------------------------------------------------------------

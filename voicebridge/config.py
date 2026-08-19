@@ -27,6 +27,9 @@ DEFAULTS: Dict[str, Any] = {
         "hold_key": "ctrl_r",  # hold-to-talk
         "alt_hold_key": "",    # optional second key
         "tap_cancel": "esc",   # tap while speaking -> stop speech
+        "tap_toggle": True,    # quick tap = start/stop listening; hold = classic PTT
+        "tap_ms": 300,         # press shorter than this counts as a tap
+        "toggle_no_speech_s": 5.0,  # toggle stops itself if nothing spoken
     },
     "mic": {
         "device": None,        # None = system default input
