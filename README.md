@@ -222,7 +222,10 @@ conversation.
 2. **Accept the license** + create an HF read token:
    https://huggingface.co/nvidia/personaplex-7b-v1
 3. **Install Tailscale on this PC** (once):
-   `curl -fsSL https://tailscale.com/install.sh | sh` then `sudo tailscale up`.
+   `curl -fsSL https://tailscale.com/install.sh | sh` then `sudo tailscale up --accept-dns=false`
+   (the `--accept-dns=false` flag keeps MagicDNS from overriding your ethernet's
+   DNS — without it, a stopped/half-logged-in tailscale leaves dead `100.100.x.x`
+   DNS servers on the interface and wired internet stops resolving).
 4. Copy the kit to the box and run the one-shot setup:
    ```bash
    scp -r vast/ root@<vast-host>:/root/
@@ -264,6 +267,41 @@ Memory/session state lives in `~/.openclaw/workspace` on this PC — the Vast
 box stores nothing. Destroy the instance, rent a new one, rerun
 `setup_personaplex.sh` with the same Tailscale hostname, and the bridge
 reconnects automatically. See `vast/README.md` for the full runbook.
+
+## Sync & new-PC bootstrap (git)
+
+Two private repos under `cgraph-dev` make the whole setup reproducible:
+
+- **`cgraph-dev/openclaw-voice-bridge`** — this repo. Ships `config/voice.local.yaml`
+  (your machine-specific installed config; `scripts/install.sh` restores it
+  automatically). Models are NOT in the repo — `install.sh` downloads them.
+- **`cgraph-dev/openclaw-home`** — a sanitized copy of `~/.openclaw` (agents,
+  sessions, memory, workspace, config). Secrets are excluded by design:
+  `.env`, `gateway.systemd.env`, `credentials/`, `identity/` — on a new PC the
+  bridge auto-discovers *that* machine's own token, so tokens never need to sync.
+
+**New PC (after installing OpenClaw):**
+
+```bash
+git clone https://github.com/cgraph-dev/openclaw-voice-bridge.git
+cd openclaw-voice-bridge && ./scripts/install.sh
+git clone https://github.com/cgraph-dev/openclaw-home.git ~/.openclaw-restore
+# restore the pieces you want (workspace, agents, state DB), then:
+./scripts/run.sh run
+```
+
+**Daily auto-push** (so nothing is ever lost): `~/.hermes/scripts/auto-push.sh`
+runs every night via Hermes cron — checkpoints the session DB, commits both
+repos, and pushes. Silent on success; alerts on failure. Add the same cron on
+any new PC.
+
+**PersonaPlex "instant" activation (when you have GPU funds):**
+Everything ships dormant. To light it up: rent a 24 GB+ box (`vast/README.md`),
+run `vast/setup_personaplex.sh`, `tailscale up` on PC + box (hostname
+`personaplex`), then flip `personaplex.enabled: true` in the config. The duplex
+lane takes over the mic→remote-GPU→speakers path; the local whisper tap keeps
+routing intents, and everything falls back to local PTT automatically if the
+box is offline.
 
 ## Project layout
 

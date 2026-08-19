@@ -45,7 +45,11 @@ fi
 
 # 3. config
 mkdir -p "$CONFIG_DIR"
-if [ ! -f "$CONFIG_DIR/voice.yaml" ]; then
+if [ -f "$PROJECT_DIR/config/voice.local.yaml" ]; then
+  # machine-specific installed config ships with the repo (see openclaw-home sync)
+  cp "$PROJECT_DIR/config/voice.local.yaml" "$CONFIG_DIR/voice.yaml"
+  echo "==> config restored from config/voice.local.yaml"
+elif [ ! -f "$CONFIG_DIR/voice.yaml" ]; then
   cp "$PROJECT_DIR/config/voice.example.yaml" "$CONFIG_DIR/voice.yaml"
   # voice tasks default to the fast fully-in-VRAM tier on this 8 GB box
   sed -i 's/^  model: null$/  model: ollama\/qwen3-vl:8b/' "$CONFIG_DIR/voice.yaml"
