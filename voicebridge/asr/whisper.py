@@ -73,25 +73,25 @@ class FasterWhisperASR(ASRProvider):
             device = self.device
             if device == "auto":
                 device = "cuda"
-            try:
-                self._model = WhisperModel(self.model_name, device=device,
-                                           compute_type=self.compute_type,
-                                           download_root=str(self.model_dir) if self.model_dir else None)
-                self._actual_device = device
-                log_event("asr.load", provider=self.name, model=self.model_name,
-                          device=device, compute_type=self.compute_type)
-            except Exception as exc:
-                if device == "cuda":
-                    log_event("asr.load.fallback", error=str(exc)[:200],
-                              note="CUDA unavailable/OOM -> CPU (slower)")
-                    self._model = WhisperModel(self.model_name, device="cpu",
-                                               compute_type="int8",
+            # try: cuda fp16 -> cuda int8 (smaller workspace) -> cpu
+            attempts = [(device, self.compute_type)]
+            if device == "cuda":
+                attempts = [(device, "float16"), (device, "int8"), ("cpu", "int8")]
+            last_err: Optional[Exception] = None
+            for dev, ctype in attempts:
+                try:
+                    self._model = WhisperModel(self.model_name, device=dev,
+                                               compute_type=ctype,
                                                download_root=str(self.model_dir) if self.model_dir else None)
-                    self._actual_device = "cpu"
+                    self._actual_device = dev
                     log_event("asr.load", provider=self.name, model=self.model_name,
-                              device="cpu", compute_type="int8")
-                else:
-                    raise ASRUnavailable(f"whisper load failed: {exc}") from exc
+                              device=dev, compute_type=ctype)
+                    return
+                except Exception as exc:
+                    last_err = exc
+                    log_event("asr.load.fallback", device=dev, compute_type=ctype,
+                              error=str(exc)[:160])
+            raise ASRUnavailable(f"whisper load failed on all devices: {last_err}")
 
     def transcribe(self, audio_path: Path | str) -> Transcript:
         self.load()
