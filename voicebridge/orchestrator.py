@@ -448,13 +448,48 @@ class VoiceOrchestrator:
                 self.task.clear()
             else:
                 self.speak("The task is still running in OpenClaw. "
-                           "Say status for an update, or cancel to stop it.")
+                           "I'll keep tracking it and let you know when it's done.")
                 self.task.last_progress_spoken = time.time()
+                self._spawn_reaper(session_key, run_id)
             return
         # status == ok
         reply = self._fetch_final_reply(session_key, run_id)
         self.task.clear()
         self._handle_agent_result(session_key, reply, "ok", time.time() - t0)
+
+    def _spawn_reaper(self, session_key: str, run_id: str) -> None:
+        """Background poller: keeps watching a long run after the spoken timeout
+        and delivers the final summary when it eventually completes."""
+        import threading
+        t0 = time.time()
+
+        def _reaper():
+            while self.task.active and not self._stop.is_set():
+                try:
+                    res = self._gateway.wait_run(run_id, timeout_ms=300_000)  # 5-min window
+                except Exception as exc:
+                    log_event("openclaw.reaper.error", error=str(exc)[:160])
+                    time.sleep(30)
+                    continue
+                st = res.get("status", "ok")
+                if st == "timeout":
+                    continue  # still going; poll again
+                if st == "ok":
+                    reply = self._fetch_final_reply(session_key, run_id)
+                    self.task.clear()
+                    self._handle_agent_result(session_key, reply, "ok",
+                                              time.time() - t0)
+                else:
+                    log_event("openclaw.result", session_key=session_key, run_id=run_id,
+                              status=st, elapsed_s=round(time.time() - t0, 2))
+                    self.task.clear()
+                    self.speak("OpenClaw finished the task with status "
+                               f"{st}. Check the logs.")
+                return
+            self.task.clear()
+
+        threading.Thread(target=_reaper, daemon=True, name="task-reaper").start()
+        log_event("openclaw.reaper.started", session_key=session_key, run_id=run_id)
 
     def _extract_assistant_reply(self, messages: list) -> str:
         """Pull the last meaningful assistant text from a transcript."""
