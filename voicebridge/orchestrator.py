@@ -1,0 +1,747 @@
+"""Voice bridge orchestrator: mic -> ASR -> classify -> route -> OpenClaw -> speak.
+
+Runs the whole loop with interruption support:
+  * push-to-talk (hold key) or manual Enter-toggle
+  * VAD endpointing + barge-in (speech while TTS -> cancel output)
+  * intent routing (system / confirm / cancel / coding / conversation / clarify)
+  * safety gate (destructive actions require spoken confirmation)
+  * OpenClaw execution via gateway WS (CLI fallback if the gateway is down)
+  * spoken status updates + summarized final results
+  * structured events.jsonl observability with per-utterance timing
+
+Threading model: the gateway client runs on its own asyncio loop thread; ASR
+and TTS are synchronous (GPU/CPU) executed in worker threads; the main loop is
+thread-based for simplicity, using events/queues for coordination.
+"""
+from __future__ import annotations
+
+import json
+import queue
+import threading
+import time
+import uuid
+from pathlib import Path
+from typing import Any, Callable, Dict, Optional
+
+import numpy as np
+import sounddevice as sd
+
+from .audio.mic import MicCapture
+from .audio.playback import Playback
+from .audio.vad import BargeInDetector, Endpointer
+from .config import Config
+from .hotkeys import HotkeyListener
+from .intent.classifier import Classifier, Intent
+from .intent.state import ConfirmationState, ConversationState, TaskState
+from .logging_setup import get_logger, log_event
+from .openclaw.cli_backend import CliBackend
+from .openclaw.discovery import discover_gateway, discover_cuda_libs
+from .openclaw.gateway_ws import GatewaySync, GatewayError
+from .safety.policy import SafetyPolicy, SafetyVerdict
+from .summarizer import summarize, trim_spoken
+
+log = get_logger()
+
+BEEP_START = np.array([], dtype=np.int16)   # placeholder; real beeps via piper
+_SAMPLE_TASK = (
+    "Open the current project, inspect the Stripe webhook flow, and "
+    "patch the signature verification and add structured logs."
+)
+
+
+class VoiceOrchestrator:
+    def __init__(self, config: Config, mic_only: bool = False,
+                 no_hotkey: bool = False, dry_run: bool = False) -> None:
+        self.cfg = config
+        self.mic_only = mic_only
+        self.no_hotkey = no_hotkey or not config.get("hotkey", "enabled", default=True)
+        self.dry_run = dry_run  # global force: never dispatch, only speak plan
+
+        # state
+        self.conversation = ConversationState(max_turns=int(config.get("conversation", "max_turns", default=4)))
+        self.confirmations = ConfirmationState()
+        self.task = TaskState()
+        self.muted = False
+        self._stop = threading.Event()
+        self._cancel = threading.Event()
+        self._ptt_started = threading.Event()
+        self._ptt_released = threading.Event()
+        self._ptt_hold = False
+        self._ptt_supported = False
+        self._events: queue.Queue = queue.Queue()  # hotkey/manual events
+
+        # layers (lazy)
+        self._asr = None
+        self._tts = None
+        self._gateway: Optional[GatewaySync] = None
+        self._cli: Optional[CliBackend] = None
+        self._mic: Optional[MicCapture] = None
+        self._barge: Optional[BargeInDetector] = None
+        self.playback = Playback()
+        self.classifier: Optional[Classifier] = None
+        self.safety = SafetyPolicy(config.section("safety"))
+        self.gateway_info = None
+        self._route: str = ""   # 'gateway' | 'cli' | 'offline'
+
+    # ------------------------------------------------------------------ setup
+    def _make_asr(self):
+        from .asr.personaplex import PersonaPlexASR
+        from .asr.whisper import FasterWhisperASR
+        asr_cfg = self.cfg.section("asr")
+        provider = asr_cfg.get("provider", "whisper")
+        if provider == "personaplex":
+            pp = PersonaPlexASR(url=asr_cfg.get("personaplex", {}).get("url", "ws://127.0.0.1:8765"))
+            if pp.available():
+                log_event("asr.provider", provider="personaplex", active=True)
+                return pp
+            log_event("asr.provider", provider="personaplex", active=False,
+                      note="PersonaPlex server unreachable; falling back to whisper")
+        model_dir = self.cfg.model_dir()
+        return FasterWhisperASR(model=asr_cfg.get("model", "base"),
+                                device=asr_cfg.get("device", "auto"),
+                                compute_type=asr_cfg.get("compute_type", "float16"),
+                                language=asr_cfg.get("language"),
+                                beam_size=asr_cfg.get("beam_size", 1),
+                                model_dir=model_dir)
+
+    def _make_tts(self):
+        from .tts.edge import EdgeTTS
+        from .tts.gateway_tts import GatewayTTS
+        from .tts.piper import PiperTTS
+        provider = self.cfg.get("tts", "provider", default="piper")
+        if provider == "edge":
+            edge = EdgeTTS(voice=self.cfg.get("tts", "edge", "voice", default="en-US-JennyNeural"),
+                           rate=self.cfg.get("tts", "edge", "rate", default="+0%"))
+            if edge.available():
+                return edge
+        if provider == "gateway" and self._gateway is not None:
+            return GatewayTTS(self._gateway, model=self.cfg.get("tts", "gateway", "model"))
+        return PiperTTS(model_dir=self.cfg.model_dir(),
+                        voice=self.cfg.get("tts", "voice", default="en_US-amy-medium"))
+
+    def _connect_gateway(self) -> str:
+        """Returns route: 'gateway' | 'cli' | 'offline'."""
+        self.gateway_info = discover_gateway(self.cfg)
+        if not self.gateway_info.token:
+            log_event("openclaw.gateway.no_token")
+            return self._connect_cli_only()
+
+        from .openclaw.discovery import current_vram_mb
+        log_event("openclaw.gateway.info", url=self.gateway_info.url,
+                  agent=self.gateway_info.agent,
+                  default_model=self.gateway_info.default_model,
+                  free_vram_mb=current_vram_mb())
+
+        self._gateway = GatewaySync(
+            self.gateway_info.url, self.gateway_info.token,
+            agent=self.gateway_info.agent,
+            event_cb=self._on_gateway_event)
+        try:
+            if self._gateway.connect(timeout=30.0):
+                self._route = "gateway"
+                log_event("openclaw.route", route="gateway")
+                return "gateway"
+        except Exception as exc:
+            log_event("openclaw.gateway.connect.failed", error=str(exc)[:200])
+        return self._connect_cli_only()
+
+    def _connect_cli_only(self) -> str:
+        self._cli = CliBackend(agent=self.gateway_info.agent if self.gateway_info else "main",
+                               timeout_s=int(self.cfg.get("openclaw", "task_timeout_s", default=900)))
+        if self._cli.connect():
+            self._route = "cli"
+            log_event("openclaw.route", route="cli")
+            return "cli"
+        self._route = "offline"
+        log_event("openclaw.route", route="offline")
+        return "offline"
+
+    # -------------------------------------------------------------- lifecycle
+    def start(self) -> None:
+        # gateway first (may inform TTS choice)
+        self._connect_gateway()
+        # ASR
+        self._asr = self._make_asr()
+        try:
+            self._asr.load()
+        except Exception as exc:
+            log_event("asr.load.failed", error=str(exc)[:200])
+        # TTS
+        self._tts = self._make_tts()
+        try:
+            self._tts.load()
+        except Exception as exc:
+            log_event("tts.load.failed", error=str(exc)[:200])
+        # classifier
+        self.classifier = Classifier(self.cfg.section("intent"),
+                                     self.confirmations, self.conversation)
+        # mic
+        mic_cfg = self.cfg.section("mic")
+        self._mic = MicCapture(device=mic_cfg.get("device"),
+                               sample_rate=mic_cfg.get("sample_rate", 48000),
+                               channels=mic_cfg.get("channels", 1),
+                               blocksize=mic_cfg.get("blocksize", 480),
+                               endpointer=Endpointer(
+                                   aggressiveness=self.cfg.get("vad", "aggressiveness", default=2),
+                                   speech_start_ms=self.cfg.get("vad", "speech_start_ms", default=220),
+                                   silence_timeout_s=self.cfg.get("vad", "silence_timeout_s", default=1.2),
+                                   max_utterance_s=self.cfg.get("vad", "max_utterance_s", default=30.0)))
+        self._barge = BargeInDetector(trigger_ms=int(self.cfg.get("vad", "barge_in", default=True)) and 150 or 999999)
+        self._barge_stream = None
+        if self.cfg.get("vad", "barge_in", default=True):
+            try:
+                self._barge_stream = sd.InputStream(
+                    samplerate=mic_cfg.get("sample_rate", 48000),
+                    channels=mic_cfg.get("channels", 1),
+                    device=mic_cfg.get("device"),
+                    blocksize=mic_cfg.get("blocksize", 480),
+                    dtype="float32")
+                self._barge_stream.start()
+                log_event("barge_in.active")
+            except Exception as exc:
+                self._barge_stream = None
+                log_event("barge_in.unavailable", error=str(exc)[:160])
+        # hotkeys
+        if not self.no_hotkey:
+            hk = HotkeyListener(hold_key=self.cfg.get("hotkey", "hold_key", default="ctrl_r"),
+                                tap_cancel=self.cfg.get("hotkey", "tap_cancel", default="esc"),
+                                alt_hold_key=self.cfg.get("hotkey", "alt_hold_key", default=""))
+            self._ptt_supported = hk.start(self._emit_hotkey)
+            if self._ptt_supported:
+                log_event("hotkey.active", hold=self.cfg.get("hotkey", "hold_key", default="ctrl_r"))
+            self.hotkey = hk
+
+    def _emit_hotkey(self, event: str, key: str) -> None:
+        if event == "ptt_start":
+            self._ptt_hold = True
+            self._ptt_started.set()
+            self._ptt_released.clear()
+        elif event == "ptt_end":
+            self._ptt_hold = False
+            self._ptt_released.set()
+        elif event == "cancel":
+            self._cancel.set()
+            self.playback.stop()
+            if self.task.active:
+                self._abort_task("cancelled by hotkey")
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._mic:
+            self._mic.close()
+        if self._barge_stream is not None:
+            try:
+                self._barge_stream.stop()
+                self._barge_stream.close()
+            except Exception:
+                pass
+            self._barge_stream = None
+        if self._gateway:
+            self._gateway.disconnect()
+        if hasattr(self, "hotkey"):
+            self.hotkey.stop()
+        self.playback.stop()
+
+    # ------------------------------------------------------------------ speak
+    def speak(self, text: str, name: str = "assistant", interruptible: bool = True,
+              barge: bool = True) -> bool:
+        """Synthesize + play with optional barge-in monitoring. Returns True if finished."""
+        if not text or self.muted:
+            return True
+        if self._tts is None:
+            log.warning("TTS not available; would say: %s", text[:120])
+            return False
+        path = self._tts.synthesize(text, Path("/tmp/openclaw-voice-bridge") / f"tts-{uuid.uuid4().hex[:10]}.wav")
+        log_event("tts.speak", text=text[:300], provider=self._tts.name)
+        self._cancel.clear()
+        self._barge.reset()
+        if not barge or self._barge_stream is None or self._barge is None:
+            return self.playback.play(path, name=name)
+        # monitor the always-open barge-in stream while playing
+        stop = threading.Event()
+
+        def _monitor():
+            while not stop.is_set():
+                try:
+                    data, _ = self._barge_stream.read(self._barge_stream.blocksize)
+                    if self._barge_stream.channels > 1:
+                        data = data.mean(axis=1, keepdims=True)
+                    mono = data[:, 0]
+                    from .audio.vad import FRAME_RATE, FRAME_SIZE, pcm16, resample_linear
+                    mono16 = resample_linear(mono, self._barge_stream.samplerate, FRAME_RATE)
+                    for i in range(len(mono16) // FRAME_SIZE):
+                        frame = mono16[i * FRAME_SIZE:(i + 1) * FRAME_SIZE]
+                        if self._barge.add_frame(pcm16(frame)):
+                            stop.set()
+                            return
+                except Exception:
+                    return
+        t = threading.Thread(target=_monitor, daemon=True)
+        t.start()
+        try:
+            finished = self.playback.play(path, name=name)
+        finally:
+            stop.set()
+        return finished
+
+    # --------------------------------------------------------------- routing
+    def _on_gateway_event(self, event: str, payload: Dict[str, Any]) -> None:
+        # Used for future live progress events; keep minimal for now.
+        if event in ("session.message", "agent", "chat"):
+            log.debug("gw event %s: %s", event, str(payload)[:160])
+
+    def _current_model(self) -> Optional[str]:
+        return self.cfg.get("openclaw", "model")
+
+    def _dispatch_coding(self, task_text: str, model: Optional[str] = None,
+                         force_confirm: bool = False) -> None:
+        """Safety-check and dispatch a coding task to OpenClaw."""
+        verdict = self.safety.check(task_text)
+        log_event("safety.verdict", text=task_text[:200], allowed=verdict.allowed,
+                  deny=verdict.deny, require_confirm=verdict.require_confirm,
+                  dry_run=verdict.dry_run, reason=verdict.confirm_reason or verdict.deny_reason)
+
+        if verdict.blocked:
+            self.speak(f"I won't do that. {verdict.deny_reason}.")
+            return
+
+        final_text = task_text
+        if verdict.dry_run:
+            final_text = verdict.dry_run_instruction + "\n\n" + task_text
+
+        if self.dry_run:
+            self.speak(f"Dry run mode: I would send this task to OpenClaw: {trim_spoken(final_text, 300)}")
+            return
+
+        if verdict.require_confirm or force_confirm:
+            self.confirmations.request(
+                action_desc=trim_spoken(final_text, 260),
+                payload={"task": final_text, "model": model or self._current_model(),
+                         "dry_run": verdict.dry_run},
+                reason=verdict.confirm_reason or "user-confirmed dispatch")
+            self.speak(self.safety.spoken_confirmation(trim_spoken(task_text, 200), verdict))
+            return
+
+        self._launch_task(final_text, model or self._current_model())
+
+    def _launch_task(self, task_text: str, model: Optional[str] = None) -> None:
+        suffix = uuid.uuid4().hex[:8]
+        session_key = self.cfg.session_key(f"task-{suffix}")
+        log_event("openclaw.request", session_key=session_key, task=task_text[:300],
+                  model=model, route=self._route)
+
+        if self._route == "gateway" and self._gateway:
+            try:
+                self.speak("On it.", name="ack", barge=False)
+            except Exception:
+                pass
+            # create session + send in one RPC (message nested)
+            try:
+                res = self._gateway.create_session(
+                    key=session_key, label=f"voice task {suffix}", model=model,
+                    message=task_text, timeout=45.0)
+                run_id = res.get("runId") or ""
+                if not run_id:
+                    # session exists but run didn't start -> send explicitly
+                    res2 = self._gateway.send_message(session_key, task_text, timeout=45.0)
+                    run_id = res2.get("runId") or ""
+                self.task.set_active(session_key, run_id, task_text, model or "")
+                if self.cfg.get("openclaw", "progress_updates", default=True):
+                    self._progress_thread = threading.Thread(target=self._progress_loop,
+                                                             daemon=True)
+                    self._progress_thread.start()
+                # wait for completion
+                self._await_run(session_key, run_id, task_text)
+            except GatewayError as exc:
+                log_event("openclaw.request.failed", error=exc.message[:200])
+                self.speak("OpenClaw rejected the task. Check the logs.")
+                return
+            except Exception as exc:
+                log_event("openclaw.request.exception", error=str(exc)[:200])
+                self.speak("Something went wrong talking to OpenClaw.")
+                return
+        elif self._route == "cli" and self._cli:
+            try:
+                self.speak("On it.", name="ack", barge=False)
+            except Exception:
+                pass
+            result = self._cli.run_task(session_key, task_text, model)
+            self.task.set_active(session_key, "", task_text, model or "")
+            self._handle_agent_result(session_key, result.reply, result.status, result.elapsed_s)
+            self.task.clear()
+        else:
+            self.speak("OpenClaw is not reachable. Start the gateway and try again.")
+
+    def _progress_loop(self) -> None:
+        """Periodic spoken status while a task runs (rate-limited)."""
+        interval = float(self.cfg.get("openclaw", "progress_min_interval_s", default=15))
+        while self.task.active and not self._stop.is_set():
+            time.sleep(interval)
+            if self.task.active and not self.playback.playing:
+                elapsed = self.task.elapsed_s()
+                if elapsed > 30:
+                    self.speak("Still working. I'll update you when it's done.",
+                               name="progress", barge=False)
+                    self.task.last_progress_spoken = time.time()
+
+    def _await_run(self, session_key: str, run_id: str, task_text: str) -> None:
+        """Wait for the run (polling up to task_timeout_s); speak summary when done."""
+        import threading
+        t0 = time.time()
+        task_timeout = int(self.cfg.get("openclaw", "task_timeout_s", default=900))
+        poll_window_ms = 60_000  # agent.wait window per call
+        result_holder: Dict[str, Any] = {}
+
+        def _waiter():
+            waited_s = 0.0
+            while waited_s < task_timeout:
+                window_ms = min(poll_window_ms, int((task_timeout - waited_s) * 1000))
+                try:
+                    res = self._gateway.wait_run(run_id, timeout_ms=window_ms)
+                except GatewayError as exc:
+                    result_holder["status"] = "failed"
+                    result_holder["error"] = exc.message
+                    return
+                except Exception as exc:
+                    result_holder["status"] = "failed"
+                    result_holder["error"] = str(exc)[:200]
+                    return
+                st = res.get("status", "ok")
+                if st == "timeout":
+                    waited_s += poll_window_ms / 1000.0
+                    continue
+                result_holder["status"] = st
+                return
+            result_holder["status"] = "timeout"
+
+        th = threading.Thread(target=_waiter, daemon=True)
+        th.start()
+        while th.is_alive():
+            if self._cancel.is_set() or self._stop.is_set():
+                try:
+                    self._gateway.abort(session_key, timeout=20.0)
+                except Exception:
+                    pass
+                log_event("openclaw.abort", session_key=session_key)
+                self.speak("Stopped.")
+                self._cancel.clear()
+                self.task.clear()
+                return
+            time.sleep(0.25)
+        status = result_holder.get("status", "timeout")
+        if status in ("failed",):
+            log_event("openclaw.result", session_key=session_key, status="failed",
+                      error=result_holder.get("error", ""), elapsed_s=round(time.time() - t0, 2))
+            self.speak("OpenClaw failed the task. Check the logs.")
+            self.task.clear()
+            return
+        if status in ("timeout", "aborted"):
+            # The run is (or was) still going on the gateway. Keep the task
+            # tracked so "status" / "cancel" still work; don't pretend it failed.
+            log_event("openclaw.result", session_key=session_key, status=status,
+                      elapsed_s=round(time.time() - t0, 2))
+            if status == "aborted":
+                self.speak("Task stopped.")
+                self.task.clear()
+            else:
+                self.speak("The task is still running in OpenClaw. "
+                           "Say status for an update, or cancel to stop it.")
+                self.task.last_progress_spoken = time.time()
+            return
+        # status == ok
+        try:
+            msgs = self._gateway.history(session_key, limit=6, timeout=45.0)
+            reply = self._extract_assistant_reply(msgs)
+        except Exception:
+            reply = ""
+        self.task.clear()
+        self._handle_agent_result(session_key, reply, "ok", time.time() - t0)
+
+    def _extract_assistant_reply(self, messages: list) -> str:
+        parts = []
+        for m in messages:
+            if m.get("role") == "assistant":
+                c = m.get("text") or m.get("content") or ""
+                if isinstance(c, list):
+                    c = " ".join(x.get("text", "") if isinstance(x, dict) else str(x) for x in c)
+                if c.strip():
+                    parts.append(c.strip())
+        return "\n".join(parts[-2:])
+
+    def _handle_agent_result(self, session_key: str, reply: str, status: str,
+                             elapsed_s: float) -> None:
+        log_event("openclaw.result", session_key=session_key, status=status,
+                  elapsed_s=round(elapsed_s, 2), reply_len=len(reply))
+        if not reply.strip():
+            self.speak("OpenClaw finished, but had nothing to report.")
+            return
+        summary = summarize(reply, self.cfg.section("summarizer"))
+        log_event("openclaw.summary", session_key=session_key, summary=summary[:400])
+        self.speak(summary)
+
+    # ----------------------------------------------------------- system cmds
+    def _handle_system(self, intent: Intent) -> None:
+        cmd = intent.params.get("command")
+        if cmd == "status":
+            route = self._route
+            model = self.cfg.get("openclaw", "model") or (self.gateway_info.default_model if self.gateway_info else "unknown")
+            self.speak(f"Voice bridge is running. Route: {route}. Agent model: {model}.")
+        elif cmd == "mute":
+            self.muted = True
+            self.playback.stop()
+            log_event("system.mute")
+        elif cmd == "unmute":
+            self.muted = False
+            self.speak("Unmuted.")
+        elif cmd == "help":
+            self.speak("Hold the talk key, say a task for OpenClaw, like: "
+                       "inspect the webhook flow and patch the signature check. "
+                       "Say stop to cancel. Say status for health.")
+        elif cmd == "stop":
+            self.playback.stop()
+            self._abort_task("voice stop")
+            self.speak("Stopped.")
+        elif cmd == "cancel":
+            self.confirmations.clear()
+            self._abort_task("voice cancel")
+            self.speak("Cancelled.")
+        elif cmd == "model":
+            tier = intent.params.get("tier")
+            model = self.classifier.resolve_model_tier(tier)
+            self.cfg.data.setdefault("openclaw", {})["model"] = model
+            log_event("system.model", tier=tier, model=model)
+            if model:
+                self.speak(f"Using model {model.split('/')[-1]} for future tasks.")
+            else:
+                self.speak("Using the agent's default model for future tasks.")
+        elif cmd == "quit":
+            self.speak("Goodbye.")
+            self._stop.set()
+
+    def _abort_task(self, why: str) -> None:
+        if self.task.active:
+            key = self.task.session_key
+            if self._route == "gateway" and self._gateway:
+                try:
+                    self._gateway.abort(key, timeout=20.0)
+                except Exception:
+                    pass
+            self.task.clear()
+            log_event("openclaw.abort", why=why, session_key=key)
+
+    # ------------------------------------------------------------- confirm
+    def _handle_confirm(self) -> None:
+        pending = self.confirmations.take()
+        if not pending:
+            self.speak("There's nothing to confirm.")
+            return
+        payload = pending.payload
+        self.speak("Okay, going ahead.")
+        self._launch_task(payload.get("task", ""), payload.get("model"))
+
+    def _handle_cancel_utterance(self) -> None:
+        if self.confirmations.pending:
+            self.confirmations.clear()
+            self.speak("Cancelled.")
+            return
+        if self.task.active:
+            self._abort_task("voice cancel")
+            self.speak("Stopping the task.")
+        else:
+            self.playback.stop()
+            self.speak("Cancelled.")
+
+    # ------------------------------------------------------------- conversation
+    def _handle_conversation(self, text: str) -> None:
+        backend = self.cfg.get("intent", "conversation_backend", default="ollama")
+        if backend == "agent" and self._route in ("gateway", "cli"):
+            # chat through OpenClaw agent (slower but full memory/tools)
+            chat_key = self.cfg.session_key("chat")
+            if self._route == "gateway" and self._gateway:
+                try:
+                    res = self._gateway.create_session(key=chat_key, label="voice chat",
+                                                       model=self._current_model())
+                    res2 = self._gateway.send_message(chat_key, text, timeout=45.0)
+                    run_id = res2.get("runId") or ""
+                    self._await_run(chat_key, run_id, text)
+                    return
+                except Exception as exc:
+                    log_event("conversation.agent.failed", error=str(exc)[:160])
+            elif self._cli:
+                result = self._cli.run_task(chat_key, text, self._current_model())
+                self._handle_agent_result(chat_key, result.reply, result.status, result.elapsed_s)
+                return
+        # fast local chat via ollama
+        reply = self._chat_ollama(text)
+        if reply:
+            self.conversation.add("user", text)
+            self.conversation.add("assistant", reply)
+            self.speak(trim_spoken(reply, 500))
+        else:
+            self.speak("I'm sorry, I couldn't reach the chat model.")
+
+    def _chat_ollama(self, text: str) -> str:
+        import urllib.request
+        url = self.cfg.get("intent", "ollama_url", default="http://127.0.0.1:11434")
+        model = self.cfg.get("intent", "ollama_model", default="qwen3-vl:8b")
+        ctx = self.conversation.as_prompt()
+        prompt = f"Recent conversation:\n{ctx}\n\nUser: {text}\n\nAssistant:"
+        payload = {"model": model, "prompt": prompt, "stream": False,
+                   "options": {"think": False, "temperature": 0.4}}
+        try:
+            req = urllib.request.Request(f"{url}/api/generate",
+                                         data=json.dumps(payload).encode(),
+                                         headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                body = json.loads(resp.read().decode())
+            return (body.get("response") or "").strip()
+        except Exception as exc:
+            log_event("conversation.ollama.failed", error=str(exc)[:160])
+            return ""
+
+    # ------------------------------------------------------------------ loop
+    def run(self) -> None:
+        self.start()
+        print("=" * 60)
+        print("OpenClaw Voice Bridge — push-to-talk")
+        if self._ptt_supported:
+            hold = self.cfg.get("hotkey", "hold_key", default="ctrl_r")
+            print(f"  Hold {hold} and speak. Esc cancels. Ctrl+C to quit.")
+        else:
+            print("  Hotkeys unavailable (no X). Press Enter to start/stop recording.")
+        print(f"  ASR: {self._asr.name}  |  TTS: {self._tts.name}  |  OpenClaw route: {self._route}")
+        print("=" * 60)
+
+        if self.mic_only:
+            self._record_once_interactive()
+            return
+
+        # hotkey mode
+        if self._ptt_supported:
+            self._run_hotkey_loop()
+        else:
+            self._run_manual_loop()
+
+    def _run_hotkey_loop(self) -> None:
+        self._ptt_started.clear()
+        while not self._stop.is_set():
+            # wait for PTT start
+            while not self._stop.is_set() and not self._ptt_started.wait(0.2):
+                pass
+            if self._stop.is_set():
+                break
+            self._ptt_started.clear()
+            self._ptt_released.clear()
+            res = self._capture_utterance()
+            if res is not None:
+                self._process_utterance(res)
+
+    def _run_manual_loop(self) -> None:
+        print("Manual mode: press Enter to start recording, Enter again to stop.")
+        while not self._stop.is_set():
+            try:
+                line = input().strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                break
+            if line in ("q", "quit", "exit"):
+                break
+            self._ptt_released.clear()
+            res = self._capture_utterance()
+            if res is not None:
+                self._process_utterance(res)
+
+    def _record_once_interactive(self) -> None:
+        res = self._capture_utterance()
+        if res is not None:
+            self._process_utterance(res)
+
+    def _capture_utterance(self) -> Optional[str]:
+        """Record one utterance (PTT start..release or manual). Returns wav path or None."""
+        if self._mic is None:
+            log.error("mic not initialized")
+            return None
+        stop_req = threading.Event()
+        if self._ptt_supported:
+            def _release_watcher():
+                while not self._stop.is_set():
+                    if self._ptt_released.is_set():
+                        # brief tail after release (finish last word)
+                        time.sleep(0.6)
+                        stop_req.set()
+                        return
+                    time.sleep(0.05)
+            threading.Thread(target=_release_watcher, daemon=True).start()
+        try:
+            with self._mic.open():
+                res = self._mic.record_utterance(stop_req, barge_in=None)
+        except Exception as exc:
+            log_event("mic.capture.error", error=str(exc)[:160])
+            self.speak("I couldn't hear you. Check the microphone.")
+            return None
+        if res.wav_path is None:
+            log_event("mic.utterance.empty", ended_by=res.ended_by)
+            return None
+        log_event("mic.utterance", wav=str(res.wav_path), duration_s=round(res.duration_s, 2),
+                  ended_by=res.ended_by)
+        return str(res.wav_path)
+
+    def _process_utterance(self, wav_path: str) -> None:
+        t0 = time.time()
+        if self._asr is None:
+            return
+        transcript = self._asr.transcribe(wav_path)
+        elapsed_asr = time.time() - t0
+        log_event("orchestrator.timing", asr_ms=round(elapsed_asr * 1000, 1), text=transcript.text[:200])
+        if transcript.empty:
+            self.speak("I didn't catch that. Try again.")
+            return
+        if transcript.confidence and transcript.confidence < self.cfg.get("asr", "min_confidence", default=0.35):
+            self.speak("Sorry, I didn't catch that. Could you repeat it?")
+            return
+        log_event("routing.input", text=transcript.text, confidence=round(transcript.confidence, 3))
+        if transcript.text.strip().lower() in ("uh", "um", "hmm", "ah", "mm", "aah", "okay", "ok"):
+            self.speak("I didn't catch that. Try again.")
+            return
+        intent = self.classifier.classify(transcript.text)
+        log_event("routing.decision", text=transcript.text[:200], kind=intent.kind,
+                  confidence=round(intent.confidence, 2), reason=intent.reason,
+                  source=intent.source)
+        self.conversation.add("user", transcript.text)
+        if intent.kind == "system":
+            self._handle_system(intent)
+        elif intent.kind == "confirm":
+            self._handle_confirm()
+        elif intent.kind == "cancel":
+            self._handle_cancel_utterance()
+        elif intent.kind == "coding":
+            self._dispatch_coding(intent.task_text or transcript.text)
+        elif intent.kind == "clarify":
+            self.speak("Could you be more specific about what you'd like OpenClaw to do?")
+        else:
+            self._handle_conversation(transcript.text)
+        log_event("orchestrator.turn_done", total_ms=round((time.time() - t0) * 1000, 1))
+
+    # -------------------------------------------------------------- external
+    def process_text(self, text: str) -> None:
+        """Process a typed task (used by `voicebridge task` and tests)."""
+        self.start()
+        if not text.strip():
+            self.speak("Empty task.")
+            return
+        log_event("routing.input", text=text, source="text")
+        intent = self.classifier.classify(text)
+        log_event("routing.decision", text=text[:200], kind=intent.kind,
+                  confidence=round(intent.confidence, 2), reason=intent.reason,
+                  source=intent.source)
+        if intent.kind == "system":
+            self._handle_system(intent)
+        elif intent.kind == "confirm":
+            self._handle_confirm()
+        elif intent.kind == "cancel":
+            self._handle_cancel_utterance()
+        elif intent.kind == "coding":
+            self._dispatch_coding(intent.task_text or text)
+        elif intent.kind == "clarify":
+            self.speak("Could you be more specific about what you'd like OpenClaw to do?")
+        else:
+            self._handle_conversation(text)

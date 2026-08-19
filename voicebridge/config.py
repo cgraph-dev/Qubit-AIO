@@ -1,0 +1,192 @@
+"""Configuration loading for the voice bridge.
+
+Load order:
+  1. defaults (this module)
+  2. YAML file at ~/.config/openclaw-voice-bridge/voice.yaml (or $VOICE_BRIDGE_CONFIG)
+  3. environment overrides: VOICE_BRIDGE_<SECTION>_<KEY> (uppercase, dotted paths)
+
+All sections map 1:1 to the example config in config/voice.example.yaml.
+"""
+from __future__ import annotations
+
+import copy
+import os
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+import yaml
+
+DEFAULT_CONFIG_PATH = Path("~/.config/openclaw-voice-bridge/voice.yaml").expanduser()
+DEFAULT_STATE_DIR = Path("~/.local/state/openclaw-voice-bridge").expanduser()
+DEFAULT_DATA_DIR = Path("~/.local/share/openclaw-voice-bridge").expanduser()
+
+DEFAULTS: Dict[str, Any] = {
+    "hotkey": {
+        "enabled": True,
+        "hold_key": "ctrl_r",  # hold-to-talk
+        "alt_hold_key": "",    # optional second key
+        "tap_cancel": "esc",   # tap while speaking -> stop speech
+    },
+    "mic": {
+        "device": None,        # None = system default input
+        "sample_rate": 48000,  # device rate; resampled to 16k for ASR
+        "channels": 1,
+        "blocksize": 480,      # ~10ms at 48k
+    },
+    "vad": {
+        "enabled": True,
+        "aggressiveness": 2,        # webrtcvad 0-3
+        "speech_start_ms": 220,     # frames of speech to consider "started"
+        "silence_timeout_s": 1.2,   # trailing silence ends the utterance
+        "max_utterance_s": 30.0,
+        "barge_in": True,           # speech while TTS is speaking -> cancel output
+    },
+    "asr": {
+        "provider": "whisper",      # whisper | personaplex
+        "model": "base",            # tiny|base|small|medium (whisper)
+        "device": "auto",           # auto|cuda|cpu
+        "compute_type": "float16",
+        "language": "en",
+        "beam_size": 1,
+        "min_confidence": 0.15,     # below -> ask to repeat (whisper logprob is conservative)
+    },
+    "personaplex": {
+        "url": "ws://127.0.0.1:8765",   # PersonaPlex realtime server (12GB+ GPU)
+        "timeout_s": 5,
+        "auto_start": False,            # never auto-start on this box; set when viable
+    },
+    "tts": {
+        "provider": "piper",        # piper | edge | gateway
+        "voice": "en_US-amy-medium",
+        "sample_rate": 22050,
+        "interrupt": True,          # allow barge-in / stop speaking
+        "edge": {"voice": "en-US-JennyNeural", "rate": "+0%"},
+        "gateway": {"model": None},  # None = gateway default
+    },
+    "intent": {
+        "llm_classifier": True,     # use ollama qwen3-vl:8b when heuristic is unsure
+        "ollama_url": "http://127.0.0.1:11434",
+        "ollama_model": "qwen3-vl:8b",
+        "classify_timeout_s": 8.0,
+        "conversation_backend": "ollama",  # ollama (fast chat) | agent (OpenClaw memory)
+    },
+    "openclaw": {
+        "gateway_url": None,     # auto-discovered: ws://127.0.0.1:18789
+        "token_file": "~/.openclaw/.env",
+        "agent": "main",
+        "model": None,           # None = agent default; "ollama/qwen3-vl:8b" for fast voice tasks
+        "session_prefix": "voice",
+        "task_timeout_s": 900,
+        "max_history_chars": 12000,   # truncate history fed to summarizer
+        "progress_updates": True,     # speak short status updates during long tasks
+        "progress_min_interval_s": 45,
+    },
+    "safety": {
+        "enabled": True,
+        "confirm_destructive": True,
+        "denylist": [   # phrases that are refused outright
+            "ignore all previous instructions",
+            "disable safety",
+        ],
+        "always_confirm": [   # extra patterns beyond the built-in destructive set
+        ],
+        "never_confirm": [    # patterns that skip confirmation even if destructive-looking
+        ],
+        "dry_run_first": False,   # prepend "dry run first" to agent coding tasks
+        "spoken_confirmation": True,
+    },
+    "summarizer": {
+        "provider": "ollama",   # ollama | extractive
+        "ollama_model": "qwen3-vl:8b",
+        "max_chars": 900,       # target spoken summary length
+    },
+    "logging": {
+        "level": "INFO",
+        "jsonl": True,          # structured event log (observability)
+        "jsonl_path": None,     # default: $STATE_DIR/events.jsonl
+    },
+}
+
+
+def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+    out = copy.deepcopy(base)
+    for k, v in override.items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
+def _env_overrides() -> Dict[str, Any]:
+    """Read VOICE_BRIDGE_* env vars into a nested dict."""
+    out: Dict[str, Any] = {}
+    for key, val in os.environ.items():
+        if not key.startswith("VOICE_BRIDGE_"):
+            continue
+        path = key[len("VOICE_BRIDGE_"):].lower().split("_")
+        node = out
+        for part in path[:-1]:
+            node = node.setdefault(part, {})
+        node[path[-1]] = val
+    return out
+
+
+@dataclass
+class Config:
+    data: Dict[str, Any]
+    path: Optional[Path] = None
+
+    # --- helpers ---
+    def section(self, name: str) -> Dict[str, Any]:
+        return self.data.get(name, {})
+
+    def get(self, *path: str, default: Any = None) -> Any:
+        node: Any = self.data
+        for p in path:
+            if not isinstance(node, dict) or p not in node:
+                return default
+            node = node[p]
+        return node
+
+    @classmethod
+    def load(cls, path: Optional[Path] = None) -> "Config":
+        cfg_path = Path(path) if path else Path(
+            os.environ.get("VOICE_BRIDGE_CONFIG", DEFAULT_CONFIG_PATH))
+        data = deep_merge(DEFAULTS, {})
+        if cfg_path.exists():
+            with open(cfg_path) as fh:
+                loaded = yaml.safe_load(fh) or {}
+            data = deep_merge(data, loaded)
+        data = deep_merge(data, _env_overrides())
+        return cls(data=data, path=cfg_path if cfg_path.exists() else None)
+
+    # --- resolved paths ---
+    def state_dir(self) -> Path:
+        p = Path(self.get("logging", "jsonl_path") or DEFAULT_STATE_DIR)
+        if not self.get("logging", "jsonl"):
+            p = DEFAULT_STATE_DIR
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+
+    def data_dir(self) -> Path:
+        p = DEFAULT_DATA_DIR
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+
+    def model_dir(self) -> Path:
+        p = self.data_dir() / "models"
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+
+    def session_key(self, suffix: str = "") -> str:
+        prefix = self.get("openclaw", "session_prefix", default="voice")
+        agent = self.get("openclaw", "agent", default="main")
+        key = f"agent:{agent}:{prefix}"
+        if suffix:
+            key += f":{suffix}"
+        return key
+
+    def as_yaml(self) -> str:
+        return yaml.safe_dump(self.data, sort_keys=False)

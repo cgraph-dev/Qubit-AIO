@@ -1,0 +1,89 @@
+"""Spoken summaries: long tool outputs -> 2-3 short spoken sentences.
+
+Two providers:
+  * ollama   — qwen3-vl:8b via the raw local API (fast, structured, preferred)
+  * extractive — deterministic fallback (first + last sentences, key numbers)
+
+Always strips markdown/code-fence noise before speaking.
+"""
+from __future__ import annotations
+
+import json
+import re
+import urllib.request
+from typing import Optional
+
+from .logging_setup import log_event
+
+SUMMARY_PROMPT = """You are summarizing a coding agent's output for a voice
+interface. Produce a short spoken summary of 2-3 sentences (max 70 words).
+Include: what was changed, key file names, and any action the user must take
+(such as "review before commit"). Use plain conversational language, no
+markdown, no bullet points. Output JSON: {"summary": "..."}"""
+
+
+def _strip_markdown(text: str) -> str:
+    text = re.sub(r"```[a-zA-Z]*\n?.*?```", " ", text, flags=re.S)   # code fences
+    text = re.sub(r"`([^`]*)`", r"\1", text)                          # inline code
+    text = re.sub(r"[*_#>{}\[\]]+", " ", text)                        # markers
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def summarize_ollama(text: str, url: str = "http://127.0.0.1:11434",
+                     model: str = "qwen3-vl:8b", timeout_s: float = 25.0,
+                     max_chars: int = 900) -> Optional[str]:
+    text = text[:max_chars]
+    payload = {"model": model, "prompt": f"Agent output:\n{text}",
+               "system": SUMMARY_PROMPT, "stream": False, "format": "json",
+               "options": {"think": False, "temperature": 0.2}}
+    req = urllib.request.Request(f"{url}/api/generate",
+                                 data=json.dumps(payload).encode(),
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+            body = json.loads(resp.read().decode())
+        summary = json.loads(body.get("response", "{}")).get("summary", "")
+        if summary.strip():
+            return _strip_markdown(summary)
+    except Exception as exc:
+        log_event("summarizer.ollama.unavailable", error=str(exc)[:160])
+    return None
+
+
+def summarize_extractive(text: str, max_chars: int = 900) -> str:
+    clean = _strip_markdown(text)
+    if not clean:
+        return ""
+    sentences = re.split(r"(?<=[.!?])\s+", clean)
+    # first 2 sentences + last sentence (if different)
+    parts = sentences[:2]
+    if len(sentences) > 3 and sentences[-1] not in parts:
+        parts.append(sentences[-1])
+    summary = " ".join(parts)
+    if len(summary) > max_chars:
+        summary = summary[:max_chars].rsplit(" ", 1)[0] + "."
+    return summary
+
+
+def summarize(text: str, cfg: Optional[dict] = None,
+              ollama_url: Optional[str] = None,
+              ollama_model: Optional[str] = None) -> str:
+    cfg = cfg or {}
+    provider = cfg.get("provider", "ollama")
+    url = ollama_url or "http://127.0.0.1:11434"
+    model = ollama_model or cfg.get("ollama_model", "qwen3-vl:8b")
+    max_chars = int(cfg.get("max_chars", 900))
+    if provider == "ollama":
+        s = summarize_ollama(text, url, model, max_chars=max_chars)
+        if s:
+            return s
+    return summarize_extractive(text, max_chars)
+
+
+def trim_spoken(text: str, max_chars: int = 700) -> str:
+    """Shorten any text for speaking (summary fallback)."""
+    clean = _strip_markdown(text)
+    if len(clean) <= max_chars:
+        return clean
+    return summarize_extractive(clean, max_chars)

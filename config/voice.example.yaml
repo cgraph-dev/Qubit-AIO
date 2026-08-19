@@ -1,0 +1,114 @@
+# OpenClaw Voice Bridge — configuration
+# Copy to ~/.config/openclaw-voice-bridge/voice.yaml and edit.
+# Every value here is optional; the bridge has sane defaults.
+
+# ---------------------------------------------------------------------------
+# Push-to-talk hotkey
+hotkey:
+  enabled: true
+  hold_key: ctrl_r        # hold this key to talk (X11). Other options: ctrl_l, alt_r, f8
+  alt_hold_key: ""        # optional second hold key
+  tap_cancel: esc         # tap while assistant speaks -> stop speech / cancel task
+
+# ---------------------------------------------------------------------------
+# Microphone
+mic:
+  device: null            # null = system default (your Focusrite Scarlett 2i2)
+  sample_rate: 48000      # device rate; resampled to 16 kHz for ASR
+  channels: 1
+  blocksize: 480          # ~10 ms at 48 kHz
+
+# Voice activity detection / endpointing
+vad:
+  enabled: true
+  aggressiveness: 2       # webrtcvad 0 (lenient) - 3 (strict)
+  speech_start_ms: 220    # how much continuous speech before "started"
+  silence_timeout_s: 1.2  # trailing silence that ends the utterance
+  max_utterance_s: 30.0
+  barge_in: true          # speech while TTS speaks -> cancel output (interrupt)
+
+# ---------------------------------------------------------------------------
+# Speech-to-text
+asr:
+  provider: whisper       # whisper | personaplex
+  model: base             # tiny|base|small|medium.
+                          #   base (~0.5 GB VRAM) coexists with a loaded agent model.
+                          #   small needs the agent model unloaded (OOM otherwise on 8 GB).
+  device: auto            # auto|cuda|cpu  (auto: GPU, falls back to CPU on OOM)
+  compute_type: float16
+  language: en
+  beam_size: 1
+  min_confidence: 0.15    # below this -> "didn't catch that, repeat please"
+                          # (whisper's avg_logprob is conservative; 0.3+ is normal)
+
+# PersonaPlex — NOT active on this 8 GB GPU (see README). Pluggable adapter:
+# on a 12 GB+ machine, run the PersonaPlex server and switch provider above.
+personaplex:
+  url: ws://127.0.0.1:8765
+  timeout_s: 5
+  auto_start: false
+
+# ---------------------------------------------------------------------------
+# Text-to-speech
+tts:
+  provider: piper         # piper (local, default) | edge (network) | gateway (OpenClaw TTS)
+  voice: en_US-amy-medium # piper voice (download: scripts/install.sh)
+  sample_rate: 22050
+  interrupt: true
+  edge:
+    voice: en-US-JennyNeural
+    rate: "+0%"
+  gateway:
+    model: null           # null = gateway default (openai gpt-4o-mini-tts / edge)
+
+# ---------------------------------------------------------------------------
+# Intent routing
+intent:
+  llm_classifier: true    # use local qwen3-vl:8b when the heuristic router is unsure
+  ollama_url: http://127.0.0.1:11434
+  ollama_model: qwen3-vl:8b
+  classify_timeout_s: 8.0
+  # conversation backend: "ollama" (fast local chat, ~2-5 s) or
+  #                      "agent"  (through OpenClaw: full memory/tools, 30-90 s)
+  conversation_backend: ollama
+
+# ---------------------------------------------------------------------------
+# OpenClaw gateway (auto-discovered; these are overrides)
+openclaw:
+  gateway_url: null       # auto: ws://127.0.0.1:<port from ~/.openclaw/openclaw.json>
+  token_file: ~/.openclaw/.env
+  agent: main
+  # Voice-task model. null = agent default (ollama/qwen3:30b-a3b — smarter, slower).
+  # For snappy voice tasks on this 3070: "ollama/qwen3-vl:8b" (fully in VRAM, ~40-70 tok/s).
+  # Say "use turbo / normal / slow / hard / pro" at runtime to switch.
+  model: null
+  session_prefix: voice
+  task_timeout_s: 900
+  progress_updates: true        # speak periodic "still working" for long tasks
+  progress_min_interval_s: 45
+
+# ---------------------------------------------------------------------------
+# Safety
+safety:
+  enabled: true
+  confirm_destructive: true     # spoken confirmation before delete/rm/drop/force-push/etc.
+  denylist:                     # refused outright
+    - "ignore all previous instructions"
+    - "disable safety"
+  always_confirm: []            # extra patterns that always ask
+  never_confirm: []             # patterns that skip confirmation
+  dry_run_first: false          # true = coding tasks start as dry runs, ask before applying
+  spoken_confirmation: true
+
+# ---------------------------------------------------------------------------
+# Spoken summaries
+summarizer:
+  provider: ollama              # ollama (local qwen3-vl:8b) | extractive (no model)
+  ollama_model: qwen3-vl:8b
+  max_chars: 900
+
+# ---------------------------------------------------------------------------
+logging:
+  level: INFO
+  jsonl: true               # structured event journal (observability)
+  jsonl_path: null          # default: ~/.local/state/openclaw-voice-bridge/events.jsonl
