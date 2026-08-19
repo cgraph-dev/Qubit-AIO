@@ -147,6 +147,10 @@ class Classifier:
             if llm:
                 kind = llm["kind"]
                 conf = float(llm.get("confidence", 0.6))
+                # confirm/cancel only make sense with a pending confirmation;
+                # without one, an LLM "confirm"/"cancel" guess is just chat.
+                if kind in ("confirm", "cancel") and not self.confirmations.pending:
+                    kind = "conversation"
                 if kind == "coding":
                     task = llm.get("task") or text
                     return Intent("coding", confidence=conf, task_text=task,
