@@ -227,6 +227,14 @@ class GatewayClient:
         res = await self.call("tts.speak", {"text": text}, timeout=timeout)
         return (res.get("audioBase64"), res.get("mimeType"), res.get("outputFormat"))
 
+    async def list_sessions(self, limit: int = 100, timeout: float = 30.0) -> List[Dict[str, Any]]:
+        res = await self.call("sessions.list", {"limit": limit}, timeout=timeout)
+        return res.get("sessions", [])
+
+    async def list_tasks(self, timeout: float = 30.0) -> List[Dict[str, Any]]:
+        res = await self.call("tasks.list", {}, timeout=timeout)
+        return res.get("tasks") or res.get("items") or []
+
     async def agents_list(self, timeout: float = 30.0) -> List[Dict[str, Any]]:
         res = await self.call("agents.list", {}, timeout=timeout)
         return res.get("agents", [])
@@ -308,6 +316,12 @@ class GatewaySync:
 
     def tts_speak(self, text, timeout=75.0):
         return self._submit(self._client.tts_speak(text), timeout)
+
+    def list_sessions(self, limit=100, timeout=45.0):
+        return self._submit(self._client.list_sessions(limit), timeout)
+
+    def list_tasks(self, timeout=45.0):
+        return self._submit(self._client.list_tasks(), timeout)
 
     def agents_list(self, timeout=45.0):
         return self._submit(self._client.agents_list(), timeout)

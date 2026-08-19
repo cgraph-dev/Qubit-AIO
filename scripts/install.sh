@@ -42,7 +42,9 @@ fi
 mkdir -p "$CONFIG_DIR"
 if [ ! -f "$CONFIG_DIR/voice.yaml" ]; then
   cp "$PROJECT_DIR/config/voice.example.yaml" "$CONFIG_DIR/voice.yaml"
-  echo "==> config created at $CONFIG_DIR/voice.yaml (edit to taste)"
+  # voice tasks default to the fast fully-in-VRAM tier on this 8 GB box
+  sed -i 's/^  model: null$/  model: ollama\/qwen3-vl:8b/' "$CONFIG_DIR/voice.yaml"
+  echo "==> config created at $CONFIG_DIR/voice.yaml (voice model: qwen3-vl:8b)"
 else
   echo "==> config already exists: $CONFIG_DIR/voice.yaml (leave as-is)"
 fi

@@ -185,6 +185,17 @@ tts.speak`). Run with `--model ollama/qwen3-vl:8b` for reasonable latency.
    `intent.conversation_backend: agent` to route chat through OpenClaw (full
    memory/tools, slower).
 
+### Known edge case: "I couldn't pull the final text"
+
+Occasionally the gateway completes a run (`agent.wait` → `ok`) but the parent
+session transcript contains only the user message — the agent's work happened
+in an embedded/subagent session that never wrote back. The bridge now walks
+three sources before giving up (parent history → child sessions via
+`parentSessionKey` → gateway task ledger via `childSessionKey`), and if all are
+empty it says so honestly instead of pretending. `openclaw.request` /
+`openclaw.result` journal entries carry the `runId` so you can find the work in
+the Control UI (`http://localhost:18789`).
+
 ## Upgrade path to a 4090 / 12 GB+ GPU
 
 1. Run the PersonaPlex realtime server (nvidia/personaplex-7b-v1 stack) on the

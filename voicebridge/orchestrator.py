@@ -327,7 +327,7 @@ class VoiceOrchestrator:
     def _launch_task(self, task_text: str, model: Optional[str] = None) -> None:
         suffix = uuid.uuid4().hex[:8]
         session_key = self.cfg.session_key(f"task-{suffix}")
-        log_event("openclaw.request", session_key=session_key, task=task_text[:300],
+        log_event("openclaw.dispatch", session_key=session_key, task=task_text[:300],
                   model=model, route=self._route)
 
         if self._route == "gateway" and self._gateway:
@@ -345,6 +345,8 @@ class VoiceOrchestrator:
                     # session exists but run didn't start -> send explicitly
                     res2 = self._gateway.send_message(session_key, task_text, timeout=45.0)
                     run_id = res2.get("runId") or ""
+                log_event("openclaw.request", session_key=session_key, task=task_text[:300],
+                          model=model, route=self._route, run_id=run_id)
                 self.task.set_active(session_key, run_id, task_text, model or "")
                 if self.cfg.get("openclaw", "progress_updates", default=True):
                     self._progress_thread = threading.Thread(target=self._progress_loop,
@@ -430,16 +432,17 @@ class VoiceOrchestrator:
             time.sleep(0.25)
         status = result_holder.get("status", "timeout")
         if status in ("failed",):
-            log_event("openclaw.result", session_key=session_key, status="failed",
-                      error=result_holder.get("error", ""), elapsed_s=round(time.time() - t0, 2))
+            log_event("openclaw.result", session_key=session_key, run_id=run_id,
+                      status="failed", error=result_holder.get("error", ""),
+                      elapsed_s=round(time.time() - t0, 2))
             self.speak("OpenClaw failed the task. Check the logs.")
             self.task.clear()
             return
         if status in ("timeout", "aborted"):
             # The run is (or was) still going on the gateway. Keep the task
             # tracked so "status" / "cancel" still work; don't pretend it failed.
-            log_event("openclaw.result", session_key=session_key, status=status,
-                      elapsed_s=round(time.time() - t0, 2))
+            log_event("openclaw.result", session_key=session_key, run_id=run_id,
+                      status=status, elapsed_s=round(time.time() - t0, 2))
             if status == "aborted":
                 self.speak("Task stopped.")
                 self.task.clear()
@@ -449,31 +452,93 @@ class VoiceOrchestrator:
                 self.task.last_progress_spoken = time.time()
             return
         # status == ok
-        try:
-            msgs = self._gateway.history(session_key, limit=6, timeout=45.0)
-            reply = self._extract_assistant_reply(msgs)
-        except Exception:
-            reply = ""
+        reply = self._fetch_final_reply(session_key, run_id)
         self.task.clear()
         self._handle_agent_result(session_key, reply, "ok", time.time() - t0)
 
     def _extract_assistant_reply(self, messages: list) -> str:
+        """Pull the last meaningful assistant text from a transcript."""
         parts = []
         for m in messages:
             if m.get("role") == "assistant":
                 c = m.get("text") or m.get("content") or ""
                 if isinstance(c, list):
                     c = " ".join(x.get("text", "") if isinstance(x, dict) else str(x) for x in c)
-                if c.strip():
-                    parts.append(c.strip())
+                c = str(c).strip()
+                # skip pure tool-call noise / silent markers
+                if c and c.lower() not in ("no_reply", "no reply") and not c.startswith("<tool"):
+                    parts.append(c)
+        # prefer the last substantial message, but include the previous one as context
         return "\n".join(parts[-2:])
+
+    def _fetch_final_reply(self, session_key: str, run_id: str = "") -> str:
+        """Layered reply lookup: parent history -> child sessions -> task ledger.
+
+        The gateway sometimes runs tool-heavy work in subagent/embedded sessions
+        whose transcript never lands on the parent session (observed in tests:
+        run status=ok, parent history contains only the user message). This walks
+        the known sources before giving up.
+        """
+        # 1. parent history
+        try:
+            msgs = self._gateway.history(session_key, limit=30, timeout=45.0)
+            reply = self._extract_assistant_reply(msgs)
+            if reply.strip():
+                return reply
+        except Exception as exc:
+            log_event("openclaw.reply.parent_failed", error=str(exc)[:160])
+
+        # 2. child sessions (rows whose parentSessionKey points at our session)
+        try:
+            rows = self._gateway.list_sessions(limit=200, timeout=45.0)
+            children = [r for r in rows if (r.get("parentSessionKey") or "") == session_key
+                        or (run_id and r.get("spawnedBy") == run_id)]
+            for child in children[:5]:
+                ckey = child.get("key") or ""
+                if not ckey:
+                    continue
+                try:
+                    msgs = self._gateway.history(ckey, limit=20, timeout=30.0)
+                    reply = self._extract_assistant_reply(msgs)
+                    if reply.strip():
+                        log_event("openclaw.reply.child", child_key=ckey)
+                        return reply
+                except Exception:
+                    continue
+        except Exception as exc:
+            log_event("openclaw.reply.children_failed", error=str(exc)[:160])
+
+        # 3. task ledger (owner/child session keys)
+        try:
+            tasks = self._gateway.list_tasks(timeout=45.0)
+            for t in tasks:
+                blob = json.dumps(t)
+                if session_key not in blob and (not run_id or run_id not in blob):
+                    continue
+                ckey = t.get("childSessionKey") or t.get("ownerKey") or t.get("sessionKey")
+                if not ckey or ckey == session_key:
+                    continue
+                try:
+                    msgs = self._gateway.history(ckey, limit=20, timeout=30.0)
+                    reply = self._extract_assistant_reply(msgs)
+                    if reply.strip():
+                        log_event("openclaw.reply.task_ledger", child_key=ckey)
+                        return reply
+                except Exception:
+                    continue
+        except Exception as exc:
+            log_event("openclaw.reply.ledger_failed", error=str(exc)[:160])
+
+        return ""
 
     def _handle_agent_result(self, session_key: str, reply: str, status: str,
                              elapsed_s: float) -> None:
         log_event("openclaw.result", session_key=session_key, status=status,
                   elapsed_s=round(elapsed_s, 2), reply_len=len(reply))
         if not reply.strip():
-            self.speak("OpenClaw finished, but had nothing to report.")
+            self.speak("OpenClaw finished the task. I couldn't pull the final "
+                       "text from the session — check the dashboard for details, "
+                       "or ask me what it did.")
             return
         summary = summarize(reply, self.cfg.section("summarizer"))
         log_event("openclaw.summary", session_key=session_key, summary=summary[:400])
@@ -521,13 +586,14 @@ class VoiceOrchestrator:
     def _abort_task(self, why: str) -> None:
         if self.task.active:
             key = self.task.session_key
+            run_id = self.task.run_id
             if self._route == "gateway" and self._gateway:
                 try:
                     self._gateway.abort(key, timeout=20.0)
                 except Exception:
                     pass
             self.task.clear()
-            log_event("openclaw.abort", why=why, session_key=key)
+            log_event("openclaw.abort", why=why, session_key=key, run_id=run_id)
 
     # ------------------------------------------------------------- confirm
     def _handle_confirm(self) -> None:

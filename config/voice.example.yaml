@@ -81,7 +81,7 @@ openclaw:
   # Voice-task model. null = agent default (ollama/qwen3:30b-a3b — smarter, slower).
   # For snappy voice tasks on this 3070: "ollama/qwen3-vl:8b" (fully in VRAM, ~40-70 tok/s).
   # Say "use turbo / normal / slow / hard / pro" at runtime to switch.
-  model: null
+  model: ollama/qwen3-vl:8b
   session_prefix: voice
   task_timeout_s: 900
   progress_updates: true        # speak periodic "still working" for long tasks
