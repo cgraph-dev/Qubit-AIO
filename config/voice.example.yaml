@@ -45,8 +45,9 @@ asr:
   compute_type: float16
   language: en
   beam_size: 1
-  min_confidence: 0.15    # below this -> "didn't catch that, repeat please"
-                          # (whisper's avg_logprob is conservative; 0.3+ is normal)
+  min_confidence: 0.02    # ~off. whisper's avg_logprob for real mic speech is
+                          # 0.05-0.2 — a higher gate rejects PERFECT transcripts.
+                          # Real "didn't catch" cases are handled by empty text + filler words.
 
 # PersonaPlex — full-duplex voice lane (remote GPU on Vast.ai over Tailscale).
 # The local bridge becomes the router: PersonaPlex answers conversation directly;

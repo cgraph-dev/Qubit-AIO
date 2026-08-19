@@ -55,7 +55,9 @@ DEFAULTS: Dict[str, Any] = {
         "compute_type": "float16",
         "language": "en",
         "beam_size": 1,
-        "min_confidence": 0.15,     # below -> ask to repeat (whisper logprob is conservative)
+        "min_confidence": 0.02,     # ~off: whisper avg_logprob for REAL mic speech is 0.05-0.2;
+                                    # a higher gate rejects perfect transcripts ("didn't catch that" bug)
+                                    # empty-text + filler-word checks handle real silence
     },
     "personaplex": {
         # Full-duplex lane: when enabled and reachable, PersonaPlex is the
