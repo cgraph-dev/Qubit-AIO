@@ -41,9 +41,9 @@ feedback:
 # Speech-to-text
 asr:
   provider: whisper       # whisper | personaplex
-  model: base             # tiny|base|small|medium.
-                          #   base (~0.5 GB VRAM) coexists with a loaded agent model.
-                          #   small needs the agent model unloaded (OOM otherwise on 8 GB).
+  model: small            # tiny|base|small|medium.
+                          #   small = 4-6x more accurate than base; fits fine now
+                          #   that agent tasks run on DeepSeek (GPU is idle during tasks).
   device: auto            # auto|cuda|cpu  (auto: GPU, falls back to CPU on OOM)
   compute_type: float16
   language: en
@@ -117,7 +117,7 @@ intent:
   #                      "agent"  (through OpenClaw: full memory/tools, 30-90 s)
   # In duplex mode PersonaPlex answers conversation directly; this backend is
   # only the fallback when the PersonaPlex lane is down.
-  conversation_backend: ollama
+  conversation_backend: deepseek   # deepseek (fast API ~1s) | ollama (local) | agent (OpenClaw memory)
 
 # ---------------------------------------------------------------------------
 # OpenClaw gateway (auto-discovered; these are overrides)

@@ -110,7 +110,10 @@ DEFAULTS: Dict[str, Any] = {
         "ollama_url": "http://127.0.0.1:11434",
         "ollama_model": "qwen3-vl:8b",
         "classify_timeout_s": 8.0,
-        "conversation_backend": "ollama",  # ollama (fast chat) | agent (OpenClaw memory)
+        "conversation_backend": "deepseek",  # deepseek (fast API) | ollama (local) | agent (OpenClaw memory)
+        "deepseek_url": "https://api.deepseek.com/chat/completions",
+        "deepseek_model": "deepseek-v4-flash",
+        "deepseek_env": "~/.hermes/.env",    # DEEPSEEK_API_KEY lives here
         # In duplex mode PersonaPlex answers conversation directly; this backend
         # is only used when the PersonaPlex lane is down.
         "duplex_conversation_fallback": True,

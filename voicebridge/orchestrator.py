@@ -16,6 +16,7 @@ thread-based for simplicity, using events/queues for coordination.
 from __future__ import annotations
 
 import json
+import os
 import queue
 import threading
 import time
@@ -716,14 +717,65 @@ class VoiceOrchestrator:
                 result = self._cli.run_task(chat_key, text, self._current_model())
                 self._handle_agent_result(chat_key, result.reply, result.status, result.elapsed_s)
                 return
-        # fast local chat via ollama
-        reply = self._chat_ollama(text)
+        # fast chat: direct DeepSeek completion (default) with local ollama fallback
+        reply = ""
+        if backend == "deepseek":
+            reply = self._chat_deepseek(text)
+        if not reply:
+            reply = self._chat_ollama(text)
         if reply:
             self.conversation.add("user", text)
             self.conversation.add("assistant", reply)
             self.speak(trim_spoken(reply, 500))
         else:
             self.speak("I'm sorry, I couldn't reach the chat model.")
+
+    def _chat_deepseek(self, text: str) -> str:
+        """Fast plain chat completion via the DeepSeek API (no agent bootstrap)."""
+        import urllib.request
+        key = self._deepseek_key()
+        if not key:
+            log_event("conversation.deepseek.nokey",
+                      hint="set DEEPSEEK_API_KEY in ~/.hermes/.env")
+            return ""
+        url = self.cfg.get("intent", "deepseek_url",
+                           default="https://api.deepseek.com/chat/completions")
+        model = self.cfg.get("intent", "deepseek_model", default="deepseek-v4-flash")
+        ctx = self.conversation.as_prompt()
+        system = ("You are a concise, warm voice assistant. Answer briefly in "
+                  "1-3 short sentences unless asked for detail.")
+        payload = {
+            "model": model, "stream": False, "temperature": 0.4,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user",
+                 "content": f"Recent conversation:\n{ctx}\n\nUser: {text}"},
+            ],
+        }
+        req = urllib.request.Request(
+            url, data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json",
+                     "Authorization": f"Bearer {key}"})
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                body = json.loads(resp.read().decode())
+            content = body["choices"][0]["message"]["content"]
+            return (content or "").strip()
+        except Exception as exc:
+            log_event("conversation.deepseek.failed", error=str(exc)[:160])
+            return ""
+
+    def _deepseek_key(self) -> str:
+        env_path = Path(self.cfg.get("intent", "deepseek_env",
+                                     default="~/.hermes/.env")).expanduser()
+        try:
+            for line in env_path.read_text(errors="replace").splitlines():
+                line = line.strip()
+                if line.startswith("DEEPSEEK_API_KEY="):
+                    return line.split("=", 1)[1].strip().strip('"').strip("'")
+        except Exception:
+            pass
+        return os.environ.get("DEEPSEEK_API_KEY", "")
 
     def _chat_ollama(self, text: str) -> str:
         import urllib.request
