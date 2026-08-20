@@ -35,20 +35,21 @@ fi
 if [ -n "$TS_AUTHKEY" ]; then
   # container-friendly: start tailscaled manually when systemd isn't running
   # (userspace networking: containers usually have no /dev/net/tun)
+  # NOTE: single-dash flags only — this tailscaled version rejects --tun/--
   if ! pgrep -x tailscaled >/dev/null 2>&1; then
     mkdir -p /var/lib/tailscale /var/run/tailscale
-    nohup tailscaled --tun=userspace-networking --netfilter-mode=off \
-      --state=/var/lib/tailscale/tailscaled.state \
-      --socket=/var/run/tailscale/tailscaled.sock >/var/log/tailscaled.log 2>&1 &
+    nohup tailscaled -tun=userspace-networking \
+      -state=/var/lib/tailscale/tailscaled.state \
+      -socket=/var/run/tailscale/tailscaled.sock >/var/log/tailscaled.log 2>&1 &
     for _ in $(seq 1 20); do
       tailscale --socket=/var/run/tailscale/tailscaled.sock status >/dev/null 2>&1 && break
       sleep 1
     done
   fi
   tailscale --socket=/var/run/tailscale/tailscaled.sock up \
-    --authkey="$TS_AUTHKEY" --hostname=personaplex --ssh=false --netfilter-mode=off \
+    -authkey="$TS_AUTHKEY" -hostname=personaplex -ssh=false \
     || tailscale --socket=/var/run/tailscale/tailscaled.sock up \
-       --authkey="$TS_AUTHKEY" --hostname=personaplex --netfilter-mode=off
+       -authkey="$TS_AUTHKEY" -hostname=personaplex
 fi
 TS_IP="$(tailscale ip -4 2>/dev/null | head -1 || true)"
 TS_HOST="$(tailscale status --json 2>/dev/null | jq -r '.Self.DNSName' 2>/dev/null | sed 's/\.$//' || true)"
