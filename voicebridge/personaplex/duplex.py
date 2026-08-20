@@ -245,6 +245,20 @@ class PersonaPlexDuplex:
             if mono.ndim > 1:
                 mono = mono.mean(axis=1)
             mono = mono * self.mic_gain
+            # ECHO GATE: never feed the server our own output — the speakers
+            # play PersonaPlex, the mic hears it, and the model babbles on its
+            # own voice forever (gibberish loop). Skip while (and shortly
+            # after) the lane is speaking.
+            if self.speaking:
+                return
+            # SPEECH GATE: only stream real speech. Constant low-level noise
+            # (room tone / dither) makes the model talk continuously; silence
+            # between turns is fine (sessions survive without frames).
+            rms = float(np.sqrt((mono ** 2).mean())) if mono.size else 0.0
+            speech_thr = float(self.cfg.get("personaplex", "speech_threshold",
+                                            default=0.02))
+            if rms < speech_thr:
+                return
             try:
                 self._queue_ref.put_nowait(mono)
             except asyncio.QueueFull:
@@ -365,8 +379,9 @@ class PersonaPlexDuplex:
                 self._set_state("live")
         t0 = time.monotonic()
         samples_sent = 0
-        # inaudible dither floor: the server closes sessions after ~40-90 s of
-        # TRUE silence (idle GC); a tiny noise floor keeps it alive invisibly
+        # inaudible dither floor: ONLY for the duck-silence keepalive path.
+        # The speech gate means silence sends nothing, so the model stays quiet
+        # between turns (no more gibberish); frames flow only for real speech.
         dither = float(self.cfg.get("personaplex", "dither_floor", default=1.0e-4))
         dither_frame = None
         if dither > 0:
