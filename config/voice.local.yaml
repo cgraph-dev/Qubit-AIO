@@ -125,10 +125,11 @@ openclaw:
   gateway_url: null       # auto: ws://127.0.0.1:<port from ~/.openclaw/openclaw.json>
   token_file: ~/.openclaw/.env
   agent: main
-  # Voice-task model. null = agent default (ollama/qwen3:30b-a3b — smarter, slower).
-  # For snappy voice tasks on this 3070: "ollama/qwen3-vl:8b" (fully in VRAM, ~40-70 tok/s).
+  # Voice-task model. DeepSeek Flash API = fast hosted agent runs (~10-60s vs
+  # minutes for local models on this 8 GB box). Alternatives: null (agent
+  # default = qwen3:30b-a3b, slower), "ollama/qwen3-vl:8b" (local, no cost).
   # Say "use turbo / normal / slow / hard / pro" at runtime to switch.
-  model: ollama/qwen3-vl:8b
+  model: deepseek/deepseek-v4-flash
   session_prefix: voice
   task_timeout_s: 900
   progress_updates: true        # speak periodic "still working" for long tasks
