@@ -1241,17 +1241,26 @@ class VoiceOrchestrator:
 
         threading.Thread(target=_stdin_reader, daemon=True, name="pp-stdin").start()
         fallback = False
+        down_since: Optional[float] = None
         while not self._stop.is_set():
             lane_live = self._duplex is not None and self._duplex.live
-            if lane_live and fallback:
-                fallback = False
-                print("\n[PersonaPlex is back — full-duplex mode resumed]")
-                self.speak("PersonaPlex is back.")
-            if not lane_live and not fallback:
-                fallback = True
-                print(f"\n[PersonaPlex offline — local push-to-talk fallback active. "
-                      f"Hold {hold} (or press Enter) to talk.]")
-                self.speak("PersonaPlex is offline. Using the local voice model.")
+            if lane_live:
+                down_since = None
+                if fallback:
+                    fallback = False
+                    print("\n[PersonaPlex is back — full-duplex mode resumed]")
+                    self.speak("PersonaPlex is back.")
+            else:
+                if down_since is None:
+                    down_since = time.time()
+                # only announce an outage once it has lasted >60 s: the lane
+                # reconnects every few seconds, so instant announcements make
+                # it sound like it "keeps restarting"
+                if (not fallback and time.time() - down_since > 60.0):
+                    fallback = True
+                    print(f"\n[PersonaPlex offline — local push-to-talk fallback active. "
+                          f"Hold {hold} (or press Enter) to talk.]")
+                    self.speak("PersonaPlex is offline. Using the local voice model.")
             if lane_live:
                 try:
                     line = stdin_q.get(timeout=1.0)

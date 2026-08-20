@@ -29,6 +29,7 @@ answers about work it cannot do. `duck()` persists until `unduck()`.
 from __future__ import annotations
 
 import asyncio
+import queue
 import threading
 import time
 import wave
@@ -74,6 +75,8 @@ class PersonaPlexDuplex:
         self._duck_seconds = 3600.0  # persistent until explicit unduck()
         self._output_mute = False    # instant stop of lane speech (PTT take-over)
         self._last_out_audio = 0.0   # for feedback suppression (speaking prop)
+        self._out_queue: "queue.Queue[np.ndarray]" = queue.Queue(maxsize=256)
+        self._out_thread: Optional[threading.Thread] = None
 
         mic = cfg.section("mic")
         self.mic_device = mic.get("device")
@@ -251,15 +254,40 @@ class PersonaPlexDuplex:
             log.warning("audio cb error: %s", exc)
 
     def _on_pp_audio(self, pcm: np.ndarray) -> None:
+        """Audio from the server -> speaker via a WRITER THREAD.
+
+        Never write to sounddevice from the async loop: OutputStream.write()
+        blocks, and any stall (generation burst, concurrent piper playback)
+        freezes the recv loop -> server transport reset -> session crash.
+        """
         with self._lock:
-            if self._is_ducked() or self._out is None or self._stop.is_set():
+            if self._is_ducked() or self._stop.is_set():
                 return
             if self._output_mute:
                 return  # PTT take-over: drop the lane's speech immediately
+        self.bytes_recv += pcm.nbytes
+        self._last_out_audio = time.time()
+        try:
+            self._out_queue.put_nowait(pcm.astype(np.float32, copy=False))
+        except queue.Full:
             try:
-                self._out.write(pcm.astype(np.float32, copy=False))
-                self.bytes_recv += pcm.nbytes
-                self._last_out_audio = time.time()
+                self._out_queue.get_nowait()  # drop oldest, keep latency low
+                self._out_queue.put_nowait(pcm.astype(np.float32, copy=False))
+            except Exception:
+                pass
+
+    def _out_worker(self) -> None:
+        """Drains the output queue to the speakers (owns sounddevice writes)."""
+        while not self._stop.is_set():
+            try:
+                pcm = self._out_queue.get(timeout=0.2)
+            except queue.Empty:
+                continue
+            with self._lock:
+                if self._out is None or self._is_ducked():
+                    continue
+            try:
+                self._out.write(pcm)
             except Exception as exc:
                 log.debug("output write: %s", exc)
 
@@ -291,6 +319,9 @@ class PersonaPlexDuplex:
         self._send_thread = threading.Thread(target=self._send_loop, daemon=True,
                                              name="pp-duplex-send")
         self._send_thread.start()
+        self._out_thread = threading.Thread(target=self._out_worker, daemon=True,
+                                            name="pp-duplex-out")
+        self._out_thread.start()
         self._set_state("connecting")
         return True
 
@@ -328,6 +359,16 @@ class PersonaPlexDuplex:
         with self._lock:
             if not self._stop.is_set() and not self._is_ducked():
                 self._set_state("live")
+        t0 = time.monotonic()
+        samples_sent = 0
+        # inaudible dither floor: the server closes sessions after ~40-90 s of
+        # TRUE silence (idle GC); a tiny noise floor keeps it alive invisibly
+        dither = float(self.cfg.get("personaplex", "dither_floor", default=1.0e-4))
+        dither_frame = None
+        if dither > 0:
+            rng = np.random.default_rng(0)
+            dither_frame = (rng.random(self.sample_rate // 50,
+                                       dtype=np.float32) - 0.5) * dither
         try:
             while not self._stop.is_set() and client.connected:
                 try:
@@ -335,11 +376,40 @@ class PersonaPlexDuplex:
                 except asyncio.TimeoutError:
                     continue
                 if self._is_ducked():
+                    # keep the session alive + never accumulate: drain the mic
+                    # queue and stream silence so unduck resumes without a burst
+                    while not self._mic_queue.empty():
+                        try:
+                            self._mic_queue.get_nowait()
+                        except asyncio.QueueEmpty:
+                            break
+                    sil = np.zeros(self.sample_rate // 50, np.float32)
+                    if dither_frame is not None:
+                        sil = sil + dither_frame
+                    try:
+                        await client.send_pcm_async(sil)
+                        samples_sent += len(sil)
+                    except DuplexError:
+                        break
+                    await asyncio.sleep(0.02)
                     continue
+                # pre-send pacing: throttle BEFORE sending so a queue backlog
+                # drains at real-time cadence instead of bursting
+                target_s = samples_sent / self.sample_rate
+                elapsed = time.monotonic() - t0
+                if target_s > elapsed:
+                    await asyncio.sleep(target_s - elapsed)
                 try:
+                    if dither_frame is not None:
+                        pcm = pcm + dither_frame
                     await client.send_pcm_async(pcm)
                     self.bytes_sent += pcm.nbytes
+                    samples_sent += len(pcm)
                 except DuplexError:
+                    break
+                except Exception as exc:
+                    log_event("personaplex.pump.error",
+                              error=f"{type(exc).__name__}: {str(exc)[:140]}")
                     break
         finally:
             with self._lock:
@@ -378,4 +448,7 @@ class PersonaPlexDuplex:
         if self._send_thread and self._send_thread.is_alive():
             self._send_thread.join(timeout=3.0)
         self._send_thread = None
+        if self._out_thread and self._out_thread.is_alive():
+            self._out_thread.join(timeout=2.0)
+        self._out_thread = None
         self._set_state("down")

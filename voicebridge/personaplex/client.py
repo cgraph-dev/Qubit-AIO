@@ -118,6 +118,24 @@ class DuplexClient:
                 timeout=timeout_s + 5.0)
         except Exception as exc:
             raise PersonaPlexUnavailable(f"connect failed: {exc}") from exc
+        # WAIT FOR THE HANDSHAKE before sending ANY audio: the server generates
+        # system prompts (~10-20 s) on session start and its is_alive() check
+        # CONSUMES + DISCARDS every frame received during that window — including
+        # the Ogg OpusHead header page. Streaming early destroys the reader
+        # ('no initial OpusHead' -> worker exits -> 'sending on a closed
+        # channel' -> session dies). The handshake byte (\\x00) marks readiness.
+        try:
+            hs = await asyncio.wait_for(self._ws.recv(), timeout=timeout_s + 10.0)
+            if not (isinstance(hs, (bytes, bytearray)) and len(hs) == 1 and hs[0] == 0):
+                await self._ws.close()
+                raise PersonaPlexUnavailable("unexpected handshake from server")
+        except asyncio.TimeoutError:
+            await self._ws.close()
+            raise PersonaPlexUnavailable("no handshake from server within timeout")
+        except PersonaPlexUnavailable:
+            raise
+        except Exception as exc:
+            raise PersonaPlexUnavailable(f"handshake failed: {exc}") from exc
         self._writer = sphn.OpusStreamWriter(self.SAMPLE_RATE)
         self._reader = sphn.OpusStreamReader(self.SAMPLE_RATE)
         self._close_reason = None
