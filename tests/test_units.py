@@ -228,6 +228,7 @@ def test_whisper_vram_plan():
     a3._free_vram_mb = lambda: 500
     assert a3._plan()[0][0] == "cpu"
     a4 = FasterWhisperASR(model="auto", compute_type="int8")
+    a4._free_vram_mb = lambda: 500
     a4._force_cpu = True
     assert a4._plan()[0] == ("cpu", "base", "int8")
 
