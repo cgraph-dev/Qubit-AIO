@@ -13,7 +13,7 @@ RestartSec=3
 Environment=LD_LIBRARY_PATH=/usr/local/lib/ollama/cuda_v12
 # Hotkey (pynput) needs the X11 session; comment the two lines below for headless/manual mode
 Environment=DISPLAY=:0
-Environment=XAUTHORITY=%h/.Xauthority
+Environment=XAUTHORITY=/run/user/1000/gdm/Xauthority
 Environment=VOICE_BRIDGE_CONFIG=%h/.config/openclaw-voice-bridge/voice.yaml
 
 [Install]
