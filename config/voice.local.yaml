@@ -41,7 +41,7 @@ feedback:
 # Speech-to-text
 asr:
   provider: whisper       # whisper | personaplex
-  model: small            # tiny|base|small|medium.
+  model: auto            # auto = small when GPU free, base when Ollama is hot (8 GB-safe)
                           #   small = 4-6x more accurate than base; fits fine now
                           #   that agent tasks run on DeepSeek (GPU is idle during tasks).
   device: auto            # auto|cuda|cpu  (auto: GPU, falls back to CPU on OOM)

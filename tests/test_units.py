@@ -213,3 +213,20 @@ def test_perplexity_config_defaults():
     assert cfg.get("intent", "perplexity_enabled", default=True) is True
     assert "perplexity.ai" in cfg.get("intent", "perplexity_url", default="")
     assert cfg.get("openclaw", "skills_nudge", default=True) is True
+
+
+def test_whisper_vram_plan():
+    from voicebridge.asr.whisper import FasterWhisperASR
+    a = FasterWhisperASR(model="auto")
+    a._free_vram_mb = lambda: 3000
+    assert a._plan()[0] == ("cuda", "small", "float16")
+    a2 = FasterWhisperASR(model="auto")
+    a2._free_vram_mb = lambda: 1200
+    plan2 = a2._plan()[0]
+    assert plan2 == ("cuda", "base", "int8")
+    a3 = FasterWhisperASR(model="auto")
+    a3._free_vram_mb = lambda: 500
+    assert a3._plan()[0][0] == "cpu"
+    a4 = FasterWhisperASR(model="auto", compute_type="int8")
+    a4._force_cpu = True
+    assert a4._plan()[0] == ("cpu", "base", "int8")
