@@ -295,6 +295,10 @@ class PersonaPlexDuplex:
 
     async def _pump_once(self) -> None:
         import sounddevice as sd
+        # fresh queue per loop iteration: asyncio.Queue binds to the loop it is
+        # first used on, and reconnect spawns a new loop
+        self._mic_queue = asyncio.Queue(maxsize=64)
+        self._queue_ref = self._mic_queue
         client = DuplexClient(
             url=self.url, voice_prompt=self.voice_prompt,
             text_prompt=self.text_prompt, ssl_insecure=self.ssl_insecure,

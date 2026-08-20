@@ -24,6 +24,17 @@ except ImportError:  # pragma: no cover - environment check
     sphn = None
 
 
+def _is_open(ws) -> bool:
+    """websockets >=14 exposes state; legacy used .closed — support both."""
+    st = getattr(ws, "state", None)
+    if st is not None:
+        try:
+            return st.name == "OPEN"
+        except AttributeError:
+            pass
+    return not getattr(ws, "closed", True)
+
+
 class PersonaPlexUnavailable(RuntimeError):
     pass
 
@@ -72,7 +83,7 @@ class DuplexClient:
     # ------------------------------------------------------------------ conn
     @property
     def connected(self) -> bool:
-        return self._ws is not None and not self._ws.closed
+        return self._ws is not None and _is_open(self._ws)
 
     def _ssl_ctx(self) -> Optional[ssl.SSLContext]:
         if self.url.startswith("wss://"):
@@ -101,7 +112,9 @@ class DuplexClient:
         try:
             self._ws = await asyncio.wait_for(
                 websockets.connect(self._query(), ssl=self._ssl_ctx(),
-                                   max_size=None, open_timeout=timeout_s),
+                                   max_size=None, open_timeout=timeout_s,
+                                   ping_interval=None,  # aiohttp server fails keepalives
+                                   ping_timeout=None),
                 timeout=timeout_s + 5.0)
         except Exception as exc:
             raise PersonaPlexUnavailable(f"connect failed: {exc}") from exc
@@ -159,7 +172,7 @@ class DuplexClient:
                 break  # no running loop (sync misuse) - drop
 
     def _ws_send(self, payload: bytes) -> None:
-        if self._ws is not None and not self._ws.closed:
+        if self._ws is not None and _is_open(self._ws):
             asyncio.ensure_future(self._ws.send(payload))
 
     async def send_pcm_async(self, pcm: np.ndarray) -> None:

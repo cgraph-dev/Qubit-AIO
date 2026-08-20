@@ -59,8 +59,8 @@ asr:
 # tasks are tapped by local whisper, classified, and delegated to OpenClaw / Hermes /
 # local PC actions. Memory stays on this PC (OpenClaw workspace).
 personaplex:
-  enabled: false            # set true once the Vast.ai instance is up
-  url: wss://personaplex:8998/api/chat   # Tailscale MagicDNS name or <tailnet-ip>
+  enabled: true             # PersonaPlex lane ACTIVE (Vast 3090 via Tailscale)
+  url: wss://100.90.173.120:8998/api/chat  # Vast box tailnet IP (verified)
   ssl_insecure: true        # self-signed cert on the Vast box (tailnet-encrypted anyway)
   voice_prompt: NATF2.pt    # NATF*/NATM*/VARF*/VARM* — pick the persona voice
   text_prompt: >

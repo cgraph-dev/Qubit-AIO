@@ -12,7 +12,8 @@
 #   the tailnet hostname, and a systemd unit bound to the tailnet IP only.
 set -euo pipefail
 
-: "${HF_TOKEN:?set HF_TOKEN (huggingface read token, license accepted on the HF page)}"
+HF_TOKEN="${HF_TOKEN:-dummy}"   # placeholder until a real read token is provided
+                                # (real token: accept the license + hf_... read token)
 TS_AUTHKEY="${TS_AUTHKEY:-}"
 REPO="${PERSONAPLEX_REPO:-https://github.com/NVIDIA/personaplex.git}"
 INSTALL_DIR=/opt/personaplex
@@ -32,8 +33,22 @@ if ! command -v tailscale >/dev/null; then
   curl -fsSL https://tailscale.com/install.sh | sh
 fi
 if [ -n "$TS_AUTHKEY" ]; then
-  tailscale up --authkey="$TS_AUTHKEY" --hostname=personaplex --ssh=false \
-    || tailscale up --authkey="$TS_AUTHKEY" --hostname=personaplex
+  # container-friendly: start tailscaled manually when systemd isn't running
+  # (userspace networking: containers usually have no /dev/net/tun)
+  if ! pgrep -x tailscaled >/dev/null 2>&1; then
+    mkdir -p /var/lib/tailscale /var/run/tailscale
+    nohup tailscaled --tun=userspace-networking --netfilter-mode=off \
+      --state=/var/lib/tailscale/tailscaled.state \
+      --socket=/var/run/tailscale/tailscaled.sock >/var/log/tailscaled.log 2>&1 &
+    for _ in $(seq 1 20); do
+      tailscale --socket=/var/run/tailscale/tailscaled.sock status >/dev/null 2>&1 && break
+      sleep 1
+    done
+  fi
+  tailscale --socket=/var/run/tailscale/tailscaled.sock up \
+    --authkey="$TS_AUTHKEY" --hostname=personaplex --ssh=false --netfilter-mode=off \
+    || tailscale --socket=/var/run/tailscale/tailscaled.sock up \
+       --authkey="$TS_AUTHKEY" --hostname=personaplex --netfilter-mode=off
 fi
 TS_IP="$(tailscale ip -4 2>/dev/null | head -1 || true)"
 TS_HOST="$(tailscale status --json 2>/dev/null | jq -r '.Self.DNSName' 2>/dev/null | sed 's/\.$//' || true)"
@@ -70,17 +85,37 @@ grep -v '^torch' moshi/requirements.txt > /tmp/pp-reqs.txt
 "$INSTALL_DIR/.venv/bin/pip" install --quiet accelerate websockets   # cpu-offload + check script
 
 log "6/8 pre-download model + voices (~16 GB, one time)"
-HF_TOKEN="$HF_TOKEN" "$INSTALL_DIR/.venv/bin/python" - <<'EOF'
+if [[ "$HF_TOKEN" == dummy* ]]; then
+  log "skipping model download: HF_TOKEN is a placeholder (set a real read token, then run:"
+  log "  HF_TOKEN=hf_xxx .venv/bin/python -c \"from huggingface_hub import snapshot_download; snapshot_download('nvidia/personaplex-7b-v1')\""
+  log "  systemctl restart personaplex"
+else
+  HF_TOKEN="$HF_TOKEN" "$INSTALL_DIR/.venv/bin/python" - <<'EOF'
 from huggingface_hub import snapshot_download
 snapshot_download("nvidia/personaplex-7b-v1")
 print("model + voices cached")
 EOF
+fi
 
 log "7/8 self-signed certs (SAN: DNS + IP) for wss://"
 mkdir -p "$SSL_DIR"
 openssl req -x509 -newkey rsa:2048 -keyout "$SSL_DIR/key.pem" -out "$SSL_DIR/cert.pem" \
   -days 365 -nodes -subj "/CN=${TS_HOST:-personaplex}" \
   -addext "subjectAltName=DNS:${TS_HOST:-personaplex},IP:${TS_IP}" >/dev/null 2>&1
+
+log "7b/8 patch NVIDIA moshi server bug (KeyError: 'seed' on any session)"
+SP="$("$INSTALL_DIR/.venv/bin/python" -c "import moshi, os; print(os.path.join(os.path.dirname(moshi.__file__), 'server.py'))")"
+if grep -q 'int(request\["seed"\]) if "seed" in request.query' "$SP"; then
+  python3 - "$SP" <<'PYEOF'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+s = s.replace('int(request["seed"]) if "seed" in request.query',
+              'int(request.query["seed"]) if "seed" in request.query')
+open(p, "w").write(s)
+print("patched server.py seed bug")
+PYEOF
+fi
 
 log "8/8 systemd service (bound to $TS_IP:$PORT only)"
 sed -e "s|__HOST__|$TS_IP|" -e "s|__HF_TOKEN__|$HF_TOKEN|" \
