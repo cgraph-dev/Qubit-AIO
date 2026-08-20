@@ -353,7 +353,11 @@ class PersonaPlexDuplex:
             text_prompt=self.text_prompt, ssl_insecure=self.ssl_insecure,
             on_audio=self._on_pp_audio, on_text=self._on_pp_text,
             on_close=self._on_pp_close)
-        await client.connect(timeout_s=15.0)
+        # generous connect: the server must generate system prompts (~30-60 s
+        # on a shared host) before it sends the handshake byte; too-short
+        # timeouts cause a permanent connect/retry loop
+        await client.connect(timeout_s=float(
+            self.cfg.get("personaplex", "connect_timeout_s", default=90.0)))
         self._client = client
         self._open_streams(sd)
         with self._lock:
