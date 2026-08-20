@@ -137,7 +137,9 @@ DEFAULTS: Dict[str, Any] = {
         "gateway_url": None,     # auto-discovered: ws://127.0.0.1:18789
         "token_file": "~/.openclaw/.env",
         "agent": "main",
-        "model": None,           # None = agent default; "ollama/qwen3-vl:8b" for fast voice tasks
+        "model": None,           # None = FOLLOW the agent's selected default model
+                                 # (gateway default; e.g. deepseek flash today) — the
+                                 # voice uses whatever LLM OpenClaw/Hermes is set to
         "session_prefix": "voice",
         "skills_nudge": True,     # append "use your skills/tools" to every task
         "task_timeout_s": 900,

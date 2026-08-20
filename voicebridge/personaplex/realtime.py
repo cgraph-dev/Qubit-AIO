@@ -57,6 +57,21 @@ def _read_env_key(env_path: str, name: str) -> str:
     return os.environ.get(name, "")
 
 
+def read_hermes_default_model(env_path: str = "~/.hermes/config.yaml") -> str:
+    """Read the model Hermes is actually configured to use (model.default)."""
+    try:
+        import yaml
+        data = yaml.safe_load(Path(env_path).expanduser().read_text(errors="replace"))
+        m = (data or {}).get("model", {})
+        if isinstance(m, dict):
+            return str(m.get("default") or m.get("model") or "").strip()
+        if isinstance(m, str):
+            return m.strip()
+    except Exception:
+        pass
+    return ""
+
+
 class RealtimeUnavailable(Exception):
     pass
 

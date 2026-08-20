@@ -43,6 +43,7 @@ from .openclaw.cli_backend import CliBackend
 from .openclaw.discovery import discover_gateway, discover_cuda_libs
 from .openclaw.gateway_ws import GatewaySync, GatewayError
 from .personaplex import PersonaPlexDuplex
+from .personaplex.realtime import read_hermes_default_model
 from .safety.policy import SafetyPolicy, SafetyVerdict
 from .summarizer import summarize, trim_spoken
 
@@ -450,7 +451,16 @@ class VoiceOrchestrator:
             log.debug("gw event %s: %s", event, str(payload)[:160])
 
     def _current_model(self) -> Optional[str]:
-        return self.cfg.get("openclaw", "model")
+        """The model voice tasks run on: explicit config override if set,
+        otherwise the agent's ACTUAL default (OpenClaw gateway default /
+        tier, or Hermes default) so the voice follows whatever LLM the
+        agent is set to."""
+        override = self.cfg.get("openclaw", "model")
+        if override:
+            return override
+        if self.gateway_info and self.gateway_info.default_model:
+            return self.gateway_info.default_model
+        return None
 
     def _dispatch_coding(self, task_text: str, model: Optional[str] = None,
                          force_confirm: bool = False) -> None:
@@ -913,7 +923,9 @@ class VoiceOrchestrator:
             return ""
         url = self.cfg.get("intent", "deepseek_url",
                            default="https://api.deepseek.com/chat/completions")
-        model = self.cfg.get("intent", "deepseek_model", default="deepseek-v4-flash")
+        model = (self.cfg.get("intent", "deepseek_model", default="")
+                 or read_hermes_default_model()
+                 or "deepseek-v4-flash")
         ctx = self.conversation.as_prompt()
         system = ("You are a concise, warm voice assistant. Answer briefly in "
                   "1-3 short sentences unless asked for detail. Be direct: "

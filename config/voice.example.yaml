@@ -138,7 +138,10 @@ openclaw:
   # minutes for local models on this 8 GB box). Alternatives: null (agent
   # default = qwen3:30b-a3b, slower), "ollama/qwen3-vl:8b" (local, no cost).
   # Say "use turbo / normal / slow / hard / pro" at runtime to switch.
-  model: deepseek/deepseek-v4-flash
+  model: deepseek/deepseek-v4-flash  # PINNED (fast). Set null to FOLLOW the agent's
+                          # selected default — note: OpenClaw's primary is currently
+                          # ollama/qwen3:30b-a3b (local 30B), deepseek flash is the
+                          # 'hard' tier; change agents.defaults.model.primary to follow
   session_prefix: voice
   task_timeout_s: 900
   progress_updates: true        # speak periodic "still working" for long tasks
