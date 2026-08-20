@@ -259,7 +259,6 @@ voicebridge run                          # full-duplex mode: talk naturally
 | "create a note in tmp…" / "patch the stripe webhook…" | coding task → OpenClaw agent (DeepSeek, ~6s) with skills nudge |
 | "ask Hermes what…" | Hermes intent → Hermes backend |
 | "use turbo / hard / pro" | model tier switch for tasks |
-|---|---|
 | "What do you think about this marketplace idea?" | PersonaPlex answers in character (CHAT) |
 | "Open the current project and inspect the Stripe webhook validation." | routed to OpenClaw (OPENCLAW_TASK); spoken summary after |
 | "Ask Hermes to review the latest PR." | Hermes backend (HERMES_TASK) |
