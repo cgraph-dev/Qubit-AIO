@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 import queue
+import re
 import threading
 import time
 import uuid
@@ -80,8 +81,45 @@ def _interrupt_decision_prompt(old_task: str, new_request: str) -> str:
         "as part of it. If it is a different direction or explicitly replaces "
         "the current work, STOP the current work and do the new request "
         "instead.\n"
-        "Then act on your decision and report what you did."
+        "Then act on your decision and report what you did. Be direct: no "
+        "emojis, no pleasantries, only what was done and what's next."
     )
+
+
+_EMOJI_RE = re.compile(
+    "["
+    "\U0001F000-\U0001FAFF"   # misc symbols & pictographs, emoji, transport
+    "\U00002600-\U000027BF"   # misc symbols, dingbats
+    "\U0001F1E6-\U0001F1FF"   # flags
+    "\U0000FE0F\U0000FE0E"    # variation selectors
+    "\U00002702-\U000027B0"
+    "]+"
+)
+_LEADING_FILLER_RE = re.compile(
+    r"^\s*(?:(?:sure|absolutely|certainly|yes|yeah|yep|ok|okay|great|"
+    r"perfect|no problem|here you go|you're welcome|happy to help|"
+    r"glad to|sure thing)\s*[,.!]?\s*)+",
+    re.IGNORECASE,
+)
+_TRAILING_FILLER_RE = re.compile(
+    r"\s*(?:let me know (?:if|whether)[^.]*\.?|if (?:you|u) (?:need|want|have) "
+    r"(?:anything|more|questions?)[^.]*\.?|hope (?:that )?helps[^.]*\.?|"
+    r"have a great day[^.]*\.?|thanks for asking[^.]*\.?|"
+    r"is there anything else[^.]*\??|feel free to ask[^.]*\.?)\s*$",
+    re.IGNORECASE,
+)
+
+
+def speech_direct(text: str) -> str:
+    """Trim spoken output: strip emojis, leading pleasantries, trailing filler.
+
+    Keeps the substance — removes the smiley faces and extra words so TTS
+    answers directly with only what's needed.
+    """
+    out = _EMOJI_RE.sub("", text)
+    out = _LEADING_FILLER_RE.sub("", out, count=1)
+    out = _TRAILING_FILLER_RE.sub("", out)
+    return " ".join(out.split()).strip()
 
 
 class VoiceOrchestrator:
@@ -123,6 +161,8 @@ class VoiceOrchestrator:
         # continues on a spoken say-so (new instruction or "continue")
         self._interrupted_session: Optional[str] = None
         self._interrupted_task_text: str = ""
+        self._interrupt_requested = False   # set from the hotkey thread while the
+                                            # loop is blocked inside speak()
         self.playback = Playback()
         self.classifier: Optional[Classifier] = None
         self.safety = SafetyPolicy(config.section("safety"))
@@ -302,6 +342,16 @@ class VoiceOrchestrator:
             self._ptt_hold = True
             self._ptt_started.set()
             self._ptt_released.clear()
+            # interrupt from the LISTENER thread: the main loop is often
+            # blocked inside speak(), so playback must be stopped here so the
+            # response is cut off immediately (task pause is handled when the
+            # loop picks up _interrupt_requested)
+            if self.cfg.get("hotkey", "interrupt_on_ptt", default=True):
+                if self.playback.playing:
+                    self.playback.stop()
+                    self._interrupt_requested = True
+                elif self.task.active:
+                    self._interrupt_requested = True
         elif event == "ptt_end":
             self._ptt_hold = False
             self._ptt_released.set()
@@ -343,6 +393,10 @@ class VoiceOrchestrator:
               barge: bool = True) -> bool:
         """Synthesize + play with optional barge-in monitoring. Returns True if finished."""
         if not text or self.muted:
+            return True
+        if self.cfg.get("tts", "direct", default=True):
+            text = speech_direct(text)
+        if not text:
             return True
         if self._tts is None:
             log.warning("TTS not available; would say: %s", text[:120])
@@ -425,7 +479,10 @@ class VoiceOrchestrator:
         if self.cfg.get("openclaw", "skills_nudge", default=True):
             task_text = (task_text
                          + "\n\nUse your available skills and tools as needed "
-                           "(files, terminal, browser, repos, delegation).")
+                           "(files, terminal, browser, repos, delegation). "
+                           "Reply directly and concisely: no emojis, no "
+                           "pleasantries, no extra words — only what was done "
+                           "and what's next.")
         suffix = uuid.uuid4().hex[:8]
         if self._interrupted_session:
             # new instruction after an interrupt: same session (context kept),
@@ -768,6 +825,8 @@ class VoiceOrchestrator:
             interrupted_anything = True
         if interrupted_anything and not self.muted:
             self.speak("Paused. Go ahead.")
+        elif not self.muted:
+            self.speak("Go ahead.")
 
     # ------------------------------------------------------------- confirm
     def _handle_confirm(self) -> None:
@@ -842,7 +901,9 @@ class VoiceOrchestrator:
         model = self.cfg.get("intent", "deepseek_model", default="deepseek-v4-flash")
         ctx = self.conversation.as_prompt()
         system = ("You are a concise, warm voice assistant. Answer briefly in "
-                  "1-3 short sentences unless asked for detail.")
+                  "1-3 short sentences unless asked for detail. Be direct: "
+                  "no emojis, no pleasantries, no filler words — say only "
+                  "what's needed.")
         payload = {
             "model": model, "stream": False, "temperature": 0.4,
             "messages": [
@@ -896,7 +957,8 @@ class VoiceOrchestrator:
         model = self.cfg.get("intent", "perplexity_model", default="sonar-pro")
         system = ("You are a concise voice assistant answering from current web "
                   "search. Give a short, accurate, up-to-date answer in 1-4 "
-                  "sentences. Prefer facts over hedging.")
+                  "sentences. Prefer facts over hedging. Be direct: no emojis, "
+                  "no pleasantries, no filler words.")
         payload = {
             "model": model, "stream": False, "temperature": 0.3,
             "messages": [
@@ -1201,11 +1263,13 @@ class VoiceOrchestrator:
                 time.sleep(0.02)
             if self._stop.is_set():
                 break
-            busy = (self.task.active or self.playback.playing)
+            busy = (self.task.active or self.playback.playing
+                    or self._interrupt_requested)
             if busy and self.cfg.get("hotkey", "interrupt_on_ptt", default=True):
                 # pause whatever the bridge is doing (speech OR agent task),
                 # then listen hands-free for the new instruction; the agent
                 # only continues on an explicit say-so
+                self._interrupt_requested = False
                 self._interrupt_task()
                 res = self._capture_utterance(toggle=True)
             else:

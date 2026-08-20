@@ -105,6 +105,7 @@ DEFAULTS: Dict[str, Any] = {
         "interrupt": True,          # allow barge-in / stop speaking
         "edge": {"voice": "en-US-JennyNeural", "rate": "+0%"},
         "gateway": {"model": None},  # None = gateway default
+        "direct": True,          # strip emojis/pleasantries/filler from spoken output
     },
     "intent": {
         "llm_classifier": True,     # use ollama qwen3-vl:8b when heuristic is unsure

@@ -252,3 +252,13 @@ def test_interrupt_decision_prompt():
     assert "check the auth flow" in p
     assert "CONTINUE" in p and "STOP" in p
     assert "Decide what to do" in p
+
+
+def test_speech_direct():
+    from voicebridge.orchestrator import speech_direct
+    assert speech_direct("Sure! 😊 Let me check that for you.") == "Let me check that for you."
+    assert speech_direct("Absolutely, here you go! The file is at /tmp/x.md.") == "The file is at /tmp/x.md."
+    assert speech_direct("OpenClaw updated two files. Let me know if you need anything else!") == "OpenClaw updated two files."
+    assert speech_direct("Yes! Done. Hope that helps!") == "Done."
+    assert speech_direct("No emoji here.") == "No emoji here."
+    assert speech_direct("Created the file. What's next?") == "Created the file. What's next?"
