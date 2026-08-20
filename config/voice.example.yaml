@@ -22,7 +22,7 @@ mic:
   sample_rate: 48000      # device rate; resampled to 16 kHz for ASR
   channels: 2             # capture N channels, use the loudest (Scarlett 4ch profile: mic on ch 0)
   blocksize: 480          # ~10 ms at 48 kHz
-  gain: 4.0               # pre-amplify quiet interfaces before VAD/ASR
+  gain: 16.0             # pre-amplify the quiet Scarlett (measured ~0.0004 RMS)
   min_rms: 0.0008         # below this RMS the capture counts as silence
 
 # Voice activity detection / endpointing

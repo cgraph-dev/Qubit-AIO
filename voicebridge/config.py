@@ -37,7 +37,7 @@ DEFAULTS: Dict[str, Any] = {
         "sample_rate": 48000,  # device rate; resampled to 16k for ASR
         "channels": 2,         # capture N channels, use the loudest
         "blocksize": 480,      # ~10ms at 48k
-        "gain": 4.0,           # pre-amplify quiet interfaces (Focusrite needs this)
+        "gain": 16.0,           # pre-amplify quiet interfaces (Focusrite needs this)
         "min_rms": 0.0008,     # below this RMS the capture is treated as silence
     },
     "vad": {
@@ -80,6 +80,9 @@ DEFAULTS: Dict[str, Any] = {
         "ptt_uses_tap": True,           # duplex mode: Ctrl routes the next tapped
                                         # utterance (no second mic stream — avoids
                                         # device conflict with the lane's mic)
+        "speech_threshold": 0.004,      # RMS gate for mic->server frames (after gain);
+                                        # tuned for the quiet Scarlett — raise if the
+                                        # model starts replying to room noise
         "duck_on_task_s": 8.0,          # mute PP + stop feeding it while a task runs
         "reconnect_s": 5.0,             # reconnect/backoff interval
         # legacy (pre-duplex) adapter knobs kept for compatibility

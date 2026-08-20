@@ -245,6 +245,9 @@ class PersonaPlexDuplex:
             if mono.ndim > 1:
                 mono = mono.mean(axis=1)
             mono = mono * self.mic_gain
+            # the tap always runs (its own VAD is tuned for quiet mics) —
+            # never gate it behind the send threshold
+            self._feed_tap(mono)
             # ECHO GATE: never feed the server our own output — the speakers
             # play PersonaPlex, the mic hears it, and the model babbles on its
             # own voice forever (gibberish loop). Skip while (and shortly
@@ -256,14 +259,13 @@ class PersonaPlexDuplex:
             # between turns is fine (sessions survive without frames).
             rms = float(np.sqrt((mono ** 2).mean())) if mono.size else 0.0
             speech_thr = float(self.cfg.get("personaplex", "speech_threshold",
-                                            default=0.02))
+                                            default=0.004))
             if rms < speech_thr:
                 return
             try:
                 self._queue_ref.put_nowait(mono)
             except asyncio.QueueFull:
                 pass
-            self._feed_tap(mono)
         except Exception as exc:
             log.warning("audio cb error: %s", exc)
 
