@@ -723,21 +723,23 @@ class VoiceOrchestrator:
             log_event("openclaw.abort", why=why, session_key=key, run_id=run_id)
 
     def _interrupt_task(self) -> None:
-        """Pause the running agent (Ctrl during a task).
+        """Pause whatever the bridge is doing (Ctrl during speech or a task).
 
-        Aborts the run, remembers the session for continuation/context, and
-        tells the user the floor is theirs. Nothing continues automatically:
-        the next run only happens on a spoken instruction or "continue".
+        Stops spoken output, aborts a running agent task (remembering its
+        session for continuation/context), and tells the user the floor is
+        theirs. Nothing continues automatically: the next run only happens on
+        a spoken instruction or "continue".
         """
+        interrupted_anything = False
         if self.task.active:
             self._interrupted_session = self.task.session_key
             self._abort_task("interrupted by hotkey")
             log_event("task.interrupted", session_key=self._interrupted_session)
-        try:
+            interrupted_anything = True
+        if self.playback.playing:
             self.playback.stop()
-        except Exception:
-            pass
-        if not self.muted:
+            interrupted_anything = True
+        if interrupted_anything and not self.muted:
             self.speak("Paused. Go ahead.")
 
     # ------------------------------------------------------------- confirm
@@ -1172,9 +1174,11 @@ class VoiceOrchestrator:
                 time.sleep(0.02)
             if self._stop.is_set():
                 break
-            if self.task.active and self.cfg.get("hotkey", "interrupt_on_ptt", default=True):
-                # pause the running agent, then listen hands-free for the
-                # new instruction ("continue" only on an explicit say-so)
+            busy = (self.task.active or self.playback.playing)
+            if busy and self.cfg.get("hotkey", "interrupt_on_ptt", default=True):
+                # pause whatever the bridge is doing (speech OR agent task),
+                # then listen hands-free for the new instruction; the agent
+                # only continues on an explicit say-so
                 self._interrupt_task()
                 res = self._capture_utterance(toggle=True)
             else:
