@@ -77,6 +77,9 @@ DEFAULTS: Dict[str, Any] = {
                         "user's projects. Keep answers concise and natural.",
         "sample_rate": 24000,           # Mimi codec rate (matches the server)
         "whisper_tap": True,            # local ASR tap for intent routing
+        "ptt_uses_tap": True,           # duplex mode: Ctrl routes the next tapped
+                                        # utterance (no second mic stream — avoids
+                                        # device conflict with the lane's mic)
         "duck_on_task_s": 8.0,          # mute PP + stop feeding it while a task runs
         "reconnect_s": 5.0,             # reconnect/backoff interval
         # legacy (pre-duplex) adapter knobs kept for compatibility

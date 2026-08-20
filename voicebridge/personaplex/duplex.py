@@ -72,6 +72,8 @@ class PersonaPlexDuplex:
         self.whisper_tap: bool = bool(pp.get("whisper_tap", True))
         self.sample_rate: int = int(pp.get("sample_rate", DuplexClient.SAMPLE_RATE))
         self._duck_seconds = 3600.0  # persistent until explicit unduck()
+        self._output_mute = False    # instant stop of lane speech (PTT take-over)
+        self._last_out_audio = 0.0   # for feedback suppression (speaking prop)
 
         mic = cfg.section("mic")
         self.mic_device = mic.get("device")
@@ -118,6 +120,19 @@ class PersonaPlexDuplex:
     @property
     def live(self) -> bool:
         return self._state == "live"
+
+    @property
+    def speaking(self) -> bool:
+        """True while the lane has recently written audio to the speakers
+        (used to suppress the mic tap so it doesn't hear its own voice)."""
+        return time.time() - self._last_out_audio < 0.8
+
+    def interrupt_output(self) -> None:
+        """Instantly stop lane speech (PTT take-over); resume with resume_output()."""
+        self._output_mute = True
+
+    def resume_output(self) -> None:
+        self._output_mute = False
 
     def _set_state(self, s: str) -> None:
         if self._state != s:
@@ -239,9 +254,12 @@ class PersonaPlexDuplex:
         with self._lock:
             if self._is_ducked() or self._out is None or self._stop.is_set():
                 return
+            if self._output_mute:
+                return  # PTT take-over: drop the lane's speech immediately
             try:
                 self._out.write(pcm.astype(np.float32, copy=False))
                 self.bytes_recv += pcm.nbytes
+                self._last_out_audio = time.time()
             except Exception as exc:
                 log.debug("output write: %s", exc)
 

@@ -278,3 +278,34 @@ def test_realtime_config_defaults():
     rt = cfg.section("realtime")
     assert rt.get("model", "").startswith("gpt-")
     assert cfg.get("personaplex", "provider", default="personaplex") in ("personaplex", "realtime")
+
+
+def test_duplex_pending_flow():
+    """Simulate the duplex PTT take-over flag flow (no mic conflict)."""
+    from voicebridge.orchestrator import VoiceOrchestrator
+    import threading, time
+    o = VoiceOrchestrator.__new__(VoiceOrchestrator)
+    o._duplex_ptt_pending = False
+    o._duplex_ptt_until = 0.0
+    # a press sets pending + window
+    o._duplex_ptt_pending = True
+    o._duplex_ptt_until = time.time() + 12.0
+    assert o._duplex_ptt_pending
+    # transcript handler clears it
+    o._duplex_ptt_pending = False
+    assert not o._duplex_ptt_pending
+
+
+def test_duplex_feedback_suppression():
+    from voicebridge.personaplex.duplex import PersonaPlexDuplex
+    import time
+    d = PersonaPlexDuplex.__new__(PersonaPlexDuplex)
+    d._last_out_audio = time.time()  # just wrote audio -> speaking
+    assert d.speaking
+    d._last_out_audio = time.time() - 2.0  # quiet for 2s -> not speaking
+    assert not d.speaking
+    d._output_mute = True
+    d.interrupt_output()
+    assert d._output_mute
+    d.resume_output()
+    assert not d._output_mute

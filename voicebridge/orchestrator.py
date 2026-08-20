@@ -165,6 +165,8 @@ class VoiceOrchestrator:
         self._interrupt_requested = False   # set from the hotkey thread while the
                                             # loop is blocked inside speak()
         self._hermes_busy = False           # a Hermes task is running in the bg
+        self._duplex_ptt_pending = False    # duplex mode: Ctrl pressed; next tap
+        self._duplex_ptt_until = 0.0        # utterance is the user's instruction
         self.playback = Playback()
         self.classifier: Optional[Classifier] = None
         self.safety = SafetyPolicy(config.section("safety"))
@@ -352,6 +354,15 @@ class VoiceOrchestrator:
             self._ptt_hold = True
             self._ptt_started.set()
             self._ptt_released.clear()
+            # duplex take-over: Ctrl = stop PersonaPlex + listen via the lane's
+            # own mic tap (never opens a second mic stream -> no conflict)
+            if (self._duplex is not None and self._duplex.live
+                    and self.cfg.get("personaplex", "ptt_uses_tap", default=True)):
+                self._duplex.interrupt_output()
+                self._duplex_ptt_pending = True
+                self._duplex_ptt_until = time.time() + 12.0
+                log_event("personaplex.ptt_pending", until=int(self._duplex_ptt_until))
+                return
             # interrupt from the LISTENER thread: the main loop is often
             # blocked inside speak(), so playback must be stopped here so the
             # response is cut off immediately (task pause is handled when the
@@ -1108,18 +1119,29 @@ class VoiceOrchestrator:
         """A tapped utterance while the PersonaPlex lane is live."""
         if self._stop.is_set():
             return
+        pending = self._duplex_ptt_pending
+        self._duplex_ptt_pending = False
+        if self._duplex is not None:
+            self._duplex.resume_output()
+        # feedback suppression: the mic hears the lane's own voice (or the
+        # bridge's piper replies) — ignore unless the user took over with PTT
+        if not pending:
+            if self.playback.playing:
+                return
+            if self._duplex is not None and self._duplex.speaking:
+                return
         log_event("routing.input", text=text, confidence=round(confidence, 3),
-                  source="duplex-tap")
+                  source="duplex-tap", ptt=pending)
         intent = self.classifier.classify(text)
         log_event("routing.decision", text=text[:200], kind=intent.kind,
                   confidence=round(intent.confidence, 2), reason=intent.reason,
                   source=intent.source)
         self.conversation.add("user", text)
-        if intent.kind == "conversation":
+        if intent.kind == "conversation" and not pending:
             # PersonaPlex is already answering in character — stay out of the way.
             return
-        # Everything else: duck PersonaPlex so it can't answer for work it
-        # cannot do, route the task, then resume the voice lane.
+        # Everything else (or a PTT take-over): duck PersonaPlex so it can't
+        # answer for work it cannot do, route the task, then resume the lane.
         self._duck_pp()
         try:
             self._route_intent(intent, text)
@@ -1305,6 +1327,17 @@ class VoiceOrchestrator:
                 time.sleep(0.02)
             if self._stop.is_set():
                 break
+            # duplex PTT take-over: the lane's mic tap delivers the utterance —
+            # do NOT open a second mic stream (device conflict). Wait for the
+            # tap to fire or the 12 s window to lapse.
+            if self._duplex_ptt_pending and self._duplex is not None:
+                if time.time() > self._duplex_ptt_until:
+                    self._duplex_ptt_pending = False
+                    self._duplex.resume_output()
+                    log_event("personaplex.ptt_expired")
+                else:
+                    time.sleep(0.05)
+                    continue
             busy = (self.task.active or self.playback.playing
                     or self._interrupt_requested or self._hermes_busy)
             if busy and self.cfg.get("hotkey", "interrupt_on_ptt", default=True):

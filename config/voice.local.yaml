@@ -69,7 +69,9 @@ personaplex:
     If the user asks you to DO something on a computer (open files, run commands,
     check code, etc.), acknowledge it briefly and note that the action will be
     performed for them.
-  whisper_tap: true         # local ASR tap for intent routing
+  whisper_tap: true
+  ptt_uses_tap: true        # duplex mode: Ctrl = stop PersonaPlex + route the next
+                            # utterance via the lane's tap (no 2nd mic stream)         # local ASR tap for intent routing
   reconnect_s: 5.0          # reconnect/backoff interval (s)
 
 # Hermes — optional second executor ("ask Hermes to ..."). Same machine as the
