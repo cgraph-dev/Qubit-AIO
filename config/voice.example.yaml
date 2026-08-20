@@ -10,6 +10,8 @@ hotkey:
   tap_toggle: true        # quick tap of hold_key = toggle too; hold = classic PTT
   tap_ms: 300             # press shorter than this counts as a tap
   toggle_no_speech_s: 5.0 # toggle stops itself if you don't speak
+  interrupt_on_ptt: true  # Ctrl while a task runs = PAUSE + listen for new
+                          # instruction; agent only continues on your say-so
   alt_hold_key: ""        # optional second hold key
   tap_cancel: esc         # tap while assistant speaks -> stop speech / cancel task
 

@@ -30,6 +30,7 @@ DEFAULTS: Dict[str, Any] = {
         "tap_toggle": True,    # quick tap = start/stop listening; hold = classic PTT
         "tap_ms": 300,         # press shorter than this counts as a tap
         "toggle_no_speech_s": 5.0,  # toggle stops itself if nothing spoken
+        "interrupt_on_ptt": True,   # Ctrl during a task = pause + listen for new instruction
     },
     "mic": {
         "device": None,        # None = system default input

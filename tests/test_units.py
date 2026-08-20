@@ -230,3 +230,16 @@ def test_whisper_vram_plan():
     a4 = FasterWhisperASR(model="auto", compute_type="int8")
     a4._force_cpu = True
     assert a4._plan()[0] == ("cpu", "base", "int8")
+
+
+def test_classify_continue_command():
+    from voicebridge.intent.classifier import Classifier
+    clf, _ = _classifier()
+    i = clf.classify("continue")
+    assert i.kind == "system" and i.params.get("command") == "continue"
+    i2 = clf.classify("resume")
+    assert i2.kind == "system" and i2.params.get("command") == "continue"
+    i3 = clf.classify("keep going")
+    assert i3.kind == "system" and i3.params.get("command") == "continue"
+    i4 = clf.classify("continue working on the stripe webhook")
+    assert i4.kind != "system" or i4.params.get("command") != "continue"

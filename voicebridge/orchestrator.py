@@ -102,6 +102,9 @@ class VoiceOrchestrator:
         self._press_time = 0.0
         self._toggle_armed = False       # a tap started a toggle capture
         self._toggle_stop = threading.Event()
+        # interrupt/pause lane: Ctrl during a task pauses it; the agent only
+        # continues on a spoken say-so (new instruction or "continue")
+        self._interrupted_session: Optional[str] = None
         self.playback = Playback()
         self.classifier: Optional[Classifier] = None
         self.safety = SafetyPolicy(config.section("safety"))
@@ -406,7 +409,14 @@ class VoiceOrchestrator:
                          + "\n\nUse your available skills and tools as needed "
                            "(files, terminal, browser, repos, delegation).")
         suffix = uuid.uuid4().hex[:8]
-        session_key = self.cfg.session_key(f"task-{suffix}")
+        if self._interrupted_session:
+            # new instruction after an interrupt: keep the same session so the
+            # agent continues with context of what it was doing
+            session_key = self._interrupted_session
+            self._interrupted_session = None
+            log_event("task.reused_session", session_key=session_key)
+        else:
+            session_key = self.cfg.session_key(f"task-{suffix}")
         log_event("openclaw.dispatch", session_key=session_key, task=task_text[:300],
                   model=model, route=self._route)
 
@@ -667,7 +677,26 @@ class VoiceOrchestrator:
         elif cmd == "cancel":
             self.confirmations.clear()
             self._abort_task("voice cancel")
+            self._interrupted_session = None
             self.speak("Cancelled.")
+        elif cmd == "continue":
+            key = self._interrupted_session
+            self._interrupted_session = None
+            if key and self._route == "gateway" and self._gateway:
+                self.speak("Continuing.")
+                try:
+                    res = self._gateway.send_message(
+                        key, "Please continue where you left off.", timeout=45.0)
+                    run_id = res.get("runId") or ""
+                    log_event("openclaw.continue", session_key=key, run_id=run_id)
+                    self.task.set_active(key, run_id, "continue",
+                                         self._current_model() or "")
+                    self._spawn_waiter(key, run_id, time.time())
+                except Exception as exc:
+                    log_event("openclaw.continue.failed", error=str(exc)[:160])
+                    self.speak("I couldn't resume the task. Say it again.")
+            else:
+                self.speak("Nothing to continue. Give me a new task instead.")
         elif cmd == "model":
             tier = intent.params.get("tier")
             model = self.classifier.resolve_model_tier(tier)
@@ -692,6 +721,24 @@ class VoiceOrchestrator:
                     pass
             self.task.clear()
             log_event("openclaw.abort", why=why, session_key=key, run_id=run_id)
+
+    def _interrupt_task(self) -> None:
+        """Pause the running agent (Ctrl during a task).
+
+        Aborts the run, remembers the session for continuation/context, and
+        tells the user the floor is theirs. Nothing continues automatically:
+        the next run only happens on a spoken instruction or "continue".
+        """
+        if self.task.active:
+            self._interrupted_session = self.task.session_key
+            self._abort_task("interrupted by hotkey")
+            log_event("task.interrupted", session_key=self._interrupted_session)
+        try:
+            self.playback.stop()
+        except Exception:
+            pass
+        if not self.muted:
+            self.speak("Paused. Go ahead.")
 
     # ------------------------------------------------------------- confirm
     def _handle_confirm(self) -> None:
@@ -1125,7 +1172,13 @@ class VoiceOrchestrator:
                 time.sleep(0.02)
             if self._stop.is_set():
                 break
-            res = self._capture_utterance()
+            if self.task.active and self.cfg.get("hotkey", "interrupt_on_ptt", default=True):
+                # pause the running agent, then listen hands-free for the
+                # new instruction ("continue" only on an explicit say-so)
+                self._interrupt_task()
+                res = self._capture_utterance(toggle=True)
+            else:
+                res = self._capture_utterance()
             if res is not None:
                 self._process_utterance(res)
             # drain: don't instantly re-trigger if the key is still held
@@ -1183,21 +1236,24 @@ class VoiceOrchestrator:
         except Exception:
             pass
 
-    def _capture_utterance(self) -> Optional[str]:
-        """Record one utterance (PTT start..release or manual). Returns wav path or None."""
+    def _capture_utterance(self, toggle: bool = False) -> Optional[str]:
+        """Record one utterance (PTT start..release or manual). Returns wav path or None.
+
+        toggle=True forces hands-free listening (interrupt flow): ends on
+        silence, a second tap, or the no-speech timeout — independent of the key.
+        """
         if self._mic is None:
             log.error("mic not initialized")
             return None
         mic = self._mic
         stop_req = threading.Event()
-        if self._ptt_supported:
+        tap_ms = int(self.cfg.get("hotkey", "tap_ms", default=300))
+        toggle_no_speech_s = float(self.cfg.get("hotkey", "toggle_no_speech_s", default=5.0))
+        self._toggle_armed = False
+        self._toggle_stop.clear()
+        if self._ptt_supported and not toggle:
             held = self._ptt_hold  # snapshot at capture start
             press_t = self._press_time
-            tap_ms = int(self.cfg.get("hotkey", "tap_ms", default=300))
-            toggle_no_speech_s = float(self.cfg.get("hotkey", "toggle_no_speech_s", default=5.0))
-            # reset per-capture toggle state
-            self._toggle_armed = False
-            self._toggle_stop.clear()
 
             def _release_watcher():
                 # wait until the key is actually released (level, not one-shot)
@@ -1227,6 +1283,26 @@ class VoiceOrchestrator:
                 time.sleep(0.6)
                 stop_req.set()
             threading.Thread(target=_release_watcher, daemon=True).start()
+        elif self._ptt_supported:
+            # forced toggle (interrupt flow): listen regardless of key state
+            self._toggle_armed = True
+            log_event("hotkey.toggle", on=True, why="interrupt")
+
+            def _toggle_watcher():
+                no_speech_t0 = time.time()
+                while not self._stop.is_set():
+                    if self._toggle_stop.is_set():
+                        log_event("hotkey.toggle", on=False, why="second tap")
+                        break
+                    if mic.endpointer.state == "done":
+                        break
+                    if mic.endpointer.state == "idle" and \
+                            time.time() - no_speech_t0 > toggle_no_speech_s:
+                        log_event("hotkey.toggle", on=False, why="no speech")
+                        break
+                    time.sleep(0.05)
+                stop_req.set()
+            threading.Thread(target=_toggle_watcher, daemon=True).start()
         self._play_beep("start")
         try:
             with self._mic.open():
