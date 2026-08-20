@@ -68,6 +68,7 @@ DEFAULTS: Dict[str, Any] = {
         # front-facing voice (mic -> remote GPU -> speakers); the bridge keeps
         # a whisper tap for intent routing and speaks task results via TTS.
         "enabled": False,               # set True once a Vast.ai instance is up
+        "provider": "personaplex",      # personaplex (needs 24 GB GPU) | realtime (OpenAI API, works today)
         "url": "wss://personaplex:8998/api/chat",  # Tailscale MagicDNS name or IP
         "ssl_insecure": True,           # self-signed cert on the Vast box
         "voice_prompt": "NATF2.pt",    # persona voice (NATF*/NATM*/VARF*/VARM*)
@@ -81,6 +82,13 @@ DEFAULTS: Dict[str, Any] = {
         # legacy (pre-duplex) adapter knobs kept for compatibility
         "timeout_s": 5,
         "auto_start": False,
+    },
+    "realtime": {
+        # OpenAI Realtime duplex lane (same orchestration, no GPU needed).
+        # Active only when personaplex.enabled=true and personaplex.provider=realtime.
+        "model": "gpt-4o-mini-realtime-preview",  # cheap lane; gpt-4o-realtime-preview for premium
+        "key_env": "~/.hermes/.env",    # OPENAI_API_KEY lives here
+        "reconnect_s": 5.0,
     },
     "hermes": {
         "enabled": False,               # route "ask Hermes ..." tasks to `hermes chat -q`

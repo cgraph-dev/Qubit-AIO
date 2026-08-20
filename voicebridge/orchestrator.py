@@ -170,7 +170,7 @@ class VoiceOrchestrator:
         self.gateway_info = None
         self._route: str = ""   # 'gateway' | 'cli' | 'offline'
         self.blocking_tasks = True   # False in the interactive hotkey loop
-        self._duplex: Optional[PersonaPlexDuplex] = None
+        self._duplex: Optional[Any] = None  # PersonaPlexDuplex | RealtimeDuplex
         self._hermes: Optional[HermesBackend] = None
         self._memory_context: str = ""
 
@@ -294,9 +294,17 @@ class VoiceOrchestrator:
                     f"{pp_cfg.get('text_prompt', '')}\n\n"
                     f"Things you remember about the user (from their notes):\n"
                     f"{self._memory_context}")
-            self._duplex = PersonaPlexDuplex(self.cfg, on_transcript=self._on_duplex_transcript)
+            self._duplex = None
+            provider = pp_cfg.get("provider", "personaplex")
+            if provider == "realtime":
+                from .personaplex.realtime import RealtimeDuplex
+                self._duplex = RealtimeDuplex(self.cfg,
+                                              on_transcript=self._on_duplex_transcript)
+            else:
+                self._duplex = PersonaPlexDuplex(self.cfg,
+                                                 on_transcript=self._on_duplex_transcript)
             ok = self._duplex.start()
-            log_event("personaplex.lane", started=ok)
+            log_event("personaplex.lane", provider=provider, started=ok)
 
         # mic
         mic_cfg = self.cfg.section("mic")

@@ -96,6 +96,13 @@ memory:
   save_notes: true
 
 # ---------------------------------------------------------------------------
+# OpenAI Realtime duplex lane (same orchestration, no GPU needed).
+# Enable: personaplex.enabled: true  AND  personaplex.provider: realtime
+# NOTE: needs the Realtime API enabled on the OpenAI account (paid/credits).
+realtime:
+  model: gpt-4o-mini-realtime-preview   # cheap lane; gpt-4o-realtime-preview for premium
+  key_env: ~/.hermes/.env               # OPENAI_API_KEY lives here
+
 # Text-to-speech
 tts:
   provider: piper         # piper (local, default) | edge (network) | gateway (OpenClaw TTS)

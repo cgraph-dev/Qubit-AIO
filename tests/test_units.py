@@ -263,3 +263,18 @@ def test_speech_direct():
     assert speech_direct("Yes! Done. Hope that helps!") == "Done."
     assert speech_direct("No emoji here.") == "No emoji here."
     assert speech_direct("Created the file. What's next?") == "Created the file. What's next?"
+
+
+def test_realtime_env_key():
+    from voicebridge.personaplex.realtime import _read_env_key
+    # reads real file; just verify it can locate OPENAI_API_KEY (may be empty in CI)
+    k = _read_env_key("~/.hermes/.env", "OPENAI_API_KEY")
+    assert isinstance(k, str)
+
+
+def test_realtime_config_defaults():
+    from voicebridge.config import Config
+    cfg = Config.load()
+    rt = cfg.section("realtime")
+    assert rt.get("model", "").startswith("gpt-")
+    assert cfg.get("personaplex", "provider", default="personaplex") in ("personaplex", "realtime")
