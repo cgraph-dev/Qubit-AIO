@@ -194,3 +194,22 @@ def test_frame_splitter_multiple_frames():
         out.extend(splitter.feed(mono16))
     assert len(out) == 2
     assert len(out[0]) == FRAME_SIZE * 2
+
+
+def test_needs_web():
+    from voicebridge.orchestrator import _needs_web
+    assert _needs_web("search for the latest openclaw release")
+    assert _needs_web("what is the weather today in Bucharest")
+    assert _needs_web("who won the last F1 race")
+    assert _needs_web("use perplexity to check the current price of bitcoin")
+    assert not _needs_web("create a note in tmp called voice test")
+    assert not _needs_web("patch the stripe webhook signature verification")
+    assert not _needs_web("what is 17 times 23")
+
+
+def test_perplexity_config_defaults():
+    from voicebridge.config import Config
+    cfg = Config.load()
+    assert cfg.get("intent", "perplexity_enabled", default=True) is True
+    assert "perplexity.ai" in cfg.get("intent", "perplexity_url", default="")
+    assert cfg.get("openclaw", "skills_nudge", default=True) is True

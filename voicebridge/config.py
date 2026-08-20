@@ -114,6 +114,11 @@ DEFAULTS: Dict[str, Any] = {
         "deepseek_url": "https://api.deepseek.com/chat/completions",
         "deepseek_model": "deepseek-v4-flash",
         "deepseek_env": "~/.hermes/.env",    # DEEPSEEK_API_KEY lives here
+        # Perplexity: used for web/current-info questions ("if needed")
+        "perplexity_enabled": True,
+        "perplexity_url": "https://api.perplexity.ai/chat/completions",
+        "perplexity_model": "sonar-pro",
+        "perplexity_env": "~/.hermes/.env",  # PERPLEXITY_API_KEY lives here
         # In duplex mode PersonaPlex answers conversation directly; this backend
         # is only used when the PersonaPlex lane is down.
         "duplex_conversation_fallback": True,
@@ -124,6 +129,7 @@ DEFAULTS: Dict[str, Any] = {
         "agent": "main",
         "model": None,           # None = agent default; "ollama/qwen3-vl:8b" for fast voice tasks
         "session_prefix": "voice",
+        "skills_nudge": True,     # append "use your skills/tools" to every task
         "task_timeout_s": 900,
         "max_history_chars": 12000,   # truncate history fed to summarizer
         "progress_updates": True,     # speak short status updates during long tasks

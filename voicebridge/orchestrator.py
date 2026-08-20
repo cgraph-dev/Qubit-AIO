@@ -54,6 +54,19 @@ _SAMPLE_TASK = (
 )
 
 
+def _needs_web(text: str) -> bool:
+    """Heuristic: does this question want current/web-grounded info (Perplexity)?"""
+    t = text.lower()
+    markers = (
+        "search", "look up", "google", "latest", "current", "news", "today",
+        "weather", "price of", "stock", "who won", "what happened", "when did",
+        "how many people", "election", "score", "release date", "announcement",
+        "update on", "perplexity", "on the web", "find out", "do you know about",
+        "new version", "recent",
+    )
+    return any(m in t for m in markers)
+
+
 class VoiceOrchestrator:
     def __init__(self, config: Config, mic_only: bool = False,
                  no_hotkey: bool = False, dry_run: bool = False) -> None:
@@ -387,6 +400,11 @@ class VoiceOrchestrator:
         self._launch_task(final_text, model or self._current_model())
 
     def _launch_task(self, task_text: str, model: Optional[str] = None) -> None:
+        # skills nudge: remind the agent to use its full skill/tool set
+        if self.cfg.get("openclaw", "skills_nudge", default=True):
+            task_text = (task_text
+                         + "\n\nUse your available skills and tools as needed "
+                           "(files, terminal, browser, repos, delegation).")
         suffix = uuid.uuid4().hex[:8]
         session_key = self.cfg.session_key(f"task-{suffix}")
         log_event("openclaw.dispatch", session_key=session_key, task=task_text[:300],
@@ -717,10 +735,15 @@ class VoiceOrchestrator:
                 result = self._cli.run_task(chat_key, text, self._current_model())
                 self._handle_agent_result(chat_key, result.reply, result.status, result.elapsed_s)
                 return
-        # fast chat: direct DeepSeek completion (default) with local ollama fallback
+        # fast chat: direct DeepSeek completion (default), Perplexity for
+        # web/current-info questions ("if needed"), local ollama as fallback
         reply = ""
         if backend == "deepseek":
-            reply = self._chat_deepseek(text)
+            if self.cfg.get("intent", "perplexity_enabled", default=True) \
+                    and (_needs_web(text) or "perplexity" in text.lower()):
+                reply = self._chat_perplexity(text)
+            if not reply:
+                reply = self._chat_deepseek(text)
         if not reply:
             reply = self._chat_ollama(text)
         if reply:
@@ -766,16 +789,58 @@ class VoiceOrchestrator:
             return ""
 
     def _deepseek_key(self) -> str:
+        return self._env_key("DEEPSEEK_API_KEY")
+
+    def _perplexity_key(self) -> str:
+        return self._env_key("PERPLEXITY_API_KEY")
+
+    def _env_key(self, name: str) -> str:
+        """Read a KEY from ~/.hermes/.env (or environment), never logging it."""
         env_path = Path(self.cfg.get("intent", "deepseek_env",
                                      default="~/.hermes/.env")).expanduser()
         try:
             for line in env_path.read_text(errors="replace").splitlines():
                 line = line.strip()
-                if line.startswith("DEEPSEEK_API_KEY="):
+                if line.startswith(name + "="):
                     return line.split("=", 1)[1].strip().strip('"').strip("'")
         except Exception:
             pass
-        return os.environ.get("DEEPSEEK_API_KEY", "")
+        return os.environ.get(name, "")
+
+    def _chat_perplexity(self, text: str) -> str:
+        """Web-grounded answer via the Perplexity API (for 'if needed' queries)."""
+        import urllib.request
+        key = self._perplexity_key()
+        if not key:
+            log_event("conversation.perplexity.nokey",
+                      hint="set PERPLEXITY_API_KEY in ~/.hermes/.env")
+            return ""
+        url = self.cfg.get("intent", "perplexity_url",
+                           default="https://api.perplexity.ai/chat/completions")
+        model = self.cfg.get("intent", "perplexity_model", default="sonar-pro")
+        system = ("You are a concise voice assistant answering from current web "
+                  "search. Give a short, accurate, up-to-date answer in 1-4 "
+                  "sentences. Prefer facts over hedging.")
+        payload = {
+            "model": model, "stream": False, "temperature": 0.3,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": text},
+            ],
+        }
+        req = urllib.request.Request(
+            url, data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json",
+                     "Authorization": f"Bearer {key}"})
+        try:
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                body = json.loads(resp.read().decode())
+            content = body["choices"][0]["message"]["content"]
+            log_event("conversation.perplexity", model=model)
+            return (content or "").strip()
+        except Exception as exc:
+            log_event("conversation.perplexity.failed", error=str(exc)[:160])
+            return ""
 
     def _chat_ollama(self, text: str) -> str:
         import urllib.request
