@@ -67,6 +67,23 @@ def _needs_web(text: str) -> bool:
     return any(m in t for m in markers)
 
 
+def _interrupt_decision_prompt(old_task: str, new_request: str) -> str:
+    """Build the prompt handed to the agent after an interrupt: it decides
+    whether to continue the paused work or switch to the user's new request."""
+    return (
+        "You were working on this task:\n"
+        f"{old_task}\n\n"
+        "The user interrupted and gave a new request:\n"
+        f"{new_request}\n\n"
+        "Decide what to do: if the new request continues, refines, or corrects "
+        "the current work, CONTINUE the current work and apply the new request "
+        "as part of it. If it is a different direction or explicitly replaces "
+        "the current work, STOP the current work and do the new request "
+        "instead.\n"
+        "Then act on your decision and report what you did."
+    )
+
+
 class VoiceOrchestrator:
     def __init__(self, config: Config, mic_only: bool = False,
                  no_hotkey: bool = False, dry_run: bool = False) -> None:
@@ -105,6 +122,7 @@ class VoiceOrchestrator:
         # interrupt/pause lane: Ctrl during a task pauses it; the agent only
         # continues on a spoken say-so (new instruction or "continue")
         self._interrupted_session: Optional[str] = None
+        self._interrupted_task_text: str = ""
         self.playback = Playback()
         self.classifier: Optional[Classifier] = None
         self.safety = SafetyPolicy(config.section("safety"))
@@ -410,11 +428,16 @@ class VoiceOrchestrator:
                            "(files, terminal, browser, repos, delegation).")
         suffix = uuid.uuid4().hex[:8]
         if self._interrupted_session:
-            # new instruction after an interrupt: keep the same session so the
-            # agent continues with context of what it was doing
+            # new instruction after an interrupt: same session (context kept),
+            # and the agent decides whether to continue the old work or switch
             session_key = self._interrupted_session
             self._interrupted_session = None
-            log_event("task.reused_session", session_key=session_key)
+            old_task = self._interrupted_task_text or ""
+            self._interrupted_task_text = ""
+            if old_task:
+                task_text = _interrupt_decision_prompt(old_task, task_text)
+            log_event("task.reused_session", session_key=session_key,
+                      decided_by="agent")
         else:
             session_key = self.cfg.session_key(f"task-{suffix}")
         log_event("openclaw.dispatch", session_key=session_key, task=task_text[:300],
@@ -725,16 +748,20 @@ class VoiceOrchestrator:
     def _interrupt_task(self) -> None:
         """Pause whatever the bridge is doing (Ctrl during speech or a task).
 
-        Stops spoken output, aborts a running agent task (remembering its
-        session for continuation/context), and tells the user the floor is
-        theirs. Nothing continues automatically: the next run only happens on
-        a spoken instruction or "continue".
+        Stops spoken output, pauses a running agent task (remembering its
+        session AND the old task text so the agent can decide afterwards whether
+        to continue that work or switch to the new request), and tells the user
+        the floor is theirs. Nothing continues automatically: after the user
+        speaks, the agent itself decides between continuing the current work or
+        doing the new request.
         """
         interrupted_anything = False
         if self.task.active:
             self._interrupted_session = self.task.session_key
+            self._interrupted_task_text = self.task.description
             self._abort_task("interrupted by hotkey")
-            log_event("task.interrupted", session_key=self._interrupted_session)
+            log_event("task.interrupted", session_key=self._interrupted_session,
+                      old_task=self._interrupted_task_text[:200])
             interrupted_anything = True
         if self.playback.playing:
             self.playback.stop()

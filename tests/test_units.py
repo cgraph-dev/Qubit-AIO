@@ -243,3 +243,12 @@ def test_classify_continue_command():
     assert i3.kind == "system" and i3.params.get("command") == "continue"
     i4 = clf.classify("continue working on the stripe webhook")
     assert i4.kind != "system" or i4.params.get("command") != "continue"
+
+
+def test_interrupt_decision_prompt():
+    from voicebridge.orchestrator import _interrupt_decision_prompt
+    p = _interrupt_decision_prompt("patch the stripe webhook", "check the auth flow")
+    assert "patch the stripe webhook" in p
+    assert "check the auth flow" in p
+    assert "CONTINUE" in p and "STOP" in p
+    assert "Decide what to do" in p
