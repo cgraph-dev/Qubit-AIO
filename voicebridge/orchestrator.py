@@ -163,6 +163,7 @@ class VoiceOrchestrator:
         self._interrupted_task_text: str = ""
         self._interrupt_requested = False   # set from the hotkey thread while the
                                             # loop is blocked inside speak()
+        self._hermes_busy = False           # a Hermes task is running in the bg
         self.playback = Playback()
         self.classifier: Optional[Classifier] = None
         self.safety = SafetyPolicy(config.section("safety"))
@@ -823,6 +824,12 @@ class VoiceOrchestrator:
         if self.playback.playing:
             self.playback.stop()
             interrupted_anything = True
+        if self._hermes_busy:
+            # Hermes task running in background: mark for discard so its stale
+            # reply is not spoken over the new instruction
+            self._hermes_busy = False
+            log_event("hermes.interrupted")
+            interrupted_anything = True
         if interrupted_anything and not self.muted:
             self.speak("Paused. Go ahead.")
         elif not self.muted:
@@ -1026,22 +1033,37 @@ class VoiceOrchestrator:
         self.speak(msg)
 
     def _handle_hermes(self, task: str) -> None:
-        """Explicit Hermes delegation (ask Hermes to ...)."""
+        """Explicit Hermes delegation (ask Hermes to ...) — background + interruptible."""
         if self._hermes is None:
             self.speak("Hermes is not enabled; routing to OpenClaw instead.")
             self._dispatch_coding(task)
             return
+        hermes = self._hermes
         self.speak("Asking Hermes.", name="ack", barge=False)
-        try:
-            reply = self._hermes.run_task(task)
-        except TimeoutError:
-            self.speak("Hermes timed out. Try again, or ask me instead.")
-            return
-        except Exception as exc:
-            self.speak(f"Hermes failed: {str(exc)[:120]}")
-            return
-        summary = summarize(reply, self.cfg.section("summarizer"))
-        self.speak(summary)
+        task = (task + "\n\nReply directly and concisely: no emojis, no "
+                     "pleasantries, no extra words — only what was needed.")
+        self._hermes_busy = True
+
+        def _run():
+            try:
+                reply = hermes.run_task(task)
+            except TimeoutError:
+                self._hermes_busy = False
+                self.speak("Hermes timed out. Try again, or ask me instead.")
+                return
+            except Exception as exc:
+                self._hermes_busy = False
+                self.speak(f"Hermes failed: {str(exc)[:120]}")
+                return
+            self._hermes_busy = False
+            if self._interrupt_requested:
+                # user redirected mid-run; don't speak the stale reply
+                log_event("hermes.result.discarded", why="interrupted")
+                return
+            summary = summarize(reply, self.cfg.section("summarizer"))
+            self.speak(summary)
+
+        threading.Thread(target=_run, daemon=True, name="hermes-task").start()
 
     def _route_intent(self, intent: Intent, text: str) -> None:
         """Shared dispatcher used by mic, typed input, and the duplex tap."""
@@ -1264,7 +1286,7 @@ class VoiceOrchestrator:
             if self._stop.is_set():
                 break
             busy = (self.task.active or self.playback.playing
-                    or self._interrupt_requested)
+                    or self._interrupt_requested or self._hermes_busy)
             if busy and self.cfg.get("hotkey", "interrupt_on_ptt", default=True):
                 # pause whatever the bridge is doing (speech OR agent task),
                 # then listen hands-free for the new instruction; the agent
