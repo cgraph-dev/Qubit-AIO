@@ -110,12 +110,26 @@ class MicCapture:
         t0 = time.time()
         peak_rms = 0.0
         first_voice_idx: Optional[int] = None   # buf16 index where speech began
+        zero_frames = 0                   # consecutive dead-stream frames
 
         while True:
             data, _ = self._stream.read(self.blocksize)  # float32 (n, ch)
             mono = self._mono(data)
             mono = np.clip(mono * self.gain, -1.0, 1.0)
             mono16 = resample_linear(mono, self.sample_rate, FRAME_RATE)
+            frame_rms = float(np.sqrt((mono ** 2).mean()))
+            if frame_rms < 1e-4:
+                zero_frames += 1
+                # Fast-fail a DEAD stream (pure zeros): after ~0.6s of nothing
+                # and no speech yet, stop — the device needs a reopen (the
+                # orchestrator retries once). A quiet-but-working mic has a
+                # noise floor ~0.003, well above this.
+                if zero_frames >= 20 and ep.state != "speech" \
+                        and time.time() - t0 > 0.6:
+                    ended_by = "silence"
+                    break
+            else:
+                zero_frames = 0
             for raw in splitter.feed(mono16):
                 frame = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32767.0
                 if barge_in is not None:

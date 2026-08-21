@@ -187,6 +187,7 @@ class VoiceOrchestrator:
         self._stop = threading.Event()
         self._cancel = threading.Event()
         self._ptt_started = threading.Event()
+        self._ptt_pressed = threading.Event()  # sticky: a press during busy work is NOT lost
         self._ptt_released = threading.Event()
         self._ptt_hold = False
         self._ptt_supported = False
@@ -204,6 +205,7 @@ class VoiceOrchestrator:
         self._beep_end = None
         # PTT state: tap-to-toggle + hold-to-talk
         self._press_time = 0.0
+        self._release_time = 0.0      # set on ptt_end; 0 while the key is down
         self._toggle_armed = False       # a tap started a toggle capture
         self._toggle_stop = threading.Event()
         # interrupt/pause lane: Ctrl during a task pauses it; the agent only
@@ -452,6 +454,7 @@ class VoiceOrchestrator:
         if event == "ptt_start":
             self._press_time = time.time()
             self._ptt_hold = True
+            self._ptt_pressed.set()      # sticky: never lose a press to busy work
             self._ptt_started.set()
             self._ptt_released.clear()
             # duplex take-over: Ctrl = stop PersonaPlex + listen via the lane's
@@ -475,6 +478,7 @@ class VoiceOrchestrator:
                     self._interrupt_requested = True
         elif event == "ptt_end":
             self._ptt_hold = False
+            self._release_time = time.time()   # for accurate tap-vs-hold timing
             self._ptt_released.set()
             if self._toggle_armed:
                 # second tap during a toggle capture -> stop listening
@@ -1095,6 +1099,7 @@ class VoiceOrchestrator:
         doing the new request.
         """
         interrupted_anything = False
+        task_paused = False
         if self.task.active:
             self._interrupted_session = self.task.session_key
             self._interrupted_task_text = self.task.description
@@ -1102,6 +1107,7 @@ class VoiceOrchestrator:
             log_event("task.interrupted", session_key=self._interrupted_session,
                       old_task=self._interrupted_task_text[:200])
             interrupted_anything = True
+            task_paused = True
         if self.playback.playing:
             self.playback.stop()
             interrupted_anything = True
@@ -1111,10 +1117,14 @@ class VoiceOrchestrator:
             self._hermes_busy = False
             log_event("hermes.interrupted")
             interrupted_anything = True
-        if interrupted_anything and not self.muted:
+        # Only announce when a TASK was actually paused. For a plain speech
+        # cut-off (or nothing at all) the beep already signals capture start —
+        # speaking "Go ahead." on every tap was the journal spam bug.
+        if task_paused and not self.muted:
             self.speak("Paused. Go ahead.")
-        elif not self.muted:
-            self.speak("Go ahead.")
+        elif not interrupted_anything and not self.muted:
+            # truly nothing to pause: stay silent, the start beep suffices
+            pass
 
     # ------------------------------------------------------------- confirm
     def _handle_confirm(self) -> None:
@@ -1686,13 +1696,24 @@ class VoiceOrchestrator:
     def _run_hotkey_loop(self) -> None:
         """Hold-to-talk loop. LEVEL-based on _ptt_hold (not one-shot flags):
         a press that arrives while the loop is busy is dropped cleanly instead
-        of racing with flag clears and starting a 30s silent capture."""
+        of racing with flag clears and starting a 30s silent capture.
+
+        Sticky-press rule: `_ptt_pressed` latches ANY press (even one fully
+        contained inside a busy window, e.g. a 100ms tap while speak() holds
+        the loop). The loop consumes it as a fresh PTT press afterwards — the
+        user never has to tap twice to "wake up" the bridge.
+        """
         while not self._stop.is_set():
-            # wait for a genuine hold
-            while not self._stop.is_set() and not self._ptt_hold:
+            # wait for a genuine hold OR a latched press
+            while not self._stop.is_set() and not self._ptt_hold \
+                    and not self._ptt_pressed.is_set():
                 time.sleep(0.02)
             if self._stop.is_set():
                 break
+            # consume the latched press: if the key is still held this becomes
+            # a normal hold; if it was a quick tap, _capture_utterance detects
+            # that from _press_time and enters toggle mode
+            self._ptt_pressed.clear()
             # duplex PTT take-over: the lane's mic tap delivers the utterance —
             # do NOT open a second mic stream (device conflict). Wait for the
             # tap to fire or the 12 s window to lapse.
@@ -1795,7 +1816,14 @@ class VoiceOrchestrator:
                 # wait until the key is actually released (level, not one-shot)
                 while held and self._ptt_hold and not self._stop.is_set():
                     time.sleep(0.02)
-                held_s = time.time() - press_t
+                # hold duration = release_time - press_time when the key is
+                # already up (accurate even if the loop was busy when the tap
+                # happened — time.time() - press_t would overcount the busy
+                # window and turn a quick tap into a "long hold" -> instant stop)
+                if not self._ptt_hold and self._release_time > 0:
+                    held_s = self._release_time - press_t
+                else:
+                    held_s = time.time() - press_t
                 if held_s < tap_ms / 1000.0:
                     # TAP -> toggle mode: keep listening until a second tap,
                     # the silence endpoint, or a no-speech timeout.
@@ -1843,9 +1871,54 @@ class VoiceOrchestrator:
         # ONE input stream at a time on the Scarlett: pause the barge stream
         # while capturing (two concurrent InputStreams segfaulted PortAudio).
         resume_barge = self._pause_barge_stream()
+        res = None
+        max_capture_s = float(self.cfg.get("mic", "max_capture_s", default=30.0))
         try:
-            with self._mic.open():
-                res = self._mic.record_utterance(stop_req, barge_in=None)
+            # Zero-read retry: after rapid start/stop cycles (or an interrupt
+            # mid-playback) the Scarlett can open a stream that delivers pure
+            # zeros (peak_rms ~0.0) until it settles. Reopen ONCE before
+            # telling the user nothing was heard — this was the "I need to
+            # press Ctrl until the voice recovers" loop.
+            for attempt in range(2):
+                # Watchdog: sd.InputStream.read() can BLOCK FOREVER on a
+                # wedged device (no timeout in sounddevice). Run the capture
+                # in a thread and force-close the stream past the deadline so
+                # the read() unblocks and the PTT loop never freezes.
+                capture_result: list = []
+                capture_done = threading.Event()
+
+                def _do_capture():
+                    try:
+                        # `mic` is the enclosing non-None reference (checked
+                        # at the top of _capture_utterance)
+                        with mic.open():
+                            capture_result.append(
+                                mic.record_utterance(stop_req, barge_in=None))
+                    except Exception as exc:  # pragma: no cover
+                        log_event("mic.capture.error", error=str(exc)[:160])
+                        capture_result.append(None)
+                    finally:
+                        capture_done.set()
+
+                t = threading.Thread(target=_do_capture, daemon=True,
+                                     name=f"capture-{attempt}")
+                t.start()
+                if not capture_done.wait(timeout=max_capture_s + 3.0):
+                    # stuck: force the stream closed to break the blocked read
+                    log_event("mic.capture.timeout", attempt=attempt + 1)
+                    try:
+                        self._mic.close()
+                    except Exception:
+                        pass
+                    t.join(timeout=3.0)
+                    capture_result.append(None)
+                res = capture_result[-1] if capture_result else None
+                if res is None or res.wav_path is not None \
+                        or res.peak_rms >= 0.002:
+                    break
+                log_event("mic.zero_read.retry", attempt=attempt + 1,
+                          ended_by=res.ended_by, peak_rms=round(res.peak_rms, 5))
+                time.sleep(0.15)  # let the device settle before reopening
         except Exception as exc:
             log_event("mic.capture.error", error=str(exc)[:160])
             res = None

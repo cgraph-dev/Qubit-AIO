@@ -26,7 +26,8 @@ mic:
   channels: 2             # capture N channels, use the loudest
   blocksize: 480          # ~10 ms at 48 kHz
   gain: 1.0               # digital pre-amplify (tune to your mic! 4-16 for quiet mics)
-  min_rms: 0.0008         # below this RMS the capture counts as silence
+  min_rms: 0.0008
+  max_capture_s: 30.0   # watchdog: force-close a wedged mic stream         # below this RMS the capture counts as silence
 
 # Voice activity detection / endpointing
 vad:

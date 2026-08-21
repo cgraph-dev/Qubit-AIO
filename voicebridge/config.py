@@ -38,7 +38,8 @@ DEFAULTS: Dict[str, Any] = {
         "channels": 2,         # capture N channels, use the loudest
         "blocksize": 480,      # ~10ms at 48k
         "gain": 64.0,           # pre-amplify quiet interfaces (Focusrite needs this)
-        "min_rms": 0.0008,     # below this RMS the capture is treated as silence
+        "min_rms": 0.0008,          # below this the capture is treated as silence
+                "max_capture_s": 30.0,       # watchdog: force-close a wedged mic stream
     },
     "vad": {
         "enabled": True,
