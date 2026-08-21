@@ -79,6 +79,9 @@ DEFAULTS: Dict[str, Any] = {
         "whisper_tap": False,           # NO local ASR: PersonaPlex hears speech
                                         # directly; tasks route via PTT whisper
                                         # (on-demand, CUDA) or OpenClaw
+        "inject_memory": False,         # do NOT inject OpenClaw memory notes into
+                                        # Sage's prompt (they made it answer with
+                                        # stale ops trivia, e.g. tailscale status)
         "ptt_uses_tap": True,           # duplex mode: Ctrl routes the next tapped
                                         # utterance (no second mic stream — avoids
                                         # device conflict with the lane's mic)

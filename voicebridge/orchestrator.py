@@ -289,14 +289,12 @@ class VoiceOrchestrator:
                 self._hermes = None
 
         # PersonaPlex full-duplex lane (remote GPU over Tailscale). Persona
-        # prompt = configured persona + memory context loaded above.
+        # prompt = configured persona. NOTE: we do NOT inject the OpenClaw
+        # memory context here anymore — Sage (moshi) is a voice model, and
+        # memory notes (keys, tailscale status, session logs) make it answer
+        # with stale operational trivia instead of the user's question.
         pp_cfg = self.cfg.section("personaplex")
         if pp_cfg.get("enabled", False):
-            if self._memory_context:
-                self.cfg.data.setdefault("personaplex", {})["text_prompt"] = (
-                    f"{pp_cfg.get('text_prompt', '')}\n\n"
-                    f"Things you remember about the user (from their notes):\n"
-                    f"{self._memory_context}")
             self._duplex = None
             provider = pp_cfg.get("provider", "personaplex")
             if provider == "realtime":
