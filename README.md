@@ -134,22 +134,7 @@ what the agent is doing live.
 Find your PC's LAN IP with `ip -4 addr show | grep inet`. The dashboard
 binds `0.0.0.0:8890` by default (`webui.host` / `webui.port` in config).
 
-### Access from outside (when your PC is on)
-
-The PC is reachable from the internet through a Pinggy tunnel (SSH, zero
-install). The systemd user service starts it on boot and auto-restarts on
-Pinggy's 60-minute free-tier expiry:
-
-```bash
-systemctl --user enable --now voice-dashboard-tunnel.service
-cat ~/.local/state/openclaw-voice-bridge/tunnel.url   # the CURRENT public URL
-```
-
-Open that URL on your phone — same chat + activity pages, served from your
-PC. The URL changes every ~60 min on the free tier (persistent subdomains
-need Pinggy Pro); the script rewrites `tunnel.url` on every restart.
-
-### Vercel-hosted frontend (coming)
+### Vercel-hosted frontend (when you're ready)
 
 The `frontend/` dir is the deployable static app: `index.html` (chat) +
 `activity.html` (dashboard). It works from Vercel too — the ⚙ settings in
