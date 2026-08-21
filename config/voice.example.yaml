@@ -117,7 +117,7 @@ openclaw:
 
 # Optional second executor (same machine as the bridge)
 hermes:
-  enabled: false
+  enabled: true           # 'ask Hermes to ...' -> local hermes CLI (opt-in phrasing)
   cmd: hermes
   resume_session: voice
   timeout_s: 600

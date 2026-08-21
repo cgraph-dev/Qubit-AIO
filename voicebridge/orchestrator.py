@@ -97,6 +97,26 @@ def _needs_web(text: str) -> bool:
     return any(re.search(p, t) for p in pats)
 
 
+_CASUAL_RE = re.compile(
+    r"^\s*(hey|hi|hello|yo|sup|hiya|howdy)\b"
+    r"|\b(how are you|how('s| is) it going|what's up|how do you do)\b"
+    r"|\b(thank(s| you)?|ty|thx)\b"
+    r"|\b(tell me a joke|make me laugh|another joke)\b"
+    r"|^(ok|okay|fine|good|nice|great|awesome|cool|love you|good "
+    r"(morning|afternoon|evening|night)|see you|bye|goodbye|good night)\b",
+    re.IGNORECASE)
+
+
+def _is_casual(text: str) -> bool:
+    """True for small talk the tiny local LLM handles well (fast, 0.3s).
+
+    Everything else (questions, requests, anything informational) routes to
+    DeepSeek — the local 3B answers real questions with generic "I was trained
+    on a large corpus…" text, which reads as "it's not using DeepSeek".
+    """
+    return bool(_CASUAL_RE.search(text))
+
+
 def _interrupt_decision_prompt(old_task: str, new_request: str) -> str:
     """Build the prompt handed to the agent after an interrupt: it decides
     whether to continue the paused work or switch to the user's new request."""
@@ -674,18 +694,20 @@ class VoiceOrchestrator:
                            "and what's next.")
         suffix = uuid.uuid4().hex[:8]
         if self._interrupted_session:
-            # new instruction after an interrupt: same session (context kept),
-            # and the agent decides whether to continue the old work or switch
-            session_key = self._interrupted_session
+            # New instruction after an interrupt. NOTE: do NOT reuse the
+            # aborted session key — the gateway's lane for that session was
+            # left in a bad state after the abort and a follow-up run on it
+            # returns status=error even when the agent completes (observed
+            # 2026-08-21). Start a fresh session and let the agent decide
+            # whether to continue the old work or switch, via the prompt.
             self._interrupted_session = None
             old_task = self._interrupted_task_text or ""
             self._interrupted_task_text = ""
             if old_task:
                 task_text = _interrupt_decision_prompt(old_task, task_text)
-            log_event("task.reused_session", session_key=session_key,
-                      decided_by="agent")
-        else:
-            session_key = self.cfg.session_key(f"task-{suffix}")
+                log_event("task.fresh_session_after_interrupt",
+                          old_task=old_task[:120])
+        session_key = self.cfg.session_key(f"task-{suffix}")
         log_event("openclaw.dispatch", session_key=session_key, task=task_text[:300],
                   model=model, route=self._route)
 
@@ -805,7 +827,18 @@ class VoiceOrchestrator:
                     self.task.clear()
                     self.speak("OpenClaw failed the task. Check the logs.")
                     return
+                if not self.task.active:
+                    # interrupted (Ctrl) or cancelled while we were blocked in
+                    # wait_run: the interrupt path already spoke ("Paused.") —
+                    # exit silently instead of announcing a bogus error.
+                    return
                 st = res.get("status", "ok")
+                if st == "aborted":
+                    # gateway aborted the run for its own reasons; not an error
+                    log_event("openclaw.result", session_key=session_key, run_id=run_id,
+                              status="aborted", elapsed_s=round(time.time() - t0, 2))
+                    self.task.clear()
+                    return
                 if st == "timeout":
                     if remaining <= 0 and not timeout_spoken:
                         timeout_spoken = True
@@ -1074,13 +1107,15 @@ class VoiceOrchestrator:
             web_ask = self.cfg.get("intent", "perplexity_enabled", default=True) \
                 and (_needs_web(text) or "perplexity" in text.lower())
             llm_cfg = self.cfg.section("intent").get("local_llm", {}) or {}
-            local_ok = llm_cfg.get("enabled", True) and not web_ask
+            local_ok = (llm_cfg.get("enabled", True) and not web_ask
+                        and _is_casual(text))  # small talk only; real asks -> DeepSeek
             if local_ok and len(text.split()) > int(llm_cfg.get("max_words", 30)):
                 log_event("conversation.local.skip", reason="too long",
                           words=len(text.split()))
                 local_ok = False
             if not local_ok and llm_cfg.get("enabled", True):
-                log_event("conversation.local.skip", reason="web_ask" if web_ask else "disabled")
+                log_event("conversation.local.skip",
+                          reason="web_ask" if web_ask else "not casual")
             if local_ok:
                 from .local_llm import chat_local
                 reply = chat_local(

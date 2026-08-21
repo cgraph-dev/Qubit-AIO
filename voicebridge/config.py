@@ -83,7 +83,8 @@ DEFAULTS: Dict[str, Any] = {
         "reconnect_s": 5.0,
     },
     "hermes": {
-        "enabled": False,               # route "ask Hermes ..." tasks to `hermes chat -q`
+        "enabled": True,                # route "ask Hermes ..." tasks to `hermes chat -q`
+                                    # (only fires on explicit "ask Hermes" phrasing)
         "cmd": "hermes",
         "resume_session": "voice",      # continuity under a fixed session name
         "timeout_s": 600,
