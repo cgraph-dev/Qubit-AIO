@@ -42,12 +42,26 @@ from .logging_setup import get_logger, log_event
 from .openclaw.cli_backend import CliBackend
 from .openclaw.discovery import discover_gateway, discover_cuda_libs
 from .openclaw.gateway_ws import GatewaySync, GatewayError
-from .personaplex import PersonaPlexDuplex
-from .personaplex.realtime import read_hermes_default_model
 from .safety.policy import SafetyPolicy, SafetyVerdict
 from .summarizer import summarize, trim_spoken
 
 log = get_logger()
+
+
+def _hermes_default_model() -> str:
+    """Read the default model name from the Hermes config (was in the removed
+    personaplex.realtime helper). Returns '' when unavailable."""
+    try:
+        import os
+        import yaml
+        p = os.path.expanduser("~/.hermes/config.yaml")
+        if os.path.exists(p):
+            with open(p) as fh:
+                d = yaml.safe_load(fh) or {}
+            return str(d.get("model", "") or "")
+    except Exception:
+        pass
+    return ""
 
 BEEP_START = np.array([], dtype=np.int16)   # placeholder; real beeps via piper
 _SAMPLE_TASK = (
@@ -288,24 +302,15 @@ class VoiceOrchestrator:
                 log_event("hermes.unavailable")
                 self._hermes = None
 
-        # PersonaPlex full-duplex lane (remote GPU over Tailscale). Persona
-        # prompt = configured persona. NOTE: we do NOT inject the OpenClaw
-        # memory context here anymore — Sage (moshi) is a voice model, and
-        # memory notes (keys, tailscale status, session logs) make it answer
-        # with stale operational trivia instead of the user's question.
+        # PersonaPlex full-duplex lane: REMOVED (user decision 2026-08-21).
+        # Voice = local push-to-talk + DeepSeek. The adapter was deleted from
+        # the repo; keep this block inert so configs referencing it degrade
+        # gracefully instead of crashing.
         pp_cfg = self.cfg.section("personaplex")
         if pp_cfg.get("enabled", False):
-            self._duplex = None
-            provider = pp_cfg.get("provider", "personaplex")
-            if provider == "realtime":
-                from .personaplex.realtime import RealtimeDuplex
-                self._duplex = RealtimeDuplex(self.cfg,
-                                              on_transcript=self._on_duplex_transcript)
-            else:
-                self._duplex = PersonaPlexDuplex(self.cfg,
-                                                 on_transcript=self._on_duplex_transcript)
-            ok = self._duplex.start()
-            log_event("personaplex.lane", provider=provider, started=ok)
+            log_event("personaplex.lane", provider="removed",
+                      started=False,
+                      detail="PersonaPlex removed by user; using local voice")
 
         # mic
         mic_cfg = self.cfg.section("mic")
@@ -933,7 +938,7 @@ class VoiceOrchestrator:
         url = self.cfg.get("intent", "deepseek_url",
                            default="https://api.deepseek.com/chat/completions")
         model = (self.cfg.get("intent", "deepseek_model", default="")
-                 or read_hermes_default_model()
+                 or _hermes_default_model()
                  or "deepseek-v4-flash")
         ctx = self.conversation.as_prompt()
         system = ("You are a concise, warm voice assistant. Answer briefly in "

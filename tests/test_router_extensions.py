@@ -72,12 +72,3 @@ def test_local_action_match_and_execute_unknown():
     assert local_actions.match("sing me a song") is None
 
 
-def test_duplex_client_query_build():
-    from voicebridge.personaplex.client import DuplexClient
-    c = DuplexClient(url="wss://personaplex:8998/api/chat",
-                     voice_prompt="NATM1.pt", text_prompt="hello")
-    q = c._query()
-    assert "voice_prompt=NATM1.pt" in q
-    assert "text_prompt=hello" in q
-    assert "seed=-1" in q
-    assert q.startswith("wss://personaplex:8998/api/chat?")

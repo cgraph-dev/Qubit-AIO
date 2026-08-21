@@ -63,41 +63,6 @@ DEFAULTS: Dict[str, Any] = {
                                     # a higher gate rejects perfect transcripts ("didn't catch that" bug)
                                     # empty-text + filler-word checks handle real silence
     },
-    "personaplex": {
-        # Full-duplex lane: when enabled and reachable, PersonaPlex is the
-        # front-facing voice (mic -> remote GPU -> speakers); the bridge keeps
-        # a whisper tap for intent routing and speaks task results via TTS.
-        "enabled": False,               # set True once a Vast.ai instance is up
-        "provider": "personaplex",      # personaplex (needs 24 GB GPU) | realtime (OpenAI API, works today)
-        "url": "wss://personaplex:8998/api/chat",  # Tailscale MagicDNS name or IP
-        "ssl_insecure": True,           # self-signed cert on the Vast box
-        "voice_prompt": "NATF2.pt",    # persona voice (NATF*/NATM*/VARF*/VARM*)
-        "text_prompt": "You are a friendly, sharp personal assistant named Sage. "
-                        "You enjoy good conversation and are curious about the "
-                        "user's projects. Keep answers concise and natural.",
-        "sample_rate": 24000,           # Mimi codec rate (matches the server)
-        "whisper_tap": False,           # NO local ASR: PersonaPlex hears speech
-                                        # directly; tasks route via PTT whisper
-                                        # (on-demand, CUDA) or OpenClaw
-        "inject_memory": False,         # do NOT inject OpenClaw memory notes into
-                                        # Sage's prompt (they made it answer with
-                                        # stale ops trivia, e.g. tailscale status)
-        "ptt_uses_tap": True,           # duplex mode: Ctrl routes the next tapped
-                                        # utterance (no second mic stream — avoids
-                                        # device conflict with the lane's mic)
-        "speech_threshold": 0.008,      # (legacy static floor, unused w/ adaptive gate)
-        "output_device": None,          # speaker device for lane audio; null = try
-                                        # pulse -> pipewire -> default (24k hardware
-                                        # rejects on Scarlett/ALC892, mixers resample)
-        "tap_confidence": 0.3,          # min whisper confidence to route a tap;
-                                        # garbage hallucinated on noise scores ~0.0
-                                        # and would duck PP + trigger piper spam
-        "duck_on_task_s": 8.0,          # mute PP + stop feeding it while a task runs
-        "reconnect_s": 5.0,             # reconnect/backoff interval
-        # legacy (pre-duplex) adapter knobs kept for compatibility
-        "timeout_s": 5,
-        "auto_start": False,
-    },
     "realtime": {
         # OpenAI Realtime duplex lane (same orchestration, no GPU needed).
         # Active only when personaplex.enabled=true and personaplex.provider=realtime.
