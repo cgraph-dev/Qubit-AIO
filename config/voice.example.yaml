@@ -110,6 +110,7 @@ openclaw:
   agent: main
   model: null             # null = follow the agent's default model
   session_prefix: voice
+  ask_executor: true       # ask 'OpenClaw or Hermes?' before each coding task (until a bigger GPU)
   task_timeout_s: 900
   progress_updates: true
   progress_min_interval_s: 45

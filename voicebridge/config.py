@@ -153,6 +153,7 @@ DEFAULTS: Dict[str, Any] = {
                                  # (gateway default; e.g. deepseek flash today) — the
                                  # voice uses whatever LLM OpenClaw/Hermes is set to
         "session_prefix": "voice",
+        "ask_executor": False,          # True = ask "OpenClaw or Hermes?" before each coding task
         "skills_nudge": True,     # append "use your skills/tools" to every task
         "task_timeout_s": 900,
         "max_history_chars": 12000,   # truncate history fed to summarizer

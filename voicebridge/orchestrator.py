@@ -36,7 +36,7 @@ from .config import Config
 from .hermes import HermesBackend
 from .hotkeys import HotkeyListener
 from .intent.classifier import Classifier, Intent
-from .intent.state import ConfirmationState, ConversationState, TaskState
+from .intent.state import ConfirmationState, ConversationState, ExecutorChoiceState, TaskState
 from .local import actions as local_actions
 from .logging_setup import get_logger, log_event
 from .openclaw.cli_backend import CliBackend
@@ -163,6 +163,7 @@ class VoiceOrchestrator:
         # state
         self.conversation = ConversationState(max_turns=int(config.get("conversation", "max_turns", default=4)))
         self.confirmations = ConfirmationState()
+        self.executor_choice = ExecutorChoiceState()
         self.task = TaskState()
         self.muted = False
         self._stop = threading.Event()
@@ -741,6 +742,16 @@ class VoiceOrchestrator:
             self.speak(self.safety.spoken_confirmation(trim_spoken(task_text, 200), verdict))
             return
 
+        # executor ask-mode: until the user gets a bigger GPU / smarter model,
+        # let THEM pick who runs the task (Hermes vs OpenClaw) instead of
+        # always defaulting to OpenClaw. The next utterance is interpreted by
+        # _handle_executor_answer().
+        if self.cfg.get("openclaw", "ask_executor", default=False):
+            self.executor_choice.request(final_text, model or self._current_model() or "")
+            self.speak("Who should handle this — OpenClaw or Hermes?")
+            log_event("executor.ask", task=final_text[:160])
+            return
+
         self._launch_task(final_text, model or self._current_model())
 
     def _launch_task(self, task_text: str, model: Optional[str] = None) -> None:
@@ -1142,6 +1153,30 @@ class VoiceOrchestrator:
             # truly nothing to pause: stay silent, the start beep suffices
             pass
 
+    # ------------------------------------------------------------- executor
+    def _handle_executor_answer(self, text: str) -> None:
+        """Interpret the answer to 'OpenClaw or Hermes?' and dispatch."""
+        pending = self.executor_choice.take()
+        if not pending:
+            return
+        low = text.strip().lower()
+        log_event("executor.answer", text=low[:120], task=pending.task_text[:160])
+        hermes_re = re.compile(
+            r"\b(hermes|use hermes|hermes agent|ask hermes)\b", re.I)
+        openclaw_re = re.compile(
+            r"\b(openclaw|open claw|claw|qubit|use (the )?agent)\b", re.I)
+        if hermes_re.search(low) and not openclaw_re.search(low):
+            self.speak("Using Hermes.")
+            self._handle_hermes(pending.task_text)
+        elif openclaw_re.search(low):
+            self.speak("Using OpenClaw.")
+            self._launch_task(pending.task_text, pending.model or None)
+        else:
+            # "you pick" / "whatever" / "either" / unparseable: default to
+            # OpenClaw (the established agent path)
+            self.speak("I'll use OpenClaw for that.")
+            self._launch_task(pending.task_text, pending.model or None)
+
     # ------------------------------------------------------------- confirm
     def _handle_confirm(self) -> None:
         pending = self.confirmations.take()
@@ -1470,6 +1505,12 @@ class VoiceOrchestrator:
 
     def _route_intent(self, intent: Intent, text: str) -> None:
         """Shared dispatcher used by mic, typed input, and the duplex tap."""
+        # executor ask-mode answer: the user just said who should run the
+        # pending task ("OpenClaw", "Hermes", "you pick", "whatever") — handle
+        # it BEFORE templates/classification so the answer isn't misrouted
+        if self.executor_choice.pending:
+            self._handle_executor_answer(text)
+            return
         # daily-task templates win over the model-based classifier: a matched
         # template dispatches the known task text directly (0 tokens, instant)
         tmpl = self._templates.match(text) if self._templates is not None else None

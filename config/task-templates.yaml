@@ -92,3 +92,35 @@ templates:
     kind: conversation
     task: "Answer from current web search, concise."
     ack: ""
+
+  # -------------------------------------------------------------- email / DMs
+  # NOTE: these need the executor's mail/DM integration configured first
+  # (Hermes: himalaya IMAP or google-workspace; OpenClaw: whatsapp extension).
+  # ask_executor must be ON so the bridge asks who should check.
+  - name: check-email
+    match:
+      - "(check|read|look at|open|scan|review) (my |the )?(email|inbox|mails|messages? in (my )?inbox)"
+      - "(any|do i have) (new|important|unread) (email|emails|mail)"
+      - "(what's|what is) (new|important|unread) in (my )?inbox"
+      - "verify my emails"
+    kind: coding
+    task: >
+      Check the user's email inbox. List any NEW messages and flag which ones
+      look IMPORTANT (sender, subject, why it matters — urgent deadlines,
+      payment/account notifications, replies waiting on the user). Summarize
+      in 3-5 short lines. If email access is not configured, say exactly what
+      is needed to enable it.
+    ack: "Checking your email."
+
+  - name: check-dms
+    match:
+      - "(check|read|look at|open|scan|review) (my )?(private )?(messages|dms?|inbox)"
+      - "(any|do i have) (new|unread) (messages|dms?|private messages)"
+      - "(check|see|look at) (my )?(whatsapp|discord|instagram|telegram|signal)"
+    kind: coding
+    task: >
+      Check the user's private messages / DMs (WhatsApp, Discord, or whichever
+      platform is configured). List new messages and flag anything IMPORTANT
+      (time-sensitive, actionable, from key contacts). Summarize in 3-5 short
+      lines. If a platform is not configured, say exactly what is needed.
+    ack: "Checking your messages."
