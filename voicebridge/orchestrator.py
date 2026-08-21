@@ -1457,7 +1457,7 @@ class VoiceOrchestrator:
                     stop_req.set()
                     return
                 # HOLD -> stop shortly after release (catch the last word)
-                time.sleep(0.6)
+                time.sleep(float(self.cfg.get("hotkey", "tail_s", default=0.2)))
                 stop_req.set()
             threading.Thread(target=_release_watcher, daemon=True).start()
         elif self._ptt_supported:
