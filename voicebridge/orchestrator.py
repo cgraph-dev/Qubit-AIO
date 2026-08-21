@@ -1808,6 +1808,31 @@ class VoiceOrchestrator:
             held = self._ptt_hold  # snapshot at capture start
             press_t = self._press_time
 
+            def _toggle_wait(why: str) -> None:
+                """Hands-free listen until second tap / endpointer done /
+                no-speech timeout. Shared by the tap path and the
+                release-before-speech hold path."""
+                self._toggle_armed = True
+                log_event("hotkey.toggle", on=True, why=why)
+                no_speech_t0 = time.time()
+                while not self._stop.is_set():
+                    if self._toggle_stop.is_set():
+                        log_event("hotkey.toggle", on=False, why="second tap")
+                        break
+                    if mic.endpointer.state == "done":
+                        break
+                    if mic.endpointer.state == "idle" and \
+                            time.time() - no_speech_t0 > toggle_no_speech_s:
+                        log_event("hotkey.toggle", on=False, why="no speech")
+                        break
+                    time.sleep(0.05)
+                # toggle over: disarm so the NEXT interaction starts clean
+                # (a stale _toggle_armed made the next hold's release act
+                # like a second tap and kill the capture instantly)
+                self._toggle_armed = False
+                self._toggle_stop.clear()
+                stop_req.set()
+
             def _release_watcher():
                 # wait until the key is actually released (level, not one-shot)
                 while held and self._ptt_hold and not self._stop.is_set():
@@ -1823,28 +1848,17 @@ class VoiceOrchestrator:
                 if held_s < tap_ms / 1000.0:
                     # TAP -> toggle mode: keep listening until a second tap,
                     # the silence endpoint, or a no-speech timeout.
-                    self._toggle_armed = True
-                    log_event("hotkey.toggle", on=True)
-                    no_speech_t0 = time.time()
-                    while not self._stop.is_set():
-                        if self._toggle_stop.is_set():
-                            log_event("hotkey.toggle", on=False, why="second tap")
-                            break
-                        if mic.endpointer.state == "done":
-                            break
-                        if mic.endpointer.state == "idle" and \
-                                time.time() - no_speech_t0 > toggle_no_speech_s:
-                            log_event("hotkey.toggle", on=False, why="no speech")
-                            break
-                        time.sleep(0.05)
-                    # toggle over: disarm so the NEXT interaction starts clean
-                    # (a stale _toggle_armed made the next hold's release act
-                    # like a second tap and kill the capture instantly)
-                    self._toggle_armed = False
-                    self._toggle_stop.clear()
-                    stop_req.set()
+                    _toggle_wait("tap")
                     return
-                # HOLD -> stop shortly after release (catch the last word)
+                # HOLD: normally stop shortly after release (catch the last
+                # word) — BUT if the user released BEFORE any speech was
+                # detected, they were still preparing to talk ("press, beep,
+                # ...start talking"). Slamming the capture shut here was the
+                # "stops after 1 sec, no time to talk" bug. Keep listening
+                # hands-free until they speak + pause, tap again, or time out.
+                if mic.endpointer.state == "idle":
+                    _toggle_wait("release before speech")
+                    return
                 time.sleep(float(self.cfg.get("hotkey", "tail_s", default=0.2)))
                 stop_req.set()
             threading.Thread(target=_release_watcher, daemon=True).start()
