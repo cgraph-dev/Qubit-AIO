@@ -253,7 +253,10 @@ class PersonaPlexDuplex:
         try:
             mono = np.asarray(indata, dtype=np.float32)
             if mono.ndim > 1:
-                mono = mono.mean(axis=1)
+                # loudest channel, not the mean: the Scarlett 4ch profile puts
+                # the mic on ch0 and ch1-3 are ~silent — averaging dilutes the
+                # voice 4x (RMS 0.008 -> 0.002, below what the model needs)
+                mono = np.max(np.abs(mono), axis=1) * np.sign(mono[:, 0] if mono.shape[1] else mono)
             mono = mono * self.mic_gain
             # the tap always runs (its own VAD is tuned for quiet mics) —
             # never gate it behind the send threshold. BUT: never transcribe
