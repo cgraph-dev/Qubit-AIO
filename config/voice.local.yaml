@@ -44,13 +44,13 @@ feedback:
 # Speech-to-text
 asr:
   provider: whisper       # whisper | personaplex
-  model: small           # small = 4-6x more accurate than base; GPU is idle during tasks
-                          #   small = 4-6x more accurate than base; fits fine now
-                          #   that agent tasks run on DeepSeek (GPU is idle during tasks).
-  device: auto            # auto|cuda|cpu  (auto: GPU, falls back to CPU on OOM)
+  model: auto            # auto: small fp16 when >=2GB VRAM free (4-6x more accurate than base);
+                          #   falls back to base when the GPU is busy -- never OOMs.
+                          #   (qwen3-vl:8b classifier no longer runs, so the GPU is free.)
+
   compute_type: float16
   language: en
-  beam_size: 1
+  beam_size: 5        # better accuracy than greedy; still <1s on GPU for short clips
   min_confidence: 0.02    # ~off. whisper's avg_logprob for real mic speech is
                           # 0.05-0.2 — a higher gate rejects PERFECT transcripts.
                           # Real "didn't catch" cases are handled by empty text + filler words.
@@ -119,7 +119,7 @@ tts:
 # ---------------------------------------------------------------------------
 # Intent routing
 intent:
-  llm_classifier: true    # use local qwen3-vl:8b when the heuristic router is unsure
+  llm_classifier: false   # heuristic router only (ambiguous -> conversation); saves ~2.2s/turn + frees VRAM
   ollama_url: http://127.0.0.1:11434
   ollama_model: qwen3-vl:8b
   classify_timeout_s: 8.0
