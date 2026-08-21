@@ -179,3 +179,24 @@ templates:
       them, and do the requested edits. Use your full tool set (files,
       terminal, browser, repos). Reply concisely with what was done.
     ack: "Using VS Code."
+
+  # ---------------------------------------------------------- CGraph graph
+  - name: graphify-query
+    match:
+      - "(query|ask|search|look up|check) (the |in )?(cgraph )?(knowledge )?graph"
+      - "(what|who|how|where) (is|are|does|connects|links|relates) .*(in|across|within) (the )?(cgraph )?(codebase|repo|project|graph)"
+      - "(what|how) (connects|links|relates|is) .*(to|with|and) (the |the )?(web|backend|api|socket|chat|logger|stripe|packages)"
+      - "graphify"
+      - "(find|trace) (the )?(call|dependency|path|import|relation).*(cgraph|in the codebase)"
+      - "(what does|how does) (the )?(web app|backend|api client|stripe|socket|logger|chat) (do|work|connect)"
+    kind: coding
+    task: >
+      Answer the user's architecture question about the CGraph codebase using
+      the prebuilt knowledge graph. Run the query wrapper:
+        ~/Projects/Repos/CGraph-graphify/graphify-query.sh "<the user's question>"
+      For path queries: graphify-query.sh path "<from>" "<to>".
+      For a single node: graphify-query.sh explain "<label>" (e.g. stripe.tsx,
+      api-client.ts, socket-manager.ts).
+      The graph has 12k+ nodes (web, backend, packages) with descriptions.
+      Answer in 2-4 short sentences based on what the graph returns.
+    ack: "Checking the code graph."
