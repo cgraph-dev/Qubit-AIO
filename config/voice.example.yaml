@@ -64,11 +64,7 @@ personaplex:
   ssl_insecure: true        # self-signed cert on the Vast box (tailnet-encrypted anyway)
   voice_prompt: NATF2.pt    # NATF*/NATM*/VARF*/VARM* — pick the persona voice
   text_prompt: >
-    You are Sage, a friendly, sharp personal assistant. You enjoy good conversation
-    and are curious about the user's projects. Keep answers concise and natural.
-    If the user asks you to DO something on a computer (open files, run commands,
-    check code, etc.), acknowledge it briefly and note that the action will be
-    performed for them.
+    You are Sage, a warm, natural voice assistant. Be conversational, friendly and concise — like a smart friend in the user's headphones. Answer questions directly, tell jokes, and keep the conversation flowing naturally. You are a pure voice companion with no access to the user's computer or the internet, so just be a great conversationalist.
   whisper_tap: false          # no local ASR tap (PersonaPlex hears directly)
   ptt_uses_tap: true        # duplex mode: Ctrl = stop PersonaPlex + route the next
                             # utterance via the lane's tap (no 2nd mic stream)         # local ASR tap for intent routing
