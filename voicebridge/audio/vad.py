@@ -30,10 +30,12 @@ FRAME_SIZE = FRAME_RATE * FRAME_MS // 1000  # 480 samples
 class SileroVadGate:
     """Silero neural VAD via sherpa-onnx (windowed, raw per-window decisions).
 
-    Buffers arbitrary-size 16 kHz int16 PCM into 512-sample (32 ms) windows and
-    returns the VAD decision for each completed window. Endpointing hysteresis
-    is left to the caller (Endpointer) — here hysteresis is disabled so we get
-    raw frame-level speech/non-speech.
+    Buffers arbitrary-size 16 kHz int16 PCM into the model's native window
+    (512 samples for v4, 576 for v5 — read from the loaded VadModel, NEVER
+    hardcoded: a mismatch makes sherpa-onnx exit(255) at the first is_speech
+    call) and returns the VAD decision for each completed window. Endpointing
+    hysteresis is left to the caller (Endpointer) — here hysteresis is disabled
+    so we get raw frame-level speech/non-speech.
     """
 
     def __init__(self, model_path: Path | str, threshold: float = 0.5,
@@ -53,12 +55,13 @@ class SileroVadGate:
                 min_silence_duration=0.0,   # raw decisions; Endpointer does hysteresis
                 min_speech_duration=0.0,
                 max_speech_duration=30.0,
-                window_size=512,
+                # window_size intentionally NOT set here — defaults to the
+                # model's native size (512 v4 / 576 v5)
             ),
         )
         self._vad = so.VadModel.create(cfg)
+        self._window = self._vad.window_size * 2  # samples * 2 bytes (int16)
         self._buf = b""
-        self._window = 1024  # 512 samples * 2 bytes
 
     def reset(self) -> None:
         self._buf = b""
