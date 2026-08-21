@@ -246,8 +246,11 @@ class PersonaPlexDuplex:
                 mono = mono.mean(axis=1)
             mono = mono * self.mic_gain
             # the tap always runs (its own VAD is tuned for quiet mics) —
-            # never gate it behind the send threshold
-            self._feed_tap(mono)
+            # never gate it behind the send threshold. BUT: never transcribe
+            # the lane's own output (echo) — whisper hallucinates gibberish
+            # on it and the garbage gets routed.
+            if not self.speaking:
+                self._feed_tap(mono)
             # ECHO GATE: never feed the server our own output — the speakers
             # play PersonaPlex, the mic hears it, and the model babbles on its
             # own voice forever (gibberish loop). Skip while (and shortly
@@ -448,9 +451,27 @@ class PersonaPlexDuplex:
                 dtype="float32", callback=self._audio_cb)
             self._stream.start()
         if self._out is None:
-            self._out = sd.OutputStream(samplerate=self.sample_rate,
+            # hardware (Scarlett 48k, ALC892 44.1/48k) rejects 24 kHz and
+            # PortAudio won't resample — the pulse/pipewire mixers do. Try the
+            # configured device, then pulse/pipewire, then the default; keep
+            # the lane alive for INPUT even if no output opens yet.
+            candidates = []
+            cfg_dev = self.cfg.get("personaplex", "output_device", default=None)
+            if cfg_dev:
+                candidates.append(cfg_dev)
+            for name in ("pulse", "pipewire", None):
+                try:
+                    idx = sd.default.device[1] if name is None else name
+                    o = sd.OutputStream(device=idx, samplerate=self.sample_rate,
                                         channels=1, dtype="float32")
-            self._out.start()
+                    o.start()
+                    self._out = o
+                    log_event("personaplex.output", device=str(idx),
+                              rate=self.sample_rate)
+                    break
+                except Exception as exc:
+                    log.warning("output stream %s failed: %s", name, exc)
+                    continue
 
     def _close_streams(self) -> None:
         for s in (self._stream, self._out):

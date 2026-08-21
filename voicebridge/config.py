@@ -83,6 +83,9 @@ DEFAULTS: Dict[str, Any] = {
         "speech_threshold": 0.008,      # RMS gate for mic->server frames (after gain);
                                         # tuned for the quiet Scarlett — raise if the
                                         # model starts replying to room noise
+        "output_device": None,          # speaker device for lane audio; null = try
+                                        # pulse -> pipewire -> default (24k hardware
+                                        # rejects on Scarlett/ALC892, mixers resample)
         "duck_on_task_s": 8.0,          # mute PP + stop feeding it while a task runs
         "reconnect_s": 5.0,             # reconnect/backoff interval
         # legacy (pre-duplex) adapter knobs kept for compatibility
