@@ -304,7 +304,7 @@ class PersonaPlexDuplex:
                     self._noise_floor = min(self._noise_floor * 1.02 + 1e-5, rms)
                 floor = self._noise_floor
                 adaptive = float(self.cfg.get("personaplex", "adaptive_gate",
-                                              default=1.2))
+                                              default=3.0))
                 if rms < max(floor * adaptive, 0.002):
                     return
             else:
