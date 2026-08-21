@@ -128,8 +128,7 @@ DEFAULTS: Dict[str, Any] = {
             "model": "huihui_ai/llama3.2-abliterate:3b",  # uncensored llama3.2:3b (same 2.6GB resident, +0.2GB disk);
                                     # fallback: llama3.2:3b (stock); qwen3:4b thinks -> empty content
             "url": "http://127.0.0.1:11434",
-            "timeout_s": 4.0,
-            "max_words": 30,           # utterances shorter than this try local first
+            "timeout_s": 8.0,           # local model chat timeout (was 4s — real 4s timeouts in the journal)
             "max_tokens": 100,         # local reply cap (short answers only)
         },
         "deepseek_url": "https://api.deepseek.com/chat/completions",

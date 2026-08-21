@@ -175,6 +175,16 @@ class Classifier:
                                   "action_params": local_match.params},
                           backend="local", reason=f"local:{local_match.name}")
 
+        # "use perplexity API to search X" MUST reach the web/conversation
+        # path, NOT the coding agent: TASK_HINTS contains \bapi\b + \bcheck\b
+        # so it otherwise scores 1.0 -> coding -> a full agent dispatch that
+        # double-bills (agent tokens + its own Perplexity search). Forcing any
+        # utterance naming perplexity to conversation fixes the trap.
+        if re.search(r"\bperplexity\b", text, re.I):
+            return Intent("conversation", confidence=0.9,
+                          reason="perplexity named -> web/conversation path",
+                          source="heuristic")
+
         hermes_i = self._hermes_request(text)
         if hermes_i:
             return hermes_i

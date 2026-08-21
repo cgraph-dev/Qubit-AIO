@@ -97,26 +97,6 @@ def _needs_web(text: str) -> bool:
     return any(re.search(p, t) for p in pats)
 
 
-_CASUAL_RE = re.compile(
-    r"^\s*(hey|hi|hello|yo|sup|hiya|howdy)\b"
-    r"|\b(how are you|how('s| is) it going|what's up|how do you do)\b"
-    r"|\b(thank(s| you)?|ty|thx)\b"
-    r"|\b(tell me a joke|make me laugh|another joke)\b"
-    r"|^(ok|okay|fine|good|nice|great|awesome|cool|love you|good "
-    r"(morning|afternoon|evening|night)|see you|bye|goodbye|good night)\b",
-    re.IGNORECASE)
-
-
-def _is_casual(text: str) -> bool:
-    """True for small talk the tiny local LLM handles well (fast, 0.3s).
-
-    Everything else (questions, requests, anything informational) routes to
-    DeepSeek — the local 3B answers real questions with generic "I was trained
-    on a large corpus…" text, which reads as "it's not using DeepSeek".
-    """
-    return bool(_CASUAL_RE.search(text))
-
-
 def _interrupt_decision_prompt(old_task: str, new_request: str) -> str:
     """Build the prompt handed to the agent after an interrupt: it decides
     whether to continue the paused work or switch to the user's new request."""
@@ -327,11 +307,16 @@ class VoiceOrchestrator:
         log_event("openclaw.gateway.retry", route=self._route)
         try:
             old_cli = self._cli
-            self._connect_gateway()
-            if self._route == "gateway":
+            new_route = self._connect_gateway()
+            if new_route == "gateway":
                 log_event("openclaw.gateway.recovered")
-            elif old_cli is not None and self._cli is None:
-                self._cli = old_cli  # keep the CLI fallback if we still have it
+            elif old_cli is not None:
+                # _connect_cli_only() REPLACED self._cli with a fresh backend
+                # that may have failed to connect — restore the working one
+                # so we don't lose the CLI fallback on a failed gateway retry
+                self._cli = old_cli
+                self._route = "cli"
+                log_event("openclaw.gateway.retry.cli_kept")
         except Exception as exc:
             log_event("openclaw.gateway.retry.failed", error=str(exc)[:160])
 
@@ -412,6 +397,7 @@ class VoiceOrchestrator:
                                    speech_start_ms=self.cfg.get("vad", "speech_start_ms", default=180),
                                    silence_timeout_s=self.cfg.get("vad", "silence_timeout_s", default=1.2),
                                    max_utterance_s=self.cfg.get("vad", "max_utterance_s", default=30.0),
+                                   rms_gate=float(self.cfg.get("vad", "rms_gate", default=0.004)),
                                    vad_backend=vad_backend,
                                    silero_model=silero_model),
                                gain=float(mic_cfg.get("gain", 4.0)),
@@ -1160,7 +1146,13 @@ class VoiceOrchestrator:
         fallbacks when the local model or gateway is down.
         """
         llm_cfg = self.cfg.section("intent").get("local_llm", {}) or {}
-        if llm_cfg.get("enabled", True):
+        # Explicit "use perplexity to search X" -> straight to Perplexity,
+        # never the local model (it answers web queries generically without
+        # actually searching — "I was trained on a large corpus…").
+        explicit_web = ("perplexity" in text.lower()
+                        or (self.cfg.get("intent", "perplexity_enabled", default=True)
+                            and _needs_web(text)))
+        if not explicit_web and llm_cfg.get("enabled", True):
             from .local_llm import chat_local
             try:
                 reply = chat_local(

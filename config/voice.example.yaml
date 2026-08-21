@@ -9,10 +9,8 @@
 # ---------------------------------------------------------------------------
 # Push-to-talk hotkeys
 hotkey:
-  hold_key: ctrl_r        # hold to talk (ends on release)
-  toggle_key: "`"         # tap to toggle listening (talk, tap again or pause to stop)
-  tap_toggle: true        # quick tap of hold_key = toggle too; hold = classic PTT
-  tap_ms: 300             # press shorter than this counts as a tap
+  hold_key: ctrl_r        # hold to talk (ends on release); quick tap = toggle
+  tap_ms: 300             # press shorter than this counts as a tap (toggle listen)
   toggle_no_speech_s: 5.0 # toggle stops itself if you don't speak
   interrupt_on_ptt: true  # Ctrl while a task runs = PAUSE + listen for new instruction
   alt_hold_key: ""        # optional second hold key
@@ -91,8 +89,7 @@ intent:
                           # DeepSeek API handles long/complex/web asks
     model: huihui_ai/llama3.2-abliterate:3b  # uncensored llama3.2:3b (same footprint as stock); fallback llama3.2:3b
     url: http://127.0.0.1:11434
-    timeout_s: 4.0
-    max_words: 30
+    timeout_s: 8.0     # local model chat timeout (was 4s — journal showed real timeouts)
     max_tokens: 100
   conversation_backend: local      # bridge answers ALL chat (<0.5s); only tasks -> OpenClaw/Hermes
   deepseek_url: https://api.deepseek.com/chat/completions

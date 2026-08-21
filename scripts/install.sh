@@ -61,7 +61,7 @@ dl "$MODELS/$VOICE.onnx" \
 dl "$MODELS/$VOICE.onnx.json" \
    "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/$VOICE.onnx.json"
 
-# sherpa-onnx ASR: Moonshine base (CPU, 0 VRAM)
+# sherpa-onnx ASR: Moonshine base (CPU, 0 VRAM) — fallback engine
 MOON="sherpa-onnx-moonshine-base-en-quantized-2026-02-27"
 if [ ! -d "$MODELS/$MOON" ]; then
   echo "==> downloading Moonshine ASR (~200 MB)"
@@ -70,6 +70,41 @@ if [ ! -d "$MODELS/$MOON" ]; then
 else
   echo "    have   $MOON"
 fi
+
+# sherpa-onnx ASR: Parakeet-TDT 0.6B v3 int8 (CPU, 0 VRAM) — DEFAULT engine
+# (asr.engine: parakeet). 25 European languages incl. Romanian, max accuracy.
+PKT="sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8"
+if [ ! -d "$MODELS/$PKT" ]; then
+  echo "==> downloading Parakeet-TDT ASR (~640 MB)"
+  curl -sL -o /tmp/parakeet.tar.bz2 "$SR/asr-models/$PKT.tar.bz2"
+  (cd "$MODELS" && tar xjf /tmp/parakeet.tar.bz2 && rm /tmp/parakeet.tar.bz2)
+else
+  echo "    have   $PKT"
+fi
+# sherpa 1.13.6 hard-errors without vocab_size/context_size metadata on the
+# decoder/joiner ONNX — patch them in if missing (idempotent).
+"$VENV/bin/python" - "$MODELS/$PKT" <<'PYEOF'
+import sys, onnx
+from pathlib import Path
+base = Path(sys.argv[1])
+n_tokens = len((base / "tokens.txt").read_text().splitlines())
+for fname in ("decoder.int8.onnx", "joiner.int8.onnx"):
+    p = base / fname
+    if not p.exists():
+        continue
+    m = onnx.load(str(p))
+    names = {x.key for x in m.metadata_props}
+    changed = False
+    if "vocab_size" not in names:
+        m.metadata_props.add().key = "vocab_size"; m.metadata_props[-1].value = str(n_tokens)
+        changed = True
+    if "context_size" not in names:
+        m.metadata_props.add().key = "context_size"; m.metadata_props[-1].value = "1"
+        changed = True
+    if changed:
+        onnx.save(m, str(p))
+        print(f"    patched {fname} metadata (vocab_size={n_tokens}, context_size=1)")
+PYEOF
 
 # Silero VAD v5 (sherpa-onnx)
 dl "$MODELS/silero_vad_v5.onnx" "$SR/asr-models/silero_vad_v5.onnx"
@@ -91,11 +126,26 @@ if command -v ollama >/dev/null; then
     (ollama serve >/dev/null 2>&1 &) || true
     for i in $(seq 1 15); do ollama list >/dev/null 2>&1 && break; sleep 1; done
   fi
+  if ! ollama list | grep -q "huihui_ai/llama3.2-abliterate:3b"; then
+    echo "==> pulling huihui_ai/llama3.2-abliterate:3b (uncensored local replies, ~2.2 GB)"
+    ollama pull huihui_ai/llama3.2-abliterate:3b
+  else
+    echo "    have   huihui_ai/llama3.2-abliterate:3b"
+  fi
+  # stock llama3.2:3b kept as a fallback model (same size)
   if ! ollama list | grep -q "llama3.2:3b"; then
-    echo "==> pulling llama3.2:3b (local replies, ~2 GB)"
+    echo "==> pulling llama3.2:3b (stock fallback, ~2 GB)"
     ollama pull llama3.2:3b
   else
     echo "    have   llama3.2:3b"
+  fi
+  # OpenClaw gateway memory embeddings need this tiny model (274 MB CPU) —
+  # the gateway spins on 'memory embeddings retryable error' without it
+  if ! ollama list | grep -q "nomic-embed-text"; then
+    echo "==> pulling nomic-embed-text (gateway memory embeddings, 274 MB)"
+    ollama pull nomic-embed-text
+  else
+    echo "    have   nomic-embed-text"
   fi
 else
   echo "    WARNING: ollama not found — install https://ollama.com then re-run"

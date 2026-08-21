@@ -110,6 +110,37 @@ class SafetyPolicy:
                 log_event("safety.never_confirm", pattern=p.pattern, text=text)
                 return v
 
+        # Informational / code-context override: destructive verbs used to
+        # describe CODE SYMBOLS or questions are not destructive actions.
+        # "fix the delete endpoint", "tell me about the remove function",
+        # "how does the drop handler work" -> no confirmation. Real actions
+        # ("delete the files", "remove the database") still confirm.
+        CODE_CTX = re.compile(
+            r"\b(delete|remove|rm|drop|erase|wipe|unlink|truncate)\s+"
+            r"(the\s+|this\s+|that\s+|my\s+|our\s+)?"
+            r"(function|method|handler|endpoint|api|route|class|module|"
+            r"code|logic|error|bug|warning|block|test|middleware|decorator|"
+            r"import|export|statement|line)\b",
+            re.I)
+        INFO_PHRASES = re.compile(
+            r"\b(tell me about|explain|what does|how does|why does|what is|"
+            r"how is|look at|show me|find|search for|review|inspect|describe)\b",
+            re.I)
+        if CODE_CTX.search(low) or (INFO_PHRASES.search(low)
+                                    and re.search(r"\b(delete|remove|rm|drop|"
+                                                  r"erase|wipe|unlink|truncate)\b", low)):
+            v.require_confirm = False
+            v.confirm_reason = ""
+            v.matched_pattern = ""
+            log_event("safety.code_context", text=text)
+            if self.dry_run_first:
+                v.dry_run = True
+                v.dry_run_instruction = (
+                    "First do a dry run: inspect the affected files and report the "
+                    "exact changes without modifying anything. Then wait for "
+                    "confirmation before applying changes.")
+            return v
+
         if self.confirm_destructive:
             for p in self._destructive:
                 if p.search(low):
