@@ -76,6 +76,8 @@ class PersonaPlexDuplex:
         self._output_mute = False    # instant stop of lane speech (PTT take-over)
         self._last_out_audio = 0.0   # for feedback suppression (speaking prop)
         self._noise_floor = 0.0      # adaptive speech-gate noise floor
+        self._hp_prev = 0.0          # one-pole high-pass state (kills 50Hz hum)
+        self._hp_xprev = 0.0
         self._out_queue: "queue.Queue[np.ndarray]" = queue.Queue(maxsize=256)
         self._out_thread: Optional[threading.Thread] = None
 
@@ -248,6 +250,24 @@ class PersonaPlexDuplex:
         return time.time() < self._duck_until
 
     # ------------------------------------------------------------------ io
+    # one-pole high-pass ~100 Hz at 48 kHz: the Scarlett input carries strong
+    # 50 Hz mains hum (measured 4x the speech band) which buries the voice and
+    # makes the model mishear — remove it before the gate/send
+    _HP_ALPHA = 0.987
+
+    def _hp_filter(self, x: np.ndarray) -> np.ndarray:
+        a = self._HP_ALPHA
+        y = np.empty_like(x)
+        prev = self._hp_prev
+        xp = self._hp_xprev
+        for i in range(len(x)):
+            y[i] = a * (prev + x[i] - xp)
+            prev = y[i]
+            xp = x[i]
+        self._hp_prev = prev
+        self._hp_xprev = xp
+        return y
+
     def _audio_cb(self, indata: np.ndarray, frames: int, t_info, status) -> None:
         if status:
             log.debug("mic status: %s", status)
@@ -258,6 +278,7 @@ class PersonaPlexDuplex:
                 # the mic on ch0 and ch1-3 are ~silent — averaging dilutes the
                 # voice 4x (RMS 0.008 -> 0.002, below what the model needs)
                 mono = np.max(np.abs(mono), axis=1) * np.sign(mono[:, 0] if mono.shape[1] else mono)
+            mono = self._hp_filter(mono)   # remove mains hum BEFORE the gain
             mono = mono * self.mic_gain
             # the tap always runs (its own VAD is tuned for quiet mics) —
             # never gate it behind the send threshold. BUT: never transcribe
