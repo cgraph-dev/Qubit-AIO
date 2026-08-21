@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice Dashboard — Activity</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; font: 14px/1.5 system-ui, sans-serif;
+         background:#0d1117; color:#e6edf3; min-height:100vh; }
+  .wrap { max-width:760px; margin:0 auto; padding:16px; }
+  header { display:flex; align-items:baseline; justify-content:space-between;
+           margin-bottom:12px; }
+  h1 { font-size:18px; margin:0; }
+  a { color:#58a6ff; text-decoration:none; }
+  .item { border:1px solid #21262d; border-radius:10px; padding:10px 12px;
+          margin:8px 0; background:#0d1117; }
+  .item .t { font-size:11px; color:#8b949e; margin-bottom:4px; }
+  .item .kind { color:#58a6ff; }
+  .item .route { color:#d29922; }
+  .item .ok { color:#3fb950; }
+  .item .fail { color:#f85149; }
+  .item .text { white-space:pre-wrap; margin-top:4px; }
+  .item .summary { color:#c9d1d9; background:#161b22; border-radius:6px;
+                   padding:6px 8px; margin-top:6px; }
+  #empty { color:#8b949e; text-align:center; margin-top:40px; }
+</style></head><body>
+<div class="wrap">
+  <header>
+    <h1>📋 Voice Dashboard — Agent Activity</h1>
+    <a href="/">← talk</a>
+  </header>
+  <div id="feed"><div id="empty">waiting for activity…</div></div>
+</div>
+<script>
+const BASE = (new URLSearchParams(location.search).get('api') || '').replace(/\/$/, '');
+const TOKEN = new URLSearchParams(location.search).get('token') || '';
+function hdrs(extra) { const h = Object.assign({}, extra || {}); if (TOKEN) h['X-Api-Token'] = TOKEN; return h; }
+
+const feed = document.getElementById('feed');
+const KIND = { user:'', routing:'', status:'', summary:'', done:'', fail:'' };
+function esc(s){ return (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function fmt(ts){ const d = new Date(ts*1000); return d.toLocaleTimeString(); }
+function render(items){
+  feed.innerHTML = items.map(it => {
+    const cls = it.kind==='fail'?'fail':it.kind==='ok'?'ok':'';
+    const route = it.route ? ` · <span class="route">${esc(it.route)}</span>` : '';
+    const summary = it.summary ? `<div class="summary">${esc(it.summary)}</div>` : '';
+    return `<div class="item">
+      <div class="t">${fmt(it.ts)} · <span class="kind">${esc(it.kind)}</span>${route}</div>
+      ${it.text ? `<div class="text">${esc(it.text)}</div>` : ''}${summary}</div>`;
+  }).join('');
+  if (!items.length) feed.innerHTML = '<div id="empty">waiting for activity…</div>';
+}
+async function refresh(){
+  try {
+    const r = await fetch(BASE + '/api/activity?limit=80');
+    const d = await r.json();
+    render(d.items || []);
+  } catch (_) {}
+}
+setInterval(refresh, 2000);
+refresh();
+</script>
+</body></html>

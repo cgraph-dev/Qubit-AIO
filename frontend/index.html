@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice Dashboard</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; font: 16px/1.5 system-ui, sans-serif;
+         background:#0d1117; color:#e6edf3; min-height:100vh; }
+  .wrap { max-width:720px; margin:0 auto; padding:16px; }
+  header { display:flex; align-items:baseline; justify-content:space-between;
+           gap:8px; margin-bottom:8px; }
+  h1 { font-size:20px; margin:0; }
+  .status { font-size:13px; color:#8b949e; }
+  .status.live { color:#3fb950; }
+  #pulse { width:10px; height:10px; border-radius:50%; background:#f85149;
+           display:inline-block; vertical-align:middle; margin-right:6px; }
+  #pulse.on { background:#3fb950; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity:.35; } }
+  .ptt { width:100%; padding:36px 0; margin:24px 0; font-size:20px;
+         border:2px solid #30363d; border-radius:16px; background:#161b22;
+         color:#e6edf3; cursor:pointer; user-select:none; -webkit-user-select:none;
+         touch-action:none; transition: background .08s; }
+  .ptt:active, .ptt.hold { background:#1f6feb; border-color:#1f6feb; color:#fff; }
+  .ptt[disabled] { opacity:.4; cursor:wait; }
+  .hint { text-align:center; color:#8b949e; font-size:13px; margin-top:-16px; }
+  #transcript { margin-top:20px; }
+  .msg { padding:10px 12px; border-radius:10px; margin:8px 0; white-space:pre-wrap; }
+  .msg.user { background:#1f6feb22; border:1px solid #1f6feb44; }
+  .msg.assistant { background:#161b22; border:1px solid #30363d; }
+  .msg.meta { background:#0d1117; color:#8b949e; font-size:13px; border:none; }
+  .err { color:#f85149; }
+  a { color:#58a6ff; text-decoration:none; }
+  .row { display:flex; gap:8px; align-items:center; }
+</style></head><body>
+<div class="wrap">
+  <header>
+    <h1>🎙 Voice Dashboard</h1>
+    <div class="row">
+      <span class="status" id="st">connecting…</span>
+      <a href="/activity">activity →</a>
+    </div>
+  </header>
+
+  <button class="ptt" id="ptt">Hold to talk</button>
+  <div class="hint">tap = toggle · release = send · esc = stop</div>
+
+  <div id="transcript"></div>
+</div>
+
+<script>
+// API base: same-origin by default (localhost/LAN). Override with ?api=<url>
+// so the same page works from Vercel against your PC's tunnel.
+const BASE = (new URLSearchParams(location.search).get('api') || '').replace(/\/$/, '');
+const TOKEN = new URLSearchParams(location.search).get('token') || '';
+function hdrs(extra) { const h = Object.assign({}, extra || {}); if (TOKEN) h['X-Api-Token'] = TOKEN; return h; }
+
+const ptt = document.getElementById('ptt');
+const st = document.getElementById('st');
+const transcript = document.getElementById('transcript');
+let ctx=null, source=null, processor=null, chunks=[], recording=false, busy=false;
+let pushMode = 'hold';  // 'hold' = press-and-hold, 'tap' = one-tap toggle
+
+function addMsg(cls, text) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + cls;
+  d.textContent = text;
+  transcript.prepend(d);
+}
+function setStatus(t, live=false) {
+  st.textContent = t;
+  st.className = 'status' + (live ? ' live' : '');
+}
+function setPulse(on) {
+  document.getElementById('pulse').style.display = 'none'; // unused fallback
+}
+
+async function startRec() {
+  if (recording) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: {
+      channelCount: 1, echoCancellation: true, noiseSuppression: true }});
+    // Ask for 16k — Chrome honours AudioContext({sampleRate:16000})
+    ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    source = ctx.createMediaStreamSource(stream);
+    processor = ctx.createScriptProcessor(4096, 1, 1);
+    processor.onaudioprocess = (e) => {
+      if (!recording) return;
+      const ch = e.inputBuffer.getChannelData(0);
+      const buf = new Int16Array(ch.length);
+      for (let i = 0; i < ch.length; i++) buf[i] = Math.max(-1, Math.min(1, ch[i])) * 32767;
+      chunks.push(buf);
+    };
+    source.connect(processor);
+    processor.connect(ctx.destination);
+    recording = true;
+    setStatus('listening…', true);
+  } catch (err) {
+    addMsg('err', 'Mic error: ' + err.message);
+    setStatus('mic error');
+  }
+}
+
+async function stopRec() {
+  if (!recording) return;
+  recording = false;
+  const total = chunks.reduce((a, c) => a + c.length, 0);
+  const out = new Int16Array(total);
+  let off = 0;
+  for (const c of chunks) { out.set(c, off); off += c.length; }
+  chunks = [];
+  try { source.disconnect(); processor.disconnect(); ctx.close(); } catch (_) {}
+  source = processor = ctx = null;
+  setStatus('thinking…');
+  if (total < 1600) {  // <0.1s of audio = accidental tap
+    setStatus('too short — try again');
+    setTimeout(() => setStatus('ready'), 1500);
+    return;
+  }
+  await sendAudio(out.buffer);
+}
+
+async function sendAudio(pcm) {
+  busy = true;
+  ptt.disabled = true;
+  ptt.textContent = 'listening to result…';
+  let rid;
+  try {
+    // 1. submit -> instant request_id (the bridge acks immediately)
+    const res = await fetch(BASE + '/api/talk', {
+      method: 'POST',
+      headers: hdrs({ 'Content-Type': 'application/octet-stream' }),
+      body: pcm,
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    rid = data.request_id;
+    setStatus('working…', true);
+    // 2. poll the result until done
+    while (true) {
+      await new Promise(r => setTimeout(r, 900));
+      const r = await fetch(BASE + '/api/result/' + rid);
+      const poll = await r.json();
+      if (poll.status === 'done') {
+        await playResult(poll);
+        break;
+      } else if (poll.status === 'unknown') {
+        addMsg('err', 'Request lost (bridge restarted?). Try again.');
+        break;
+      }
+    }
+  } catch (err) {
+    addMsg('err', 'Request failed: ' + err.message);
+    setStatus('error');
+  } finally {
+    busy = false;
+    ptt.disabled = false;
+    ptt.textContent = 'Hold to talk';
+    setStatus('ready');
+  }
+}
+
+async function playResult(data) {
+  addMsg('user', data.text || '(no speech recognized)');
+  if (data.events && data.events.length) {
+    for (const ev of data.events) {
+      if (ev.kind === 'meta') addMsg('meta', '· ' + ev.text);
+    }
+  }
+  if (data.audio_b64) {
+    const audio = new Audio('data:audio/wav;base64,' + data.audio_b64);
+    addMsg('assistant', data.summary || data.text || '');
+    setStatus('speaking…', true);
+    await audio.play();
+    await new Promise(r => audio.onended = r);
+  } else if (data.summary) {
+    addMsg('assistant', data.summary);
+  } else if (data.error) {
+    addMsg('err', data.error);
+  }
+}
+
+// ---- PTT: hold on desktop / toggle on touch ----
+let holdTimer = null;
+ptt.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  if (busy) return;
+  if (pushMode === 'hold') {
+    holdTimer = setTimeout(() => { pushMode = 'toggle'; startRec(); }, 120);
+  } else {
+    startRec();
+  }
+});
+ptt.addEventListener('pointerup', (e) => {
+  e.preventDefault();
+  if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+  if (pushMode === 'hold' && !recording) { pushMode = 'toggle'; }
+  if (recording) stopRec();
+});
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Escape') { if (recording) stopRec(); }
+});
+
+setStatus('ready');
+fetch(BASE + '/api/status').then(r => r.json()).then(d => {
+  if (d.bridge === 'up') setStatus('bridge up · ' + d.route, true);
+  else setStatus('bridge: ' + (d.bridge || 'unknown'));
+}).catch(() => setStatus('bridge offline'));
+</script>
+</body></html>

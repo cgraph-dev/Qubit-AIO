@@ -383,14 +383,42 @@ class WebUIHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        # CORS: the Vercel-hosted frontend calls the PC API cross-origin.
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Api-Token")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.end_headers()
         self.wfile.write(body)
+
+    def _api_token_ok(self) -> bool:
+        """Gate API endpoints: no token configured = open (localhost/LAN);
+        token configured = must match X-Api-Token header or ?token= param."""
+        token = self.app.api_token
+        if not token:
+            return True
+        header = self.headers.get("X-Api-Token", "")
+        query = self.path.split("token=")[1].split("&")[0] if "token=" in self.path else ""
+        return header == token or query == token
 
     def _json(self, obj: Any, code: int = 200) -> None:
         self._send(code, json.dumps(obj).encode(), "application/json")
 
     def _html(self, page: str, code: int = 200) -> None:
         self._send(code, page.encode(), "text/html; charset=utf-8")
+
+    def _file(self, path: Path, ctype: str) -> None:
+        try:
+            self._send(200, path.read_bytes(), ctype)
+        except OSError:
+            self._send(404, b"not found")
+
+    def do_OPTIONS(self) -> None:  # noqa: N802  (CORS preflight)
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Api-Token")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def log_message(self, format: str, *args: Any) -> None:  # silence noise
         pass
@@ -399,23 +427,44 @@ class WebUIHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         path = self.path.split("?")[0]
         if path in ("/", "/index.html"):
-            self._html(CHAT_PAGE)
+            if self.app._use_frontend_dir:
+                self._file(self.app._frontend_dir / "index.html", "text/html; charset=utf-8")
+            else:
+                self._html(CHAT_PAGE)
         elif path == "/activity":
-            self._html(ACTIVITY_PAGE)
+            if self.app._use_frontend_dir and (self.app._frontend_dir / "activity.html").exists():
+                self._file(self.app._frontend_dir / "activity.html", "text/html; charset=utf-8")
+            else:
+                self._html(ACTIVITY_PAGE)
         elif path == "/api/status":
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
             self._json(self.app.status())
         elif path == "/api/activity":
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
             limit = int(self.path.split("limit=")[1].split("&")[0]) if "limit=" in self.path else 100
             self._json({"items": self.app.feed.recent(min(limit, 300))})
         elif path.startswith("/api/result/"):
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
             rid = path.rsplit("/", 1)[-1]
             self._json(self.app.result(rid))
+        elif self.app._use_frontend_dir and path.startswith("/static/"):
+            name = path.split("/", 2)[-1]
+            self._file(self.app._frontend_dir / name, "application/octet-stream")
         else:
             self._send(404, b"not found")
 
     def do_POST(self) -> None:  # noqa: N802
         path = self.path.split("?")[0]
         if path == "/api/talk":
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
             length = int(self.headers.get("Content-Length", 0))
             pcm = self.rfile.read(length) if length else b""
             if not pcm:
@@ -455,6 +504,12 @@ class WebUI:
         self._pending_lock = threading.Lock()
         self._results: Dict[str, Dict[str, Any]] = {}
         self._result_lock = threading.Lock()
+        # serve the shared frontend/ dir when it exists (Vercel-ready build),
+        # otherwise fall back to the embedded pages.
+        self._frontend_dir = Path(__file__).resolve().parents[1] / "frontend"
+        self._use_frontend_dir = self._frontend_dir.is_dir() and (self._frontend_dir / "index.html").exists()
+        # optional shared secret for tunneled/external access (config: webui.token)
+        self.api_token: str = orchestrator.cfg.get("webui", "token", default="") if orchestrator is not None else ""
 
     # -- lifecycle --------------------------------------------------------
     def start(self) -> None:
