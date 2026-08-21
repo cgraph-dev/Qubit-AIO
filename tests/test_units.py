@@ -115,6 +115,18 @@ def test_classify_system_status():
     assert i.kind == "system" and i.params.get("command") == "status"
 
 
+def test_classify_greeting_is_conversation_not_status():
+    # regression: "how are you" used to match the status regex and got the
+    # bridge status readout instead of a conversation reply
+    clf, _ = _classifier()
+    for phrase in ("how are you", "how are you today", "how's it going",
+                   "how are you doing", "hello there"):
+        i = clf.classify(phrase)
+        assert i.kind != "system", f"{phrase!r} misrouted as system ({i.reason})"
+    i = clf.classify("are you there")
+    assert i.kind == "system" and i.params.get("command") == "status"
+
+
 def test_classify_system_model_tier():
     clf, _ = _classifier()
     i = clf.classify("use turbo from now on")

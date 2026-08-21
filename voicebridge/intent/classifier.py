@@ -24,8 +24,10 @@ log = get_logger()
 
 SYSTEM_COMMANDS: Dict[str, Dict[str, Any]] = {
     "status": {
-        "patterns": [r"\b(what'?s|what is)?\s*(the\s+)?(status|state|health|how are you)\b",
-                     r"\b(are you (there|working|listening))\b"],
+        # explicit status asks ONLY — "how are you" is a greeting, not status
+        "patterns": [r"\b(status|system status|bridge status)\b",
+                     r"\b(are you (there|working|listening|alive|up|online))\b",
+                     r"\bhow('s| is) the (bridge|voice|system|assistant)\b"],
         "desc": "report bridge + gateway status",
     },
     "mute":     {"patterns": [r"\b(mute|silence|shut up|be quiet)\b"], "desc": "mute spoken output"},
