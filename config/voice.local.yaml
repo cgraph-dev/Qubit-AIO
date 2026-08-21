@@ -44,7 +44,7 @@ feedback:
 # Speech-to-text
 asr:
   provider: whisper       # whisper | personaplex
-  model: base            # base = ~2x faster than small on the 3070; good for PTT commands
+  model: small           # small = 4-6x more accurate than base; GPU is idle during tasks
                           #   small = 4-6x more accurate than base; fits fine now
                           #   that agent tasks run on DeepSeek (GPU is idle during tasks).
   device: auto            # auto|cuda|cpu  (auto: GPU, falls back to CPU on OOM)

@@ -24,7 +24,7 @@ import time
 import uuid
 import wave
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 import sounddevice as sd
@@ -426,7 +426,6 @@ class VoiceOrchestrator:
         self._barge.reset()
         if not barge or self._barge_stream is None or self._barge is None:
             return self.playback.play(path, name=name)
-        # monitor the always-open barge-in stream while playing
         stop = threading.Event()
         splitter = FrameSplitter()
 
@@ -452,6 +451,65 @@ class VoiceOrchestrator:
         finally:
             stop.set()
         return finished
+
+    def speak_stream(self, sentences, name: str = "assistant") -> str:
+        """Speak a sequence of sentences with synthesis ahead of playback.
+
+        Sentences are synthesized in the caller thread while a background
+        player drains them sequentially — the first sentence starts playing as
+        soon as it is synthesized instead of waiting for the whole reply.
+        Returns the joined text that was actually spoken.
+        """
+        import queue as _queue
+        if self.muted or not sentences:
+            return " ".join(sentences)
+        if self._tts is None:
+            log.warning("TTS not available; would say: %s",
+                        " ".join(sentences)[:120])
+            return ""
+        q: "_queue.Queue[Optional[Path]]" = _queue.Queue()
+        spoken: list[str] = []
+
+        def _player() -> None:
+            while True:
+                try:
+                    path = q.get(timeout=0.2)
+                except _queue.Empty:
+                    if self._interrupt_requested:
+                        self.playback.stop()
+                        break
+                    continue
+                if path is None:
+                    break
+                try:
+                    if self._interrupt_requested:
+                        self.playback.stop()
+                        break
+                    self.playback.play(path, name=name, interruptible=True)
+                except Exception as exc:
+                    log.warning("stream speak: %s", exc)
+
+        t = threading.Thread(target=_player, daemon=True, name="stream-speak")
+        t.start()
+        try:
+            for sentence in sentences:
+                sentence = (sentence or "").strip()
+                if not sentence:
+                    continue
+                spoken.append(sentence)
+                if self._interrupt_requested:
+                    break
+                try:
+                    path = self._tts.synthesize(
+                        sentence,
+                        Path("/tmp/openclaw-voice-bridge") / f"tts-{uuid.uuid4().hex[:10]}.wav")
+                    q.put(path)
+                except Exception as exc:
+                    log.warning("stream synth: %s", exc)
+        finally:
+            q.put(None)
+            t.join(timeout=15)
+        return " ".join(spoken)
 
     # --------------------------------------------------------------- routing
     def _on_gateway_event(self, event: str, payload: Dict[str, Any]) -> None:
@@ -907,20 +965,98 @@ class VoiceOrchestrator:
         # fast chat: direct DeepSeek completion (default), Perplexity for
         # web/current-info questions ("if needed"), local ollama as fallback
         reply = ""
+        spoke = False
         if backend == "deepseek":
             if self.cfg.get("intent", "perplexity_enabled", default=True) \
                     and (_needs_web(text) or "perplexity" in text.lower()):
                 reply = self._chat_perplexity(text)
             if not reply:
-                reply = self._chat_deepseek(text)
+                if self.cfg.get("intent", "stream_speech", default=True):
+                    sentences: List[str] = []
+                    reply = self._chat_deepseek_stream(text, sentences.append)
+                    if reply:
+                        self.speak_stream(sentences or [reply])
+                        spoke = True
+                if not reply:
+                    reply = self._chat_deepseek(text)
         if not reply:
             reply = self._chat_ollama(text)
         if reply:
             self.conversation.add("user", text)
             self.conversation.add("assistant", reply)
-            self.speak(trim_spoken(reply, 500))
+            if not spoke:
+                self.speak(trim_spoken(reply, 500))
         else:
             self.speak("I'm sorry, I couldn't reach the chat model.")
+
+    def _chat_deepseek_stream(self, text: str, on_sentence) -> str:
+        """Stream a DeepSeek completion; emit completed sentences via
+        on_sentence(str) as they arrive and return the full reply."""
+        import urllib.request
+        import urllib.error
+        key = self._deepseek_key()
+        if not key:
+            return ""
+        url = self.cfg.get("intent", "deepseek_url",
+                           default="https://api.deepseek.com/chat/completions")
+        model = (self.cfg.get("intent", "deepseek_model", default="")
+                 or _hermes_default_model()
+                 or "deepseek-v4-flash")
+        ctx = self.conversation.as_prompt()
+        system = ("You are a concise, warm voice assistant. Answer briefly in "
+                  "1-3 short sentences unless asked for detail. Be direct: "
+                  "no emojis, no pleasantries, no filler words — say only "
+                  "what's needed.")
+        payload = {
+            "model": model, "stream": True, "temperature": 0.4,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user",
+                 "content": f"Recent conversation:\n{ctx}\n\nUser: {text}"},
+            ],
+        }
+        req = urllib.request.Request(
+            url, data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json",
+                     "Authorization": f"Bearer {key}"})
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                buf = ""
+                full = ""
+                for raw in resp:
+                    if self._interrupt_requested:
+                        resp.close()
+                        break
+                    line = raw.decode("utf-8", "replace").strip()
+                    if not line.startswith("data: "):
+                        continue
+                    data = line[6:].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        delta = (json.loads(data)["choices"][0]
+                                 .get("delta", {}).get("content") or "")
+                    except Exception:
+                        continue
+                    buf += delta
+                    full += delta
+                    # emit completed sentences as they form
+                    while True:
+                        m = re.search(r"[.!?…]\s*", buf)
+                        if not m:
+                            break
+                        sentence = buf[:m.end()].strip()
+                        buf = buf[m.end():]
+                        if sentence:
+                            on_sentence(sentence)
+                tail = buf.strip()
+                if tail:
+                    full += ""
+                    on_sentence(tail)
+                return full.strip()
+        except Exception as exc:
+            log_event("conversation.deepseek.failed", error=str(exc)[:160])
+            return ""
 
     def _chat_deepseek(self, text: str) -> str:
         """Fast plain chat completion via the DeepSeek API (no agent bootstrap)."""
