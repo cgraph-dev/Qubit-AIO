@@ -116,7 +116,8 @@ DEFAULTS: Dict[str, Any] = {
         "ollama_url": "http://127.0.0.1:11434",
         "ollama_model": "qwen3-vl:8b",
         "classify_timeout_s": 8.0,
-        "conversation_backend": "local",    # bridge IS the voice: local model answers ALL chat instantly
+        "conversation_backend": "local",
+        "templates_path": "~/.config/openclaw-voice-bridge/task-templates.yaml",  # daily-task templates (spoken phrase -> known task)    # bridge IS the voice: local model answers ALL chat instantly
                                     # (chitchat + questions). Only TASKS go through OpenClaw/Hermes.
                                     # deepseek/perplexity = last-resort fallbacks
         # Hybrid local LLM: tiny 3-4B answers SHORT conversational turns locally
@@ -125,8 +126,9 @@ DEFAULTS: Dict[str, Any] = {
         "local_llm": {
             "enabled": True,           # bridge responds to ALL chat itself (<0.5s);
                                         # only tasks dispatch to OpenClaw/Hermes
-            "model": "huihui_ai/phi4-mini-abliterated",  # Phi-4-mini abliterated: same 0.3s warm latency as 3B, clearly
-                                    # smarter/less generic; 3.1GB resident. fallback: llama3.2-abliterate:3b
+            "model": "huihui_ai/llama3.2-abliterate:3b",  # 3B default: native Romanian + smaller (2.6GB resident).
+                                    # phi-4-mini-abliterated is smarter in EN but BROKEN at RO (echoes/
+                                    # wrong dates/hallucinates) — kept as optional EN-only smart mode.
             "url": "http://127.0.0.1:11434",
             "timeout_s": 8.0,           # local model chat timeout (was 4s — real 4s timeouts in the journal)
             "max_tokens": 100,         # local reply cap (short answers only)

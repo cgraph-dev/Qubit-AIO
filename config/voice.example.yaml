@@ -87,11 +87,12 @@ intent:
   local_llm:
     enabled: true         # bridge answers ALL chat itself (<0.5s); only tasks -> OpenClaw/Hermes
                           # DeepSeek API handles long/complex/web asks
-    model: huihui_ai/phi4-mini-abliterated  # Phi-4-mini: same ~0.3s warm latency, clearly smarter (3.1GB resident)
+    model: huihui_ai/llama3.2-abliterate:3b  # 3B: native Romanian + smaller (2.6GB). phi-4-mini broken at RO
     url: http://127.0.0.1:11434
     timeout_s: 8.0     # local model chat timeout (was 4s — journal showed real timeouts)
     max_tokens: 100
   conversation_backend: local      # bridge answers ALL chat (<0.5s); only tasks -> OpenClaw/Hermes
+  templates_path: ~/.config/openclaw-voice-bridge/task-templates.yaml  # daily-task templates
   deepseek_url: https://api.deepseek.com/chat/completions
   deepseek_model: deepseek-v4-flash
   deepseek_env: ~/.hermes/.env     # DEEPSEEK_API_KEY lives here

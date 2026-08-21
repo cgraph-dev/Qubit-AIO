@@ -1,0 +1,94 @@
+# Daily-task templates — spoken phrase → known task text for OpenClaw/Hermes.
+# A matched template dispatches instantly (deterministic, 0 model tokens).
+# Edit freely: add your own recurring tasks. Restart the bridge after editing.
+#
+# Fields:
+#   name  – short id (used in logs)
+#   match – regex(es), case-insensitive; any() wins. Use ^...$ or \b...\b for precision.
+#   kind  – coding (OpenClaw) | hermes (Hermes CLI) | conversation (local model)
+#   task  – the exact task text sent to the agent (battle-tested wording)
+#   ack   – short spoken ack, optional
+#
+# NOTE: destructive phrasing still goes through the safety policy; templates
+# only speed up SAFE, KNOWN tasks.
+
+templates:
+  # ---------------------------------------------------------------- projects
+  - name: projects-status
+    match:
+      - "check (my )?(projects|repos|repositories) (status|state)"
+      - "status of (my )?projects"
+      - "what('s| is) the (status|state) of (my )?projects?"
+    kind: coding
+    task: >
+      Inspect ~/Projects/Repos/ and list the main projects with: current git
+      branch, dirty/uncommitted changes, and how many commits ahead/behind
+      origin. Report each project on one line, keep it concise.
+    ack: "Checking your projects."
+
+  - name: cgraph-status
+    match:
+      - "cgraph (status|state)"
+      - "how('s| is) cgraph (going|doing|looking)"
+      - "(update|news) on cgraph"
+    kind: coding
+    task: >
+      Check the CGraph monorepo at ~/Projects/Repos/CGraph Umbrella/: git status,
+      branch, uncommitted changes, and whether cgraph-web is deployed (Vercel).
+      Summarize in 3-4 short lines.
+    ack: "Checking CGraph."
+
+  # ------------------------------------------------------------------- voice
+  - name: bridge-status
+    match:
+      - "(voice )?(bridge|assistant) (status|health|state)"
+      - "are you (ok|okay|fine|healthy|working|up)"
+      - "is the bridge (working|up|ok)"
+    kind: conversation
+    task: "Report your own status: ASR engine, model, gateway route, in one sentence."
+    ack: ""
+
+  # -------------------------------------------------------------- reminders
+  - name: what-day
+    match:
+      - "what (day|date) is (it|today)"
+      - "what('s| is) today('s)? (date|day)"
+      - "what time is it"
+    kind: conversation
+    task: "Say today's date and current local time (Europe/Bucharest) in one short sentence."
+    ack: ""
+
+  - name: daily-plan
+    match:
+      - "(what('s| is)|make|show|give me) (my |the )?(daily )?(plan|schedule|agenda)"
+      - "what do i (have|need) (to do|today)"
+    kind: coding
+    task: >
+      Read today's notes in ~/.openclaw/workspace/memory/ and any TODO/plan files
+      in ~/Projects/Repos, and list the user's top 3-5 items for today. If nothing
+      is found, say so and suggest asking for a plan.
+    ack: "Pulling up your plan."
+
+  # ------------------------------------------------------------------ git
+  - name: git-sync
+    match:
+      - "(sync|push|publish) (my )?changes"
+      - "(commit and push|git push)"
+      - "sync (the )?(repo|repository)"
+    kind: coding
+    task: >
+      For the CURRENT project in ~/Projects/Repos (or the one the user just
+      mentioned): review uncommitted changes, write a clear conventional commit
+      message, commit, and push to origin. Do NOT force-push. Report the commit
+      hash and branch.
+    ack: "Syncing your changes."
+
+  # --------------------------------------------------------------- research
+  - name: research-current
+    match:
+      - "(use )?perplexity to (search|find|look up|check)"
+      - "search (the )?(web|internet) for"
+      - "what('s| is) the (latest|current) news (on|about)"
+    kind: conversation
+    task: "Answer from current web search, concise."
+    ack: ""

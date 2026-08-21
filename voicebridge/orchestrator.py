@@ -41,6 +41,7 @@ from .local import actions as local_actions
 from .logging_setup import get_logger, log_event
 from .openclaw.cli_backend import CliBackend
 from .openclaw.discovery import discover_gateway, discover_cuda_libs
+from .task_templates import TaskTemplates
 from .openclaw.gateway_ws import GatewaySync, GatewayError
 from .safety.policy import SafetyPolicy, SafetyVerdict
 from .summarizer import summarize, trim_spoken
@@ -199,6 +200,7 @@ class VoiceOrchestrator:
         self._duplex_ptt_until = 0.0        # utterance is the user's instruction
         self.playback = Playback()
         self.classifier: Optional[Classifier] = None
+        self._templates: Optional[TaskTemplates] = None
         self.safety = SafetyPolicy(config.section("safety"))
         self.gateway_info = None
         self._route: str = ""   # 'gateway' | 'cli' | 'offline'
@@ -366,6 +368,18 @@ class VoiceOrchestrator:
         # classifier
         self.classifier = Classifier(self.cfg.section("intent"),
                                      self.confirmations, self.conversation)
+
+        # daily-task templates (spoken phrase -> known task text; bypasses the
+        # model entirely for recurring tasks — deterministic + 0 tokens)
+        self._templates = TaskTemplates.load(
+            path=self.cfg.get("intent", "templates_path",
+                              default="~/.config/openclaw-voice-bridge/task-templates.yaml"),
+            defaults_path=os.path.expanduser(
+                "~/Projects/Repos/openclaw-voice-bridge/config/task-templates.yaml")
+            if Path("~/Projects/Repos/openclaw-voice-bridge/config/task-templates.yaml").expanduser().exists()
+            else None)
+        if self._templates.items:
+            log_event("task_templates.loaded", count=len(self._templates.items))
 
         # memory context (loaded from the OpenClaw workspace on THIS PC — the
         # Vast.ai box is disposable and never owns state)
@@ -1456,6 +1470,21 @@ class VoiceOrchestrator:
 
     def _route_intent(self, intent: Intent, text: str) -> None:
         """Shared dispatcher used by mic, typed input, and the duplex tap."""
+        # daily-task templates win over the model-based classifier: a matched
+        # template dispatches the known task text directly (0 tokens, instant)
+        tmpl = self._templates.match(text) if self._templates is not None else None
+        if tmpl is not None:
+            log_event("routing.template", name=tmpl.name, kind=tmpl.kind,
+                      text=text[:160])
+            if tmpl.ack:
+                self.speak(tmpl.ack)
+            if tmpl.kind == "hermes":
+                self._handle_hermes(tmpl.task)
+            elif tmpl.kind == "conversation":
+                self._handle_conversation(tmpl.task)
+            else:
+                self._dispatch_coding(tmpl.task)
+            return
         if intent.kind == "system":
             self._handle_system(intent)
         elif intent.kind == "confirm":
@@ -1529,9 +1558,11 @@ class VoiceOrchestrator:
                 parts.append(f"<MEMORY.md>\n{mem.read_text(errors='replace')[:budget]}")
             daily_dir = ws / "memory"
             if daily_dir.exists():
-                recent = sorted(daily_dir.glob("*.md"))[-2:]
+                # only the MOST RECENT note — daily logs are low-signal for
+                # chat replies and cost tokens on EVERY local turn
+                recent = sorted(daily_dir.glob("*.md"))[-1:]
                 for p in recent:
-                    parts.append(f"<{p.name}>\n{p.read_text(errors='replace')[:budget]}")
+                    parts.append(f"<{p.name}>\n{p.read_text(errors='replace')[:min(budget, 800)]}")
             ctx = "\n\n".join(parts)
             if ctx:
                 log_event("memory.loaded", chars=len(ctx), pk=str(pk))

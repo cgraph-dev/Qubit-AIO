@@ -8,7 +8,9 @@ down or the model isn't pulled, so the caller goes to the cloud path.
 from __future__ import annotations
 
 import json
+import os
 import urllib.request
+from pathlib import Path
 from typing import Optional
 
 from .logging_setup import log_event
@@ -17,10 +19,34 @@ SYSTEM_PROMPT = (
     "You are a concise, warm voice assistant. Answer briefly in 1-3 short "
     "sentences unless asked for detail. Be direct: no emojis, no pleasantries, "
     "no filler words - say only what's needed. "
-    "Your only languages are English and Romanian. You reply in ENGLISH by "
-    "default. If the user writes to you in Romanian, you reply in Romanian. "
-    "Never use any other language."
+    "Reply in ENGLISH unless the user writes in ROMANIAN — then reply in "
+    "Romanian. Never use any other language."
 )
+
+# Few-shot dialog examples (style teaching). Loaded from config/dialogs.md —
+# part of the SYSTEM prompt so it costs tokens once per turn, not per request.
+def _load_dialogs() -> str:
+    candidates = [
+        Path(os.path.expanduser("~/.config/openclaw-voice-bridge/dialogs.md")),
+        Path(__file__).resolve().parent.parent / "config" / "dialogs.md",
+    ]
+    for p in candidates:
+        if p.exists():
+            try:
+                text = p.read_text(errors="replace")
+                start = text.find("DIALOG_EXAMPLES = ")
+                if start >= 0:
+                    text = text[start:].split('"""')[1]
+                return text.strip()
+            except Exception:
+                return ""
+    return ""
+
+
+_DIALOGS = _load_dialogs()
+
+if _DIALOGS:
+    SYSTEM_PROMPT = SYSTEM_PROMPT + "\n\n# Example dialogs (match this style)\n" + _DIALOGS
 
 
 def chat_local(text: str, conversation_prompt: str = "",
