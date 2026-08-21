@@ -82,9 +82,7 @@ DEFAULTS: Dict[str, Any] = {
         "ptt_uses_tap": True,           # duplex mode: Ctrl routes the next tapped
                                         # utterance (no second mic stream — avoids
                                         # device conflict with the lane's mic)
-        "speech_threshold": 0.008,      # RMS gate for mic->server frames (after gain);
-                                        # tuned for the quiet Scarlett — raise if the
-                                        # model starts replying to room noise
+        "speech_threshold": 0.008,      # (legacy static floor, unused w/ adaptive gate)
         "output_device": None,          # speaker device for lane audio; null = try
                                         # pulse -> pipewire -> default (24k hardware
                                         # rejects on Scarlett/ALC892, mixers resample)
