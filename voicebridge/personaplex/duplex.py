@@ -302,11 +302,13 @@ class PersonaPlexDuplex:
                 if self._noise_floor <= 0.0:
                     self._noise_floor = rms
                 else:
-                    # slow rise, fast drop: floor follows quiet periods
-                    self._noise_floor = min(self._noise_floor * 1.02 + 1e-5, rms)
+                    # slow rise (~1.02/s), fast drop: floor follows quiet periods.
+                    # 1.02/block used to rocket 7x/second during speech and slam
+                    # the gate shut mid-word.
+                    self._noise_floor = min(self._noise_floor * 1.0002 + 1e-6, rms)
                 floor = self._noise_floor
                 adaptive = float(self.cfg.get("personaplex", "adaptive_gate",
-                                              default=3.0))
+                                              default=2.0))
                 if rms < max(floor * adaptive, 0.002):
                     return
             else:
