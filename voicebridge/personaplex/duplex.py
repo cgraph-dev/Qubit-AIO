@@ -75,6 +75,7 @@ class PersonaPlexDuplex:
         self._duck_seconds = 3600.0  # persistent until explicit unduck()
         self._output_mute = False    # instant stop of lane speech (PTT take-over)
         self._last_out_audio = 0.0   # for feedback suppression (speaking prop)
+        self._noise_floor = 0.0      # adaptive speech-gate noise floor
         self._out_queue: "queue.Queue[np.ndarray]" = queue.Queue(maxsize=256)
         self._out_thread: Optional[threading.Thread] = None
 
@@ -270,13 +271,22 @@ class PersonaPlexDuplex:
             # after) the lane is speaking.
             if self.speaking:
                 return
-            # SPEECH GATE: only stream real speech. Constant low-level noise
-            # (room tone / dither) makes the model talk continuously; silence
-            # between turns is fine (sessions survive without frames).
+            # SPEECH GATE (adaptive): only stream real speech. A static
+            # threshold can't win — the noise floor moves with the physical
+            # gain. Track a slow noise floor and require signal well above it.
             rms = float(np.sqrt((mono ** 2).mean())) if mono.size else 0.0
-            speech_thr = float(self.cfg.get("personaplex", "speech_threshold",
-                                            default=0.004))
-            if rms < speech_thr:
+            if rms > 0.0:
+                if self._noise_floor <= 0.0:
+                    self._noise_floor = rms
+                else:
+                    # slow rise, fast drop: floor follows quiet periods
+                    self._noise_floor = min(self._noise_floor * 1.02 + 1e-5, rms)
+                floor = self._noise_floor
+                adaptive = float(self.cfg.get("personaplex", "adaptive_gate",
+                                              default=3.0))
+                if rms < max(floor * adaptive, 0.004):
+                    return
+            else:
                 return
             try:
                 self._queue_ref.put_nowait(mono)
