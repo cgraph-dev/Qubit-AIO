@@ -115,13 +115,17 @@ DEFAULTS: Dict[str, Any] = {
         "ollama_url": "http://127.0.0.1:11434",
         "ollama_model": "qwen3-vl:8b",
         "classify_timeout_s": 8.0,
-        "conversation_backend": "deepseek",  # deepseek (fast API) | ollama (local) | agent (OpenClaw memory)
+        "conversation_backend": "local",    # bridge IS the voice: local model answers casual talk instantly;
+                                    # everything else dispatches to OpenClaw (or Hermes on ask);
+                                    # deepseek/perplexity = last-resort fallbacks when gateway is down
         # Hybrid local LLM: tiny 3-4B answers SHORT conversational turns locally
         # (~0.3s, private), DeepSeek handles long/complex/web asks. Flip enabled
         # to false to go cloud-only (DeepSeek every turn, GPU idle).
         "local_llm": {
-            "enabled": True,
-            "model": "llama3.2:3b",    # ollama tag (pull once); qwen3:4b thinks by default -> empty content
+            "enabled": True,           # bridge responds to casual talk itself (<0.5s);
+                                        # tasks/questions dispatch to OpenClaw/Hermes
+            "model": "huihui_ai/llama3.2-abliterate:3b",  # uncensored llama3.2:3b (same 2.6GB resident, +0.2GB disk);
+                                    # fallback: llama3.2:3b (stock); qwen3:4b thinks -> empty content
             "url": "http://127.0.0.1:11434",
             "timeout_s": 4.0,
             "max_words": 30,           # utterances shorter than this try local first
@@ -170,7 +174,8 @@ DEFAULTS: Dict[str, Any] = {
     "summarizer": {
         "provider": "ollama",   # ollama | extractive
         "ollama_model": "qwen3-vl:8b",
-        "max_chars": 900,       # target spoken summary length
+        "max_chars": 900,       # extractive/summarizer input budget
+        "max_words": 40,         # HARD cap on every spoken response (save time)
     },
     "logging": {
         "level": "INFO",

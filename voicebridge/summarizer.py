@@ -66,24 +66,41 @@ def summarize_extractive(text: str, max_chars: int = 900) -> str:
     return summary
 
 
+def clamp_words(text: str, max_words: int = 40) -> str:
+    """Hard cap for SPOKEN text — 40 words ≈ ~12s of speech (save time).
+
+    Truncates at a word boundary, strips trailing punctuation, and appends
+    a period so the voice never cuts mid-word.
+    """
+    if not text:
+        return text
+    words = text.split()
+    if len(words) <= max_words:
+        return text
+    cut = " ".join(words[:max_words]).rstrip(" ,;:.-")
+    return cut + "."
+
+
 def summarize(text: str, cfg: Optional[dict] = None,
               ollama_url: Optional[str] = None,
               ollama_model: Optional[str] = None) -> str:
     cfg = cfg or {}
-    provider = cfg.get("provider", "ollama")
+    provider = cfg.get("provider", "extractive")
     url = ollama_url or "http://127.0.0.1:11434"
     model = ollama_model or cfg.get("ollama_model", "qwen3-vl:8b")
     max_chars = int(cfg.get("max_chars", 900))
     if provider == "ollama":
         s = summarize_ollama(text, url, model, max_chars=max_chars)
         if s:
-            return s
-    return summarize_extractive(text, max_chars)
+            return clamp_words(s, int(cfg.get("max_words", 40)))
+    return clamp_words(summarize_extractive(text, max_chars),
+                       int(cfg.get("max_words", 40)))
 
 
-def trim_spoken(text: str, max_chars: int = 700) -> str:
-    """Shorten any text for speaking (summary fallback)."""
+def trim_spoken(text: str, max_chars: int = 700,
+                max_words: int = 40) -> str:
+    """Shorten any text for speaking (summary fallback), capped in words."""
     clean = _strip_markdown(text)
     if len(clean) <= max_chars:
-        return clean
-    return summarize_extractive(clean, max_chars)
+        return clamp_words(clean, max_words)
+    return clamp_words(summarize_extractive(clean, max_chars), max_words)

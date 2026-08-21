@@ -713,7 +713,7 @@ class VoiceOrchestrator:
 
         if self._route == "gateway" and self._gateway:
             try:
-                self.speak("On it.", name="ack", barge=False)
+                self.speak("On it. Routing to OpenClaw.", name="ack", barge=False)
             except Exception:
                 pass
             # create session + send in one RPC (message nested)
@@ -745,7 +745,7 @@ class VoiceOrchestrator:
                 return
         elif self._route == "cli" and self._cli:
             try:
-                self.speak("On it.", name="ack", barge=False)
+                self.speak("On it. Running locally.", name="ack", barge=False)
             except Exception:
                 pass
             result = self._cli.run_task(session_key, task_text, model)
@@ -1080,9 +1080,42 @@ class VoiceOrchestrator:
 
     # ------------------------------------------------------------- conversation
     def _handle_conversation(self, text: str) -> None:
-        backend = self.cfg.get("intent", "conversation_backend", default="ollama")
-        if backend == "agent" and self._route in ("gateway", "cli"):
-            # chat through OpenClaw agent (slower but full memory/tools)
+        """The bridge's voice: answer casual talk instantly from the local
+        model, and DISPATCH everything else to OpenClaw (or Hermes on
+        explicit ask). The bridge is the responder — it speaks the results.
+        DeepSeek/Perplexity remain last-resort fallbacks when the gateway
+        is down.
+        """
+        backend = self.cfg.get("intent", "conversation_backend", default="local")
+        llm_cfg = self.cfg.section("intent").get("local_llm", {}) or {}
+
+        # 1) LOCAL MODEL answers casual small talk instantly (<0.5s) — the
+        #    bridge's own voice. Real asks skip this and go to OpenClaw.
+        if backend in ("local", "deepseek") and llm_cfg.get("enabled", True) \
+                and _is_casual(text) \
+                and len(text.split()) <= int(llm_cfg.get("max_words", 30)):
+            from .local_llm import chat_local
+            reply = chat_local(
+                text, self.conversation.as_prompt(),
+                model=llm_cfg.get("model", "huihui_ai/llama3.2-abliterate:3b"),
+                url=llm_cfg.get("url", "http://127.0.0.1:11434"),
+                timeout_s=float(llm_cfg.get("timeout_s", 4.0)),
+                max_tokens=int(llm_cfg.get("max_tokens", 100)))
+            if reply:
+                self.conversation.add("user", text)
+                self.conversation.add("assistant", reply)
+                self.speak(trim_spoken(reply, 500))
+                return
+            log_event("conversation.local.skip", reason="local model failed")
+
+        # 2) EVERYTHING ELSE -> OpenClaw agent (bridge dispatches, agent works,
+        #    bridge speaks the result). Instant ack so the user always hears a
+        #    response <0.5s after routing.
+        if backend in ("agent", "local", "deepseek") and self._route in ("gateway", "cli"):
+            try:
+                self.speak("On it.", name="ack", barge=False)
+            except Exception:
+                pass
             chat_key = self.cfg.session_key("chat")
             if self._route == "gateway" and self._gateway:
                 try:
@@ -1096,45 +1129,26 @@ class VoiceOrchestrator:
                     log_event("conversation.agent.failed", error=str(exc)[:160])
             elif self._cli:
                 result = self._cli.run_task(chat_key, text, self._current_model())
-                self._handle_agent_result(chat_key, result.reply, result.status, result.elapsed_s)
+                self._handle_agent_result(chat_key, result.reply, result.status,
+                                          result.elapsed_s)
                 return
-        # fast chat: direct DeepSeek completion (default), Perplexity for
-        # web/current-info questions ("if needed"), local ollama as fallback.
-        # Hybrid: SHORT utterances first try the tiny local LLM (~0.3s, private).
+
+        # 3) LAST RESORT when the gateway is unreachable: cloud chat APIs.
         reply = ""
         spoke = False
-        if backend == "deepseek":
-            web_ask = self.cfg.get("intent", "perplexity_enabled", default=True) \
-                and (_needs_web(text) or "perplexity" in text.lower())
-            llm_cfg = self.cfg.section("intent").get("local_llm", {}) or {}
-            local_ok = (llm_cfg.get("enabled", True) and not web_ask
-                        and _is_casual(text))  # small talk only; real asks -> DeepSeek
-            if local_ok and len(text.split()) > int(llm_cfg.get("max_words", 30)):
-                log_event("conversation.local.skip", reason="too long",
-                          words=len(text.split()))
-                local_ok = False
-            if not local_ok and llm_cfg.get("enabled", True):
-                log_event("conversation.local.skip",
-                          reason="web_ask" if web_ask else "not casual")
-            if local_ok:
-                from .local_llm import chat_local
-                reply = chat_local(
-                    text, self.conversation.as_prompt(),
-                    model=llm_cfg.get("model", "qwen3:4b"),
-                    url=llm_cfg.get("url", "http://127.0.0.1:11434"),
-                    timeout_s=float(llm_cfg.get("timeout_s", 4.0)),
-                    max_tokens=int(llm_cfg.get("max_tokens", 100)))
-            if not reply and web_ask:
-                reply = self._chat_perplexity(text)
+        web_ask = self.cfg.get("intent", "perplexity_enabled", default=True) \
+            and (_needs_web(text) or "perplexity" in text.lower())
+        if web_ask:
+            reply = self._chat_perplexity(text)
+        if not reply:
+            if self.cfg.get("intent", "stream_speech", default=True):
+                sentences: List[str] = []
+                reply = self._chat_deepseek_stream(text, sentences.append)
+                if reply:
+                    self.speak_stream(sentences or [reply])
+                    spoke = True
             if not reply:
-                if self.cfg.get("intent", "stream_speech", default=True):
-                    sentences: List[str] = []
-                    reply = self._chat_deepseek_stream(text, sentences.append)
-                    if reply:
-                        self.speak_stream(sentences or [reply])
-                        spoke = True
-                if not reply:
-                    reply = self._chat_deepseek(text)
+                reply = self._chat_deepseek(text)
         if not reply:
             reply = self._chat_ollama(text)
         if reply:
@@ -1360,7 +1374,7 @@ class VoiceOrchestrator:
             self._dispatch_coding(task)
             return
         hermes = self._hermes
-        self.speak("Asking Hermes.", name="ack", barge=False)
+        self.speak("On it. Routing to Hermes.", name="ack", barge=False)
         task = (task + "\n\nReply directly and concisely: no emojis, no "
                      "pleasantries, no extra words — only what was needed.")
         self._hermes_busy = True
