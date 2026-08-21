@@ -80,6 +80,8 @@ class PersonaPlexDuplex:
         self._hp_xprev = 0.0
         self._out_queue: "queue.Queue[np.ndarray]" = queue.Queue(maxsize=256)
         self._out_thread: Optional[threading.Thread] = None
+        self._out_prime = 3   # jitter buffer: drop first N chunks per response
+                              # burst so playback starts smooth, not stuttering
 
         mic = cfg.section("mic")
         self.mic_device = mic.get("device")
@@ -345,10 +347,14 @@ class PersonaPlexDuplex:
             try:
                 pcm = self._out_queue.get(timeout=0.2)
             except queue.Empty:
+                self._out_prime = 3  # queue ran dry -> re-prime next burst
                 continue
             with self._lock:
                 if self._out is None or self._is_ducked():
                     continue
+            if self._out_prime > 0:
+                self._out_prime -= 1
+                continue
             try:
                 self._out.write(pcm)
             except Exception as exc:

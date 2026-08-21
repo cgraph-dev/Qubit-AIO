@@ -60,7 +60,7 @@ asr:
 # local PC actions. Memory stays on this PC (OpenClaw workspace).
 personaplex:
   enabled: true       # PersonaPlex = the voice brain (user directive)             # PersonaPlex lane ACTIVE (Vast 3090 via Tailscale)
-  url: wss://100.69.231.30:8998/api/chat  # Vast box tailnet IP (verified)
+  url: wss://100.71.237.100:8998/api/chat  # Vast box tailnet IP (verified)
   ssl_insecure: true        # self-signed cert on the Vast box (tailnet-encrypted anyway)
   voice_prompt: NATF2.pt    # NATF*/NATM*/VARF*/VARM* — pick the persona voice
   text_prompt: >
