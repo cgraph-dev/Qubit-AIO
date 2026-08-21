@@ -92,7 +92,7 @@ intent:
     timeout_s: 4.0
     max_words: 30
     max_tokens: 100
-  conversation_backend: local      # bridge answers casual talk (<0.5s); rest -> OpenClaw/Hermes
+  conversation_backend: local      # bridge answers ALL chat (<0.5s); only tasks -> OpenClaw/Hermes
   deepseek_url: https://api.deepseek.com/chat/completions
   deepseek_model: deepseek-v4-flash
   deepseek_env: ~/.hermes/.env     # DEEPSEEK_API_KEY lives here

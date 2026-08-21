@@ -1080,60 +1080,31 @@ class VoiceOrchestrator:
 
     # ------------------------------------------------------------- conversation
     def _handle_conversation(self, text: str) -> None:
-        """The bridge's voice: answer casual talk instantly from the local
-        model, and DISPATCH everything else to OpenClaw (or Hermes on
-        explicit ask). The bridge is the responder — it speaks the results.
-        DeepSeek/Perplexity remain last-resort fallbacks when the gateway
-        is down.
+        """The bridge's voice: the LOCAL model answers ALL chat (chitchat AND
+        questions) — fast (<0.5s), local, uncensored. Only TASKS go through
+        OpenClaw/Hermes (see _route_intent); cloud APIs are last-resort
+        fallbacks when the local model or gateway is down.
         """
-        backend = self.cfg.get("intent", "conversation_backend", default="local")
         llm_cfg = self.cfg.section("intent").get("local_llm", {}) or {}
-
-        # 1) LOCAL MODEL answers casual small talk instantly (<0.5s) — the
-        #    bridge's own voice. Real asks skip this and go to OpenClaw.
-        if backend in ("local", "deepseek") and llm_cfg.get("enabled", True) \
-                and _is_casual(text) \
-                and len(text.split()) <= int(llm_cfg.get("max_words", 30)):
+        if llm_cfg.get("enabled", True):
             from .local_llm import chat_local
-            reply = chat_local(
-                text, self.conversation.as_prompt(),
-                model=llm_cfg.get("model", "huihui_ai/llama3.2-abliterate:3b"),
-                url=llm_cfg.get("url", "http://127.0.0.1:11434"),
-                timeout_s=float(llm_cfg.get("timeout_s", 4.0)),
-                max_tokens=int(llm_cfg.get("max_tokens", 100)))
+            try:
+                reply = chat_local(
+                    text, self.conversation.as_prompt(),
+                    model=llm_cfg.get("model", "huihui_ai/llama3.2-abliterate:3b"),
+                    url=llm_cfg.get("url", "http://127.0.0.1:11434"),
+                    timeout_s=float(llm_cfg.get("timeout_s", 4.0)),
+                    max_tokens=int(llm_cfg.get("max_tokens", 100)))
+            except Exception as exc:
+                reply = ""
+                log_event("conversation.local.skip", error=str(exc)[:120])
             if reply:
                 self.conversation.add("user", text)
                 self.conversation.add("assistant", reply)
                 self.speak(trim_spoken(reply, 500))
                 return
-            log_event("conversation.local.skip", reason="local model failed")
 
-        # 2) EVERYTHING ELSE -> OpenClaw agent (bridge dispatches, agent works,
-        #    bridge speaks the result). Instant ack so the user always hears a
-        #    response <0.5s after routing.
-        if backend in ("agent", "local", "deepseek") and self._route in ("gateway", "cli"):
-            try:
-                self.speak("On it.", name="ack", barge=False)
-            except Exception:
-                pass
-            chat_key = self.cfg.session_key("chat")
-            if self._route == "gateway" and self._gateway:
-                try:
-                    res = self._gateway.create_session(key=chat_key, label="voice chat",
-                                                       model=self._current_model())
-                    res2 = self._gateway.send_message(chat_key, text, timeout=45.0)
-                    run_id = res2.get("runId") or ""
-                    self._await_run(chat_key, run_id, text)
-                    return
-                except Exception as exc:
-                    log_event("conversation.agent.failed", error=str(exc)[:160])
-            elif self._cli:
-                result = self._cli.run_task(chat_key, text, self._current_model())
-                self._handle_agent_result(chat_key, result.reply, result.status,
-                                          result.elapsed_s)
-                return
-
-        # 3) LAST RESORT when the gateway is unreachable: cloud chat APIs.
+        # last-resort fallbacks when the local model is unavailable
         reply = ""
         spoke = False
         web_ask = self.cfg.get("intent", "perplexity_enabled", default=True) \

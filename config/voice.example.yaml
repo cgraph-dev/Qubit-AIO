@@ -86,14 +86,14 @@ tts:
 intent:
   llm_classifier: false   # heuristic router only (fast; ambiguous -> conversation)
   local_llm:
-    enabled: true         # bridge answers casual talk itself (<0.5s); rest -> OpenClaw/Hermes
+    enabled: true         # bridge answers ALL chat itself (<0.5s); only tasks -> OpenClaw/Hermes
                           # DeepSeek API handles long/complex/web asks
     model: huihui_ai/llama3.2-abliterate:3b  # uncensored llama3.2:3b (same footprint as stock); fallback llama3.2:3b
     url: http://127.0.0.1:11434
     timeout_s: 4.0
     max_words: 30
     max_tokens: 100
-  conversation_backend: local      # bridge answers casual talk (<0.5s); rest -> OpenClaw/Hermes
+  conversation_backend: local      # bridge answers ALL chat (<0.5s); only tasks -> OpenClaw/Hermes
   deepseek_url: https://api.deepseek.com/chat/completions
   deepseek_model: deepseek-v4-flash
   deepseek_env: ~/.hermes/.env     # DEEPSEEK_API_KEY lives here
