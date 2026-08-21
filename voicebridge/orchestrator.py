@@ -253,6 +253,18 @@ class VoiceOrchestrator:
         return PiperTTS(model_dir=self.cfg.model_dir(),
                         voice=self.cfg.get("tts", "voice", default="en_US-amy-medium"))
 
+    def _resolve_silero_model(self) -> Path:
+        """Silero v6 preferred (Aug 2025, ~16% fewer errors than v5 on noisy
+        real data); fall back to v5 if v6 isn't downloaded yet."""
+        model_dir = self.cfg.model_dir()
+        v6 = model_dir / "silero_vad_v6.onnx"
+        if v6.exists():
+            return v6
+        v5 = model_dir / "silero_vad_v5.onnx"
+        if v5.exists():
+            return v5
+        return v6  # let the loader report the missing-file error clearly
+
     def _connect_gateway(self) -> str:
         """Returns route: 'gateway' | 'cli' | 'offline'."""
         self.gateway_info = discover_gateway(self.cfg)
@@ -387,7 +399,7 @@ class VoiceOrchestrator:
         mic_cfg = self.cfg.section("mic")
         vad_backend = self.cfg.get("vad", "backend", default="silero")
         silero_model = self.cfg.get("vad", "silero_model", default="") \
-            or (self.cfg.model_dir() / "silero_vad_v5.onnx")
+            or self._resolve_silero_model()
         self._mic = MicCapture(device=mic_cfg.get("device"),
                                sample_rate=mic_cfg.get("sample_rate", 48000),
                                channels=mic_cfg.get("channels", 2),
@@ -1802,6 +1814,11 @@ class VoiceOrchestrator:
         stop_req = threading.Event()
         tap_ms = int(self.cfg.get("hotkey", "tap_ms", default=300))
         toggle_no_speech_s = float(self.cfg.get("hotkey", "toggle_no_speech_s", default=5.0))
+        # End-of-turn silence (research-validated 0.7-0.9s; was 0.4s which cut
+        # mid-thought pauses). Hold-to-talk still ends FAST on release via
+        # stop_req + tail_s — this only lengthens the VAD 'done' backstop that
+        # ends hands-free/toggle captures and tolerates breathing pauses.
+        end_of_turn_s = float(self.cfg.get("vad", "silence_timeout_s", default=0.8))
         self._toggle_armed = False
         self._toggle_stop.clear()
         if self._ptt_supported and not toggle:
@@ -1912,7 +1929,8 @@ class VoiceOrchestrator:
                         # at the top of _capture_utterance)
                         with mic.open():
                             capture_result.append(
-                                mic.record_utterance(stop_req, barge_in=None))
+                                mic.record_utterance(stop_req, barge_in=None,
+                                                     silence_timeout_s=end_of_turn_s))
                     except Exception as exc:  # pragma: no cover
                         log_event("mic.capture.error", error=str(exc)[:160])
                         capture_result.append(None)

@@ -108,6 +108,10 @@ PYEOF
 
 # Silero VAD v5 (sherpa-onnx)
 dl "$MODELS/silero_vad_v5.onnx" "$SR/asr-models/silero_vad_v5.onnx"
+# Silero VAD v6 (Aug 2025: ~16% fewer errors than v5 on noisy real data) —
+# the bridge prefers v6 and falls back to v5 automatically.
+dl "$MODELS/silero_vad_v6.onnx" \
+   "https://raw.githubusercontent.com/snakers4/silero-vad/v6.2.1/src/silero_vad/data/silero_vad.onnx"
 
 # Speaker verification (voice-ID): eres2net English
 dl "$MODELS/3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx" \
@@ -126,18 +130,18 @@ if command -v ollama >/dev/null; then
     (ollama serve >/dev/null 2>&1 &) || true
     for i in $(seq 1 15); do ollama list >/dev/null 2>&1 && break; sleep 1; done
   fi
+  if ! ollama list | grep -q "huihui_ai/phi4-mini-abliterated"; then
+    echo "==> pulling huihui_ai/phi4-mini-abliterated (local chat, 3.1GB resident, ~0.3s)"
+    ollama pull huihui_ai/phi4-mini-abliterated
+  else
+    echo "    have   huihui_ai/phi4-mini-abliterated"
+  fi
+  # uncensored 3B kept as a fast fallback model (older, more generic answers)
   if ! ollama list | grep -q "huihui_ai/llama3.2-abliterate:3b"; then
-    echo "==> pulling huihui_ai/llama3.2-abliterate:3b (uncensored local replies, ~2.2 GB)"
+    echo "==> pulling huihui_ai/llama3.2-abliterate:3b (3B fallback, ~2.2 GB)"
     ollama pull huihui_ai/llama3.2-abliterate:3b
   else
     echo "    have   huihui_ai/llama3.2-abliterate:3b"
-  fi
-  # stock llama3.2:3b kept as a fallback model (same size)
-  if ! ollama list | grep -q "llama3.2:3b"; then
-    echo "==> pulling llama3.2:3b (stock fallback, ~2 GB)"
-    ollama pull llama3.2:3b
-  else
-    echo "    have   llama3.2:3b"
   fi
   # OpenClaw gateway memory embeddings need this tiny model (274 MB CPU) —
   # the gateway spins on 'memory embeddings retryable error' without it

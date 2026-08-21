@@ -148,12 +148,19 @@ class Endpointer:
         rms = np.sqrt(np.frombuffer(pcm_int16, dtype=np.int16).astype(np.float32).__pow__(2).mean()) / 32767.0
         return self._vad(pcm_int16) and rms >= self.rms_gate
 
-    def reset(self) -> None:
+    def reset(self, silence_timeout_s: Optional[float] = None) -> None:
         self.speech_frames = 0
         self.silence_frames = 0
         self.total_frames = 0
         self.voiced_frames = 0
         self.state = "idle"
+        # dynamic end-of-turn tuning: hands-free/toggle captures get a longer
+        # silence window (user pauses mid-thought), hold-to-talk keeps the
+        # fast setting (release is the end signal anyway)
+        if silence_timeout_s is not None:
+            self.silence_timeout_s = float(silence_timeout_s)
+            self._silence_frames = max(
+                1, int(self.silence_timeout_s * 1000 / FRAME_MS))
 
     def add_frame(self, pcm_int16: bytes) -> str:
         """Feed one 30 ms frame; returns 'idle'|'speech'|'done'."""

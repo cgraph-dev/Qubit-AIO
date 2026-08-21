@@ -34,7 +34,7 @@ vad:
   silero_model: ""        # empty = <model_dir>/silero_vad_v5.onnx
   aggressiveness: 1       # webrtcvad 0-3 (unused for silero)
   speech_start_ms: 180    # how much continuous speech before "started"
-  silence_timeout_s: 0.8  # trailing silence that ends the utterance
+  silence_timeout_s: 0.8  # end-of-turn silence (research: 0.7-0.9s)
   max_utterance_s: 30.0
   rms_gate: 0.004         # frame RMS floor for "voiced" (after gain) — stops hiss triggering VAD
   barge_in: true          # speech while TTS speaks -> cancel output (interrupt)
@@ -87,7 +87,7 @@ intent:
   local_llm:
     enabled: true         # bridge answers ALL chat itself (<0.5s); only tasks -> OpenClaw/Hermes
                           # DeepSeek API handles long/complex/web asks
-    model: huihui_ai/llama3.2-abliterate:3b  # uncensored llama3.2:3b (same footprint as stock); fallback llama3.2:3b
+    model: huihui_ai/phi4-mini-abliterated  # Phi-4-mini: same ~0.3s warm latency, clearly smarter (3.1GB resident)
     url: http://127.0.0.1:11434
     timeout_s: 8.0     # local model chat timeout (was 4s — journal showed real timeouts)
     max_tokens: 100

@@ -44,7 +44,7 @@ DEFAULTS: Dict[str, Any] = {
     "vad": {
         "enabled": True,
         "backend": "silero",         # silero (neural, sherpa-onnx) | webrtc
-        "silero_model": "",          # empty = <model_dir>/silero_vad_v5.onnx
+        "silero_model": "",          # empty = <model_dir>/silero_vad_v6.onnx (v6, Aug 2025: ~16% fewer errors than v5; falls back to v5 if v6 missing)
         "aggressiveness": 1,        # webrtcvad 0-3 (1 = lenient for quiet mics); unused for silero
         "speech_start_ms": 180,     # frames of speech to consider "started"
         "silence_timeout_s": 1.2,   # trailing silence ends the utterance
@@ -125,8 +125,8 @@ DEFAULTS: Dict[str, Any] = {
         "local_llm": {
             "enabled": True,           # bridge responds to ALL chat itself (<0.5s);
                                         # only tasks dispatch to OpenClaw/Hermes
-            "model": "huihui_ai/llama3.2-abliterate:3b",  # uncensored llama3.2:3b (same 2.6GB resident, +0.2GB disk);
-                                    # fallback: llama3.2:3b (stock); qwen3:4b thinks -> empty content
+            "model": "huihui_ai/phi4-mini-abliterated",  # Phi-4-mini abliterated: same 0.3s warm latency as 3B, clearly
+                                    # smarter/less generic; 3.1GB resident. fallback: llama3.2-abliterate:3b
             "url": "http://127.0.0.1:11434",
             "timeout_s": 8.0,           # local model chat timeout (was 4s — real 4s timeouts in the journal)
             "max_tokens": 100,         # local reply cap (short answers only)

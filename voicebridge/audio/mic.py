@@ -88,17 +88,21 @@ class MicCapture:
 
     def record_utterance(self, stop_requested: threading.Event,
                          barge_in=None, out_dir: Optional[Path] = None,
-                         pre_roll_ms: int = 200) -> CaptureResult:
+                         pre_roll_ms: int = 200,
+                         silence_timeout_s: Optional[float] = None) -> CaptureResult:
         """Record until silence endpoint, stop_requested, or max duration.
 
         The audio from press→release is ALWAYS saved when it has any audible
         energy (RMS >= min_rms) — VAD is only used to trim silence and to end
         hands-free captures via the silence timeout.
+
+        `silence_timeout_s` overrides the Endpointer's trailing-silence window
+        for THIS capture only (toggle/hands-free gets a longer end-of-turn).
         """
         if self._stream is None:
             raise RuntimeError("mic not open; call open() first")
         ep = self.endpointer
-        ep.reset()
+        ep.reset(silence_timeout_s=silence_timeout_s)
         if barge_in is not None:
             barge_in.reset()
 
