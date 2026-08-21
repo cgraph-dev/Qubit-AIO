@@ -54,6 +54,14 @@ DEFAULTS: Dict[str, Any] = {
     "feedback": {
         "beeps": True,              # short beep when recording starts/stops
     },
+    "speaker_verify": {
+        "enabled": True,            # gate barge-in on voice-ID when enrolled;
+                                    # no enrollment = old behavior (any speech barges)
+        "name": "user",
+        "threshold": 0.65,          # cosine similarity; eres2net: self 0.7-0.96 / cross ~0.3
+        "window_s": 2.0,            # analysis window for barge verification
+        "enroll_seconds": 5,        # default enrollment recording length
+    },
     "asr": {
         "provider": "sherpa",         # sherpa (Moonshine/Parakeet, 0 VRAM CPU) | whisper | personaplex
         "engine": "moonshine",        # sherpa engine: moonshine | parakeet

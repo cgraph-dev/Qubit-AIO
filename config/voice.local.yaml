@@ -32,6 +32,12 @@ vad:
   backend: silero         # silero (neural, sherpa-onnx) | webrtc
   silero_model: ""        # empty = <model_dir>/silero_vad_v5.onnx
   aggressiveness: 1       # webrtcvad 0-3 (unused for silero)
+speaker_verify:
+  enabled: true           # gate barge-in on voice-ID when enrolled; else old behavior
+  name: user
+  threshold: 0.65         # eres2net: self 0.7-0.96 / cross ~0.3
+  window_s: 2.0           # analysis window for barge verification
+  enroll_seconds: 5
   speech_start_ms: 180    # how much continuous speech before "started"
   silence_timeout_s: 0.4  # trailing silence that ends the utterance (latency)
   max_utterance_s: 30.0

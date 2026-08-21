@@ -362,6 +362,23 @@ class VoiceOrchestrator:
         self._barge_stream = None
         if self.cfg.get("vad", "barge_in", default=True):
             self._start_barge_stream(mic_cfg)
+        # speaker verification (voice-ID): gates barge-in on "is this ME?"
+        self._speaker = None
+        if self.cfg.get("speaker_verify", "enabled", default=True):
+            try:
+                from .voice_id import SpeakerVerifier
+                sv_cfg = self.cfg.section("speaker_verify")
+                self._speaker = SpeakerVerifier(
+                    self.cfg.model_dir(), self.cfg.state_dir(),
+                    name=sv_cfg.get("name", "user"),
+                    threshold=float(sv_cfg.get("threshold", 0.75)))
+                self._speaker.load()
+                if not self._speaker.ready:
+                    log_event("speaker.verify.no_enrollment",
+                              hint="run `voicebridge enroll`")
+            except Exception as exc:
+                self._speaker = None
+                log_event("speaker.verify.unavailable", error=str(exc)[:160])
         # hotkeys
         if not self.no_hotkey:
             hk = HotkeyListener(hold_key=self.cfg.get("hotkey", "hold_key", default="ctrl_r"),
@@ -488,19 +505,46 @@ class VoiceOrchestrator:
         stop = threading.Event()
         splitter = FrameSplitter()
 
+        def _barge_allowed(buf: bytearray) -> bool:
+            """True = honor the barge (stop talking). If voice-ID is armed,
+            only the ENROLLED voice passes; without it, old behavior (any
+            speech barges). Too-short buffers (<1s) default to allowed."""
+            if self._speaker is None or not self._speaker.ready:
+                return True
+            import numpy as np
+            samples = np.frombuffer(bytes(buf), dtype=np.int16).astype(np.float32) / 32768.0
+            if len(samples) < 16000:  # <1s: can't embed reliably -> don't block
+                return True
+            try:
+                accepted, score = self._speaker.verify(samples, 16000)
+            except Exception as exc:
+                log_event("barge.verify.error", error=str(exc)[:120])
+                return True
+            log_event("barge.verify", accepted=bool(accepted), score=round(score, 3))
+            return bool(accepted)
+
         def _monitor():
+            from .audio.vad import FRAME_RATE, resample_linear
+            buf = bytearray()
+            sv_cfg = self.cfg.section("speaker_verify") if self._speaker is not None else {}
+            max_buf = int(float(sv_cfg.get("window_s", 2.0)) * FRAME_RATE) * 2
             while not stop.is_set():
                 try:
                     data, _ = self._barge_stream.read(self._barge_stream.blocksize)
                     if self._barge_stream.channels > 1:
                         data = data.mean(axis=1, keepdims=True)
                     mono = data[:, 0]
-                    from .audio.vad import FRAME_RATE, resample_linear
                     mono16 = resample_linear(mono, self._barge_stream.samplerate, FRAME_RATE)
                     for raw in splitter.feed(mono16):
+                        buf.extend(raw)
+                        del buf[:max(0, len(buf) - max_buf)]
                         if self._barge.add_frame(raw):
-                            stop.set()
-                            return
+                            if _barge_allowed(buf):
+                                stop.set()
+                                return
+                            # impostor (or unverifiable but enrolled system):
+                            # reset the detector and keep talking
+                            self._barge.reset()
                 except Exception:
                     return
         t = threading.Thread(target=_monitor, daemon=True)

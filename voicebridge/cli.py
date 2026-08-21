@@ -44,6 +44,14 @@ def build_parser() -> argparse.ArgumentParser:
     roundtrip = add("roundtrip", help="end-to-end test: synth speech -> ASR -> classify -> gateway -> summarize -> TTS file")
     roundtrip.add_argument("--text", default=None, help="sample utterance (default: Stripe webhook example)")
     roundtrip.add_argument("--model", default=None, help="model override for the agent run")
+    enroll = add("enroll", help="enroll your voice for speaker verification (voice-ID)")
+    enroll.add_argument("--file", type=Path, default=None,
+                        help="enroll from an existing WAV instead of recording")
+    enroll.add_argument("--name", default=None, help="speaker name (default: from config, 'user')")
+    enroll.add_argument("--seconds", type=int, default=None, help="recording length (default: 5)")
+    verify = add("verify", help="diagnostic: score a WAV against the enrolled speaker")
+    verify.add_argument("file", type=Path)
+    verify.add_argument("--name", default=None)
     return p
 
 
@@ -67,6 +75,10 @@ def main(argv=None) -> int:
         return _cmd_asr_test(cfg, args.file)
     if command == "tts-test":
         return _cmd_tts_test(cfg, " ".join(args.text), args.out)
+    if command == "enroll":
+        return _cmd_enroll(cfg, args.file, args.name, args.seconds)
+    if command == "verify":
+        return _cmd_verify(cfg, args.file, args.name)
 
     from .orchestrator import VoiceOrchestrator
     orch = VoiceOrchestrator(cfg, no_hotkey=args.no_hotkey, dry_run=args.dry_run)
@@ -105,14 +117,47 @@ def _cmd_status(cfg) -> int:
     print(f"tier aliases     : {info.models or '(none)'}")
     print(f"free VRAM        : {current_vram_mb()} MiB")
     # ASR
-    from .asr.whisper import FasterWhisperASR
     asr_cfg = cfg.section("asr")
-    asr = FasterWhisperASR(model=asr_cfg.get("model", "base"), device=asr_cfg.get("device", "auto"))
+    if asr_cfg.get("provider", "sherpa") == "sherpa":
+        from .asr.sherpa import SherpaASR
+        try:
+            asr = SherpaASR(engine=asr_cfg.get("engine", "moonshine"),
+                            model_dir=cfg.model_dir(),
+                            provider=asr_cfg.get("provider_ep", "cpu"))
+            asr.load()
+            print(f"ASR              : sherpa/{asr.engine} on {asr.provider}")
+        except Exception as exc:
+            print(f"ASR              : FAILED ({str(exc)[:120]})")
+    else:
+        from .asr.whisper import FasterWhisperASR
+        asr = FasterWhisperASR(model=asr_cfg.get("model", "base"),
+                               device=asr_cfg.get("device", "auto"))
+        try:
+            asr.load()
+            print(f"ASR              : whisper/{asr.model_name} on {asr._actual_device}")
+        except Exception as exc:
+            print(f"ASR              : FAILED ({str(exc)[:120]})")
+    # TTS
+    from .tts.piper import PiperTTS
+    tts = PiperTTS(model_dir=cfg.model_dir(), voice=cfg.get("tts", "voice", default="en_US-amy-medium"))
     try:
-        asr.load()
-        print(f"ASR              : whisper/{asr.model_name} on {asr._actual_device}")
+        tts.load()
+        print(f"TTS              : piper/{tts.voice} ({tts.sample_rate} Hz)")
     except Exception as exc:
-        print(f"ASR              : FAILED ({str(exc)[:120]})")
+        print(f"TTS              : FAILED ({str(exc)[:120]})")
+    # speaker verification
+    try:
+        from .voice_id import SpeakerVerifier
+        sv_cfg = cfg.section("speaker_verify")
+        sv = SpeakerVerifier(cfg.model_dir(), cfg.state_dir(),
+                             name=sv_cfg.get("name", "user"),
+                             threshold=float(sv_cfg.get("threshold", 0.75)))
+        sv.load()
+        state = f"enrolled '{sv.name}' (threshold {sv.threshold})" if sv.ready \
+            else "NOT enrolled (run: voicebridge enroll)"
+        print(f"voice-ID         : {state}")
+    except Exception as exc:
+        print(f"voice-ID         : FAILED ({str(exc)[:120]})")
     # PersonaPlex / Hermes / local
     print(f"hermes backend   : {'enabled' if cfg.get('hermes', 'enabled', default=False) else 'disabled'}")
     print(f"local actions    : {'enabled' if cfg.get('local', 'enabled', default=True) else 'disabled'}")
@@ -222,6 +267,78 @@ def _cmd_roundtrip(cfg, text: str | None, model: str | None, orch) -> int:
     print(f"      -> {check}")
 
     print("[6/6] roundtrip OK")
+    return 0
+
+
+def _record_seconds_to_wav(cfg, seconds: int, out_path: Path) -> Path:
+    """Record `seconds` of raw mono 16k mic audio to a WAV (for enrollment)."""
+    import numpy as np
+    import sounddevice as sd
+    from .audio.vad import FRAME_RATE, resample_linear
+    mic_cfg = cfg.section("mic")
+    sr = int(mic_cfg.get("sample_rate", 48000))
+    ch = int(mic_cfg.get("channels", 2))
+    print(f"Recording {seconds}s of your voice — speak naturally now...")
+    chunks = []
+    with sd.InputStream(samplerate=sr, channels=ch,
+                        device=mic_cfg.get("device"),
+                        blocksize=int(mic_cfg.get("blocksize", 480)),
+                        dtype="float32") as stream:
+        for _ in range(int(seconds * sr / stream.blocksize)):
+            data, _ = stream.read(stream.blocksize)
+            chunks.append(data)
+    audio = np.concatenate(chunks, axis=0)
+    # loudest channel mono (same as the bridge's capture path)
+    if audio.ndim > 1 and audio.shape[1] > 1:
+        audio = np.max(np.abs(audio), axis=1) * np.sign(audio[:, 0])
+    mono = resample_linear(audio.astype(np.float32), sr, FRAME_RATE)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    import wave
+    with wave.open(str(out_path), "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(FRAME_RATE)
+        wf.writeframes((np.clip(mono, -1.0, 1.0) * 32767).astype(np.int16).tobytes())
+    print(f"Saved {seconds}s capture to {out_path}")
+    return out_path
+
+
+def _cmd_enroll(cfg, file: Path, name: str | None, seconds: int | None) -> int:
+    from .voice_id import SpeakerVerifier
+    sv_cfg = cfg.section("speaker_verify")
+    name = name or sv_cfg.get("name", "user")
+    sv = SpeakerVerifier(cfg.model_dir(), cfg.state_dir(), name=name,
+                         threshold=float(sv_cfg.get("threshold", 0.75)))
+    if file is None:
+        seconds = seconds or int(sv_cfg.get("enroll_seconds", 5))
+        wav = _record_seconds_to_wav(cfg, seconds,
+                                     Path(cfg.state_dir()) / "enroll-last.wav")
+    else:
+        wav = file
+    try:
+        score = sv.enroll(wav)
+    except Exception as exc:
+        print(f"ENROLL FAILED: {exc}")
+        return 1
+    print(f"Enrolled '{name}' (self-score {score:.3f}).")
+    print("Barge-in now answers only to YOUR voice. Hold Ctrl and talk.")
+    return 0
+
+
+def _cmd_verify(cfg, file: Path, name: str | None) -> int:
+    from .voice_id import SpeakerVerifier
+    sv_cfg = cfg.section("speaker_verify")
+    name = name or sv_cfg.get("name", "user")
+    sv = SpeakerVerifier(cfg.model_dir(), cfg.state_dir(), name=name,
+                         threshold=float(sv_cfg.get("threshold", 0.75)))
+    try:
+        sv.load()
+        accepted, score = sv.verify_wav(file, name)
+    except Exception as exc:
+        print(f"VERIFY FAILED: {exc}")
+        return 1
+    print(f"score vs '{name}': {score:.3f}  (threshold {sv.threshold}) -> "
+          f"{'MATCH (your voice)' if accepted else 'REJECT (not you)'}")
     return 0
 
 
