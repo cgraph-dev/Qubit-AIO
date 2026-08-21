@@ -78,6 +78,8 @@ class _FakeOrch:
         self._tts = _FakeTTs()
         self._last_web_summary = ""
         self._last_web_route = ""
+        self._web_mode = False
+        self._web_spoken = []
 
     def process_web_utterance(self, text: str) -> dict:
         return {"text": text, "route": "conversation",
@@ -91,12 +93,25 @@ def test_webui_talk_returns_audio(tmp_path: Path) -> None:
     ui = WebUI(orch, host="127.0.0.1", port=0, state_dir=tmp_path)
     # stub ASR: return a fixed transcript
     class _FakeASR:
+        def load(self):
+            pass
+
         def transcribe(self, wav_path: Path):
             from voicebridge.asr.base import Transcript
             return Transcript(text="hello there", confidence=0.95)
     ui._asr_factory = lambda: _FakeASR()
     pcm = b"\x00\x00" * 16000
-    result = ui.handle_talk(pcm)
+    # async: submit -> poll until done
+    rid = ui.submit_talk(pcm)
+    assert rid
+    result = None
+    for _ in range(50):
+        r = ui.result(rid)
+        if r["status"] == "done":
+            result = r
+            break
+        time.sleep(0.05)
+    assert result is not None
     assert result["text"] == "hello there"
     assert result["route"] == "conversation"
     assert result["summary"] == "short summary"
@@ -108,8 +123,16 @@ def test_webui_rejects_empty_audio(tmp_path: Path) -> None:
     from voicebridge.webui import WebUI
     orch = _FakeOrch()
     ui = WebUI(orch, host="127.0.0.1", port=0, state_dir=tmp_path)
-    result = ui.handle_talk(b"")
-    assert result["audio_b64"] is None
+    rid = ui.submit_talk(b"")
+    assert rid
+    result = None
+    for _ in range(50):
+        r = ui.result(rid)
+        if r["status"] == "done":
+            result = r
+            break
+        time.sleep(0.02)
+    assert result is not None and result["audio_b64"] is None
 
 
 def test_local_script_dispatch_runs_script(tmp_path: Path) -> None:

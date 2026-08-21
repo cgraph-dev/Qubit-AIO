@@ -195,7 +195,7 @@ templates:
     summary_words: 35          # speak ONLY a ≤35-word summary, never raw output
     script: >
       ~/Projects/Repos/openclaw-voice-bridge/.venv/bin/python
-      ~/.hermes/skills/research/perplexity-web-search/scripts/perplexity_search.py
+      ~/Projects/Repos/openclaw-voice-bridge/scripts/web_search.py
       "{question}" 1500
 
   # -------------------------------------------------- social inbox check

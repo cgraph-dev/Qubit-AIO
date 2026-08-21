@@ -215,8 +215,10 @@ async function stopRec() {
 async function sendAudio(pcm) {
   busy = true;
   ptt.disabled = true;
-  ptt.textContent = 'working…';
+  ptt.textContent = 'listening to result…';
+  let rid;
   try {
+    // 1. submit -> instant request_id (the bridge acks immediately)
     const res = await fetch('/api/talk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/octet-stream' },
@@ -224,24 +226,21 @@ async function sendAudio(pcm) {
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    addMsg('user', data.text || '(no speech recognized)');
-    if (data.events && data.events.length) {
-      for (const ev of data.events) {
-        if (ev.kind === 'meta') addMsg('meta', '· ' + ev.text);
+    rid = data.request_id;
+    setStatus('working…', true);
+    // 2. poll the result until done
+    while (true) {
+      await new Promise(r => setTimeout(r, 900));
+      const r = await fetch('/api/result/' + rid);
+      const poll = await r.json();
+      if (poll.status === 'done') {
+        await playResult(poll);
+        break;
+      } else if (poll.status === 'unknown') {
+        addMsg('err', 'Request lost (bridge restarted?). Try again.');
+        break;
       }
     }
-    if (data.audio_b64) {
-      const audio = new Audio('data:audio/wav;base64,' + data.audio_b64);
-      addMsg('assistant', data.summary || data.text || '');
-      setStatus('speaking…', true);
-      await audio.play();
-      await new Promise(r => audio.onended = r);
-    } else if (data.summary) {
-      addMsg('assistant', data.summary);
-    } else if (data.error) {
-      addMsg('err', data.error);
-    }
-    setStatus('ready');
   } catch (err) {
     addMsg('err', 'Request failed: ' + err.message);
     setStatus('error');
@@ -249,6 +248,27 @@ async function sendAudio(pcm) {
     busy = false;
     ptt.disabled = false;
     ptt.textContent = 'Hold to talk';
+    setStatus('ready');
+  }
+}
+
+async function playResult(data) {
+  addMsg('user', data.text || '(no speech recognized)');
+  if (data.events && data.events.length) {
+    for (const ev of data.events) {
+      if (ev.kind === 'meta') addMsg('meta', '· ' + ev.text);
+    }
+  }
+  if (data.audio_b64) {
+    const audio = new Audio('data:audio/wav;base64,' + data.audio_b64);
+    addMsg('assistant', data.summary || data.text || '');
+    setStatus('speaking…', true);
+    await audio.play();
+    await new Promise(r => audio.onended = r);
+  } else if (data.summary) {
+    addMsg('assistant', data.summary);
+  } else if (data.error) {
+    addMsg('err', data.error);
   }
 }
 
@@ -387,6 +407,9 @@ class WebUIHandler(BaseHTTPRequestHandler):
         elif path == "/api/activity":
             limit = int(self.path.split("limit=")[1].split("&")[0]) if "limit=" in self.path else 100
             self._json({"items": self.app.feed.recent(min(limit, 300))})
+        elif path.startswith("/api/result/"):
+            rid = path.rsplit("/", 1)[-1]
+            self._json(self.app.result(rid))
         else:
             self._send(404, b"not found")
 
@@ -399,8 +422,10 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self._json({"error": "no audio"}, 400)
                 return
             try:
-                result = self.app.handle_talk(pcm)
-                self._json(result)
+                # async: return a request_id immediately (fast ack), the
+                # result (audio) is fetched via /api/result/<id>
+                rid = self.app.submit_talk(pcm)
+                self._json({"request_id": rid})
             except Exception as exc:  # keep the phone page alive on bridge errors
                 log.exception("webui /api/talk failed")
                 log_event("webui.talk.error", error=str(exc)[:200])
@@ -426,6 +451,10 @@ class WebUI:
         self._asr_lock = threading.Lock()
         self._server: Optional[ThreadingHTTPServer] = None
         self._thread: Optional[threading.Thread] = None
+        self._pending: Dict[str, Dict[str, Any]] = {}
+        self._pending_lock = threading.Lock()
+        self._results: Dict[str, Dict[str, Any]] = {}
+        self._result_lock = threading.Lock()
 
     # -- lifecycle --------------------------------------------------------
     def start(self) -> None:
@@ -452,6 +481,53 @@ class WebUI:
             "port": self.port,
             "uptime_s": round(time.time() - getattr(self.orch, "_t0", time.time()), 1),
         }
+
+    def submit_talk(self, pcm: bytes) -> str:
+        """Start a voice roundtrip in the background; returns a request id.
+
+        The browser gets the id instantly (fast ack), then polls
+        /api/result/<id>. The heavy work (ASR -> route -> script/OpenClaw
+        -> local summary -> TTS) runs on a worker thread so the phone UI
+        never blocks on a 30s Perplexity search.
+        """
+        rid = uuid.uuid4().hex[:12]
+        with self._pending_lock:
+            self._pending[rid] = {"created": time.time()}
+
+        def _run() -> None:
+            try:
+                result = self.handle_talk(pcm)
+            except Exception as exc:
+                log.exception("webui talk worker failed")
+                log_event("webui.talk.error", error=str(exc)[:200])
+                result = {"text": "", "route": "error",
+                          "summary": "Something went wrong.",
+                          "reply": "", "events": [],
+                          "audio_b64": None, "latency_s": 0.0}
+            with self._result_lock:
+                self._results[rid] = result
+            with self._pending_lock:
+                self._pending.pop(rid, None)
+            # prune old results (keep last 50)
+            with self._result_lock:
+                if len(self._results) > 50:
+                    for k in list(self._results)[:-50]:
+                        self._results.pop(k, None)
+
+        threading.Thread(target=_run, daemon=True, name=f"webui-talk-{rid}").start()
+        return rid
+
+    def result(self, rid: str) -> Dict[str, Any]:
+        """Poll endpoint: pending -> {"status": "pending"} until done."""
+        with self._pending_lock:
+            pending = rid in self._pending
+        if pending:
+            return {"status": "pending", "request_id": rid}
+        with self._result_lock:
+            r = self._results.get(rid)
+        if r is None:
+            return {"status": "unknown", "request_id": rid}
+        return {"status": "done", "request_id": rid, **r}
 
     def handle_talk(self, pcm: bytes) -> Dict[str, Any]:
         """Full voice roundtrip: PCM -> text -> route -> summary -> TTS."""
@@ -480,8 +556,13 @@ class WebUI:
         result = self.orch.process_web_utterance(text)
         self.feed.push({"kind": "routing", "text": text, "route": result.get("route", ""),
                         "conf": result.get("confidence", "")})
-        # summarize + speak the FINAL reply (never the raw tool output)
-        summary = result.get("summary") or result.get("reply") or text
+        # summarize + speak the FINAL reply (never the raw tool output).
+        # Prefer the text the orchestrator actually "spoke" in web mode
+        # (recorded in _web_spoken — acks, summaries, fallbacks); fall back
+        # to the routing result.
+        spoken = getattr(self.orch, "_web_spoken", None) or []
+        spoken_text = " ".join(x for x in spoken if x).strip()
+        summary = result.get("summary") or result.get("reply") or spoken_text or text
         audio_b64 = None
         events: List[Dict[str, Any]] = []
         if summary:
@@ -507,8 +588,17 @@ class WebUI:
     # -- internals ---------------------------------------------------------
     def _transcribe(self, wav_path: Path):
         with self._asr_lock:
+            # Reuse the bridge's OWN ASR instance when it's loaded: the model
+            # (parakeet, ~640MB) is already warm and thread-safe (internal
+            # lock) — avoids loading a second copy from disk (~10s on the
+            # slow Kingston SSD + extra RAM). Fall back to a private instance
+            # only when the bridge has no ASR (mic-only edge cases).
+            orch_asr = getattr(self.orch, "_asr", None)
+            if orch_asr is not None and getattr(orch_asr, "_recognizer", None) is not None:
+                return orch_asr.transcribe(wav_path)
             if self._asr is None:
                 self._asr = self._asr_factory()
+                self._asr.load()
             return self._asr.transcribe(wav_path)
 
     def _synthesize(self, text: str) -> bytes:

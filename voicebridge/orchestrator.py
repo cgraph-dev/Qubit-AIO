@@ -591,6 +591,13 @@ class VoiceOrchestrator:
             text = speech_direct(text)
         if not text:
             return True
+        if self._web_mode:
+            # Web/phone request: the browser plays the TTS audio (returned via
+            # /api/result). DO NOT play through the PC speakers — that both
+            # blocks the phone (audio playback takes ~10s for a summary) and
+            # blasts the room. Record the text so the web result can use it.
+            self._web_spoken.append(text)
+            return True
         if self._tts is None:
             log.warning("TTS not available; would say: %s", text[:120])
             return False
@@ -792,6 +799,8 @@ class VoiceOrchestrator:
     _last_web_text: str = ""
     _last_web_summary: str = ""
     _last_web_route: str = ""
+    _web_mode: bool = False
+    _web_spoken: List[str] = []
 
     def process_web_utterance(self, text: str) -> dict:
         """Phone/web roundtrip: route like the mic but return data, not audio.
@@ -801,6 +810,14 @@ class VoiceOrchestrator:
         the SAME gateway (shared session machinery); the reply is summarized
         by the local model before it's spoken/sent back.
         """
+        self._web_mode = True
+        self._web_spoken = []
+        try:
+            return self._process_web_utterance_inner(text)
+        finally:
+            self._web_mode = False
+
+    def _process_web_utterance_inner(self, text: str) -> dict:
         self._last_web_text = text
         self._last_web_summary = ""
         self._last_web_route = ""
