@@ -59,7 +59,7 @@ asr:
 # tasks are tapped by local whisper, classified, and delegated to OpenClaw / Hermes /
 # local PC actions. Memory stays on this PC (OpenClaw workspace).
 personaplex:
-  enabled: true             # PersonaPlex lane ACTIVE (Vast 3090 via Tailscale)
+  enabled: false      # moshi-7B confabulates; PTT+DeepSeek is the active brain             # PersonaPlex lane ACTIVE (Vast 3090 via Tailscale)
   url: wss://100.69.231.30:8998/api/chat  # Vast box tailnet IP (verified)
   ssl_insecure: true        # self-signed cert on the Vast box (tailnet-encrypted anyway)
   voice_prompt: NATF2.pt    # NATF*/NATM*/VARF*/VARM* — pick the persona voice
