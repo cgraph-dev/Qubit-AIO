@@ -46,6 +46,12 @@
   <button class="ptt" id="ptt">Hold to talk</button>
   <div class="hint">tap = toggle · release = send · esc = stop</div>
 
+  <div class="row" style="margin-top:14px;">
+    <input id="textin" type="text" placeholder="…or type a task (Enter to send)"
+           style="flex:1; padding:10px 12px; background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:8px; font-size:15px;">
+    <button id="textsend" style="padding:10px 16px; background:#238636; border:none; color:#fff; border-radius:8px; cursor:pointer;">Send</button>
+  </div>
+
   <div id="transcript"></div>
 </div>
 
@@ -222,6 +228,45 @@ ptt.addEventListener('pointerup', (e) => {
 });
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Escape') { if (recording) stopRec(); }
+});
+
+// ---- typed tasks (no mic needed) ----
+async function sendTyped() {
+  const input = document.getElementById('textin');
+  const t = input.value.trim();
+  if (!t || busy) return;
+  input.value = '';
+  busy = true;
+  ptt.disabled = true;
+  try {
+    const res = await fetch(BASE + '/api/type', {
+      method: 'POST',
+      headers: hdrs({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ text: t }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const rid = data.request_id;
+    setStatus('working…', true);
+    while (true) {
+      await new Promise(r => setTimeout(r, 900));
+      const r = await fetch(BASE + '/api/result/' + rid);
+      const poll = await r.json();
+      if (poll.status === 'done') { await playResult(poll); break; }
+      if (poll.status === 'unknown') { addMsg('err', 'Request lost.'); break; }
+    }
+  } catch (err) {
+    addMsg('err', 'Request failed: ' + err.message);
+    setStatus('error');
+  } finally {
+    busy = false;
+    ptt.disabled = false;
+    setStatus('ready');
+  }
+}
+document.getElementById('textsend').addEventListener('click', sendTyped);
+document.getElementById('textin').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') sendTyped();
 });
 
 setStatus('ready');

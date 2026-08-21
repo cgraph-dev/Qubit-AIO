@@ -67,11 +67,16 @@ TASK_HINTS = [
     r"refactor|rename|move|delete|remove|implement|build|test|run tests|run the (tests|app|server|pipeline)|"
     r"compile|review|debug|trace|profile|commit|push|pull|merge|rebase|deploy|release|migrate|"
     r"restructure|simplify|clean( up)?|lint|format|document|explain (the )?(code|repo|project)|"
-    r"analyze|generate|scaffold|initialize|install|upgrade|downgrade|configure|setup)\b",
-    r"\b(webhook|api|endpoint|schema|database|migration|stripe|repo|repository|branch|commit|pr|"
-    r"pull request|issue|bug|crash|error|exception|stack trace|log|logs|terminal|shell|command|"
-    r"script|browser|file|files|directory|folder|package|dependency|docker|kubernetes|ci|pipeline|"
-    r"component|widget|screen|feature|module|class|function|method|test|tests|deploy|production)\b",
+    r"analyze|generate|scaffold|initialize|install|upgrade|downgrade|configure|setup|"
+    r"list|show|find|search|count|summarize|report|describe)\b",
+    r"\b(webhook|webhooks|api|apis|endpoint|endpoints|schema|database|migration|stripe|repo|repos|"
+    r"repository|repositories|branch|branches|commit|commits|pr|"
+    r"pull request|issue|issues|bug|bugs|crash|error|errors|exception|stack trace|log|logs|"
+    r"terminal|shell|command|commands|"
+    r"script|scripts|browser|file|files|directory|directories|folder|folders|package|packages|"
+    r"dependency|dependencies|docker|kubernetes|ci|pipeline|pipelines|"
+    r"component|components|widget|widgets|screen|screens|feature|features|module|modules|"
+    r"class|classes|function|functions|method|methods|test|tests|deploy|production)\b",
     # web-action tasks (shop/order/browse/captcha) -> agent with browser
     r"\b(open|visit|go to|navigate to|load)\s+[a-z0-9.-]+\.[a-z]{2,}\b",
     r"\b(buy|purchase|order|add to cart|checkout|pay for|book|reserve|subscribe)\b",

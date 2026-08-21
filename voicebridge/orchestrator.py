@@ -669,6 +669,12 @@ class VoiceOrchestrator:
         Returns the joined text that was actually spoken.
         """
         import queue as _queue
+        joined = " ".join(sentences)
+        if self._web_mode:
+            # web/phone: record for the result, never play on PC speakers
+            if joined.strip():
+                self._web_spoken.append(joined.strip())
+            return joined
         if self.muted or not sentences:
             return " ".join(sentences)
         if self._tts is None:
@@ -923,8 +929,11 @@ class VoiceOrchestrator:
         # executor ask-mode: until the user gets a bigger GPU / smarter model,
         # let THEM pick who runs the task (Hermes vs OpenClaw) instead of
         # always defaulting to OpenClaw. The next utterance is interpreted by
-        # _handle_executor_answer().
-        if self.cfg.get("openclaw", "ask_executor", default=False):
+        # _handle_executor_answer(). Web/phone requests skip the question —
+        # the website is the OpenClaw control surface; asking "who should run
+        # this?" over the phone UI adds friction with no benefit.
+        if (self.cfg.get("openclaw", "ask_executor", default=False)
+                and not self._web_mode):
             self.executor_choice.request(final_text, model or self._current_model() or "")
             self.speak("Who should handle this — OpenClaw or Hermes?")
             log_event("executor.ask", task=final_text[:160])
@@ -1425,6 +1434,9 @@ class VoiceOrchestrator:
             if reply:
                 self.conversation.add("user", text)
                 self.conversation.add("assistant", reply)
+                self.feed_push({"kind": "summary", "text": "conversation",
+                                "summary": trim_spoken(reply, 300),
+                                "route": "local"})
                 self.speak(trim_spoken(reply, 500))
                 return
 

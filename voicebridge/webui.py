@@ -479,6 +479,26 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 log.exception("webui /api/talk failed")
                 log_event("webui.talk.error", error=str(exc)[:200])
                 self._json({"error": str(exc)[:300]}, 500)
+        elif path == "/api/type":
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length) if length else b""
+            try:
+                data = json.loads(body or b"{}")
+                text = str(data.get("text", "")).strip()
+            except Exception:
+                text = ""
+            if not text:
+                self._json({"error": "no text"}, 400)
+                return
+            try:
+                rid = self.app.submit_text(text)
+                self._json({"request_id": rid})
+            except Exception as exc:
+                log_event("webui.type.error", error=str(exc)[:200])
+                self._json({"error": str(exc)[:300]}, 500)
         else:
             self._send(404, b"not found")
 
@@ -505,9 +525,12 @@ class WebUI:
         self._results: Dict[str, Dict[str, Any]] = {}
         self._result_lock = threading.Lock()
         # serve the shared frontend/ dir when it exists (Vercel-ready build),
-        # otherwise fall back to the embedded pages.
-        self._frontend_dir = Path(__file__).resolve().parents[1] / "frontend"
-        self._use_frontend_dir = self._frontend_dir.is_dir() and (self._frontend_dir / "index.html").exists()
+        # otherwise fall back to the embedded pages. Prefer the dedicated
+        # voice-dashboard repo (edits there apply live), then the bridge repo.
+        self._frontend_dir = Path.home() / "Projects" / "Repos" / "voice-dashboard" / "frontend"
+        if not (self._frontend_dir / "index.html").exists():
+            self._frontend_dir = Path(__file__).resolve().parents[1] / "frontend"
+        self._use_frontend_dir = (self._frontend_dir / "index.html").exists()
         # optional shared secret for tunneled/external access (config: webui.token)
         self.api_token: str = orchestrator.cfg.get("webui", "token", default="") if orchestrator is not None else ""
 
@@ -536,6 +559,49 @@ class WebUI:
             "port": self.port,
             "uptime_s": round(time.time() - getattr(self.orch, "_t0", time.time()), 1),
         }
+
+    def submit_text(self, text: str) -> str:
+        """Type-in path: same pipeline as voice but no ASR step."""
+        rid = uuid.uuid4().hex[:12]
+        with self._pending_lock:
+            self._pending[rid] = {"created": time.time()}
+        self.feed.push({"kind": "user", "text": text, "route": "input"})
+
+        def _run() -> None:
+            try:
+                t0 = time.time()
+                result = self.orch.process_web_utterance(text)
+                result["latency_s"] = round(time.time() - t0, 2)
+                # conversation/local replies are "spoken" through speak() which
+                # records into _web_spoken in web mode — surface that text
+                # (same fallback as the voice path).
+                spoken = getattr(self.orch, "_web_spoken", None) or []
+                spoken_text = " ".join(x for x in spoken if x).strip()
+                if not result.get("summary") and spoken_text:
+                    result["summary"] = spoken_text
+                    result["reply"] = spoken_text
+                # synthesize the reply audio (same as the voice path)
+                summary = result.get("summary") or ""
+                if summary:
+                    try:
+                        wav = self._synthesize(summary)
+                        result["audio_b64"] = base64.b64encode(wav).decode()
+                    except Exception as exc:
+                        log_event("webui.tts.failed", error=str(exc)[:160])
+            except Exception as exc:
+                log.exception("webui type worker failed")
+                log_event("webui.type.error", error=str(exc)[:200])
+                result = {"text": text, "route": "error",
+                          "summary": "Something went wrong.",
+                          "reply": "", "events": [],
+                          "audio_b64": None, "latency_s": 0.0}
+            with self._result_lock:
+                self._results[rid] = result
+            with self._pending_lock:
+                self._pending.pop(rid, None)
+
+        threading.Thread(target=_run, daemon=True, name=f"webui-type-{rid}").start()
+        return rid
 
     def submit_talk(self, pcm: bytes) -> str:
         """Start a voice roundtrip in the background; returns a request id.
