@@ -20,9 +20,10 @@ hotkey:
 mic:
   device: null            # null = system default (your Focusrite Scarlett 2i2)
   sample_rate: 48000      # device rate; resampled to 16 kHz for ASR
-  channels: 2             # capture N channels, use the loudest (Scarlett 4ch profile: mic on ch 0)
+  channels: 4             # capture ALL channels of the Scarlett's 4ch profile;
+                          # per-channel max picks whichever has the mic
   blocksize: 480          # ~10 ms at 48 kHz
-  gain: 64.0             # pre-amplify the quiet Scarlett (measured ~0.0004 RMS)
+  gain: 8.0             # AT2020 + 2i2 gain knob up: 64x would hard-clip
   min_rms: 0.0008         # below this RMS the capture counts as silence
 
 # Voice activity detection / endpointing
@@ -30,7 +31,7 @@ vad:
   enabled: true
   aggressiveness: 1       # webrtcvad 0 (lenient) - 3 (strict); 1 suits quiet mics
   speech_start_ms: 180    # how much continuous speech before "started"
-  silence_timeout_s: 1.2  # trailing silence that ends the utterance
+  silence_timeout_s: 0.4  # trailing silence that ends the utterance (latency)
   max_utterance_s: 30.0
   rms_gate: 0.004         # frame RMS floor for "voiced" (after gain) — stops hiss triggering VAD
   barge_in: true          # speech while TTS speaks -> cancel output (interrupt)
@@ -43,7 +44,7 @@ feedback:
 # Speech-to-text
 asr:
   provider: whisper       # whisper | personaplex
-  model: auto            # auto = small when GPU free, base when Ollama is hot (8 GB-safe)
+  model: base            # base = ~2x faster than small on the 3070; good for PTT commands
                           #   small = 4-6x more accurate than base; fits fine now
                           #   that agent tasks run on DeepSeek (GPU is idle during tasks).
   device: auto            # auto|cuda|cpu  (auto: GPU, falls back to CPU on OOM)
