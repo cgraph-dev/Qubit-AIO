@@ -84,13 +84,13 @@ templates:
     ack: "Syncing your changes."
 
   # --------------------------------------------------------------- research
+  # NOTE: replaced by the zero-cost search-web template (Perplexity Pro
+  # browser session) — see search-web below.
   - name: research-current
     match:
-      - "(use )?perplexity to (search|find|look up|check)"
-      - "search (the )?(web|internet) for"
-      - "what('s| is) the (latest|current) news (on|about)"
-    kind: conversation
-    task: "Answer from current web search, concise."
+      - "use perplexity to search for (the )?latest (news|price|version|update)"
+    kind: coding
+    task: "Run the perplexity-web-search skill (zero-cost browser search)."
     ack: ""
 
   # -------------------------------------------------------------- email / DMs
@@ -180,6 +180,26 @@ templates:
       them, and do the requested edits. Use your full tool set (files,
       terminal, browser, repos). Reply concisely with what was done.
     ack: "Using VS Code."
+
+  # --------------------------------------------------- web search (free)
+  # Zero-cost Perplexity Pro browser search (no API money).
+  - name: search-web
+    match:
+      - "(use )?(perplexity|search the web|search|look up|google|find out|research) (for |about |on |: )?(.*)"
+      - "(what|who|when|where|why|how) (is|are|was|were|did|does|will|can) (the |a |an )?(latest|new|current|best|price|cost|weather|news|version|release|date|time)[^?]*(\\?|$)"
+      - "(is|are) (there|it|this|that) (a |an |any )?(new|latest|better|cheaper)?( version| price| deal| offer)?"
+      - "latest (version|news|release|price|update) (of|on|for) "
+      - "what('?s| is) (the )?(latest|new|current|best) (version|price|news|release|model|phone|game|movie|album|book|update)"
+    kind: coding
+    task: >
+      Run the perplexity-web-search skill: search using the user's logged-in
+      Perplexity Pro browser session (zero API cost):
+        ~/.hermes/skills/research/perplexity-web-search/scripts/perplexity_search.py "<question>" 1500
+      (uses the CDP Chromium profile; browser_ensure.sh starts it if needed).
+      Then speak a ≤3-sentence answer based on what the script returned.
+      If the script fails (browser down / not logged in), say so and fall
+      back to normal web search.
+    ack: "Searching the web."
 
   # -------------------------------------------------- social inbox check
   # Zero-token deterministic readers (CDP vs logged-in Chromium profile).
