@@ -126,12 +126,36 @@ what the agent is doing live.
   final spoken summary, latency, and (for tool runs) the raw output behind
   the summary. Auto-refreshes every 2s.
 - **API** (for scripts): `POST /api/talk` with raw Int16 PCM @16k mono
-  returns `{text, route, summary, audio_b64, events, latency_s}`;
-  `GET /api/activity` returns the feed.
+  returns `{request_id}` instantly, then poll `GET /api/result/<id>` for
+  `{text, route, summary, audio_b64}`. `GET /api/activity` = the feed.
+  `GET /api/status` = health. All API routes accept an optional
+  `X-Api-Token` header / `?token=` (config `webui.token`) for external use.
 
 Find your PC's LAN IP with `ip -4 addr show | grep inet`. The dashboard
-binds `0.0.0.0:8890` by default (`webui.host` / `webui.port` in config) —
-on a trusted LAN only; add firewall rules if you need it internet-facing.
+binds `0.0.0.0:8890` by default (`webui.host` / `webui.port` in config).
+
+### Access from outside (when your PC is on)
+
+The PC is reachable from the internet through a Pinggy tunnel (SSH, zero
+install). The systemd user service starts it on boot and auto-restarts on
+Pinggy's 60-minute free-tier expiry:
+
+```bash
+systemctl --user enable --now voice-dashboard-tunnel.service
+cat ~/.local/state/openclaw-voice-bridge/tunnel.url   # the CURRENT public URL
+```
+
+Open that URL on your phone — same chat + activity pages, served from your
+PC. The URL changes every ~60 min on the free tier (persistent subdomains
+need Pinggy Pro); the script rewrites `tunnel.url` on every restart.
+
+### Vercel-hosted frontend (coming)
+
+The `frontend/` dir is the deployable static app: `index.html` (chat) +
+`activity.html` (dashboard). It works from Vercel too — the ⚙ settings in
+the page let you paste your PC's current tunnel URL + token (saved in
+localStorage), or pass them as `?api=<url>&token=<secret>` query params.
+CORS is enabled on the bridge so the Vercel origin can call the PC API.
 
 **Summarize-first workflow (why it feels smart):** recurring tool tasks are
 `local-script` templates — the bridge runs the tool itself (Perplexity

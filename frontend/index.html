@@ -39,7 +39,7 @@
     <h1>🎙 Voice Dashboard</h1>
     <div class="row">
       <span class="status" id="st">connecting…</span>
-      <a href="/activity">activity →</a>
+      <a href="/activity">activity →</a> <a href="#" id="gearlink" style="margin-left:8px">⚙</a>
     </div>
   </header>
 
@@ -49,12 +49,21 @@
   <div id="transcript"></div>
 </div>
 
+
+<div id="settings" style="display:none; border:1px solid #30363d; border-radius:10px; padding:10px; margin:10px 0; background:#161b22;">
+  <div style="font-size:13px; margin-bottom:6px;">API server (from Vercel, paste your PC's tunnel URL, e.g. https://xxx.run.pinggy-free.link)</div>
+  <input id="set-api" type="text" placeholder="https://your-pc-tunnel-url" style="width:100%; padding:6px; margin-bottom:6px; background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:6px;">
+  <input id="set-token" type="text" placeholder="token (optional)" style="width:100%; padding:6px; margin-bottom:6px; background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:6px;">
+  <div class="row"><button id="set-save" style="padding:6px 14px; background:#1f6feb; border:none; color:#fff; border-radius:6px; cursor:pointer;">Save</button>
+  <span id="set-status" style="font-size:12px; color:#8b949e; margin-left:10px;"></span></div>
+</div>
+
 <script>
 // API base: same-origin by default (localhost/LAN). Override with ?api=<url>
 // so the same page works from Vercel against your PC's tunnel.
-const BASE = (new URLSearchParams(location.search).get('api') || '').replace(/\/$/, '');
-const TOKEN = new URLSearchParams(location.search).get('token') || '';
-function hdrs(extra) { const h = Object.assign({}, extra || {}); if (TOKEN) h['X-Api-Token'] = TOKEN; return h; }
+let BASE = (new URLSearchParams(location.search).get('api') || localStorage.getItem('vdb_api') || '').replace(/\/$/, '');
+let API_TOKEN = (new URLSearchParams(location.search).get('token') || localStorage.getItem('vdb_token') || '');
+function hdrs(extra) { const h = Object.assign({}, extra || {}); if (API_TOKEN) h['X-Api-Token'] = API_TOKEN; return h; }
 
 const ptt = document.getElementById('ptt');
 const st = document.getElementById('st');
@@ -157,9 +166,22 @@ async function sendAudio(pcm) {
     busy = false;
     ptt.disabled = false;
     ptt.textContent = 'Hold to talk';
-    setStatus('ready');
   }
 }
+
+// ---- settings (API base + token for Vercel -> PC tunnel) ----
+const gear = document.getElementById('gearlink');
+const panel = document.getElementById('settings');
+gear.addEventListener('click', (e) => { e.preventDefault(); panel.style.display = panel.style.display === 'none' ? 'block' : 'none'; });
+document.getElementById('set-api').value = localStorage.getItem('vdb_api') || '';
+document.getElementById('set-token').value = localStorage.getItem('vdb_token') || '';
+document.getElementById('set-save').addEventListener('click', () => {
+  const a = document.getElementById('set-api').value.trim().replace(/\/$/, '');
+  const t = document.getElementById('set-token').value.trim();
+  localStorage.setItem('vdb_api', a); localStorage.setItem('vdb_token', t);
+  // reload so BASE/API_TOKEN pick up the saved values cleanly
+  location.reload();
+});
 
 async function playResult(data) {
   addMsg('user', data.text || '(no speech recognized)');

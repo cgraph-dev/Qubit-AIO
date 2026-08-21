@@ -33,7 +33,9 @@
   <div id="feed"><div id="empty">waiting for activity…</div></div>
 </div>
 <script>
-const BASE = (new URLSearchParams(location.search).get('api') || '').replace(/\/$/, '');
+const BASE = (new URLSearchParams(location.search).get('api') || localStorage.getItem('vdb_api') || '').replace(/\/$/, '');
+const TOKEN = (new URLSearchParams(location.search).get('token') || localStorage.getItem('vdb_token') || '');
+function hdrs(extra) { const h = Object.assign({}, extra || {}); if (TOKEN) h['X-Api-Token'] = TOKEN; return h; }
 const TOKEN = new URLSearchParams(location.search).get('token') || '';
 function hdrs(extra) { const h = Object.assign({}, extra || {}); if (TOKEN) h['X-Api-Token'] = TOKEN; return h; }
 
