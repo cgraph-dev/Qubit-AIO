@@ -86,6 +86,9 @@ DEFAULTS: Dict[str, Any] = {
         "output_device": None,          # speaker device for lane audio; null = try
                                         # pulse -> pipewire -> default (24k hardware
                                         # rejects on Scarlett/ALC892, mixers resample)
+        "tap_confidence": 0.3,          # min whisper confidence to route a tap;
+                                        # garbage hallucinated on noise scores ~0.0
+                                        # and would duck PP + trigger piper spam
         "duck_on_task_s": 8.0,          # mute PP + stop feeding it while a task runs
         "reconnect_s": 5.0,             # reconnect/backoff interval
         # legacy (pre-duplex) adapter knobs kept for compatibility

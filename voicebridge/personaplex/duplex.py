@@ -203,10 +203,20 @@ class PersonaPlexDuplex:
                     wf.writeframes(np.clip(pcm * 32767, -32768, 32767).astype(np.int16).tobytes())
                 tr = self._make_whisper().transcribe(tmp)
                 if tr.text and tr.text.strip():
-                    log_event("personaplex.tap", text=tr.text[:300], confidence=tr.confidence)
+                    conf = float(tr.confidence)
+                    log_event("personaplex.tap", text=tr.text[:300], confidence=conf)
+                    # confidence gate: whisper hallucinates garbage (0.0-0.1) on
+                    # noise/echo — routing it ducks PersonaPlex and the local
+                    # piper voice answers nonsense. Real speech is 0.7+.
+                    min_conf = float(self.cfg.get("personaplex", "tap_confidence",
+                                                  default=0.3))
+                    if conf < min_conf:
+                        log_event("personaplex.tap.low", text=tr.text[:120],
+                                  confidence=conf)
+                        return
                     if self.on_transcript:
                         try:
-                            self.on_transcript(tr.text.strip(), float(tr.confidence))
+                            self.on_transcript(tr.text.strip(), conf)
                         except Exception as exc:
                             log.warning("transcript callback failed: %s", exc)
             except Exception as exc:
