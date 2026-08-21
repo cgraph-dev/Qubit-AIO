@@ -1,22 +1,23 @@
 [project]
 name = "openclaw-voice-bridge"
-version = "0.1.0"
-description = "Local push-to-talk voice bridge for OpenClaw: ASR (faster-whisper), intent routing, gateway execution, local TTS. PersonaPlex-ready."
+version = "1.0.0"
+description = "Local push-to-talk voice bridge for OpenClaw: Moonshine ASR, Silero VAD, voice-ID, local LLM, piper TTS — 8 GB GPU safe."
 requires-python = ">=3.11"
 dependencies = [
-    "faster-whisper>=1.1",
-    "sounddevice>=0.4",
+    "sherpa-onnx>=1.13",      # Moonshine ASR + Silero VAD + eres2net voice-ID + Kokoro
+    "sounddevice>=0.4",       # mic capture + playback (PortAudio)
     "numpy>=1.24",
-    "webrtcvad>=2.0.10",
-    "websockets>=12",
     "pyyaml>=6",
-    "piper-tts>=1.2",
-    "sphn>=0.1.4,<0.2",   # PersonaPlex duplex: streaming ogg/opus (needs libopus-dev); 0.2.x changed the API
+    "websockets>=12",         # OpenClaw gateway
+    "piper-tts>=1.2",         # default TTS
+    "faster-whisper>=1.1",    # optional ASR fallback (asr.provider: whisper)
+    "webrtcvad>=2.0.10",      # optional VAD fallback (vad.backend: webrtc)
 ]
 
 [project.optional-dependencies]
 hotkey = ["pynput>=1.7"]
 edge = ["edge-tts>=6"]
+kokoro = []                   # Kokoro TTS ships inside sherpa-onnx; model download only
 test = ["pytest>=8"]
 
 [project.scripts]

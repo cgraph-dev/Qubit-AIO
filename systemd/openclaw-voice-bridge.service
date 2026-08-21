@@ -1,20 +1,26 @@
 [Unit]
 Description=OpenClaw Voice Bridge (push-to-talk voice interface)
-After=network.target openclaw-gateway.service
-Wants=openclaw-gateway.service
+After=network.target
+# OpenClaw gateway + ollama (local LLM) should be up first if they exist as units:
+After=openclaw-gateway.service ollama.service
+Wants=ollama.service
 
 [Service]
 Type=simple
-ExecStart=%h/Projects/Repos/openclaw-voice-bridge/.venv/bin/python -m voicebridge run
-WorkingDirectory=%h/Projects/Repos/openclaw-voice-bridge
+# __PROJECT_DIR__ is replaced with the actual path by scripts/install.sh
+ExecStart=__PROJECT_DIR__/.venv/bin/python -m voicebridge run
+WorkingDirectory=__PROJECT_DIR__
 Restart=on-failure
 RestartSec=3
-# CUDA 12 libs ship inside the Ollama install; without them faster-whisper falls back to CPU
-Environment=LD_LIBRARY_PATH=/usr/local/lib/ollama/cuda_v12
-# Hotkey (pynput) needs the X11 session; comment the two lines below for headless/manual mode
+# Hotkey (pynput) needs your graphical session. Set DISPLAY/XAUTHORITY to your
+# session's values (check: echo $DISPLAY; echo $XAUTHORITY) or run headless
+# with --no-hotkey (manual Enter PTT).
 Environment=DISPLAY=:0
-Environment=XAUTHORITY=/run/user/1000/gdm/Xauthority
+# Environment=XAUTHORITY=/run/user/1000/xdg/xwaylandauth.XXXX
 Environment=VOICE_BRIDGE_CONFIG=%h/.config/openclaw-voice-bridge/voice.yaml
+# Only needed if you use the whisper fallback ASR on CUDA with a non-standard
+# CUDA install (sherpa/moonshine run on CPU by default):
+# Environment=LD_LIBRARY_PATH=/usr/local/lib/ollama/cuda_v12
 
 [Install]
 WantedBy=default.target

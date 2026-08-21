@@ -1,330 +1,190 @@
 # OpenClaw Voice Bridge
 
-A **production-style local voice interface for OpenClaw** — push-to-talk, natural
-speech in, spoken results out, built for an **RTX 3070 Ti 8 GB** machine.
-It routes commands into your *existing* OpenClaw gateway, agents, and APIs
-(no OpenClaw config changes), summarizes long coding output, and can be
-interrupted mid-speech.
+A **production-style local voice interface for OpenClaw** — push-to-talk,
+natural speech in, spoken results out. Built for an **RTX 3070 Ti 8 GB** box
+but runs on any Linux PC with a mic. It routes commands into your *existing*
+OpenClaw gateway, agents, and APIs (no OpenClaw config changes), summarizes
+long coding output, and can be interrupted mid-speech — **only by your voice**.
 
 ```
-                     ┌──────────────────────────────────────────────┐
-                     │ Vast.ai (disposable compute, Tailscale-only) │
-                     │  PersonaPlex (nvidia/personaplex-7b-v1)      │
-                     │  wss://personaplex:8998/api/chat             │
-                     └──────────────▲───────────────────────────────┘
-                                    │ opus audio (full duplex)
-┌───────────────────────────────────┴────────────────────────────────────┐
-│ YOUR PC                                                                │
-│  mic ──┬─► PersonaPlex lane ────────────────► speakers (persona chat) │
-│        │      (continuous, PP does barge-in)                           │
-│        └─► whisper tap ─► intent router                                │
-│                 ├─ CHAT ──────────────► PersonaPlex answers            │
-│                 ├─ OPENCLAW_TASK ─────► OpenClaw gateway (loopback)    │
-│                 ├─ HERMES_TASK ───────► hermes chat -q (optional)      │
-│                 ├─ LOCAL_PC_TASK ─────► whitelisted actions            │
-│                 ├─ CONFIRMATION ──────► safety policy (spoken yes/no)  │
-│                 └─ STATUS ────────────► bridge status                  │
-│  result ──► summarizer ──► TTS (piper/edge) ──► speakers               │
-│  memory: ~/.openclaw/workspace (MEMORY.md + memory/YYYY-MM-DD.md)      │
-└────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────── YOUR PC (everything local) ────────────────────────────┐
+│                                                                                    │
+│  mic ──hold Ctrl──► Silero VAD ──► Moonshine ASR (sherpa-onnx, CPU, ~0.07s)       │
+│                          │                                                          │
+│                          ▼                                                          │
+│                   intent router (heuristic, ~0 ms)                                  │
+│                    ├─ CONVERSATION ──► short: llama3.2:3b (local, 0.3s)             │
+│                    │                   long/complex: DeepSeek API (~1s)             │
+│                    │                   web/current: Perplexity API                  │
+│                    ├─ CODING TASK ────► OpenClaw gateway (existing agent, tools,    │
+│                    │                     ACP, VS Code, terminal, browser, repos)    │
+│                    ├─ CONFIRM / CANCEL / STATUS / LOCAL ACTION                      │
+│                    └─ SYSTEM ─────────► bridge control                              │
+│                                                                                    │
+│  result ──► summarizer ──► piper TTS (local) ──► speakers                          │
+│  barge-in: eres2net voice-ID — ONLY the enrolled voice can interrupt               │
+└────────────────────────────────────────────────────────────────────────────────────┘
 ```
-(whisper-pipeline mode, without a PersonaPlex server, keeps working unchanged:
-`mic → ASR → intent → gateway → TTS`.)
 
-PersonaPlex verdict: **runs remotely on Vast.ai** — this 8 GB 3070 Ti cannot
-run the 15.6 GB bf16 weights locally, so the model lives on a rented 24 GB GPU
-and the bridge talks to it over **Tailscale**. Two modes:
+## What is local vs cloud (honest)
 
-- **whisper pipeline** (default, offline): mic → ASR → intent → OpenClaw → TTS.
-- **PersonaPlex full-duplex** (`personaplex.enabled: true`): the remote model
-  is the front-facing voice — natural conversation, barge-in, low latency. The
-  bridge taps the same mic stream with whisper, classifies intent, and routes
-  tasks to OpenClaw / Hermes / local PC actions, speaking results back in
-  character. Vast.ai stays disposable; memory lives on this PC.
-
----
-
-## Architecture (why this design)
-
-| Layer | Component | Why |
+| Component | Runs | Notes |
 |---|---|---|
-| Voice input | `audio/mic.py` + `audio/vad.py` | sounddevice capture via PipeWire, webrtcvad endpointing (silence timeout 1.2 s), hold-to-talk |
-| ASR | `asr/whisper.py` (active), `asr/personaplex.py` (plug) | faster-whisper `base` on CUDA ≈ 180× realtime and fits in ~0.5 GB VRAM *alongside* a loaded agent model |
-| Intent | `intent/classifier.py` + `intent/llm.py` | fast deterministic router (system/confirm/cancel/coding/local/hermes/conversation) + local qwen3-vl:8b JSON classifier when unsure |
-| Execution | `openclaw/gateway_ws.py` (primary), `openclaw/cli_backend.py` (fallback), `hermes/backend.py`, `local/actions.py` | the **documented** Gateway WS protocol v4 (`sessions.create/send`, `agent.wait`, `chat.history`, `sessions.abort`); CLI fallback; optional Hermes delegation; whitelisted local PC actions |
-| Speech out | `tts/piper.py` (active), `tts/edge.py`, `tts/gateway_tts.py` (optional) | piper is fully local, CPU-only (never fights the GPU), faster than real time; gateway TTS reuses your configured OpenAI/Edge providers if you want |
-| Safety | `safety/policy.py` | destructive-pattern confirmation, allow/deny list, dry-run-first, spoken confirmations |
-| Summaries | `summarizer.py` | long agent output → 2–3 spoken sentences (ollama or extractive fallback) |
-| Observability | `logging_setup.py` | human logs + structured `events.jsonl` (transcript, routing decision, request, status, result, failures, reconnects, timing) |
+| ASR (Moonshine) | **local, CPU, 0 VRAM** | ~0.07s per utterance, ~41-50× realtime |
+| VAD (Silero v5) | **local, CPU** | neural endpointing, far better than webrtcvad |
+| Voice-ID (eres2net) | **local, CPU** | ~50ms/check; self 0.72-0.96 vs strangers ~0.3 |
+| TTS (piper amy) | **local, CPU** | Kokoro-82M optional (`tts.provider: kokoro`) |
+| Short replies (llama3.2:3b) | **local, GPU, 2.6 GB** | stays resident 24/7 (`keep_alive: -1`) |
+| Long/complex answers | DeepSeek API | optional — needs `DEEPSEEK_API_KEY` |
+| Current-info/web answers | Perplexity API | optional — needs `PERPLEXITY_API_KEY` |
+| Task execution | **your OpenClaw** | gateway auto-discovered, agents untouched |
 
-**Why Python:** the OpenClaw gateway exposes a clean WebSocket JSON-RPC protocol
-with published schemas (`@openclaw/gateway-protocol`), and the machine already
-runs the Python voice stack (faster-whisper, sounddevice, piper). The CLI
-(`openclaw agent`) remains as a second route.
+Without the two API keys the bridge still fully works for local chat + all
+OpenClaw task routing; only long/web conversational answers fall back.
 
-**Route selection:** the bridge connects to the running gateway as a trusted
-loopback backend client (`client.id: gateway-client`, `mode: backend`) using the
-existing `OPENCLAW_GATEWAY_TOKEN` — no device pairing, no config writes. If the
-gateway is unreachable it falls back to `openclaw agent` subprocesses, then to
-"offline" with a spoken notice.
-
-## Hardware facts measured on this machine
-
-| Item | Value |
-|---|---|
-| GPU | RTX 3070 Ti, 8 GB (~7.1 GB usable after desktop) |
-| ASR | whisper `base` fp16 on CUDA: 0.6 s load, **0.04 s for 7.2 s audio** |
-| TTS | piper `en_US-amy-medium`: 0.85 s load, ~0.25 s per sentence, CPU |
-| Agent task | qwen3-vl:8b via gateway: **1–15 min for a real tool-using task** on a fresh session (agent bootstrap = system prompt + tool docs + workspace context, processed on CPU-offloaded layers; a warm model + existing session is faster) |
-| Note | GPU ASR needs `LD_LIBRARY_PATH=/usr/local/lib/ollama/cuda_v12` (Ollama bundles CUDA 12; without it whisper silently falls back to CPU) |
-
-## Install (exact commands)
-
-```bash
-# 1. project + venv
-mkdir -p ~/Projects/Repos/openclaw-voice-bridge
-cd ~/Projects/Repos/openclaw-voice-bridge
-uv venv --python 3.12 .venv
-uv pip install --python .venv/bin/python faster-whisper sounddevice numpy webrtcvad websockets pyyaml piper-tts setuptools pynput
-.venv/bin/python -m pip install 'setuptools<81' -q   # webrtcvad needs pkg_resources
-
-# 2. piper voice (~63 MB)
-mkdir -p ~/.local/share/openclaw-voice-bridge/models
-curl -sL -o ~/.local/share/openclaw-voice-bridge/models/en_US-amy-medium.onnx \
-  https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/en_US-amy-medium.onnx
-curl -sL -o ~/.local/share/openclaw-voice-bridge/models/en_US-amy-medium.onnx.json \
-  https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/en_US-amy-medium.onnx.json
-
-# 3. config
-mkdir -p ~/.config/openclaw-voice-bridge
-cp config/voice.example.yaml ~/.config/openclaw-voice-bridge/voice.yaml
-# edit: pick openclaw.model (null = agent default; "ollama/qwen3-vl:8b" = snappy)
-
-# or run the whole thing:
-./scripts/install.sh
-```
-
-## Run (exact commands)
-
-```bash
-./scripts/run.sh status          # gateway discovery + ASR/TTS/VRAM health
-./scripts/run.sh run             # interactive push-to-talk loop
-./scripts/run.sh task "inspect the Stripe webhook flow and patch signature verification"
-./scripts/run.sh once            # record one utterance, process, exit
-./scripts/run.sh mic-test        # verify mic levels (Focusrite: gain ~12 o'clock)
-```
-
-**Push-to-talk:** hold **Right Ctrl**, speak, release. **Esc** cancels
-(stop speech / abort task). If hotkeys are unavailable (SSH/headless), run with
-`--no-hotkey` and press **Enter** to start/stop recording.
-
-**Voice commands:** "status", "help", "mute"/"unmute", "stop"/"cancel",
-"use turbo|normal|slow|hard|pro" (switches the model for subsequent tasks),
-"quit". In full-duplex mode, tasks come naturally in conversation:
-"open the current project and inspect the Stripe webhook validation".
-
-**systemd (optional):** the unit runs the bridge under your user session
-(hotkey requires the X session; comment the `DISPLAY`/`XAUTHORITY` lines for
-headless manual mode):
-
-```bash
-mkdir -p ~/.config/systemd/user
-cp systemd/openclaw-voice-bridge.service ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable --now openclaw-voice-bridge
-journalctl --user -u openclaw-voice-bridge -f
-```
-
-For daily use, tmux is honestly the smoothest: `tmux new -s voice && ./scripts/run.sh run`.
-
-## Test (exact commands)
-
-```bash
-.venv/bin/python -m pytest tests/ -q            # 19 unit tests (classifier/safety/config/state)
-
-./scripts/test_roundtrip.sh                     # full voice→OpenClaw roundtrip, no mic needed
-./scripts/test_roundtrip.sh --no-dispatch       # quick: synth→ASR→classify only (~5 s)
-```
-
-`test_roundtrip.py` synthesizes the sample utterance with piper, transcribes it
-with GPU whisper, classifies it as a **coding** task, dispatches it to your
-existing `main` agent through the gateway, waits for completion, and renders
-the spoken summary — then asserts the event journal contains the full pipeline
-(`asr.transcribe → routing.decision → openclaw.request → openclaw.result →
-tts.speak`). Run with `--model ollama/qwen3-vl:8b` for reasonable latency.
-
-## Logs / observability
-
-- Console: human-readable to stderr.
-- `~/.local/state/openclaw-voice-bridge/events.jsonl` — one JSON per event:
-  `asr.transcribe`, `routing.decision`, `openclaw.request/status/result/summary`,
-  `openclaw.gateway.connect.retry` (reconnects), `safety.destructive`,
-  `orchestrator.timing`, `tts.speak`, and failures. Timestamps + durations are
-  on every request/result pair.
-
-## Safety
-
-- **Destructive actions** (delete/rm/drop/truncate/wipe/force-push/reset --hard/
-  shutdown/kill/sudo/chmod/`>` redirects/curl|sh …) require a **spoken
-  confirmation**: the bridge asks *"Do you want me to …?"* and waits for
-  yes/no. `no` cancels.
-- **Deny list** refuses outright (prompt-injection markers like "ignore all
-  previous instructions").
-- **Dry-run-first** mode (`safety.dry_run_first: true`) prepends an explicit
-  dry-run instruction to every coding task: inspect + report, then wait for
-  confirmation before applying.
-- `--dry-run` CLI flag: never dispatch, only speak the plan.
-
-## Limitations on this 3070 Ti (honest)
-
-1. **Agent latency is bootstrap-dominated.** Even the fast 8B takes ~85 s cold
-   through the agent (system prompt + tool docs + workspace context on 8 GB);
-   the 30B MoE takes minutes. The bridge speaks "On it." immediately and
-   streams a summary at the end — but don't expect chat-speed turnarounds for
-   real tool-using tasks. Warm models help; `ollama stop` the 30B before
-   expecting fast 8B tasks.
-2. **VRAM budgeting.** whisper `small` OOMs while the 30B MoE is loaded; the
-   default `base` coexists. If you need `small`/`medium`, stop Ollama models
-   first (`ollama stop qwen3:30b-a3b`).
-3. **Hotkeys need the X11 session** (pynput). Wayland/SSH → use `--no-hotkey`
-   manual mode or run inside the graphical session.
-4. **No wake word yet.** Push-to-talk first, by design. A wake word can be
-   added behind the same mic pipeline later (or via PersonaPlex's full-duplex
-   input once it's on bigger hardware).
-5. **Agent tooling quirks are the agent's, not the bridge's.** During testing
-   the agent tried a *file-transfer/paired-node* tool first and had to adapt
-   to local file tools (no paired nodes on this gateway). The bridge routes
-   the task; tool selection is the agent's business.
-6. **Conversation class is fast local chat** (ollama) by default; set
-   `intent.conversation_backend: agent` to route chat through OpenClaw (full
-   memory/tools, slower).
-
-### Known edge case: "I couldn't pull the final text"
-
-Occasionally the gateway completes a run (`agent.wait` → `ok`) but the parent
-session transcript contains only the user message — the agent's work happened
-in an embedded/subagent session that never wrote back. The bridge now walks
-three sources before giving up (parent history → child sessions via
-`parentSessionKey` → gateway task ledger via `childSessionKey`), and if all are
-empty it says so honestly instead of pretending. `openclaw.request` /
-`openclaw.result` journal entries carry the `runId` so you can find the work in
-the Control UI (`http://localhost:18789`). Tasks that outlive
-`openclaw.task_timeout_s` get a spoken "still running" and a background
-**reaper** keeps polling until completion, then delivers the final summary
-anyway — so a 20-minute job still gets its spoken result without blocking the
-conversation.
-
-## PersonaPlex on Vast.ai (full-duplex mode)
-
-### Deploy the server on Vast (one-time, ~15 min)
-
-1. **Rent** a 24 GB GPU (see `vast/README.md` for the `vastai search offers` query).
-2. **Accept the license** + create an HF read token:
-   https://huggingface.co/nvidia/personaplex-7b-v1
-3. **Install Tailscale on this PC** (once):
-   `curl -fsSL https://tailscale.com/install.sh | sh` then `sudo tailscale up --accept-dns=false`
-   (the `--accept-dns=false` flag keeps MagicDNS from overriding your ethernet's
-   DNS — without it, a stopped/half-logged-in tailscale leaves dead `100.100.x.x`
-   DNS servers on the interface and wired internet stops resolving).
-4. Copy the kit to the box and run the one-shot setup:
-   ```bash
-   scp -r vast/ root@<vast-host>:/root/
-   ssh root@<vast-host>
-   cd /root/vast && HF_TOKEN=hf_xxx TS_AUTHKEY=tskey-xxx ./setup_personaplex.sh
-   ```
-5. Verify: `python3 /root/vast/check_personaplex.py wss://$(tailscale ip -4):8998/api/chat`
-
-### Point the bridge at it
-
-```yaml
-# ~/.config/openclaw-voice-bridge/voice.yaml
-personaplex:
-  enabled: true
-  url: wss://personaplex:8998/api/chat
-  voice_prompt: NATF2.pt
-```
-
-```bash
-voicebridge personaplex-check            # connectivity test from this PC
-voicebridge status                       # duplex lane + hermes + local state
-voicebridge run                          # full-duplex mode: talk naturally
-```
-
-### Test phrases (chat vs task routing)
-
-| Say | Expected |
-|---|---|
-| "Hey, can you hear me?" | conversation → DeepSeek chat (~1s) |
-| "what's the latest Node.js version" / "search for…" / "who won…" | conversation → **Perplexity** (web-grounded, ~2s) |
-| "create a note in tmp…" / "patch the stripe webhook…" | coding task → OpenClaw agent (DeepSeek, ~6s) with skills nudge |
-| "ask Hermes what…" | Hermes intent → Hermes backend |
-| "use turbo / hard / pro" | model tier switch for tasks |
-| "What do you think about this marketplace idea?" | PersonaPlex answers in character (CHAT) |
-| "Open the current project and inspect the Stripe webhook validation." | routed to OpenClaw (OPENCLAW_TASK); spoken summary after |
-| "Ask Hermes to review the latest PR." | Hermes backend (HERMES_TASK) |
-| "Turn the volume up" / "open the terminal" | local PC action (LOCAL_PC_TASK) |
-| "What's your status?" | bridge + lane health (STATUS) |
-| "Delete the file foo" (dangerous) | safety gate asks spoken confirmation (CONFIRMATION) |
-
-### Rotating instances without losing memory
-
-Memory/session state lives in `~/.openclaw/workspace` on this PC — the Vast
-box stores nothing. Destroy the instance, rent a new one, rerun
-`setup_personaplex.sh` with the same Tailscale hostname, and the bridge
-reconnects automatically. See `vast/README.md` for the full runbook.
-
-## Sync & new-PC bootstrap (git)
-
-Two private repos under `cgraph-dev` make the whole setup reproducible:
-
-- **`cgraph-dev/openclaw-voice-bridge`** — this repo. Ships `config/voice.local.yaml`
-  (your machine-specific installed config; `scripts/install.sh` restores it
-  automatically). Models are NOT in the repo — `install.sh` downloads them.
-- **`cgraph-dev/openclaw-home`** — a sanitized copy of `~/.openclaw` (agents,
-  sessions, memory, workspace, config). Secrets are excluded by design:
-  `.env`, `gateway.systemd.env`, `credentials/`, `identity/` — on a new PC the
-  bridge auto-discovers *that* machine's own token, so tokens never need to sync.
-
-**New PC (after installing OpenClaw):**
+## Install on a fresh PC
 
 ```bash
 git clone https://github.com/cgraph-dev/openclaw-voice-bridge.git
-cd openclaw-voice-bridge && ./scripts/install.sh
-git clone https://github.com/cgraph-dev/openclaw-home.git ~/.openclaw-restore
-# restore the pieces you want (workspace, agents, state DB), then:
-./scripts/run.sh run
+cd openclaw-voice-bridge
+
+# prereqs (one-time): uv, ollama
+curl -LsSf https://astral.sh/uv/install.sh | sh
+curl -fsSL https://ollama.com/install.sh | sh      # then: ollama serve
+
+./scripts/install.sh
 ```
 
-**Daily auto-push** (so nothing is ever lost): `~/.hermes/scripts/auto-push.sh`
-runs every night via Hermes cron — checkpoints the session DB, commits both
-repos, and pushes. Silent on success; alerts on failure. Add the same cron on
-any new PC.
+The installer (idempotent) creates the venv, installs deps, downloads the
+models (piper voice, Moonshine ASR, Silero VAD, eres2net voice-ID), pulls
+llama3.2:3b into ollama, and writes `~/.config/openclaw-voice-bridge/voice.yaml`
+from `config/voice.example.yaml`.
 
-**PersonaPlex "instant" activation (when you have GPU funds):**
-Everything ships dormant. To light it up: rent a 24 GB+ box (`vast/README.md`),
-run `vast/setup_personaplex.sh`, `tailscale up` on PC + box (hostname
-`personaplex`), then flip `personaplex.enabled: true` in the config. The duplex
-lane takes over the mic→remote-GPU→speakers path; the local whisper tap keeps
-routing intents, and everything falls back to local PTT automatically if the
-box is offline.
+Optional keys for the cloud paths:
 
-## Project layout
-
+```bash
+echo 'DEEPSEEK_API_KEY=sk-...'    >> ~/.hermes/.env
+echo 'PERPLEXITY_API_KEY=pplx-...' >> ~/.hermes/.env
 ```
-voicebridge/
-  audio/        mic capture, VAD endpointing, playback+barge-in
-  asr/          whisper (active), personaplex (legacy plug)
-  personaplex/  real full-duplex client + duplex lane (duplex.py)
-  hermes/       optional Hermes backend (hermes chat -q)
-  local/        whitelisted PC actions (volume, apps, screenshot, ...)
-  tts/          piper (active), edge, gateway
-  intent/       classifier (incl. local/hermes kinds), ollama LLM, state
-  openclaw/     discovery, gateway WS client, CLI fallback
-  safety/       policy (confirmation, allow/deny, dry-run)
-  orchestrator.py  main loop + duplex tap routing + memory load/save
-  cli.py        run/once/task/status/mic-test/asr-test/personaplex-check/...
-config/voice.example.yaml
-scripts/install.sh, run.sh, test_roundtrip.{py,sh}
-systemd/openclaw-voice-bridge.service
-tests/test_units.py
+
+## Run
+
+```bash
+voicebridge status        # gateway / ASR / TTS / voice-ID status
+voicebridge run           # hotkey push-to-talk loop (Ctrl held = talk)
 ```
+
+First-run checklist:
+
+```bash
+voicebridge enroll        # record 5s of YOUR voice — arms voice-ID
+```
+
+Auto-start (optional):
+
+```bash
+./scripts/install.sh --with-systemd     # renders + enables the user service
+systemctl --user status openclaw-voice-bridge
+```
+
+Headless / SSH (no X11): `voicebridge run --no-hotkey` and press Enter to
+start/stop capture, or `voicebridge once` for a single utterance.
+
+## Usage
+
+- **Hold Ctrl, talk** — release to send. TTS speech stops the moment you
+  start talking (verified by voice-ID — other people/TV do NOT interrupt).
+- **Tap Ctrl** — toggle hands-free listening (talks until you tap again or
+  go silent).
+- **Esc** — stop speech / cancel the current task.
+- Say things like: *"open the current project, inspect the Stripe webhook
+  flow, and tell OpenClaw to patch the signature verification and add
+  structured logs"* — it routes to your OpenClaw agent, tracks progress, and
+  speaks a short summary at the end.
+- *"status"*, *"stop"*, *"mute"*, *"unmute"*, *"use turbo / normal / slow /
+  hard / pro"* are built-in system commands.
+
+## Configuration
+
+Full reference: `config/voice.example.yaml` (installed to
+`~/.config/openclaw-voice-bridge/voice.yaml`). Key knobs:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `asr.provider` / `asr.engine` | `sherpa` / `moonshine` | `parakeet` = max English accuracy; `whisper` = old fallback |
+| `vad.backend` | `silero` | `webrtc` fallback |
+| `tts.provider` | `piper` | `kokoro` = quality voice (~1s/reply CPU) |
+| `intent.local_llm.model` | `llama3.2:3b` | local short-turn model (non-thinking!) |
+| `speaker_verify.threshold` | `0.65` | voice-ID strictness (0.7-0.96 self / ~0.3 strangers) |
+| `mic.gain` / `mic.channels` | `1.0` / `2` | tune to YOUR mic (Scarlett+AT2020: `8.0` / `4`) |
+| `safety.dry_run_first` | `false` | `true` = coding tasks plan first, ask before applying |
+
+## Safety
+
+- **Spoken confirmation** before destructive commands (`rm`, `drop`, force
+  push, installs, service restarts…).
+- **Denylist** (`ignore all previous instructions`, `disable safety`) refused
+  outright — see `safety` in the config.
+- **Dry-run mode**: `safety.dry_run_first: true` makes coding tasks plan
+  first and ask *"Do you want me to apply the patch?"* before acting.
+- Everything routes through **your OpenClaw safety policy** for terminal/file
+  work; the bridge never bypasses it.
+
+## Observability
+
+Every turn is logged as structured events to
+`~/.local/state/openclaw-voice-bridge/events.jsonl`:
+
+```bash
+tail -f ~/.local/state/openclaw-voice-bridge/events.jsonl | jq -c '{t:.ts, e:.event}'
+```
+
+Watch for `mic.utterance`, `asr.transcribe`, `routing.decision`,
+`conversation.local` (0.3s) vs `conversation.deepseek`/`conversation.perplexity`,
+`barge.verify` (accepted/score), `task.finished`, and any `*.failed`.
+
+## Troubleshooting
+
+- **"It doesn't talk back"** — check the SERVICE journal first, not the
+  events file: `journalctl --user -u openclaw-voice-bridge.service -n 50`.
+  A crash-restart loop looks like silence; the traceback is in the journal.
+- **`vad.silero.unavailable` at startup** — Silero failed to load, you're on
+  webrtcvad. Check `silero_vad_v5.onnx` exists under the models dir.
+- **Greetings feel slow** — verify `conversation.local` (0.3s) fires, not
+  `conversation.perplexity` (2.3s). The web heuristic is deliberately strict;
+  if a real web question misses it, say "search …" or "look up …".
+- **Barge-in too eager / too deaf** — tune `speaker_verify.threshold`
+  (down = easier to interrupt, up = stricter) and re-enroll with a clean
+  5s clip.
+- **Microphone too quiet** — physical gain first, then `mic.gain` (8-16 for
+  quiet mics); check levels: `voicebridge mic-test`.
+
+## Design notes / why this stack
+
+- **Moonshine ASR on CPU** — measured 0.074s for a short utterance (41-50×
+  realtime), zero VRAM, beats whisper-small accuracy. The GPU stays free for
+  the local reply model (or idle).
+- **Silero VAD v5** replaces webrtcvad (which missed ~half of speech in
+  noise). Three hard-won pitfalls are documented in code: window size is a
+  method, never hardcode `window_size` (sherpa exits 255 on mismatch), and
+  hold the last window decision when frames don't align to 576-sample windows.
+- **Voice-ID gates barge-in** — eres2net measured on real clips: self 0.72-0.96
+  vs strangers 0.22-0.36 (wespeaker-resnet34 was unusable: 0.79-0.85 overlap).
+- **One input stream at a time** — two concurrent PortAudio InputStreams on
+  one Scarlett intermittently segfault ALSA; capture pauses the barge stream.
+
+## Upgrade path (when you move to a 4090)
+
+1. **Kokoro TTS** — `tts.provider: kokoro` (int8 is ~1× realtime on this
+   CPU; on a 4090 you can run the fp32 model GPU-side via a CUDA build of
+   sherpa-onnx for ~10× headroom).
+2. **Parakeet-TDT 0.6B v3** — `asr.engine: parakeet` for maximum ASR accuracy.
+3. **Bigger local LLM** — swap `intent.local_llm.model` to `qwen3:14b`-class
+   once VRAM allows (keep it non-thinking).
+4. **PersonaPlex / realtime duplex** — the bridge's route layer was
+   PersonaPlex-ready and the adapter point is preserved; on a 12 GB+ GPU or
+   rented box you can re-add the duplex lane without touching the local stack.
+
+## License / scope
+
+Personal tool. No telemetry, no cloud dependency for the core loop.
