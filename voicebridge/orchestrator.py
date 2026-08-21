@@ -481,8 +481,12 @@ class VoiceOrchestrator:
             self._release_time = time.time()   # for accurate tap-vs-hold timing
             self._ptt_released.set()
             if self._toggle_armed:
-                # second tap during a toggle capture -> stop listening
+                # second tap during a toggle capture -> stop listening AND
+                # consume the latched press so it does NOT start a fresh
+                # capture (that was the "closed too fast" double-beep bug:
+                # the stop-tap both stopped the toggle and re-triggered it)
                 self._toggle_stop.set()
+                self._ptt_pressed.clear()
         elif event == "cancel":
             self._cancel.set()
             self._toggle_stop.set()
@@ -1841,6 +1845,11 @@ class VoiceOrchestrator:
                             log_event("hotkey.toggle", on=False, why="no speech")
                             break
                         time.sleep(0.05)
+                    # toggle over: disarm so the NEXT interaction starts clean
+                    # (a stale _toggle_armed made the next hold's release act
+                    # like a second tap and kill the capture instantly)
+                    self._toggle_armed = False
+                    self._toggle_stop.clear()
                     stop_req.set()
                     return
                 # HOLD -> stop shortly after release (catch the last word)
@@ -1865,6 +1874,10 @@ class VoiceOrchestrator:
                         log_event("hotkey.toggle", on=False, why="no speech")
                         break
                     time.sleep(0.05)
+                # forced toggle over: disarm (see tap path — stale _toggle_armed
+                # made the next hold's release kill the capture instantly)
+                self._toggle_armed = False
+                self._toggle_stop.clear()
                 stop_req.set()
             threading.Thread(target=_toggle_watcher, daemon=True).start()
         self._play_beep("start")
