@@ -71,16 +71,30 @@ _SAMPLE_TASK = (
 
 
 def _needs_web(text: str) -> bool:
-    """Heuristic: does this question want current/web-grounded info (Perplexity)?"""
+    """Heuristic: does this question want current/web-grounded info (Perplexity)?
+
+    STRICT by design (Aug 2026): casual speech contains "today"/"current"/
+    "latest" constantly ("how are you today", "what's our current plan") — a
+    loose substring match sends greetings to Perplexity (~2.3s) instead of the
+    local LLM (~0.3s), which felt exactly like the old slow stack. Only clear
+    web-intent constructions match.
+    """
     t = text.lower()
-    markers = (
-        "search", "look up", "google", "latest", "current", "news", "today",
-        "weather", "price of", "stock", "who won", "what happened", "when did",
-        "how many people", "election", "score", "release date", "announcement",
-        "update on", "perplexity", "on the web", "find out", "do you know about",
-        "new version", "recent",
+    if any(m in t for m in (
+            "search", "look up", "google", "perplexity", "on the web",
+            "find out", "do you know about", "what's the latest",
+            "what is the latest")):
+        return True
+    pats = (
+        r"\bweather\b", r"\bprice of\b", r"\bstock", r"\bwho won\b",
+        r"\bwhat happened\b", r"\bwhen did\b", r"\bhow many people\b",
+        r"\belection", r"\bscore\b", r"\brelease date\b", r"\bannouncement",
+        r"\bupdate on\b", r"\bnew version\b", r"\brecent\b", r"\bnews\b",
+        r"\btoday['’]?s (weather|news|price|headlines|match|game|score|results)\b",
+        r"\bcurrent (price|time|weather|events|news|status of)\b",
+        r"\blatest (news|version|price|update|release|headlines|results|scores)\b",
     )
-    return any(m in t for m in markers)
+    return any(re.search(p, t) for p in pats)
 
 
 def _interrupt_decision_prompt(old_task: str, new_request: str) -> str:
@@ -347,18 +361,7 @@ class VoiceOrchestrator:
             vad_backend=vad_backend, silero_model=silero_model)
         self._barge_stream = None
         if self.cfg.get("vad", "barge_in", default=True):
-            try:
-                self._barge_stream = sd.InputStream(
-                    samplerate=mic_cfg.get("sample_rate", 48000),
-                    channels=mic_cfg.get("channels", 1),
-                    device=mic_cfg.get("device"),
-                    blocksize=mic_cfg.get("blocksize", 480),
-                    dtype="float32")
-                self._barge_stream.start()
-                log_event("barge_in.active")
-            except Exception as exc:
-                self._barge_stream = None
-                log_event("barge_in.unavailable", error=str(exc)[:160])
+            self._start_barge_stream(mic_cfg)
         # hotkeys
         if not self.no_hotkey:
             hk = HotkeyListener(hold_key=self.cfg.get("hotkey", "hold_key", default="ctrl_r"),
@@ -428,6 +431,40 @@ class VoiceOrchestrator:
         if hasattr(self, "hotkey"):
             self.hotkey.stop()
         self.playback.stop()
+
+    def _start_barge_stream(self, mic_cfg=None) -> None:
+        """Open the barge-in InputStream (one input stream at a time rule).
+
+        The Scarlett tolerates ONE InputStream at a time: a second stream
+        opened while this one polls corrupted ALSA's poll descriptors and
+        segfaulted PortAudio (snd_pcm_poll_descriptors_revents, intermittent).
+        Capture pauses this stream; speak() re-uses it.
+        """
+        mic_cfg = mic_cfg or self.cfg.section("mic")
+        try:
+            self._barge_stream = sd.InputStream(
+                samplerate=mic_cfg.get("sample_rate", 48000),
+                channels=mic_cfg.get("channels", 1),
+                device=mic_cfg.get("device"),
+                blocksize=mic_cfg.get("blocksize", 480),
+                dtype="float32")
+            self._barge_stream.start()
+            log_event("barge_in.active")
+        except Exception as exc:
+            self._barge_stream = None
+            log_event("barge_in.unavailable", error=str(exc)[:160])
+
+    def _pause_barge_stream(self) -> bool:
+        """Stop+close the barge stream; returns True if it was open (restart it)."""
+        if self._barge_stream is None:
+            return False
+        try:
+            self._barge_stream.stop()
+            self._barge_stream.close()
+        except Exception:
+            pass
+        self._barge_stream = None
+        return True
 
     # ------------------------------------------------------------------ speak
     def speak(self, text: str, name: str = "assistant", interruptible: bool = True,
@@ -993,8 +1030,14 @@ class VoiceOrchestrator:
             web_ask = self.cfg.get("intent", "perplexity_enabled", default=True) \
                 and (_needs_web(text) or "perplexity" in text.lower())
             llm_cfg = self.cfg.section("intent").get("local_llm", {}) or {}
-            if (llm_cfg.get("enabled", True) and not web_ask
-                    and len(text.split()) <= int(llm_cfg.get("max_words", 30))):
+            local_ok = llm_cfg.get("enabled", True) and not web_ask
+            if local_ok and len(text.split()) > int(llm_cfg.get("max_words", 30)):
+                log_event("conversation.local.skip", reason="too long",
+                          words=len(text.split()))
+                local_ok = False
+            if not local_ok and llm_cfg.get("enabled", True):
+                log_event("conversation.local.skip", reason="web_ask" if web_ask else "disabled")
+            if local_ok:
                 from .local_llm import chat_local
                 reply = chat_local(
                     text, self.conversation.as_prompt(),
@@ -1651,14 +1694,22 @@ class VoiceOrchestrator:
                 stop_req.set()
             threading.Thread(target=_toggle_watcher, daemon=True).start()
         self._play_beep("start")
+        # ONE input stream at a time on the Scarlett: pause the barge stream
+        # while capturing (two concurrent InputStreams segfaulted PortAudio).
+        resume_barge = self._pause_barge_stream()
         try:
             with self._mic.open():
                 res = self._mic.record_utterance(stop_req, barge_in=None)
         except Exception as exc:
             log_event("mic.capture.error", error=str(exc)[:160])
+            res = None
+        finally:
+            if resume_barge:
+                self._start_barge_stream()
+        self._play_beep("end")
+        if res is None:
             self.speak("I couldn't hear you. Check the microphone.")
             return None
-        self._play_beep("end")
         if res.wav_path is None:
             log_event("mic.utterance.empty", ended_by=res.ended_by,
                       peak_rms=round(res.peak_rms, 5),

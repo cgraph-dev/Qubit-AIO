@@ -52,30 +52,43 @@ class SileroVadGate:
             silero_vad=so.SileroVadModelConfig(
                 model=str(Path(model_path)),
                 threshold=float(threshold),
-                min_silence_duration=0.0,   # raw decisions; Endpointer does hysteresis
-                min_speech_duration=0.0,
+                # sherpa's VadModel is a state machine: zero hysteresis made it
+                # never latch into speech (tested). These bridge short word
+                # gaps; the Endpointer's own timers dominate end detection.
+                min_silence_duration=0.25,
+                min_speech_duration=0.1,
                 max_speech_duration=30.0,
                 # window_size intentionally NOT set here — defaults to the
                 # model's native size (512 v4 / 576 v5)
             ),
         )
         self._vad = so.VadModel.create(cfg)
-        self._window = self._vad.window_size * 2  # samples * 2 bytes (int16)
+        # NOTE: window_size is a METHOD in sherpa-onnx (not a property)
+        self._window = self._vad.window_size() * 2  # samples * 2 bytes (int16)
         self._buf = b""
+        self._last = False   # hold last window decision between windows
 
     def reset(self) -> None:
         self._buf = b""
+        self._last = False
         self._vad.reset()
 
     def is_speech(self, pcm_int16: bytes) -> bool:
+        """Decision for the LAST completed window; holds the previous decision
+        on frames that don't complete a window.
+
+        Input frames (480 samples) rarely align with the model window
+        (576 samples for v5) — without the hold, every ~6th call returns False
+        (buffer-refill cadence) and consecutive-frame counters downstream can
+        never reach their threshold.
+        """
         self._buf += pcm_int16
-        result = False
         while len(self._buf) >= self._window:
             chunk = self._buf[: self._window]
             self._buf = self._buf[self._window:]
             samples = np.frombuffer(chunk, dtype=np.int16).astype(np.float32) / 32768.0
-            result = self._vad.is_speech(samples)
-        return result
+            self._last = self._vad.is_speech(samples)
+        return self._last
 
 
 def _make_vad_gate(backend: str, aggressiveness: int,

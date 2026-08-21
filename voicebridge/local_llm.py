@@ -27,6 +27,7 @@ def chat_local(text: str, conversation_prompt: str = "",
     payload = {
         "model": model,
         "stream": False,
+        "keep_alive": "30m",       # stay resident between turns; reload = seconds of latency
         "options": {"num_predict": max_tokens, "temperature": 0.4},
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
