@@ -30,12 +30,22 @@ class HotkeyListener:
         self.tap_cancel = tap_cancel
         self.on_event = None          # callback(event: str, key)
         self._listener = None
+        self._proc = None
+        self._xinput_state = {"press": False, "release": False}
         self._held = set()
         self._thread: Optional[threading.Thread] = None
 
     def start(self, on_event) -> bool:
-        """Start the listener; returns False if pynput/X is unavailable."""
+        """Start the listener; returns False if no backend can capture keys.
+
+        Backends, in order: xinput XI2 (raw X events — reliable on Ubuntu 24.04,
+        where pynput's XRecord silently delivers nothing) -> pynput -> None.
+        """
         self.on_event = on_event
+        # 1) xinput XI2 backend (subprocess; no XRecord dependency)
+        if self._start_xinput():
+            return True
+        # 2) pynput backend
         try:
             from pynput import keyboard
         except Exception as exc:
@@ -51,7 +61,67 @@ class HotkeyListener:
             self._listener = None
             return False
 
+    # keycode -> name map used by the xinput backend
+    _KEYCODES = {37: "ctrl_l", 105: "ctrl_r", 9: "esc", 133: "super_l",
+                 134: "super_r", 64: "alt_l", 108: "alt_r", 50: "shift_l",
+                 62: "shift_r", 65: "space"}
+
+    def _start_xinput(self) -> bool:
+        import os
+        import subprocess
+        if not os.environ.get("DISPLAY"):
+            return False
+        try:
+            self._proc = subprocess.Popen(
+                ["xinput", "test-xi2", "--root"],
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                env={**os.environ, "DISPLAY": os.environ["DISPLAY"]},
+                text=True, bufsize=1)
+        except Exception as exc:
+            log.warning("hotkeys: xinput unavailable (%s)", exc)
+            return False
+        self._xinput_state = {"press": False, "release": False}
+        self._thread = threading.Thread(target=self._xinput_loop, daemon=True,
+                                        name="hotkey-xinput")
+        self._thread.start()
+        return True
+
+    def _xinput_loop(self) -> None:
+        try:
+            assert self._proc and self._proc.stdout is not None
+            for line in self._proc.stdout:
+                line = line.strip()
+                if line.startswith("EVENT type 13"):        # RawKeyPress
+                    self._xinput_state["press"] = True
+                elif line.startswith("EVENT type 14"):      # RawKeyRelease
+                    self._xinput_state["release"] = True
+                elif line.startswith("detail:"):
+                    try:
+                        code = int(line.split(":")[1].strip())
+                    except ValueError:
+                        code = 0
+                    if self._xinput_state["press"]:
+                        self._xinput_state["press"] = False
+                        self._press(self._KEYCODES.get(code, str(code)))
+                    elif self._xinput_state["release"]:
+                        self._xinput_state["release"] = False
+                        self._release(self._KEYCODES.get(code, str(code)))
+        except Exception as exc:
+            log.warning("hotkeys: xinput loop ended (%s)", exc)
+        finally:
+            if self._proc is not None:
+                try:
+                    self._proc.kill()
+                except Exception:
+                    pass
+
     def stop(self) -> None:
+        if self._proc is not None:
+            try:
+                self._proc.kill()
+            except Exception:
+                pass
+            self._proc = None
         if self._listener is not None:
             try:
                 self._listener.stop()
