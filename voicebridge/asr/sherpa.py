@@ -94,6 +94,20 @@ class SherpaASR(ASRProvider):
                         provider=self.provider,
                         debug=False)
                 else:
+                    # NeMo parakeet packs need model_type="nemo_transducer"
+                    # (feature-first [batch, feat, time] input layout) — the
+                    # default "transducer" feeds time-first and sherpa errors
+                    # "Got invalid dimensions ... Expected: <feat_dim>".
+                    # feature_dim: read from the encoder's ONNX metadata
+                    # (parakeet-tdt-0.6b-v2/v3 = 128; older packs = 80)
+                    feat_dim = 80
+                    try:
+                        import onnx as _onnx
+                        enc_model = _onnx.load(str(p["encoder"]))
+                        meta = {x.key: x.value for x in enc_model.metadata_props}
+                        feat_dim = int(meta.get("feat_dim", 80))
+                    except Exception:
+                        pass
                     self._recognizer = so.OfflineRecognizer.from_transducer(
                         tokens=str(p["tokens"]),
                         encoder=str(p["encoder"]),
@@ -101,9 +115,10 @@ class SherpaASR(ASRProvider):
                         joiner=str(p["joiner"]),
                         num_threads=self.num_threads,
                         sample_rate=16000,
-                        feature_dim=80,
+                        feature_dim=feat_dim,
                         provider=self.provider,
-                        decoding_method="greedy_search")
+                        decoding_method="greedy_search",
+                        model_type="nemo_transducer")
             except Exception as exc:  # pragma: no cover
                 raise ASRUnavailable(f"sherpa {self.engine} load failed: {exc}") from exc
             log_event("asr.load", provider=self.name, engine=self.engine,

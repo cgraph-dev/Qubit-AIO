@@ -54,7 +54,7 @@ feedback:
 # Speech-to-text (sherpa-onnx Moonshine: CPU, 0 VRAM, ~0.07s per utterance)
 asr:
   provider: sherpa        # sherpa (Moonshine, 0 VRAM CPU) | whisper (fallback)
-  engine: moonshine       # sherpa: moonshine | parakeet (max accuracy)
+  engine: parakeet      # sherpa: parakeet v3 (max accuracy, 25 langs) | moonshine (fastest)
   provider_ep: cpu        # sherpa onnxruntime EP: cpu | cuda
   # whisper fallback options (asr.provider: whisper)
   model: base             # tiny|base|small|medium

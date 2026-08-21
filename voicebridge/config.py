@@ -64,7 +64,7 @@ DEFAULTS: Dict[str, Any] = {
     },
     "asr": {
         "provider": "sherpa",         # sherpa (Moonshine/Parakeet, 0 VRAM CPU) | whisper | personaplex
-        "engine": "moonshine",        # sherpa engine: moonshine | parakeet
+        "engine": "parakeet",        # sherpa engine: parakeet v3 (max accuracy, 25 langs) | moonshine (fastest)
         "provider_ep": "cpu",         # sherpa onnxruntime EP: cpu (0 VRAM) | cuda
         "model": "base",            # tiny|base|small|medium (whisper only)
         "device": "auto",           # auto|cuda|cpu (whisper only)

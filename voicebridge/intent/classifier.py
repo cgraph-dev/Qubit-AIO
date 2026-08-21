@@ -56,6 +56,9 @@ HERMES_PATTERNS = [
     r"^\s*hermes[,:]?\s+",
     r"\broute (this|it) (to|through) hermes\b",
     r"\b(delegate|hand off|handoff)\s+(this|it)?\s*to\s+hermes\b",
+    r"\buse\s+(the\s+)?hermes\b",      # "use Hermes", "use Hermes agent"
+    r"\bhermes agent\b",
+    r"\b(send|give|hand)\s+(this|it|the task)\s+to\s+hermes\b",
 ]
 
 # Task-ish verbs/domains that strongly suggest a coding request.

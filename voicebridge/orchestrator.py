@@ -308,10 +308,50 @@ class VoiceOrchestrator:
         log_event("openclaw.route", route="offline")
         return "offline"
 
+    def _retry_gateway(self) -> None:
+        """Best-effort reconnect when the route is offline/stale.
+
+        The bridge starts once and normally keeps its connection; if the
+        gateway was down at startup (or its restart drops us), the route can
+        stay 'offline'/'cli' forever even after the gateway is healthy again.
+        This re-runs discovery so the bridge self-heals without a restart.
+        """
+        if self._route == "gateway" and self._gateway is not None:
+            try:
+                if self._gateway.connected:
+                    return
+            except Exception:
+                pass
+        log_event("openclaw.gateway.retry", route=self._route)
+        try:
+            old_cli = self._cli
+            self._connect_gateway()
+            if self._route == "gateway":
+                log_event("openclaw.gateway.recovered")
+            elif old_cli is not None and self._cli is None:
+                self._cli = old_cli  # keep the CLI fallback if we still have it
+        except Exception as exc:
+            log_event("openclaw.gateway.retry.failed", error=str(exc)[:160])
+
+    def _gateway_watchdog(self) -> None:
+        """Periodically re-try the gateway when the bridge isn't on it."""
+        interval = float(self.cfg.get("openclaw", "reconnect_s", default=20))
+        while not self._stop.is_set():
+            time.sleep(interval)
+            try:
+                if self._route != "gateway":
+                    self._retry_gateway()
+            except Exception:
+                pass
+
     # -------------------------------------------------------------- lifecycle
     def start(self) -> None:
         # gateway first (may inform TTS choice)
         self._connect_gateway()
+        # self-heal: if the gateway was down at startup, keep re-trying in the
+        # background so the bridge recovers without a restart
+        threading.Thread(target=self._gateway_watchdog, daemon=True,
+                         name="gateway-watchdog").start()
         # ASR
         self._asr = self._make_asr()
         try:
@@ -711,6 +751,11 @@ class VoiceOrchestrator:
         log_event("openclaw.dispatch", session_key=session_key, task=task_text[:300],
                   model=model, route=self._route)
 
+        # self-heal: if we're currently offline (gateway was down at startup or
+        # dropped us), re-try discovery BEFORE giving up on this task
+        if self._route != "gateway" and self._route != "cli":
+            self._retry_gateway()
+
         if self._route == "gateway" and self._gateway:
             try:
                 self.speak("On it. Routing to OpenClaw.", name="ack", barge=False)
@@ -737,10 +782,20 @@ class VoiceOrchestrator:
                 self._await_run(session_key, run_id, task_text)
             except GatewayError as exc:
                 log_event("openclaw.request.failed", error=exc.message[:200])
+                if self._hermes is not None:
+                    log_event("openclaw.failover.hermes", reason="gateway error")
+                    self._handle_hermes(task_text,
+                                        notice="OpenClaw is unreachable. Routing to Hermes.")
+                    return
                 self.speak("OpenClaw rejected the task. Check the logs.")
                 return
             except Exception as exc:
                 log_event("openclaw.request.exception", error=str(exc)[:200])
+                if self._hermes is not None:
+                    log_event("openclaw.failover.hermes", reason=str(exc)[:120])
+                    self._handle_hermes(task_text,
+                                        notice="OpenClaw is unreachable. Routing to Hermes.")
+                    return
                 self.speak("Something went wrong talking to OpenClaw.")
                 return
         elif self._route == "cli" and self._cli:
@@ -753,6 +808,11 @@ class VoiceOrchestrator:
             self._handle_agent_result(session_key, result.reply, result.status, result.elapsed_s)
             self.task.clear()
         else:
+            if self._hermes is not None:
+                log_event("openclaw.failover.hermes", reason="no gateway route")
+                self._handle_hermes(task_text,
+                                    notice="OpenClaw is not reachable. Routing to Hermes.")
+                return
             self.speak("OpenClaw is not reachable. Start the gateway and try again.")
 
     def _progress_loop(self) -> None:
@@ -1339,14 +1399,18 @@ class VoiceOrchestrator:
         msg = local_actions.execute(m)
         self.speak(msg)
 
-    def _handle_hermes(self, task: str) -> None:
-        """Explicit Hermes delegation (ask Hermes to ...) — background + interruptible."""
+    def _handle_hermes(self, task: str, notice: str = "") -> None:
+        """Explicit Hermes delegation (ask Hermes to ...) — background + interruptible.
+
+        `notice` overrides the default ack (used by the OpenClaw→Hermes
+        failover path so the user hears WHY it routed to Hermes).
+        """
         if self._hermes is None:
             self.speak("Hermes is not enabled; routing to OpenClaw instead.")
             self._dispatch_coding(task)
             return
         hermes = self._hermes
-        self.speak("On it. Routing to Hermes.", name="ack", barge=False)
+        self.speak(notice or "On it. Routing to Hermes.", name="ack", barge=False)
         task = (task + "\n\nReply directly and concisely: no emojis, no "
                      "pleasantries, no extra words — only what was needed.")
         self._hermes_busy = True
