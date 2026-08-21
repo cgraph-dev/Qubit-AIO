@@ -124,3 +124,58 @@ templates:
       (time-sensitive, actionable, from key contacts). Summarize in 3-5 short
       lines. If a platform is not configured, say exactly what is needed.
     ack: "Checking your messages."
+
+  # ----------------------------------------------------- vision / web / video
+  - name: look-at-image
+    match:
+      - "(look at|check|read|see|analyze|view|inspect) (this |that |the |an |a )?(image|picture|photo|screenshot|png|jpg)"
+      - "(what'?s|what is) (in|on|shown in) (this |that |the )?(image|picture|photo|screenshot)"
+      - "read (the |this )?(text )?(from|in) (this |the )?image"
+      - "(analyze|describe|look at) (my |the )?screenshot"
+    kind: coding
+    task: >
+      The user wants you to look at an image (screenshot, photo, or file they
+      will point you to — check ~/Pictures or /tmp for recent screenshots if
+      no path is given). Use your vision capability to describe what's in it
+      and answer their question about it. If they asked to read text, extract
+      the text accurately. Reply concisely in 2-4 sentences.
+    ack: "Looking at the image."
+
+  - name: watch-video
+    match:
+      - "(watch|analyze|look at|check|view|see) (this |that |the |a )?(video|clip|recording)"
+      - "(what'?s|what is) (happening|going on) in (this |that |the )?video"
+      - "(summarize|describe) (this |that |the )?video"
+    kind: coding
+    task: >
+      The user wants you to analyze a video (they will give a path or URL, or
+      check recent captures in ~/Videos or /tmp). Use your video analysis
+      capability to describe what happens and answer their question. Reply
+      concisely in 2-4 sentences.
+    ack: "Watching the video."
+
+  - name: read-website
+    match:
+      - "(read|check|look at|open|fetch|summarize|analyze) (this |that |the |a )?(website|webpage|page|site|url|link)"
+      - "(what'?s|what is) (on|at) (this |that |the )?(website|webpage|page|url)"
+      - "(check|read) (the )?(latest|current) (article|post|page)"
+    kind: coding
+    task: >
+      The user wants you to look at a website or webpage (they will give a URL,
+      or check the browser for the current page). Fetch it, extract the key
+      content, and summarize what's there or answer their question. Reply
+      concisely in 2-4 sentences.
+    ack: "Reading the page."
+
+  - name: vscode-task
+    match:
+      - "(use|open|work in|work on) (the )?(vscode|vs code|editor|ide) (to|and|on)"
+      - "(open|look at|review|fix|edit|refactor|inspect) (the )?(code|project|repo) (in|with|using) (vscode|vs code|the editor)"
+      - "agent (should|shouldn'?t|can|to) use (the )?vscode"
+    kind: coding
+    task: >
+      The user wants coding work done with VS Code in the loop. Use the VS Code
+      CLI (code --reuse-window <path>) to open relevant files/projects, inspect
+      them, and do the requested edits. Use your full tool set (files,
+      terminal, browser, repos). Reply concisely with what was done.
+    ack: "Using VS Code."

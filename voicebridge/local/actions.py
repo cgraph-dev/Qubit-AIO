@@ -87,6 +87,41 @@ def _a_open_app(params: Dict[str, Any]) -> str:
         return f"Could not open {app}: {exc}"
 
 
+# Known project roots for "open X in VS Code" — add more as needed.
+PROJECT_ROOTS = {
+    "cgraph": "/home/trick/Projects/Repos/CGraph Umbrella",
+    "cgraph umbrella": "/home/trick/Projects/Repos/CGraph Umbrella",
+    "rankvalut": "/home/trick/Projects/Repos/RankValut",
+    "qubit": "/home/trick/Projects/Repos/Qubit (2)",
+    "voice bridge": "/home/trick/Projects/Repos/openclaw-voice-bridge",
+    "voicebridge": "/home/trick/Projects/Repos/openclaw-voice-bridge",
+    "repos": "/home/trick/Projects/Repos",
+    "projects": "/home/trick/Projects/Repos",
+}
+
+
+def _a_open_project(params: Dict[str, Any]) -> str:
+    """'open the CGraph project in vscode' -> launch VS Code on that repo."""
+    name = (params.get("project", "") or "").strip().lower()
+    root = PROJECT_ROOTS.get(name)
+    if not root:
+        # fuzzy: pick the first root whose name appears in what was said
+        said = (params.get("project", "") or "").lower()
+        for key, path in PROJECT_ROOTS.items():
+            if key in said and len(key) > 2:
+                root = path
+                break
+    if not root:
+        return (f"I know these projects: CGraph, RankValut, Qubit, voice bridge. "
+                f"Which one should I open?")
+    try:
+        subprocess.Popen(["code", root], stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL)
+        return f"Opening {name or 'project'} in VS Code."
+    except Exception as exc:
+        return f"Could not open VS Code: {exc}"
+
+
 def _a_screenshot(_: Dict[str, Any]) -> str:
     out = "/home/trick/Pictures/screenshot-%s.png" % __import__("time").strftime("%Y%m%d-%H%M%S")
     if shutil.which("gnome-screenshot"):
@@ -133,6 +168,10 @@ ACTIONS: Dict[str, LocalAction] = {
                             patterns=[r"\b(mute|unmute) (the )?(microphone|mic)\b"]),
     "open_app": LocalAction("open_app", "launch an application", _a_open_app,
                             patterns=[r"\b(open|launch|start|run) (the )?(browser|editor|vscode|terminal|discord|telegram|files|fl studio|spotify)\b"]),
+    "open_project": LocalAction("open_project", "open a project in VS Code", _a_open_project,
+                               patterns=[r"\b(open|launch|start) (the )?(cgraph|rankvalut|qubit|voice bridge|voicebridge|project|repo|repos|projects) (in|with|using) (vs ?code|the editor|editor)\b",
+                                         r"\bopen (cgraph|rankvalut|qubit) (in|with|using) (vs ?code|editor)\b",
+                                         r"\b(open|launch) (the )?(cgraph|rankvalut|qubit) project\b"]),
     "screenshot": LocalAction("screenshot", "take a screenshot", _a_screenshot,
                               patterns=[r"\b(take|grab) (a |an? )?(screenshot|screen ?shot)\b"]),
     "media_playpause": LocalAction("media_playpause", "play/pause media", _a_media_playpause,
@@ -166,6 +205,12 @@ def match(text: str) -> Optional[ActionMatch]:
                     for word, canon in APP_NAMES.items():
                         if word in low:
                             params["app"] = canon
+                            break
+                elif name == "open_project":
+                    # capture the project word so _a_open_project can resolve it
+                    for word in PROJECT_ROOTS:
+                        if word in low:
+                            params["project"] = word
                             break
                 return ActionMatch(name=name, params=params, text=text)
     return None

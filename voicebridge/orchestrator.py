@@ -759,7 +759,10 @@ class VoiceOrchestrator:
         if self.cfg.get("openclaw", "skills_nudge", default=True):
             task_text = (task_text
                          + "\n\nUse your available skills and tools as needed "
-                           "(files, terminal, browser, repos, delegation). "
+                           "(files, terminal, browser, repos, delegation, "
+                           "VS Code via `code` CLI for opening/editing, "
+                           "vision for images/screenshots, video analysis, "
+                           "web fetching). "
                            "Reply directly and concisely: no emojis, no "
                            "pleasantries, no extra words — only what was done "
                            "and what's next.")
