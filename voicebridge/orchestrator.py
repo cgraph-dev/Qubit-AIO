@@ -897,6 +897,12 @@ class VoiceOrchestrator:
         if self._webui is not None:
             self._webui.feed.push(item)
 
+    def _push_input(self, text: str, confidence: float = 0.0, source: str = "mic") -> None:
+        """Surface a mic/tap/typed utterance in the dashboard feed (same shape
+        as the web path pushes, so the activity page reflects EVERY source)."""
+        self.feed_push({"kind": "user", "text": text, "route": source,
+                        "conf": round(float(confidence or 0), 3)})
+
     def _dispatch_coding(self, task_text: str, model: Optional[str] = None,
                          force_confirm: bool = False) -> None:
         """Safety-check and dispatch a coding task to OpenClaw."""
@@ -1713,6 +1719,11 @@ class VoiceOrchestrator:
 
     def _route_intent(self, intent: Intent, text: str) -> None:
         """Shared dispatcher used by mic, typed input, and the duplex tap."""
+        # push the routing decision for mic/tap/typed sources (the web path
+        # pushes its own routing item in webui.handle_talk)
+        self.feed_push({"kind": "routing", "text": text, "route": intent.kind,
+                        "conf": round(float(getattr(intent, "confidence", 0) or 0), 2),
+                        "detail": getattr(intent, "reason", "") or ""})
         # executor ask-mode answer: the user just said who should run the
         # pending task ("OpenClaw", "Hermes", "you pick", "whatever") — handle
         # it BEFORE templates/classification so the answer isn't misrouted
@@ -1771,6 +1782,7 @@ class VoiceOrchestrator:
                 return
         log_event("routing.input", text=text, confidence=round(confidence, 3),
                   source="duplex-tap", ptt=pending)
+        self._push_input(text, confidence, "duplex-tap")
         intent = self.classifier.classify(text)
         log_event("routing.decision", text=text[:200], kind=intent.kind,
                   confidence=round(intent.confidence, 2), reason=intent.reason,
@@ -2276,6 +2288,7 @@ class VoiceOrchestrator:
             self.speak("Sorry, I didn't catch that. Could you repeat it?")
             return
         log_event("routing.input", text=transcript.text, confidence=round(transcript.confidence, 3))
+        self._push_input(transcript.text, transcript.confidence, "mic")
         if transcript.text.strip().lower() in ("uh", "um", "hmm", "ah", "mm", "aah", "okay", "ok"):
             self.speak("I didn't catch that. Try again.")
             return
@@ -2295,6 +2308,7 @@ class VoiceOrchestrator:
             self.speak("Empty task.")
             return
         log_event("routing.input", text=text, source="text")
+        self._push_input(text, 0.0, "typed")
         intent = self.classifier.classify(text)
         log_event("routing.decision", text=text[:200], kind=intent.kind,
                   confidence=round(intent.confidence, 2), reason=intent.reason,

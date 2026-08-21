@@ -70,6 +70,77 @@ class ActivityFeed:
         with self._lock:
             self._items.clear()
 
+    def load_history(self, events_path: Path, limit: int = 200) -> None:
+        """Seed the feed from the persisted event journal (events.jsonl) so
+        the dashboard reflects EVERYTHING the bridge did — mic loop, duplex
+        taps, typed tasks, web — including activity from before this process
+        started (the ring buffer alone only covers this process's lifetime)."""
+        try:
+            with events_path.open("r", errors="replace") as fh:
+                lines = fh.readlines()
+        except OSError:
+            return
+        for line in lines[-4000:]:  # bound the scan; ring keeps newest `limit`
+            try:
+                ev = json.loads(line)
+            except Exception:
+                continue
+            item = _event_to_feed_item(ev)
+            if item is None:
+                continue
+            item.setdefault("ts", ev.get("ts") or time.time())
+            with self._lock:
+                self._items.appendleft(item)  # newest stays at index 0
+
+
+# Event journal -> activity feed item. Return None for noise (personaplex
+# lane text, hotkeys, TTS, ASR internals, memory notes...).
+def _event_to_feed_item(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    evt = ev.get("event", "")
+    if evt == "routing.input":
+        return {"kind": "user", "text": ev.get("text", ""),
+                "route": ev.get("source", "mic"),
+                "conf": ev.get("confidence")}
+    if evt == "routing.decision":
+        return {"kind": "routing", "text": ev.get("text", ""),
+                "route": ev.get("kind", ""),
+                "conf": ev.get("confidence"),
+                "detail": ev.get("reason", "")}
+    if evt == "routing.template":
+        return {"kind": "routing", "text": ev.get("text", ""),
+                "route": f"template:{ev.get('name', '')}",
+                "detail": ev.get("kind", "")}
+    if evt == "webui.utterance":
+        return {"kind": "user", "text": ev.get("text", ""), "route": "web"}
+    if evt == "local_script.summary":
+        return {"kind": "summary", "text": ev.get("name", "local script"),
+                "summary": ev.get("summary", ""), "route": "local-script",
+                "detail": f"{ev.get('raw_len', '')} chars raw"}
+    if evt == "openclaw.dispatch":
+        return {"kind": "status", "text": "dispatched to OpenClaw",
+                "route": "openclaw",
+                "detail": str(ev.get("task", ""))[:300]}
+    if evt == "openclaw.result":
+        return {"kind": "status",
+                "text": f"task {ev.get('status', 'done')}",
+                "route": "openclaw",
+                "detail": f"elapsed {ev.get('elapsed_s', '')}s · {ev.get('reply_len', '')} chars"}
+    if evt == "openclaw.summary":
+        return {"kind": "summary", "text": "OpenClaw task",
+                "summary": ev.get("summary", ""), "route": "openclaw"}
+    if evt == "openclaw.request.failed" or evt == "openclaw.request.exception":
+        return {"kind": "fail", "text": "OpenClaw request",
+                "route": "openclaw",
+                "detail": str(ev.get("error", ev.get("reason", "")))[:300]}
+    if evt == "safety.verdict":
+        return {"kind": "routing", "text": str(ev.get("text", ""))[:160],
+                "route": "safety",
+                "detail": "allowed" if ev.get("allowed") else "denied"}
+    if evt == "webui.talk.error" or evt == "webui.type.error":
+        return {"kind": "fail", "text": evt.replace(".", " "),
+                "route": "webui", "detail": str(ev.get("error", ""))[:300]}
+    return None
+
 
 # --------------------------------------------------------------------------
 # PCM helpers
@@ -302,7 +373,7 @@ fetch('/api/status').then(r => r.json()).then(d => {
 </body></html>
 """
 
-ACTIVITY_PAGE = """<!doctype html>
+ACTIVITY_PAGE = r"""<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -312,52 +383,94 @@ ACTIVITY_PAGE = """<!doctype html>
   * { box-sizing: border-box; }
   body { margin:0; font: 14px/1.5 system-ui, sans-serif;
          background:#0d1117; color:#e6edf3; min-height:100vh; }
-  .wrap { max-width:760px; margin:0 auto; padding:16px; }
+  .wrap { max-width:820px; margin:0 auto; padding:16px; }
   header { display:flex; align-items:baseline; justify-content:space-between;
            margin-bottom:12px; }
   h1 { font-size:18px; margin:0; }
   a { color:#58a6ff; text-decoration:none; }
+  #conn { font-size:12px; color:#8b949e; }
+  #conn.live { color:#3fb950; }
   .item { border:1px solid #21262d; border-radius:10px; padding:10px 12px;
           margin:8px 0; background:#0d1117; }
-  .item .t { font-size:11px; color:#8b949e; margin-bottom:4px; }
-  .item .kind { color:#58a6ff; }
-  .item .route { color:#d29922; }
-  .item .ok { color:#3fb950; }
-  .item .fail { color:#f85149; }
+  .item .t { font-size:11px; color:#8b949e; margin-bottom:4px;
+             display:flex; flex-wrap:wrap; gap:4px 10px; align-items:center; }
+  .badge { display:inline-block; padding:0 7px; border-radius:10px;
+           font-size:10px; font-weight:600; text-transform:uppercase;
+           letter-spacing:.03em; }
+  .b-user    { background:#1f6feb33; color:#58a6ff; border:1px solid #1f6feb66; }
+  .b-routing { background:#d2992233; color:#d29922; border:1px solid #d2992266; }
+  .b-status  { background:#8b949e22; color:#8b949e; border:1px solid #8b949e55; }
+  .b-summary { background:#3fb95022; color:#3fb950; border:1px solid #3fb95066; }
+  .b-done    { background:#3fb95022; color:#3fb950; border:1px solid #3fb95066; }
+  .b-fail, .b-error { background:#f8514922; color:#f85149; border:1px solid #f8514966; }
+  .route { color:#d29922; }
+  .conf { color:#8b949e; }
+  .lat  { color:#8b949e; }
   .item .text { white-space:pre-wrap; margin-top:4px; }
   .item .summary { color:#c9d1d9; background:#161b22; border-radius:6px;
                    padding:6px 8px; margin-top:6px; }
+  .item .err { color:#f85149; background:#f8514911; border-radius:6px;
+               padding:6px 8px; margin-top:6px; }
+  .item details { margin-top:6px; }
+  .item summary { font-size:11px; color:#8b949e; cursor:pointer; }
+  .item .raw { color:#8b949e; background:#161b22; border-radius:6px;
+               padding:6px 8px; margin-top:4px; white-space:pre-wrap;
+               font-size:12px; max-height:220px; overflow:auto; }
   #empty { color:#8b949e; text-align:center; margin-top:40px; }
+  #errbox { color:#f85149; text-align:center; margin-top:16px; }
 </style></head><body>
 <div class="wrap">
   <header>
     <h1>📋 Voice Dashboard — Agent Activity</h1>
-    <a href="/">← talk</a>
+    <span id="conn">connecting…</span>
   </header>
+  <a href="/">← talk</a>
   <div id="feed"><div id="empty">waiting for activity…</div></div>
 </div>
 <script>
+const BASE = (new URLSearchParams(location.search).get('api') || localStorage.getItem('vdb_api') || '').replace(/\/$/, '');
+const TOKEN = new URLSearchParams(location.search).get('token') || localStorage.getItem('vdb_token') || '';
+function hdrs(extra) { const h = Object.assign({}, extra || {}); if (TOKEN) h['X-Api-Token'] = TOKEN; return h; }
+
 const feed = document.getElementById('feed');
-const KIND = { user:'', routing:'', status:'', summary:'', done:'', fail:'' };
+const conn = document.getElementById('conn');
 function esc(s){ return (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
-function fmt(ts){ const d = new Date(ts*1000); return d.toLocaleTimeString(); }
+function fmt(ts){
+  if (!ts) return '';
+  const d = new Date(ts * 1000);
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
 function render(items){
   feed.innerHTML = items.map(it => {
-    const cls = it.kind==='fail'?'fail':it.kind==='ok'?'ok':'';
+    const kind = it.kind || 'status';
+    const badge = `<span class="badge b-${esc(kind)}">${esc(kind)}</span>`;
     const route = it.route ? ` · <span class="route">${esc(it.route)}</span>` : '';
+    const conf = it.conf ? ` · <span class="conf">conf ${esc(it.conf)}</span>` : '';
+    const lat = it.latency_s != null ? ` · <span class="lat">${esc(it.latency_s)}s</span>` : '';
+    const detail = it.detail ? ` · <span class="lat">${esc(it.detail)}</span>` : '';
+    const text = it.text ? `<div class="text">${esc(it.text)}</div>` : '';
     const summary = it.summary ? `<div class="summary">${esc(it.summary)}</div>` : '';
+    const err = it.error ? `<div class="err">${esc(it.error)}</div>` : '';
+    const raw = it.raw ? `<details><summary>raw output</summary><div class="raw">${esc(it.raw)}</div></details>` : '';
     return `<div class="item">
-      <div class="t">${fmt(it.ts)} · <span class="kind">${esc(it.kind)}</span>${route}</div>
-      ${it.text ? `<div class="text">${esc(it.text)}</div>` : ''}${summary}</div>`;
+      <div class="t"><span>${fmt(it.ts)}</span>${badge}${route}${conf}${lat}${detail}</div>
+      ${text}${summary}${err}${raw}</div>`;
   }).join('');
-  if (!items.length) feed.innerHTML = '<div id="empty">waiting for activity…</div>';
+  if (!items.length) feed.innerHTML = '<div id="empty">no activity yet</div>';
 }
 async function refresh(){
   try {
-    const r = await fetch('/api/activity?limit=80');
+    const r = await fetch(BASE + '/api/activity?limit=200', { headers: hdrs() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
+    conn.textContent = 'live · ' + (d.items || []).length + ' items';
+    conn.className = 'live';
     render(d.items || []);
-  } catch (_) {}
+  } catch (_) {
+    conn.textContent = 'bridge offline';
+    conn.className = '';
+  }
 }
 setInterval(refresh, 2000);
 refresh();
@@ -516,6 +629,9 @@ class WebUI:
         self._asr_factory = asr_factory or _default_asr_factory(orchestrator)
         self._tts = tts
         self._state_dir = state_dir or Path("/tmp")
+        # pre-seed the live feed from the persisted event journal so the
+        # dashboard reflects everything (mic loop, taps, typed, web, history)
+        self.feed.load_history(self._state_dir / "events.jsonl", limit=200)
         self._asr = None
         self._asr_lock = threading.Lock()
         self._server: Optional[ThreadingHTTPServer] = None
