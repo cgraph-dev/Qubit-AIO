@@ -1,7 +1,9 @@
-"""Voice Activity Detection (webrtcvad) + utterance endpointing + barge-in.
+"""Voice Activity Detection (Silero neural VAD preferred, webrtcvad fallback)
++ utterance endpointing + barge-in.
 
-webrtcvad works on 16 kHz mono 16-bit PCM in 10/20/30 ms frames. We feed it
-30 ms frames. The Endpointer is a small state machine:
+Silero VAD v5 (sherpa-onnx) works on 16 kHz float32 in 512-sample (32 ms)
+windows and is far more accurate than webrtcvad in noise. The Endpointer is a
+small state machine (backend-agnostic):
 
     idle -> (speech_start_ms of voiced frames) -> speech
     speech -> (silence_timeout_s of unvoiced) -> done
@@ -13,12 +15,87 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
 
 import numpy as np
+
+from ..logging_setup import log_event
 
 FRAME_MS = 30
 FRAME_RATE = 16000
 FRAME_SIZE = FRAME_RATE * FRAME_MS // 1000  # 480 samples
+
+
+class SileroVadGate:
+    """Silero neural VAD via sherpa-onnx (windowed, raw per-window decisions).
+
+    Buffers arbitrary-size 16 kHz int16 PCM into 512-sample (32 ms) windows and
+    returns the VAD decision for each completed window. Endpointing hysteresis
+    is left to the caller (Endpointer) — here hysteresis is disabled so we get
+    raw frame-level speech/non-speech.
+    """
+
+    def __init__(self, model_path: Path | str, threshold: float = 0.5,
+                 num_threads: int = 1) -> None:
+        try:
+            import sherpa_onnx as so
+        except Exception as exc:  # pragma: no cover
+            raise RuntimeError(f"sherpa-onnx unavailable for Silero VAD: {exc}") from exc
+        cfg = so.VadModelConfig(
+            sample_rate=FRAME_RATE,
+            num_threads=num_threads,
+            provider="cpu",
+            debug=False,
+            silero_vad=so.SileroVadModelConfig(
+                model=str(Path(model_path)),
+                threshold=float(threshold),
+                min_silence_duration=0.0,   # raw decisions; Endpointer does hysteresis
+                min_speech_duration=0.0,
+                max_speech_duration=30.0,
+                window_size=512,
+            ),
+        )
+        self._vad = so.VadModel.create(cfg)
+        self._buf = b""
+        self._window = 1024  # 512 samples * 2 bytes
+
+    def reset(self) -> None:
+        self._buf = b""
+        self._vad.reset()
+
+    def is_speech(self, pcm_int16: bytes) -> bool:
+        self._buf += pcm_int16
+        result = False
+        while len(self._buf) >= self._window:
+            chunk = self._buf[: self._window]
+            self._buf = self._buf[self._window:]
+            samples = np.frombuffer(chunk, dtype=np.int16).astype(np.float32) / 32768.0
+            result = self._vad.is_speech(samples)
+        return result
+
+
+def _make_vad_gate(backend: str, aggressiveness: int,
+                   silero_model: Optional[Path | str] = None):
+    """Returns a callable `is_speech(pcm_int16: bytes) -> bool`."""
+    if backend == "silero":
+        try:
+            gate = SileroVadGate(silero_model or _default_silero_model())
+            log_event("vad.backend", backend="silero", model=str(silero_model))
+            return gate.is_speech
+        except Exception as exc:
+            log_event("vad.silero.unavailable", error=str(exc)[:160],
+                      fallback="webrtc")
+    import webrtcvad
+    vad = webrtcvad.Vad(aggressiveness)
+    return lambda pcm: vad.is_speech(pcm, FRAME_RATE)
+
+
+def _default_silero_model() -> Path:
+    cand = Path.home() / ".local/share/openclaw-voice-bridge/models/silero_vad_v5.onnx"
+    if not cand.exists():
+        raise FileNotFoundError(f"silero_vad_v5.onnx not found at {cand}")
+    return cand
 
 
 @dataclass
@@ -30,6 +107,8 @@ class Endpointer:
     silence_timeout_s: float = 1.2    # trailing silence that ends the utterance
     max_utterance_s: float = 30.0
     rms_gate: float = 0.004           # frame RMS floor for "voiced" (after gain)
+    vad_backend: str = "silero"       # silero | webrtc
+    silero_model: Optional[Path | str] = None
     speech_frames: int = field(init=False, default=0)
     silence_frames: int = field(init=False, default=0)
     total_frames: int = field(init=False, default=0)
@@ -37,24 +116,21 @@ class Endpointer:
     state: str = field(init=False, default="idle")  # idle|speech|done
 
     def __post_init__(self) -> None:
-        try:
-            import webrtcvad
-            self._vad = webrtcvad.Vad(self.aggressiveness)
-        except Exception as exc:  # pragma: no cover - environment dependent
-            raise RuntimeError(f"webrtcvad unavailable: {exc}") from exc
+        self._vad = _make_vad_gate(self.vad_backend, self.aggressiveness,
+                                   self.silero_model)
         self._start_frames = max(1, int(self.speech_start_ms / FRAME_MS))
         self._silence_frames = max(1, int(self.silence_timeout_s * 1000 / FRAME_MS))
         self._max_frames = int(self.max_utterance_s * 1000 / FRAME_MS)
 
     def _gate_voiced(self, pcm_int16: bytes) -> bool:
-        """webrtcvad decision ANDed with an RMS floor.
+        """VAD decision ANDed with an RMS floor.
 
-        webrtcvad (especially at aggressiveness 1) happily calls ambient hiss
-        "speech" once a gain boost is applied. The RMS gate keeps quiet noise
-        out of the speech decision; real speech sits well above it.
+        The VAD (webrtcvad at low aggressiveness, or Silero on hiss) can call
+        ambient noise "speech" once a gain boost is applied. The RMS gate keeps
+        quiet noise out of the speech decision; real speech sits well above it.
         """
         rms = np.sqrt(np.frombuffer(pcm_int16, dtype=np.int16).astype(np.float32).__pow__(2).mean()) / 32767.0
-        return self._vad.is_speech(pcm_int16, FRAME_RATE) and rms >= self.rms_gate
+        return self._vad(pcm_int16) and rms >= self.rms_gate
 
     def reset(self) -> None:
         self.speech_frames = 0
@@ -93,9 +169,9 @@ class BargeInDetector:
     """Detects user speech while the assistant is speaking (for interruption)."""
 
     def __init__(self, aggressiveness: int = 2, trigger_ms: int = 150,
-                 rms_gate: float = 0.004) -> None:
-        import webrtcvad
-        self._vad = webrtcvad.Vad(aggressiveness)
+                 rms_gate: float = 0.004, vad_backend: str = "silero",
+                 silero_model: Optional[Path | str] = None) -> None:
+        self._vad = _make_vad_gate(vad_backend, aggressiveness, silero_model)
         self._trigger_frames = max(1, trigger_ms // FRAME_MS)
         self._rms_gate = rms_gate
         self._voiced = 0
@@ -109,7 +185,7 @@ class BargeInDetector:
 
     def add_frame(self, pcm_int16: bytes) -> bool:
         rms = np.sqrt(np.frombuffer(pcm_int16, dtype=np.int16).astype(np.float32).__pow__(2).mean()) / 32767.0
-        voiced = self._vad.is_speech(pcm_int16, FRAME_RATE) and rms >= self._rms_gate
+        voiced = self._vad(pcm_int16) and rms >= self._rms_gate
         with self._lock:
             self._voiced = self._voiced + 1 if voiced else 0
             if self._voiced >= self._trigger_frames:

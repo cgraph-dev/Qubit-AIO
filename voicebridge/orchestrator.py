@@ -193,13 +193,21 @@ class VoiceOrchestrator:
 
     # ------------------------------------------------------------------ setup
     def _make_asr(self):
+        from .asr.sherpa import SherpaASR
         from .asr.whisper import FasterWhisperASR
         asr_cfg = self.cfg.section("asr")
-        provider = asr_cfg.get("provider", "whisper")
+        provider = asr_cfg.get("provider", "sherpa")
         if provider == "personaplex":
             log_event("asr.provider", provider="personaplex", active=False,
-                      detail="PersonaPlex ASR removed; falling back to whisper")
+                      detail="PersonaPlex ASR removed; falling back to sherpa")
+            provider = "sherpa"
         model_dir = self.cfg.model_dir()
+        if provider == "sherpa":
+            return SherpaASR(engine=asr_cfg.get("engine", "moonshine"),
+                             model_dir=model_dir,
+                             provider=asr_cfg.get("provider_ep", "cpu"),
+                             num_threads=4,
+                             language=asr_cfg.get("language"))
         return FasterWhisperASR(model=asr_cfg.get("model", "base"),
                                 device=asr_cfg.get("device", "auto"),
                                 compute_type=asr_cfg.get("compute_type", "float16"),
@@ -210,6 +218,7 @@ class VoiceOrchestrator:
     def _make_tts(self):
         from .tts.edge import EdgeTTS
         from .tts.gateway_tts import GatewayTTS
+        from .tts.kokoro import KokoroTTS
         from .tts.piper import PiperTTS
         provider = self.cfg.get("tts", "provider", default="piper")
         if provider == "edge":
@@ -219,6 +228,12 @@ class VoiceOrchestrator:
                 return edge
         if provider == "gateway" and self._gateway is not None:
             return GatewayTTS(self._gateway, model=self.cfg.get("tts", "gateway", "model"))
+        if provider == "kokoro":
+            tts = KokoroTTS(model_dir=self.cfg.model_dir(),
+                            voice_sid=int(self.cfg.get("tts", "kokoro", "voice_sid", default=0)))
+            if tts.available():
+                return tts
+            log_event("tts.kokoro.unavailable", fallback="piper")
         return PiperTTS(model_dir=self.cfg.model_dir(),
                         voice=self.cfg.get("tts", "voice", default="en_US-amy-medium"))
 
@@ -309,6 +324,9 @@ class VoiceOrchestrator:
 
         # mic
         mic_cfg = self.cfg.section("mic")
+        vad_backend = self.cfg.get("vad", "backend", default="silero")
+        silero_model = self.cfg.get("vad", "silero_model", default="") \
+            or (self.cfg.model_dir() / "silero_vad_v5.onnx")
         self._mic = MicCapture(device=mic_cfg.get("device"),
                                sample_rate=mic_cfg.get("sample_rate", 48000),
                                channels=mic_cfg.get("channels", 2),
@@ -317,12 +335,16 @@ class VoiceOrchestrator:
                                    aggressiveness=self.cfg.get("vad", "aggressiveness", default=1),
                                    speech_start_ms=self.cfg.get("vad", "speech_start_ms", default=180),
                                    silence_timeout_s=self.cfg.get("vad", "silence_timeout_s", default=1.2),
-                                   max_utterance_s=self.cfg.get("vad", "max_utterance_s", default=30.0)),
+                                   max_utterance_s=self.cfg.get("vad", "max_utterance_s", default=30.0),
+                                   vad_backend=vad_backend,
+                                   silero_model=silero_model),
                                gain=float(mic_cfg.get("gain", 4.0)),
                                min_rms=float(mic_cfg.get("min_rms", 0.0008)))
         self._beep_start = self._make_beep(880.0, 0.08)
         self._beep_end = self._make_beep(660.0, 0.06)
-        self._barge = BargeInDetector(trigger_ms=int(self.cfg.get("vad", "barge_in", default=True)) and 150 or 999999)
+        self._barge = BargeInDetector(
+            trigger_ms=int(self.cfg.get("vad", "barge_in", default=True)) and 150 or 999999,
+            vad_backend=vad_backend, silero_model=silero_model)
         self._barge_stream = None
         if self.cfg.get("vad", "barge_in", default=True):
             try:
@@ -963,12 +985,24 @@ class VoiceOrchestrator:
                 self._handle_agent_result(chat_key, result.reply, result.status, result.elapsed_s)
                 return
         # fast chat: direct DeepSeek completion (default), Perplexity for
-        # web/current-info questions ("if needed"), local ollama as fallback
+        # web/current-info questions ("if needed"), local ollama as fallback.
+        # Hybrid: SHORT utterances first try the tiny local LLM (~0.3s, private).
         reply = ""
         spoke = False
         if backend == "deepseek":
-            if self.cfg.get("intent", "perplexity_enabled", default=True) \
-                    and (_needs_web(text) or "perplexity" in text.lower()):
+            web_ask = self.cfg.get("intent", "perplexity_enabled", default=True) \
+                and (_needs_web(text) or "perplexity" in text.lower())
+            llm_cfg = self.cfg.section("intent").get("local_llm", {}) or {}
+            if (llm_cfg.get("enabled", True) and not web_ask
+                    and len(text.split()) <= int(llm_cfg.get("max_words", 30))):
+                from .local_llm import chat_local
+                reply = chat_local(
+                    text, self.conversation.as_prompt(),
+                    model=llm_cfg.get("model", "qwen3:4b"),
+                    url=llm_cfg.get("url", "http://127.0.0.1:11434"),
+                    timeout_s=float(llm_cfg.get("timeout_s", 4.0)),
+                    max_tokens=int(llm_cfg.get("max_tokens", 100)))
+            if not reply and web_ask:
                 reply = self._chat_perplexity(text)
             if not reply:
                 if self.cfg.get("intent", "stream_speech", default=True):

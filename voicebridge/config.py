@@ -42,7 +42,9 @@ DEFAULTS: Dict[str, Any] = {
     },
     "vad": {
         "enabled": True,
-        "aggressiveness": 1,        # webrtcvad 0-3 (1 = lenient for quiet mics)
+        "backend": "silero",         # silero (neural, sherpa-onnx) | webrtc
+        "silero_model": "",          # empty = <model_dir>/silero_vad_v5.onnx
+        "aggressiveness": 1,        # webrtcvad 0-3 (1 = lenient for quiet mics); unused for silero
         "speech_start_ms": 180,     # frames of speech to consider "started"
         "silence_timeout_s": 1.2,   # trailing silence ends the utterance
         "max_utterance_s": 30.0,
@@ -53,9 +55,11 @@ DEFAULTS: Dict[str, Any] = {
         "beeps": True,              # short beep when recording starts/stops
     },
     "asr": {
-        "provider": "whisper",      # whisper | personaplex
-        "model": "base",            # tiny|base|small|medium (whisper)
-        "device": "auto",           # auto|cuda|cpu
+        "provider": "sherpa",         # sherpa (Moonshine/Parakeet, 0 VRAM CPU) | whisper | personaplex
+        "engine": "moonshine",        # sherpa engine: moonshine | parakeet
+        "provider_ep": "cpu",         # sherpa onnxruntime EP: cpu (0 VRAM) | cuda
+        "model": "base",            # tiny|base|small|medium (whisper only)
+        "device": "auto",           # auto|cuda|cpu (whisper only)
         "compute_type": "float16",
         "language": "en",
         "beam_size": 1,
@@ -87,9 +91,10 @@ DEFAULTS: Dict[str, Any] = {
         "save_notes": True,             # append session summary to memory/YYYY-MM-DD.md
     },
     "tts": {
-        "provider": "piper",        # piper | edge | gateway
+        "provider": "piper",        # piper (fast) | kokoro (quality, ~1x realtime CPU) | edge | gateway
         "voice": "en_US-amy-medium",
         "sample_rate": 22050,
+        "kokoro": {"voice_sid": 0},  # Kokoro v0.19 EN: 11 voices, sid 0..10
         "interrupt": True,          # allow barge-in / stop speaking
         "edge": {"voice": "en-US-JennyNeural", "rate": "+0%"},
         "gateway": {"model": None},  # None = gateway default
@@ -102,6 +107,17 @@ DEFAULTS: Dict[str, Any] = {
         "ollama_model": "qwen3-vl:8b",
         "classify_timeout_s": 8.0,
         "conversation_backend": "deepseek",  # deepseek (fast API) | ollama (local) | agent (OpenClaw memory)
+        # Hybrid local LLM: tiny 3-4B answers SHORT conversational turns locally
+        # (~0.3s, private), DeepSeek handles long/complex/web asks. Flip enabled
+        # to false to go cloud-only (DeepSeek every turn, GPU idle).
+        "local_llm": {
+            "enabled": True,
+            "model": "llama3.2:3b",    # ollama tag (pull once); qwen3:4b thinks by default -> empty content
+            "url": "http://127.0.0.1:11434",
+            "timeout_s": 4.0,
+            "max_words": 30,           # utterances shorter than this try local first
+            "max_tokens": 100,         # local reply cap (short answers only)
+        },
         "deepseek_url": "https://api.deepseek.com/chat/completions",
         "deepseek_model": "deepseek-v4-flash",
         "deepseek_env": "~/.hermes/.env",    # DEEPSEEK_API_KEY lives here
