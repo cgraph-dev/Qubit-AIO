@@ -76,7 +76,9 @@ DEFAULTS: Dict[str, Any] = {
                         "You enjoy good conversation and are curious about the "
                         "user's projects. Keep answers concise and natural.",
         "sample_rate": 24000,           # Mimi codec rate (matches the server)
-        "whisper_tap": True,            # local ASR tap for intent routing
+        "whisper_tap": False,           # NO local ASR: PersonaPlex hears speech
+                                        # directly; tasks route via PTT whisper
+                                        # (on-demand, CUDA) or OpenClaw
         "ptt_uses_tap": True,           # duplex mode: Ctrl routes the next tapped
                                         # utterance (no second mic stream — avoids
                                         # device conflict with the lane's mic)
@@ -128,7 +130,8 @@ DEFAULTS: Dict[str, Any] = {
         "direct": True,          # strip emojis/pleasantries/filler from spoken output
     },
     "intent": {
-        "llm_classifier": True,     # use ollama qwen3-vl:8b when heuristic is unsure
+        "llm_classifier": False,    # NO local ollama — heuristic only (fast);
+                                    # ambiguous taps default to conversation
         "ollama_url": "http://127.0.0.1:11434",
         "ollama_model": "qwen3-vl:8b",
         "classify_timeout_s": 8.0,
