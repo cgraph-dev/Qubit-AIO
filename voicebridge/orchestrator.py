@@ -1094,7 +1094,8 @@ class VoiceOrchestrator:
                     model=llm_cfg.get("model", "huihui_ai/llama3.2-abliterate:3b"),
                     url=llm_cfg.get("url", "http://127.0.0.1:11434"),
                     timeout_s=float(llm_cfg.get("timeout_s", 4.0)),
-                    max_tokens=int(llm_cfg.get("max_tokens", 100)))
+                    max_tokens=int(llm_cfg.get("max_tokens", 100)),
+                    context=self._memory_context)
             except Exception as exc:
                 reply = ""
                 log_event("conversation.local.skip", error=str(exc)[:120])
@@ -1425,12 +1426,22 @@ class VoiceOrchestrator:
 
     # ----------------------------------------------------------------- memory
     def _load_memory_context(self) -> str:
-        """Read MEMORY.md + recent daily notes from the OpenClaw workspace."""
+        """Read personal-knowledge.md + MEMORY.md + recent daily notes.
+
+        personal-knowledge.md lives next to the voice config
+        (~/.config/openclaw-voice-bridge/personal-knowledge.md, shipped in the
+        repo as config/personal-knowledge.md) — edit it freely; it is injected
+        into every local-model chat turn so the bridge knows the user's world.
+        """
         try:
             ws = Path(self.cfg.get("memory", "workspace",
                                    default="~/.openclaw/workspace")).expanduser()
             budget = int(self.cfg.get("memory", "context_chars", default=1500))
             parts: list[str] = []
+            # personal knowledge (user-editable, highest priority)
+            pk = self._personal_knowledge_path()
+            if pk.exists():
+                parts.append(f"<personal-knowledge>\n{pk.read_text(errors='replace')[:2500]}")
             mem = ws / "MEMORY.md"
             if mem.exists():
                 parts.append(f"<MEMORY.md>\n{mem.read_text(errors='replace')[:budget]}")
@@ -1441,11 +1452,18 @@ class VoiceOrchestrator:
                     parts.append(f"<{p.name}>\n{p.read_text(errors='replace')[:budget]}")
             ctx = "\n\n".join(parts)
             if ctx:
-                log_event("memory.loaded", chars=len(ctx))
+                log_event("memory.loaded", chars=len(ctx), pk=str(pk))
             return ctx
         except Exception as exc:
             log_event("memory.load.error", error=str(exc)[:160])
             return ""
+
+    def _personal_knowledge_path(self) -> Path:
+        """<config dir>/personal-knowledge.md (alongside voice.yaml)."""
+        cfg_file = self.cfg.path
+        if cfg_file:
+            return Path(cfg_file).parent / "personal-knowledge.md"
+        return Path(os.path.expanduser("~/.config/openclaw-voice-bridge")) / "personal-knowledge.md"
 
     def _save_session_note(self, note: str) -> None:
         try:

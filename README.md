@@ -34,10 +34,17 @@ long coding output, and can be interrupted mid-speech — **only by your voice**
 | VAD (Silero v5) | **local, CPU** | neural endpointing, far better than webrtcvad |
 | Voice-ID (eres2net) | **local, CPU** | ~50ms/check; self 0.72-0.96 vs strangers ~0.3 |
 | TTS (piper amy) | **local, CPU** | Kokoro-82M optional (`tts.provider: kokoro`) |
-| Short replies (llama3.2:3b) | **local, GPU, 2.6 GB** | stays resident 24/7 (`keep_alive: -1`) |
-| Long/complex answers | DeepSeek API | optional — needs `DEEPSEEK_API_KEY` |
-| Current-info/web answers | Perplexity API | optional — needs `PERPLEXITY_API_KEY` |
-| Task execution | **your OpenClaw** | gateway auto-discovered, agents untouched |
+| Chat (all questions) | **local, GPU, 2.6 GB** | `huihui_ai/llama3.2-abliterate:3b` — uncensored llama3.2:3b, EN/RO only, personal-knowledge.md injected, 24/7 |
+| Task execution | **your OpenClaw** | only TASKS go here (coding, files, terminal, browser, repos); "ask Hermes" → Hermes CLI |
+| Cloud APIs | **fallback only** | DeepSeek/Perplexity when the local model or gateway is down |
+
+## Personal knowledge
+
+The bridge reads `~/.config/openclaw-voice-bridge/personal-knowledge.md` (shipped as
+`config/personal-knowledge.md`, installed by `install.sh`) and injects it into every
+chat turn — the local model knows your projects, preferences, and how you want answers.
+Edit the file freely, then `systemctl --user restart openclaw-voice-bridge`. The model
+answers **only in English or Romanian** (EN by default, RO when you write in Romanian).
 
 Without the two API keys the bridge still fully works for local chat + all
 OpenClaw task routing; only long/web conversational answers fall back.

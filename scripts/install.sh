@@ -111,6 +111,13 @@ else
   echo "==> config exists:  $CONFIG_DIR/voice.yaml (leave as-is; merge new keys from"
   echo "    config/voice.example.yaml manually if you want them)"
 fi
+# personal knowledge for the local chat model (user-editable)
+if [ ! -f "$CONFIG_DIR/personal-knowledge.md" ]; then
+  cp "$PROJECT_DIR/config/personal-knowledge.md" "$CONFIG_DIR/personal-knowledge.md"
+  echo "==> personal-knowledge.md created: edit it, then restart the bridge"
+else
+  echo "==> personal-knowledge.md exists (leave as-is)"
+fi
 
 # ------------------------------------------------------------- systemd (opt)
 if [ "${1:-}" = "--with-systemd" ] || [ "${1:-}" = "-s" ]; then
