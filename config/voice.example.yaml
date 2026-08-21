@@ -148,13 +148,24 @@ safety:
   dry_run_first: false          # true = coding tasks start as dry runs
   spoken_confirmation: true
 
-# Spoken summaries (extractive = no model needed; switch to ollama if you have
-# a small local model loaded for better compression)
+# Spoken summaries — the LOCAL 3B model compresses tool output into ≤40 words.
+# provider: ollama uses the local chat model (fast, ~0.3s, smarter feel);
+# extractive is the no-model fallback (auto-used if ollama is down).
 summarizer:
-  provider: extractive          # extractive (no model) | ollama
-  ollama_model: qwen3-vl:8b
+  provider: ollama              # ollama (local model) | extractive (no model)
+  ollama_url: http://127.0.0.1:11434
+  ollama_model: huihui_ai/llama3.2-abliterate:3b   # the bridge's local chat model
   max_chars: 900
   max_words: 40             # HARD cap on every spoken response (save time)
+
+# ---------------------------------------------------------------------------
+# Voice dashboard (web UI): talk from your phone + live activity feed.
+#   http://<this-pc-ip>:8890   (chat)   ·   /activity  (agent dashboard)
+webui:
+  enabled: true
+  host: 0.0.0.0            # 0.0.0.0 = reachable from the LAN (phone)
+  port: 8890
+  script_timeout_s: 60     # local-script tools (e.g. Perplexity search) cap
 
 # ---------------------------------------------------------------------------
 logging:

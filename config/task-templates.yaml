@@ -190,16 +190,13 @@ templates:
       - "(is|are) (there|it|this|that) (a |an |any )?(new|latest|better|cheaper)?( version| price| deal| offer)?"
       - "latest (version|news|release|price|update) (of|on|for) "
       - "what('?s| is) (the )?(latest|new|current|best) (version|price|news|release|model|phone|game|movie|album|book|update)"
-    kind: coding
-    task: >
-      Run the perplexity-web-search skill: search using the user's logged-in
-      Perplexity Pro browser session (zero API cost):
-        ~/.hermes/skills/research/perplexity-web-search/scripts/perplexity_search.py "<question>" 1500
-      (uses the CDP Chromium profile; browser_ensure.sh starts it if needed).
-      Then speak a ≤3-sentence answer based on what the script returned.
-      If the script fails (browser down / not logged in), say so and fall
-      back to normal web search.
+    kind: local-script
     ack: "Searching the web."
+    summary_words: 35          # speak ONLY a ≤35-word summary, never raw output
+    script: >
+      ~/Projects/Repos/openclaw-voice-bridge/.venv/bin/python
+      ~/.hermes/skills/research/perplexity-web-search/scripts/perplexity_search.py
+      "{question}" 1500
 
   # -------------------------------------------------- social inbox check
   # Zero-token deterministic readers (CDP vs logged-in Chromium profile).
@@ -250,15 +247,11 @@ templates:
       - "(what|how) (connects|links|relates|is) .*(to|with|and) (the |the )?(web|backend|api|socket|chat|logger|stripe|packages)"
       - "graphify"
       - "(find|trace) (the )?(call|dependency|path|import|relation).*(cgraph|in the codebase)"
-      - "(what does|how does) (the )?(web app|backend|api client|stripe|socket|logger|chat) (do|work|connect)"
-    kind: coding
-    task: >
-      Answer the user's architecture question about the CGraph codebase using
-      the prebuilt knowledge graph. Run the query wrapper:
-        ~/Projects/Repos/CGraph-graphify/graphify-query.sh "<the user's question>"
-      For path queries: graphify-query.sh path "<from>" "<to>".
-      For a single node: graphify-query.sh explain "<label>" (e.g. stripe.tsx,
-      api-client.ts, socket-manager.ts).
-      The graph has 12k+ nodes (web, backend, packages) with descriptions.
-      Answer in 2-4 short sentences based on what the graph returns.
+      - "(what does|how does|what is|how is) (the )?(web app|backend|api client|stripe|webhook|socket|logger|chat|module|component)[ a-z]* (do|work|connect|handle|use)"
+      - "(explain|describe|summarize) (the )?(stripe|webhook|socket|logger|api client|backend|web app)[ a-z]* (in|from|of) (the )?(cgraph|codebase|repo)"
+    kind: local-script
     ack: "Checking the code graph."
+    summary_words: 40
+    script: >
+      ~/Projects/Repos/CGraph-graphify/graphify-query.sh
+      "{question}"

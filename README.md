@@ -111,6 +111,35 @@ start/stop capture, or `voicebridge once` for a single utterance.
 - *"status"*, *"stop"*, *"mute"*, *"unmute"*, *"use turbo / normal / slow /
   hard / pro"* are built-in system commands.
 
+## Voice Dashboard (talk from your phone)
+
+The bridge serves a small web UI (stdlib HTTP, no extra deps) so you can
+talk to the PC from any browser on the LAN — phone included — and watch
+what the agent is doing live.
+
+- **Chat page**: `http://<this-pc-ip>:8890/` — hold/tap the button, speak,
+  hear the reply (audio comes back to the phone; the PC speakers stay
+  silent). Same pipeline as the mic: ASR → route → OpenClaw/local → **the
+  local 3B model's ≤40-word summary** → TTS.
+- **Activity dashboard**: `http://<this-pc-ip>:8890/activity` — live feed
+  of what the agent did: recognized text, routing decision, status, the
+  final spoken summary, latency, and (for tool runs) the raw output behind
+  the summary. Auto-refreshes every 2s.
+- **API** (for scripts): `POST /api/talk` with raw Int16 PCM @16k mono
+  returns `{text, route, summary, audio_b64, events, latency_s}`;
+  `GET /api/activity` returns the feed.
+
+Find your PC's LAN IP with `ip -4 addr show | grep inet`. The dashboard
+binds `0.0.0.0:8890` by default (`webui.host` / `webui.port` in config) —
+on a trusted LAN only; add firewall rules if you need it internet-facing.
+
+**Summarize-first workflow (why it feels smart):** recurring tool tasks are
+`local-script` templates — the bridge runs the tool itself (Perplexity
+browser search, graphify graph queries, …), feeds the raw output to the
+LOCAL 3B model (`summarizer.provider: ollama`), and speaks ONLY the summary.
+The phone/dashboard shows the raw result as reference, but the voice never
+reads it out. Zero API cost, ~0.3s for the compression step.
+
 ## Configuration
 
 Full reference: `config/voice.example.yaml` (installed to

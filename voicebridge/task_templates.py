@@ -33,9 +33,11 @@ from .logging_setup import log_event
 @dataclass
 class TemplateMatch:
     name: str
-    kind: str            # coding | hermes | conversation
+    kind: str            # coding | hermes | conversation | local-script
     task: str
     ack: str = ""
+    script: str = ""     # local-script: shell command (can embed {question})
+    summary_words: int = 40
     confidence: float = 0.9
     reason: str = "task template"
 
@@ -79,6 +81,9 @@ class TaskTemplates:
                     kind=it.get("kind", "coding"),
                     task=it.get("task", text),
                     ack=it.get("ack", ""),
+                    script=it.get("script", ""),
+                    summary_words=int(it.get("summary_words", 40)),
+                    confidence=float(it.get("confidence", 0.9)),
                     reason=f"task template: {it.get('name', 'template')}",
                 )
         return None

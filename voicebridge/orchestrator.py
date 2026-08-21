@@ -185,6 +185,8 @@ class VoiceOrchestrator:
         self._barge_stream = None
         self._beep_start = None
         self._beep_end = None
+        self._webui = None
+        self._t0 = time.time()
         # PTT state: tap-to-toggle + hold-to-talk
         self._press_time = 0.0
         self._release_time = 0.0      # set on ptt_end; 0 while the key is down
@@ -463,6 +465,21 @@ class VoiceOrchestrator:
             if self._ptt_supported:
                 log_event("hotkey.active", hold=self.cfg.get("hotkey", "hold_key", default="ctrl_r"))
             self.hotkey = hk
+        # voice dashboard (web UI): talk from the phone + live activity feed
+        try:
+            wu_cfg = self.cfg.section("webui")
+            if wu_cfg.get("enabled", True):
+                from .webui import WebUI
+                self._webui = WebUI(
+                    self,
+                    host=wu_cfg.get("host", "0.0.0.0"),
+                    port=int(wu_cfg.get("port", 8890)),
+                    state_dir=self.cfg.state_dir())
+                self._webui.start()
+        except Exception as exc:
+            self._webui = None
+            log_event("webui.start.failed", error=str(exc)[:200])
+
     def _emit_hotkey(self, event: str, key: str) -> None:
         if event == "ptt_start":
             self._press_time = time.time()
@@ -712,6 +729,150 @@ class VoiceOrchestrator:
         if self.gateway_info and self.gateway_info.default_model:
             return self.gateway_info.default_model
         return None
+
+    def _dispatch_local_script(self, tmpl) -> str:
+        """Summarize-first workflow: run a local tool, speak ONLY the summary.
+
+        The small local model never sees the raw tool output for speaking —
+        the script's stdout is collapsed into a ≤summary_words summary via
+        the summarizer (local ollama model or extractive fallback), and that
+        summary is what gets spoken. Raw output goes to the activity feed for
+        the dashboard, not to the ears.
+        """
+        script = (tmpl.script or "").strip()
+        if not script:
+            self.speak("That template is missing its script.")
+            return ""
+        question = self._last_web_text or ""
+        cmd = script.replace("{question}", question.replace("\n", " ")).replace("{text}", question.replace("\n", " "))
+        log_event("local_script.run", name=tmpl.name, cmd=cmd[:300])
+        try:
+            import subprocess
+            proc = subprocess.run(cmd, shell=True, capture_output=True, text=True,
+                                  timeout=float(self.cfg.get("webui", "script_timeout_s", default=60)))
+            raw = (proc.stdout or "").strip()
+            if proc.returncode != 0:
+                err = (proc.stderr or "").strip()[:300]
+                log_event("local_script.failed", name=tmpl.name, rc=proc.returncode, error=err)
+                self.speak(f"The search failed. {err}" if err else "The search failed.")
+                self._last_web_summary = ""
+                return ""
+        except subprocess.TimeoutExpired:
+            log_event("local_script.timeout", name=tmpl.name)
+            self.speak("That took too long and was cancelled.")
+            self._last_web_summary = ""
+            return ""
+        except Exception as exc:
+            log_event("local_script.error", name=tmpl.name, error=str(exc)[:160])
+            self.speak("Something went wrong running that.")
+            self._last_web_summary = ""
+            return ""
+        if not raw:
+            self.speak("I didn't get any result back.")
+            self._last_web_summary = ""
+            return ""
+        # summarize-first: local model compresses to ≤N words, then speak it
+        from .summarizer import summarize
+        sum_cfg = self.cfg.section("summarizer")
+        max_words = int(tmpl.summary_words or sum_cfg.get("max_words", 40))
+        summary = summarize(raw, cfg={**sum_cfg, "max_words": max_words},
+                            ollama_url=sum_cfg.get("ollama_url"),
+                            ollama_model=sum_cfg.get("ollama_model"))
+        if not summary:
+            summary = clamp_words(raw, max_words)
+        self._last_web_summary = summary
+        self._last_web_route = f"local-script:{tmpl.name}"
+        log_event("local_script.summary", name=tmpl.name,
+                  raw_len=len(raw), summary=summary[:300])
+        self.feed_push({"kind": "summary", "text": f"{tmpl.name}", "summary": summary,
+                        "route": self._last_web_route, "raw": raw[:500]})
+        self.speak(summary)
+        return summary
+
+    _last_web_text: str = ""
+    _last_web_summary: str = ""
+    _last_web_route: str = ""
+
+    def process_web_utterance(self, text: str) -> dict:
+        """Phone/web roundtrip: route like the mic but return data, not audio.
+
+        Mirrors _route_intent for the web UI: template first, then the
+        classifier. Coding tasks still dispatch to OpenClaw/Hermes through
+        the SAME gateway (shared session machinery); the reply is summarized
+        by the local model before it's spoken/sent back.
+        """
+        self._last_web_text = text
+        self._last_web_summary = ""
+        self._last_web_route = ""
+        log_event("webui.utterance", text=text[:200])
+        tmpl = self._templates.match(text) if self._templates is not None else None
+        if tmpl is not None:
+            log_event("routing.template", name=tmpl.name, kind=tmpl.kind,
+                      text=text[:160], source="web")
+            if tmpl.kind == "local-script":
+                self._last_web_route = f"local-script:{tmpl.name}"
+                self._dispatch_local_script(tmpl)
+                return {"text": text, "route": self._last_web_route,
+                        "summary": self._last_web_summary or tmpl.ack,
+                        "reply": self._last_web_summary,
+                        "confidence": tmpl.confidence}
+            if tmpl.ack:
+                self.speak(tmpl.ack)
+            if tmpl.kind == "hermes":
+                self._handle_hermes(tmpl.task)
+                self._web_wait_for_summary()
+            elif tmpl.kind == "conversation":
+                self._handle_conversation(tmpl.task)
+            else:
+                self._dispatch_coding(tmpl.task)
+                self._web_wait_for_summary()
+            return {"text": text, "route": tmpl.kind,
+                    "summary": self._last_web_summary or "",
+                    "reply": self._last_web_summary or "", "confidence": tmpl.confidence}
+        intent = self.classifier.classify(text)
+        log_event("routing.decision", text=text[:200], kind=intent.kind,
+                  confidence=round(intent.confidence, 2), reason=intent.reason,
+                  source="web")
+        if intent.kind == "coding":
+            self._dispatch_coding(intent.task_text or text)
+            self._web_wait_for_summary()
+        elif intent.kind == "local":
+            self._handle_local(intent, text)
+        elif intent.kind == "hermes":
+            self._handle_hermes(intent.task_text or text)
+            self._web_wait_for_summary()
+        elif intent.kind == "system":
+            self._handle_system(intent)
+        elif intent.kind == "confirm":
+            self._handle_confirm()
+        elif intent.kind == "cancel":
+            self._handle_cancel_utterance()
+        elif intent.kind == "clarify":
+            self.speak("Could you be more specific about what you'd like me to do?")
+        else:
+            self._handle_conversation(text)
+        return {"text": text, "route": intent.kind,
+                "summary": self._last_web_summary or "",
+                "reply": self._last_web_summary or "",
+                "confidence": round(intent.confidence, 2)}
+
+    def _web_wait_for_summary(self, timeout_s: Optional[float] = None) -> None:
+        """Block the web request until the dispatched task produces a summary
+        (or the timeout expires). Long OpenClaw runs: the phone shows the ack
+        immediately, and the summary arrives when the task completes — the
+        dashboard feed updates live meanwhile."""
+        if timeout_s is None:
+            timeout_s = float(self.cfg.get("webui", "task_wait_s", default=300))
+        deadline = time.time() + timeout_s
+        while time.time() < deadline and not self._stop.is_set():
+            if self._last_web_summary:
+                return
+            time.sleep(0.5)
+
+    def feed_push(self, item: dict) -> None:
+        """Bridge -> webui activity feed (no-op if webui not started)."""
+        if self._webui is not None:
+            self._webui.feed.push(item)
 
     def _dispatch_coding(self, task_text: str, model: Optional[str] = None,
                          force_confirm: bool = False) -> None:
@@ -1046,6 +1207,9 @@ class VoiceOrchestrator:
                              elapsed_s: float) -> None:
         log_event("openclaw.result", session_key=session_key, status=status,
                   elapsed_s=round(elapsed_s, 2), reply_len=len(reply))
+        self.feed_push({"kind": "status", "text": f"task {status}",
+                        "route": "openclaw",
+                        "detail": f"elapsed {round(elapsed_s, 1)}s"})
         if not reply.strip():
             self.speak("OpenClaw finished the task. I couldn't pull the final "
                        "text from the session — check the dashboard for details, "
@@ -1053,6 +1217,9 @@ class VoiceOrchestrator:
             return
         summary = summarize(reply, self.cfg.section("summarizer"))
         log_event("openclaw.summary", session_key=session_key, summary=summary[:400])
+        self.feed_push({"kind": "summary", "text": "OpenClaw task",
+                        "summary": summary, "route": "openclaw", "raw": reply[:500]})
+        self._last_web_summary = summary
         self.speak(summary)
 
     # ----------------------------------------------------------- system cmds
@@ -1535,6 +1702,9 @@ class VoiceOrchestrator:
                 self._handle_hermes(tmpl.task)
             elif tmpl.kind == "conversation":
                 self._handle_conversation(tmpl.task)
+            elif tmpl.kind == "local-script":
+                self._last_web_text = text
+                self._dispatch_local_script(tmpl)
             else:
                 self._dispatch_coding(tmpl.task)
             return
