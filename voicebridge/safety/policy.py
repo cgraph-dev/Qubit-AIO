@@ -52,6 +52,15 @@ DENY_PATTERNS: List[str] = [
     r"you are now (dan|without restrictions)",
 ]
 
+# Money / real-world actions: always ask before spending or ordering.
+# Matched before destructive patterns so a "buy X" is confirmed even though
+# it isn't destructive in the filesystem sense.
+MONEY_ALWAYS_CONFIRM: List[str] = [
+    r"\b(buy|purchase|order|checkout|pay for|subscribe|book|reserve|place (the )?order)\b",
+    r"\b(add to cart|confirm (the )?purchase|complete (the )?(order|purchase|checkout)|pay now)\b",
+    r"\b(price|cost)\s+.*\b(buy|order|purchase)\b",
+]
+
 
 @dataclass
 class SafetyVerdict:
@@ -79,6 +88,7 @@ class SafetyPolicy:
         self.always_confirm = [re.compile(p, re.I) for p in cfg.get("always_confirm", [])]
         self.never_confirm = [re.compile(p, re.I) for p in cfg.get("never_confirm", [])]
         self._destructive = [re.compile(p, re.I) for p in DESTRUCTIVE_PATTERNS]
+        self._money = [re.compile(p, re.I) for p in MONEY_ALWAYS_CONFIRM]
 
     def check(self, text: str) -> SafetyVerdict:
         v = SafetyVerdict()
@@ -101,6 +111,28 @@ class SafetyPolicy:
                 v.matched_pattern = p.pattern
                 log_event("safety.confirm", reason=v.confirm_reason, text=text)
                 return v
+
+        # Money actions (buy/order/checkout) always need spoken confirmation,
+        # even though they aren't filesystem-destructive. Exempt informational
+        # / code-context questions ("tell me about the buy handler", "what
+        # does the checkout function do") — those are code questions, not
+        # purchase attempts.
+        MONEY_INFO = re.compile(
+            r"\b(tell me about|explain|what does|how does|why does|what is|"
+            r"how is|look at|show me|find|search for|review|inspect|describe|"
+            r"the (buy|order|checkout|purchase)\s+(function|method|handler|"
+            r"endpoint|api|route|class|module|code|logic|flow|test))\b",
+            re.I)
+        if MONEY_INFO.search(low):
+            pass
+        else:
+            for p in self._money:
+                if p.search(low):
+                    v.require_confirm = True
+                    v.confirm_reason = f"money action: {p.pattern}"
+                    v.matched_pattern = p.pattern
+                    log_event("safety.money_confirm", reason=v.confirm_reason, text=text)
+                    return v
 
         for p in self.never_confirm:
             if p.search(low):

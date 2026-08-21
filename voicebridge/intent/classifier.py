@@ -72,6 +72,13 @@ TASK_HINTS = [
     r"pull request|issue|bug|crash|error|exception|stack trace|log|logs|terminal|shell|command|"
     r"script|browser|file|files|directory|folder|package|dependency|docker|kubernetes|ci|pipeline|"
     r"component|widget|screen|feature|module|class|function|method|test|tests|deploy|production)\b",
+    # web-action tasks (shop/order/browse/captcha) -> agent with browser
+    r"\b(open|visit|go to|navigate to|load)\s+[a-z0-9.-]+\.[a-z]{2,}\b",
+    r"\b(buy|purchase|order|add to cart|checkout|pay for|book|reserve|subscribe)\b",
+    r"\b(price|prices|product|products|shop|shopping|store|cart|order|orders|delivery|shipping)\b",
+    r"\b(captcha|sign in|log in|login|2fa|two.factor|verify me on)\b",
+    r"\b(website|web page|site|online|amazon|ebay|zara|aliexpress|netflix|spotify|steam|epic)\b",
+    r"\b(how much|what does it cost|is it in stock|in stock|available)\b",
 ]
 
 SYSTEM_STOP_WORDS = {"the", "a", "an", "is", "are", "to", "of", "in", "on", "for", "and", "or"}

@@ -114,9 +114,10 @@ templates:
 
   - name: check-dms
     match:
-      - "(check|read|look at|open|scan|review) (my )?(private )?(messages|dms?|inbox)"
-      - "(any|do i have) (new|unread) (messages|dms?|private messages)"
-      - "(check|see|look at) (my )?(whatsapp|discord|instagram|telegram|signal)"
+      - "(check|read|look at|open|scan|review) (my )?(private )?(messages|dms?|inbox)( please)?"
+      - "(any|do i have) (new|unread) (private )?(messages|dms?)(?! (on|in) (facebook|instagram|messenger))"
+      - "(check|see|look at) (my )?(whatsapp|discord|telegram|signal)"
+      - "any (new|unread) (whatsapp|discord|telegram|signal) (messages|dms?)"
     kind: coding
     task: >
       Check the user's private messages / DMs (WhatsApp, Discord, or whichever
@@ -179,6 +180,47 @@ templates:
       them, and do the requested edits. Use your full tool set (files,
       terminal, browser, repos). Reply concisely with what was done.
     ack: "Using VS Code."
+
+  # -------------------------------------------------- social inbox check
+  # Zero-token deterministic readers (CDP vs logged-in Chromium profile).
+  # Scripts live in the social-inbox-check skill; the agent runs them and
+  # only summarizes the JSON in 2 short sentences.
+  - name: check-email
+    match:
+      - "(check|read|see|look at|any|what('?s| is) (new|new in))? (my |the )?(gmail|email|emails|inbox|mail)( please)?"
+      - "(what|any) (new )?(email|emails|messages?) (did|have|do) i (get|receive)"
+      - "latest (email|emails|mail)"
+    kind: coding
+    task: >
+      Run the social-inbox-check skill: read the Gmail inbox with
+      read_gmail.py 3 (uses the logged-in Chromium profile over CDP, zero
+      tokens). Then speak a 2-sentence summary of the top 3 emails: sender,
+      subject, and how recent. Mention unread/important ones first.
+    ack: "Checking your inbox."
+  - name: check-messenger
+    match:
+      - "(check|read|see|any|what('?s| is) (new|new in))? (my )?(messenger|facebook|fb) (messages|chats?|dm|dms)( please)?"
+      - "(what|any) (new )?(messages?) (on|in) (messenger|facebook|fb)"
+      - "latest (messenger|facebook) (messages|chats)"
+    kind: coding
+    task: >
+      Run the social-inbox-check skill: read the Messenger chat list with
+      read_messenger.py 3 (logged-in Chromium profile over CDP, zero
+      tokens). Speak a 2-sentence summary: who messaged, the preview, and
+      how long ago. Mention unread chats first.
+    ack: "Checking Messenger."
+  - name: check-instagram
+    match:
+      - "(check|read|see|any|what('?s| is) (new|new in))? (my )?instagram (messages|dms?|direct|inbox)( please)?"
+      - "(what|any) (new )?(messages?) (on|in) instagram"
+      - "latest instagram (messages|dms)"
+    kind: coding
+    task: >
+      Run the social-inbox-check skill: read the Instagram DM inbox with
+      read_instagram.py 3 (logged-in Chromium profile over CDP, zero
+      tokens). Speak a 2-sentence summary: who messaged, the preview, and
+      how long ago. Mention unread conversations first.
+    ack: "Checking Instagram."
 
   # ---------------------------------------------------------- CGraph graph
   - name: graphify-query
