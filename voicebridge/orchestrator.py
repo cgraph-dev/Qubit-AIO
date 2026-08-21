@@ -193,17 +193,12 @@ class VoiceOrchestrator:
 
     # ------------------------------------------------------------------ setup
     def _make_asr(self):
-        from .asr.personaplex import PersonaPlexASR
         from .asr.whisper import FasterWhisperASR
         asr_cfg = self.cfg.section("asr")
         provider = asr_cfg.get("provider", "whisper")
         if provider == "personaplex":
-            pp = PersonaPlexASR(url=asr_cfg.get("personaplex", {}).get("url", "ws://127.0.0.1:8765"))
-            if pp.available():
-                log_event("asr.provider", provider="personaplex", active=True)
-                return pp
             log_event("asr.provider", provider="personaplex", active=False,
-                      note="PersonaPlex server unreachable; falling back to whisper")
+                      detail="PersonaPlex ASR removed; falling back to whisper")
         model_dir = self.cfg.model_dir()
         return FasterWhisperASR(model=asr_cfg.get("model", "base"),
                                 device=asr_cfg.get("device", "auto"),
