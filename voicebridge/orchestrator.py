@@ -1579,6 +1579,56 @@ class VoiceOrchestrator:
         OpenClaw/Hermes (see _route_intent); cloud APIs are last-resort
         fallbacks when the local model or gateway is down.
         """
+        # === Fast path: short filler / ack without semantic content ===
+        # "yeah / okay / ok / hello / hi / hey / ...": don't burn the 3B LLM (0.7s) for a canned line.
+        # Keep them local, no history pollution, and free the pipeline for real work.
+        _filler_re = getattr(self, "_filler_re", None)
+        if _filler_re is None:
+            import re as _re
+            # matches bare filler / greeting with optional trailing period
+            self._filler_re = _re.compile(r"^(?:yeah|yep|okay|ok|hello|hi|hey|bruski|sup|howdy|yo|hmm|ah|oh|alright|fine|good|thanks|thank you)\b[.!?]*$", flags=_re.I)
+            _filler_re = self._filler_re
+        low = text.strip().lower()
+        if _filler_re.fullmatch(low):
+            # Route by language but keep it instant — also mirror to per-request ctx so /api/result returns it
+            if low.startswith(("salut","buna","bruski")) or "salut" in low or "bruski" in low:
+                # Romanian-ish greeting -> short RO ack
+                reply_f = "Sunt bine. Cu ce te pot ajuta?"
+            else:
+                reply_f = "I'm functioning well. What do you need?"
+            _cf = self._cur_ctx()
+            if _cf is not None:
+                _cf.summary = reply_f
+                _cf.route = "local"
+                _cf.done.set()
+            with self._web_lock:
+                self._last_web_summary = reply_f
+                self._last_web_route = "local"
+            self.speak(reply_f)
+            self.feed_push({"kind": "summary", "text": text[:300], "summary": reply_f, "route": "local", "detail": "filler"})
+            log_event("conversation.filler", text=text[:80])
+            return
+        # Hotword for identity: "my name" / "who am i" -> answer without LLM (deterministic, fast, non-hallucinating)
+        _low_identity = low
+        if ("what is my name" in _low_identity or "what's my name" in _low_identity or "who am i" in _low_identity):
+            # Deterministic answer from memory — never ask back
+            reply = "Your name is Tricky."
+            # Keep per-request ctx + conversation history consistent for next turns
+            _ctx_id = self._cur_ctx()
+            if _ctx_id is not None:
+                _ctx_id.summary = reply
+                _ctx_id.route = "local"
+                _ctx_id.done.set()
+            with _conv_lock:
+                self.conversation.add("user", text)
+                self.conversation.add("assistant", reply)
+            with self._web_lock:
+                self._last_web_summary = reply
+                self._last_web_route = "local"
+            self.feed_push({"kind": "summary", "text": text[:300], "summary": reply, "route": "local", "detail": "identity"})
+            log_event("conversation.identity", text=text[:80], summary=reply)
+            self.speak(reply)
+            return
         llm_cfg = self.cfg.section("intent").get("local_llm", {}) or {}
         # Explicit "use perplexity to search X" -> straight to Perplexity,
         # never the local model (it answers web queries generically without
@@ -1591,6 +1641,8 @@ class VoiceOrchestrator:
             # Use per-request snapshot so concurrent EN/RO requests don't bleed
             _ctx_for_llm = self._cur_ctx()
             _conv_prompt = _ctx_for_llm.conv_snapshot if _ctx_for_llm is not None and _ctx_for_llm.conv_snapshot is not None else self.conversation.as_prompt()
+            # Ensure EVERY local chat turn sees the identity file (Qubit/Tricky) — even per-request isolated ctx
+            _mem_ctx = self._memory_context or self.conversation.as_prompt()  # both include personal-knowledge
             try:
                 reply = chat_local(
                     text, _conv_prompt,
@@ -1598,7 +1650,7 @@ class VoiceOrchestrator:
                     url=llm_cfg.get("url", "http://127.0.0.1:11434"),
                     timeout_s=float(llm_cfg.get("timeout_s", 4.0)),
                     max_tokens=int(llm_cfg.get("max_tokens", 100)),
-                    context=self._memory_context)
+                    context=_mem_ctx)
             except Exception as exc:
                 reply = ""
                 log_event("conversation.local.skip", error=str(exc)[:120])
