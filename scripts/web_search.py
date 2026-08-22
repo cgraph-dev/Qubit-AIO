@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import shlex
 import subprocess
+import re
 import sys
 import time
 
@@ -75,6 +76,18 @@ def main() -> int:
         print("usage: web_search.py <query> [--perplexity] [max_chars]", file=sys.stderr)
         return 2
 
+    # Weather: Bucharest (and mangled 'Corest') must return real temps, not DDG titles.
+    if re.search(r"weather|temperature|forecast", query, re.I):
+        try:
+            import subprocess, pathlib
+            venv = pathlib.Path.home() / "Projects/Repos/openclaw-voice-bridge/.venv/bin/python"
+            weather = pathlib.Path.home() / "Projects/Repos/openclaw-voice-bridge/scripts/weather.py"
+            r = subprocess.run([str(venv), str(weather), query], capture_output=True, text=True, timeout=12)
+            if r.returncode == 0 and r.stdout.strip():
+                print(r.stdout.strip())
+                return 0
+        except Exception as e:
+            print(f"weather fallback err: {e}", file=sys.stderr)
     if not force_perplexity:
         answer = ddg_answer(query)
         if answer:

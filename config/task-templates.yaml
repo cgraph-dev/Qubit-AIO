@@ -1,4 +1,17 @@
 templates:
+- name: weather-bucharest
+  match:
+  - weather (in|for|at|near)? (bucharest|bucuresti|corest)
+  - (bucharest|bucuresti|corest).*(weather|forecast|temperature|rain)
+  - what('?s|s) (the )?weather.*(bucharest|bucuresti|today|now)
+  - weather.*(today|now|current)
+  kind: local-script
+  ack: Checking the weather.
+  summary_words: 40
+  script: '~/Projects/Repos/openclaw-voice-bridge/.venv/bin/python ~/Projects/Repos/openclaw-voice-bridge/scripts/weather.py
+    "{question}" 1500
+
+    '
 - name: search-web
   match:
   - '(use )?(perplexity|search the web|search|look up|google|find out|research) (for
