@@ -170,6 +170,9 @@ def _event_to_feed_item(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if evt == "hermes.summary":
         return {"kind": "summary", "text": "Hermes task",
                 "summary": ev.get("summary",""), "route": "hermes"}
+    if evt == "hermes.task":
+        return {"kind": "status", "text": "Hermes task dispatched",
+                "route": "hermes", "detail": str(ev.get("task",""))[:300]}
     if evt == "system.command":
         cmd = ev.get("command","") or "system"
         return {"kind": "status", "text": f"system:{cmd}",
@@ -177,6 +180,24 @@ def _event_to_feed_item(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if evt == "hermes.result.discarded":
         return {"kind": "status", "text": "Hermes task interrupted",
                 "route": "hermes", "detail": ev.get("why","")}
+    if evt == "openclaw.error":
+        return {"kind": "fail", "text": "OpenClaw error",
+                "route": "openclaw", "detail": str(ev.get("error",""))[:300]}
+    if evt == "openclaw.status":
+        return {"kind": "status", "text": "OpenClaw running",
+                "route": "openclaw", "detail": f"elapsed {ev.get('elapsed_s','')}s"}
+    if evt == "openclaw.progress":
+        return {"kind": "status", "text": "OpenClaw progress",
+                "route": "openclaw", "detail": f"elapsed {ev.get('elapsed_s','')}s"}
+    if evt == "hermes.error":
+        return {"kind": "fail", "text": "Hermes error",
+                "route": "hermes", "detail": str(ev.get("error",""))[:300]}
+    if evt == "boss_talk":
+        return {"kind": "status", "text": ev.get("phrase","boss talk"),
+                "route": ev.get("target",""), "detail": str(ev.get("task",""))[:160]}
+    if evt == "humming":
+        return {"kind": "status", "text": ev.get("phrase","humming"),
+                "route": ev.get("target","humming"), "detail": f"elapsed {ev.get('elapsed_s','')}s"}
     return None
 
 
@@ -612,6 +633,11 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self._file(self.app._frontend_dir / "index.html", "text/html; charset=utf-8")
             else:
                 self._html(CHAT_PAGE)
+        elif path == "/reports" or path == "/reports.html":
+            if self.app._use_frontend_dir and (self.app._frontend_dir / "reports.html").exists():
+                self._file(self.app._frontend_dir / "reports.html", "text/html; charset=utf-8")
+            else:
+                self._send(404, b"reports page not found")
         elif path == "/activity":
             if self.app._use_frontend_dir and (self.app._frontend_dir / "activity.html").exists():
                 self._file(self.app._frontend_dir / "activity.html", "text/html; charset=utf-8")
@@ -644,6 +670,62 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self._send(404, b"not found")
                 return
             self._json(item)
+        elif path == "/api/reports":
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            qs = self.path.split("?", 1)[1] if "?" in self.path else ""
+            params: Dict[str, str] = {}
+            for kv in qs.split("&"):
+                if "=" in kv:
+                    k, v = kv.split("=", 1)
+                    params[k] = __import__("urllib.parse").parse.unquote_plus(v)
+            q = params.get("q", "").strip()[:120]
+            cat = params.get("category", "").strip()[:40]
+            days = int(params.get("days", "90") or 90)
+            limit = min(int(params.get("limit", "200") or 200), 500)
+            # merged activity + logs, categorized, with filters
+            activity = self.app.feed.recent(limit=300)
+            logs = self.app.logs(limit=300, q=q, since=0.0)
+            # tag categories
+            def _cat(it):
+                k = (it.get("kind") or "").lower()
+                r = (it.get("route") or it.get("detail") or "").lower()
+                txt = " ".join(str(it.get(x, "")) for x in ("text","summary","detail","route","kind")).lower()
+                if "weather" in txt: return "weather"
+                if any(x in k for x in ("interrupt","hotkey")): return "interrupt"
+                if "filler" in txt: return "filler"
+                if "hermes" in k or "hermes" in r: return "hermes"
+                if "openclaw" in k or "openclaw" in r: return "openclaw"
+                if "inbox" in txt or "gmail" in txt or "messenger" in txt or "instagram" in txt or "tiktok" in txt: return "inbox"
+                if k in ("summary","conversation","local","fallback"): return k
+                return k or "other"
+            import time as _time
+            cutoff = _time.time() - days * 86400 if days > 0 else 0
+            merged = []
+            for it in activity:
+                if cutoff and float(it.get("ts") or 0) < cutoff:
+                    continue
+                if cat and _cat(it) != cat:
+                    continue
+                if q and q.lower() not in __import__("json").dumps(it).lower():
+                    continue
+                it = dict(it); it["category"] = _cat(it)
+                merged.append(it)
+            # also include raw log events not yet in feed
+            for ev in logs:
+                if any(ev.get("ts") == m.get("ts") and ev.get("event") == m.get("kind") for m in merged):
+                    continue
+                if cutoff and float(ev.get("ts") or 0) < cutoff:
+                    continue
+                c = _cat({"kind": ev.get("event",""), "text": str(ev)})
+                if cat and c != cat:
+                    continue
+                if q and q.lower() not in __import__("json").dumps(ev).lower():
+                    continue
+                merged.append({"kind": ev.get("event"), "text": str(ev.get("text","")), "summary": str(ev.get("summary","")), "route": ev.get("route",""), "ts": ev.get("ts"), "category": c, "raw_log": ev})
+            merged.sort(key=lambda x: float(x.get("ts") or 0), reverse=True)
+            self._json({"items": merged[:limit], "pruned_available": True})
         elif path == "/api/logs":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
@@ -713,6 +795,18 @@ class WebUIHandler(BaseHTTPRequestHandler):
             except Exception as exc:
                 log.exception("webui /api/interrupt failed")
                 self._json({"error": str(exc)[:200]}, 500)
+        elif path == "/api/prune" or path == "/api/reports/prune":
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            try:
+                body = self.rfile.read(int(self.headers.get("Content-Length", 0)) if self.headers.get("Content-Length") else 0) or b"{}"
+                data = __import__("json").loads(body or b"{}")
+                days = int(data.get("days", 90))
+            except Exception:
+                days = 90
+            removed = self.app._prune_old_events(max_age_days=days)
+            self._json({"ok": True, "removed": removed, "days": days})
         elif path == "/api/type":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
@@ -909,6 +1003,38 @@ class WebUI:
 
     def item(self, item_id: str) -> Optional[Dict[str, Any]]:
         return self.feed.get(item_id)
+
+    def _prune_old_events(self, max_age_days: int = 90) -> int:
+        """Delete events.jsonl entries older than max_age_days. Returns removed count."""
+        import time
+        path = self.orch.cfg.state_dir() / "events.jsonl" if self.orch and self.orch.cfg else Path("/tmp") / "events.jsonl"
+        try:
+            lines = path.read_text(errors="replace").splitlines()
+        except OSError:
+            return 0
+        cutoff = time.time() - max_age_days * 86400
+        kept = []
+        removed = 0
+        for l in lines:
+            try:
+                ev = __import__("json").loads(l)
+                ts = float(ev.get("ts") or 0)
+                if ts and ts < cutoff:
+                    removed += 1
+                    continue
+            except Exception:
+                pass
+            kept.append(l)
+        if removed:
+            # atomic replace
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text("\n".join(kept) + ("\n" if kept else ""), errors="replace")
+            tmp.replace(path)
+            try:
+                self.feed.load_history(path, limit=200)
+            except Exception:
+                pass
+        return removed
 
     def logs(self, limit: int = 200, q: str = "", since: float = 0.0) -> List[Dict[str, Any]]:
         path = self.orch.cfg.state_dir() / "events.jsonl" if self.orch and self.orch.cfg else Path("/tmp") / "events.jsonl"

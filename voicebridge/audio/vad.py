@@ -122,7 +122,7 @@ class Endpointer:
     speech_start_ms: int = 220        # consecutive voiced time to enter speech
     silence_timeout_s: float = 1.2    # trailing silence that ends the utterance
     max_utterance_s: float = 30.0
-    rms_gate: float = 0.004           # frame RMS floor for "voiced" (after gain)
+    rms_gate: float = 0.0018           # frame RMS floor for "voiced" (after gain)
     vad_backend: str = "silero"       # silero | webrtc
     silero_model: Optional[Path | str] = None
     speech_frames: int = field(init=False, default=0)
@@ -192,7 +192,7 @@ class BargeInDetector:
     """Detects user speech while the assistant is speaking (for interruption)."""
 
     def __init__(self, aggressiveness: int = 2, trigger_ms: int = 150,
-                 rms_gate: float = 0.004, vad_backend: str = "silero",
+                 rms_gate: float = 0.0018, vad_backend: str = "silero",
                  silero_model: Optional[Path | str] = None) -> None:
         self._vad = _make_vad_gate(vad_backend, aggressiveness, silero_model)
         self._trigger_frames = max(1, trigger_ms // FRAME_MS)

@@ -43,7 +43,7 @@ class MicCapture:
                  channels: int = 2, blocksize: int = 480,
                  endpointer: Optional[Endpointer] = None,
                  gain: float = 4.0, min_rms: float = 0.0008,
-                 min_speech_s: float = 0.25) -> None:
+                 min_speech_s: float = 0.15) -> None:
         self.device = device
         self.sample_rate = sample_rate
         self.channels = channels
@@ -162,8 +162,12 @@ class MicCapture:
                 break
 
         voiced_s = ep.voiced_frames * FRAME_MS / 1000.0
+        # Don't discard audible speech just because VAD missed it:
+        # quiet Focusrite speech (peak ~0.006) can have voiced_s=0 yet still be
+        # perfectly transcribable — ASR is the final judge, not VAD.
+        audible = peak_rms >= max(self.min_rms * 3, 0.0015)
         if not buf16 or (ended_by == "cancelled" and peak_rms < self.min_rms) \
-                or voiced_s < self.min_speech_s:
+                or (voiced_s < self.min_speech_s and not audible):
             return CaptureResult(None, 0.0, 0, ended_by, peak_rms)
 
         # Include pre-roll context before the first voiced frame for ASR stability.

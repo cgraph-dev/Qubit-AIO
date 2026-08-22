@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 import queue
+import random
 import re
 import threading
 import time
@@ -90,6 +91,40 @@ _SAMPLE_TASK = (
     "Open the current project, inspect the Stripe webhook flow, and "
     "patch the signature verification and add structured logs."
 )
+
+# Boss-talk + humming while thinking (characterful, not spammy)
+_BOSS_PHRASES = [
+    "I'm on it boss",
+    "Starting the task now",
+    "Processing your orders",
+    "You got it boss",
+    "On my way boss",
+    "Working on it now",
+    "Consider it done boss",
+    "Right away boss",
+    "Copy that boss",
+    "At your service boss",
+]
+
+_HUM_PHRASES = [
+    "hmm~",
+    "still working boss",
+    "almost there boss",
+    "still on it boss",
+    "working away here",
+    "hang tight boss",
+    "*whistles*",
+    "still cooking boss",
+]
+
+
+def _boss_phrase() -> str:
+    return random.choice(_BOSS_PHRASES)
+
+
+def _hum_phrase() -> str:
+    return random.choice(_HUM_PHRASES)
+
 
 
 def _needs_web(text: str) -> bool:
@@ -447,11 +482,11 @@ class VoiceOrchestrator:
                                    speech_start_ms=self.cfg.get("vad", "speech_start_ms", default=180),
                                    silence_timeout_s=self.cfg.get("vad", "silence_timeout_s", default=1.2),
                                    max_utterance_s=self.cfg.get("vad", "max_utterance_s", default=30.0),
-                                   rms_gate=float(self.cfg.get("vad", "rms_gate", default=0.004)),
+                                   rms_gate=float(self.cfg.get("vad", "rms_gate", default=0.0018)),
                                    vad_backend=vad_backend,
                                    silero_model=silero_model),
                                gain=float(mic_cfg.get("gain", 4.0)),
-                               min_rms=float(mic_cfg.get("min_rms", 0.0008)))
+                               min_rms=float(mic_cfg.get("min_rms", 0.0005)))
         self._beep_start = self._make_beep(880.0, 0.08)
         self._beep_end = self._make_beep(660.0, 0.06)
         self._barge = BargeInDetector(
@@ -817,7 +852,10 @@ class VoiceOrchestrator:
             summary = clamp_words(raw, max_words)
         # Update both the legacy global and the per-request ctx (if any) so concurrent
         # web requests don't race on _last_web_summary (the wrong-answer bug).
-        ctx = self._cur_ctx()
+        try:
+            ctx = self._cur_ctx()
+        except AttributeError:
+            ctx = None
         if ctx is not None:
             ctx.summary = summary
             ctx.route = f"local-script:{tmpl.name}"
@@ -1036,46 +1074,54 @@ class VoiceOrchestrator:
     def _dispatch_coding(self, task_text: str, model: Optional[str] = None,
                          force_confirm: bool = False) -> None:
         """Safety-check and dispatch a coding task to OpenClaw."""
-        verdict = self.safety.check(task_text)
-        log_event("safety.verdict", text=task_text[:200], allowed=verdict.allowed,
-                  deny=verdict.deny, require_confirm=verdict.require_confirm,
-                  dry_run=verdict.dry_run, reason=verdict.confirm_reason or verdict.deny_reason)
+        try:
+            verdict = self.safety.check(task_text)
+            log_event("safety.verdict", text=task_text[:200], allowed=verdict.allowed,
+                      deny=verdict.deny, require_confirm=verdict.require_confirm,
+                      dry_run=verdict.dry_run, reason=verdict.confirm_reason or verdict.deny_reason)
 
-        if verdict.blocked:
-            self.speak(f"I won't do that. {verdict.deny_reason}.")
-            return
+            if verdict.blocked:
+                self.speak(f"I won't do that. {verdict.deny_reason}.")
+                return
 
-        final_text = task_text
-        if verdict.dry_run:
-            final_text = verdict.dry_run_instruction + "\n\n" + task_text
+            final_text = task_text
+            if verdict.dry_run:
+                final_text = verdict.dry_run_instruction + "\n\n" + task_text
 
-        if self.dry_run:
-            self.speak(f"Dry run mode: I would send this task to OpenClaw: {trim_spoken(final_text, 300)}")
-            return
+            if self.dry_run:
+                self.speak(f"Dry run mode: I would send this task to OpenClaw: {trim_spoken(final_text, 300)}")
+                return
 
-        if verdict.require_confirm or force_confirm:
-            self.confirmations.request(
-                action_desc=trim_spoken(final_text, 260),
-                payload={"task": final_text, "model": model or self._current_model(),
-                         "dry_run": verdict.dry_run},
-                reason=verdict.confirm_reason or "user-confirmed dispatch")
-            self.speak(self.safety.spoken_confirmation(trim_spoken(task_text, 200), verdict))
-            return
+            if verdict.require_confirm or force_confirm:
+                self.confirmations.request(
+                    action_desc=trim_spoken(final_text, 260),
+                    payload={"task": final_text, "model": model or self._current_model(),
+                             "dry_run": verdict.dry_run},
+                    reason=verdict.confirm_reason or "user-confirmed dispatch")
+                self.speak(self.safety.spoken_confirmation(trim_spoken(task_text, 200), verdict))
+                return
 
-        # executor ask-mode: until the user gets a bigger GPU / smarter model,
-        # let THEM pick who runs the task (Hermes vs OpenClaw) instead of
-        # always defaulting to OpenClaw. The next utterance is interpreted by
-        # _handle_executor_answer(). Web/phone requests skip the question —
-        # the website is the OpenClaw control surface; asking "who should run
-        # this?" over the phone UI adds friction with no benefit.
-        if (self.cfg.get("openclaw", "ask_executor", default=False)
-                and not self._web_mode):
-            self.executor_choice.request(final_text, model or self._current_model() or "")
-            self.speak("Who should handle this — OpenClaw or Hermes?")
-            log_event("executor.ask", task=final_text[:160])
-            return
+            # executor ask-mode: until the user gets a bigger GPU / smarter model,
+            # let THEM pick who runs the task (Hermes vs OpenClaw) instead of
+            # always defaulting to OpenClaw. The next utterance is interpreted by
+            # _handle_executor_answer(). Web/phone requests skip the question —
+            # the website is the OpenClaw control surface; asking "who should run
+            # this?" over the phone UI adds friction with no benefit.
+            if (self.cfg.get("openclaw", "ask_executor", default=False)
+                    and not self._web_mode):
+                self.executor_choice.request(final_text, model or self._current_model() or "")
+                self.speak("Who should handle this — OpenClaw or Hermes?")
+                log_event("executor.ask", task=final_text[:160])
+                return
 
-        self._launch_task(final_text, model or self._current_model())
+            self._launch_task(final_text, model or self._current_model())
+        except Exception as exc:
+            log_event("openclaw.error", task=task_text[:200], error=str(exc)[:300])
+            log_event("hermes.error", task=task_text[:200], error=str(exc)[:300])
+            try:
+                self.speak("Something went wrong dispatching the task. Check the logs.")
+            except Exception:
+                pass
 
     def _launch_task(self, task_text: str, model: Optional[str] = None) -> None:
         # skills nudge: remind the agent to use its full skill/tool set
@@ -1123,10 +1169,12 @@ class VoiceOrchestrator:
             self._retry_gateway()
 
         if self._route == "gateway" and self._gateway:
+            boss = _boss_phrase()
             try:
-                self.speak("On it. Routing to OpenClaw.", name="ack", barge=False)
+                self.speak(boss, name="ack", barge=False)
             except Exception:
                 pass
+            log_event("boss_talk", target="openclaw", phrase=boss, task=task_text[:160])
             # create session + send in one RPC (message nested)
             try:
                 res = self._gateway.create_session(
@@ -1165,11 +1213,22 @@ class VoiceOrchestrator:
                 self.speak("Something went wrong talking to OpenClaw.")
                 return
         elif self._route == "cli" and self._cli:
+            boss = _boss_phrase()
             try:
-                self.speak("On it. Running locally.", name="ack", barge=False)
+                self.speak(boss, name="ack", barge=False)
             except Exception:
                 pass
-            result = self._cli.run_task(session_key, task_text, model)
+            log_event("boss_talk", target="cli", phrase=boss, task=task_text[:160])
+            try:
+                result = self._cli.run_task(session_key, task_text, model)
+            except Exception as exc:
+                log_event("openclaw.error", session_key=session_key, error=str(exc)[:300])
+                if self._hermes is not None:
+                    log_event("openclaw.failover.hermes", reason=str(exc)[:120])
+                    self._handle_hermes(task_text, notice="OpenClaw hit an error. Routing to Hermes.")
+                    return
+                self.speak("OpenClaw hit an error. Check the logs.")
+                return
             self.task.set_active(session_key, "", task_text, model or "")
             self._handle_agent_result(session_key, result.reply, result.status, result.elapsed_s)
             self.task.clear()
@@ -1188,9 +1247,11 @@ class VoiceOrchestrator:
             time.sleep(interval)
             if self.task.active and not self.playback.playing:
                 elapsed = self.task.elapsed_s()
+                log_event("openclaw.status", session_key=self.task.session_key, elapsed_s=round(elapsed, 1))
                 if elapsed > 30:
                     self.speak("Still working. I'll update you when it's done.",
                                name="progress", barge=False)
+                    log_event("openclaw.progress", elapsed_s=round(elapsed, 1))
                     self.task.last_progress_spoken = time.time()
 
     def _await_run(self, session_key: str, run_id: str, task_text: str,
@@ -1205,9 +1266,35 @@ class VoiceOrchestrator:
             blocking = self.blocking_tasks
         t0 = time.time()
         self._spawn_waiter(session_key, run_id, t0)
+        # humming while the gateway task runs (non-blocking, stop when task clears)
+        _hum_stop = threading.Event()
+        def _hum_loop():
+            import random as _rnd
+            # wait a bit before first hum so immediate boss phrase isn't drowned
+            _hum_stop.wait(timeout=_rnd.uniform(8, 15))
+            while not _hum_stop.is_set() and self.task.active and not self._stop.is_set():
+                if self.playback.playing or self._interrupt_requested:
+                    _hum_stop.wait(timeout=_rnd.uniform(8, 15))
+                    continue
+                phrase = _hum_phrase()
+                log_event("humming", phrase=phrase, target="openclaw", elapsed_s=round(time.time() - t0, 1))
+                try:
+                    self.speak(phrase, name="hum", barge=False)
+                except Exception:
+                    pass
+                _hum_stop.wait(timeout=_rnd.uniform(8, 15))
+        threading.Thread(target=_hum_loop, daemon=True, name="openclaw-hum").start()
         if blocking:
             while self.task.active and not self._stop.is_set():
                 time.sleep(0.5)
+            _hum_stop.set()
+        else:
+            # non-blocking: stop hum when waiter clears the task (watch the task)
+            def _watch_hum_stop():
+                while self.task.active and not self._stop.is_set():
+                    time.sleep(1.0)
+                _hum_stop.set()
+            threading.Thread(target=_watch_hum_stop, daemon=True, name="openclaw-hum-watch").start()
 
     def _spawn_waiter(self, session_key: str, run_id: str, t0: float) -> None:
         """Background poller (waiter + reaper in one).
@@ -1237,9 +1324,15 @@ class VoiceOrchestrator:
                     return
                 remaining = task_timeout - (time.time() - t0)
                 window_ms = 60_000 if remaining > 0 else 300_000
+                # heartbeat so dashboard feed + events.jsonl show the task is alive (was invisible on crash)
+                try:
+                    log_event("openclaw.status", session_key=session_key, run_id=run_id, elapsed_s=round(time.time() - t0, 1), remaining_s=round(remaining, 1) if remaining > 0 else 0)
+                except Exception:
+                    pass
                 try:
                     res = self._gateway.wait_run(run_id, timeout_ms=window_ms)
                 except GatewayError as exc:
+                    log_event("openclaw.error", session_key=session_key, run_id=run_id, error=exc.message, elapsed_s=round(time.time() - t0, 2))
                     log_event("openclaw.result", session_key=session_key, run_id=run_id,
                               status="failed", error=exc.message,
                               elapsed_s=round(time.time() - t0, 2))
@@ -1247,6 +1340,7 @@ class VoiceOrchestrator:
                     self.speak("OpenClaw failed the task. Check the logs.")
                     return
                 except Exception as exc:
+                    log_event("openclaw.error", session_key=session_key, run_id=run_id, error=str(exc)[:200], elapsed_s=round(time.time() - t0, 2))
                     log_event("openclaw.result", session_key=session_key, run_id=run_id,
                               status="failed", error=str(exc)[:200],
                               elapsed_s=round(time.time() - t0, 2))
@@ -1951,22 +2045,48 @@ class VoiceOrchestrator:
             self._dispatch_coding(task)
             return
         hermes = self._hermes
-        self.speak(notice or "On it. Routing to Hermes.", name="ack", barge=False)
+        log_event("hermes.task", task=task[:300], notice=notice[:120] if notice else "")
+        boss = _boss_phrase()
+        self.speak(notice or boss, name="ack", barge=False)
+        log_event("boss_talk", target="hermes", phrase=boss, task=task[:160])
         task = (task + "\n\nReply directly and concisely: no emojis, no "
                      "pleasantries, no extra words — only what was needed.")
         self._hermes_busy = True
+        _humming_stop = threading.Event()
+
+        def _hum_loop():
+            import random as _rnd
+            while not _humming_stop.is_set() and self._hermes_busy and not self._stop.is_set():
+                _humming_stop.wait(timeout=_rnd.uniform(8, 15))
+                if _humming_stop.is_set() or not self._hermes_busy or self._stop.is_set():
+                    break
+                if self.playback.playing or self._interrupt_requested:
+                    continue
+                phrase = _hum_phrase()
+                log_event("humming", phrase=phrase, target="hermes")
+                try:
+                    self.speak(phrase, name="hum", barge=False)
+                except Exception:
+                    pass
+
+        threading.Thread(target=_hum_loop, daemon=True, name="hermes-hum").start()
 
         def _run():
             try:
                 reply = hermes.run_task(task)
-            except TimeoutError:
+            except TimeoutError as exc:
+                _humming_stop.set()
                 self._hermes_busy = False
+                log_event("hermes.error", task=task[:200], error="timeout")
                 self.speak("Hermes timed out. Try again, or ask me instead.")
                 return
             except Exception as exc:
+                _humming_stop.set()
                 self._hermes_busy = False
+                log_event("hermes.error", task=task[:200], error=str(exc)[:300])
                 self.speak(f"Hermes failed: {str(exc)[:120]}")
                 return
+            _humming_stop.set()
             self._hermes_busy = False
             if self._interrupt_requested:
                 # user redirected mid-run; don't speak the stale reply
@@ -2533,7 +2653,7 @@ class VoiceOrchestrator:
                     capture_result.append(None)
                 res = capture_result[-1] if capture_result else None
                 if res is None or res.wav_path is not None \
-                        or res.peak_rms >= 0.002:
+                        or res.peak_rms >= 0.0015:
                     break
                 log_event("mic.zero_read.retry", attempt=attempt + 1,
                           ended_by=res.ended_by, peak_rms=round(res.peak_rms, 5))

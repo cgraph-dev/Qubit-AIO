@@ -38,7 +38,7 @@ DEFAULTS: Dict[str, Any] = {
         "channels": 2,         # capture N channels, use the loudest
         "blocksize": 480,      # ~10ms at 48k
         "gain": 64.0,           # pre-amplify quiet interfaces (Focusrite needs this)
-        "min_rms": 0.0008,          # below this the capture is treated as silence
+        "min_rms": 0.0005,          # lowered from 0.0008 — quiet tap speech peaked at 0.006 but was still gated          # below this the capture is treated as silence
                 "max_capture_s": 30.0,       # watchdog: force-close a wedged mic stream
     },
     "vad": {
@@ -49,7 +49,7 @@ DEFAULTS: Dict[str, Any] = {
         "speech_start_ms": 180,     # frames of speech to consider "started"
         "silence_timeout_s": 1.2,   # trailing silence ends the utterance
         "max_utterance_s": 30.0,
-        "rms_gate": 0.004,          # frame RMS floor for "voiced" (after gain); lowers false VAD on hiss
+        "rms_gate": 0.0018,          # frame RMS floor for "voiced" (after gain); 0.004 was too strict — quiet Focusrite speech at peak 0.006 was dropped as silence
         "barge_in": True,           # speech while TTS is speaking -> cancel output
     },
     "feedback": {
