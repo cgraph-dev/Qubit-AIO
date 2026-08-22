@@ -59,12 +59,20 @@ class ActivityFeed:
 
     def push(self, item: Dict[str, Any]) -> None:
         item.setdefault("ts", time.time())
+        item.setdefault("id", uuid.uuid4().hex[:12])
         with self._lock:
             self._items.appendleft(item)
 
     def recent(self, limit: int = 100) -> List[Dict[str, Any]]:
         with self._lock:
             return list(self._items)[:limit]
+
+    def get(self, item_id: str) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            for it in self._items:
+                if it.get("id") == item_id:
+                    return dict(it)
+        return None
 
     def clear(self) -> None:
         with self._lock:
@@ -626,6 +634,34 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 return
             rid = path.rsplit("/", 1)[-1]
             self._json(self.app.result(rid))
+        elif path.startswith("/api/item/"):
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            iid = path.rsplit("/", 1)[-1].split("?")[0]
+            item = self.app.item(iid)
+            if item is None:
+                self._send(404, b"not found")
+                return
+            self._json(item)
+        elif path == "/api/logs":
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            # ?limit=200&q=foo&since=<unix ts>
+            qs = self.path.split("?", 1)[1] if "?" in self.path else ""
+            params: Dict[str, str] = {}
+            for kv in qs.split("&"):
+                if "=" in kv:
+                    k, v = kv.split("=", 1)
+                    params[k] = v
+            limit = min(int(params.get("limit", "200")), 500)
+            q = params.get("q", "").strip()[:80]
+            try:
+                since = float(params.get("since", ""))
+            except Exception:
+                since = 0.0
+            self._json({"items": self.app.logs(limit=limit, q=q, since=since)})
         elif self.app._use_frontend_dir and path.startswith("/static/"):
             name = path.split("/", 2)[-1]
             # correct MIME so browsers cache and render images properly
@@ -870,6 +906,29 @@ class WebUI:
         if r is None:
             return {"status": "unknown", "request_id": rid}
         return {"status": "done", "request_id": rid, **r}
+
+    def item(self, item_id: str) -> Optional[Dict[str, Any]]:
+        return self.feed.get(item_id)
+
+    def logs(self, limit: int = 200, q: str = "", since: float = 0.0) -> List[Dict[str, Any]]:
+        path = self.orch.cfg.state_dir() / "events.jsonl" if self.orch and self.orch.cfg else Path("/tmp") / "events.jsonl"
+        try:
+            lines = path.read_text(errors="replace").splitlines()[-max(limit * 6, 6000):]
+        except OSError:
+            return []
+        out: List[Dict[str, Any]] = []
+        ql = q.lower() if q else ""
+        for l in lines:
+            try:
+                ev = json.loads(l)
+            except Exception:
+                continue
+            if since and float(ev.get("ts") or 0) < since:
+                continue
+            if ql and ql not in json.dumps(ev).lower():
+                continue
+            out.append(ev)
+        return out[-limit:]
 
     def handle_talk(self, pcm: bytes) -> Dict[str, Any]:
         """Full voice roundtrip: PCM -> text -> route -> summary -> TTS."""

@@ -826,7 +826,7 @@ class VoiceOrchestrator:
         log_event("local_script.summary", name=tmpl.name,
                   raw_len=len(raw), summary=summary[:300])
         self.feed_push({"kind": "summary", "text": f"{tmpl.name}", "summary": summary,
-                        "route": self._last_web_route, "raw": raw[:8000]})
+                        "route": self._last_web_route, "raw": raw[:50000]})
         self.speak(summary)
         return summary
 
@@ -1379,7 +1379,7 @@ class VoiceOrchestrator:
         summary = summarize(reply, self.cfg.section("summarizer"))
         log_event("openclaw.summary", session_key=session_key, summary=summary[:400])
         self.feed_push({"kind": "summary", "text": "OpenClaw task",
-                        "summary": summary, "route": "openclaw", "raw": reply[:8000]})
+                        "summary": summary, "route": "openclaw", "raw": reply[:50000]})
         # Only satisfy a waiting web poll if a web request is actually waiting;
         # otherwise a Right Ctrl task would overwrite a concurrent dashboard request's
         # _last_web_summary before it polls it (the "delay / wrong answer" bug).
@@ -1597,7 +1597,7 @@ class VoiceOrchestrator:
                     self._last_web_summary = trimmed
                     self._last_web_route = "local"
                 self.feed_push({"kind": "summary", "text": text[:300], "summary": trimmed,
-                                "route": "local", "detail": "conversation"})
+                                "route": "local", "detail": "conversation", "raw": reply[:50000]})
                 log_event("conversation.local.summary", text=text[:160], summary=reply[:160])
                 self.speak(trim_spoken(reply, 500))
                 return
@@ -1634,7 +1634,7 @@ class VoiceOrchestrator:
                 ctx3.route = "fallback"
                 ctx3.done.set()
             self.feed_push({"kind": "summary", "text": text[:300], "summary": trimmed2,
-                            "route": "fallback", "detail": "conversation"})
+                            "route": "fallback", "detail": "conversation", "raw": reply[:50000]})
             log_event("conversation.fallback.summary", text=text[:160], summary=reply[:160])
         else:
             self.speak("I'm sorry, I couldn't reach the chat model.")
@@ -1858,7 +1858,7 @@ class VoiceOrchestrator:
             c_local.done.set()
         # sync Right Ctrl local actions to dashboard activity feed + event journal (persists after restart)
         log_event("local.action.summary", action=name, text=text[:160], summary=msg[:300])
-        self.feed_push({"kind": "summary", "text": f"local:{name}", "summary": msg[:300], "route": "local", "raw": msg[:8000]})
+        self.feed_push({"kind": "summary", "text": f"local:{name}", "summary": msg[:300], "route": "local", "raw": msg[:50000]})
         self.speak(msg)
 
     def _handle_hermes(self, task: str, notice: str = "") -> None:
@@ -1895,7 +1895,7 @@ class VoiceOrchestrator:
                 return
             summary = summarize(reply, self.cfg.section("summarizer"))
             # sync Right Ctrl Hermes tasks to dashboard (raw = full reply, summary = spoken)
-            self.feed_push({"kind": "summary", "text": "Hermes task", "summary": summary, "route": "hermes", "raw": reply[:8000]})
+            self.feed_push({"kind": "summary", "text": "Hermes task", "summary": summary, "route": "hermes", "raw": reply[:50000]})
             log_event("hermes.summary", summary=summary[:300])
             # Mirror to per-request ctx so /api/result prefers isolated summary (no swap with concurrent)
             if (_ctx_h := self._cur_ctx()) is not None:
