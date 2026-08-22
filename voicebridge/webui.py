@@ -139,6 +139,36 @@ def _event_to_feed_item(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if evt == "webui.talk.error" or evt == "webui.type.error":
         return {"kind": "fail", "text": evt.replace(".", " "),
                 "route": "webui", "detail": str(ev.get("error", ""))[:300]}
+    if evt == "conversation.local.summary":
+        # new: text=what user SAID (transcription), summary=bot reply — lets Tricky
+        # verify ASR: the activity card shows "You: How are you?" alongside the reply
+        return {"kind": "summary", "text": ev.get("text", ""),
+                "summary": ev.get("summary", ""), "route": "local",
+                "detail": "conversation"}
+    if evt == "conversation.fallback.summary":
+        return {"kind": "summary", "text": ev.get("text", ""),
+                "summary": ev.get("summary", ""), "route": "fallback",
+                "detail": "conversation"}
+    if evt == "conversation.local":
+        # legacy journal items (before text field was added): show the reply chars
+        # these will appear as e.g. "conversation · 21 chars" so old history still renders
+        return {"kind": "summary", "text": ev.get("text", "") or "conversation",
+                "summary": f"({ev.get('chars','?')} chars reply)", "route": "local",
+                "detail": f"{ev.get('model','local')} · {ev.get('elapsed_s','?')}s"}
+    if evt == "local.action.summary":
+        return {"kind": "summary", "text": f"local:{ev.get('action','')}",
+                "summary": ev.get("summary",""), "route": "local",
+                "detail": str(ev.get("text",""))[:160]}
+    if evt == "hermes.summary":
+        return {"kind": "summary", "text": "Hermes task",
+                "summary": ev.get("summary",""), "route": "hermes"}
+    if evt == "system.command":
+        cmd = ev.get("command","") or "system"
+        return {"kind": "status", "text": f"system:{cmd}",
+                "route": "system", "detail": cmd}
+    if evt == "hermes.result.discarded":
+        return {"kind": "status", "text": "Hermes task interrupted",
+                "route": "hermes", "detail": ev.get("why","")}
     return None
 
 
@@ -492,16 +522,19 @@ class WebUIHandler(BaseHTTPRequestHandler):
 
     # -- helpers ---------------------------------------------------------
     def _send(self, code: int, body: bytes, ctype: str = "text/plain") -> None:
-        self.send_response(code)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        # CORS: the Vercel-hosted frontend calls the PC API cross-origin.
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Api-Token")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.send_response(code)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            # CORS: the Vercel-hosted frontend calls the PC API cross-origin.
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Api-Token")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass  # client disconnected (refresh/cancel/navigate) — not an error
 
     def _api_token_ok(self) -> bool:
         """Gate API endpoints: no token configured = open (localhost/LAN);
@@ -530,6 +563,33 @@ class WebUIHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Api-Token")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def do_HEAD(self) -> None:  # noqa: N802  (some browsers preload with HEAD)
+        # Reuse GET logic but don't send body
+        path = self.path.split("?")[0]
+        if path.startswith("/static/") and self.app._use_frontend_dir:
+            name = path.split("/", 2)[-1]
+            fpath = self.app._frontend_dir / name
+            if fpath.exists():
+                low = name.lower()
+                if low.endswith(".gif"): ctype = "image/gif"
+                elif low.endswith(".png"): ctype = "image/png"
+                elif low.endswith(".jpg") or low.endswith(".jpeg"): ctype = "image/jpeg"
+                elif low.endswith(".svg"): ctype = "image/svg+xml"
+                elif low.endswith(".css"): ctype = "text/css"
+                elif low.endswith(".js"): ctype = "application/javascript"
+                else: ctype = "application/octet-stream"
+                self.send_response(200)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(fpath.stat().st_size))
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                return
+        # fallback: try GET path handling but just send headers
+        self.send_response(404)
         self.send_header("Content-Length", "0")
         self.end_headers()
 
@@ -568,7 +628,16 @@ class WebUIHandler(BaseHTTPRequestHandler):
             self._json(self.app.result(rid))
         elif self.app._use_frontend_dir and path.startswith("/static/"):
             name = path.split("/", 2)[-1]
-            self._file(self.app._frontend_dir / name, "application/octet-stream")
+            # correct MIME so browsers cache and render images properly
+            low = name.lower()
+            if low.endswith(".gif"): ctype = "image/gif"
+            elif low.endswith(".png"): ctype = "image/png"
+            elif low.endswith(".jpg") or low.endswith(".jpeg"): ctype = "image/jpeg"
+            elif low.endswith(".svg"): ctype = "image/svg+xml"
+            elif low.endswith(".css"): ctype = "text/css"
+            elif low.endswith(".js"): ctype = "application/javascript"
+            else: ctype = "application/octet-stream"
+            self._file(self.app._frontend_dir / name, ctype)
         else:
             self._send(404, b"not found")
 
@@ -592,6 +661,22 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 log.exception("webui /api/talk failed")
                 log_event("webui.talk.error", error=str(exc)[:200])
                 self._json({"error": str(exc)[:300]}, 500)
+        elif path == "/api/interrupt":
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length) if length else b"{}"
+            try:
+                mode = json.loads(body or b"{}").get("mode", "interrupt")
+            except Exception:
+                mode = "interrupt"
+            try:
+                self.app.interrupt(mode=mode)
+                self._json({"ok": True, "mode": mode})
+            except Exception as exc:
+                log.exception("webui /api/interrupt failed")
+                self._json({"error": str(exc)[:200]}, 500)
         elif path == "/api/type":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
@@ -668,13 +753,26 @@ class WebUI:
     # -- public API -------------------------------------------------------
     def status(self) -> Dict[str, Any]:
         task = self.orch.task
+        busy = bool(getattr(task, "active", False)) or bool(getattr(self.orch, "_web_active", 0))
         return {
             "bridge": "up",
             "route": getattr(self.orch, "_route", "unknown"),
             "task_active": bool(getattr(task, "active", False)),
+            "busy": busy,
+            "web_active": int(getattr(self.orch, "_web_active", 0)),
             "port": self.port,
             "uptime_s": round(time.time() - getattr(self.orch, "_t0", time.time()), 1),
         }
+
+    def interrupt(self, mode: str = "interrupt") -> None:
+        """Dashboard interrupt (tap the orb while assistant is speaking or
+        a task is running). Mirrors the Ctrl-key barge-in.
+
+        mode='interrupt' — single tap: stops TTS, pauses the task, announces
+                           'Paused. Go ahead.' so the user can re-direct.
+        mode='stop'     — double tap: full stop without announcement (like Esc).
+        """
+        self.orch._interrupt_task(announce=(mode == "interrupt"))
 
     def submit_text(self, text: str) -> str:
         """Type-in path: same pipeline as voice but no ASR step."""
@@ -691,11 +789,18 @@ class WebUI:
                 # conversation/local replies are "spoken" through speak() which
                 # records into _web_spoken in web mode — surface that text
                 # (same fallback as the voice path).
-                spoken = getattr(self.orch, "_web_spoken", None) or []
+                # Prefer per-request spoken (isolated, no race) over legacy global _web_spoken
+                _ctx = self.orch._cur_ctx() if hasattr(self.orch, "_cur_ctx") else None
+                spoken = list(_ctx.spoken) if _ctx is not None and getattr(_ctx, "spoken", None) else (getattr(self.orch, "_web_spoken", None) or [])
                 spoken_text = " ".join(x for x in spoken if x).strip()
                 if not result.get("summary") and spoken_text:
-                    result["summary"] = spoken_text
-                    result["reply"] = spoken_text
+                    # spoken_text IS the reply when _WebCtx already has summary (avoid overwrite)
+                    if _ctx is not None and getattr(_ctx, "summary", None):
+                        result["summary"] = _ctx.summary
+                        result["reply"] = _ctx.summary
+                    else:
+                        result["summary"] = spoken_text
+                        result["reply"] = spoken_text
                 # synthesize the reply audio (same as the voice path)
                 summary = result.get("summary") or ""
                 if summary:
@@ -797,9 +902,11 @@ class WebUI:
         # Prefer the text the orchestrator actually "spoke" in web mode
         # (recorded in _web_spoken — acks, summaries, fallbacks); fall back
         # to the routing result.
-        spoken = getattr(self.orch, "_web_spoken", None) or []
-        spoken_text = " ".join(x for x in spoken if x).strip()
-        summary = result.get("summary") or result.get("reply") or spoken_text or text
+        # Per-request spoken: isolated so concurrent EN/RO don't swap
+        _ctx2 = self.orch._cur_ctx() if hasattr(self.orch, "_cur_ctx") else None
+        spoken2 = list(_ctx2.spoken) if _ctx2 is not None and getattr(_ctx2, "spoken", None) else (getattr(self.orch, "_web_spoken", None) or [])
+        spoken_text = " ".join(x for x in spoken2 if x).strip()
+        summary = (_ctx2.summary if _ctx2 is not None and getattr(_ctx2, "summary", None) else "") or result.get("summary") or result.get("reply") or spoken_text or text
         audio_b64 = None
         events: List[Dict[str, Any]] = []
         if summary:

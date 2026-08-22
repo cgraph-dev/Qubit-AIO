@@ -1,161 +1,119 @@
-# OpenClaw Voice Bridge — THIS machine's tuned config (Scarlett 2i2 + AT2020).
-# Machine-agnostic defaults live in config/voice.example.yaml (installed to
-# ~/.config/openclaw-voice-bridge/voice.yaml on fresh machines by install.sh).
-
-# ---------------------------------------------------------------------------
-# Push-to-talk hotkeys
 hotkey:
-  hold_key: ctrl_r        # hold to talk (ends on release); quick tap = toggle
-  tap_ms: 300             # press shorter than this counts as a tap (toggle listen)
-  toggle_no_speech_s: 5.0 # toggle stops itself if you don't speak
-  interrupt_on_ptt: true  # Ctrl while a task runs = PAUSE + listen for new instruction
-  alt_hold_key: ""        # optional second hold key
-  tap_cancel: esc         # tap while assistant speaks -> stop speech / cancel task
-
-# ---------------------------------------------------------------------------
-# Microphone
+  hold_key: ctrl_r
+  tap_ms: 300
+  toggle_no_speech_s: 5.0
+  interrupt_on_ptt: true
+  alt_hold_key: ''
+  tap_cancel: esc
 mic:
-  device: null            # null = system default (Focusrite Scarlett 2i2)
-  sample_rate: 48000      # device rate; resampled to 16 kHz for ASR
-  channels: 4             # capture ALL channels of the Scarlett's 4ch profile;
-                          # per-channel max picks whichever has the mic
-  blocksize: 480          # ~10 ms at 48 kHz
-  gain: 8.0               # AT2020 + 2i2 gain knob up: 64x would hard-clip
-  min_rms: 0.0008         # below this RMS the capture counts as silence
-  max_capture_s: 30.0     # watchdog: force-close a wedged mic stream
-
-# Voice activity detection / endpointing
+  device: null
+  sample_rate: 48000
+  channels: 4
+  blocksize: 480
+  gain: 8.0
+  min_rms: 0.0008
+  max_capture_s: 30.0
 vad:
   enabled: true
-  backend: silero         # silero (neural, sherpa-onnx) | webrtc
-  silero_model: ""        # empty = <model_dir>/silero_vad_v5.onnx
-  aggressiveness: 1       # webrtcvad 0-3 (unused for silero)
-  speech_start_ms: 180    # how much continuous speech before "started"
-  silence_timeout_s: 0.8  # end-of-turn silence (research: 0.7-0.9s; 0.4s cut mid-thought pauses)
+  backend: silero
+  silero_model: ''
+  aggressiveness: 1
+  speech_start_ms: 280
+  silence_timeout_s: 1.2
   max_utterance_s: 30.0
-  rms_gate: 0.004         # frame RMS floor for "voiced" (after gain) — stops hiss triggering VAD
-  barge_in: true          # speech while TTS speaks -> cancel output (interrupt)
-
-# Speaker verification (voice-ID): only the ENROLLED voice can barge in.
-# Enrolled: `voicebridge enroll` (records 5s of YOUR voice).
+  rms_gate: 0.004
+  barge_in: true
 speaker_verify:
-  enabled: true           # no enrollment = old behavior (any speech barges)
+  enabled: true
   name: user
-  threshold: 0.65         # eres2net: self 0.7-0.96 / cross ~0.3
-  window_s: 2.0           # analysis window for barge verification
+  threshold: 0.65
+  window_s: 2.0
   enroll_seconds: 5
-
-# Audible feedback
 feedback:
-  beeps: true             # short beep when recording starts/stops
-
-# ---------------------------------------------------------------------------
-# Speech-to-text (sherpa-onnx Moonshine: CPU, 0 VRAM, ~0.07s per utterance)
+  beeps: true
 asr:
-  provider: sherpa        # sherpa (Moonshine, 0 VRAM CPU) | whisper (fallback)
-  engine: parakeet      # sherpa: parakeet v3 (max accuracy, 25 langs) | moonshine (fastest)
-  provider_ep: cpu        # sherpa onnxruntime EP: cpu | cuda
-  # whisper fallback options (asr.provider: whisper)
-  model: base             # tiny|base|small|medium
+  provider: sherpa
+  engine: parakeet
+  provider_ep: cpu
+  model: base
   compute_type: float16
   language: en
-  beam_size: 5            # better accuracy than greedy; still <1s on GPU for short clips
-  min_confidence: 0.02    # ~off. whisper's avg_logprob for real mic speech is
-                          # 0.05-0.2 — a higher gate rejects PERFECT transcripts.
-                          # Real "didn't catch" cases: empty text + filler words.
-
-# ---------------------------------------------------------------------------
-# Text-to-speech
+  beam_size: 5
+  min_confidence: 0.02
 tts:
-  provider: piper         # piper (fast, local) | kokoro (quality, ~1x realtime CPU) | edge | gateway
-  voice: en_US-amy-medium # piper voice (downloaded by scripts/install.sh)
+  provider: piper
+  voice: en_US-amy-medium
   sample_rate: 22050
   kokoro:
-    voice_sid: 0          # Kokoro v0.19 EN: 11 voices, sid 0..10
+    voice_sid: 0
   interrupt: true
   edge:
     voice: en-US-JennyNeural
-    rate: "+0%"
+    rate: +0%
   gateway:
     model: null
-
-# ---------------------------------------------------------------------------
-# Intent routing
 intent:
-  llm_classifier: false   # heuristic router only (fast; ambiguous -> conversation)
+  llm_classifier: false
   local_llm:
-    enabled: true         # bridge answers casual talk itself (<0.5s); rest -> OpenClaw/Hermes
-                          # DeepSeek API handles long/complex/web asks
-    model: huihui_ai/llama3.2-abliterate:3b  # 3B: native Romanian + smaller (2.6GB). phi-4-mini broken at RO
+    enabled: true
+    model: huihui_ai/llama3.2-abliterate:3b
     url: http://127.0.0.1:11434
-    timeout_s: 8.0     # local model chat timeout (was 4s — journal showed real timeouts)
+    timeout_s: 8.0
     max_tokens: 100
-  conversation_backend: local      # bridge answers ALL chat (<0.5s); only tasks -> OpenClaw/Hermes
-  templates_path: ~/.config/openclaw-voice-bridge/task-templates.yaml  # daily-task templates
+  conversation_backend: local
+  templates_path: ~/.config/openclaw-voice-bridge/task-templates.yaml
   deepseek_url: https://api.deepseek.com/chat/completions
   deepseek_model: deepseek-v4-flash
-  deepseek_env: ~/.hermes/.env     # DEEPSEEK_API_KEY lives here
-  # Perplexity: web/current-info questions (requires PERPLEXITY_API_KEY)
+  deepseek_env: ~/.hermes/.env
   perplexity_enabled: true
   perplexity_url: https://api.perplexity.ai/chat/completions
   perplexity_model: sonar-pro
   perplexity_env: ~/.hermes/.env
-
-# ---------------------------------------------------------------------------
-# OpenClaw gateway (auto-discovered from ~/.openclaw/; these are overrides)
 openclaw:
-  gateway_url: null       # auto: ws://127.0.0.1:<port from openclaw config>
+  gateway_url: null
   token_file: ~/.openclaw/.env
   agent: main
-  model: null             # null = follow the agent's default model (deepseek flash)
+  model: null
   session_prefix: voice
-  ask_executor: true       # ask 'OpenClaw or Hermes?' before each coding task (until a bigger GPU)
+  ask_executor: true
   task_timeout_s: 900
   progress_updates: true
   progress_min_interval_s: 45
-
-# Optional second executor (same machine as the bridge)
 hermes:
-  enabled: true           # 'ask Hermes to ...' -> local hermes CLI (opt-in phrasing)
+  enabled: true
   cmd: hermes
   resume_session: voice
   timeout_s: 600
   model: null
-
-# Local PC actions — whitelisted, safe, reversible. Risky actions go to
-# OpenClaw where the safety policy + confirmations apply.
 local:
   enabled: true
-
-# Memory — loaded from the OpenClaw workspace into the persona prompt
 memory:
   enabled: true
   workspace: ~/.openclaw/workspace
   context_chars: 1500
   save_notes: true
-
-# ---------------------------------------------------------------------------
-# Safety
 safety:
   enabled: true
-  confirm_destructive: true     # spoken confirmation before delete/rm/drop/force-push/etc.
+  confirm_destructive: true
   denylist:
-    - "ignore all previous instructions"
-    - "disable safety"
-  always_confirm: []            # extra patterns that always ask
-  never_confirm: []             # patterns that skip confirmation
-  dry_run_first: false          # true = coding tasks start as dry runs
+  - ignore all previous instructions
+  - disable safety
+  always_confirm: []
+  never_confirm: []
+  dry_run_first: false
   spoken_confirmation: true
-
-# Spoken summaries (extractive = no model needed)
 summarizer:
-  provider: extractive          # extractive (no model) | ollama
-  ollama_model: qwen3-vl:8b
+  provider: ollama
+  ollama_url: http://127.0.0.1:11434
+  ollama_model: huihui_ai/llama3.2-abliterate:3b
   max_chars: 900
-  max_words: 40             # HARD cap on every spoken response (save time)
-
-# ---------------------------------------------------------------------------
+  max_words: 40
 logging:
   level: INFO
-  jsonl: true               # structured event journal (observability)
-  jsonl_path: null          # default: ~/.local/state/openclaw-voice-bridge/events.jsonl
+  jsonl: true
+  jsonl_path: null
+webui:
+  enabled: true
+  host: 0.0.0.0
+  port: 8890
+  script_timeout_s: 60

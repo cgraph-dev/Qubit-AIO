@@ -114,7 +114,7 @@ DEFAULTS: Dict[str, Any] = {
         "llm_classifier": False,    # NO local ollama — heuristic only (fast);
                                     # ambiguous taps default to conversation
         "ollama_url": "http://127.0.0.1:11434",
-        "ollama_model": "qwen3-vl:8b",
+        "ollama_model": "huihui_ai/llama3.2-abliterate:3b",
         "classify_timeout_s": 8.0,
         "conversation_backend": "local",
         "templates_path": "~/.config/openclaw-voice-bridge/task-templates.yaml",  # daily-task templates (spoken phrase -> known task)    # bridge IS the voice: local model answers ALL chat instantly
@@ -176,7 +176,7 @@ DEFAULTS: Dict[str, Any] = {
     },
     "summarizer": {
         "provider": "ollama",   # ollama | extractive
-        "ollama_model": "qwen3-vl:8b",
+        "ollama_model": "huihui_ai/llama3.2-abliterate:3b",
         "max_chars": 900,       # extractive/summarizer input budget
         "max_words": 40,         # HARD cap on every spoken response (save time)
     },

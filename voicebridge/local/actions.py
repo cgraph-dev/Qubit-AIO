@@ -151,6 +151,183 @@ def _a_lock(_: Dict[str, Any]) -> str:
     return "Locking the screen."
 
 
+def _a_brightness_up(_: Dict[str, Any]) -> str:
+    # try brightnessctl, then light, then xrandr fallback
+    if shutil.which("brightnessctl"):
+        _run(["brightnessctl", "set", "+10%"])
+        return "Brightness up."
+    if shutil.which("light"):
+        _run(["light", "-A", "10"])
+        return "Brightness up."
+    # xrandr: bump primary output by 0.1 (clamped 0.3-1.0)
+    if shutil.which("xrandr"):
+        out = _run(["xrandr", "--verbose"])
+        import re
+        m = re.search(r"^\S+ connected", out, re.M)
+        if m:
+            name = m.group(0).split()[0]
+            b = _run(["xrandr", "--verbose"])
+            cur = 1.0
+            for line in b.splitlines():
+                if "Brightness:" in line:
+                    try: cur = float(line.split(":")[1].strip())
+                    except: pass
+                    break
+            nxt = min(1.0, round(cur + 0.1, 2))
+            _run(["xrandr", "--output", name, "--brightness", str(nxt)])
+            return f"Brightness {int(nxt*100)}%."
+    return "No brightness control found (install brightnessctl)."
+
+
+def _a_brightness_down(_: Dict[str, Any]) -> str:
+    if shutil.which("brightnessctl"):
+        _run(["brightnessctl", "set", "10%-"])
+        return "Brightness down."
+    if shutil.which("light"):
+        _run(["light", "-U", "10"])
+        return "Brightness down."
+    if shutil.which("xrandr"):
+        out = _run(["xrandr", "--verbose"])
+        import re
+        m = re.search(r"^\S+ connected", out, re.M)
+        if m:
+            name = m.group(0).split()[0]
+            b = _run(["xrandr", "--verbose"])
+            cur = 1.0
+            for line in b.splitlines():
+                if "Brightness:" in line:
+                    try: cur = float(line.split(":")[1].strip())
+                    except: pass
+                    break
+            nxt = max(0.3, round(cur - 0.1, 2))
+            _run(["xrandr", "--output", name, "--brightness", str(nxt)])
+            return f"Brightness {int(nxt*100)}%."
+    return "No brightness control found."
+
+
+def _a_system_stats(_: Dict[str, Any]) -> str:
+    try:
+        import psutil  # type: ignore
+        cpu = psutil.cpu_percent(interval=0.4)
+        mem = psutil.virtual_memory()
+        disk = psutil.disk_usage("/")
+        batt = ""
+        try:
+            b = psutil.sensors_battery()
+            if b: batt = f" Battery {int(b.percent)}%{' charging' if b.power_plugged else ''}."
+        except: pass
+        return f"CPU {cpu:.0f}%, RAM {mem.percent:.0f}% ({mem.used//1024//1024}M used), Disk {disk.percent:.0f}% full.{batt}"
+    except ImportError:
+        # fallback without psutil
+        import os
+        try:
+            load = os.getloadavg()[0]
+            return f"Load {load:.2f}. Install psutil for full stats: pip install psutil."
+        except: return "System stats unavailable."
+    except Exception as exc: return f"Stats failed: {exc}"
+
+
+def _a_quick_note(params: Dict[str, Any]) -> str:
+    text = params.get("note", "").strip()
+    if not text:
+        return "What should I note down?"
+    from pathlib import Path; import datetime
+    p = Path.home() / ".config" / "openclaw-voice-bridge" / "quick-notes.md"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    with open(p, "a") as f: f.write(f"\n- [{ts}] {text}\n")
+    log_event("local.quick_note", text=text[:120])
+    return f"Noted: {text[:80]}"
+
+
+def _a_timer(params: Dict[str, Any]) -> str:
+    mins = params.get("minutes", 5)
+    try: mins = int(mins)
+    except: mins = 5
+    mins = max(1, min(mins, 180))
+    import threading
+    def _fire():
+        # desktop notification + spoken reminder
+        if shutil.which("notify-send"):
+            _run(["notify-send", f"Timer: {mins} minute{'s' if mins!=1 else ''} up.", "Time's up."])
+        # try to speak via piper if available (fire-and-forget)
+        try:
+            import subprocess as sp
+            sp.Popen(["paplay", "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"],
+                     stdout=sp.DEVNULL, stderr=sp.DEVNULL)
+        except: pass
+    threading.Timer(mins*60, _fire).start()
+    return f"Timer set for {mins} minute{'s' if mins!=1 else ''}. I'll notify you."
+
+
+def _a_window_close(_: Dict[str, Any]) -> str:
+    if shutil.which("xdotool"):
+        _run(["xdotool", "key", "Alt+F4"])
+        return "Closing window."
+    # wayland fallback: wtype
+    if shutil.which("wtype"):
+        return "Close the window with Alt+F4."
+    return "Install xdotool to close windows by voice."
+
+
+def _a_find_file(params: Dict[str, Any]) -> str:
+    q = params.get("query", "").strip()
+    if not q: return "What file should I find?"
+    # quick locate in home (bounded)
+    from pathlib import Path
+    import subprocess as sp
+    try:
+        out = sp.run(["find", str(Path.home()), "-maxdepth", "4", "-iname", f"*{q}*", "-type", "f"],
+                     capture_output=True, text=True, timeout=6).stdout.strip()
+        if not out: return f"No file matching '{q}' in the top levels of home."
+        lines = out.splitlines()[:5]
+        return "Found: " + "; ".join(lines) + (f" and {len(out.splitlines())-5} more." if len(out.splitlines())>5 else "")
+    except Exception as exc: return f"Search failed: {exc}"
+
+
+def _a_empty_trash(_: Dict[str, Any]) -> str:
+    trash = __import__("pathlib").Path.home() / ".local/share/Trash/files"
+    if trash.exists():
+        import shutil as sh
+        count = len(list(trash.iterdir()))
+        if count == 0: return "Trash is already empty."
+        sh.rmtree(trash, ignore_errors=True)
+        trash.mkdir(parents=True, exist_ok=True)
+        (trash.parent / "info").mkdir(parents=True, exist_ok=True)
+        return f"Emptied {count} item{'s' if count!=1 else ''} from trash."
+    return "Trash is already empty."
+
+
+
+def _a_time_date(_: Dict[str, Any]) -> str:
+    import datetime
+    # Use Europe/Bucharest
+    try:
+        import zoneinfo
+        tz = zoneinfo.ZoneInfo("Europe/Bucharest")
+        now = datetime.datetime.now(tz)
+    except Exception:
+        now = datetime.datetime.now()
+    # Natural: "Today is Saturday, August 23. The time is 02:14 EEST."
+    day = now.strftime("%A, %B %d")
+    time_str = now.strftime("%H:%M %Z").strip()
+    if time_str.endswith(" "):
+        time_str = now.strftime("%H:%M")
+        time_str += " EEST"  # fallback known zone
+    return f"Today is {day}. The time is {time_str}."
+
+def _a_bluetooth_toggle(_: Dict[str, Any]) -> str:
+    if shutil.which("bluetoothctl"):
+        cur = _run(["bluetoothctl", "show"])
+        on = "Powered: yes" in cur
+        _run(["bluetoothctl", "power", "off" if on else "on"])
+        return f"Bluetooth {'off' if on else 'on'}."
+    if shutil.which("rfkill"):
+        _run(["rfkill", "toggle", "bluetooth"])
+        return "Bluetooth toggled."
+    return "Bluetooth control not found."
+
+
 # ---------------------------------------------------------------------------
 ACTIONS: Dict[str, LocalAction] = {
     "volume_up": LocalAction("volume_up", "raise speaker volume", _a_volume_up,
@@ -181,6 +358,39 @@ ACTIONS: Dict[str, LocalAction] = {
                              patterns=[r"\b(read|what'?s on|what is on) (the )?clipboard\b"]),
     "lock": LocalAction("lock", "lock the screen", _a_lock,
                         patterns=[r"\b(lock|lock the screen)\b"]),
+    "brightness_up": LocalAction("brightness_up", "raise screen brightness", _a_brightness_up,
+                        patterns=[r"\b(brightness|screen brightness|display brightness|backlight)\s+(up|higher|brighter|increase|raise|boost)\b",
+                                  r"\b(increase|raise|boost)\s+(the\s+)?(brightness|backlight)\b",
+                                  r"\bbrighter\b"]),
+    "brightness_down": LocalAction("brightness_down", "lower screen brightness", _a_brightness_down,
+                        patterns=[r"\b(brightness|screen brightness|display brightness|backlight)\s+(down|lower|dimmer|decrease|reduce|dim)\b",
+                                  r"\b(lower|decrease|reduce|dim)\s+(the\s+)?(brightness|backlight)\b",
+                                  r"\b(dimmer|dim the screen)\b"]),
+    "system_stats": LocalAction("system_stats", "report CPU/RAM/disk stats", _a_system_stats,
+                        patterns=[r"\b(system stats|system status|how'?s the system|resource usage|cpu usage|memory usage|disk usage)\b",
+                                  r"\b(how much (ram|memory|cpu|disk))\b",
+                                  r"\b(battery (level|status|percent))\b"]),
+    "quick_note": LocalAction("quick_note", "save a quick note", _a_quick_note,
+                        patterns=[r"\b(note (that|this)|remember (that|this)|write down|jot down|save (a )?note)\b",
+                                  r"\b(remind me (to |that )?)\b"]),
+    "timer": LocalAction("timer", "set a timer", _a_timer,
+                        patterns=[r"\b(set (a )?timer (for )?|start (a )?timer)\b",
+                                  r"\b(timer for |remind me in )\s*\d+\s*(minute|minutes|min|mins|second|seconds)\b"]),
+    "window_close": LocalAction("window_close", "close the active window", _a_window_close,
+                        patterns=[r"\b(close (this |the |current )?(window|tab))\b"]),
+    "find_file": LocalAction("find_file", "find a file by name", _a_find_file,
+                        patterns=[r"\b(find|locate|search for) (a |the )?file\b",
+                                  r"\bwhere is (the )?file\b"]),
+    "empty_trash": LocalAction("empty_trash", "empty the trash", _a_empty_trash,
+                        patterns=[r"\b(empty (the )?trash|clear (the )?trash|empty (the )?bin)\b"]),
+    "bluetooth_toggle": LocalAction("bluetooth_toggle", "toggle bluetooth", _a_bluetooth_toggle,
+                        patterns=[r"\b(toggle bluetooth|bluetooth (on|off))\b",
+                                  r"\b(turn bluetooth (on|off))\b"]),
+    "time_date": LocalAction("time_date", "say date and time", _a_time_date,
+                        patterns=[r"\bwhat (day|date|time) is (it|today)\b",
+                                  r"\bwhat('s| is) today('s)? (date|day)\b",
+                                  r"\bwhat time is it\b",
+                                  r"\b(current )?(date|time)\b"]),
 }
 
 APP_NAMES = {
@@ -207,11 +417,34 @@ def match(text: str) -> Optional[ActionMatch]:
                             params["app"] = canon
                             break
                 elif name == "open_project":
-                    # capture the project word so _a_open_project can resolve it
                     for word in PROJECT_ROOTS:
                         if word in low:
                             params["project"] = word
                             break
+                elif name == "quick_note":
+                    import re as _re
+                    m2 = _re.search(r"(?:note (?:that|this)|remember (?:that|this)|write down|jot down|save (?:a )?note|remind me (?:to |that )?)(.*)", low)
+                    if m2:
+                        params["note"] = m2.group(1).strip(" :,-") or text
+                    else:
+                        params["note"] = text
+                elif name == "timer":
+                    import re as _re
+                    m2 = _re.search(r"(\d+)\s*(minute|minutes|min|mins|second|seconds)", low)
+                    if m2:
+                        n = int(m2.group(1))
+                        if "second" in m2.group(2):
+                            n = max(1, (n + 59)//60)
+                        params["minutes"] = n
+                    else:
+                        params["minutes"] = 5
+                elif name == "find_file":
+                    import re as _re
+                    m2 = _re.search(r"(?:find|locate|search for|where is) (?:a |the )?file\s*(?:named |called )?(.+)", low)
+                    if m2:
+                        params["query"] = m2.group(1).strip(" \"'.)")
+                    else:
+                        params["query"] = ""
                 return ActionMatch(name=name, params=params, text=text)
     return None
 

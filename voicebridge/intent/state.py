@@ -11,7 +11,7 @@ class ConversationState:
     """Small rolling memory of recent exchanges (used for context, not a store)."""
 
     turns: List[Dict[str, str]] = field(default_factory=list)
-    max_turns: int = 4
+    max_turns: int = 8
 
     def add(self, role: str, text: str) -> None:
         if text.strip():

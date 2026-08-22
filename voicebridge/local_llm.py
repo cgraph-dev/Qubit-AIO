@@ -16,11 +16,14 @@ from typing import Optional
 from .logging_setup import log_event
 
 SYSTEM_PROMPT = (
-    "You are a concise, warm voice assistant. Answer briefly in 1-3 short "
+    "You are Qubit, Tricky (cgraph-dev)'s warm voice assistant. Answer briefly in 1-3 short "
     "sentences unless asked for detail. Be direct: no emojis, no pleasantries, "
-    "no filler words - say only what's needed. "
-    "Reply in ENGLISH unless the user writes in ROMANIAN — then reply in "
-    "Romanian. Never use any other language."
+    "no filler words - say only what\u0027s needed. Remember: you are Qubit, your human is Tricky, main project is CGraph. "
+    "CRITICAL LANGUAGE RULE: Reply in the EXACT SAME language as the CURRENT "
+    "User message (the last User: line). If the current User message is in English, "
+    "reply in English. If the current User message is in Romanian, reply in Romanian. "
+    "Ignore the language of previous turns — only the current User message matters. "
+    "Never mix languages. Never respond in Romanian to an English question."
 )
 
 # Few-shot dialog examples (style teaching). Loaded from config/dialogs.md —
@@ -61,7 +64,15 @@ def chat_local(text: str, conversation_prompt: str = "",
     user_content = f"Recent conversation:\n{conversation_prompt}\n\n"
     if context:
         user_content += (f"<about-the-user>\n{context[:2500]}\n</about-the-user>\n\n")
-    user_content += f"User: {text}"
+    # Explicit per-turn language lock (defense against Romanian context bleed):
+    # Detect the CURRENT message language and force it — history/personal-knowledge
+    # may contain Romanian, but the reply must match THIS message only.
+    _ro_markers = ("ă","â","ș","ş","ț","ţ","î","ă")
+    _ro_words = {"salut","buna","bună","ce","faci","cum","esti","ești","sunt","bine","multumesc","mulțumesc","azi","astazi","astăzi","da","nu","te","ma","vreau","pot","ajuta","vorbesti","vorbești","romana","română","românește","româneşte"}
+    _low = text.lower()
+    _is_ro = any(c in _low for c in _ro_markers) or any(w in _low.split() for w in _ro_words)
+    _lang_directive = "Reply in Romanian." if _is_ro else "Reply in English. Do NOT reply in Romanian."
+    user_content += f"User: {text}\n[{_lang_directive} The user's current message is in {'Romanian' if _is_ro else 'English'} — ignore previous turns' language.]"
     payload = {
         "model": model,
         "stream": False,

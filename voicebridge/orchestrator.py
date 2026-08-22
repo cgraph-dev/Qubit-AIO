@@ -21,6 +21,7 @@ import queue
 import re
 import threading
 import time
+from dataclasses import dataclass, field
 import uuid
 import wave
 from pathlib import Path
@@ -45,6 +46,26 @@ from .task_templates import TaskTemplates
 from .openclaw.gateway_ws import GatewaySync, GatewayError
 from .safety.policy import SafetyPolicy, SafetyVerdict
 from .summarizer import summarize, trim_spoken
+
+# Per-request context so Right Ctrl (mic loop, main thread) and dashboard (web
+# worker threads) never share _last_web_* globals. Without this, two concurrent
+# requests overwrite each other's summary before polling — the "wrong answer" bug.
+# Legacy _last_web_* fields stay for backwards compat (other code reads them) but
+# the hot path now uses WebCtx.
+
+@dataclass
+class _WebCtx:
+    """One request's isolated web state. Created per call, never shared."""
+    text: str = ""
+    summary: str = ""
+    route: str = ""
+    spoken: List[str] = field(default_factory=list)
+    web_mode: bool = True
+    done: threading.Event = field(default_factory=threading.Event)
+    conv_snapshot: str = ""  # snapshot of conversation.as_prompt() at request start
+
+_thread_ctx: threading.local = threading.local()  # type: ignore[no-redef]
+_conv_lock = threading.RLock()  # type: ignore[var-annotated]  # guards ConversationState.add
 
 log = get_logger()
 
@@ -161,7 +182,7 @@ class VoiceOrchestrator:
         self.dry_run = dry_run  # global force: never dispatch, only speak plan
 
         # state
-        self.conversation = ConversationState(max_turns=int(config.get("conversation", "max_turns", default=4)))
+        self.conversation = ConversationState(max_turns=int(config.get("conversation", "max_turns", default=8)))
         self.confirmations = ConfirmationState()
         self.executor_choice = ExecutorChoiceState()
         self.task = TaskState()
@@ -793,12 +814,19 @@ class VoiceOrchestrator:
                             ollama_model=sum_cfg.get("ollama_model"))
         if not summary:
             summary = clamp_words(raw, max_words)
+        # Update both the legacy global and the per-request ctx (if any) so concurrent
+        # web requests don't race on _last_web_summary (the wrong-answer bug).
+        ctx = self._cur_ctx()
+        if ctx is not None:
+            ctx.summary = summary
+            ctx.route = f"local-script:{tmpl.name}"
+            ctx.done.set()
         self._last_web_summary = summary
         self._last_web_route = f"local-script:{tmpl.name}"
         log_event("local_script.summary", name=tmpl.name,
                   raw_len=len(raw), summary=summary[:300])
         self.feed_push({"kind": "summary", "text": f"{tmpl.name}", "summary": summary,
-                        "route": self._last_web_route, "raw": raw[:500]})
+                        "route": self._last_web_route, "raw": raw[:8000]})
         self.speak(summary)
         return summary
 
@@ -807,6 +835,32 @@ class VoiceOrchestrator:
     _last_web_route: str = ""
     _web_mode: bool = False
     _web_spoken: List[str] = []
+    # Lock serializing concurrent requests (Right Ctrl mic loop vs dashboard web threads).
+    # Prevents shared-state races on _last_web_*, _web_spoken, conversation, executor_choice.
+    _web_lock = threading.RLock()  # type: ignore
+    # Active-request counter so the dashboard can show "busy" and the mic loop can wait politely.
+    _web_active: int = 0
+
+    # Thread-local per-request ctx helpers (added for non-blocking isolation)
+    def _cur_ctx(self) -> "Optional[_WebCtx]":
+        return getattr(_thread_ctx, "ctx", None)
+
+    def _new_ctx(self, text: str = "") -> "_WebCtx":
+        # Snapshot conversation so concurrent requests don't bleed Romanian/English history
+        try:
+            with _conv_lock:
+                snap = self.conversation.as_prompt()
+        except Exception:
+            snap = ""
+        ctx = _WebCtx(text=text, conv_snapshot=snap)
+        _thread_ctx.ctx = ctx  # type: ignore[attr-defined]
+        return ctx
+
+    def _clear_ctx(self) -> None:
+        try:
+            delattr(_thread_ctx, "ctx")  # type: ignore[attr-defined]
+        except Exception:
+            pass
 
     def process_web_utterance(self, text: str) -> dict:
         """Phone/web roundtrip: route like the mic but return data, not audio.
@@ -815,29 +869,82 @@ class VoiceOrchestrator:
         classifier. Coding tasks still dispatch to OpenClaw/Hermes through
         the SAME gateway (shared session machinery); the reply is summarized
         by the local model before it's spoken/sent back.
+
+        Concurrency: Right Ctrl (mic loop, main thread) and dashboard web workers
+        both call into the same orchestrator. Shared state (_last_web_*, _web_spoken,
+        conversation, executor_choice) is isolated per-request via thread-local _WebCtx
+        so concurrent requests don't overwrite each other's summary (the "wrong answer"
+        bug). Only the final summary handoff is briefly serialized; the heavy I/O
+        (OpenClaw task 5-60s, script 30s, LLM 0.5s) runs fully concurrently — no
+        Right Ctrl turn waits for a dashboard web search.
         """
-        self._web_mode = True
-        self._web_spoken = []
+        # Per-request isolation: each thread gets its own WebCtx (text/summary/route/spoken).
+        # Legacy globals (_last_web_*) are still updated for backwards-compat readers,
+        # but the hot path uses ctx.
+        ctx = self._new_ctx(text)
+        # Track web concurrency for status.busy (dashboard shows "busy" when mic has a task).
+        with self._web_lock:
+            self._web_active += 1
         try:
-            return self._process_web_utterance_inner(text)
+            # _web_mode + _web_spoken are kept for legacy speak() branching, but also mirrored to ctx.
+            prev_mode = self._web_mode
+            prev_spoken = self._web_spoken
+            self._web_mode = True
+            self._web_spoken = ctx.spoken  # share the list so speak() appends to ctx.spoken
+            try:
+                result = self._process_web_utterance_inner(text)
+                # Mirror ctx state to legacy globals for any external pollers still on them.
+                self._last_web_text = ctx.text or self._last_web_text
+                if ctx.summary:
+                    with self._web_lock:
+                        self._last_web_summary = ctx.summary
+                    self._last_web_route = ctx.route
+                # Surface ctx summary if inner didn't (handles local-script + openclaw async summary)
+                if not result.get("summary") and ctx.summary:
+                    result["summary"] = ctx.summary
+                    result["reply"] = ctx.summary
+                return result
+            finally:
+                self._web_mode = prev_mode
+                self._web_spoken = prev_spoken
         finally:
-            self._web_mode = False
+            with self._web_lock:
+                self._web_active = max(0, self._web_active - 1)
+            self._clear_ctx()
 
     def _process_web_utterance_inner(self, text: str) -> dict:
         self._last_web_text = text
         self._last_web_summary = ""
         self._last_web_route = ""
+        ctx0 = self._cur_ctx()
+        if ctx0 is not None:
+            ctx0.text = text
+            ctx0.summary = ""
+            ctx0.route = ""
         log_event("webui.utterance", text=text[:200])
+        # Hermes delegation outranks templates on web too — same fix as mic path.
+        if self.classifier and (_hw := self.classifier._hermes_request(text)):
+            log_event("routing.decision", text=text[:200], kind="hermes", confidence=0.9, reason="hermes delegation", source="web")
+            if (ctx0 := self._cur_ctx()) is not None:
+                ctx0.route = "hermes"
+            self._handle_hermes(_hw.task_text or text)
+            self._web_wait_for_summary()
+            return {"text": text, "route": "hermes", "summary": (self._cur_ctx().summary if self._cur_ctx() else "") or self._last_web_summary or "", "reply": (self._cur_ctx().summary if self._cur_ctx() else "") or self._last_web_summary or "", "confidence": 0.9}
         tmpl = self._templates.match(text) if self._templates is not None else None
         if tmpl is not None:
             log_event("routing.template", name=tmpl.name, kind=tmpl.kind,
                       text=text[:160], source="web")
             if tmpl.kind == "local-script":
                 self._last_web_route = f"local-script:{tmpl.name}"
+                if (c0 := self._cur_ctx()) is not None:
+                    c0.route = f"local-script:{tmpl.name}"
                 self._dispatch_local_script(tmpl)
-                return {"text": text, "route": self._last_web_route,
-                        "summary": self._last_web_summary or tmpl.ack,
-                        "reply": self._last_web_summary,
+                c1 = self._cur_ctx()
+                summ = (c1.summary if c1 and c1.summary else self._last_web_summary) if True else ""
+                rout = (c1.route if c1 and c1.route else self._last_web_route) if True else ""
+                return {"text": text, "route": rout,
+                        "summary": summ or tmpl.ack,
+                        "reply": summ,
                         "confidence": tmpl.confidence}
             if tmpl.ack:
                 self.speak(tmpl.ack)
@@ -861,6 +968,12 @@ class VoiceOrchestrator:
             self._web_wait_for_summary()
         elif intent.kind == "local":
             self._handle_local(intent, text)
+            # _handle_local already set ctx.summary; also mirror to legacy global for polling
+            _cl = self._cur_ctx()
+            if _cl and _cl.summary:
+                with self._web_lock:
+                    self._last_web_summary = _cl.summary
+                    self._last_web_route = _cl.route or "local"
         elif intent.kind == "hermes":
             self._handle_hermes(intent.task_text or text)
             self._web_wait_for_summary()
@@ -874,23 +987,39 @@ class VoiceOrchestrator:
             self.speak("Could you be more specific about what you'd like me to do?")
         else:
             self._handle_conversation(text)
-        return {"text": text, "route": intent.kind,
-                "summary": self._last_web_summary or "",
-                "reply": self._last_web_summary or "",
+        # Prefer isolated ctx.summary so concurrent EN/RO never swap on the shared global
+        _cr = self._cur_ctx()
+        _cr_summ = _cr.summary if _cr is not None and getattr(_cr, "summary", None) else ""
+        _cr_route = _cr.route if _cr is not None and getattr(_cr, "route", None) else ""
+        return {"text": text, "route": _cr_route or intent.kind,
+                "summary": _cr_summ or self._last_web_summary or "",
+                "reply": _cr_summ or self._last_web_summary or "",
                 "confidence": round(intent.confidence, 2)}
 
     def _web_wait_for_summary(self, timeout_s: Optional[float] = None) -> None:
         """Block the web request until the dispatched task produces a summary
         (or the timeout expires). Long OpenClaw runs: the phone shows the ack
         immediately, and the summary arrives when the task completes — the
-        dashboard feed updates live meanwhile."""
+        dashboard feed updates live meanwhile.
+
+        Checks both the per-request ctx (isolated, no race) and the legacy
+        _last_web_summary global (set by the background waiter thread which has
+        no ctx). Either path satisfies the wait.
+        """
         if timeout_s is None:
-            timeout_s = float(self.cfg.get("webui", "task_wait_s", default=300))
+            timeout_s = float(self.cfg.get("webui", "task_wait_s", default=900))
         deadline = time.time() + timeout_s
+        ctx = self._cur_ctx()
         while time.time() < deadline and not self._stop.is_set():
-            if self._last_web_summary:
+            if ctx is not None and ctx.summary:
                 return
-            time.sleep(0.5)
+            if self._last_web_summary:
+                # Mirror global into ctx so the caller returns the right summary
+                if ctx is not None:
+                    ctx.summary = self._last_web_summary
+                    ctx.route = self._last_web_route
+                return
+            time.sleep(0.2)
 
     def feed_push(self, item: dict) -> None:
         """Bridge -> webui activity feed (no-op if webui not started)."""
@@ -1250,13 +1379,20 @@ class VoiceOrchestrator:
         summary = summarize(reply, self.cfg.section("summarizer"))
         log_event("openclaw.summary", session_key=session_key, summary=summary[:400])
         self.feed_push({"kind": "summary", "text": "OpenClaw task",
-                        "summary": summary, "route": "openclaw", "raw": reply[:500]})
-        self._last_web_summary = summary
+                        "summary": summary, "route": "openclaw", "raw": reply[:8000]})
+        # Only satisfy a waiting web poll if a web request is actually waiting;
+        # otherwise a Right Ctrl task would overwrite a concurrent dashboard request's
+        # _last_web_summary before it polls it (the "delay / wrong answer" bug).
+        if self._web_active or self._web_mode:
+            self._last_web_summary = summary
         self.speak(summary)
 
     # ----------------------------------------------------------- system cmds
     def _handle_system(self, intent: Intent) -> None:
         cmd = intent.params.get("command")
+        # sync Right Ctrl system commands to dashboard activity feed
+        log_event("system.command", command=cmd or "unknown", text=str(getattr(intent, "task_text", ""))[:120])
+        self.feed_push({"kind": "status", "text": f"system:{cmd or 'unknown'}", "route": "system", "detail": cmd or ""})
         if cmd == "status":
             route = self._route
             model = self.cfg.get("openclaw", "model") or (self.gateway_info.default_model if self.gateway_info else "unknown")
@@ -1326,7 +1462,7 @@ class VoiceOrchestrator:
             self.task.clear()
             log_event("openclaw.abort", why=why, session_key=key, run_id=run_id)
 
-    def _interrupt_task(self) -> None:
+    def _interrupt_task(self, announce: bool = True) -> None:
         """Pause whatever the bridge is doing (Ctrl during speech or a task).
 
         Stops spoken output, pauses a running agent task (remembering its
@@ -1335,6 +1471,9 @@ class VoiceOrchestrator:
         the floor is theirs. Nothing continues automatically: after the user
         speaks, the agent itself decides between continuing the current work or
         doing the new request.
+
+        announce=False — silent stop (like Esc/cancel); skips the "Paused."
+                         verbal acknowledgement.
         """
         interrupted_anything = False
         task_paused = False
@@ -1358,7 +1497,7 @@ class VoiceOrchestrator:
         # Only announce when a TASK was actually paused. For a plain speech
         # cut-off (or nothing at all) the beep already signals capture start —
         # speaking "Go ahead." on every tap was the journal spam bug.
-        if task_paused and not self.muted:
+        if task_paused and not self.muted and announce:
             self.speak("Paused. Go ahead.")
         elif not interrupted_anything and not self.muted:
             # truly nothing to pause: stay silent, the start beep suffices
@@ -1426,9 +1565,12 @@ class VoiceOrchestrator:
                             and _needs_web(text)))
         if not explicit_web and llm_cfg.get("enabled", True):
             from .local_llm import chat_local
+            # Use per-request snapshot so concurrent EN/RO requests don't bleed
+            _ctx_for_llm = self._cur_ctx()
+            _conv_prompt = _ctx_for_llm.conv_snapshot if _ctx_for_llm is not None and _ctx_for_llm.conv_snapshot is not None else self.conversation.as_prompt()
             try:
                 reply = chat_local(
-                    text, self.conversation.as_prompt(),
+                    text, _conv_prompt,
                     model=llm_cfg.get("model", "huihui_ai/llama3.2-abliterate:3b"),
                     url=llm_cfg.get("url", "http://127.0.0.1:11434"),
                     timeout_s=float(llm_cfg.get("timeout_s", 4.0)),
@@ -1438,11 +1580,25 @@ class VoiceOrchestrator:
                 reply = ""
                 log_event("conversation.local.skip", error=str(exc)[:120])
             if reply:
-                self.conversation.add("user", text)
-                self.conversation.add("assistant", reply)
-                self.feed_push({"kind": "summary", "text": "conversation",
-                                "summary": trim_spoken(reply, 300),
-                                "route": "local"})
+                # Activity feed: show what the user SAID (transcription) alongside the reply
+                # so Tricky can verify ASR quality: "You: How are you? → Bot: Sunt bine..."
+                # text=sanitized user utterance, summary=bot reply, detail=routing reason
+                trimmed = trim_spoken(reply, 300)
+                ctx2 = self._cur_ctx()
+                if ctx2 is not None:
+                    ctx2.summary = trimmed
+                    ctx2.route = "local"
+                    ctx2.done.set()
+                with _conv_lock:
+                    self.conversation.add("user", text)
+                    self.conversation.add("assistant", reply)
+                # Mirror so legacy pollers (_web_wait_for_summary waiting on global) also see it
+                with self._web_lock:
+                    self._last_web_summary = trimmed
+                    self._last_web_route = "local"
+                self.feed_push({"kind": "summary", "text": text[:300], "summary": trimmed,
+                                "route": "local", "detail": "conversation"})
+                log_event("conversation.local.summary", text=text[:160], summary=reply[:160])
                 self.speak(trim_spoken(reply, 500))
                 return
 
@@ -1465,10 +1621,21 @@ class VoiceOrchestrator:
         if not reply:
             reply = self._chat_ollama(text)
         if reply:
-            self.conversation.add("user", text)
-            self.conversation.add("assistant", reply)
+            with _conv_lock:
+                self.conversation.add("user", text)
+                self.conversation.add("assistant", reply)
             if not spoke:
                 self.speak(trim_spoken(reply, 500))
+            # sync fallback replies to dashboard too (Right Ctrl + web alike) — show what was HEARD
+            trimmed2 = trim_spoken(reply, 300)
+            ctx3 = self._cur_ctx()
+            if ctx3 is not None:
+                ctx3.summary = trimmed2
+                ctx3.route = "fallback"
+                ctx3.done.set()
+            self.feed_push({"kind": "summary", "text": text[:300], "summary": trimmed2,
+                            "route": "fallback", "detail": "conversation"})
+            log_event("conversation.fallback.summary", text=text[:160], summary=reply[:160])
         else:
             self.speak("I'm sorry, I couldn't reach the chat model.")
 
@@ -1485,11 +1652,13 @@ class VoiceOrchestrator:
         model = (self.cfg.get("intent", "deepseek_model", default="")
                  or _hermes_default_model()
                  or "deepseek-v4-flash")
-        ctx = self.conversation.as_prompt()
+        _c = self._cur_ctx()
+        ctx = _c.conv_snapshot if _c is not None and _c.conv_snapshot else self.conversation.as_prompt()
         system = ("You are a concise, warm voice assistant. Answer briefly in "
                   "1-3 short sentences unless asked for detail. Be direct: "
                   "no emojis, no pleasantries, no filler words — say only "
-                  "what's needed.")
+                  "what's needed. "
+                  "Reply in the SAME language as the current User message — if it is English, reply in English; if Romanian, reply in Romanian. Ignore previous turns' language.")
         payload = {
             "model": model, "stream": True, "temperature": 0.4,
             "messages": [
@@ -1558,7 +1727,8 @@ class VoiceOrchestrator:
         system = ("You are a concise, warm voice assistant. Answer briefly in "
                   "1-3 short sentences unless asked for detail. Be direct: "
                   "no emojis, no pleasantries, no filler words — say only "
-                  "what's needed.")
+                  "what's needed. "
+                  "Reply in the SAME language as the current User message — if it is English, reply in English; if Romanian, reply in Romanian. Ignore previous turns' language.")
         payload = {
             "model": model, "stream": False, "temperature": 0.4,
             "messages": [
@@ -1613,7 +1783,8 @@ class VoiceOrchestrator:
         system = ("You are a concise voice assistant answering from current web "
                   "search. Give a short, accurate, up-to-date answer in 1-4 "
                   "sentences. Prefer facts over hedging. Be direct: no emojis, "
-                  "no pleasantries, no filler words.")
+                  "no pleasantries, no filler words. "
+                  "Reply in the SAME language as the current User message.")
         payload = {
             "model": model, "stream": False, "temperature": 0.3,
             "messages": [
@@ -1639,7 +1810,8 @@ class VoiceOrchestrator:
         import urllib.request
         url = self.cfg.get("intent", "ollama_url", default="http://127.0.0.1:11434")
         model = self.cfg.get("intent", "ollama_model", default="qwen3-vl:8b")
-        ctx = self.conversation.as_prompt()
+        _c = self._cur_ctx()
+        ctx = _c.conv_snapshot if _c is not None and _c.conv_snapshot else self.conversation.as_prompt()
         prompt = f"Recent conversation:\n{ctx}\n\nUser: {text}\n\nAssistant:"
         payload = {"model": model, "prompt": prompt, "stream": False,
                    "options": {"think": False, "temperature": 0.4}}
@@ -1678,6 +1850,15 @@ class VoiceOrchestrator:
             return
         m = local_actions.ActionMatch(name=name, params=params, text=text)
         msg = local_actions.execute(m)
+        # Mirror to per-request ctx so /api/result returns the summary (dashboard poll), not just activity feed
+        c_local = self._cur_ctx()
+        if c_local is not None:
+            c_local.summary = msg[:300]
+            c_local.route = "local"
+            c_local.done.set()
+        # sync Right Ctrl local actions to dashboard activity feed + event journal (persists after restart)
+        log_event("local.action.summary", action=name, text=text[:160], summary=msg[:300])
+        self.feed_push({"kind": "summary", "text": f"local:{name}", "summary": msg[:300], "route": "local", "raw": msg[:8000]})
         self.speak(msg)
 
     def _handle_hermes(self, task: str, notice: str = "") -> None:
@@ -1713,6 +1894,17 @@ class VoiceOrchestrator:
                 log_event("hermes.result.discarded", why="interrupted")
                 return
             summary = summarize(reply, self.cfg.section("summarizer"))
+            # sync Right Ctrl Hermes tasks to dashboard (raw = full reply, summary = spoken)
+            self.feed_push({"kind": "summary", "text": "Hermes task", "summary": summary, "route": "hermes", "raw": reply[:8000]})
+            log_event("hermes.summary", summary=summary[:300])
+            # Mirror to per-request ctx so /api/result prefers isolated summary (no swap with concurrent)
+            if (_ctx_h := self._cur_ctx()) is not None:
+                _ctx_h.summary = summary
+                _ctx_h.route = "hermes"
+                _ctx_h.done.set()
+            with self._web_lock:
+                self._last_web_summary = summary
+                self._last_web_route = "hermes"
             self.speak(summary)
 
         threading.Thread(target=_run, daemon=True, name="hermes-task").start()
@@ -1729,6 +1921,12 @@ class VoiceOrchestrator:
         # it BEFORE templates/classification so the answer isn't misrouted
         if self.executor_choice.pending:
             self._handle_executor_answer(text)
+            return
+        # Explicit hermes delegation wins over everything (templates/classifier) —
+        # "ask hermes to check my inbox" must route to Hermes, not to the generic
+        # coding "check-email" template that also matches "my inbox".
+        if self.classifier and (_h := self.classifier._hermes_request(text)):
+            self._handle_hermes(_h.task_text or text)
             return
         # daily-task templates win over the model-based classifier: a matched
         # template dispatches the known task text directly (0 tokens, instant)
@@ -1758,6 +1956,12 @@ class VoiceOrchestrator:
             self._dispatch_coding(intent.task_text or text)
         elif intent.kind == "local":
             self._handle_local(intent, text)
+            # _handle_local already set ctx.summary; also mirror to legacy global for polling
+            _cl = self._cur_ctx()
+            if _cl and _cl.summary:
+                with self._web_lock:
+                    self._last_web_summary = _cl.summary
+                    self._last_web_route = _cl.route or "local"
         elif intent.kind == "hermes":
             self._handle_hermes(intent.task_text or text)
         elif intent.kind == "clarify":

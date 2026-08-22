@@ -117,7 +117,8 @@ class SherpaASR(ASRProvider):
                         sample_rate=16000,
                         feature_dim=feat_dim,
                         provider=self.provider,
-                        decoding_method="greedy_search",
+                        decoding_method="modified_beam_search",
+                        max_active_paths=4,
                         model_type="nemo_transducer")
             except Exception as exc:  # pragma: no cover
                 raise ASRUnavailable(f"sherpa {self.engine} load failed: {exc}") from exc
