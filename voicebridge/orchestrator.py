@@ -1496,11 +1496,32 @@ class VoiceOrchestrator:
             self._hermes_busy = False
             log_event("hermes.interrupted")
             interrupted_anything = True
-        # Only announce when a TASK was actually paused. For a plain speech
-        # cut-off (or nothing at all) the beep already signals capture start —
-        # speaking "Go ahead." on every tap was the journal spam bug.
+        # Rate-limit idle interrupts so a stuck dashboard poll loop doesn't spam the journal.
+        if not interrupted_anything:
+            now = time.time()
+            if not hasattr(self, "_last_idle_interrupt_ts"):
+                self._last_idle_interrupt_ts = 0.0  # type: ignore[attr-defined]
+            if now - float(getattr(self, "_last_idle_interrupt_ts", 0.0)) < 2.0:  # type: ignore[attr-defined]
+                return
+            self._last_idle_interrupt_ts = now  # type: ignore[attr-defined]
+        # Always journal the interrupt so /api/logs + dashboard Logs + qubit-dev /logs
+        # can show it, even when idle (so "interrupt doesn't work" is debuggable).
+        log_event("interrupt.request", announce=announce, had_task=task_paused,
+                  had_playback=bool(self.playback.playing), was_idle=not interrupted_anything,
+                  had_hermes=bool(self._interrupted_session and task_paused is False))
+        # Publish to the dashboard Activity feed too (so clicking shows it)
+        try:
+            self.feed_push({"kind": "status", "text": "interrupt", "route": "interrupt",
+                            "detail": f"task={task_paused} playback={self.playback.playing} hermes={bool(task_paused is False and self._interrupted_session)} idle={not interrupted_anything}", "raw": f"announce={announce} interrupted_anything={interrupted_anything} task_paused={task_paused}"})
+        except Exception:
+            pass
+        # Non-blocking announce: never hold the HTTP /api/interrupt handler on TTS.
+        # The previous speak("Paused. Go ahead.") blocked the response and left
+        # the dashboard's busy flag stuck on "idle" until TTS finished — that's
+        # the "freezes when I'm interrupting and it blocks on idle" bug.
         if task_paused and not self.muted and announce:
-            self.speak("Paused. Go ahead.")
+            import threading as _th
+            _th.Thread(target=lambda: self.speak("Paused. Go ahead."), daemon=True, name="interrupt-ack").start()
         elif not interrupted_anything and not self.muted:
             # truly nothing to pause: stay silent, the start beep suffices
             pass
