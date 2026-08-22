@@ -618,6 +618,7 @@ class VoiceOrchestrator:
             # blocks the phone (audio playback takes ~10s for a summary) and
             # blasts the room. Record the text so the web result can use it.
             self._web_spoken.append(text)
+            log_event("tts.speak", text=text[:300], provider="web")
             return True
         if self._tts is None:
             log.warning("TTS not available; would say: %s", text[:120])
@@ -1376,6 +1377,7 @@ class VoiceOrchestrator:
                        "text from the session — check the dashboard for details, "
                        "or ask me what it did.")
             return
+        log_event("openclaw.full_reply", session_key=session_key, reply_len=len(reply), reply=reply[:2000])
         summary = summarize(reply, self.cfg.section("summarizer"))
         log_event("openclaw.summary", session_key=session_key, summary=summary[:400])
         self.feed_push({"kind": "summary", "text": "OpenClaw task",
@@ -1599,6 +1601,7 @@ class VoiceOrchestrator:
                 self.feed_push({"kind": "summary", "text": text[:300], "summary": trimmed,
                                 "route": "local", "detail": "conversation", "raw": reply[:50000]})
                 log_event("conversation.local.summary", text=text[:160], summary=reply[:160])
+                log_event("conversation.local.full", text=text[:300], reply_len=len(reply), reply=reply[:2000])
                 self.speak(trim_spoken(reply, 500))
                 return
 
@@ -1636,6 +1639,7 @@ class VoiceOrchestrator:
             self.feed_push({"kind": "summary", "text": text[:300], "summary": trimmed2,
                             "route": "fallback", "detail": "conversation", "raw": reply[:50000]})
             log_event("conversation.fallback.summary", text=text[:160], summary=reply[:160])
+            log_event("conversation.fallback.full", text=text[:300], reply_len=len(reply), reply=reply[:2000])
         else:
             self.speak("I'm sorry, I couldn't reach the chat model.")
 
@@ -1849,7 +1853,9 @@ class VoiceOrchestrator:
                        "like: mute the microphone, or open the terminal.")
             return
         m = local_actions.ActionMatch(name=name, params=params, text=text)
+        log_event("local.action.exec", action=name, text=text[:160], params=params)
         msg = local_actions.execute(m)
+        log_event("local.action.result", action=name, result_len=len(msg), result=msg[:2000])
         # Mirror to per-request ctx so /api/result returns the summary (dashboard poll), not just activity feed
         c_local = self._cur_ctx()
         if c_local is not None:
@@ -1893,6 +1899,7 @@ class VoiceOrchestrator:
                 # user redirected mid-run; don't speak the stale reply
                 log_event("hermes.result.discarded", why="interrupted")
                 return
+            log_event("hermes.full_reply", reply_len=len(reply), reply=reply[:2000])
             summary = summarize(reply, self.cfg.section("summarizer"))
             # sync Right Ctrl Hermes tasks to dashboard (raw = full reply, summary = spoken)
             self.feed_push({"kind": "summary", "text": "Hermes task", "summary": summary, "route": "hermes", "raw": reply[:50000]})
@@ -1916,6 +1923,9 @@ class VoiceOrchestrator:
         self.feed_push({"kind": "routing", "text": text, "route": intent.kind,
                         "conf": round(float(getattr(intent, "confidence", 0) or 0), 2),
                         "detail": getattr(intent, "reason", "") or ""})
+        log_event("routing.decision", text=text[:200], kind=intent.kind,
+                  confidence=round(float(getattr(intent, "confidence", 0) or 0), 2),
+                  reason=getattr(intent, "reason", "") or "", source="mic")
         # executor ask-mode answer: the user just said who should run the
         # pending task ("OpenClaw", "Hermes", "you pick", "whatever") — handle
         # it BEFORE templates/classification so the answer isn't misrouted
