@@ -109,13 +109,15 @@ _BOSS_PHRASES = [
 
 _HUM_PHRASES = [
     "hmm~",
-    "still working boss",
-    "almost there boss",
-    "still on it boss",
-    "working away here",
-    "hang tight boss",
-    "*whistles*",
-    "still cooking boss",
+    "still working boss~",
+    "almost there boss, hang in there~",
+    "still on it boss, I'm watching them for you~",
+    "working away here, *soft hum*~",
+    "hang tight boss, they're cooking~",
+    "*whistles softly*~",
+    "still cooking boss, smells good~",
+    "*cute hum* hmm hmm~",
+    "boss, they're busy — I'm keeping an eye on them~",
 ]
 
 
@@ -1301,18 +1303,56 @@ class VoiceOrchestrator:
             self.speak("OpenClaw is not reachable. Start the gateway and try again.")
 
     def _progress_loop(self) -> None:
-        """Periodic spoken status while a task runs (rate-limited)."""
+        """Periodic talk-back while a big task runs — local Qubit checks what
+        the worker (OpenClaw/Hermes) actually did so far and gives a real update.
+        Falls back to 'Still working' when the history isn't readable yet."""
         interval = float(self.cfg.get("openclaw", "progress_min_interval_s", default=15))
         while self.task.active and not self._stop.is_set():
             time.sleep(interval)
-            if self.task.active and not self.playback.playing:
+            if self.task.active and not self.playback.playing and not self._interrupt_requested:
                 elapsed = self.task.elapsed_s()
                 log_event("openclaw.status", session_key=self.task.session_key, elapsed_s=round(elapsed, 1))
-                if elapsed > 30:
-                    self.speak("Still working. I'll update you when it's done.",
-                               name="progress", barge=False)
-                    log_event("openclaw.progress", elapsed_s=round(elapsed, 1))
-                    self.task.last_progress_spoken = time.time()
+                # Try to give a REAL update: pull last turns from gateway history
+                spoken = False
+                if elapsed > 25:
+                    try:
+                        # _fetch_progress_snippet is best-effort; never crash the loop
+                        snippet = getattr(self, "_fetch_progress_snippet", lambda: "")() or ""
+                        if snippet:
+                            now = time.time()
+                            if now - float(getattr(self.task, "last_progress_spoken", 0)) >= 20:
+                                # local small brain summarizes the snippet into a 1-sentence update
+                                try:
+                                    from .local_llm import chat_local as _chat_local
+                                    _hist = ""
+                                    try:
+                                        _hist = self.shared.as_prompt(max_chars=800, max_turns=6)
+                                    except Exception:
+                                        pass
+                                    upd = _chat_local(
+                                        f"Summarize this worker progress in ONE short, playful and cute sentence for voice (max 18 words, warm and a little flirty, no filler):\n{snippet[:700]}",
+                                        _hist, model=self.cfg.get("intent", "local_llm", "model", default="huihui_ai/llama3.2-abliterate:3b"),
+                                        url=self.cfg.get("intent", "local_llm", "url", default="http://127.0.0.1:11434"), timeout_s=6.0, max_tokens=40,
+                                        context="")
+                                    if upd and len(upd.split()) <= 22:
+                                        self.speak(upd, name="progress", barge=False)
+                                        log_event("openclaw.progress.llm", elapsed_s=round(elapsed,1), update=upd[:160])
+                                    else:
+                                        self.speak(f"Still working — {snippet[:80]}", name="progress", barge=False)
+                                        log_event("openclaw.progress.snippet", elapsed_s=round(elapsed,1), snippet=snippet[:120])
+                                except Exception:
+                                    self.speak(f"Still working — {snippet[:80]}", name="progress", barge=False)
+                                    log_event("openclaw.progress.snippet", elapsed_s=round(elapsed,1), snippet=snippet[:120])
+                                self.task.last_progress_spoken = time.time()
+                                spoken = True
+                    except Exception:
+                        pass
+                if not spoken and elapsed > 30:
+                    if time.time() - float(getattr(self.task, "last_progress_spoken", 0)) >= 25:
+                        self.speak("Still working. I'll update you when it's done.",
+                                   name="progress", barge=False)
+                        log_event("openclaw.progress", elapsed_s=round(elapsed, 1))
+                        self.task.last_progress_spoken = time.time()
 
     def _await_run(self, session_key: str, run_id: str, task_text: str,
                    blocking: Optional[bool] = None) -> None:
@@ -1470,6 +1510,39 @@ class VoiceOrchestrator:
 
         threading.Thread(target=_waiter, daemon=True, name="task-waiter").start()
         log_event("openclaw.waiter.started", session_key=session_key, run_id=run_id)
+
+    def _fetch_progress_snippet(self) -> str:
+        """Best-effort peek at the worker's recent tool activity for voice updates."""
+        try:
+            if self._gateway is None or not getattr(self._gateway, "connected", False):
+                return ""
+            sk = getattr(self.task, "session_key", "")
+            if not sk:
+                return ""
+            msgs = self._gateway.history(sk, limit=12, timeout=10.0)
+            tools = []
+            last_assistant = ""
+            for m in (msgs or [])[-12:]:
+                role = (m.get("role") or "").lower()
+                if role == "tool" or m.get("tool"):
+                    nm = m.get("tool") or m.get("name") or m.get("function") or ""
+                    if nm and nm not in tools:
+                        tools.append(str(nm)[:24])
+                if role == "assistant":
+                    c = m.get("text") or m.get("content") or ""
+                    if isinstance(c, list):
+                        c = " ".join(x.get("text","") if isinstance(x, dict) else str(x) for x in c)
+                    c = str(c).strip()
+                    if c and c.lower() not in ("no_reply","no reply") and not c.startswith("<tool"):
+                        last_assistant = c[:120]
+            parts = []
+            if tools:
+                parts.append(f"tools: {', '.join(tools[-4:])}")
+            if last_assistant:
+                parts.append(last_assistant)
+            return " — ".join(parts)[:220]
+        except Exception:
+            return ""
 
     def _extract_assistant_reply(self, messages: list) -> str:
         """Pull the last meaningful assistant text from a transcript."""
