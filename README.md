@@ -111,6 +111,45 @@ start/stop capture, or `voicebridge once` for a single utterance.
 - *"status"*, *"stop"*, *"mute"*, *"unmute"*, *"use turbo / normal / slow /
   hard / pro"* are built-in system commands.
 
+## Capabilities (voiced)
+
+The local agent (cripped `qubit-brain` baked model) + the bridge can do these by
+voice, fast and low-resource (no GPU training):
+
+- **Play YouTube / YouTube Music**: `play <song/video> on youtube` resolves the
+  top 5 via `yt-dlp`, picks the one with the **most views**, and opens it in a
+  **Chromium tab**. First time it asks: *"in a windowed tab or quietly in the
+  background?"* (audio-only via `ffplay`) — the choice is remembered.
+- **Control media**: `pause / resume the youtube music`, `next video` (skip to
+  the next ranked result), `stop the music` / `close the youtube tabs` (stops
+  playback AND closes all `youtube.com` + `music.youtube.com` tabs).
+- **Browser tabs**: `scripts/browser_auto.py` reads/scrapes ANY open Chromium
+  tab (`list_tabs`, `read`, `write JS`, `open`), `scripts/tab_report.py` turns a
+  tab into a professional report.
+- **Inboxes**: check Gmail / Instagram DMs / Messenger / TikTok via the
+  logged-in Chromium (review scripts) — fast, cached.
+- **Reports**: `scripts/generate_report.py` produces deterministic
+  professional reports (full detail + ≤40-word spoken summary).
+- **Task queue**: give a task while one is running → it's QUEUED (never
+  lost, never hard-aborted). `close task` finishes the current and asks whether
+  to start the queued one.
+- **Follow-ups**: when the bridge asks a question (play mode, confirm, executor
+  choice), the dashboard shows "waiting for your answer…" and keeps listening —
+  answer in the same turn, no need to re-ask.
+
+### Recommended plugins / tools (must be installed)
+
+| Tool | Why |
+|---|---|
+| `yt-dlp` | YouTube search + resolution (top-N, rank by views) |
+| `ffplay` (ffmpeg) | audio-only background playback fallback |
+| Playwright + snap **Chromium** | drive the real logged-in browser via CDP (no "bot secure") |
+| `pactl`/`wpctl` | audio sink/volume control |
+
+The bridge runs everything through the **real logged-in Chromium** profile — one
+browser for all accounts (Gmail, Instagram, Facebook/Messenger, TikTok, Vercel,
+Reddit, X) so no re-login and no captcha flapping.
+
 ## Voice Dashboard (talk from your phone)
 
 The bridge serves a small web UI (stdlib HTTP, no extra deps) so you can
@@ -119,8 +158,13 @@ what the agent is doing live.
 
 - **Chat page**: `http://<this-pc-ip>:8890/` — hold/tap the button, speak,
   hear the reply (audio comes back to the phone; the PC speakers stay
-  silent). Same pipeline as the mic: ASR → route → OpenClaw/local → **the
-  local 3B model's ≤40-word summary** → TTS.
+  silent unless `webui.speak_web_locally` is on). Same pipeline as the mic:
+  ASR → route → OpenClaw/local → **the local 3B model's ≤40-word summary** → TTS.
+- **Audio on the PC too**: by default a web/dashboard request ALSO speaks the
+  reply through the PC speakers (`webui.speak_web_locally: true` in config), so
+  replies, summaries, and action results (playing a song, a finished report,
+  inbox/research results) are both shown on the dashboard AND spoken aloud.
+  Set it to `false` to keep the phone the only audio output.
 - **Activity dashboard**: `http://<this-pc-ip>:8890/activity` — live feed
   of what the agent did: recognized text, routing decision, status, the
   final spoken summary, latency, and (for tool runs) the raw output behind

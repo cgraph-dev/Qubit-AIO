@@ -704,12 +704,16 @@ class VoiceOrchestrator:
             return True
         if self._web_mode:
             # Web/phone request: the browser plays the TTS audio (returned via
-            # /api/result). DO NOT play through the PC speakers — that both
-            # blocks the phone (audio playback takes ~10s for a summary) and
-            # blasts the room. Record the text so the web result can use it.
+            # /api/result). By default we ALSO speak it on the PC speakers so
+            # the user hears the reply locally (config: webui.speak_web_locally).
+            # When off, only record the text (no room blast / no phone block).
             self._web_spoken.append(text)
             log_event("tts.speak", text=text[:300], provider="web")
-            return True
+            if not self.cfg.get("webui", "speak_web_locally", default=True):
+                return True
+            # fall through to local playback (bold=True allows barge-in off)
+            if self.muted:
+                return True
         if self._tts is None:
             log.warning("TTS not available; would say: %s", text[:120])
             return False

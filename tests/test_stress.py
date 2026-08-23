@@ -328,3 +328,43 @@ def test_play_youtube_ranks_by_views():
             res = A._a_play_youtube_params({"query": "queen"})
             A._YT_MODE = None
     assert "Popular one" in res, res
+
+
+def test_web_replies_speak_locally_by_default():
+    """In web mode speak() must fall through to local playback when
+    webui.speak_web_locally is true (default); when false it records only."""
+    import pathlib
+    from voicebridge.config import Config
+    from unittest import mock
+    import tempfile
+    from voicebridge.orchestrator import VoiceOrchestrator
+
+    def make_orb(speak_locally):
+        orb = VoiceOrchestrator.__new__(VoiceOrchestrator)
+        with tempfile.TemporaryDirectory() as td:
+            cfg = Config.load(pathlib.Path(td) / "none.yaml")
+        cfg.data.setdefault("webui", {})["speak_web_locally"] = speak_locally
+        cfg.data.setdefault("tts", {})["direct"] = False
+        orb.cfg = cfg
+        orb.muted = False
+        orb._web_mode = True
+        orb._web_spoken = []
+        orb._tts = mock.MagicMock()
+        orb._tts.synthesize.return_value = pathlib.Path("/tmp/opencode/x.wav")
+        orb._cancel = mock.MagicMock()
+        orb._barge = mock.MagicMock()
+        orb._barge_stream = None
+        orb.playback = mock.MagicMock()
+        return orb
+
+    # speak_web_locally=True -> should reach playback (play called)
+    orb = make_orb(True)
+    orb.speak("hello there")
+    orb.playback.play.assert_called_once()
+    assert orb._web_spoken == ["hello there"]
+
+    # speak_web_locally=False -> records only, no playback
+    orb2 = make_orb(False)
+    orb2.speak("hello there")
+    orb2.playback.play.assert_not_called()
+    assert orb2._web_spoken == ["hello there"]
