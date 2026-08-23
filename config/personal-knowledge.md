@@ -12,6 +12,8 @@
 # --- Who Tricky is ------------------------------------------------------------
 - Name: Tricky
 - Timezone: Europe/Bucharest (EEST, UTC+3)
+- Location: Bucharest, Romania
+- Phone: +40 750 200 004  (+40750200004)
 - Email: contact@cgraph.org
 - GitHub: cgraph-dev
 - OS: Ubuntu 24.04 (Noble)

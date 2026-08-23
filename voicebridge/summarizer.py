@@ -31,7 +31,7 @@ def _strip_markdown(text: str) -> str:
 
 
 def summarize_ollama(text: str, url: str = "http://127.0.0.1:11434",
-                     model: str = "huihui_ai/llama3.2-abliterate:3b", timeout_s: float = 5.0,
+                     model: str = "qubit-brain", timeout_s: float = 5.0,
                      max_chars: int = 900) -> Optional[str]:
     text = text[:max_chars]
     payload = {"model": model, "prompt": f"Agent output:\n{text}",
@@ -89,7 +89,7 @@ def summarize(text: str, cfg: Optional[dict] = None,
         cfg = cfg or {}
         provider = cfg.get("provider", "extractive")
         url = ollama_url or "http://127.0.0.1:11434"
-        model = ollama_model or cfg.get("ollama_model", "huihui_ai/llama3.2-abliterate:3b")
+        model = ollama_model or cfg.get("ollama_model", "qubit-brain")
         max_chars = int(cfg.get("max_chars", 900))
         max_words = int(cfg.get("max_words", 40))
         if not text or not text.strip():

@@ -118,7 +118,7 @@ DEFAULTS: Dict[str, Any] = {
         "llm_classifier": True,     # enabled: +~0.3-0.6s but fixes broken-English routing (user approved 20-30% cost) — heuristic only (fast);
                                     # ambiguous taps default to conversation
         "ollama_url": "http://127.0.0.1:11434",
-        "ollama_model": "huihui_ai/llama3.2-abliterate:3b",
+        "ollama_model": "qubit-brain",
         "classify_timeout_s": 8.0,
         "conversation_backend": "local",
         "templates_path": "~/.config/openclaw-voice-bridge/task-templates.yaml",  # daily-task templates (spoken phrase -> known task)    # bridge IS the voice: local model answers ALL chat instantly
@@ -130,7 +130,7 @@ DEFAULTS: Dict[str, Any] = {
         "local_llm": {
             "enabled": True,           # bridge responds to ALL chat itself (<0.5s);
                                         # only tasks dispatch to OpenClaw/Hermes
-            "model": "huihui_ai/llama3.2-abliterate:3b",  # 3B default: native Romanian + smaller (2.6GB resident).
+            "model": "qubit-brain",  # 3B default: native Romanian + smaller (2.6GB resident).
                                     # phi-4-mini-abliterated is smarter in EN but BROKEN at RO (echoes/
                                     # wrong dates/hallucinates) — kept as optional EN-only smart mode.
             "url": "http://127.0.0.1:11434",
@@ -180,7 +180,7 @@ DEFAULTS: Dict[str, Any] = {
     },
     "summarizer": {
         "provider": "ollama",   # ollama | extractive
-        "ollama_model": "huihui_ai/llama3.2-abliterate:3b",
+        "ollama_model": "qubit-brain",
         "max_chars": 900,       # extractive/summarizer input budget
         "max_words": 40,         # HARD cap on every spoken response (save time)
     },

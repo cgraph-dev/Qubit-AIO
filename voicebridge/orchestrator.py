@@ -1453,7 +1453,7 @@ class VoiceOrchestrator:
                                         pass
                                     upd = _chat_local(
                                         f"Summarize this worker progress in ONE short, playful and cute sentence for voice (max 18 words, warm and a little flirty, no filler):\n{snippet[:700]}",
-                                        _hist, model=self.cfg.get("intent", "local_llm", "model", default="huihui_ai/llama3.2-abliterate:3b"),
+                                        _hist, model=self.cfg.get("intent", "local_llm", "model", default="qubit-brain"),
                                         url=self.cfg.get("intent", "local_llm", "url", default="http://127.0.0.1:11434"), timeout_s=6.0, max_tokens=40,
                                         context="")
                                     if upd and len(upd.split()) <= 22:
@@ -2138,7 +2138,7 @@ class VoiceOrchestrator:
             try:
                 reply = chat_local(
                     text, _conv_prompt,
-                    model=llm_cfg.get("model", "huihui_ai/llama3.2-abliterate:3b"),
+                    model=llm_cfg.get("model", "qubit-brain"),
                     url=llm_cfg.get("url", "http://127.0.0.1:11434"),
                     timeout_s=float(llm_cfg.get("timeout_s", 4.0)),
                     max_tokens=int(llm_cfg.get("max_tokens", 100)),
@@ -2166,13 +2166,13 @@ class VoiceOrchestrator:
                 self.feed_push({"kind": "summary", "text": text[:300], "summary": trimmed,
                                 "route": "local", "detail": "conversation", "raw": reply[:50000]})
                 log_event("conversation.local.summary", text=text[:160], summary=reply[:160],
-                          model=llm_cfg.get("model", "huihui_ai/llama3.2-abliterate:3b"))
+                          model=llm_cfg.get("model", "qubit-brain"))
                 try:
                     self.shared.append_assistant(reply, route="local", provider="local")
                 except Exception:
                     pass
                 log_event("conversation.local.full", text=text[:300], reply_len=len(reply), reply=reply[:2000],
-                          model=llm_cfg.get("model", "huihui_ai/llama3.2-abliterate:3b"))
+                          model=llm_cfg.get("model", "qubit-brain"))
                 self.speak(trim_spoken(reply, 500))
                 return
 
@@ -2395,7 +2395,7 @@ class VoiceOrchestrator:
         import urllib.request
         url = self.cfg.get("intent", "ollama_url", default="http://127.0.0.1:11434")
         # Fallback uses the same resident model as local_llm (was hardcoded qwen3-vl:8b which is not resident)
-        fallback = self.cfg.get("intent", "local_llm", "model", default="huihui_ai/llama3.2-abliterate:3b")
+        fallback = self.cfg.get("intent", "local_llm", "model", default="qubit-brain")
         model = self.cfg.get("intent", "ollama_model", default=fallback)
         _c = self._cur_ctx()
         ctx = _c.conv_snapshot if _c is not None and _c.conv_snapshot else self.conversation.as_prompt()
