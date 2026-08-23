@@ -134,8 +134,11 @@ voice, fast and low-resource (no GPU training):
   lost, never hard-aborted). `close task` finishes the current and asks whether
   to start the queued one.
 - **Follow-ups**: when the bridge asks a question (play mode, confirm, executor
-  choice), the dashboard shows "waiting for your answer…" and keeps listening —
-  answer in the same turn, no need to re-ask.
+  choice), it stays **active and online** — the dashboard shows **clickable
+  option buttons** under the orb (e.g. "Windowed tab" / "Background audio",
+  "Yes" / "No" / "OpenClaw" / "Hermes") AND the mic keeps listening so you can
+  answer by voice in the same turn. Answer with a click or by speaking — no need
+  to open a fresh message.
 
 ### Recommended plugins / tools (must be installed)
 
