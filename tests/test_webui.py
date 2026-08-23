@@ -70,7 +70,8 @@ class _FakeOrch:
         self._route = "gateway"
         self._t0 = time.time()
         self.cfg = type("C", (), {
-            "get": lambda self, *p, **kw: kw.get("default"),
+            # speak_web_locally False -> bridge returns audio_b64 to the browser
+            "get": lambda self, *p, **kw: False if p and p[-1] == "speak_web_locally" else kw.get("default"),
             "section": lambda self, n: {},
             "model_dir": lambda self: Path("/tmp"),
             "state_dir": lambda self: Path("/tmp"),

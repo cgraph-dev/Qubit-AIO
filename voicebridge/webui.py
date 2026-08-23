@@ -1014,12 +1014,18 @@ class WebUI:
                         result["reply"] = spoken_text
                 # synthesize the reply audio (same as the voice path)
                 summary = result.get("summary") or ""
-                if summary:
+                # If the bridge speaks on the PC speakers (speak_web_locally), do NOT
+                # also hand the browser an audio_b64 to play -> that's the "responds
+                # twice" bug. The dashboard shows the text only.
+                speak_locally = self._speak_locally()
+                if summary and not speak_locally:
                     try:
                         wav = self._synthesize(summary)
                         result["audio_b64"] = base64.b64encode(wav).decode()
                     except Exception as exc:
                         log_event("webui.tts.failed", error=str(exc)[:160])
+                else:
+                    result["audio_b64"] = None
                 result["awaiting_input"] = bool(self.orch._needs_answer()) if hasattr(self.orch, "_needs_answer") else False
             except Exception as exc:
                 log.exception("webui type worker failed")
@@ -1180,7 +1186,10 @@ class WebUI:
         summary = (_ctx2.summary if _ctx2 is not None and getattr(_ctx2, "summary", None) else "") or result.get("summary") or result.get("reply") or spoken_text or text
         audio_b64 = None
         events: List[Dict[str, Any]] = []
-        if summary:
+        # If the bridge speaks on the PC speakers (speak_web_locally), don't also
+        # hand the browser audio_b64 -> that's the "responds twice" bug.
+        speak_locally = self._speak_locally()
+        if summary and not speak_locally:
             events.append({"kind": "meta", "text": result.get("route", "route")})
             try:
                 wav = self._synthesize(summary)
@@ -1203,6 +1212,14 @@ class WebUI:
         }
 
     # -- internals ---------------------------------------------------------
+    def _speak_locally(self) -> bool:
+        """True when the bridge plays TTS on the PC speakers (webui.speak_web_locally).
+        When true, the dashboard must NOT also autoplay audio_b64 (responds twice)."""
+        try:
+            return bool(self.orch.cfg.get("webui", "speak_web_locally", default=True))
+        except Exception:
+            return True
+
     def _transcribe(self, wav_path: Path):
         with self._asr_lock:
             # Reuse the bridge's OWN ASR instance when it's loaded: the model

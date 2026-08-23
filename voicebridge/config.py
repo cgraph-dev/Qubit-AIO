@@ -42,8 +42,9 @@ DEFAULTS: Dict[str, Any] = {
         "channels": 2,         # capture N channels, use the loudest
         "blocksize": 480,      # ~10ms at 48k
         "gain": 3.0,           # pre-amplify quiet mics (too high (8x+64x) amplifies hiss and distorts ASR -> empty transcripts)
-        "min_rms": 0.0005,          # lowered from 0.0008 — quiet tap speech peaked at 0.006 but was still gated          # below this the capture is treated as silence
-                "max_capture_s": 30.0,       # watchdog: force-close a wedged mic stream
+        "min_rms": 0.0005,          # below this the capture is treated as silence
+        "normalize_target": 0.35,   # peak-normalize the clip to this fraction before ASR (stable level for quiet mics)
+        "max_capture_s": 30.0,      # watchdog: force-close a wedged mic stream
     },
     "vad": {
         "enabled": True,

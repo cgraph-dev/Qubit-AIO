@@ -43,7 +43,8 @@ class MicCapture:
                  channels: int = 2, blocksize: int = 480,
                  endpointer: Optional[Endpointer] = None,
                  gain: float = 4.0, min_rms: float = 0.0008,
-                 min_speech_s: float = 0.15) -> None:
+                 min_speech_s: float = 0.15,
+                 normalize_target: float = 0.35) -> None:
         self.device = device
         self.sample_rate = sample_rate
         self.channels = channels
@@ -52,6 +53,7 @@ class MicCapture:
         self.gain = gain
         self.min_rms = min_rms
         self.min_speech_s = min_speech_s
+        self.normalize_target = normalize_target  # peak-normalize pre-amp before ASR
         self._stream: Optional[sd.InputStream] = None
 
     def open(self) -> "MicCapture":
@@ -185,6 +187,21 @@ class MicCapture:
             start = 0
         payload = b"".join(buf16[start:])
         duration = len(payload) / FRAME_RATE / 2  # int16 = 2 bytes
+
+        # Peak-normalize pre-amp: a quiet/variable mic (HyperX) makes ASR drop
+        # words or hallucinate. Scale the clip so its peak hits a target fraction
+        # of full scale — consistent, non-clipping level regardless of raw gain,
+        # fixed hardware gain knob, or autogain swings.
+        try:
+            _pcm = np.frombuffer(payload, dtype=np.int16).astype(np.float32) / 32767.0
+            _peak = float(np.max(np.abs(_pcm))) if _pcm.size else 0.0
+            _target = float(getattr(self, "normalize_target", 0.35)) or 0.35
+            if _peak > 0.001 and _peak < 0.98:
+                _scale = _target / _peak
+                _pcm = np.clip(_pcm * _scale, -1.0, 1.0)
+                payload = (_pcm * 32767).astype(np.int16).tobytes()
+        except Exception:
+            pass
 
         out_dir = out_dir or Path("/tmp/openclaw-voice-bridge")
         out_dir.mkdir(parents=True, exist_ok=True)

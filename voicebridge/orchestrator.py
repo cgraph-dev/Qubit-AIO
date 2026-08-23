@@ -570,8 +570,9 @@ class VoiceOrchestrator:
                                    rms_gate=float(self.cfg.get("vad", "rms_gate", default=0.0018)),
                                    vad_backend=vad_backend,
                                    silero_model=silero_model),
-                               gain=float(mic_cfg.get("gain", 4.0)),
-                               min_rms=float(mic_cfg.get("min_rms", 0.0005)))
+                                gain=float(mic_cfg.get("gain", 4.0)),
+                                min_rms=float(mic_cfg.get("min_rms", 0.0005)),
+                                normalize_target=float(mic_cfg.get("normalize_target", 0.35)))
         self._beep_start = self._make_beep(880.0, 0.08)
         self._beep_end = self._make_beep(660.0, 0.06)
         self._barge = BargeInDetector(

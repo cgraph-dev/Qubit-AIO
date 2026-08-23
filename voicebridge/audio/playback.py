@@ -10,6 +10,15 @@ from typing import Optional
 import numpy as np
 import sounddevice as sd
 
+from ..logging_setup import log_event
+
+
+def _log(event: str, **fields) -> None:
+    try:
+        log_event(event, **fields)
+    except Exception:
+        pass
+
 
 def _resample(audio: np.ndarray, from_sr: int, to_sr: int) -> np.ndarray:
     """Linear-interpolation resample float/int audio to a new sample rate."""
@@ -68,15 +77,27 @@ class Playback:
             idx = None
         if idx is not None and 0 <= idx < len(devs) and devs[idx]["max_output_channels"] > 0:
             return idx
-        # 3) any device with >=8 output channels that isn't 'default'/'pipewire'/'pulse'
+        # 3) fall back to a REAL output, avoiding HDMI/TV (NVidia) and virtual sinks:
+        #    prefer USB/analog headsets (2 ch) over 8-ch HDMI (a display, not a speaker).
+        bad = ("default", "pipewire", "pulse", "hdmi", "nvidia")
+        cands = [i for i, d in enumerate(devs)
+                 if d["max_output_channels"] > 0 and not any(b in d["name"].lower() for b in bad)]
+        if cands:
+            return cands[0]
+        # 4) last resort: any output device at all (including HDMI)
         for i, d in enumerate(devs):
-            if d["max_output_channels"] >= 8 and d["name"] not in ("default", "pipewire", "pulse"):
+            if d["max_output_channels"] > 0:
                 return i
         return None
 
     def play(self, wav_path: Path | str, name: str = "", interruptible: bool = True,
              on_start=None, on_finish=None) -> bool:
-        """Blocking playback of a WAV. Returns False if interrupted."""
+        """Blocking playback of a WAV. Returns False if interrupted.
+
+        Tries the pinned device first; if it FAILS to open (e.g. "Device
+        unavailable" from a slow-to-handshake USB headset), it retries on the
+        system default sink so audio is never silently dropped.
+        """
         with self._lock:
             if self._playing:
                 # Interrupt whatever is playing first (we are the only speaker).
@@ -85,13 +106,24 @@ class Playback:
             self._stop = threading.Event()
             self._playing = True
             self._name = name
-        # Resolve a device each play: name-substring > valid index > any 8-ch
-        # output. Falls back to system default (None) only if nothing resolves.
-        dev = self._resolve_device()
+        try:
+            finished = self._play_try(wav_path, on_start)
+            if finished is None:   # pinned device failed -> fall back to default
+                finished = self._play_try(wav_path, on_start, force_default=True)
+            return finished if finished is not None else False
+        finally:
+            with self._lock:
+                self._playing = False
+            if on_finish:
+                on_finish(finished if finished is not None else False)
+
+    def _play_try(self, wav_path, on_start, force_default=False):
+        """Return True=finished, False=interrupted, None=pinned open failed."""
+        import sounddevice as _sd
+        dev = None if force_default else self._resolve_device()
         target_sr = None
         if dev is not None:
             try:
-                import sounddevice as _sd
                 target_sr = int(_sd.query_devices()[dev].get("default_samplerate") or 0)
             except Exception:
                 target_sr = None
@@ -101,28 +133,54 @@ class Playback:
                 frames = wf.readframes(wf.getnframes())
                 nch = wf.getnchannels()
             audio = np.frombuffer(frames, dtype=np.int16).reshape(-1, nch)
-            # Resample to the pinned device's native rate (raw ALSA hw rejects a
-            # mismatched rate, e.g. 22050 TTS vs 44100 headphone) — error -9997.
             if target_sr and sr != target_sr:
                 audio = _resample(audio, sr, target_sr)
                 sr = target_sr
-            sd.play(audio, sr, blocking=False, device=dev)
+            try:
+                _sd.play(audio, sr, blocking=False, device=dev)
+            except Exception as exc:
+                _log("playback.device_unavailable", device=str(dev), error=str(exc)[:120])
+                return None
             if on_start:
                 on_start()
             self._started_at = time.time()
             finished = True
-            while sd.get_stream().active:
-                if self._stop.is_set():
-                    sd.stop()
-                    finished = False
+            # Watchdog: never let playback block a request forever (page freeze).
+            # Wait while the stream is alive OR up to duration+grace. If a wedged
+            # device never becomes active, bail early and report failure so the
+            # caller retries on the default device.
+            import math
+            dur_s = len(audio) / sr if sr else 0.0
+            deadline = time.time() + max(dur_s, 0.2) + 2.0
+            ever_active = False
+            no_play_grace = time.time() + 3.0
+            while not self._stop.is_set() and time.time() < deadline:
+                try:
+                    st = sd.get_stream()
+                    if st is not None and st.active:
+                        ever_active = True
+                    elif not ever_active and time.time() > no_play_grace:
+                        break   # never became active (wedged device) -> bail
+                except Exception:
                     break
-                time.sleep(0.02)
-        finally:
-            with self._lock:
-                self._playing = False
-            if on_finish:
-                on_finish(finished)
-        return finished
+                time.sleep(0.05)
+            # If it never produced an active stream, it didn't actually play -> report
+            # failure so the caller falls back to a different device.
+            if not ever_active and not self._stop.is_set():
+                return None
+            finished = not self._stop.is_set()
+            try:
+                sd.stop()
+            except Exception:
+                pass
+            try:
+                sd.wait()
+            except Exception:
+                pass
+            return finished
+        except Exception as exc:
+            _log("playback.play_error", error=str(exc)[:120])
+            return None
 
     def stop(self) -> None:
         with self._lock:

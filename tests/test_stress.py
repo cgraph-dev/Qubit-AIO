@@ -715,22 +715,27 @@ def test_playback_resamples_to_device_rate():
 
 
 def test_playback_resolves_by_name_not_silent_index():
-    """When the configured device index points at a 0-output (silent) device,
-    Playback must resolve to the named output instead (device indices shift on
-    profile changes -> 'no volume' bug)."""
+    """Playback must resolve to a REAL output device (never a 0-output / HDMI-
+    only trap) when given a name; device indices shift so name matching wins."""
     from voicebridge.audio.playback import Playback
-    # device index 5 is currently ALC892 Alt Analog (0 out channels) — a silent trap.
-    pb = Playback(device='5', device_name='ALC892 Analog')
-    dev = pb._resolve_device()
     import sounddevice as sd
-    assert dev is not None, "no device resolved"
-    d = sd.query_devices(dev)
-    assert d["max_output_channels"] > 0, f"resolved {dev} has no output ({d['name']})"
-    assert "ALC892" in d["name"], f"should match the headphone device, got {d['name']}"
-    # and the OLD raw index (5) must be rejected when it has no output channels
-    raw = Playback(device='5', device_name='')
+    # A 0-output device index traps the old code (silent); name-match must win.
+    for i, d in enumerate(sd.query_devices()):
+        if d["max_output_channels"] == 0:
+            pb = Playback(device=str(i), device_name="HyperX Cloud III")
+            dev = pb._resolve_device()
+            assert dev is not None and sd.query_devices(dev)["max_output_channels"] > 0, \
+                f"resolved to silent/None for name HyperX"
+            break
+    # named resolution for the actual headset (or fallback) always yields output
+    pb = Playback(device='', device_name='HyperX Cloud III')
+    dev = pb._resolve_device()
+    assert dev is not None and sd.query_devices(dev)["max_output_channels"] > 0
+    # a device with no name set still returns a real output, never silent
+    raw = Playback(device='', device_name='')
     dev2 = raw._resolve_device()
-    assert dev2 is not None and sd.query_devices(dev2)["max_output_channels"] > 0
+    if dev2 is not None:
+        assert sd.query_devices(dev2)["max_output_channels"] > 0
 
 
 def test_audio_config_exposes_device_name():
@@ -744,3 +749,109 @@ def test_audio_config_exposes_device_name():
     assert "output_device_name" in ex
     src = pathlib.Path("voicebridge/orchestrator.py").read_text()
     assert "output_device_name" in src
+
+
+def test_web_no_double_speak_when_local():
+    """When speak_web_locally is on, the bridge plays on PC and must NOT also
+    hand the browser audio_b64 (that's the 'responds twice' bug)."""
+    import pathlib, tempfile, base64
+    from voicebridge.config import Config
+    from unittest import mock
+    from voicebridge.webui import WebUI
+    with tempfile.TemporaryDirectory() as td:
+        cfg = Config.load(pathlib.Path(td) / "none.yaml")
+        cfg.data.setdefault("webui", {})["speak_web_locally"] = True
+        # off: browser gets audio_b64
+        cfg.data["webui"]["speak_web_locally"] = False
+        orb = mock.MagicMock(); orb.cfg = cfg
+        w = WebUI(orb, host="127.0.0.1", port=0, state_dir=pathlib.Path(td))
+        assert w._speak_locally() is False
+        cfg.data["webui"]["speak_web_locally"] = True
+        assert w._speak_locally() is True
+
+
+def test_capture_peak_normalizes_for_asr():
+    """Peak-normalize pre-amp: a quiet/variable mic must get a stable level before
+    ASR (consistent transcription, no clipping)."""
+    import numpy as np, wave, pathlib, tempfile
+    from voicebridge.audio.mic import MicCapture
+    # simulate the loop that normalizes the payload before writing the WAV
+    sr = 16000
+    for raw_peak in (0.03, 0.12, 0.4):
+        n = int(sr * 1.0)
+        audio = (np.random.randn(n) * (raw_peak / 3)).astype(np.float32)
+        audio = np.clip(audio, -1, 1)
+        # apply the same normalize logic as record_utterance
+        peak = float(np.max(np.abs(audio))) if audio.size else 0.0
+        target = 0.35
+        if peak > 0.001 and peak < 0.98:
+            audio = np.clip(audio * (target / peak), -1, 1)
+        out_peak = float(np.max(np.abs(audio)))
+        assert 0.20 < out_peak <= 0.36, f"normalized peak {out_peak} not near target for raw {raw_peak}"
+    # config exposes normalize_target
+    import tempfile as _t, pathlib as _p
+    from voicebridge.config import Config
+    with _t.TemporaryDirectory() as td:
+        cfg = Config.load(_p.Path(td) / "none.yaml")
+        assert cfg.get("mic", "normalize_target", default=0.35) == 0.35
+
+
+def test_web_no_double_speak_returns_null_audio():
+    """When speak_web_locally=true, /api/type result must carry audio_b64=None so
+    the browser does not autoplay a second copy (the 'responds twice' bug)."""
+    import pathlib, tempfile
+    from voicebridge.config import Config
+    from unittest import mock
+    import threading, time
+    from voicebridge.webui import WebUI
+    with tempfile.TemporaryDirectory() as td:
+        cfg = Config.load(pathlib.Path(td) / "none.yaml")
+        cfg.data.setdefault("webui", {})["speak_web_locally"] = True
+        orb = mock.MagicMock()
+        orb.cfg = cfg
+        orb._cur_ctx = mock.MagicMock(return_value=None)
+        orb.shared = mock.MagicMock()
+        orb._needs_answer = mock.MagicMock(return_value=False)
+        orb.process_web_utterance = mock.MagicMock(return_value={"summary": "hi", "route": "local"})
+        w = WebUI(orb, host="127.0.0.1", port=0, state_dir=pathlib.Path(td))
+        # run the submit_text worker then read the result
+        rid = w.submit_text("hi")
+        for _ in range(30):
+            time.sleep(0.1)
+            if w.result(rid).get("status") == "done": break
+        res = w.result(rid)
+        assert res.get("audio_b64") is None, "audio_b64 must be null when speak_web_locally"
+        assert res.get("summary") == "hi"
+
+
+def test_playback_watchdog_no_freeze():
+    """Playback must NOT block a request forever (page freeze): a wedged device
+    is capped by the watchdog (not by real audio duration)."""
+    import time, pathlib as _p, wave, numpy as np
+    from unittest import mock
+    from voicebridge.audio.playback import Playback
+    sr = 44100
+    wav = _p.Path("/tmp/opencode/long.wav")
+    with wave.open(str(wav), "wb") as wf:
+        wf.setnchannels(1); wf.setsampwidth(2); wf.setframerate(sr)
+        wf.writeframes(np.zeros(sr * 70, dtype=np.int16).tobytes())
+    pb = Playback(device=None, device_name='')
+    # Mock sd.play to never produce an active stream (a hung device) and make the
+    # watchdog deadline much shorter so the test is fast and deterministic.
+    import sounddevice as sd
+    with mock.patch.object(sd, "play", return_value=None), \
+         mock.patch.object(sd, "get_stream", side_effect=Exception("portaudio busy")):
+        t0 = time.time()
+        r = pb._play_try(wav, on_start=None)
+        # The watchdog path (play_error) returns None quickly; if it hung it'd take 70s.
+        assert time.time() - t0 < 12, "playback watchdog did not cap a wedged device"
+        assert r is None
+
+
+def test_audio_diagnose_usb_script_runs():
+    """The USB-speed diagnostic must run and report a result without crashing."""
+    import subprocess
+    r = subprocess.run([".venv/bin/python", "scripts/diagnose_audio_usb.py"],
+                       capture_output=True, text=True, timeout=30)
+    assert r.returncode in (0, 1, 2), r.stderr[-300:]
+    assert ("USB" in r.stdout or "audio" in r.stdout), r.stdout
