@@ -47,6 +47,7 @@ from .task_templates import TaskTemplates
 from .openclaw.gateway_ws import GatewaySync, GatewayError
 from .safety.policy import SafetyPolicy, SafetyVerdict
 from .shared_memory import SharedMemory
+from .learning import LearningLedger
 from .summarizer import summarize, trim_spoken
 
 # Per-request context so Right Ctrl (mic loop, main thread) and dashboard (web
@@ -233,6 +234,7 @@ class VoiceOrchestrator:
         self.executor_choice = ExecutorChoiceState()
         self.sticky_route = StickyRouteState(state_dir=self.cfg.state_dir())
         self.shared = SharedMemory(self.cfg.state_dir())
+        self.learning = LearningLedger(self.cfg.state_dir())
         # restore recent history into conversation so switching provider / power loss doesn't blank context
         try:
             for _rec in self.shared.recent(limit=max(8, int(config.get("conversation", "max_turns", default=8)))):
@@ -2165,6 +2167,14 @@ class VoiceOrchestrator:
             _conv_prompt = _ctx_for_llm.conv_snapshot if _ctx_for_llm is not None and _ctx_for_llm.conv_snapshot is not None else self.conversation.as_prompt()
             # Ensure EVERY local chat turn sees the identity file (Qubit/Tricky) — even per-request isolated ctx
             _mem_ctx = (self._memory_context or self.conversation.as_prompt())  # both include personal-knowledge
+            # CLHF: inject durable user-taught lessons so the agent never repeats a
+            # corrected/wrong answer (self-learning, no retraining).
+            try:
+                _lessons = self.learning.as_prompt()
+                if _lessons:
+                    _mem_ctx = f"{_lessons}\n\n{_mem_ctx}"
+            except Exception:
+                pass
             if _sticky_hint:
                 _mem_ctx = f"{_sticky_hint}\n\n{_mem_ctx}" if _mem_ctx else _sticky_hint
             # also show recent reports hint so local chat can answer "what did you do?" accurately

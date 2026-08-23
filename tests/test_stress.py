@@ -672,3 +672,43 @@ def test_audio_output_pinning_config():
     assert "_apply_output_volume" in src
     ex = pathlib.Path("config/voice.example.yaml").read_text()
     assert "output_device" in ex and "output_volume" in ex
+
+
+def test_learning_ledger_clhf():
+    """CLHF: corrections/bad/good feedback become durable prompt lessons that the
+    model can use — never repeats the wrong version; bounded ledger; fsynced."""
+    import tempfile, pathlib
+    from voicebridge.learning import LearningLedger
+    with tempfile.TemporaryDirectory() as td:
+        L = LearningLedger(pathlib.Path(td))
+        L.record("what is my instagram", "I cannot access it", "bad",
+                 corrected="My Instagram is tr.cky (instagram.com/tr.cky)")
+        L.record("what time is it", "The time is 20:00 EEST", "good")
+        L.add_preference("answer in English only")
+        p = L.as_prompt()
+        assert "tr.cky" in p, "correction lesson not surfaced"
+        assert "ALWAYS true" in p or "taught me" in p
+        assert "instagram.com/tr.cky" in p
+        # persistence: reload from disk
+        L2 = LearningLedger(pathlib.Path(td))
+        assert "tr.cky" in L2.as_prompt()
+        # bounded: many rows don't blow up
+        for i in range(60):
+            L2.record(f"q{i}", "a", "bad", corrected=f"c{i}")
+        assert len(L2.as_prompt()) > 0  # still renders without error
+
+
+def test_playback_resamples_to_device_rate():
+    """Pinned raw ALSA device rejects a mismatched sample rate (-9997). Playback
+    must resample the TTS (22050) to the device's native (44100)."""
+    import pathlib
+    from voicebridge.audio.playback import _resample
+    import numpy as np
+    src = (np.sin(np.linspace(0, 20, 22050)) * 32767).astype(np.int16)
+    out = _resample(src, 22050, 44100)
+    assert len(out) == 44100, f"expected 44100 samples, got {len(out)}"
+    assert out.dtype == np.int16
+    # resampled signal still has energy (valid audio)
+    assert float(np.sqrt((out.astype(float)**2).mean())) > 1000
+    # no-op when rates match
+    assert len(_resample(src, 22050, 22050)) == 22050

@@ -11,6 +11,26 @@ import numpy as np
 import sounddevice as sd
 
 
+def _resample(audio: np.ndarray, from_sr: int, to_sr: int) -> np.ndarray:
+    """Linear-interpolation resample float/int audio to a new sample rate."""
+    if from_sr == to_sr or from_sr <= 0 or to_sr <= 0:
+        return audio
+    is_int = np.issubdtype(audio.dtype, np.integer)
+    x = audio.astype(np.float32)
+    n_out = int(round(len(x) * to_sr / from_sr))
+    # per-sample input positions
+    idx = np.linspace(0, len(x) - 1, n_out)
+    y = np.zeros((n_out,) + x.shape[1:], dtype=np.float32)
+    i0 = np.floor(idx).astype(int)
+    i1 = np.minimum(i0 + 1, len(x) - 1)
+    frac = (idx - i0).astype(np.float32)
+    y = x[i0] * (1 - frac[..., None]) + x[i1] * (frac[..., None])
+    if is_int:
+        y = np.clip(y, -1, 1) * 32767
+        return y.astype(np.int16)
+    return y
+
+
 class Playback:
     """Plays WAV files through the default output (or a pinned device); can be
     stopped at any time. `device` is a sounddevice/PortAudio device name or index;
@@ -39,6 +59,7 @@ class Playback:
         # Resolve a device each play: if the pinned device is gone, fall back to
         # None (system default) so we never crash.
         dev = self.device
+        target_sr = None
         if dev is not None:
             try:
                 dev = int(dev)
@@ -46,9 +67,10 @@ class Playback:
                 pass
             try:
                 import sounddevice as _sd
-                # Validate the device exists; if not, fall back to default.
-                out_devs = [d for d in _sd.query_devices() if d["max_output_channels"] > 0]
-                if not (0 <= dev < len(_sd.query_devices())):
+                devs = _sd.query_devices()
+                if 0 <= dev < len(devs):
+                    target_sr = int(devs[dev].get("default_samplerate") or 0)
+                else:
                     dev = None
             except Exception:
                 dev = None
@@ -56,7 +78,13 @@ class Playback:
             with wave.open(str(wav_path), "rb") as wf:
                 sr = wf.getframerate()
                 frames = wf.readframes(wf.getnframes())
-            audio = np.frombuffer(frames, dtype=np.int16).reshape(-1, wf.getnchannels())
+                nch = wf.getnchannels()
+            audio = np.frombuffer(frames, dtype=np.int16).reshape(-1, nch)
+            # Resample to the pinned device's native rate (raw ALSA hw rejects a
+            # mismatched rate, e.g. 22050 TTS vs 44100 headphone) — error -9997.
+            if target_sr and sr != target_sr:
+                audio = _resample(audio, sr, target_sr)
+                sr = target_sr
             sd.play(audio, sr, blocking=False, device=dev)
             if on_start:
                 on_start()

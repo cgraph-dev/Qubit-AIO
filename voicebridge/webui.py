@@ -862,6 +862,35 @@ class WebUIHandler(BaseHTTPRequestHandler):
             except Exception as exc:
                 log_event("webui.type.error", error=str(exc)[:200])
                 self._json({"error": str(exc)[:300]}, 500)
+        elif path == "/api/feedback":
+            # CLHF: user rates the last answer (good/bad) or offers a correction.
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length) if length else b""
+            try:
+                data = json.loads(body or b"{}")
+            except Exception:
+                data = {}
+            fb = str(data.get("feedback", "")).lower()
+            if fb not in ("good", "bad", "correction"):
+                self._json({"error": "feedback must be good|bad|correction"}, 400)
+                return
+            try:
+                _orch = getattr(self.app, "orch", None)
+                if _orch is not None and hasattr(_orch, "learning"):
+                    _orch.learning.record(
+                        user_text=str(data.get("user", ""))[:300],
+                        answer=str(data.get("answer", ""))[:500],
+                        feedback=fb,
+                        corrected=str(data.get("corrected", ""))[:500])
+                log_event("feedback.recorded", feedback=fb,
+                          user=str(data.get("user", ""))[:80])
+                self._json({"ok": True, "feedback": fb})
+            except Exception as exc:
+                log_event("feedback.error", error=str(exc)[:160])
+                self._json({"error": str(exc)[:200]}, 500)
         else:
             self._send(404, b"not found")
 
