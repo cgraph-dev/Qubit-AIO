@@ -1,5 +1,9 @@
 # OpenClaw Voice Bridge
 
+> 📘 **Read `docs/VOICE_BRIDGE_SYSTEM.md`** for the full system map, what we
+> cherry-picked from open-source (CopilotKit/AirLLM/OpenSandbox), the roadmap,
+> and the "smarter model" plan.
+
 A **production-style local voice interface for OpenClaw** — push-to-talk,
 natural speech in, spoken results out. Built for an **RTX 3070 Ti 8 GB** box
 but runs on any Linux PC with a mic. It routes commands into your *existing*
