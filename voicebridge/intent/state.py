@@ -199,6 +199,56 @@ class TaskState:
         return time.time() - self.started_at if self.started_at else 0.0
 
 
+class TaskQueue:
+    """FIFO queue of tasks awaiting dispatch while another task is running.
+
+    Lets the user keep dictating tasks while OpenClaw/Hermes works — nothing is
+    lost and nothing hard-aborts a running task under load. Each entry carries
+    the task text plus the model/provider it should run on.
+    """
+
+    def __init__(self, max_size: int = 20) -> None:
+        self._q: "List[Dict[str, str]]" = []
+        self._lock = None
+        import threading as _th
+        self._lock = _th.Lock()
+        self.max_size = max_size
+
+    def enqueue(self, task_text: str, model: str = "", provider: str = "") -> int:
+        """Return the 1-based position in the queue, or 0 when full/ignored."""
+        task_text = (task_text or "").strip()
+        if not task_text:
+            return 0
+        with self._lock:
+            if len(self._q) >= self.max_size:
+                return 0
+            self._q.append({"task": task_text, "model": model, "provider": provider})
+            return len(self._q)
+
+    def peek(self) -> Optional[Dict[str, str]]:
+        with self._lock:
+            return self._q[0] if self._q else None
+
+    def dequeue(self) -> Optional[Dict[str, str]]:
+        with self._lock:
+            return self._q.pop(0) if self._q else None
+
+    def clear(self) -> int:
+        with self._lock:
+            n = len(self._q)
+            self._q = []
+            return n
+
+    @property
+    def size(self) -> int:
+        with self._lock:
+            return len(self._q)
+
+    def items(self) -> List[Dict[str, str]]:
+        with self._lock:
+            return list(self._q)
+
+
 @dataclass
 class PendingConfirmation:
     """A destructive/risky action awaiting spoken yes/no."""

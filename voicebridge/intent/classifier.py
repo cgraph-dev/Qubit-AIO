@@ -46,6 +46,8 @@ SYSTEM_COMMANDS: Dict[str, Dict[str, Any]] = {
     "stop":     {"patterns": [r"^\s*(stop|halt|freeze|quit that|never ?mind)\s*[.!]*$"], "desc": "abort active task / stop speaking"},
     "continue": {"patterns": [r"^\s*(continue|resume|keep going|go on|carry on|pick it back up)\s*[.!]*$"],
                  "desc": "resume the interrupted task"},
+    "closetask": {"patterns": [r"^\s*(close( the)? (current )?task|finish (the current )?task|close this|wrap (it|this) up|ok done|that'?s (all|enough)|done with this)\s*[.!]*$"],
+                  "desc": "finish current task, then ask about the queue"},
     "cancel":   {"patterns": [r"^\s*(cancel|abort|forget it|scrap (that|it)|never ?mind)\s*[.!]*$"], "desc": "cancel confirmation or task"},
     "model":    {"patterns": [r"^\s*(use|switch (to|back (to)?)|set (the )?model (to)?)\s+(turbo|normal|slow|hard|pro|fast|deepseek|default)\b"],
                  "desc": "switch agent model tier for subsequent tasks"},

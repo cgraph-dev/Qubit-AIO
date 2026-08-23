@@ -48,8 +48,30 @@ class HermesBackend:
             log_event("hermes.task.timeout", text=text[:200])
             raise TimeoutError(f"hermes task timed out after {(timeout_s or self.timeout_s):.0f}s")
         out = (proc.stdout or "").strip()
+        err = (proc.stderr or "").strip()
+        # Hermes only checks --continue by name/ID and, when the session is gone
+        # (e.g. it expired or was pruned), it prints the notice to STDOUT and
+        # exits 1 — which made EVERY routed task fail with "hermes exited 1"
+        # even though Hermes itself is fine. Detect that case and re-run with a
+        # fresh session so the task completes instead of dying silently.
+        if proc.returncode != 0 and self.resume_session \
+                and ("no session found" in (out + err).lower()
+                     or f"matching '{self.resume_session}'" in (out + err).lower()):
+            log_event("hermes.task.session_missing", session=self.resume_session,
+                      retry_fresh=True, text=text[:120])
+            argv_fresh = [self.cmd, "chat", "-q", text, "-Q"]
+            if self.model:
+                argv_fresh += ["-m", self.model]
+            try:
+                proc = subprocess.run(argv_fresh, capture_output=True, text=True,
+                                      timeout=timeout_s or self.timeout_s)
+            except subprocess.TimeoutExpired:
+                log_event("hermes.task.timeout", text=text[:200])
+                raise TimeoutError(f"hermes task timed out after {(timeout_s or self.timeout_s):.0f}s")
+            out = (proc.stdout or "").strip()
+            err = (proc.stderr or "").strip()
         if proc.returncode != 0:
-            err = (proc.stderr or "")[-500:]
+            err = err[-500:]
             log_event("hermes.task.error", code=proc.returncode, error=err[:200])
             raise RuntimeError(f"hermes exited {proc.returncode}: {err}")
         if not out:

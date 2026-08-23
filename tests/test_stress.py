@@ -66,9 +66,9 @@ def test_boss_and_hum_variants():
     import importlib; importlib.reload(orch)
     assert len(orch._BOSS_PHRASES) >= 8, len(orch._BOSS_PHRASES)
     assert len(orch._HUM_PHRASES) >= 4
-    # ensure every 8-15s wait is present
+    # ensure every heartbeat wait is present (first faster, spaced after)
     txt = (ROOT/"voicebridge/orchestrator.py").read_text()
-    assert ("uniform(8, 15)" in txt or "uniform(15, 30)" in txt)
+    assert ("uniform(6, 10)" in txt or "uniform(8, 15)" in txt or "uniform(15, 30)" in txt)
     # boss/hum speak must be barge=False and daemon threads
     assert 'name="hum"' in txt and 'daemon=True' in txt
 
@@ -207,3 +207,29 @@ def test_reports_page_fetches_with_token():
     t = (ROOT / "frontend/reports.html").read_text()
     assert t.count("const TOKEN") == 1, "reports.html duplicate TOKEN"
     assert "new URLSearchParams" in t and t.count("***") == 0
+
+
+def test_task_queue_fifo_and_capacity():
+    """TaskQueue is FIFO, returns position, caps at max_size, and honors provider."""
+    from voicebridge.intent.state import TaskQueue
+    q = TaskQueue(max_size=3)
+    assert q.enqueue("task A") == 1
+    assert q.enqueue("task B", provider="hermes") == 2
+    assert q.enqueue("task C") == 3
+    # full: extra returns 0 (not enqueued)
+    assert q.enqueue("task D") == 0, "queue must reject beyond capacity"
+    assert q.size == 3
+    first = q.dequeue()
+    assert first and first["task"] == "task A"
+    assert q.dequeue()["task"] == "task B"
+    assert q.dequeue()["provider"] == ""  # task C had no provider
+    assert q.dequeue() is None            # empty
+
+
+def test_task_queue_clear_and_empty():
+    from voicebridge.intent.state import TaskQueue
+    q = TaskQueue()
+    q.enqueue("x"); q.enqueue("y")
+    assert q.size == 2
+    assert q.clear() == 2
+    assert q.size == 0 and q.items() == []

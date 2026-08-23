@@ -38,7 +38,7 @@ from .config import Config
 from .hermes import HermesBackend
 from .hotkeys import HotkeyListener
 from .intent.classifier import Classifier, Intent
-from .intent.state import ConfirmationState, ConversationState, ExecutorChoiceState, StickyRouteState, TaskState
+from .intent.state import ConfirmationState, ConversationState, ExecutorChoiceState, StickyRouteState, TaskQueue, TaskState
 from .local import actions as local_actions
 from .logging_setup import get_logger, log_event
 from .openclaw.cli_backend import CliBackend
@@ -251,6 +251,9 @@ class VoiceOrchestrator:
         except Exception:
             pass
         self.task = TaskState()
+        self.task_queue = TaskQueue()
+        # pending "start the queued task?" confirmation (user answers yes/no)
+        self._queued_confirm = None
         self.muted = False
         self._stop = threading.Event()
         self._cancel = threading.Event()
@@ -1155,6 +1158,11 @@ class VoiceOrchestrator:
     def _dispatch_coding(self, task_text: str, model: Optional[str] = None,
                          force_confirm: bool = False) -> None:
         """Safety-check and dispatch a coding task to OpenClaw."""
+        # If a task is already running, queue instead of hard-switching: the
+        # running agent keeps working (no abort strain) and this task runs next.
+        if self._busy_on_task():
+            self._enqueue_task(task_text, model or self._current_model())
+            return
         try:
             verdict = self.safety.check(task_text)
             log_event("safety.verdict", text=task_text[:200], allowed=verdict.allowed,
@@ -1218,6 +1226,72 @@ class VoiceOrchestrator:
                 self.speak("Something went wrong dispatching the task. Check the logs.")
             except Exception:
                 pass
+
+    # ------------------------------------------------------------- task queue
+    def _busy_on_task(self) -> bool:
+        """True when an agent task is already dispatched and still running."""
+        return bool(self.task.active or self._hermes_busy)
+
+    def _enqueue_task(self, task_text: str, model: Optional[str] = None,
+                      provider: str = "openclaw") -> None:
+        """Add a task to the FIFO queue; acknowledge how many are waiting."""
+        pos = self.task_queue.enqueue(task_text, model or "", provider)
+        if pos:
+            log_event("task.queue.add", task=task_text[:200], position=pos,
+                      model=model or "", provider=provider)
+            n = "next" if pos == 1 else f"#{pos} in line"
+            self.speak(f"Noted — queued as the {n} task. I'll start it when the current one wraps up.")
+            self.feed_push({"kind": "status", "text": "task queued", "route": "queue",
+                            "detail": f"#{pos}", "task": task_text[:200]})
+        else:
+            self.speak("The queue is full. Finish the current task first or cancel something.")
+
+    def _run_next_queued(self) -> bool:
+        """Launch the next queued task (if any) and tell the user it started."""
+        nxt = self.task_queue.dequeue()
+        if nxt is None:
+            return False
+        task_text = nxt.get("task", "")
+        provider = nxt.get("provider", "openclaw")
+        model = nxt.get("model") or None
+        log_event("task.queue.start", task=task_text[:200], provider=provider,
+                  remaining=self.task_queue.size)
+        self.speak("Starting the next queued task.")
+        self.feed_push({"kind": "status", "text": "queued task starting",
+                        "route": "queue", "detail": task_text[:160]})
+        if provider == "hermes":
+            self._handle_hermes(task_text)
+        else:
+            self._launch_task(task_text, model)
+        return True
+
+    def _close_task(self) -> None:
+        """Finish the current task cleanly, then ask whether to start the queue."""
+        if self.task.active:
+            self._abort_task("close task")
+            log_event("task.close", session_key=self.task.session_key)
+        elif self._hermes_busy:
+            self._hermes_busy = False
+            log_event("task.close", session_key="hermes")
+        if self.task_queue.size:
+            self._queued_confirm = True
+            self.speak("Current task closed. There's a queued task — should I start it?")
+            log_event("task.queue.ask", queued=self.task_queue.size)
+        else:
+            self.speak("Current task closed. The queue is empty.")
+
+    def _answer_queued_confirm(self, text: str) -> None:
+        """Interpret yes/no to 'start the queued task?'."""
+        if not self._queued_confirm:
+            return
+        self._queued_confirm = None
+        low = text.strip().lower()
+        yes = any(w in low for w in ("yes", "yeah", "yep", "sure", "ok", "go", "do it"))
+        if yes:
+            self._run_next_queued()
+        else:
+            self.task_queue.clear()
+            self.speak("Okay, dropping the queued task.")
 
     def _launch_task(self, task_text: str, model: Optional[str] = None) -> None:
         # skills nudge: remind the agent to use its full skill/tool set
@@ -1418,11 +1492,11 @@ class VoiceOrchestrator:
         _hum_stop = threading.Event()
         def _hum_loop():
             import random as _rnd
-            # wait a bit before first hum so immediate boss phrase isn't drowned
-            _hum_stop.wait(timeout=_rnd.uniform(15, 30))
+            # first hum sooner so the user knows it's alive, then spaced out
+            _hum_stop.wait(timeout=_rnd.uniform(6, 10))
             while not _hum_stop.is_set() and self.task.active and not self._stop.is_set():
                 if self.playback.playing or self._interrupt_requested:
-                    _hum_stop.wait(timeout=_rnd.uniform(15, 30))
+                    _hum_stop.wait(timeout=_rnd.uniform(12, 20))
                     continue
                 phrase = _hum_phrase()
                 log_event("humming", phrase=phrase, target="openclaw", elapsed_s=round(time.time() - t0, 1))
@@ -1430,7 +1504,7 @@ class VoiceOrchestrator:
                     self.speak(phrase, name="hum", barge=False)
                 except Exception:
                     pass
-                _hum_stop.wait(timeout=_rnd.uniform(15, 30))
+                _hum_stop.wait(timeout=_rnd.uniform(12, 20))
         threading.Thread(target=_hum_loop, daemon=True, name="openclaw-hum").start()
         if blocking:
             while self.task.active and not self._stop.is_set():
@@ -1743,6 +1817,12 @@ class VoiceOrchestrator:
         if self._web_active or self._web_mode:
             self._last_web_summary = summary
         self.speak(summary)
+        # A task finished — start the next queued one (if any).
+        try:
+            if self.task_queue.size:
+                self._run_next_queued()
+        except Exception:
+            pass
 
     
     def _persist_full_report(self, session_key: str, reply: str, status: str, elapsed_s: float) -> None:
@@ -1839,6 +1919,8 @@ class VoiceOrchestrator:
                     self.speak("I couldn't resume the task. Say it again.")
             else:
                 self.speak("Nothing to continue. Give me a new task instead.")
+        elif cmd == "closetask":
+            self._close_task()
         elif cmd == "model":
             tier = intent.params.get("tier")
             model = self.classifier.resolve_model_tier(tier)
@@ -1865,36 +1947,31 @@ class VoiceOrchestrator:
             log_event("openclaw.abort", why=why, session_key=key, run_id=run_id)
 
     def _interrupt_task(self, announce: bool = True) -> None:
-        """Pause whatever the bridge is doing (Ctrl during speech or a task).
+        """Give the floor back to the user (Ctrl during speech or a task).
 
-        Stops spoken output, pauses a running agent task (remembering its
-        session AND the old task text so the agent can decide afterwards whether
-        to continue that work or switch to the new request), and tells the user
-        the floor is theirs. Nothing continues automatically: after the user
-        speaks, the agent itself decides between continuing the current work or
-        doing the new request.
+        Stops spoken output but KEEPS a running agent task alive — a task is
+        not hard-aborted, so the PC isn't thrashed and nothing is lost. The new
+        utterance is then interpreted: a new task is QUEUED (runs after the
+        current one), "cancel" aborts, "close task" finishes + asks about the
+        queue, "continue" resumes. The running agent decides what to do next.
 
-        announce=False — silent stop (like Esc/cancel); skips the "Paused."
-                         verbal acknowledgement.
+        announce=False — silent stop (like Esc/cancel); skips the ack.
         """
         interrupted_anything = False
-        task_paused = False
+        task_running = False
         if self.task.active:
-            self._interrupted_session = self.task.session_key
-            self._interrupted_task_text = self.task.description
-            self._abort_task("interrupted by hotkey")
-            log_event("task.interrupted", session_key=self._interrupted_session,
-                      old_task=self._interrupted_task_text[:200])
+            # Keep the task running; remember it so interrupt bookkeeping + logs
+            # stay accurate. No _abort_task() — that killed work under load.
+            task_running = True
+            log_event("task.interrupted", session_key=self.task.session_key,
+                      old_task=self.task.description[:200], keep_running=True)
             interrupted_anything = True
-            task_paused = True
         if self.playback.playing:
             self.playback.stop()
             interrupted_anything = True
         if self._hermes_busy:
-            # Hermes task running in background: mark for discard so its stale
-            # reply is not spoken over the new instruction
-            self._hermes_busy = False
-            log_event("hermes.interrupted")
+            # Hermes task keeps running in the background (no abort).
+            log_event("hermes.interrupted", keep_running=True)
             interrupted_anything = True
         # Rate-limit idle interrupts so a stuck dashboard poll loop doesn't spam the journal.
         if not interrupted_anything:
@@ -1906,25 +1983,25 @@ class VoiceOrchestrator:
             self._last_idle_interrupt_ts = now  # type: ignore[attr-defined]
         # Always journal the interrupt so /api/logs + dashboard Logs + qubit-dev /logs
         # can show it, even when idle (so "interrupt doesn't work" is debuggable).
-        log_event("interrupt.request", announce=announce, had_task=task_paused,
+        log_event("interrupt.request", announce=announce, had_task=task_running,
                   had_playback=bool(self.playback.playing), was_idle=not interrupted_anything,
-                  had_hermes=bool(self._interrupted_session and task_paused is False))
+                  had_hermes=bool(self._hermes_busy))
         # Publish to the dashboard Activity feed too (so clicking shows it)
         try:
             self.feed_push({"kind": "status", "text": "interrupt", "route": "interrupt",
-                            "detail": f"task={task_paused} playback={self.playback.playing} hermes={bool(task_paused is False and self._interrupted_session)} idle={not interrupted_anything}", "raw": f"announce={announce} interrupted_anything={interrupted_anything} task_paused={task_paused}"})
+                            "detail": f"task={task_running} playback={self.playback.playing} hermes={bool(self._hermes_busy)} idle={not interrupted_anything}",
+                            "raw": f"announce={announce} interrupted_anything={interrupted_anything} task_running={task_running}"})
         except Exception:
             pass
         # Non-blocking announce: never hold the HTTP /api/interrupt handler on TTS.
-        # The previous speak("Paused. Go ahead.") blocked the response and left
-        # the dashboard's busy flag stuck on "idle" until TTS finished — that's
-        # the "freezes when I'm interrupting and it blocks on idle" bug.
-        if task_paused and not self.muted and announce:
+        if interrupted_anything and not self.muted and announce:
             import threading as _th
-            _th.Thread(target=lambda: self.speak("Paused. Go ahead."), daemon=True, name="interrupt-ack").start()
-        elif not interrupted_anything and not self.muted:
-            # truly nothing to pause: stay silent, the start beep suffices
-            pass
+            if task_running:
+                _th.Thread(target=lambda: self.speak(
+                    "Go ahead — I'm listening. Name a task and I'll queue it; say cancel or close task to stop the current one."),
+                    daemon=True, name="interrupt-ack").start()
+            else:
+                _th.Thread(target=lambda: self.speak("Go ahead."), daemon=True, name="interrupt-ack").start()
 
     # ------------------------------------------------------------- executor
     def _handle_executor_answer(self, text: str) -> None:
@@ -2088,12 +2165,14 @@ class VoiceOrchestrator:
                     self._last_web_route = "local"
                 self.feed_push({"kind": "summary", "text": text[:300], "summary": trimmed,
                                 "route": "local", "detail": "conversation", "raw": reply[:50000]})
-                log_event("conversation.local.summary", text=text[:160], summary=reply[:160])
+                log_event("conversation.local.summary", text=text[:160], summary=reply[:160],
+                          model=llm_cfg.get("model", "huihui_ai/llama3.2-abliterate:3b"))
                 try:
                     self.shared.append_assistant(reply, route="local", provider="local")
                 except Exception:
                     pass
-                log_event("conversation.local.full", text=text[:300], reply_len=len(reply), reply=reply[:2000])
+                log_event("conversation.local.full", text=text[:300], reply_len=len(reply), reply=reply[:2000],
+                          model=llm_cfg.get("model", "huihui_ai/llama3.2-abliterate:3b"))
                 self.speak(trim_spoken(reply, 500))
                 return
 
@@ -2377,6 +2456,10 @@ class VoiceOrchestrator:
         `notice` overrides the default ack (used by the OpenClaw→Hermes
         failover path so the user hears WHY it routed to Hermes).
         """
+        # Queue a new Hermes task while one is already running (don't interrupt).
+        if self._busy_on_task():
+            self._enqueue_task(task, self._current_model(), provider="hermes")
+            return
         if self._hermes is None:
             self.speak("Hermes is not enabled; routing to OpenClaw instead.")
             self._dispatch_coding(task)
@@ -2400,7 +2483,7 @@ class VoiceOrchestrator:
         def _hum_loop():
             import random as _rnd
             while not _humming_stop.is_set() and self._hermes_busy and not self._stop.is_set():
-                _humming_stop.wait(timeout=_rnd.uniform(15, 30))
+                _humming_stop.wait(timeout=_rnd.uniform(6, 10))
                 if _humming_stop.is_set() or not self._hermes_busy or self._stop.is_set():
                     break
                 if self.playback.playing or self._interrupt_requested:
@@ -2491,6 +2574,12 @@ class VoiceOrchestrator:
                 self._last_web_summary = summary
                 self._last_web_route = "hermes"
             self.speak(summary)
+            # A Hermes task finished — start the next queued one (if any).
+            try:
+                if self.task_queue.size:
+                    self._run_next_queued()
+            except Exception:
+                pass
 
         threading.Thread(target=_run, daemon=True, name="hermes-task").start()
 
@@ -2570,6 +2659,10 @@ class VoiceOrchestrator:
         # it BEFORE templates/classification so the answer isn't misrouted
         if self.executor_choice.pending:
             self._handle_executor_answer(text)
+            return
+        # queued-task confirmation: answer to "should I start the queued task?"
+        if self._queued_confirm:
+            self._answer_queued_confirm(text)
             return
         # Explicit hermes delegation wins over everything (templates/classifier) —
         # "ask hermes to check my inbox" must route to Hermes, not to the generic
