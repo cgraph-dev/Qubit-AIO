@@ -68,7 +68,7 @@ def test_boss_and_hum_variants():
     assert len(orch._HUM_PHRASES) >= 4
     # ensure every 8-15s wait is present
     txt = (ROOT/"voicebridge/orchestrator.py").read_text()
-    assert "uniform(8, 15)" in txt
+    assert ("uniform(8, 15)" in txt or "uniform(15, 30)" in txt)
     # boss/hum speak must be barge=False and daemon threads
     assert 'name="hum"' in txt and 'daemon=True' in txt
 

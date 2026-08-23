@@ -105,19 +105,33 @@ _BOSS_PHRASES = [
     "Right away boss",
     "Copy that boss",
     "At your service boss",
+    "Got it boss, moving~",
+    "On it, boss — let's go~",
 ]
 
 _HUM_PHRASES = [
     "hmm~",
+    "*soft hum* hmm hmm~",
+    "*whistles softly*~",
+    "*whistles a little tune*~",
+    "*cute hum* la la~",
+    "*little whistle* whew~",
     "still working boss~",
     "almost there boss, hang in there~",
     "still on it boss, I'm watching them for you~",
-    "working away here, *soft hum*~",
+    "working away here, on it~",
     "hang tight boss, they're cooking~",
-    "*whistles softly*~",
     "still cooking boss, smells good~",
-    "*cute hum* hmm hmm~",
     "boss, they're busy — I'm keeping an eye on them~",
+    "they're grinding away, boss~",
+    "shh, they're thinking hard~",
+    "still at it, boss — got my eye on them~",
+    "hmm hmm~ still going~",
+    "*giggly hum* still here~",
+    "yep, still running, boss~",
+    "hang on, almost~",
+    "working, working~",
+    "all good boss, they're on it~",
 ]
 
 
@@ -1306,7 +1320,7 @@ class VoiceOrchestrator:
         """Periodic talk-back while a big task runs — local Qubit checks what
         the worker (OpenClaw/Hermes) actually did so far and gives a real update.
         Falls back to 'Still working' when the history isn't readable yet."""
-        interval = float(self.cfg.get("openclaw", "progress_min_interval_s", default=15))
+        interval = float(self.cfg.get("openclaw", "progress_min_interval_s", default=22))
         while self.task.active and not self._stop.is_set():
             time.sleep(interval)
             if self.task.active and not self.playback.playing and not self._interrupt_requested:
@@ -1320,7 +1334,7 @@ class VoiceOrchestrator:
                         snippet = getattr(self, "_fetch_progress_snippet", lambda: "")() or ""
                         if snippet:
                             now = time.time()
-                            if now - float(getattr(self.task, "last_progress_spoken", 0)) >= 20:
+                            if now - float(getattr(self.task, "last_progress_spoken", 0)) >= 30:
                                 # local small brain summarizes the snippet into a 1-sentence update
                                 try:
                                     from .local_llm import chat_local as _chat_local
@@ -1348,7 +1362,7 @@ class VoiceOrchestrator:
                     except Exception:
                         pass
                 if not spoken and elapsed > 30:
-                    if time.time() - float(getattr(self.task, "last_progress_spoken", 0)) >= 25:
+                    if time.time() - float(getattr(self.task, "last_progress_spoken", 0)) >= 30:
                         self.speak("Still working. I'll update you when it's done.",
                                    name="progress", barge=False)
                         log_event("openclaw.progress", elapsed_s=round(elapsed, 1))
@@ -1371,10 +1385,10 @@ class VoiceOrchestrator:
         def _hum_loop():
             import random as _rnd
             # wait a bit before first hum so immediate boss phrase isn't drowned
-            _hum_stop.wait(timeout=_rnd.uniform(8, 15))
+            _hum_stop.wait(timeout=_rnd.uniform(15, 30))
             while not _hum_stop.is_set() and self.task.active and not self._stop.is_set():
                 if self.playback.playing or self._interrupt_requested:
-                    _hum_stop.wait(timeout=_rnd.uniform(8, 15))
+                    _hum_stop.wait(timeout=_rnd.uniform(15, 30))
                     continue
                 phrase = _hum_phrase()
                 log_event("humming", phrase=phrase, target="openclaw", elapsed_s=round(time.time() - t0, 1))
@@ -1382,7 +1396,7 @@ class VoiceOrchestrator:
                     self.speak(phrase, name="hum", barge=False)
                 except Exception:
                     pass
-                _hum_stop.wait(timeout=_rnd.uniform(8, 15))
+                _hum_stop.wait(timeout=_rnd.uniform(15, 30))
         threading.Thread(target=_hum_loop, daemon=True, name="openclaw-hum").start()
         if blocking:
             while self.task.active and not self._stop.is_set():
@@ -2352,7 +2366,7 @@ class VoiceOrchestrator:
         def _hum_loop():
             import random as _rnd
             while not _humming_stop.is_set() and self._hermes_busy and not self._stop.is_set():
-                _humming_stop.wait(timeout=_rnd.uniform(8, 15))
+                _humming_stop.wait(timeout=_rnd.uniform(15, 30))
                 if _humming_stop.is_set() or not self._hermes_busy or self._stop.is_set():
                     break
                 if self.playback.playing or self._interrupt_requested:
