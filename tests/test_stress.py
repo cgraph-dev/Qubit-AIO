@@ -652,3 +652,23 @@ def test_mic_gain_avoids_over_amp():
     import re
     m = re.search(r"gain:\s*([\d.]+)", repo)
     assert m and float(m.group(1)) <= 6.0, f"repo config gain too high: {m.group(0) if m else 'none'}"
+
+
+def test_audio_output_pinning_config():
+    """audio.output_device can pin TTS to a specific (headphone) device, and
+    config/defaults expose it; Playback accepts a device index without crashing."""
+    import pathlib, tempfile
+    from voicebridge.config import Config
+    from voicebridge.audio.playback import Playback
+    with tempfile.TemporaryDirectory() as td:
+        cfg = Config.load(pathlib.Path(td) / "none.yaml")
+        # default exists
+        assert "output_device" in cfg.data.get("audio", {})
+    # Playback can be constructed with a device index (validated at play time)
+    pb = Playback(device=5)
+    assert pb.device == 5
+    # source has the volume helper + example documents it
+    src = pathlib.Path("voicebridge/orchestrator.py").read_text()
+    assert "_apply_output_volume" in src
+    ex = pathlib.Path("config/voice.example.yaml").read_text()
+    assert "output_device" in ex and "output_volume" in ex

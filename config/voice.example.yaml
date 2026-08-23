@@ -7,6 +7,15 @@
 # overrides: Scarlett 4ch, gain, silence_timeout).
 
 # ---------------------------------------------------------------------------
+# Audio output — optionally PIN the TTS to a specific device (e.g. your
+# headphones) so GNOME's default-sink choice can't route audio to a quiet/wrong
+# device. `output_device` is a sounddevice device index (run `voicebridge status`
+# or python -c "print(sounddevice.query_devices())" to see them). "" = system default.
+audio:
+  output_device: ""         # e.g. 5 = motherboard ALC892 headphone jack
+  output_volume: 80          # percent, applied + unmuted on boot
+
+# ---------------------------------------------------------------------------
 # Push-to-talk hotkeys
 hotkey:
   hold_key: ctrl_r        # hold to talk (ends on release); quick tap = toggle

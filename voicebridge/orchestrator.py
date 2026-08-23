@@ -286,7 +286,14 @@ class VoiceOrchestrator:
         self._hermes_busy = False           # a Hermes task is running in the bg
         self._duplex_ptt_pending = False    # duplex mode: Ctrl pressed; next tap
         self._duplex_ptt_until = 0.0        # utterance is the user's instruction
-        self.playback = Playback()
+        # Pin the playback output to a specific sink (config: audio.output_device)
+        # so GNOME's default-sink fights can't route TTS to the wrong/quiet device.
+        try:
+            _playback_dev = self.cfg.get("audio", "output_device", default="") or None
+        except Exception:
+            _playback_dev = None
+        self.playback = Playback(device=_playback_dev)
+        self._apply_output_volume()
         self.classifier: Optional[Classifier] = None
         self._templates: Optional[TaskTemplates] = None
         self.safety = SafetyPolicy(config.section("safety"))
@@ -456,6 +463,20 @@ class VoiceOrchestrator:
                 pass
 
     # -------------------------------------------------------------- lifecycle
+    def _apply_output_volume(self) -> None:
+        """Unmute + set the output volume on boot so the bridge is audible."""
+        try:
+            import shutil as _sh, subprocess as _sp
+            vol = int(self.cfg.get("audio", "output_volume", default=80) or 80)
+            if _sh.which("pactl"):
+                _sp.run(["pactl", "set-sink-mute", "@DEFAULT_SINK@", "0"],
+                        capture_output=True, timeout=5)
+                _sp.run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{int(vol)}%"],
+                        capture_output=True, timeout=5)
+                log_event("audio.output_volume", volume=vol)
+        except Exception as exc:
+            log_event("audio.output_volume.failed", error=str(exc)[:120])
+
     def start(self) -> None:
         # gateway first (may inform TTS choice)
         self._connect_gateway()

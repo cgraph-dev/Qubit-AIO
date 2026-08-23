@@ -22,6 +22,9 @@ DEFAULT_STATE_DIR = Path("~/.local/state/openclaw-voice-bridge").expanduser()
 DEFAULT_DATA_DIR = Path("~/.local/share/openclaw-voice-bridge").expanduser()
 
 DEFAULTS: Dict[str, Any] = {
+    "audio": {
+        "output_device": "",        # portaudio device index for TTS (pin to headphones); "" = system default
+    },
     "hotkey": {
         "enabled": True,
         "hold_key": "ctrl_r",  # hold-to-talk
