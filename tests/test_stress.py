@@ -675,3 +675,27 @@ def test_routing_success_rate_95():
                 misses.append((text, want, kind))
         rate = ok / len(cases)
         assert rate >= 0.95, f"routing success {rate:.0%} < 95%: {misses}"
+
+
+def test_language_guard_only_en_ro():
+    """The agent speaks ONLY English and Romanian: the reply guard must flag other
+    languages (FR/DE/ES/RU) and never flag EN or RO replies."""
+    import importlib.util, pathlib
+    spec = importlib.util.spec_from_file_location("vbridge_llm", "voicebridge/local_llm.py")
+    # local_llm uses relative imports -> import via package instead
+    from voicebridge.local_llm import _reply_is_other_language as f
+    allowed = ["Hello, how are you today?",
+               "Fusul tău orar este Europe/Bucharest, UTC+3.",
+               "care este fusul meu orar",
+               "Yes I can hear you fine.",
+               "Sunt bine, multumesc! Ce faci?"]
+    other = ["Je parle uniquement deux langues.",           # FR
+             "Ich spreche nur Deutsch und das ist gut.",     # DE
+             "No puedo hablar español, lo siento amigo.",    # ES
+             "Привет как дела"]                              # RU
+    for t in allowed:
+        assert not f(t), f"EN/RO wrongly flagged foreign: {t!r}"
+    for t in other:
+        assert f(t), f"foreign not detected: {t!r}"
+    src = pathlib.Path("voicebridge/local_llm.py").read_text()
+    assert "lang_drift" in src and "STRICT: answer in English or Romanian only" in src

@@ -52,6 +52,59 @@ _DIALOGS = _load_dialogs()
 if _DIALOGS:
     SYSTEM_PROMPT = SYSTEM_PROMPT + "\n\n# Example dialogs (match this style)\n" + _DIALOGS
 
+# --- language guard -----------------------------------------------------------
+# Common high-frequency words per ALLOWED language (EN + RO only).
+_EN_COMMON = {"the","be","to","of","and","a","in","that","have","i","it","for","not",
+              "on","with","he","as","you","do","at","this","but","his","by","from",
+              "they","we","say","her","she","or","an","will","my","one","all","would",
+              "there","their","what","so","up","out","if","about","who","get","which",
+              "go","me","when","make","can","like","time","no","just","him","know",
+              "take","people","into","year","your","good","some","could","them","see",
+              "other","than","then","now","look","only","come","its","over","think",
+              "also","back","after","use","two","how","our","work","first","well",
+              "way","even","new","want","because","any","these","give","day","most","is","are"}
+_RO_COMMON = {"si","și","este","sunt","nu","da","ce","care","pentru","din","în","la",
+              "pe","cu","un","una","o","mai","cel","cea","ale","meu","mea","ta","tău",
+              "nostru","vostru","lor","acest","aceasta","acum","azi","bine","salut",
+              "mulțumesc","poate","foarte","dar","cum","unde","cand","când","vrea",
+              "vreau","pot","face","facut","făcut","trebuie","om","zi","ziua","an"}
+# Words from languages we do NOT speak (sample: fr/de/es/it/hu/ru translit).
+_FOREIGN_HINTS = {"je","tu","il","elle","nous","vous","sont","avec","pour","dans",
+                  "etre","être","cette","tout","tous","ich","bin","und","nicht",
+                  "ein","eine","ist","das","mit","auch","pero","porque","muy","sono",
+                  "questa","non","perché","che","per","gli","és","vagy",
+                  "nincs","и","да","нет","что","это","el","los","del","como",
+                  "para","con","une","deux","langues","parle",
+                  "puedo","puede","hablar","español","mucho","siento","por","qué",
+                  "yo","mi","sus","ese","esta","aqui","aquí","bien","gracias",
+                  "sprechen","danke","vielleicht","francais","français","parlez"}
+
+def _reply_is_other_language(text: str) -> bool:
+    """True when the reply looks like a language we DON'T speak (not EN, not RO)."""
+    if not text:
+        return False
+    # Non-Latin scripts (Cyrillic/CJK/Arabic/...) => definitely not EN/RO.
+    for ch in text[:400]:
+        o = ord(ch)
+        if o > 0x2FF and not (0x1E00 <= o <= 0x1EFF):   # outside Latin + Latin-Ext
+            return True
+    low = text.lower()
+    tokens = [w.strip(".,!?;:'\"()[]") for w in low.split()]
+    tokens = [t for t in tokens if t.isalpha()]
+    if not tokens:
+        return False
+    en = sum(1 for t in tokens if t in _EN_COMMON)
+    ro = sum(1 for t in tokens if t in _RO_COMMON)
+    known = en + ro
+    foreign = sum(1 for t in tokens
+                  if t in _FOREIGN_HINTS and t not in _EN_COMMON and t not in _RO_COMMON)
+    # Heavily foreign: more foreign than known signals, with a minimum mass.
+    if len(tokens) >= 5 and foreign >= 2 and foreign > known:
+        return True
+    if len(tokens) >= 8 and known == 0 and foreign >= 1:
+        return True
+    return False
+
 
 def chat_local(text: str, conversation_prompt: str = "",
                model: str = "qwen3:4b", url: str = "http://127.0.0.1:11434",
@@ -129,6 +182,28 @@ def chat_local(text: str, conversation_prompt: str = "",
         log_event("conversation.local.failed", error=str(exc)[:160], model=model)
         return ""
     elapsed = __import__("time").time() - t0
+    # HARD LANGUAGE GUARD: the agent speaks ONLY English and Romanian. If the
+    # reply drifted into another language, retry ONCE with an explicit lock;
+    # if it still drifts, keep the retry (best effort) but log it.
+    if reply and _reply_is_other_language(reply):
+        log_event("conversation.local.lang_drift", lang="other", chars=len(reply),
+                  preview=reply[:80])
+        payload["messages"] = payload["messages"][:-1] + [
+            {"role": "user", "content": user_content +
+             "\n[STRICT: answer in English or Romanian only. No other language.]"},
+        ]
+        try:
+            req2 = urllib.request.Request(
+                f"{url}/api/chat",
+                data=json.dumps(payload).encode(),
+                headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req2, timeout=timeout_s) as resp2:
+                body2 = json.loads(resp2.read().decode())
+            fixed = (body2.get("message", {}) or {}).get("content", "").strip()
+            if fixed and not _reply_is_other_language(fixed):
+                reply = fixed
+        except Exception as exc:
+            log_event("conversation.local.retry_failed", error=str(exc)[:120])
     log_event("conversation.local", model=model, chars=len(reply),
               elapsed_s=round(elapsed, 3))
     return reply
