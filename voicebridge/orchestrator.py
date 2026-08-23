@@ -3097,11 +3097,38 @@ class VoiceOrchestrator:
                   ended_by=res.ended_by, peak_rms=round(res.peak_rms, 5))
         return str(res.wav_path)
 
+    def _transcribe_with_fallback(self, wav_path: str):
+        """Primary ASR (parakeet/moonshine) + one low-cost fallback when it returns empty on a real wav.
+        Moonshine is fastest fallback (~0.05s) so retries stay snappy even on empty captures.
+        Returns the transcript that has text, or the original empty one if fallback also empty.
+        """
+        tr = self._asr.transcribe(wav_path)
+        if not tr.empty:
+            return tr
+        # Only fallback when the wav had energy (peak_rms already logged as >=0.055 in the capture path) —
+        # i.e. mic heard something but parakeet/moonshine blanked. Don't retry pure silence.
+        try:
+            kind = getattr(tr, "text", "") or ""
+            # wavs with chars==0 but duration>0.6s deserve a retry
+            cur_engine = getattr(self._asr, "engine", "") or self.cfg.get("asr","engine","parakeet")
+            alt_engine = "moonshine" if cur_engine != "moonshine" else "parakeet"
+            from .asr.sherpa import SherpaASR as _FallbackASR
+            fb = _FallbackASR(engine=alt_engine, model_dir=self.cfg.model_dir(), provider="cpu", num_threads=2, language=self.cfg.get("asr","language","en"))
+            fb.load()
+            tr2 = fb.transcribe(Path(wav_path))
+            if not getattr(tr2, "empty", True) and (tr2.text or "").strip():
+                log_event("asr.fallback.success", primary=cur_engine, fallback=alt_engine, text=tr2.text[:120])
+                return tr2
+            log_event("asr.fallback.empty", primary=cur_engine, fallback=alt_engine)
+        except Exception as exc:
+            log_event("asr.fallback.failed", error=str(exc)[:160])
+        return tr
+
     def _process_utterance(self, wav_path: str) -> None:
         t0 = time.time()
         if self._asr is None:
             return
-        transcript = self._asr.transcribe(wav_path)
+        transcript = self._transcribe_with_fallback(wav_path)
         elapsed_asr = time.time() - t0
         log_event("orchestrator.timing", asr_ms=round(elapsed_asr * 1000, 1), text=transcript.text[:200])
         if transcript.empty:
