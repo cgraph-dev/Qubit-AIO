@@ -712,3 +712,35 @@ def test_playback_resamples_to_device_rate():
     assert float(np.sqrt((out.astype(float)**2).mean())) > 1000
     # no-op when rates match
     assert len(_resample(src, 22050, 22050)) == 22050
+
+
+def test_playback_resolves_by_name_not_silent_index():
+    """When the configured device index points at a 0-output (silent) device,
+    Playback must resolve to the named output instead (device indices shift on
+    profile changes -> 'no volume' bug)."""
+    from voicebridge.audio.playback import Playback
+    # device index 5 is currently ALC892 Alt Analog (0 out channels) — a silent trap.
+    pb = Playback(device='5', device_name='ALC892 Analog')
+    dev = pb._resolve_device()
+    import sounddevice as sd
+    assert dev is not None, "no device resolved"
+    d = sd.query_devices(dev)
+    assert d["max_output_channels"] > 0, f"resolved {dev} has no output ({d['name']})"
+    assert "ALC892" in d["name"], f"should match the headphone device, got {d['name']}"
+    # and the OLD raw index (5) must be rejected when it has no output channels
+    raw = Playback(device='5', device_name='')
+    dev2 = raw._resolve_device()
+    assert dev2 is not None and sd.query_devices(dev2)["max_output_channels"] > 0
+
+
+def test_audio_config_exposes_device_name():
+    import pathlib
+    from voicebridge.config import Config
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        cfg = Config.load(pathlib.Path(td) / "none.yaml")
+        assert "output_device_name" in cfg.data.get("audio", {})
+    ex = pathlib.Path("config/voice.example.yaml").read_text()
+    assert "output_device_name" in ex
+    src = pathlib.Path("voicebridge/orchestrator.py").read_text()
+    assert "output_device_name" in src

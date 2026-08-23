@@ -27,29 +27,67 @@ responsibly. Anything that doubles memory per call is out.
 - **Block-wise / BNB quantization of WEIGHTS only** → ~3x speedup, near-zero loss,
   because the bottleneck is memory-not-compute for small models. AirLLM: `compression='4bit'/'8bit'`.
 
-### What we can do (highest leverage)
-- Add a **`hard`/`pro` model tier** that loads a smarter model, quantized to fit 8GB:
-  - `Qwen3-8B` (Q4_K_M ≈ 5.3GB) for complex/logical questions.
-  - Keep `qubit-brain` 3.6B as the fast default for chit-chat + routing.
-  - Switch by complexity: heuristic + a cheap "is this hard?" check + user's
-    `pro/hard/turbo` command + feedback signal (bad answers -> escalate to 8B).
-- Store BOTH resident (`keep_alive -1`) so switching is instant (no reload).
-  Monitor: if VRAM can't hold both, evict the 8B when idle and reload on demand
-  (measure first — see validation below).
-- **Prefetching overlap** (AirLLM): overlap model-load with compute. For us that
-  means: warm the 8B in the background *after* the 3B answers, so the next hard
-  question is instantly handled. Cheap thread, no user-visible latency.
+### ✅ VERIFIED on this box: replace the 3B with an uncensored 4B (not add to it)
+We do NOT keep the 3B. A single smarter 4B replaces it as the default brain —
+same speed/size, better accuracy, LESS VRAM (one model, not two).
 
-### Validation before committing (run on this box)
+**What works (already pulled + tested):**
 ```
-# pull 8B Q4
-ollama pull qwen3:8b --quantize q4_K_M  (or the huggingface equivalent)
-# measure: tokens/s + peak VRAM for 2 resident models
-ollama create hard-brain -f Modelfile.hard   # baked EN-only like qubit-brain
+ollama pull hf.co/bartowski/mlabonne_Qwen3-4B-abliterated-GGUF:Q4_K_M   # 2.5 GB, uncensored
 ```
-Accept it only if: 8B + 3B both stay resident under 8GB **and** 8B answers in
-<1.5s on your hardware. If not, keep 8B on-demand (not resident) — AirLLM-style
-"load only when needed, evict after" — slight reload cost, zero idle VRAM.
+- Uncensored / abliterated Qwen3-4B (base model `mlabonne/Qwen3-4B-abliterated`).
+- Sits in the ~4.3GB free VRAM; cold load 2.3s, warm ~0.6s (≈ same as the 3B).
+- In the SAME speed class as the 3B → fits the "≤30% slower" budget.
+
+### ⚠️ PITFALL found (MUST fix when baking)
+The Qwen3-4B is a **thinking model** — when queried directly it fills the
+`num_predict` budget with the `thinking` field and returns an EMPTY `content`
+(`done_reason: length`). Two things needed:
+1. Bake with enough `num_predict` (e.g. 128+) so short thoughts fit, OR
+2. Disable/ignore thinking. `options: {"think": false}` alone still returned
+   empty via the ollama HF-imported GGUF. So the reliable fix is a baked
+   `Modelfile` that pins a working template + params (same approach as
+   `Modelfile.qubit`).
+
+### How to bake it (same pattern as qubit-brain)
+```
+# Modelfile.qubit4 — EN-only identity, thinking budget, no template leak
+FROM hf.co/bartowski/mlabonne_Qwen3-4B-abliterated-GGUF:Q4_K_M
+SYSTEM """<same EN-only Qubit identity + behavior as Modelfile.qubit>"""
+PARAMETER temperature 0.4
+PARAMETER num_ctx 4096
+PARAMETER top_p 0.9
+# Qwen3 thinking: keep room OR force quick answer
+# >- if it still emits thinking, RESPECT it (do not strip) and set num_predict high.
+ollama create qubit-brain4 -f Modelfile.qubit4
+```
+Then point config `intent.local_llm.model: qubit-brain4` (+ `ollama_model`).
+REWRITE the response to only use `content`; if the model returns empty `content`
+but non-empty `thinking`, keep the thinking as the answer (best effort) — do NOT
+return blank.
+
+### Validation before making it the default (run on this box)
+```
+# 1. baked model answers, never blank:
+ollama run qubit-brain4 "what is 12 times 8"   # must return text, not "" 
+# 2. speed vs 3B (warm): must be within 30% (≈≤0.7s for a 40-token chat)
+# 3. VRAM: only ONE model resident (4B replaces 3B, no double-load)
+# 4. re-run the full 124-test suite + routing success ≥95%
+```
+Accept only if: answers non-empty, warm latency within 30% of the 3B, single
+model resident, all tests pass. If the 4B can't be made to answer cleanly,
+fall back: keep the 3B (no regression) and revisit.
+
+### Alternative (only if 4B fails): bigger on-demand tier (NOT resident)
+`Qwen3-8B Q4_K_M ≈ 5.3GB` cannot co-reside with a 2.5GB model under 8GB. Only
+viable as on-demand "load→answer→evict", which costs a multi-second reload — so
+it would VIOLATE the ≤30% budget. Keep it on the roadmap but NOT as default.
+
+### Note on "faster routing" (honest)
+The 4B does **not** speed up each call (~same 0.6s). It makes routing *fewer
+mistakes* → you reach the right answer in fewer turns → effectively faster, and
+answers are smarter. Voice-to-text (ASR) is a SEPARATE layer (sherpa parakeet)
+and is unaffected by the model — that's the mic-gain fix (`mic.gain: 3.0` + Air).
 
 ---
 

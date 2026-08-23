@@ -288,13 +288,24 @@ class VoiceOrchestrator:
         self._hermes_busy = False           # a Hermes task is running in the bg
         self._duplex_ptt_pending = False    # duplex mode: Ctrl pressed; next tap
         self._duplex_ptt_until = 0.0        # utterance is the user's instruction
-        # Pin the playback output to a specific sink (config: audio.output_device)
-        # so GNOME's default-sink fights can't route TTS to the wrong/quiet device.
+        # Pin the playback output to a specific device (config: audio.output_device
+        # index + output_device_name) so GNOME's default-sink fights can't route TTS
+        # to a silent/wrong device. Resolved by name first (index shifts on profile
+        # changes, e.g. 5 -> 4 -> could become a 0-output device).
         try:
             _playback_dev = self.cfg.get("audio", "output_device", default="") or None
+            _playback_name = self.cfg.get("audio", "output_device_name", default="") or None
         except Exception:
             _playback_dev = None
-        self.playback = Playback(device=_playback_dev)
+            _playback_name = None
+        self.playback = Playback(device=_playback_dev, device_name=_playback_name)
+        try:
+            from .audio.playback import Playback as _PB
+            _res = self.playback._resolve_device()
+            log_event("audio.pinned", index=_res, name=str(_playback_name),
+                      configured_index=str(_playback_dev))
+        except Exception:
+            pass
         self._apply_output_volume()
         self.classifier: Optional[Classifier] = None
         self._templates: Optional[TaskTemplates] = None

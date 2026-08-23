@@ -12,7 +12,8 @@
 # device. `output_device` is a sounddevice device index (run `voicebridge status`
 # or python -c "print(sounddevice.query_devices())" to see them). "" = system default.
 audio:
-  output_device: ""         # e.g. 5 = motherboard ALC892 headphone jack
+  output_device: ""         # e.g. 4 = motherboard ALC892 headphone jack (index SHIFTS on profile change)
+  output_device_name: ""    # more robust: match by name substring, e.g. "ALC892 Analog"
   output_volume: 80          # percent, applied + unmuted on boot
 
 # ---------------------------------------------------------------------------

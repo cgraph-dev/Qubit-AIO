@@ -37,13 +37,42 @@ class Playback:
     when set it overrides the (GNOME-pinned) default sink so the bridge always
     plays to the intended output, e.g. your headphones."""
 
-    def __init__(self, device: Optional[str] = None) -> None:
+    def __init__(self, device: Optional[str] = None, device_name: Optional[str] = None) -> None:
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._playing = False
         self._started_at = 0.0
         self._name = ""
         self.device = device
+        self.device_name = device_name
+
+    def _resolve_device(self):
+        """Resolve the output device. Priority: explicit index (if it has output
+        channels) > name-substring match > a real 8+-channel output > None. This
+        stops a shifting device index from silently picking a 0-output device."""
+        import sounddevice as _sd
+        try:
+            devs = _sd.query_devices()
+        except Exception:
+            return None
+        # 1) name substring (most robust)
+        if self.device_name:
+            for i, d in enumerate(devs):
+                if self.device_name.lower() in d["name"].lower() and d["max_output_channels"] > 0:
+                    return i
+        # 2) explicit index, only if it can actually output
+        idx = self.device
+        try:
+            idx = int(idx) if idx is not None else None
+        except (ValueError, TypeError):
+            idx = None
+        if idx is not None and 0 <= idx < len(devs) and devs[idx]["max_output_channels"] > 0:
+            return idx
+        # 3) any device with >=8 output channels that isn't 'default'/'pipewire'/'pulse'
+        for i, d in enumerate(devs):
+            if d["max_output_channels"] >= 8 and d["name"] not in ("default", "pipewire", "pulse"):
+                return i
+        return None
 
     def play(self, wav_path: Path | str, name: str = "", interruptible: bool = True,
              on_start=None, on_finish=None) -> bool:
@@ -56,24 +85,16 @@ class Playback:
             self._stop = threading.Event()
             self._playing = True
             self._name = name
-        # Resolve a device each play: if the pinned device is gone, fall back to
-        # None (system default) so we never crash.
-        dev = self.device
+        # Resolve a device each play: name-substring > valid index > any 8-ch
+        # output. Falls back to system default (None) only if nothing resolves.
+        dev = self._resolve_device()
         target_sr = None
         if dev is not None:
             try:
-                dev = int(dev)
-            except (TypeError, ValueError):
-                pass
-            try:
                 import sounddevice as _sd
-                devs = _sd.query_devices()
-                if 0 <= dev < len(devs):
-                    target_sr = int(devs[dev].get("default_samplerate") or 0)
-                else:
-                    dev = None
+                target_sr = int(_sd.query_devices()[dev].get("default_samplerate") or 0)
             except Exception:
-                dev = None
+                target_sr = None
         try:
             with wave.open(str(wav_path), "rb") as wf:
                 sr = wf.getframerate()

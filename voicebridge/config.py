@@ -24,6 +24,7 @@ DEFAULT_DATA_DIR = Path("~/.local/share/openclaw-voice-bridge").expanduser()
 DEFAULTS: Dict[str, Any] = {
     "audio": {
         "output_device": "",        # portaudio device index for TTS (pin to headphones); "" = system default
+        "output_device_name": "",   # more robust: match by name substring (e.g. "ALC892 Analog")
     },
     "hotkey": {
         "enabled": True,
