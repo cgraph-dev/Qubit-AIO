@@ -702,6 +702,25 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 return k or "other"
             import time as _time
             cutoff = _time.time() - days * 86400 if days > 0 else 0
+            # shared ledger (durable across provider switches + reboots) — also visible in reports
+            try:
+                _shared = self.app.orch.shared.recent(limit=300) if hasattr(self.app.orch, "shared") else []
+                for _r in _shared:
+                    _ts = float(_r.get("ts") or 0)
+                    if cutoff and _ts and _ts < cutoff:
+                        continue
+                    _it = {"kind": _r.get("route") or _r.get("role") or "shared", "text": _r.get("text","")[:600], "summary": _r.get("text","")[:600] if _r.get("role")=="agent" else "", "route": _r.get("route","") or _r.get("provider",""), "ts": _ts, "detail": f"shared:{_r.get('role','')}", "shared": True}
+                    c = _cat(_it)
+                    if cat and c != cat:
+                        continue
+                    if q and q.lower() not in __import__("json").dumps(_it).lower():
+                        continue
+                    _it["category"] = c
+                    merged_item_exists = any(abs(float(m.get("ts") or 0) - _ts) < 1.0 and m.get("text","")[:80]==_it["text"][:80] for m in activity)
+                    if not merged_item_exists:
+                        activity.append(_it)
+            except Exception:
+                pass
             merged = []
             for it in activity:
                 if cutoff and float(it.get("ts") or 0) < cutoff:
@@ -724,6 +743,25 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 if q and q.lower() not in __import__("json").dumps(ev).lower():
                     continue
                 merged.append({"kind": ev.get("event"), "text": str(ev.get("text","")), "summary": str(ev.get("summary","")), "route": ev.get("route",""), "ts": ev.get("ts"), "category": c, "raw_log": ev})
+            # include cross-provider shared ledger (so switching OpenClaw<->Hermes doesn't lose context)
+            try:
+                _shared = self.app.orch.shared.recent(limit=100) if hasattr(self.app.orch, "shared") else []
+                for _r in _shared:
+                    _ts = float(_r.get("ts") or 0)
+                    if cutoff and _ts < cutoff:
+                        continue
+                    _txt = str(_r.get("text",""))
+                    _route = str(_r.get("route",""))
+                    _c2 = "shared-" + (_route or _r.get("role","") or "other")
+                    if cat and _c2 != cat:
+                        continue
+                    if q and q.lower() not in __import__("json").dumps(_r).lower():
+                        continue
+                    if any(abs(float(m.get("ts") or 0) - _ts) < 0.5 and m.get("text") == _txt for m in merged):
+                        continue
+                    merged.append({"kind": "shared", "text": _txt, "summary": "", "route": _route, "ts": _ts, "category": _c2, "role": _r.get("role",""), "provider": _r.get("provider","")})
+            except Exception:
+                pass
             merged.sort(key=lambda x: float(x.get("ts") or 0), reverse=True)
             self._json({"items": merged[:limit], "pruned_available": True})
         elif path == "/api/logs":
@@ -744,6 +782,22 @@ class WebUIHandler(BaseHTTPRequestHandler):
             except Exception:
                 since = 0.0
             self._json({"items": self.app.logs(limit=limit, q=q, since=since)})
+        elif path == "/api/shared":
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            # ?limit=60 — recent cross-provider history
+            try:
+                lim = int(self.path.split("limit=")[1].split("&")[0]) if "limit=" in self.path else 60
+            except Exception:
+                lim = 60
+            lim = max(1, min(lim, 200))
+            try:
+                items = self.app.orch.shared.recent(limit=lim) if hasattr(self.app.orch, "shared") else []
+            except Exception:
+                items = []
+            self._json({"items": items})
+
         elif self.app._use_frontend_dir and path.startswith("/static/"):
             name = path.split("/", 2)[-1]
             # correct MIME so browsers cache and render images properly
@@ -868,8 +922,12 @@ class WebUI:
     # -- lifecycle --------------------------------------------------------
     def start(self) -> None:
         handler = type("W", (WebUIHandler,), {})  # subclass per instance
-        handler.app = self  # type: ignore[attr-defined]
+        handler.app = self  # type: ignore[attr-defined]  # keep for direct class access
         self._server = ThreadingHTTPServer((self.host, self.port), handler)
+        # FIX: 'W' object has no attribute 'feed' crash (2026-08-23 02:23:13)
+        # WebUIHandler.app property returns self.server.app, not handler.app.
+        # Without this, /api/reports -> self.app.feed fails with AttributeError.
+        self._server.app = self  # type: ignore[attr-defined]
         self._thread = threading.Thread(target=self._server.serve_forever,
                                         daemon=True, name="webui-http")
         self._thread.start()
@@ -884,6 +942,16 @@ class WebUI:
     def status(self) -> Dict[str, Any]:
         task = self.orch.task
         busy = bool(getattr(task, "active", False)) or bool(getattr(self.orch, "_web_active", 0))
+        shared_len = 0
+        sticky = ""
+        try:
+            shared_len = len(self.orch.shared.recent(limit=200)) if hasattr(self.orch, "shared") else 0
+        except Exception:
+            pass
+        try:
+            sticky = self.orch.sticky_route.target() if hasattr(self.orch, "sticky_route") else ""
+        except Exception:
+            pass
         return {
             "bridge": "up",
             "route": getattr(self.orch, "_route", "unknown"),
@@ -892,6 +960,9 @@ class WebUI:
             "web_active": int(getattr(self.orch, "_web_active", 0)),
             "port": self.port,
             "uptime_s": round(time.time() - getattr(self.orch, "_t0", time.time()), 1),
+            "shared_items": shared_len,
+            "sticky_route": sticky,
+            "tts": getattr(getattr(self.orch, "_tts", None), "name", "") if hasattr(self.orch, "_tts") else "",
         }
 
     def interrupt(self, mode: str = "interrupt") -> None:

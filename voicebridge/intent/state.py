@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -66,6 +67,105 @@ class ExecutorChoiceState:
     def pending(self) -> bool:
         return self.current() is not None
 
+
+
+@dataclass
+class StickyRoute:
+    """Remembers the user's preferred executor across turns.
+    Set when the user says `route to hermes/openclaw/browser` or
+    `use hermes` — persists until explicitly cleared or overridden.
+    The local LLM brain tends to forget; this is the reliable memory.
+    """
+    target: str = ""  # hermes | openclaw | browser | "" (none)
+    reason: str = ""  # why it was set (for logging)
+    set_at: float = field(default_factory=time.time)
+    turns: int = 0    # how many turns it has survived
+
+    def is_set(self) -> bool:
+        return bool(self.target)
+
+    def age_s(self) -> float:
+        return time.time() - self.set_at
+
+
+class StickyRouteState:
+    """One sticky route at a time; auto-expires after N turns or timeout.
+    Updated by explicit user routing phrases (not inferred).
+    Persists to <state_dir>/sticky_route.json so provider switches and
+    bridge restarts don't blank the preference.
+    """
+    def __init__(self, timeout_s: float = 600.0, max_turns: int = 8,
+                 state_dir: Optional[Path] = None) -> None:
+        self.timeout_s = timeout_s
+        self.max_turns = max_turns
+        self._route: Optional[StickyRoute] = None
+        self._path: Optional[Path] = (Path(state_dir).expanduser() / "sticky_route.json") if state_dir else None
+        self._load()
+
+    def _load(self) -> None:
+        if not self._path or not self._path.exists():
+            return
+        try:
+            import json as _js
+            d = _js.loads(self._path.read_text(errors="replace"))
+            t = str(d.get("target","")).lower().strip()
+            if t in ("hermes","openclaw","browser"):
+                self._route = StickyRoute(target=t, reason=str(d.get("reason",""))[:120],
+                                          set_at=float(d.get("set_at", time.time())),
+                                          turns=int(d.get("turns",0)))
+        except Exception:
+            pass
+
+    def _save(self) -> None:
+        if not self._path:
+            return
+        try:
+            import json as _js
+            if self._route is None:
+                try: self._path.unlink(missing_ok=True)
+                except Exception: pass
+                return
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            _js.dump({"target": self._route.target, "reason": self._route.reason,
+                      "set_at": self._route.set_at, "turns": self._route.turns},
+                     open(self._path,"w", errors="replace"))
+        except Exception:
+            pass
+
+    def set(self, target: str, reason: str = "") -> None:
+        self._route = StickyRoute(target=target.lower().strip(), reason=reason)
+        self._save()
+
+    def current(self) -> Optional[StickyRoute]:
+        if self._route is None:
+            return None
+        if self._route.age_s() > self.timeout_s:
+            self._route = None
+            self._save()
+            return None
+        if self._route.turns >= self.max_turns:
+            self._route = None
+            self._save()
+            return None
+        return self._route
+
+    def bump(self) -> None:
+        """Call once per turn so max_turns expiry works."""
+        if self._route is not None:
+            self._route.turns += 1
+            self._save()
+
+    def clear(self) -> None:
+        self._route = None
+        self._save()
+
+    @property
+    def pending(self) -> bool:
+        return self.current() is not None
+
+    def target(self) -> str:
+        c = self.current()
+        return c.target if c else ""
 
 @dataclass
 class TaskState:

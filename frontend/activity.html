@@ -28,39 +28,55 @@
 <div class="wrap">
   <header>
     <h1>📋 Voice Dashboard — Agent Activity</h1>
-    <a href="/">← talk</a>
+    <span><a href="/">talk</a> · <a href="/reports">reports</a> · <a href="/activity">activity</a></span>
   </header>
+  <div id="bar" style="font-size:12px;color:#8b949e;margin-bottom:8px;"><span id="conn">connecting…</span> · <span id="count">—</span> · <label>filter <select id="kindFilter"><option value="">all kinds</option><option value="user">user</option><option value="routing">routing</option><option value="summary">summary</option><option value="status">status</option><option value="fail">fail</option><option value="raw_report">raw report</option></select></label> <input id="q" placeholder="search" style="margin-left:8px;padding:4px 6px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:6px;font-size:12px;"> <button id="pauseBtn" style="margin-left:8px;padding:4px 8px;background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:6px;cursor:pointer;font-size:12px;">pause</button></div>
   <div id="feed"><div id="empty">waiting for activity…</div></div>
 </div>
 <script>
 const BASE = (new URLSearchParams(location.search).get('api') || localStorage.getItem('vdb_api') || '').replace(/\/$/, '');
 const TOKEN = (new URLSearchParams(location.search).get('token') || localStorage.getItem('vdb_token') || '');
 function hdrs(extra) { const h = Object.assign({}, extra || {}); if (TOKEN) h['X-Api-Token'] = TOKEN; return h; }
-const TOKEN = new URLSearchParams(location.search).get('token') || '';
-function hdrs(extra) { const h = Object.assign({}, extra || {}); if (TOKEN) h['X-Api-Token'] = TOKEN; return h; }
 
 const feed = document.getElementById('feed');
-const KIND = { user:'', routing:'', status:'', summary:'', done:'', fail:'' };
+let paused=false;
+document.getElementById('pauseBtn').addEventListener('click', ()=>{ paused=!paused; document.getElementById('pauseBtn').textContent=paused?'resume':'pause'; });
 function esc(s){ return (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 function fmt(ts){ const d = new Date(ts*1000); return d.toLocaleTimeString(); }
 function render(items){
-  feed.innerHTML = items.map(it => {
-    const cls = it.kind==='fail'?'fail':it.kind==='ok'?'ok':'';
+  const kindFilter=document.getElementById('kindFilter').value;
+  const q=(document.getElementById('q').value||'').toLowerCase();
+  let filtered=items;
+  if(kindFilter) filtered=filtered.filter(it=> (it.kind||'')===kindFilter);
+  if(q) filtered=filtered.filter(it=> JSON.stringify(it).toLowerCase().includes(q));
+  document.getElementById('count').textContent = filtered.length + '/' + items.length + ' items';
+  if(!filtered.length){ feed.innerHTML='<div id="empty">'+(items.length?'no matches':'waiting for activity…')+'</div>'; return; }
+  feed.innerHTML = filtered.map(it => {
     const route = it.route ? ` · <span class="route">${esc(it.route)}</span>` : '';
     const summary = it.summary ? `<div class="summary">${esc(it.summary)}</div>` : '';
+    const detail = it.detail ? `<div style="font-size:11px;color:#8b949e;margin-top:4px;">${esc(it.detail)}</div>` : '';
+    const raw = it.raw ? `<details style="margin-top:6px;"><summary style="font-size:11px;color:#8b949e;cursor:pointer;">raw</summary><div style="background:#161b22;border-radius:6px;padding:6px 8px;margin-top:4px;white-space:pre-wrap;font-size:12px;max-height:240px;overflow:auto;">${esc(typeof it.raw==='string'?it.raw:JSON.stringify(it.raw,null,2))}</div></details>` : '';
     return `<div class="item">
-      <div class="t">${fmt(it.ts)} · <span class="kind">${esc(it.kind)}</span>${route}</div>
-      ${it.text ? `<div class="text">${esc(it.text)}</div>` : ''}${summary}</div>`;
+      <div class="t">${fmt(it.ts)} · <span class="kind">${esc(it.kind||'status')}</span>${route}</div>
+      ${it.text ? `<div class="text">${esc(it.text)}</div>` : ''}${summary}${detail}${raw}</div>`;
   }).join('');
-  if (!items.length) feed.innerHTML = '<div id="empty">waiting for activity…</div>';
+}
+async function refreshStatus(){
+  try{ const r=await fetch(BASE+'/api/status', {headers:hdrs()}); if(r.ok){ const d=await r.json(); if(d.sticky_route) document.getElementById('conn').textContent += ' · sticky→'+d.sticky_route; if(d.shared_items) document.getElementById('conn').title=d.shared_items+' history items'; }}catch(_){}
 }
 async function refresh(){
+  if(paused) return;
   try {
-    const r = await fetch(BASE + '/api/activity?limit=80');
+    const r = await fetch(BASE + '/api/activity?limit=200', { headers: hdrs() });
+    if(!r.ok) throw new Error(''+r.status);
     const d = await r.json();
+    document.getElementById('conn').textContent='live · '+(d.items||[]).length+' items';
+    document.getElementById('conn').style.color='#3fb950';
     render(d.items || []);
-  } catch (_) {}
+  } catch(e){ document.getElementById('conn').textContent='offline'; document.getElementById('conn').style.color='#f85149'; }
 }
+document.getElementById('kindFilter').addEventListener('change', ()=>refresh());
+document.getElementById('q').addEventListener('input', ()=>refresh());
 setInterval(refresh, 2000);
 refresh();
 </script>

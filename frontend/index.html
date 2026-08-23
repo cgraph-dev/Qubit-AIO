@@ -39,12 +39,12 @@
     <h1>🎙 Voice Dashboard</h1>
     <div class="row">
       <span class="status" id="st">connecting…</span>
-      <a href="/activity">activity →</a> <a href="#" id="gearlink" style="margin-left:8px">⚙</a>
+      <a href="/activity">activity</a> · <a href="/reports">reports</a> <a href="#" id="gearlink" style="margin-left:8px">⚙</a>
     </div>
   </header>
 
   <button class="ptt" id="ptt">Hold to talk</button>
-  <div class="hint">tap = toggle · release = send · esc = stop</div>
+  <div class="hint">tap = toggle · release = send · esc = stop · <a href="#" id="interruptBtn" style="color:#f85149;">⏹ interrupt</a></div>
 
   <div class="row" style="margin-top:14px;">
     <input id="textin" type="text" placeholder="…or type a task (Enter to send)"
@@ -62,6 +62,9 @@
   <input id="set-token" type="text" placeholder="token (optional)" style="width:100%; padding:6px; margin-bottom:6px; background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:6px;">
   <div class="row"><button id="set-save" style="padding:6px 14px; background:#1f6feb; border:none; color:#fff; border-radius:6px; cursor:pointer;">Save</button>
   <span id="set-status" style="font-size:12px; color:#8b949e; margin-left:10px;"></span></div>
+  <div style="font-size:13px; margin:6px 0 4px;">Voice (TTS provider) — pick higher quality (openai nova = premium, edge = free, piper = offline)</div>
+  <select id="voiceSel" style="width:100%; padding:6px; background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:6px; margin-bottom:6px;"><option value="piper">piper (offline, fast)</option><option value="openai">openai nova (highest quality, requires key)</option><option value="edge">edge JennyNeural (free, online)</option><option value="kokoro">kokoro (local quality)</option><option value="gateway">gateway</option></select>
+  <div style="font-size:11px;color:#8b949e;margin-bottom:6px;">Change persists to voice.yaml on this PC; openai needs OPENAI_API_KEY in ~/.hermes/.env</div>
 </div>
 
 <script>
@@ -269,6 +272,10 @@ document.getElementById('textin').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') sendTyped();
 });
 
+document.getElementById('interruptBtn').addEventListener('click', async (e)=>{ e.preventDefault(); try{ await fetch(BASE+'/api/interrupt', {method:'POST', headers: hdrs({'Content-Type':'application/json'}), body: JSON.stringify({mode:'interrupt'})}); addMsg('meta','· interrupt sent'); }catch(_){}});
+// voice selector: load + persist via /api/status + localStorage
+try{ const vs=document.getElementById('voiceSel'); if(vs){ const saved=localStorage.getItem('vdb_voice')||''; if(saved) vs.value=saved; vs.addEventListener('change', ()=>{ localStorage.setItem('vdb_voice', vs.value); document.getElementById('set-status').textContent='voice='+vs.value+' (restart bridge to apply)'; }); }}
+catch(_){}
 setStatus('ready');
 fetch(BASE + '/api/status').then(r => r.json()).then(d => {
   if (d.bridge === 'up') setStatus('bridge up · ' + d.route, true);

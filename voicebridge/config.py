@@ -71,7 +71,7 @@ DEFAULTS: Dict[str, Any] = {
         "device": "auto",           # auto|cuda|cpu (whisper only)
         "compute_type": "float16",
         "language": "en",
-        "beam_size": 1,
+        "beam_size": 4,          # 4 = much better accent/broken-English, still <0.3s
         "min_confidence": 0.02,     # ~off: whisper avg_logprob for REAL mic speech is 0.05-0.2;
                                     # a higher gate rejects perfect transcripts ("didn't catch that" bug)
                                     # empty-text + filler-word checks handle real silence
@@ -108,10 +108,11 @@ DEFAULTS: Dict[str, Any] = {
         "interrupt": True,          # allow barge-in / stop speaking
         "edge": {"voice": "en-US-JennyNeural", "rate": "+0%"},
         "gateway": {"model": None},  # None = gateway default
+        "openai": {"voice": "nova", "model": "gpt-4o-mini-tts", "key_env": "~/.hermes/.env", "instructions": ""},
         "direct": True,          # strip emojis/pleasantries/filler from spoken output
     },
     "intent": {
-        "llm_classifier": False,    # NO local ollama — heuristic only (fast);
+        "llm_classifier": True,     # enabled: +~0.3-0.6s but fixes broken-English routing (user approved 20-30% cost) — heuristic only (fast);
                                     # ambiguous taps default to conversation
         "ollama_url": "http://127.0.0.1:11434",
         "ollama_model": "huihui_ai/llama3.2-abliterate:3b",
@@ -179,6 +180,10 @@ DEFAULTS: Dict[str, Any] = {
         "ollama_model": "huihui_ai/llama3.2-abliterate:3b",
         "max_chars": 900,       # extractive/summarizer input budget
         "max_words": 40,         # HARD cap on every spoken response (save time)
+    },
+    "reports": {
+        "save_dir": None,       # None = <state_dir>/reports/<session_key>.md (full raw report)
+        "verify": True,         # lightweight verify after each task (fs / git / reply sanity)
     },
     "logging": {
         "level": "INFO",

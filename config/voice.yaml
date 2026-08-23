@@ -82,7 +82,7 @@ tts:
 # ---------------------------------------------------------------------------
 # Intent routing
 intent:
-  llm_classifier: false   # heuristic router only (fast; ambiguous -> conversation)
+  llm_classifier: true   # enabled for accent/broken-English (user approved ~20% cost)   # heuristic router only (fast; ambiguous -> conversation)
   local_llm:
     enabled: true         # bridge answers casual talk itself (<0.5s); rest -> OpenClaw/Hermes
                           # DeepSeek API handles long/complex/web asks

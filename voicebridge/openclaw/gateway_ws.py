@@ -79,7 +79,8 @@ class GatewayClient:
             try:
                 self.ws = await websockets.connect(
                     self.url, max_size=64 * 1024 * 1024,
-                    open_timeout=self.connect_timeout)
+                    open_timeout=self.connect_timeout,
+                    ping_interval=20, ping_timeout=20)
                 await self._handshake()
                 self.connected = True
                 self._reader_task = asyncio.create_task(self._reader())

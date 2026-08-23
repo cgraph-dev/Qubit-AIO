@@ -22,6 +22,16 @@ from .state import ConfirmationState, ConversationState
 
 log = get_logger()
 
+# Broken-English / accent / ASR-error tolerant helpers
+_BROKEN_MAP = {
+    "open claw": "openclaw", "openclaw": "openclaw",
+    "hermes": "hermes",
+    "root to": "route to",  # "root to open claw" ~ "route to openclaw"
+    "trickish": "tricky", "micky": "mickey", "miki": "mickey",
+}
+_FUZZY_TASK_VERBS = r"\b(creat|creaet|cretae|make|do|put|write|ad|add|build|fix|open|update|change|delete|remove|move|copy)\w*\b"
+
+
 SYSTEM_COMMANDS: Dict[str, Dict[str, Any]] = {
     "status": {
         # explicit status asks ONLY — "how are you" is a greeting, not status
@@ -48,6 +58,15 @@ CONFIRM_PATTERNS = [
 ]
 CANCEL_PATTERNS = [
     r"^\s*(no|nope|nah|cancel|abort|stop|don'?t|never ?mind|forget (it|that)|not now|skip|negative|no thanks|no way|wrong|reject)\s*[,.]?\s*(cancel|stop|don'?t|please)?\s*[.!]*$",
+]
+
+# Sticky routing — explicit user preference that survives turns (fixes the 'forgets Hermes/browser' bug)
+STICKY_PATTERNS = [
+    (r"\broute (this|it|everything|all)?\s*(to|through)\s+(hermes|openclaw|browser)\b", "route"),
+    (r"\buse (the )?(hermes|openclaw|browser)\b( for (this|now|everything|all))?", "use"),
+    (r"\b(always )?(use|route through) hermes\b", "hermes"),
+    (r"\b(always )?(use|route through) openclaw\b", "openclaw"),
+    (r"\b(always )?(use|route through) browser\b", "browser"),
 ]
 
 # Explicit Hermes delegation ("ask Hermes to ...", "Hermes, ...").
@@ -99,6 +118,18 @@ class Intent:
     source: str = "heuristic"       # heuristic | llm
     backend: str = "openclaw"       # openclaw | hermes | local | chat | system
 
+
+def normalize_broken_english(text: str) -> str:
+    """Fix common ASR/accents artifacts without breaking correct English."""
+    low = text.lower()
+    # keep original casing for task_text but use lowered for matching; these fixes are whitespace-safe
+    for k, v in _BROKEN_MAP.items():
+        if k in low:
+            # word-boundary replace
+            low = re.sub(r"\b" + re.escape(k) + r"\b", v, low)
+    # collapse repeated spaces
+    low = re.sub(r"\s+", " ", low).strip()
+    return low
 
 class Classifier:
     def __init__(self, cfg: Dict[str, Any], confirmations: ConfirmationState,
@@ -153,6 +184,22 @@ class Classifier:
                 score += 0.5
         return min(score, 1.5)
 
+    def _sticky_route(self, text: str) -> Optional[str]:
+        """If text is an explicit routing preference, return target (hermes/openclaw/browser)."""
+        low = text.lower().strip()
+        for pat, _ in STICKY_PATTERNS:
+            m = __import__("re").search(pat, low)
+            if m:
+                # extract which target was mentioned
+                for t in ("hermes", "openclaw", "browser"):
+                    if t in low[m.start():m.end()+20] or t in m.group(0):
+                        return t
+                # fallback: find target anywhere in text
+                for t in ("hermes", "openclaw", "browser"):
+                    if t in low:
+                        return t
+        return None
+
     def _hermes_request(self, text: str) -> Optional[Intent]:
         low = text.lower().strip()
         for pat in HERMES_PATTERNS:
@@ -167,9 +214,14 @@ class Classifier:
 
     # ---- main entry -----------------------------------------------------------
     def classify(self, text: str) -> Intent:
-        text = text.strip()
-        if not text:
+        orig = text.strip()
+        if not orig:
             return Intent("conversation", confidence=0.0, reason="empty")
+        # keep original for speaking/task but use normalized for decisions
+        norm = normalize_broken_english(orig)
+        text = norm  # downstream heuristics see cleaned form
+        # preserve original for task_text when we emit intents (swap back)
+        _orig_text = orig
 
         sys_i = self._system_command(text)
         if sys_i:
@@ -237,6 +289,9 @@ class Classifier:
                                   params=params, reason=llm.get("reason", ""), source="llm")
                 # fall through to heuristic default
 
+        # Broken-English boost: file/doc/text + action verb even with typo
+        if re.search(_FUZZY_TASK_VERBS, text) and re.search(r"\b(file|document|doc|text|folder|tmp|project|code|html|image|screenshot)\b", text):
+            return Intent("coding", confidence=0.68, task_text=text, reason="broken-english file task")
         # Default: conversation (safe), or coding if hints were partial.
         if task_score >= 0.5:
             return Intent("coding", confidence=0.7, task_text=text,

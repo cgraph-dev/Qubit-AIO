@@ -38,7 +38,7 @@ from .config import Config
 from .hermes import HermesBackend
 from .hotkeys import HotkeyListener
 from .intent.classifier import Classifier, Intent
-from .intent.state import ConfirmationState, ConversationState, ExecutorChoiceState, TaskState
+from .intent.state import ConfirmationState, ConversationState, ExecutorChoiceState, StickyRouteState, TaskState
 from .local import actions as local_actions
 from .logging_setup import get_logger, log_event
 from .openclaw.cli_backend import CliBackend
@@ -46,6 +46,7 @@ from .openclaw.discovery import discover_gateway, discover_cuda_libs
 from .task_templates import TaskTemplates
 from .openclaw.gateway_ws import GatewaySync, GatewayError
 from .safety.policy import SafetyPolicy, SafetyVerdict
+from .shared_memory import SharedMemory
 from .summarizer import summarize, trim_spoken
 
 # Per-request context so Right Ctrl (mic loop, main thread) and dashboard (web
@@ -220,6 +221,19 @@ class VoiceOrchestrator:
         self.conversation = ConversationState(max_turns=int(config.get("conversation", "max_turns", default=8)))
         self.confirmations = ConfirmationState()
         self.executor_choice = ExecutorChoiceState()
+        self.sticky_route = StickyRouteState(state_dir=self.cfg.state_dir())
+        self.shared = SharedMemory(self.cfg.state_dir())
+        # restore recent history into conversation so switching provider / power loss doesn't blank context
+        try:
+            for _rec in self.shared.recent(limit=max(8, int(config.get("conversation", "max_turns", default=8)))):
+                if _rec.get("role") in ("user","assistant","agent") and _rec.get("text"):
+                    self.conversation.add(_rec["role"] if _rec["role"]!="agent" else "assistant", _rec["text"][:2000])
+            # also show restore in journal so dashboard reflects it
+            if self.conversation.turns:
+                from .logging_setup import log_event as _le
+                _le("shared_memory.restored", turns=len(self.conversation.turns))
+        except Exception:
+            pass
         self.task = TaskState()
         self.muted = False
         self._stop = threading.Event()
@@ -305,6 +319,15 @@ class VoiceOrchestrator:
                 return edge
         if provider == "gateway" and self._gateway is not None:
             return GatewayTTS(self._gateway, model=self.cfg.get("tts", "gateway", "model"))
+        if provider == "openai":
+            from .tts.openai_tts import OpenAITTS
+            tts = OpenAITTS(voice=self.cfg.get("tts", "openai", "voice", default="nova"),
+                            model=self.cfg.get("tts", "openai", "model", default="gpt-4o-mini-tts"),
+                            key_env=self.cfg.get("tts", "openai", "key_env", default="~/.hermes/.env"),
+                            instructions=self.cfg.get("tts", "openai", "instructions", default=""))
+            if tts.available():
+                return tts
+            log_event("tts.openai.unavailable", fallback="piper")
         if provider == "kokoro":
             tts = KokoroTTS(model_dir=self.cfg.model_dir(),
                             voice_sid=int(self.cfg.get("tts", "kokoro", "voice_sid", default=0)))
@@ -394,12 +417,15 @@ class VoiceOrchestrator:
             log_event("openclaw.gateway.retry.failed", error=str(exc)[:160])
 
     def _gateway_watchdog(self) -> None:
-        """Periodically re-try the gateway when the bridge isn't on it."""
+        """Periodically re-try the gateway when the bridge isn't on it, and
+        keep the connection alive (the gateway's keepalive ping timeout was
+        killing the WS with 'no close frame received' — websockets ping fixes
+        that, watchdog catches the rest)."""
         interval = float(self.cfg.get("openclaw", "reconnect_s", default=20))
         while not self._stop.is_set():
             time.sleep(interval)
             try:
-                if self._route != "gateway":
+                if self._route != "gateway" or (self._gateway is not None and not self._gateway.connected):
                     self._retry_gateway()
             except Exception:
                 pass
@@ -961,6 +987,10 @@ class VoiceOrchestrator:
             ctx0.summary = ""
             ctx0.route = ""
         log_event("webui.utterance", text=text[:200])
+        try:
+            self.shared.append_user(text, route="web")
+        except Exception:
+            pass
         # Hermes delegation outranks templates on web too — same fix as mic path.
         if self.classifier and (_hw := self.classifier._hermes_request(text)):
             log_event("routing.decision", text=text[:200], kind="hermes", confidence=0.9, reason="hermes delegation", source="web")
@@ -1127,23 +1157,37 @@ class VoiceOrchestrator:
         # skills nudge: remind the agent to use its full skill/tool set
         if self.cfg.get("openclaw", "skills_nudge", default=True):
             task_text = (task_text
-                         + "\n\nUse your available skills and tools as needed "
-                           "(files, terminal, browser, repos, delegation, "
-                           "VS Code via `code` CLI for opening/editing, "
-                           "vision for images/screenshots, video analysis, "
-                           "web fetching). "
-                           "For personal web tasks (shopping, orders, logins, "
-                           "browsing sites the user uses) prefer "
-                           "browser profile=\"user\" so the user's real "
-                           "sessions/cookies/payment methods apply; use "
-                           "profile=\"openclaw\" only for isolated tasks. "
-                           "If a page needs a captcha, 2FA, or a manual "
-                           "confirmation the user must do, stop and tell the "
-                           "user exactly what to do on screen — do not loop "
-                           "or claim success. "
-                           "Reply directly and concisely: no emojis, no "
-                           "pleasantries, no extra words — only what was done "
-                           "and what's next.")
+                         + "\n\nYou are the WORKER (OpenClaw/Hermes). The router is ONLY a router — you own the task: use your full toolkit to deliver it end-to-end."
+                           "\nExtensions + tools you MUST use freely (never ask the user for permission):"
+                           "\n• terminal — full PC shell: run any command, install deps, launch apps, edit files, check repos, system control."
+                           "\n• browser (tool: browser) — full Chromium automation: navigate, click, type, screenshot, copy a site 1:1, extract HTML/CSS, analyze forums/discussions, fill forms, handle logins. For pixel-perfect 1:1 copies, open the target URL, use `browser open/snapshot/screenshot`, copy the DOM + computed styles, and reconstruct faithfully."
+                           "\n• vision — analyze any screenshot/image you captured, read text, verify layout matches the source."
+                           "\n• web search (perplexity/ddg) — research questions, forum threads, docs, release notes; keep excerpts verbatim in the report."
+                           "\n• files/repos/delegation/VS Code (`code` CLI) + all other extensions, skills and tools."
+                           "\nFor personal web tasks (shopping, orders, logins, browsing sites the user uses) prefer browser profile=\"user\" so the user's real sessions/cookies/payment methods apply; use profile=\"openclaw\" only for isolated tasks."
+                           "\nScreenshots/images are OPTIONAL — capture only when needed for verification (browser/vision tasks), not every time."
+                           "\nWhen you use web search (perplexity/ddg) or browser, keep the relevant excerpts verbatim in your final report."
+                           "\nProfessional report helper: run scripts/generate_report.py with --task and --summary to generate a perfect report without reasoning - the script is deterministic and idiot-proof. Use it whenever you need to produce a report.\nAlways produce two parts: 1) a FULL detailed report (all tool outputs, image descriptions, forum excerpts, browser screenshots refs, terminal outputs) 2) the last paragraph must be a tight 40-word max spoken summary — that summary is what gets spoken."
+                           "\nIf a page needs a captcha, 2FA, or a manual confirmation the user must do, stop and tell the user exactly what to do on screen — do not loop or claim success."
+                           "\nReply directly and concisely: no emojis, no pleasantries, no extra words — only what was done and what's next.")
+        # capture VS Code workspace context (so switching agents doesn't blank it)
+        try:
+            import os as _os2
+            _ws = _os2.environ.get("VSCODE_CWD", "").strip() or _os2.environ.get("VSCODE_GIT_IPC_HANDLE", "").strip()
+            # also probe current working dir if VS Code launched the bridge
+            if not _ws and _os2.environ.get("TERM_PROGRAM") == "vscode":
+                _ws = str(Path.cwd())
+            if _ws:
+                self.shared.append_vscode(f"VS Code workspace: {_ws}", workspace=_ws)
+        except Exception:
+            pass
+        # inject cross-provider shared history so switching agents doesn't blank context
+        try:
+            _hist = self.shared.as_prompt(max_chars=4000, max_turns=24)
+            if _hist:
+                task_text = f"{_hist}\n\n---\n\nCurrent task: {task_text}"
+        except Exception:
+            pass
         suffix = uuid.uuid4().hex[:8]
         if self._interrupted_session:
             # New instruction after an interrupt. NOTE: do NOT reuse the
@@ -1333,6 +1377,20 @@ class VoiceOrchestrator:
                     res = self._gateway.wait_run(run_id, timeout_ms=window_ms)
                 except GatewayError as exc:
                     log_event("openclaw.error", session_key=session_key, run_id=run_id, error=exc.message, elapsed_s=round(time.time() - t0, 2))
+                    # Try to salvage whatever the agent already wrote before declaring failure
+                    salvaged = ""
+                    try:
+                        salvaged = self._fetch_final_reply(session_key, run_id) or ""
+                    except Exception:
+                        salvaged = ""
+                    if salvaged.strip():
+                        log_event("openclaw.result", session_key=session_key, run_id=run_id,
+                                  status="partial", error=exc.message,
+                                  elapsed_s=round(time.time() - t0, 2))
+                        self.task.clear()
+                        self._handle_agent_result(session_key, salvaged, "partial",
+                                                  time.time() - t0)
+                        return
                     log_event("openclaw.result", session_key=session_key, run_id=run_id,
                               status="failed", error=exc.message,
                               elapsed_s=round(time.time() - t0, 2))
@@ -1341,6 +1399,19 @@ class VoiceOrchestrator:
                     return
                 except Exception as exc:
                     log_event("openclaw.error", session_key=session_key, run_id=run_id, error=str(exc)[:200], elapsed_s=round(time.time() - t0, 2))
+                    salvaged = ""
+                    try:
+                        salvaged = self._fetch_final_reply(session_key, run_id) or ""
+                    except Exception:
+                        salvaged = ""
+                    if salvaged.strip():
+                        log_event("openclaw.result", session_key=session_key, run_id=run_id,
+                                  status="partial", error=str(exc)[:200],
+                                  elapsed_s=round(time.time() - t0, 2))
+                        self.task.clear()
+                        self._handle_agent_result(session_key, salvaged, "partial",
+                                                  time.time() - t0)
+                        return
                     log_event("openclaw.result", session_key=session_key, run_id=run_id,
                               status="failed", error=str(exc)[:200],
                               elapsed_s=round(time.time() - t0, 2))
@@ -1461,21 +1532,74 @@ class VoiceOrchestrator:
 
     def _handle_agent_result(self, session_key: str, reply: str, status: str,
                              elapsed_s: float) -> None:
-        log_event("openclaw.result", session_key=session_key, status=status,
-                  elapsed_s=round(elapsed_s, 2), reply_len=len(reply))
-        self.feed_push({"kind": "status", "text": f"task {status}",
-                        "route": "openclaw",
-                        "detail": f"elapsed {round(elapsed_s, 1)}s"})
+        # Always journal + persist the FULL raw report first — summary/speech must never hide it.
+        try:
+            log_event("openclaw.result", session_key=session_key, status=status,
+                      elapsed_s=round(elapsed_s, 2), reply_len=len(reply))
+        except Exception:
+            pass
+        try:
+            self.feed_push({"kind": "status", "text": f"task {status}",
+                            "route": "openclaw",
+                            "detail": f"elapsed {round(elapsed_s, 1)}s"})
+        except Exception:
+            pass
         if not reply.strip():
-            self.speak("OpenClaw finished the task. I couldn't pull the final "
-                       "text from the session — check the dashboard for details, "
-                       "or ask me what it did.")
+            try:
+                self.speak("OpenClaw finished the task. I couldn't pull the final "
+                           "text from the session — check the dashboard for details, "
+                           "or ask me what it did.")
+            except Exception:
+                pass
             return
-        log_event("openclaw.full_reply", session_key=session_key, reply_len=len(reply), reply=reply[:2000])
-        summary = summarize(reply, self.cfg.section("summarizer"))
-        log_event("openclaw.summary", session_key=session_key, summary=summary[:400])
-        self.feed_push({"kind": "summary", "text": "OpenClaw task",
-                        "summary": summary, "route": "openclaw", "raw": reply[:50000]})
+        try:
+            log_event("openclaw.full_reply", session_key=session_key, reply_len=len(reply), reply=reply[:50000])
+        except Exception:
+            pass
+        # Persist full report to <state_dir>/reports/ so the dashboard / "full report" survives restarts/crashes.
+        try:
+            self._persist_full_report(session_key, reply, status, elapsed_s)
+        except Exception as exc:
+            try:
+                log_event("openclaw.report.persist_failed", error=str(exc)[:200])
+            except Exception:
+                pass
+        # Lightweight verify: what did the agent actually do? (fs / git hints; never crashes the task)
+        try:
+            if self.cfg.get("reports", "verify", default=True):
+                self._verify_task_result(session_key, reply)
+        except Exception as exc:
+            try:
+                log_event("openclaw.verify.failed", error=str(exc)[:160])
+            except Exception:
+                pass
+        # Summarize for voice — bulletproof: never let summarizer failure hide the full report.
+        summary = ""
+        try:
+            summary = summarize(reply, self.cfg.section("summarizer"))
+        except Exception as exc:
+            try:
+                log_event("openclaw.summarize.failed", error=str(exc)[:160])
+            except Exception:
+                pass
+            from .summarizer import clamp_words as _cw, _strip_markdown as _sm
+            try:
+                summary = _cw(_sm(reply or ""), 40) or "Task finished — check the full report on the dashboard."
+            except Exception:
+                summary = "Task finished — check the full report on the dashboard."
+        try:
+            log_event("openclaw.summary", session_key=session_key, summary=summary[:400])
+        except Exception:
+            pass
+        try:
+            self.shared.append_agent_report(summary, raw=reply, provider="openclaw", session_key=session_key)
+        except Exception:
+            pass
+        try:
+            self.feed_push({"kind": "summary", "text": "OpenClaw task",
+                            "summary": summary, "route": "openclaw", "raw": reply[:50000]})
+        except Exception:
+            pass
         # Only satisfy a waiting web poll if a web request is actually waiting;
         # otherwise a Right Ctrl task would overwrite a concurrent dashboard request's
         # _last_web_summary before it polls it (the "delay / wrong answer" bug).
@@ -1483,7 +1607,52 @@ class VoiceOrchestrator:
             self._last_web_summary = summary
         self.speak(summary)
 
-    # ----------------------------------------------------------- system cmds
+    
+    def _persist_full_report(self, session_key: str, reply: str, status: str, elapsed_s: float) -> None:
+        """Save full raw report to <state_dir>/reports/<session_key>.md for dashboard + crash recovery."""
+        try:
+            base = self.cfg.get("reports", "save_dir") or str(self.cfg.state_dir() / "reports")
+            rdir = pathlib.Path(base).expanduser()
+            rdir.mkdir(parents=True, exist_ok=True)
+            import re as _re2
+            safe = _re2.sub(r"[^a-zA-Z0-9._:-]", "_", session_key)[:120] or "report"
+            path = rdir / f"{safe}.md"
+            import time as _tm2
+            header = "# OpenClaw full report — {}\n\n- status: {}\n- elapsed: {}s\n- at: {}\n\n---\n\n".format(session_key, status, round(elapsed_s,1), _tm2.strftime("%Y-%m-%d %H:%M:%S"))
+            path.write_text(header + (reply or ""), errors="replace")
+            try: log_event("openclaw.report.saved", path=str(path), chars=len(reply or ""))
+            except: pass
+            try: self.feed_push({"kind": "raw_report", "text": f"full report: {safe}", "route": "openclaw", "detail": str(path), "raw": (reply or "")[:50000]})
+            except: pass
+        except Exception as exc:
+            try: log_event("openclaw.report.save_failed", error=str(exc)[:200])
+            except: pass
+
+    def _verify_task_result(self, session_key: str, reply: str) -> None:
+        """Lightweight verify: check mentioned paths + git hints, never crashes."""
+        try:
+            import re as _re2, subprocess as _sp2
+            paths = _re2.findall(r"(?:^|\s)(/(?:[^\s`'\"]+/)*[^\s`'\"]+\.\w+|\./[^\s`'\"]+)", reply or "")
+            checked=[]
+            for q in paths[:4]:
+                try: checked.append(f"{q}={'ok' if pathlib.Path(q).exists() else 'missing'}")
+                except: pass
+            git_hint=""
+            try:
+                out=_sp2.run(["git","status","--porcelain"], capture_output=True, text=True, timeout=3)
+                if out.returncode==0:
+                    git_hint="; ".join([l.strip() for l in (out.stdout or "").splitlines()[:6]])[:300]
+            except: pass
+            try: log_event("openclaw.verify", session_key=session_key, reply_chars=len(reply or ""), paths="; ".join(checked)[:400], git=git_hint[:300])
+            except: pass
+            if checked and any("missing" in c for c in checked):
+                try: self.feed_push({"kind": "status", "text": "verify: some mentioned files missing", "route": "verify", "detail": "; ".join(checked)[:300]})
+                except: pass
+        except Exception as exc:
+            try: log_event("openclaw.verify.error", error=str(exc)[:160])
+            except: pass
+
+# ----------------------------------------------------------- system cmds
     def _handle_system(self, intent: Intent) -> None:
         cmd = intent.params.get("command")
         # sync Right Ctrl system commands to dashboard activity feed
@@ -1683,6 +1852,9 @@ class VoiceOrchestrator:
             self._filler_re = _re.compile(r"^(?:yeah|yep|okay|ok|hello|hi|hey|bruski|sup|howdy|yo|hmm|ah|oh|alright|fine|good|thanks|thank you)\b[.!?]*$", flags=_re.I)
             _filler_re = self._filler_re
         low = text.strip().lower()
+        # Explicit hello/hi must never burn the 3B — instant and keeps the bridge responsive under load
+        if low in ("hello","hello.","hi","hi.","hey","hey."):
+            low = "hello"  # normalize for filler check
         if _filler_re.fullmatch(low):
             # Route by language but keep it instant — also mirror to per-request ctx so /api/result returns it
             if low.startswith(("salut","buna","bruski")) or "salut" in low or "bruski" in low:
@@ -1702,9 +1874,10 @@ class VoiceOrchestrator:
             self.feed_push({"kind": "summary", "text": text[:300], "summary": reply_f, "route": "local", "detail": "filler"})
             log_event("conversation.filler", text=text[:80])
             return
-        # Hotword for identity: "my name" / "who am i" -> answer without LLM (deterministic, fast, non-hallucinating)
+        # Hotword for identity: robust to ASR clipping ("My name." / "my name"), accent and missing "what's"
+        # Covers: "whats my name", "what is my name", "my name", "who am i", "who i am" — bare "my name" is the RCtrl clipped case
         _low_identity = low
-        if ("what is my name" in _low_identity or "what's my name" in _low_identity or "who am i" in _low_identity):
+        if re.search(r"\b(my name|who am i|who i am)\b", _low_identity):
             # Deterministic answer from memory — never ask back
             reply = "Your name is Tricky."
             # Keep per-request ctx + conversation history consistent for next turns
@@ -1723,6 +1896,14 @@ class VoiceOrchestrator:
             log_event("conversation.identity", text=text[:80], summary=reply)
             self.speak(reply)
             return
+        # inject sticky route into local LLM context so it doesn't hallucinate
+        _sticky_hint = ""
+        try:
+            _sr = self.sticky_route.target()
+            if _sr:
+                _sticky_hint = f"Active routing preference: route to {_sr.title()} (user asked to route to {_sr}). Honor it."
+        except Exception:
+            pass
         llm_cfg = self.cfg.section("intent").get("local_llm", {}) or {}
         # Explicit "use perplexity to search X" -> straight to Perplexity,
         # never the local model (it answers web queries generically without
@@ -1736,7 +1917,10 @@ class VoiceOrchestrator:
             _ctx_for_llm = self._cur_ctx()
             _conv_prompt = _ctx_for_llm.conv_snapshot if _ctx_for_llm is not None and _ctx_for_llm.conv_snapshot is not None else self.conversation.as_prompt()
             # Ensure EVERY local chat turn sees the identity file (Qubit/Tricky) — even per-request isolated ctx
-            _mem_ctx = self._memory_context or self.conversation.as_prompt()  # both include personal-knowledge
+            _mem_ctx = (self._memory_context or self.conversation.as_prompt())  # both include personal-knowledge
+            if _sticky_hint:
+                _mem_ctx = f"{_sticky_hint}\n\n{_mem_ctx}" if _mem_ctx else _sticky_hint
+            # also show recent reports hint so local chat can answer "what did you do?" accurately
             try:
                 reply = chat_local(
                     text, _conv_prompt,
@@ -1768,6 +1952,10 @@ class VoiceOrchestrator:
                 self.feed_push({"kind": "summary", "text": text[:300], "summary": trimmed,
                                 "route": "local", "detail": "conversation", "raw": reply[:50000]})
                 log_event("conversation.local.summary", text=text[:160], summary=reply[:160])
+                try:
+                    self.shared.append_assistant(reply, route="local", provider="local")
+                except Exception:
+                    pass
                 log_event("conversation.local.full", text=text[:300], reply_len=len(reply), reply=reply[:2000])
                 self.speak(trim_spoken(reply, 500))
                 return
@@ -1806,9 +1994,19 @@ class VoiceOrchestrator:
             self.feed_push({"kind": "summary", "text": text[:300], "summary": trimmed2,
                             "route": "fallback", "detail": "conversation", "raw": reply[:50000]})
             log_event("conversation.fallback.summary", text=text[:160], summary=reply[:160])
+            try:
+                self.shared.append_assistant(reply, route="fallback", provider="fallback")
+            except Exception:
+                pass
             log_event("conversation.fallback.full", text=text[:300], reply_len=len(reply), reply=reply[:2000])
         else:
-            self.speak("I'm sorry, I couldn't reach the chat model.")
+            # Last resort: if even fallbacks 402/timeout, still answer greetings/identity deterministically so UX never blocks
+            if re.search(r"\b(hello|hi|hey)\b", low):
+                self.speak("Hey Tricky, I\'m Qubit — I\'m here. Try again?")
+            elif re.search(r"\b(my name|who am i)\b", low):
+                self.speak("Your name is Tricky.")
+            else:
+                self.speak("I'm sorry, I couldn't reach the chat model.")
 
     def _chat_deepseek_stream(self, text: str, on_sentence) -> str:
         """Stream a DeepSeek completion; emit completed sentences via
@@ -1980,7 +2178,9 @@ class VoiceOrchestrator:
     def _chat_ollama(self, text: str) -> str:
         import urllib.request
         url = self.cfg.get("intent", "ollama_url", default="http://127.0.0.1:11434")
-        model = self.cfg.get("intent", "ollama_model", default="qwen3-vl:8b")
+        # Fallback uses the same resident model as local_llm (was hardcoded qwen3-vl:8b which is not resident)
+        fallback = self.cfg.get("intent", "local_llm", "model", default="huihui_ai/llama3.2-abliterate:3b")
+        model = self.cfg.get("intent", "ollama_model", default=fallback)
         _c = self._cur_ctx()
         ctx = _c.conv_snapshot if _c is not None and _c.conv_snapshot else self.conversation.as_prompt()
         prompt = f"Recent conversation:\n{ctx}\n\nUser: {text}\n\nAssistant:"
@@ -2049,6 +2249,12 @@ class VoiceOrchestrator:
         boss = _boss_phrase()
         self.speak(notice or boss, name="ack", barge=False)
         log_event("boss_talk", target="hermes", phrase=boss, task=task[:160])
+        try:
+            _hist_h = self.shared.as_prompt(max_chars=4000, max_turns=24)
+            if _hist_h:
+                task = f"{_hist_h}\n\n---\n\nCurrent task: {task}"
+        except Exception:
+            pass
         task = (task + "\n\nReply directly and concisely: no emojis, no "
                      "pleasantries, no extra words — only what was needed.")
         self._hermes_busy = True
@@ -2092,11 +2298,53 @@ class VoiceOrchestrator:
                 # user redirected mid-run; don't speak the stale reply
                 log_event("hermes.result.discarded", why="interrupted")
                 return
-            log_event("hermes.full_reply", reply_len=len(reply), reply=reply[:2000])
-            summary = summarize(reply, self.cfg.section("summarizer"))
-            # sync Right Ctrl Hermes tasks to dashboard (raw = full reply, summary = spoken)
-            self.feed_push({"kind": "summary", "text": "Hermes task", "summary": summary, "route": "hermes", "raw": reply[:50000]})
-            log_event("hermes.summary", summary=summary[:300])
+            # Persist full hermes raw report (images + perplexity/ddg excerpts kept verbatim) — never lose it on crash/summarize failure.
+            try:
+                log_event("hermes.full_reply", reply_len=len(reply), reply=reply[:50000])
+            except Exception:
+                pass
+            try:
+                self._persist_full_report(f"hermes:{self.task.session_key or 'hermes'}", reply, "ok", 0.0)
+            except Exception:
+                pass
+            try:
+                if self.cfg.get("reports", "verify", default=True):
+                    self._verify_task_result(f"hermes:{self.task.session_key or 'hermes'}", reply)
+            except Exception:
+                pass
+            # Bulletproof summarize: always <=40w even if ollama down
+            summary = ""
+            try:
+                summary = summarize(reply, self.cfg.section("summarizer"))
+            except Exception:
+                from .summarizer import clamp_words as _cw, _strip_markdown as _sm
+                try:
+                    summary = _cw(_sm(reply or ""), 40)
+                except Exception:
+                    summary = "Task finished — check the full report on the dashboard."
+            try:
+                # hermes hyperlink enrich
+                _hl=[]
+                try:
+                    import re as _re3
+                    for mm in _re3.finditer(r"https?://[^\s)\]\"']+", reply or ""):
+                        uu=mm.group(0).rstrip('.,;)')
+                        if uu not in _hl: _hl.append(uu)
+                    if _hl:
+                        reply = reply + "\n\n---\n\n### References\n" + "\n".join(f"- [{u}]({u})" for u in _hl[:20])
+                except Exception:
+                    pass
+                try:
+                    self.shared.append_agent_report(summary, raw=reply, provider="hermes", session_key=self.task.session_key or "hermes")
+                except Exception:
+                    pass
+                self.feed_push({"kind": "summary", "text": "Hermes task", "summary": summary, "route": "hermes", "raw": reply[:50000], "links": _hl[:20]})
+            except Exception:
+                pass
+            try:
+                log_event("hermes.summary", summary=summary[:300])
+            except Exception:
+                pass
             # Mirror to per-request ctx so /api/result prefers isolated summary (no swap with concurrent)
             if (_ctx_h := self._cur_ctx()) is not None:
                 _ctx_h.summary = summary
@@ -2119,6 +2367,54 @@ class VoiceOrchestrator:
         log_event("routing.decision", text=text[:200], kind=intent.kind,
                   confidence=round(float(getattr(intent, "confidence", 0) or 0), 2),
                   reason=getattr(intent, "reason", "") or "", source="mic")
+        try:
+            self.shared.append_user(text, route=intent.kind)
+        except Exception:
+            pass
+        # sticky routing: explicit "route to X / use X" sets persistent preference
+        # so the local brain doesn't forget on next turn. Also handle "clear/reset route".
+        if self.classifier:
+            _low_sticky = text.lower().strip()
+            if __import__("re").search(r"\b(clear|reset|forget) (route|routing|preference)\b", _low_sticky):
+                self.sticky_route.clear()
+                self.speak("Routing preference cleared.")
+                log_event("sticky_route.cleared")
+                return
+            _sticky = self.classifier._sticky_route(text)
+            if _sticky:
+                # pure routing preference (no task attached) -> just set and ack
+                _task_re = __import__("re").sub(r"route (this|it|everything|all)?\s*(to|through)\s+(hermes|openclaw|browser)\b|use (the )?(hermes|openclaw|browser)\b.*|always (use|route through) (hermes|openclaw|browser)\b", "", _low_sticky, flags=__import__("re").I).strip(" .,;:")
+                self.sticky_route.set(_sticky, reason=text[:120])
+                log_event("sticky_route.set", target=_sticky, text=text[:160])
+                if not _task_re or len(_task_re) < 4:
+                    self.speak(f"Got it — routing to {_sticky.title()} from now on.")
+                    self.feed_push({"kind": "status", "text": f"sticky route → {_sticky}", "route": "sticky"})
+                    return
+                # routing + task in one utterance: "route to hermes and do X" -> strip prefix and continue
+                text = _task_re
+                intent.task_text = _task_re
+                log_event("sticky_route.with_task", target=_sticky, task=text[:160])
+            # if we already have a sticky route and this utterance is a real task/conversation NOT a system cmd,
+            # apply it — but explicit hermes delegation still wins (checked next), and local actions win too.
+            # We bump the sticky counter here so it naturally expires.
+            _sticky_now = self.sticky_route.target()
+            if _sticky_now and intent.kind not in ("system", "confirm", "cancel"):
+                # only apply sticky to tasks / open-ended requests; not to pure conversation filler
+                if intent.kind in ("coding", "hermes") or (intent.kind == "conversation" and len(text.split()) > 3):
+                    _h = self.classifier._hermes_request(text)
+                    if not _h:  # no explicit hermes override in this utterance
+                        if _sticky_now == "hermes" and intent.kind != "hermes":
+                            log_event("sticky_route.applied", target=_sticky_now, from_kind=intent.kind)
+                            self._handle_hermes(intent.task_text or text)
+                            self.sticky_route.bump()
+                            return
+                        if _sticky_now == "browser" and intent.kind == "coding":
+                            # browser tasks are still coding but with browser hint — prepend it
+                            intent.task_text = f"[use browser] {intent.task_text or text}"
+                            log_event("sticky_route.applied", target=_sticky_now, from_kind=intent.kind)
+                            self.sticky_route.bump()
+                            # fall through to normal coding dispatch with browser hint
+
         # executor ask-mode answer: the user just said who should run the
         # pending task ("OpenClaw", "Hermes", "you pick", "whatever") — handle
         # it BEFORE templates/classification so the answer isn't misrouted
@@ -2414,6 +2710,13 @@ class VoiceOrchestrator:
         user never has to tap twice to "wake up" the bridge.
         """
         while not self._stop.is_set():
+            # keep xinput alive: if the XI2 loop died, restart it (never leave hotkey dead)
+            try:
+                hk = getattr(self, "hotkey", None)
+                if hk is not None and hasattr(hk, "ensure_alive"):
+                    hk.ensure_alive()
+            except Exception:
+                pass
             # wait for a genuine hold OR a latched press
             while not self._stop.is_set() and not self._ptt_hold \
                     and not self._ptt_pressed.is_set():

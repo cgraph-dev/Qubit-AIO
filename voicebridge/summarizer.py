@@ -16,7 +16,7 @@ from typing import Optional
 from .logging_setup import log_event
 
 SUMMARY_PROMPT = """You are summarizing a coding agent's output for a voice
-interface. Produce a short spoken summary of 2-3 sentences (max 70 words).
+interface. Produce a short spoken summary of 2-3 sentences (max 40 words).
 Include: what was changed, key file names, and any action the user must take
 (such as "review before commit"). Use plain conversational language, no
 markdown, no bullet points. Output JSON: {"summary": "..."}"""
@@ -84,17 +84,35 @@ def clamp_words(text: str, max_words: int = 40) -> str:
 def summarize(text: str, cfg: Optional[dict] = None,
               ollama_url: Optional[str] = None,
               ollama_model: Optional[str] = None) -> str:
-    cfg = cfg or {}
-    provider = cfg.get("provider", "extractive")
-    url = ollama_url or "http://127.0.0.1:11434"
-    model = ollama_model or cfg.get("ollama_model", "huihui_ai/llama3.2-abliterate:3b")
-    max_chars = int(cfg.get("max_chars", 900))
-    if provider == "ollama":
-        s = summarize_ollama(text, url, model, max_chars=max_chars)
-        if s:
-            return clamp_words(s, int(cfg.get("max_words", 40)))
-    return clamp_words(summarize_extractive(text, max_chars),
-                       int(cfg.get("max_words", 40)))
+    """Never crash, always return <=max_words. Raw full report is kept separately."""
+    try:
+        cfg = cfg or {}
+        provider = cfg.get("provider", "extractive")
+        url = ollama_url or "http://127.0.0.1:11434"
+        model = ollama_model or cfg.get("ollama_model", "huihui_ai/llama3.2-abliterate:3b")
+        max_chars = int(cfg.get("max_chars", 900))
+        max_words = int(cfg.get("max_words", 40))
+        if not text or not text.strip():
+            return ""
+        # truncate for LLM but keep deterministic fallback on full stripped text
+        if provider == "ollama":
+            try:
+                s = summarize_ollama(text, url, model, max_chars=max_chars)
+                if s and s.strip():
+                    return clamp_words(s, max_words)
+            except Exception:
+                pass
+        # extractive fallback is guaranteed
+        try:
+            return clamp_words(summarize_extractive(text, max_chars), max_words)
+        except Exception:
+            return clamp_words(_strip_markdown(text or ""), max_words)
+    except Exception:
+        # ultimate fallback: first 40 words
+        try:
+            return clamp_words(text or "", int((cfg or {}).get("max_words", 40)))
+        except Exception:
+            return ""
 
 
 def trim_spoken(text: str, max_chars: int = 700,

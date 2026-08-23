@@ -107,13 +107,16 @@ class HotkeyListener:
                         self._xinput_state["release"] = False
                         self._release(self._KEYCODES.get(code, str(code)))
         except Exception as exc:
-            log.warning("hotkeys: xinput loop ended (%s)", exc)
+            log.warning("hotkeys: xinput loop ended (%s) — will auto-restart on next PTT check", exc)
         finally:
             if self._proc is not None:
                 try:
                     self._proc.kill()
                 except Exception:
                     pass
+            self._proc = None
+            # mark for lazy restart in start()-check or next emit cycle
+            self._xinput_dead = True  # type: ignore[attr-defined]
 
     def stop(self) -> None:
         if self._proc is not None:
@@ -133,6 +136,16 @@ class HotkeyListener:
     def _key_name(key) -> str:
         return getattr(key, "name", None) or getattr(key, "char", None) or str(key)
 
+
+    def ensure_alive(self) -> None:
+        """Restart xinput if the loop died (never leave hotkey permanently dead)."""
+        if getattr(self, "_xinput_dead", False) and self.on_event is not None:
+            self._xinput_dead = False  # type: ignore[attr-defined]
+            try:
+                if self._start_xinput():
+                    log_event("hotkey.xinput.restarted")
+            except Exception as exc:
+                log.warning("hotkeys: xinput restart failed (%s)", exc)
     def _press(self, key) -> None:
         name = self._key_name(key)
         if name in (self.hold_key, self.alt_hold_key):
