@@ -233,3 +233,23 @@ def test_task_queue_clear_and_empty():
     assert q.size == 2
     assert q.clear() == 2
     assert q.size == 0 and q.items() == []
+
+
+def test_browser_inbox_module_imports_and_sites():
+    """browser_inbox exposes per-site config and the reader without launching."""
+    import importlib.util, pathlib
+    mod_path = pathlib.Path("scripts/browser_inbox.py")
+    spec = importlib.util.spec_from_file_location("browser_inbox", mod_path)
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    for site in ("gmail", "instagram", "messenger", "tiktok"):
+        assert site in m.SITES, f"missing site config {site}"
+        assert m.SITES[site]["url"], f"no url for {site}"
+    assert m.DEFAULT_ENGINE_ORDER == ["chromium", "firefox"]
+
+
+def test_browser_inbox_unknown_site():
+    import importlib.util, pathlib
+    spec = importlib.util.spec_from_file_location("browser_inbox", pathlib.Path("scripts/browser_inbox.py"))
+    m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+    assert m.read_site("nope")["error" if "error" in m.read_site("nope") else "site"] == "unknown site nope"

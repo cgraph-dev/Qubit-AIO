@@ -12,6 +12,7 @@ dependencies = [
     "piper-tts>=1.2",         # default TTS
     "faster-whisper>=1.1",    # optional ASR fallback (asr.provider: whisper)
     "webrtcvad>=2.0.10",      # optional VAD fallback (vad.backend: webrtc)
+    "playwright>=1.49",       # browser inbox reader (Gmail/IG/FB/TikTok via persistent profiles)
 ]
 
 [project.optional-dependencies]
