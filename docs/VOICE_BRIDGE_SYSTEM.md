@@ -59,6 +59,9 @@ mic (HyperX on Scarlett 2i2) --gain 3x + Air mode--> 16k WAV
 
 ## 3. What we TOOK from open-source (and built)
 
+> **See `STEAL_LIST.md`** for the focused speed/smarter/minimal-VRAM steal-list
+> with the specific techniques to implement next.
+
 ### CopilotKit — Self-Learning (CLHF) ✅ SHIPPED
 - Realized: agents improve in-context from feedback, no fine-tuning.
 - Built: `LearningLedger` (state_dir/learning.jsonl, fsynced) + `POST /api/feedback`
@@ -135,6 +138,7 @@ state-machine proofs.
 
 ---
 
+---
 ## 8. The one "bigger" idea we keep circling
 **A smarter local model without losing speed.** The 3B is fast (~0.5s) but not
 deep. AirLLM shows you can run a **7-8B Q4 on 8GB**. Plan:

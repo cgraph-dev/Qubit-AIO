@@ -3,6 +3,8 @@
 > 📘 **Read `docs/VOICE_BRIDGE_SYSTEM.md`** for the full system map, what we
 > cherry-picked from open-source (CopilotKit/AirLLM/OpenSandbox), the roadmap,
 > and the "smarter model" plan.
+> 🧠 **Read `docs/STEAL_LIST.md`** for a focused speed / smarter / minimal-VRAM
+> steal-list (specific techniques we can lift from each source and implement).
 
 A **production-style local voice interface for OpenClaw** — push-to-talk,
 natural speech in, spoken results out. Built for an **RTX 3070 Ti 8 GB** box
