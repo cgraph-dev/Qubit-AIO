@@ -5,6 +5,8 @@
 > and the "smarter model" plan.
 > 🧠 **Read `docs/STEAL_LIST.md`** for a focused speed / smarter / minimal-VRAM
 > steal-list (specific techniques we can lift from each source and implement).
+> 🔊 **Read `docs/AUDIO_SETUP.md`** for the working HyperX audio config (mic + output)
+> — read this FIRST before touching any audio/mic/TTS setting.
 
 A **production-style local voice interface for OpenClaw** — push-to-talk,
 natural speech in, spoken results out. Built for an **RTX 3070 Ti 8 GB** box

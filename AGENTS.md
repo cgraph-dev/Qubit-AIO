@@ -39,3 +39,10 @@ re-read whole files.
 After big code changes, refresh the graph with `graft build` (deterministic,
 no API key, $0).
 <!-- graft:end -->
+
+## Voice Bridge docs (read before editing audio/voice)
+- `docs/AUDIO_SETUP.md` — the WORKING HyperX audio config (mic = mono USB,
+  output = HyperX digital; keep output_device EMPTY; speak_web_locally=false).
+- `docs/STEAL_LIST.md` — what to implement next from CopilotKit/AirLLM/OpenSandbox
+  (smarter 4B model tier, live streaming, tool schema, etc).
+- `docs/VOICE_BRIDGE_SYSTEM.md` — full pipeline + roadmap.
