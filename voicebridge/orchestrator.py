@@ -1033,6 +1033,15 @@ class VoiceOrchestrator:
             self.shared.append_user(text, route="web")
         except Exception:
             pass
+        # FAST filler bypass on web too (typed hello shouldn't hit LLM)
+        _low_web = text.strip().lower()
+        if _low_web in ("hello","hello.","hi","hi.","hey","hey.","yeah","yeah.","yep","yep.","ok","ok.","okay","okay."):
+            log_event("routing.filler_fast", text=text[:60], source="web")
+            self._handle_conversation(text)
+            _cr_h = self._cur_ctx()
+            _sum_h = _cr_h.summary if _cr_h and getattr(_cr_h,"summary",None) else ""
+            return {"text": text, "route": _cr_h.route if _cr_h and _cr_h.route else "local", "summary": _sum_h or self._last_web_summary or "", "reply": _sum_h or "", "confidence": 1.0}
+
         # Hermes delegation outranks templates on web too — same fix as mic path.
         if self.classifier and (_hw := self.classifier._hermes_request(text)):
             log_event("routing.decision", text=text[:200], kind="hermes", confidence=0.9, reason="hermes delegation", source="web")
@@ -1725,7 +1734,7 @@ class VoiceOrchestrator:
         """Save full raw report to <state_dir>/reports/<session_key>.md for dashboard + crash recovery."""
         try:
             base = self.cfg.get("reports", "save_dir") or str(self.cfg.state_dir() / "reports")
-            rdir = pathlib.Path(base).expanduser()
+            rdir = Path(base).expanduser()
             rdir.mkdir(parents=True, exist_ok=True)
             import re as _re2
             safe = _re2.sub(r"[^a-zA-Z0-9._:-]", "_", session_key)[:120] or "report"
@@ -1748,7 +1757,7 @@ class VoiceOrchestrator:
             paths = _re2.findall(r"(?:^|\s)(/(?:[^\s`'\"]+/)*[^\s`'\"]+\.\w+|\./[^\s`'\"]+)", reply or "")
             checked=[]
             for q in paths[:4]:
-                try: checked.append(f"{q}={'ok' if pathlib.Path(q).exists() else 'missing'}")
+                try: checked.append(f"{q}={'ok' if Path(q).exists() else 'missing'}")
                 except: pass
             git_hint=""
             try:
@@ -2484,6 +2493,19 @@ class VoiceOrchestrator:
             self.shared.append_user(text, route=intent.kind)
         except Exception:
             pass
+        # FAST filler bypass: "yeah / hello / hi / hey" must never hit the 4.6s LLM — answer instantly
+        _low_fast = text.strip().lower()
+        if _low_fast in ("hello","hello.","hi","hi.","hey","hey.","yeah","yeah.","yep","yep.","ok","ok.","okay","okay."):
+            if _low_fast in ("hello","hello.","hi","hi.","hey","hey."):
+                _low_fast = "hello"
+            _reply_f = "Sunt bine. Cu ce te pot ajuta?" if any(w in _low_fast for w in ("salut","buna")) else "I'm functioning well. What do you need?"
+            # For hello/yeah the intent is filler — bypass LLM and go straight to _handle_conversation's fast path
+            # but we can short-circuit here to avoid the 4.6s LLM entirely
+            log_event("routing.filler_fast", text=text[:60])
+            self.feed_push({"kind": "routing", "text": text, "route": "filler", "conf": 1.0, "detail": "fast filler bypass (no LLM)"})
+            self._handle_conversation(text)
+            return
+
         # sticky routing: explicit "route to X / use X" sets persistent preference
         # so the local brain doesn't forget on next turn. Also handle "clear/reset route".
         if self.classifier:
