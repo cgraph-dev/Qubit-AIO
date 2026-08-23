@@ -1195,6 +1195,21 @@ class VoiceOrchestrator:
                 log_event("executor.ask", task=final_text[:160])
                 return
 
+            # Hermes-first: when hermes.prefer, route coding to Hermes by default.
+            # OpenClaw is strictly for things Hermes can't do (browser pixel-verification, or when Hermes is down).
+            # Heuristic: heavy browser / 1:1 copy / CAPTCHA tasks that benefit from full UI automation stay on OpenClaw when requested.
+            try:
+                _pref = bool(self.cfg.get("hermes", "prefer", default=True) and self._hermes is not None and self._hermes.available())
+            except Exception:
+                _pref = False
+            _needs_openclaw = any(s in (final_text or "").lower() for s in ("1:1", "pixel-perfect", "copy a site 1:1", "screenshot.*verify", "captcha.*bypass"))
+            # sticky route overrides prefer (user said route to openclaw explicitly)
+            _sticky_now2 = getattr(self, "sticky_route", None)
+            _sticky_target = _sticky_now2.target() if _sticky_now2 else ""
+            if _pref and _sticky_target != "openclaw" and not _needs_openclaw:
+                log_event("routing.prefer", target="hermes", reason="hermes.prefer: coding -> Hermes by default")
+                self._handle_hermes(final_text)
+                return
             self._launch_task(final_text, model or self._current_model())
         except Exception as exc:
             log_event("openclaw.error", task=task_text[:200], error=str(exc)[:300])

@@ -91,6 +91,7 @@ DEFAULTS: Dict[str, Any] = {
         "resume_session": "voice",      # continuity under a fixed session name
         "timeout_s": 600,
         "model": None,                  # None = hermes default (deepseek-v4-flash)
+        "prefer": True,                 # True = Hermes is default for all coding tasks; OpenClaw only for things Hermes can't do
     },
     "local": {
         "enabled": True,                # whitelisted direct PC actions (volume, apps, ...)
