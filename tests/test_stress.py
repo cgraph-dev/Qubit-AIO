@@ -405,3 +405,42 @@ def test_webui_results_pruned_both_paths():
         with w._result_lock:
             n = len(w._results)
         assert n <= 50, f"results not bounded: {n}"
+
+
+def test_terminal_health_and_watch_tools():
+    """qubit-dev /health and /watch must return a usable snapshot without crashing."""
+    import pathlib, tempfile, json
+    from voicebridge.config import Config
+    from voicebridge.terminal import _health_text, _watch_text
+    with tempfile.TemporaryDirectory() as td:
+        cfg = Config.load(pathlib.Path(td) / "none.yaml")
+        # health must never raise, even with no live bridge / no logs
+        h = _health_text(cfg)
+        assert isinstance(h, str) and h.strip(), "health returned empty"
+        assert "dashboard:" in h
+        # watch must tolerate no activity
+        w = _watch_text(cfg, [])
+        assert isinstance(w, str)
+
+
+def test_actions_youtube_uses_module_path():
+    """The windowed-tab path needs Path — regression for 'name Path is not defined'."""
+    import pathlib, subprocess
+    src = pathlib.Path("voicebridge/local/actions.py").read_text()
+    # Path must be imported at module top (not just locally) so all 4 call sites work
+    assert "from pathlib import Path" in src
+    # and the youtube tab path must not rely on a local-only Path import
+    assert "import browser_auto" in src
+
+
+def test_play_tab_path_no_unbound():
+    """Mock the browser tab launch; assert _yt_launch tab branch runs without
+    NameError (the Path fix) and reports 'in a tab'."""
+    from unittest import mock
+    from voicebridge.local import actions as A
+    with mock.patch.object(A, "log_event"), \
+         mock.patch.object(A.subprocess, "Popen"), \
+         mock.patch("sys.modules", {**{"browser_auto": mock.MagicMock(
+             open_url=mock.MagicMock(return_value={"error": None, "url": "https://yt/1"}))}, **__import__("sys").modules}):
+        res = A._yt_launch("queen", [{"title": "Queen", "url": "https://yt/1", "views": 1}], 0, "tab")
+    assert "in a tab" in res, res

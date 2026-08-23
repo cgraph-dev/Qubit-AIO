@@ -35,6 +35,8 @@ Usage:
 Slash commands inside the REPL:
   /help                      this help
   /status                    bridge + gateway + hermes state
+  /health [window_s]         live health (status + recent errors + ASR/turn timings)
+  /watch [rows]              live activity tail (run in a loop; Ctrl-C to stop)
   /activity [limit] [q]      recent activity (limit default 20)
   /logs [limit] [q]          tail events.jsonl (e.g. /logs 50 hermes)
   /interrupt [stop]          interrupt current task
@@ -82,6 +84,75 @@ def _status_text(cfg) -> str:
     except Exception:
         pass
     return "\n".join(lines)
+
+
+def _health_text(cfg, since_s: float = 3600.0) -> str:
+    """Live health snapshot: status + recent error/timing events (verifies the
+    voice path is healthy and nothing errored recently)."""
+    lines = []
+    try:
+        import urllib.request, json as _json
+        j = _json.load(urllib.request.urlopen("http://127.0.0.1:8890/api/status", timeout=3))
+        lines.append(f"dashboard: bridge={j.get('bridge')} route={j.get('route')} busy={j.get('busy')} "
+                     f"web_active={j.get('web_active')} awaiting={j.get('awaiting_input')} "
+                     f"uptime={j.get('uptime_s')}s tts={j.get('tts')}")
+    except Exception as e:
+        lines.append(f"dashboard: offline ({e})")
+    # Scan events.jsonl for recent failures / slow turns / empty transcripts.
+    state = Path(cfg.state_dir()) / "events.jsonl"
+    now = time.time()
+    want = {"fail", "error", "timeout", "failed", "empty", "capture_error", "interrupt"}
+    errs = []
+    timings = []
+    last_ts = 0.0
+    last_event = ""
+    if state.exists():
+        try:
+            for line in state.read_text(errors="replace").splitlines():
+                try:
+                    ev = json.loads(line)
+                except Exception:
+                    continue
+                ts = float(ev.get("ts") or 0)
+                if ts:
+                    if ts > last_ts:
+                        last_ts = ts
+                        last_event = ev.get("event", "")
+                    if now - ts > since_s:
+                        continue
+                    evt = (ev.get("event") or "").lower()
+                    if any(w in evt for w in want) and evt not in errs and len(errs) < 6:
+                        errs.append(f"{time.strftime('%H:%M:%S', time.localtime(ts))} {ev.get('event')} "
+                                    f"{str(ev.get('error') or ev.get('reason') or '')[:60]}")
+                    if "timing" in evt or "turn_done" in evt:
+                        timings.append(ev)
+        except Exception:
+            pass
+    lines.append(f"logs: last event {time.strftime('%H:%M:%S', time.localtime(last_ts)) if last_ts else '?'} "
+                 f"({last_event or 'none'})  errors in last {int(since_s)}s: {len(errs)}")
+    if timings:
+        asr = [t.get("asr_ms") for t in timings if t.get("asr_ms")]
+        total = [t.get("total_ms") for t in timings if t.get("total_ms")]
+        if asr:
+            lines.append(f"asr: avg {round(sum(asr)/len(asr))}ms across {len(asr)} turns")
+        if total:
+            lines.append(f"turn: avg {round(sum(total)/len(total))}ms across {len(total)} turns")
+    for e in errs:
+        lines.append(f"  ! {e}")
+    if not errs:
+        lines.append("  ✓ no recent errors")
+    return "\n".join(lines)
+
+
+def _watch_text(cfg, args, interval_s: float = 2.0, max_rows: int = 8) -> str:
+    """One-shot 'watch' snapshot: tail the newest activity feed rows (like a live
+    log). Best used in a loop; printing only the newest rows keeps it readable."""
+    lim = int(args[0]) if args and args[0].isdigit() else max_rows
+    q = " ".join(args[1:] if args and args[0].isdigit() else args)
+    items = _activity_items(cfg, limit=lim, query=q)
+    if not items:
+        return "(no activity yet — waiting for voice/tasks…) [hit Ctrl-C to stop]"
+    return _format_activity(items) + "\n[Ctrl-C to stop watching]"
 
 
 def _activity_items(cfg, limit: int = 20, query: str = ""):
@@ -241,6 +312,10 @@ def handle_slash(line: str, cfg, orch=None) -> Optional[str]:
         return ""
     if cmd == "/status":
         return _status_text(cfg)
+    if cmd == "/health":
+        return _health_text(cfg)
+    if cmd == "/watch":
+        return _watch_text(cfg, args)
     if cmd in ("/activity", "/a"):
         lim = int(args[0]) if args and args[0].isdigit() else 20
         q = " ".join(args[1:] if args and args[0].isdigit() else args)

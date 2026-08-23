@@ -12,6 +12,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from ..logging_setup import get_logger, log_event
@@ -154,6 +155,7 @@ def _yt_launch(query: str, ranked: list, idx: int, mode: str) -> str:
     if mode == "tab":
         try:
             import sys as _sys
+            from pathlib import Path
             _sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
             import browser_auto
             res = browser_auto.open_url(win.get("url", ""))
