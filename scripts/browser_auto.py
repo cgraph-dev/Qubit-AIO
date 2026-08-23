@@ -179,6 +179,27 @@ def open_url(url: str) -> dict:
         return {"engine": "chromium", "error": str(e)[:200]}
 
 
+def close_tabs(match: str = "") -> dict:
+    """Close any tabs whose URL contains `match` (e.g. 'youtube.com' matched)."""
+    t0 = time.time()
+    try:
+        conn = _connect()
+        context, browser = next(conn)
+        closed = 0
+        for pg in list(context.pages):
+            if match and match in pg.url:
+                try:
+                    pg.close()
+                    closed += 1
+                except Exception:
+                    pass
+        _log("close_tabs", (time.time() - t0) * 1000, True, f"{closed}")
+        return {"engine": "chromium", "closed": closed}
+    except Exception as e:
+        _log("close_tabs", (time.time() - t0) * 1000, False, str(e)[:120])
+        return {"engine": "chromium", "error": str(e)[:200]}
+
+
 def perf() -> dict:
     """Read the perf log; report avg/max ms and call count (ongoing monitoring)."""
     rows = []

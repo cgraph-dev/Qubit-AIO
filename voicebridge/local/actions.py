@@ -133,20 +133,47 @@ def _a_screenshot(_: Dict[str, Any]) -> str:
     return "Screenshot saved."
 
 
-def _a_media_playpause(_: Dict[str, Any]) -> str:
-    if shutil.which("playerctl"):
-        _run(["playerctl", "play-pause"])
-        return "Media toggled."
-    return "playerctl not installed."
+# --- YouTube playback state + controls ------------------------------------
+_YT_MODE = None          # None=unset, "tab"=windowed Chromium tab, "audio"=audio-only background
+_YT_PENDING = None       # resolved candidates waiting for the user to pick a mode
+_YT_PLAYING = None       # {query, results, idx, url, title, mode}
 
+def _yt_ask_mode(query: str, ranked: list) -> str:
+    """If no play mode is set, stash the resolved track and ask how to play it."""
+    global _YT_PENDING
+    _YT_PENDING = {"query": query, "ranked": ranked}
+    return ("Should I play that in a windowed browser tab, or quietly in the "
+            "background with just the audio?")
 
-def _a_play_youtube(params: Dict[str, Any]) -> str:
-    """Pick one of the top YouTube results by likes/views and open it in Chromium.
+def _yt_launch(query: str, ranked: list, idx: int, mode: str) -> str:
+    """Actually start playback for the chosen track in the given mode."""
+    global _YT_PLAYING
+    win = ranked[idx] if idx < len(ranked) else ranked[-1]
+    _YT_PLAYING = {"query": query, "ranked": ranked, "idx": idx,
+                   "url": win.get("url", ""), "title": win.get("title", ""), "mode": mode}
+    if mode == "tab":
+        try:
+            import sys as _sys
+            _sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+            import browser_auto
+            res = browser_auto.open_url(win.get("url", ""))
+            if res.get("error") is None and res.get("url"):
+                log_event("play.youtube.tab", query=query[:160], title=win.get("title")[:80],
+                          url=win.get("url"), mode=mode)
+                return f"Playing {win.get('title', query)} in a tab."
+        except Exception as exc:
+            log_event("play.youtube.tab_error", error=str(exc)[:160])
+    # audio-only / tab-fallback: stream via ffplay in the background
+    subprocess.Popen(
+        ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", win.get("url", "")],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        start_new_session=True, stdin=subprocess.DEVNULL)
+    log_event("play.youtube.audio", query=query[:160], title=win.get("title")[:80], mode=mode)
+    return f"Playing {win.get('title', query)} quietly in the background."
 
-    Resolves the top N (default 5) results via `yt-dlp ytsearch<N>:`, ranks by
-    view_count (then by position for ties), and opens the winner in a Chromium
-    tab (CDP) so it plays there — no separate ffplay/streaming path.
-    """
+def _a_play_youtube_params(params: Dict[str, Any]) -> str:
+    """Resolve search + start playback in the stored mode (or first ask)."""
+    global _YT_PENDING, _YT_MODE
     query = (params.get("query") or params.get("text") or "").strip()
     if not query:
         return "What would you like me to play?"
@@ -179,41 +206,93 @@ def _a_play_youtube(params: Dict[str, Any]) -> str:
         return "I had trouble searching YouTube."
     if not results:
         return "I couldn't find that on YouTube."
-    # Rank: most views first (ties -> earlier position).
     ranked = sorted(results, key=lambda r: (r.get("views") or 0), reverse=True)
-    win = ranked[0]
-    if not win.get("url"):
-        return "Found it but couldn't get a link."
-    # Open the winner in a Chromium tab via CDP.
-    opened = False
+    if _YT_MODE is None:
+        return _yt_ask_mode(query, ranked)
+    return _yt_launch(query, ranked, 0, _YT_MODE)
+
+def _a_yt_mode(params: Dict[str, Any]) -> str:
+    """Answer to 'windowed tab or background?': resolve the pending track in that mode."""
+    global _YT_MODE, _YT_PENDING
+    text = ((params.get("text") or "") + " " + (params.get("query") or "")).strip().lower()
+    if any(w in text for w in ("background", "audio", "quiet", "quietly", "just audio", "audio only", "no tab", "sound only", "behind", "headless", "nonstop")):
+        mode = "audio"
+    elif any(w in text for w in ("window", "tab", "browser", "open", "screen", "windowed", "show", "see", "video", "watch")):
+        mode = "tab"
+    else:
+        return "In a windowed tab, or quietly in the background?"
+    _YT_MODE = mode
+    if _YT_PENDING is None:
+        return f"Got it — I'll play in {'a tab' if mode == 'tab' else 'the background'} from now on."
+    pending = _YT_PENDING
+    _YT_PENDING = None
+    return _yt_launch(pending["query"], pending["ranked"], 0, mode)
+
+def _yt_play_pause_js(mute: bool) -> str:
+    action = "pause" if mute else "play"
+    return ("(function(){var v=document.querySelector('video');if(v){v." + action +
+            "();return 'ok';}return 'no-video';})()")
+
+def _yt_signal_player(sig: str) -> None:
+    if not shutil.which("pgrep"):
+        return
+    try:
+        pids = subprocess.run(["pgrep", "-af", "ffplay"],
+                              capture_output=True, text=True).stdout.splitlines()
+        for line in pids:
+            pid = line.split()[0]
+            try:
+                subprocess.run(["kill", "-s", sig, pid], capture_output=True)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+def _a_youtube_pause(_: Dict[str, Any]) -> str:
     try:
         import sys as _sys
-        sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+        _sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
         import browser_auto
-        res = browser_auto.open_url(win.get("url", ""))
-        opened = res.get("error") is None and bool(res.get("url"))
-        if opened:
-            log_event("play.youtube", query=query[:160], chosen=win.get("title")[:80],
-                      url=win.get("url"), views=win.get("views"))
-            return f"Playing {win.get('title', query)}."
-        log_event("play.youtube.browser_fail", error=str(res.get("error", ""))[:120])
+        browser_auto.run_js("youtube.com", _yt_play_pause_js(True))
     except Exception as exc:
-        log_event("play.youtube.browser_error", error=str(exc)[:160])
-        opened = False
-    if not opened:
-        # Fall back to streaming via ffplay if the browser tab couldn't open.
-        try:
-            import os as _os
-            subprocess.Popen(
-                ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet",
-                 win.get("url", "")],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                start_new_session=True, stdin=subprocess.DEVNULL)
-            log_event("play.youtube.ffplay_fallback", query=query[:160])
-            return f"Playing {win.get('title', query)}."
-        except Exception as exc2:
-            log_event("play.youtube.failed", error=str(exc2)[:160])
-            return "I couldn't open YouTube right now."
+        log_event("play.youtube.pause_error", error=str(exc)[:160])
+    _yt_signal_player("SIGSTOP")
+    return "Paused."
+
+def _a_youtube_resume(_: Dict[str, Any]) -> str:
+    try:
+        import sys as _sys
+        _sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+        import browser_auto
+        browser_auto.run_js("youtube.com", _yt_play_pause_js(False))
+    except Exception as exc:
+        log_event("play.youtube.resume_error", error=str(exc)[:160])
+    _yt_signal_player("SIGCONT")
+    return "Resumed."
+
+def _a_youtube_next(_: Dict[str, Any]) -> str:
+    global _YT_PLAYING, _YT_MODE
+    if not _YT_PLAYING:
+        return "Nothing is playing right now."
+    ranked = _YT_PLAYING.get("ranked") or []
+    idx = (_YT_PLAYING.get("idx") or 0) + 1
+    if idx >= len(ranked):
+        return "That's the last one I found. Say play <something> for more."
+    mode = _YT_PLAYING.get("mode") or _YT_MODE or "tab"
+    return _yt_launch(_YT_PLAYING.get("query", ""), ranked, idx, mode)
+
+def _a_youtube_stop(_: Dict[str, Any]) -> str:
+    global _YT_PLAYING
+    _yt_signal_player("SIGKILL")
+    try:
+        import sys as _sys
+        _sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+        import browser_auto
+        browser_auto.close_tabs("youtube.com")
+    except Exception as exc:
+        log_event("play.youtube.stop_error", error=str(exc)[:160])
+    _YT_PLAYING = None
+    return "Music stopped and YouTube tabs closed."
 
 
 def _a_clipboard(_: Dict[str, Any]) -> str:
@@ -427,14 +506,30 @@ ACTIONS: Dict[str, LocalAction] = {
                                          r"\b(open|launch) (the )?(cgraph|rankvalut|qubit) project\b"]),
     "screenshot": LocalAction("screenshot", "take a screenshot", _a_screenshot,
                               patterns=[r"\b(take|grab) (a |an? )?(screenshot|screen ?shot)\b"]),
-    "media_playpause": LocalAction("media_playpause", "play/pause media", _a_media_playpause,
-                                   patterns=[r"\b(play|pause|resume) (the )?(music|media)\b",
-                                             r"\b(pause|resume) (it|that)\b"]),
-    "play_youtube": LocalAction("play_youtube", "play a YouTube song/video", _a_play_youtube,
-                                patterns=[r"\b(play|put on|queue|start|i want to (hear|watch|listen to)|listen to|turn on)\s+(.+?\s+)?(on\s+)?(youtube|music|a song|the song|this song|some music|a video|a track)\b",
-                                          r"\b(play|listen to|put on|start)\s+(?!the\s+(music|media|song|video))(.+)\b"]),
     "clipboard": LocalAction("clipboard", "read the clipboard", _a_clipboard,
                              patterns=[r"\b(read|what'?s on|what is on) (the )?clipboard\b"]),
+    "play_youtube": LocalAction("play_youtube", "play a YouTube song/video", _a_play_youtube_params,
+                                patterns=[r"\b(play|put on|queue|start a|i want to (hear|watch|listen to)|listen to|turn on)\b",
+                                          r"\b(?!pause\b|stop\b|resume\b|close\b|next\b).*\byoutube music\b",
+                                          r"\b(play|queue|listen to)\b.*\b(music|song|youtube music|video)\b",
+                                          r"\bplay\s+(?!the\s+(music|media|song|video)|it\b|pause|whatever|some|game|football|chess)\b"]),
+    "yt_mode": LocalAction("yt_mode", "choose youtube play mode (tab vs background)", _a_yt_mode,
+                           patterns=[r"\b(windowed|in a (browser )?tab|open it (in|on)|background|audio only|just audio|quietly|in the background|sound only|no tab|headless)\b"]),
+    "youtube_pause": LocalAction("youtube_pause", "pause youtube playback", _a_youtube_pause,
+                                 patterns=[r"\b(pause|stop playing|hold)\s+(the\s+)?(youtube|music|song|video)\b",
+                                           r"\b(pause|mute) (it|the music)\b"]),
+    "youtube_resume": LocalAction("youtube_resume", "resume youtube playback", _a_youtube_resume,
+                                  patterns=[r"\b(resume|continue|unpause|unmute)\s+(the\s+)?(youtube|music|song|video)\b",
+                                            r"\b(resume|continue) (it|the music)\b"]),
+    "youtube_next": LocalAction("youtube_next", "play the next youtube result", _a_youtube_next,
+                                patterns=[r"\b(next|skip|next song|next video|next one)\b"],
+                                confirm=False),
+    "youtube_stop": LocalAction("youtube_stop", "stop youtube playback and close tabs", _a_youtube_stop,
+                                patterns=[r"\b(stop|close)\s+(the\s+)?(youtube|music|song|video)\b",
+                                          r"\b(stop|close) (the music|it|this)\b",
+                                          r"\bshut (it|the music) (down|off)\b",
+                                           r"\bclose (the )?(youtube|music) tabs?\b",
+                                           r"\b(quit|close|stop)\s+(the\s+)?youtube\b"]),
     "lock": LocalAction("lock", "lock the screen", _a_lock,
                         patterns=[r"\b(lock|lock the screen)\b"]),
     "brightness_up": LocalAction("brightness_up", "raise screen brightness", _a_brightness_up,
@@ -484,6 +579,17 @@ APP_NAMES = {
 def match(text: str) -> Optional[ActionMatch]:
     """Return the first matching local action, or None."""
     low = text.lower().strip()
+    import re as _re
+    # Youtube CONTROL verbs (pause/stop/resume/next/close + music/youtube) take
+    # priority over "play youtube": "pause the youtube music" must not be routed
+    # to play_youtube (which also matches the bare 'youtube music' substring).
+    if _re.search(r"\b(pause|stop|resume|continue|close|shut|skip|next|unpause|unmute|quit|hold)\b", low) \
+            and _re.search(r"\b(youtube|music|song|video|it|this)\b", low):
+        for name in ("youtube_pause", "youtube_resume", "youtube_next", "youtube_stop"):
+            act = ACTIONS.get(name)
+            for pat in act.patterns:
+                if _re.search(pat, low):
+                    return ActionMatch(name=name, params={"query": text, "text": text}, text=text)
     for name, act in ACTIONS.items():
         for pat in act.patterns:
             import re
@@ -526,17 +632,22 @@ def match(text: str) -> Optional[ActionMatch]:
                         params["query"] = ""
                 elif name == "play_youtube":
                     import re as _re
-                    # Strip the leading verb + casual fillers so the query is the song.
+                    # Strip leading verb + casual fillers, and any leading "youtube music".
                     q = _re.sub(
                         r"^(please\s+|can you\s+|you know\s+|just\s+|um\s+|uh\s+)*"
                         r"(please\s+)?(can you\s+)?"
                         r"(play|put on|queue|start|turn on|i want to (hear|watch|listen to)|i want to|listen to)\b[\s:]?",
                         "", low, flags=_re.I).strip()
+                    # Drop leading "youtube music" / "youtube".
+                    q = _re.sub(r"^(youtube music|youtube)\s+", "", q, flags=_re.I).strip()
                     # Drop trailing "on youtube / music / video / a song / the song".
-                    q = _re.sub(r"\s+(on\s+)?(youtube|music|some music|a song|the song|this song|a video|a track|media)\s*$", "", q).strip(" .,")
+                    q = _re.sub(r"\s+(on\s+)?(youtube music|youtube|music|some music|a song|the song|this song|a video|a track|media)\s*$", "", q, flags=_re.I).strip(" .,")
                     # Drop leading "some lofi"/"the song NAME" filler.
                     q = _re.sub(r"^(some|the)\s*(song|music|video|track)?\s*", "", q).strip(" .,")
                     params["query"] = q or text
+                    params["text"] = text
+                elif name in ("youtube_pause", "youtube_resume", "youtube_next", "youtube_stop", "yt_mode"):
+                    params["query"] = text
                     params["text"] = text
                 return ActionMatch(name=name, params=params, text=text)
     return None

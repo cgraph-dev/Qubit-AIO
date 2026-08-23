@@ -289,9 +289,13 @@ def test_play_youtube_query_extraction():
         "i want to listen to queen on youtube": ("play_youtube", "queen"),
         "you know just play imagine dragons": ("play_youtube", "imagine dragons"),
         "play the song shape of you": ("play_youtube", "shape of you"),
-        "play the music": ("media_playpause", ""),
-        "pause it": ("media_playpause", ""),
-        "resume the music": ("media_playpause", ""),
+        "play the music": ("play_youtube", "the music"),
+        "pause it": ("youtube_pause", ""),
+        "pause the youtube music": ("youtube_pause", ""),
+        "resume the music": ("youtube_resume", ""),
+        "next video": ("youtube_next", ""),
+        "stop the music": ("youtube_stop", ""),
+        "close the youtube tabs": ("youtube_stop", ""),
     }
     for text, (name, q) in cases.items():
         m = actions.match(text)
@@ -299,9 +303,10 @@ def test_play_youtube_query_extraction():
         assert m.name == name, f"{text!r}: expected {name}, got {m.name}"
         if q:
             assert q in m.params.get("query", ""), f"{text!r}: query={m.params.get('query')!r} missing {q!r}"
-        # query must not still lead with the verb
-        assert not m.params.get("query", "").startswith(("play ", "put on ", "listen to ", "start ")), \
-            f"{text!r}: query still has verb: {m.params.get('query')!r}"
+        # query must not still lead with the verb (except the generic "play the music")
+        if text != "play the music":
+            assert not m.params.get("query", "").startswith(("play ", "put on ", "listen to ", "start ")), \
+                f"{text!r}: query still has verb: {m.params.get('query')!r}"
 
 
 def test_play_youtube_ranks_by_views():
@@ -318,5 +323,8 @@ def test_play_youtube_ranks_by_views():
          mock.patch.object(A.subprocess, "run", return_value=A.subprocess.CompletedProcess([], 0, stdout=fake_out, stderr="")), \
          mock.patch("sys.modules", {**{"browser_auto": mock.MagicMock(open_url=mock.MagicMock(return_value={"error": None, "url": "https://yt/2"}))}, **sys.modules}):
         with mock.patch("shutil.which", return_value="/x"):
-            res = A._a_play_youtube({"query": "queen"})
+            # force a known mode so it launches (not asks) — ranking still applies
+            A._YT_MODE = "tab"
+            res = A._a_play_youtube_params({"query": "queen"})
+            A._YT_MODE = None
     assert "Popular one" in res, res

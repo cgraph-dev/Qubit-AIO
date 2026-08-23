@@ -1232,6 +1232,26 @@ class VoiceOrchestrator:
         """True when an agent task is already dispatched and still running."""
         return bool(self.task.active or self._hermes_busy)
 
+    def _needs_answer(self) -> bool:
+        """True when the bridge is waiting on a follow-up from the user (a
+        question was just asked and the dashboard should keep listening for the
+        answer instead of resetting to 'ready')."""
+        if getattr(self.confirmations, "pending", False):
+            return True
+        if getattr(self.executor_choice, "pending", False):
+            return True
+        if self._queued_confirm:
+            return True
+        # YouTube-mode / other local-action "pick one" asks stash a pending
+        # answer in the local actions module.
+        try:
+            from .local import actions as _a
+            if getattr(_a, "_YT_PENDING", None) is not None:
+                return True
+        except Exception:
+            pass
+        return False
+
     def _enqueue_task(self, task_text: str, model: Optional[str] = None,
                       provider: str = "openclaw") -> None:
         """Add a task to the FIFO queue; acknowledge how many are waiting."""

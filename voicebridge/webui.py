@@ -943,6 +943,7 @@ class WebUI:
             "shared_items": shared_len,
             "sticky_route": sticky,
             "tts": getattr(getattr(self.orch, "_tts", None), "name", "") if hasattr(self.orch, "_tts") else "",
+            "awaiting_input": bool(self.orch._needs_answer()) if hasattr(self.orch, "_needs_answer") else False,
         }
 
     def interrupt(self, mode: str = "interrupt") -> None:
@@ -990,6 +991,7 @@ class WebUI:
                         result["audio_b64"] = base64.b64encode(wav).decode()
                     except Exception as exc:
                         log_event("webui.tts.failed", error=str(exc)[:160])
+                result["awaiting_input"] = bool(self.orch._needs_answer()) if hasattr(self.orch, "_needs_answer") else False
             except Exception as exc:
                 log.exception("webui type worker failed")
                 log_event("webui.type.error", error=str(exc)[:200])
@@ -1155,6 +1157,7 @@ class WebUI:
         self.feed.push({"kind": "done", "text": text, "summary": summary,
                         "route": result.get("route", ""),
                         "latency_s": round(time.time() - t0, 2)})
+        awaiting = bool(self.orch._needs_answer()) if hasattr(self.orch, "_needs_answer") else False
         return {
             "text": text,
             "route": result.get("route", ""),
@@ -1163,6 +1166,7 @@ class WebUI:
             "events": events,
             "audio_b64": audio_b64,
             "latency_s": round(time.time() - t0, 2),
+            "awaiting_input": awaiting,
         }
 
     # -- internals ---------------------------------------------------------
