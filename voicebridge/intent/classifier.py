@@ -75,8 +75,9 @@ STICKY_PATTERNS = [
 HERMES_PATTERNS = [
     r"\b(ask|tell|have|let|get)\s+hermes\b",
     r"^\s*hermes[,:]?\s+",
-    r"\broute (this|it) (to|through) hermes\b",
+    r"\broute (this|it|that)?\s*(to|through|via)\s+hermes\b",
     r"\b(delegate|hand off|handoff)\s+(this|it)?\s*to\s+hermes\b",
+    r"\buse\s+(the\s+)?(browser|chromium)\b.*\b(check|open|browse|look|search|find|watch|read|scrape|research|copy)\b",
     r"\buse\s+(the\s+)?hermes\b",      # "use Hermes", "use Hermes agent"
     r"\bhermes agent\b",
     r"\b(send|give|hand)\s+(this|it|the task)\s+to\s+hermes\b",

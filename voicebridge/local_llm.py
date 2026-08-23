@@ -95,7 +95,14 @@ def chat_local(text: str, conversation_prompt: str = "",
         _is_ro = language.lower().startswith("ro")
     _lang_directive = "Reply ONLY in Romanian (diacritics included)." if _is_ro \
         else "Reply ONLY in English. Do NOT reply in any other language."
-    user_content += f"User: {text}\n[{_lang_directive} The user's current message is in {'Romanian' if _is_ro else 'English'} — ignore previous turns' language.]"
+    user_content += (
+        f"{_lang_directive} The user's current message is in "
+        f"{'Romanian' if _is_ro else 'English'} — ignore previous turns' language.\n"
+        "FACTS OVERRIDE HISTORY: the <about-the-user> facts above are ALWAYS true. "
+        "If older conversation turns contain a different or refusing answer "
+        "(e.g. \"I'm not capable\"), correct it now with the real fact and do not repeat the old mistake."
+    )
+    user_content += f"\nUser: {text}"
     payload = {
         "model": model,
         "stream": False,

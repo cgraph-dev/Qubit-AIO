@@ -3250,8 +3250,19 @@ class VoiceOrchestrator:
         Returns the transcript that has text, or the original empty one if fallback also empty.
         """
         tr = self._asr.transcribe(wav_path)
-        if not tr.empty:
+        # Suspicious transcript: the EN-only sherpa models mangle Romanian (and
+        # heavily accented English) into a couple of junk words. If the words/sec
+        # rate is implausibly low for real speech, treat it like an empty result
+        # and let the multilingual tier re-recognise it.
+        def _suspicious(t) -> bool:
+            dur = float(getattr(t, "duration_s", 0) or 0)
+            words = len(((getattr(t, "text", "") or "").strip()).split())
+            if dur >= 1.2 and words <= max(1, int(dur * 0.9)):
+                return True
+            return False
+        if not tr.empty and not _suspicious(tr):
             return tr
+        _why = "empty" if tr.empty else "suspicious"
         # Only fallback when the wav had energy (peak_rms already logged as >=0.055 in the capture path) —
         # i.e. mic heard something but parakeet/moonshine blanked. Don't retry pure silence.
         try:
@@ -3279,18 +3290,22 @@ class VoiceOrchestrator:
         except Exception as exc:
             log_event("asr.fallback.failed", error=str(exc)[:160])
         # Third tier — multilingual: the sherpa engines are English-only. If the
-        # mic heard real speech but sherpa blanked it, TRY a multilingual
-        # recogniser (faster-whisper-large-v3-turbo, language auto-detect) so
-        # Romanian / accented speech is still transcribed instead of 'no speech'.
+        # mic heard real speech but sherpa blanked OR mangled it (suspicious),
+        # re-recognise with a multilingual model (auto-detect) so Romanian and
+        # accented speech is transcribed correctly instead of junk English.
         if self.cfg.get("asr", "multilingual_fallback", default=True):
             try:
                 mlt = self._get_multilingual_asr()
                 trm = mlt.transcribe(Path(wav_path))
-                if not getattr(trm, "empty", True) and (trm.text or "").strip():
-                    log_event("asr.multilingual.success", text=trm.text[:120],
-                              language=trm.language)
+                _mtext = (getattr(trm, "text", "") or "").strip()
+                # Accept only a clearly better result (more words than the
+                # suspicious primary, or non-empty when primary was empty).
+                better = bool(_mtext) and (tr.empty or len(_mtext.split()) > len((tr.text or "").split()))
+                if better:
+                    log_event("asr.multilingual.success", text=_mtext[:120],
+                              language=getattr(trm, "language", None), why=_why)
                     return trm
-                log_event("asr.multilingual.empty", language=getattr(trm, "language", None))
+                log_event("asr.multilingual.empty", language=getattr(trm, "language", None), why=_why)
             except Exception as exc:
                 log_event("asr.multilingual.failed", error=str(exc)[:160])
         return tr

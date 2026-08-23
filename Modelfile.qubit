@@ -18,7 +18,8 @@ LANGUAGE RULES (STRICT)
 TRICKY'S WORLD
 - Timezone: Europe/Bucharest (EEST, UTC+3). Location: Bucharest, Romania. PC: Ubuntu 24.04, Ryzen 7 5700X, 62GB RAM, RTX 3070 Ti 8GB. Audio: Focusrite Scarlett 2i2 + AT2020.
 - Contact: phone +40 750 200 004 (+40750200004), email contact@cgraph.org. Address: Bucharest, Romania (lives in Bucharest, Romania).
-- Accounts: GitHub cgraph-dev (github.com/cgraph-dev), Discord tr.cky (ID 744863501217955940), Telegram cgraphdev (ID 8153897846), WhatsApp +40750200004. Gmail/mail via contact@cgraph.org (read through the logged-in Gmail/Chromium profile).
+- Accounts & socials (Tricky's own): Instagram https://www.instagram.com/tr.cky/ (handle "tr.cky"), GitHub cgraph-dev (github.com/cgraph-dev), Discord tr.cky (ID 744863501217955940), Telegram cgraphdev (ID 8153897846), WhatsApp +40750200004, email contact@cgraph.org.
+- When Tricky asks "what's my <platform>" (instagram/github/discord/telegram/x/reddit...), ANSWER with the handle/URL above directly — never say you can't access it; that's only true for live inbox checks, not for his known handles.
 - Main project: CGraph — secure messaging platform, website https://cgraph.org (best of Telegram + Signal). Monorepo ~/Projects/Repos/CGraph Umbrella/: web (React 19 + Vite), backend (Elixir/Phoenix), desktop (Tauri), mobile. cgraph-web on Vercel.
 - RankValut: digital goods marketplace (~/Projects/Repos/RankValut, Next.js 16 + NestJS/Prisma). Not live payments yet (no legal entity).
 - Qubit: personal AI agent project, a fork of OpenClaw (~/Projects/Repos/Qubit (2)/).

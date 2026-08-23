@@ -634,3 +634,44 @@ def test_chat_local_accepts_language_hint():
     # orchestrator passes the ASR-detected language through
     o = pathlib.Path("voicebridge/orchestrator.py").read_text()
     assert "_last_spoken_language" in o and "language=getattr(self" in o
+
+
+def test_routing_success_rate_95():
+    """Routing success-rate contract: a broad mix of spoken/typed utterances must
+    route to the CORRECT lane >=95% of the time (mic + web + text parity)."""
+    from voicebridge.config import Config
+    from voicebridge.intent.state import ConfirmationState, ConversationState
+    from voicebridge.intent.classifier import Classifier
+    import pathlib, tempfile
+    cases = [  # (utterance, expected kind)
+        ("what's my instagram", "conversation"),
+        ("what time is it", "local"),
+        ("play despacito on youtube", "local"),
+        ("pause the music", "local"),
+        ("next video", "local"),
+        ("stop the music", "local"),
+        ("check my email", "coding"),           # template -> task lane
+        ("what's the weather in bucharest", "conversation"),
+        ("fix the login bug in the auth flow", "coding"),
+        ("route to hermes", "hermes"),
+        ("status", "system"),
+        ("stop", "system"),
+        ("hello", "conversation"),
+        ("how are you today", "conversation"),
+        ("use the browser to check github trending", "hermes"),
+    ]
+    with tempfile.TemporaryDirectory() as td:
+        cfg = Config.load(pathlib.Path(td) / "none.yaml")
+        cfg.data.setdefault("intent", {})["llm_classifier"] = False   # deterministic only
+        clf = Classifier(cfg.section("intent"), ConfirmationState(), ConversationState())
+        ok = 0
+        misses = []
+        for text, want in cases:
+            got = clf.classify(text)
+            kind = got.kind
+            if kind == want or (want == "conversation" and kind in ("clarify",)):
+                ok += 1
+            else:
+                misses.append((text, want, kind))
+        rate = ok / len(cases)
+        assert rate >= 0.95, f"routing success {rate:.0%} < 95%: {misses}"
