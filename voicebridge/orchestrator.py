@@ -684,7 +684,23 @@ class VoiceOrchestrator:
         if self._tts is None:
             log.warning("TTS not available; would say: %s", text[:120])
             return False
-        path = self._tts.synthesize(text, Path("/tmp/openclaw-voice-bridge") / f"tts-{uuid.uuid4().hex[:10]}.wav")
+        try:
+            path = self._tts.synthesize(text, Path("/tmp/openclaw-voice-bridge") / f"tts-{uuid.uuid4().hex[:10]}.wav")
+        except Exception as exc:
+            # Hot-fallback: OpenAI network/key hiccup must never silence the bridge — fall back to local Piper instantly
+            log_event("tts.synthesize.failed", provider=getattr(self._tts, "name", "unknown"), error=str(exc)[:200])
+            if getattr(self._tts, "name", "") == "openai":
+                try:
+                    from .tts.piper import PiperTTS as _FallbackPiper
+                    _fb = _FallbackPiper(model_dir=self.cfg.model_dir(), voice=self.cfg.get("tts", "voice", default="en_US-amy-medium"))
+                    _fb.load()
+                    path = _fb.synthesize(text, Path("/tmp/openclaw-voice-bridge") / f"tts-fb-{uuid.uuid4().hex[:10]}.wav")
+                    log_event("tts.fallback", provider="piper", reason=str(exc)[:120])
+                except Exception as exc2:
+                    log.warning("TTS fallback also failed: %s", exc2)
+                    return False
+            else:
+                raise
         log_event("tts.speak", text=text[:300], provider=self._tts.name)
         self._cancel.clear()
         self._barge.reset()

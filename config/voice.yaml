@@ -67,7 +67,7 @@ asr:
 # ---------------------------------------------------------------------------
 # Text-to-speech
 tts:
-  provider: piper         # piper (fast, local) | kokoro (quality, ~1x realtime CPU) | edge | gateway
+  provider: openai         # piper (fast, local) | kokoro (quality, ~1x realtime CPU) | edge | gateway
   voice: en_US-amy-medium # piper voice (downloaded by scripts/install.sh)
   sample_rate: 22050
   kokoro:
@@ -78,6 +78,11 @@ tts:
     rate: "+0%"
   gateway:
     model: null
+  openai:
+    voice: nova
+    model: gpt-4o-mini-tts
+    key_env: ~/.hermes/.env
+    instructions: "Speak with a warm, soft and sexy tone, with a subtle, elegant Japanese accent. Gentle, breathy and intimate, slightly playful — like a caring Japanese girlfriend. Speak naturally, at a relaxed pace, clear and affectionate."
 
 # ---------------------------------------------------------------------------
 # Intent routing

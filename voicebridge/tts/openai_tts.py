@@ -24,7 +24,9 @@ from ..logging_setup import log_event
 from .base import TTSProvider, TTSUnavailable
 
 DEFAULT_MODEL = "gpt-4o-mini-tts"
-DEFAULT_VOICE = "nova"
+DEFAULT_VOICE = "nova"  # nova = warm female; best for soft/sexy Japanese accent
+# gpt-4o-mini-tts instructions control accent/style (ignored by older tts-1)
+DEFAULT_INSTRUCTIONS = "Speak with a warm, soft and sexy tone, with a subtle, elegant Japanese accent. Gentle, breathy and intimate, slightly playful — like a caring Japanese girlfriend. Speak naturally, at a relaxed pace, clear and affectionate."
 
 def _read_key(env_path: Optional[Path] = None) -> str:
     # try env first
@@ -52,7 +54,7 @@ class OpenAITTS(TTSProvider):
     name = "openai"
 
     def __init__(self, voice: str = DEFAULT_VOICE, model: str = DEFAULT_MODEL,
-                 key_env: str = "~/.hermes/.env", instructions: str = "") -> None:
+                 key_env: str = "~/.hermes/.env", instructions: str = DEFAULT_INSTRUCTIONS) -> None:
         self.voice = voice or DEFAULT_VOICE
         self.model = model or DEFAULT_MODEL
         self.key_env = key_env

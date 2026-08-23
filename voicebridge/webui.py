@@ -1208,7 +1208,19 @@ class WebUI:
             raise RuntimeError("no TTS provider")
         out = self._state_dir / f"webui-{uuid.uuid4().hex[:10]}.wav"
         try:
-            self._tts.synthesize(text, out)
+            try:
+                self._tts.synthesize(text, out)
+            except Exception as exc:
+                # Hot-fallback for dashboard audio too (OpenAI -> Piper)
+                from .logging_setup import log_event as _le2
+                _le2("webui.tts.fallback", provider=getattr(self._tts, "name", "unknown"), error=str(exc)[:160])
+                if getattr(self._tts, "name", "") == "openai":
+                    from .tts.piper import PiperTTS as _WebFallbackPiper
+                    _fb2 = _WebFallbackPiper(model_dir=self.orch.cfg.model_dir(), voice=self.orch.cfg.get("tts", "voice", default="en_US-amy-medium"))
+                    _fb2.load()
+                    _fb2.synthesize(text, out)
+                else:
+                    raise
             return out.read_bytes()
         finally:
             try:

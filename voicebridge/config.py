@@ -108,7 +108,7 @@ DEFAULTS: Dict[str, Any] = {
         "interrupt": True,          # allow barge-in / stop speaking
         "edge": {"voice": "en-US-JennyNeural", "rate": "+0%"},
         "gateway": {"model": None},  # None = gateway default
-        "openai": {"voice": "nova", "model": "gpt-4o-mini-tts", "key_env": "~/.hermes/.env", "instructions": ""},
+        "openai": {"voice": "nova", "model": "gpt-4o-mini-tts", "key_env": "~/.hermes/.env", "instructions": "Speak with a warm, soft and sexy tone, with a subtle, elegant Japanese accent. Gentle, breathy and intimate, slightly playful — like a caring Japanese girlfriend. Speak naturally, at a relaxed pace, clear and affectionate."},
         "direct": True,          # strip emojis/pleasantries/filler from spoken output
     },
     "intent": {

@@ -41,7 +41,7 @@ asr:
   beam_size: 5
   min_confidence: 0.02
 tts:
-  provider: piper
+  provider: openai
   voice: en_US-amy-medium
   sample_rate: 22050
   kokoro:
@@ -52,6 +52,11 @@ tts:
     rate: +0%
   gateway:
     model: null
+  openai:
+    voice: nova
+    model: gpt-4o-mini-tts
+    key_env: ~/.hermes/.env
+    instructions: "Speak with a warm, soft and sexy tone, with a subtle, elegant Japanese accent. Gentle, breathy and intimate, slightly playful — like a caring Japanese girlfriend. Speak naturally, at a relaxed pace, clear and affectionate."
 intent:
   llm_classifier: true   # enabled for accent/broken-English (user approved ~20% cost)
   local_llm:
