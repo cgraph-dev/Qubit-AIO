@@ -335,6 +335,16 @@ class VoiceOrchestrator:
                 return edge
         if provider == "gateway" and self._gateway is not None:
             return GatewayTTS(self._gateway, model=self.cfg.get("tts", "gateway", "model"))
+        if provider == "hybrid":
+            from .tts.hybrid import HybridTTS
+            h = self.cfg.get("tts", "hybrid", default={}) if isinstance(self.cfg.get("tts", "hybrid", default={}), dict) else {}
+            return HybridTTS(model_dir=self.cfg.model_dir(),
+                             piper_voice=h.get("piper_voice", self.cfg.get("tts", "voice", default="en_US-amy-medium")),
+                             openai_voice=h.get("openai_voice", "nova"),
+                             openai_model=h.get("openai_model", "gpt-4o-mini-tts"),
+                             key_env=self.cfg.get("tts", "openai", "key_env", default="~/.hermes/.env"),
+                             instructions=self.cfg.get("tts", "openai", "instructions", default=""),
+                             threshold_words=int(h.get("threshold_words", 18)))
         if provider == "openai":
             from .tts.openai_tts import OpenAITTS
             tts = OpenAITTS(voice=self.cfg.get("tts", "openai", "voice", default="nova"),

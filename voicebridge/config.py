@@ -101,7 +101,7 @@ DEFAULTS: Dict[str, Any] = {
         "save_notes": True,             # append session summary to memory/YYYY-MM-DD.md
     },
     "tts": {
-        "provider": "piper",        # piper (fast) | kokoro (quality, ~1x realtime CPU) | edge | gateway
+        "provider": "piper",        # piper (fast, cheap, local) | hybrid (piper short, openai nova long) | kokoro | edge | gateway | openai
         "voice": "en_US-amy-medium",
         "sample_rate": 22050,
         "kokoro": {"voice_sid": 0},  # Kokoro v0.19 EN: 11 voices, sid 0..10
@@ -109,6 +109,7 @@ DEFAULTS: Dict[str, Any] = {
         "edge": {"voice": "en-US-JennyNeural", "rate": "+0%"},
         "gateway": {"model": None},  # None = gateway default
         "openai": {"voice": "nova", "model": "gpt-4o-mini-tts", "key_env": "~/.hermes/.env", "instructions": "Speak with a warm, soft and sexy tone, with a subtle, elegant Japanese accent. Gentle, breathy and intimate, slightly playful — like a caring Japanese girlfriend. Speak naturally, at a relaxed pace, clear and affectionate."},
+        "hybrid": {"threshold_words": 18, "piper_voice": "en_US-amy-medium", "openai_voice": "nova", "openai_model": "gpt-4o-mini-tts"},
         "direct": True,          # strip emojis/pleasantries/filler from spoken output
     },
     "intent": {

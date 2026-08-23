@@ -743,25 +743,6 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 if q and q.lower() not in __import__("json").dumps(ev).lower():
                     continue
                 merged.append({"kind": ev.get("event"), "text": str(ev.get("text","")), "summary": str(ev.get("summary","")), "route": ev.get("route",""), "ts": ev.get("ts"), "category": c, "raw_log": ev})
-            # include cross-provider shared ledger (so switching OpenClaw<->Hermes doesn't lose context)
-            try:
-                _shared = self.app.orch.shared.recent(limit=100) if hasattr(self.app.orch, "shared") else []
-                for _r in _shared:
-                    _ts = float(_r.get("ts") or 0)
-                    if cutoff and _ts < cutoff:
-                        continue
-                    _txt = str(_r.get("text",""))
-                    _route = str(_r.get("route",""))
-                    _c2 = "shared-" + (_route or _r.get("role","") or "other")
-                    if cat and _c2 != cat:
-                        continue
-                    if q and q.lower() not in __import__("json").dumps(_r).lower():
-                        continue
-                    if any(abs(float(m.get("ts") or 0) - _ts) < 0.5 and m.get("text") == _txt for m in merged):
-                        continue
-                    merged.append({"kind": "shared", "text": _txt, "summary": "", "route": _route, "ts": _ts, "category": _c2, "role": _r.get("role",""), "provider": _r.get("provider","")})
-            except Exception:
-                pass
             merged.sort(key=lambda x: float(x.get("ts") or 0), reverse=True)
             self._json({"items": merged[:limit], "pruned_available": True})
         elif path == "/api/logs":
@@ -912,9 +893,11 @@ class WebUI:
         # serve the shared frontend/ dir when it exists (Vercel-ready build),
         # otherwise fall back to the embedded pages. Prefer the dedicated
         # voice-dashboard repo (edits there apply live), then the bridge repo.
-        self._frontend_dir = Path.home() / "Projects" / "Repos" / "voice-dashboard" / "frontend"
+        # Prefer the bridge's own small frontend (voice pages ~12KB, fast over tunnel).
+        # The voice-dashboard React build is 41MB and would make / on mobile brutally slow.
+        self._frontend_dir = Path(__file__).resolve().parents[1] / "frontend"
         if not (self._frontend_dir / "index.html").exists():
-            self._frontend_dir = Path(__file__).resolve().parents[1] / "frontend"
+            self._frontend_dir = Path.home() / "Projects" / "Repos" / "voice-dashboard" / "frontend"
         self._use_frontend_dir = (self._frontend_dir / "index.html").exists()
         # optional shared secret for tunneled/external access (config: webui.token)
         self.api_token: str = orchestrator.cfg.get("webui", "token", default="") if orchestrator is not None else ""
