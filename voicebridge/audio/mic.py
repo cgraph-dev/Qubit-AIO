@@ -81,10 +81,16 @@ class MicCapture:
 
     @staticmethod
     def _mono(data: np.ndarray) -> np.ndarray:
-        """Downmix to mono taking the loudest channel (robust to channel maps)."""
+        """Downmix to mono taking the loudest/best channel (robust to channel maps).
+
+        NB: pick ONE channel by total energy (not per-sample max-abs * ch0 sign,
+        which phase-corrupts frames when the mic isn't on channel 0)."""
         if data.ndim == 1 or data.shape[1] == 1:
             return data[:, 0] if data.ndim == 2 else data
-        return np.max(np.abs(data), axis=1) * np.sign(data[:, 0] if data.shape[1] else data)
+        # energy per channel -> use the channel with the most energy
+        chan_energy = np.sqrt((data.astype(np.float32) ** 2).mean(axis=0))
+        best = int(np.argmax(chan_energy)) if chan_energy.size else 0
+        return data[:, best]
 
     def record_utterance(self, stop_requested: threading.Event,
                          barge_in=None, out_dir: Optional[Path] = None,

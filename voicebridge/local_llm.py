@@ -78,7 +78,9 @@ def chat_local(text: str, conversation_prompt: str = "",
         "model": model,
         "stream": False,
         "keep_alive": -1,          # -1 = always resident (24/7); cold reload = seconds of latency
-        "options": {"num_predict": max_tokens, "temperature": 0.4},
+        "options": {"num_predict": max_tokens, "temperature": 0.4,
+                    "num_ctx": 4096,          # fits system prompt + dialogs + context + instruction (avoids truncation)
+                    "top_p": 0.9},
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_content},

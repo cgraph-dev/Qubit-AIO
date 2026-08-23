@@ -67,6 +67,7 @@ DEFAULTS: Dict[str, Any] = {
         "provider": "sherpa",         # sherpa (Moonshine/Parakeet, 0 VRAM CPU) | whisper | personaplex
         "engine": "parakeet",        # sherpa engine: parakeet v3 (max accuracy, 25 langs) | moonshine (fastest)
         "provider_ep": "cpu",         # sherpa onnxruntime EP: cpu (0 VRAM) | cuda
+        "num_threads": 4,            # sherpa/parakeet CPU threads (honoured by mic + fallback path)
         "model": "base",            # tiny|base|small|medium (whisper only)
         "device": "auto",           # auto|cuda|cpu (whisper only)
         "compute_type": "float16",

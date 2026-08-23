@@ -46,7 +46,7 @@ def classify_with_ollama(text: str, url: str = "http://127.0.0.1:11434",
         "system": SYSTEM_PROMPT,
         "stream": False,
         "format": "json",
-        "options": {"think": False, "temperature": 0.0},
+        "options": {"think": False, "temperature": 0.0, "num_ctx": 4096},
     }
     req = urllib.request.Request(
         f"{url}/api/generate",

@@ -130,9 +130,10 @@ class SherpaASR(ASRProvider):
         audio_path = Path(audio_path)
         with wave.open(str(audio_path), "rb") as wf:
             sr = wf.getframerate()
+            sampwidth = wf.getsampwidth()
             frames = wf.readframes(wf.getnframes())
-        if wf.getsampwidth() != 2:
-            raise ASRUnavailable(f"sherpa needs 16-bit PCM, got {wf.getsampwidth()*8}-bit")
+        if sampwidth != 2:
+            raise ASRUnavailable(f"sherpa needs 16-bit PCM, got {sampwidth*8}-bit")
         audio = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
         dur_s = len(audio) / sr if sr else 0.0
         if len(audio) == 0:

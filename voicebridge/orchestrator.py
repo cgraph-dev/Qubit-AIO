@@ -260,6 +260,8 @@ class VoiceOrchestrator:
 
         # layers (lazy)
         self._asr = None
+        self._fallback_asr = None    # cached fallback recognizer (built once, reused)
+        self._full_asr_reload = None
         self._tts = None
         self._gateway: Optional[GatewaySync] = None
         self._cli: Optional[CliBackend] = None
@@ -310,7 +312,7 @@ class VoiceOrchestrator:
             return SherpaASR(engine=asr_cfg.get("engine", "moonshine"),
                              model_dir=model_dir,
                              provider=asr_cfg.get("provider_ep", "cpu"),
-                             num_threads=4,
+                             num_threads=int(asr_cfg.get("num_threads", 4)),
                              language=asr_cfg.get("language"))
         return FasterWhisperASR(model=asr_cfg.get("model", "base"),
                                 device=asr_cfg.get("device", "auto"),
@@ -3259,17 +3261,26 @@ class VoiceOrchestrator:
         # i.e. mic heard something but parakeet/moonshine blanked. Don't retry pure silence.
         try:
             kind = getattr(tr, "text", "") or ""
-            # wavs with chars==0 but duration>0.6s deserve a retry
             cur_engine = getattr(self._asr, "engine", "") or self.cfg.get("asr","engine","parakeet")
-            alt_engine = "moonshine" if cur_engine != "moonshine" else "parakeet"
-            from .asr.sherpa import SherpaASR as _FallbackASR
-            fb = _FallbackASR(engine=alt_engine, model_dir=self.cfg.model_dir(), provider="cpu", num_threads=2, language=self.cfg.get("asr","language","en"))
-            fb.load()
-            tr2 = fb.transcribe(Path(wav_path))
+            # Honor the configured fallback engine; default to the opposite engine.
+            fb_engine = self.cfg.get("asr", "fallback_engine", default="") or (
+                "moonshine" if cur_engine != "moonshine" else "parakeet")
+            # Cache the fallback recognizer so an empty transcript doesn't reload a
+            # ~100MB (moonshine) or ~640MB (parakeet) model on every call.
+            cached = getattr(self, "_fallback_asr", None)
+            if cached is None or cached.engine != fb_engine:
+                from .asr.sherpa import SherpaASR as _FallbackASR
+                nt = int(self.cfg.get("asr", "num_threads", default=2))
+                cached = _FallbackASR(engine=fb_engine, model_dir=self.cfg.model_dir(),
+                                      provider="cpu", num_threads=nt,
+                                      language=self.cfg.get("asr","language","en"))
+                cached.load()
+                self._fallback_asr = cached
+            tr2 = cached.transcribe(Path(wav_path))
             if not getattr(tr2, "empty", True) and (tr2.text or "").strip():
-                log_event("asr.fallback.success", primary=cur_engine, fallback=alt_engine, text=tr2.text[:120])
+                log_event("asr.fallback.success", primary=cur_engine, fallback=fb_engine, text=tr2.text[:120])
                 return tr2
-            log_event("asr.fallback.empty", primary=cur_engine, fallback=alt_engine)
+            log_event("asr.fallback.empty", primary=cur_engine, fallback=fb_engine)
         except Exception as exc:
             log_event("asr.fallback.failed", error=str(exc)[:160])
         return tr
@@ -3284,7 +3295,12 @@ class VoiceOrchestrator:
         if transcript.empty:
             self.speak("I didn't catch that. Try again.")
             return
-        if transcript.confidence and transcript.confidence < self.cfg.get("asr", "min_confidence", default=0.35):
+        # Confidence gate: only enforce for REAL provider estimates (whisper sets a
+        # 0-1 conf; sherpa returns 1.0 as "unknown-ok" — never gate those). Aligns
+        # the default with config's min_confidence so an absent key isn't too strict.
+        _mc = float(self.cfg.get("asr", "min_confidence", default=0.02))
+        _conf = transcript.confidence
+        if _conf is not None and 0 < _conf < 1.0 and _conf < _mc:
             self.speak("Sorry, I didn't catch that. Could you repeat it?")
             return
         log_event("routing.input", text=transcript.text, confidence=round(transcript.confidence, 3))

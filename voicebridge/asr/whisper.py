@@ -95,7 +95,9 @@ class FasterWhisperASR(ASRProvider):
         if model == "auto":
             model = "small" if (free or 0) >= _AUTO_SMALL_MB else "base"
         if free is None:
-            return [("cuda", model, "float16"), ("cpu", model, "int8")]
+            # No GPU detected (headless/no nvidia): don't burn a CUDA load cycle,
+            # go straight to CPU int8 (fast fallback) — avoids double model init.
+            return [("cpu", model, "int8")]
         if self._force_cpu:
             return [("cpu", model, "int8")]
         attempts: List[Tuple[str, str, str]] = []

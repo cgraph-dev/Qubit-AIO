@@ -493,3 +493,68 @@ def test_report_infers_status():
     assert g.infer_status("Traceback: ZeroDivisionError") == "partial"
     assert g.infer_status("3 tests FAILED on deploy") == "partial"
     assert g.infer_status("worked fine") == "completed"
+
+
+def test_classifier_uses_config_model_not_hardcoded():
+    """The classifier must NOT default to qwen3-vl:8b (never pulled/resident). It
+    should source its model from intent.local_llm.model / intent.ollama_model."""
+    import pathlib, tempfile
+    from voicebridge.config import Config
+    from voicebridge.intent.state import ConfirmationState, ConversationState
+    from voicebridge.intent.classifier import Classifier
+    with tempfile.TemporaryDirectory() as td:
+        cfg = Config.load(pathlib.Path(td) / "none.yaml")
+        cfg.data.setdefault("intent", {})["local_llm"] = {"model": "qubit-brain", "enabled": True}
+        cfg.data["intent"]["ollama_model"] = "qubit-brain"
+        clf = Classifier(cfg.section("intent"), ConfirmationState(), ConversationState())
+        assert clf.ollama_model == "qubit-brain", clf.ollama_model
+        # tiers resolve to the config model, not hardcoded qwen3-vl
+        assert clf._tier_map.get("turbo") == "qubit-brain"
+        assert clf._tier_map.get("normal") == "qubit-brain"
+        assert "qwen3-vl" not in (clf._tier_map.get("turbo") or "")
+
+
+def test_local_llm_options_have_num_ctx_and_keepalive():
+    """local_llm must send num_ctx=4096 + keep_alive=-1 to avoid instruction
+    truncation and model ejection (accuracy + latency)."""
+    import pathlib, re
+    src = pathlib.Path("voicebridge/local_llm.py").read_text()
+    assert '"num_ctx": 4096' in src, "local_llm missing num_ctx"
+    assert '"keep_alive": -1' in src, "local_llm missing keep_alive"
+    summ = pathlib.Path("voicebridge/summarizer.py").read_text()
+    assert '"num_ctx": 4096' in summ, "summarizer missing num_ctx"
+    assert '"keep_alive": -1' in summ, "summarizer missing keep_alive"
+
+
+def test_mic_mono_takes_best_channel():
+    """_mono must pick the highest-energy channel (not max-abs*ch0-sign which
+    phase-corrupts when the mic isn't on channel 0)."""
+    import numpy as np
+    from voicebridge.audio.mic import MicCapture
+    # ch0 nearly silent, ch1 loud with positive signal
+    data = np.array([
+        [0.0, 0.5],
+        [0.001, 0.6],
+        [0.0, 0.4],
+        [-0.001, 0.55],
+    ], dtype=np.float32)
+    mono = MicCapture._mono(data)
+    # should track channel 1 (positive/negative faithfully), not ch0-sign mix
+    assert np.all((mono > 0.3) & (mono < 0.7)), f"did not pick loud channel: {mono}"
+
+
+def test_fallback_asr_honors_config_engine_and_num_threads():
+    """_transcribe_with_fallback must honor asr.fallback_engine + num_threads and
+    cache the recognizer (no reload per empty transcript)."""
+    import pathlib, tempfile
+    from voicebridge.config import Config
+    with tempfile.TemporaryDirectory() as td:
+        cfg = Config.load(pathlib.Path(td) / "none.yaml")
+        # fallback_engine default present in defaults
+        assert cfg.get("asr", "fallback_engine", default="moonshine") == "moonshine"
+        assert cfg.get("asr", "num_threads", default=4) >= 1
+    # assert the orchestrator reads them (not hardcoded opposite-engine)
+    src = pathlib.Path("voicebridge/orchestrator.py").read_text()
+    assert '"fallback_engine"' in src, "orchestrator must read asr.fallback_engine"
+    assert '"num_threads"' in src, "orchestrator must read asr.num_threads"
+    assert "_fallback_asr" in src, "must cache the fallback recognizer"

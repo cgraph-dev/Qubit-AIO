@@ -36,7 +36,10 @@ def summarize_ollama(text: str, url: str = "http://127.0.0.1:11434",
     text = text[:max_chars]
     payload = {"model": model, "prompt": f"Agent output:\n{text}",
                "system": SUMMARY_PROMPT, "stream": False, "format": "json",
-               "options": {"think": False, "temperature": 0.2}}
+               "keep_alive": -1,          # never eject the resident model (avoids cold reload)
+               "options": {"think": False, "temperature": 0.2,
+                           "num_ctx": 4096,       # stop instruction truncation
+                           "num_predict": 90}}    # cap generation (<=40w summary + json)
     req = urllib.request.Request(f"{url}/api/generate",
                                  data=json.dumps(payload).encode(),
                                  headers={"Content-Type": "application/json"})

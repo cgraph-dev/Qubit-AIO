@@ -141,13 +141,20 @@ class Classifier:
         self.conversation = conversation
         self.llm_enabled = bool(cfg.get("llm_classifier", True))
         self.ollama_url = cfg.get("ollama_url", "http://127.0.0.1:11434")
-        self.ollama_model = cfg.get("ollama_model", "qwen3-vl:8b")
+        # Default the classifier to the SAME resident model the bridge uses for
+        # chat (local_llm.model / intent.ollama_model), not a hardcoded qwen3-vl
+        # which is never pulled/resident on this box. Falls back gracefully.
+        _local = (cfg.get("local_llm") or {}).get("model") or cfg.get("ollama_model") or "qubit-brain"
+        self.ollama_model = cfg.get("ollama_model") or _local
         self.timeout = float(cfg.get("classify_timeout_s", 8.0))
+        # Tier map: local tiers resolve to the resident local model; cloud tiers
+        # to deepseek (already configured). Kept as labels, not hardcoded emojis.
         self._tier_map = {
-            "turbo": "ollama/qwen3-vl:8b", "fast": "ollama/qwen3-vl:8b",
-            "normal": "ollama/qwen3:30b-a3b", "slow": "ollama/qwen3.8:27b-q3",
-            "hard": "deepseek/deepseek-v4-flash", "pro": "deepseek/deepseek-v4-pro",
-            "deepseek": "deepseek/deepseek-v4-flash", "default": None,
+            "turbo": _local, "fast": _local, "normal": _local,
+            "hard": cfg.get("deepseek_model", "deepseek/deepseek-v4-flash"),
+            "pro": cfg.get("deepseek_model", "deepseek/deepseek-v4-pro"),
+            "deepseek": cfg.get("deepseek_model", "deepseek/deepseek-v4-flash"),
+            "default": None,
         }
 
     # ---- deterministic checks -------------------------------------------------
