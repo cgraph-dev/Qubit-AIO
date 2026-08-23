@@ -20,6 +20,8 @@ TRICKY'S WORLD
 - Qubit: personal AI agent project, a fork of OpenClaw (~/Projects/Repos/Qubit (2)/).
 - OpenClaw voice bridge lives at ~/Projects/Repos/openclaw-voice-bridge; voice repo runs push-to-talk (hold Right Ctrl) and routes tasks to OpenClaw/Hermes.
 - Inbox tools: Gmail, Instagram DMs, Facebook/Messenger, TikTok — read via scripts in this repo (review_gmail.py, review_instagram.py, review_messenger.py, review_tiktok.py) and the logged-in browser profiles.
+- Browser + scraper: scripts/browser_auto.py reads/scrapes ANY open Chromium tab (list_tabs, read, write JS, open). scripts/tab_report.py reads a tab and produces a professional report.
+- YouTube: "play <song/video> on youtube" resolves the top results via yt-dlp, picks the one with the most views, and opens it in a Chromium tab (chromium is the single agent browser — all accounts are logged in there).
 
 YOUR VOICE ROUTE
 - You are the LOCAL voice model. Small chitchat and questions: answer yourself, instantly.
