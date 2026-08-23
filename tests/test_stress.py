@@ -253,3 +253,70 @@ def test_browser_inbox_unknown_site():
     spec = importlib.util.spec_from_file_location("browser_inbox", pathlib.Path("scripts/browser_inbox.py"))
     m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
     assert m.read_site("nope")["error" if "error" in m.read_site("nope") else "site"] == "unknown site nope"
+
+
+def test_browser_auto_module_surface():
+    """browser_auto exposes the chromium single-engine reader + perf without launching."""
+    import importlib.util, pathlib
+    mod_path = pathlib.Path("scripts/browser_auto.py")
+    spec = importlib.util.spec_from_file_location("browser_auto", mod_path)
+    m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+    assert m.PORT == 9222
+    assert "chromium" in m.BINARY  # single agent browser = snap Chromium
+    for fn in ("list_tabs", "read_tab", "run_js", "open_url", "perf"):
+        assert callable(getattr(m, fn)), f"missing {fn}"
+    # perf() must not raise even with no log yet
+    p = m.perf()
+    assert isinstance(p, dict) and p.get("engine") == "chromium"
+
+
+def test_browser_auto_compiles_and_ignores_state():
+    import subprocess, pathlib
+    r = subprocess.run([".venv/bin/python", "-m", "py_compile", "scripts/browser_auto.py", "scripts/tab_report.py"],
+                       capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    gi = pathlib.Path(".gitignore").read_text()
+    assert "browser_auto_state" in gi and "browser_profiles" in gi
+
+
+def test_play_youtube_query_extraction():
+    """'play X on youtube' routes to play_youtube with a clean song query; generic
+    'play the music' stays on media_playpause."""
+    from voicebridge.local import actions
+    cases = {
+        "play despacito on youtube": ("play_youtube", "despacito"),
+        "put on some lofi music": ("play_youtube", "lofi"),
+        "i want to listen to queen on youtube": ("play_youtube", "queen"),
+        "you know just play imagine dragons": ("play_youtube", "imagine dragons"),
+        "play the song shape of you": ("play_youtube", "shape of you"),
+        "play the music": ("media_playpause", ""),
+        "pause it": ("media_playpause", ""),
+        "resume the music": ("media_playpause", ""),
+    }
+    for text, (name, q) in cases.items():
+        m = actions.match(text)
+        assert m is not None, f"no match for {text!r}"
+        assert m.name == name, f"{text!r}: expected {name}, got {m.name}"
+        if q:
+            assert q in m.params.get("query", ""), f"{text!r}: query={m.params.get('query')!r} missing {q!r}"
+        # query must not still lead with the verb
+        assert not m.params.get("query", "").startswith(("play ", "put on ", "listen to ", "start ")), \
+            f"{text!r}: query still has verb: {m.params.get('query')!r}"
+
+
+def test_play_youtube_ranks_by_views():
+    """The winner is chosen by most views from the top results (not just the 1st)."""
+    import json as _j
+    from unittest import mock
+    from voicebridge.local import actions as A
+    fake_out = "\n".join(_j.dumps(r) for r in [
+        {"title": "First (few views)", "webpage_url": "https://yt/1", "view_count": 100, "uploader": "r1"},
+        {"title": "Popular one", "webpage_url": "https://yt/2", "view_count": 99999999, "uploader": "r2"},
+        {"title": "Third", "webpage_url": "https://yt/3", "view_count": 5000, "uploader": "r3"},
+    ])
+    with mock.patch.object(A, "log_event"), \
+         mock.patch.object(A.subprocess, "run", return_value=A.subprocess.CompletedProcess([], 0, stdout=fake_out, stderr="")), \
+         mock.patch("sys.modules", {**{"browser_auto": mock.MagicMock(open_url=mock.MagicMock(return_value={"error": None, "url": "https://yt/2"}))}, **sys.modules}):
+        with mock.patch("shutil.which", return_value="/x"):
+            res = A._a_play_youtube({"query": "queen"})
+    assert "Popular one" in res, res

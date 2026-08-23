@@ -78,6 +78,8 @@ const ptt = document.getElementById('ptt');
 const st = document.getElementById('st');
 const transcript = document.getElementById('transcript');
 let ctx=null, source=null, processor=null, chunks=[], recording=false, busy=false;
+let micStream=null;            // the getUserMedia stream; MUST be stopped on release
+let micBusy=false;             // a getUserMedia() is in flight (debounce rapid taps)
 let pushMode = 'hold';  // 'hold' = press-and-hold, 'tap' = one-tap toggle
 
 function addMsg(cls, text) {
@@ -95,10 +97,12 @@ function setPulse(on) {
 }
 
 async function startRec() {
-  if (recording) return;
+  if (recording || micBusy) return;   // already recording, or a mic request is in flight
+  micBusy = true;
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: {
       channelCount: 1, echoCancellation: true, noiseSuppression: true }});
+    micStream = stream;                      // keep a handle so we can release it
     // Ask for 16k — Chrome honours AudioContext({sampleRate:16000})
     ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
     source = ctx.createMediaStreamSource(stream);
@@ -117,6 +121,8 @@ async function startRec() {
   } catch (err) {
     addMsg('err', 'Mic error: ' + err.message);
     setStatus('mic error');
+  } finally {
+    micBusy = false;                     // allow the next tap now that this one resolved
   }
 }
 
@@ -130,6 +136,9 @@ async function stopRec() {
   chunks = [];
   try { source.disconnect(); processor.disconnect(); ctx.close(); } catch (_) {}
   source = processor = ctx = null;
+  // Release the mic so a rapid re-start doesn't fight a held MediaTrack.
+  try { if (micStream && micStream.getTracks) micStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+  micStream = null;
   setStatus('thinking…');
   if (total < 1600) {  // <0.1s of audio = accidental tap
     setStatus('too short — try again');

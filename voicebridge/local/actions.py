@@ -140,6 +140,82 @@ def _a_media_playpause(_: Dict[str, Any]) -> str:
     return "playerctl not installed."
 
 
+def _a_play_youtube(params: Dict[str, Any]) -> str:
+    """Pick one of the top YouTube results by likes/views and open it in Chromium.
+
+    Resolves the top N (default 5) results via `yt-dlp ytsearch<N>:`, ranks by
+    view_count (then by position for ties), and opens the winner in a Chromium
+    tab (CDP) so it plays there — no separate ffplay/streaming path.
+    """
+    query = (params.get("query") or params.get("text") or "").strip()
+    if not query:
+        return "What would you like me to play?"
+    if not shutil.which("yt-dlp"):
+        return "yt-dlp is not installed."
+    top_n = 5
+    try:
+        proc = subprocess.run(
+            ["yt-dlp", "--no-playlist", "--dump-json", "--playlist-items",
+             f"1-{top_n}", f"ytsearch{top_n}:{query}"],
+            capture_output=True, text=True, timeout=60.0)
+        results = []
+        for line in (proc.stdout or "").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                import json as _j
+                d = _j.loads(line)
+            except Exception:
+                continue
+            results.append({
+                "title": d.get("title", ""),
+                "url": d.get("webpage_url", ""),
+                "views": d.get("view_count") or 0,
+                "uploader": d.get("uploader", ""),
+            })
+    except Exception as exc:
+        log_event("play.youtube.resolve_failed", error=str(exc)[:160])
+        return "I had trouble searching YouTube."
+    if not results:
+        return "I couldn't find that on YouTube."
+    # Rank: most views first (ties -> earlier position).
+    ranked = sorted(results, key=lambda r: (r.get("views") or 0), reverse=True)
+    win = ranked[0]
+    if not win.get("url"):
+        return "Found it but couldn't get a link."
+    # Open the winner in a Chromium tab via CDP.
+    opened = False
+    try:
+        import sys as _sys
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+        import browser_auto
+        res = browser_auto.open_url(win.get("url", ""))
+        opened = res.get("error") is None and bool(res.get("url"))
+        if opened:
+            log_event("play.youtube", query=query[:160], chosen=win.get("title")[:80],
+                      url=win.get("url"), views=win.get("views"))
+            return f"Playing {win.get('title', query)}."
+        log_event("play.youtube.browser_fail", error=str(res.get("error", ""))[:120])
+    except Exception as exc:
+        log_event("play.youtube.browser_error", error=str(exc)[:160])
+        opened = False
+    if not opened:
+        # Fall back to streaming via ffplay if the browser tab couldn't open.
+        try:
+            import os as _os
+            subprocess.Popen(
+                ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet",
+                 win.get("url", "")],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                start_new_session=True, stdin=subprocess.DEVNULL)
+            log_event("play.youtube.ffplay_fallback", query=query[:160])
+            return f"Playing {win.get('title', query)}."
+        except Exception as exc2:
+            log_event("play.youtube.failed", error=str(exc2)[:160])
+            return "I couldn't open YouTube right now."
+
+
 def _a_clipboard(_: Dict[str, Any]) -> str:
     if shutil.which("xclip"):
         return _run(["xclip", "-o", "-selection", "clipboard"])[:300] or "Clipboard is empty."
@@ -352,8 +428,11 @@ ACTIONS: Dict[str, LocalAction] = {
     "screenshot": LocalAction("screenshot", "take a screenshot", _a_screenshot,
                               patterns=[r"\b(take|grab) (a |an? )?(screenshot|screen ?shot)\b"]),
     "media_playpause": LocalAction("media_playpause", "play/pause media", _a_media_playpause,
-                                   patterns=[r"\b(play|pause|resume) (the )?(music|media|song|video)\b",
-                                             r"\b(play|pause) it\b"]),
+                                   patterns=[r"\b(play|pause|resume) (the )?(music|media)\b",
+                                             r"\b(pause|resume) (it|that)\b"]),
+    "play_youtube": LocalAction("play_youtube", "play a YouTube song/video", _a_play_youtube,
+                                patterns=[r"\b(play|put on|queue|start|i want to (hear|watch|listen to)|listen to|turn on)\s+(.+?\s+)?(on\s+)?(youtube|music|a song|the song|this song|some music|a video|a track)\b",
+                                          r"\b(play|listen to|put on|start)\s+(?!the\s+(music|media|song|video))(.+)\b"]),
     "clipboard": LocalAction("clipboard", "read the clipboard", _a_clipboard,
                              patterns=[r"\b(read|what'?s on|what is on) (the )?clipboard\b"]),
     "lock": LocalAction("lock", "lock the screen", _a_lock,
@@ -445,6 +524,20 @@ def match(text: str) -> Optional[ActionMatch]:
                         params["query"] = m2.group(1).strip(" \"'.)")
                     else:
                         params["query"] = ""
+                elif name == "play_youtube":
+                    import re as _re
+                    # Strip the leading verb + casual fillers so the query is the song.
+                    q = _re.sub(
+                        r"^(please\s+|can you\s+|you know\s+|just\s+|um\s+|uh\s+)*"
+                        r"(please\s+)?(can you\s+)?"
+                        r"(play|put on|queue|start|turn on|i want to (hear|watch|listen to)|i want to|listen to)\b[\s:]?",
+                        "", low, flags=_re.I).strip()
+                    # Drop trailing "on youtube / music / video / a song / the song".
+                    q = _re.sub(r"\s+(on\s+)?(youtube|music|some music|a song|the song|this song|a video|a track|media)\s*$", "", q).strip(" .,")
+                    # Drop leading "some lofi"/"the song NAME" filler.
+                    q = _re.sub(r"^(some|the)\s*(song|music|video|track)?\s*", "", q).strip(" .,")
+                    params["query"] = q or text
+                    params["text"] = text
                 return ActionMatch(name=name, params=params, text=text)
     return None
 

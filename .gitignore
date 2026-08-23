@@ -3,4 +3,8 @@ __pycache__/
 *.pyc
 .pytest_cache/
 *.egg-info/
+
+# browser automation persistent state (real logins — NEVER commit)
 browser_profiles
+browser_auto_state
+*.done
