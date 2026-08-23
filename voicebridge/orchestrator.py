@@ -2086,12 +2086,8 @@ class VoiceOrchestrator:
         if low in ("hello","hello.","hi","hi.","hey","hey."):
             low = "hello"  # normalize for filler check
         if _filler_re.fullmatch(low):
-            # Route by language but keep it instant — also mirror to per-request ctx so /api/result returns it
-            if low.startswith(("salut","buna","bruski")) or "salut" in low or "bruski" in low:
-                # Romanian-ish greeting -> short RO ack
-                reply_f = "Sunt bine. Cu ce te pot ajuta?"
-            else:
-                reply_f = "I'm functioning well. What do you need?"
+            # ENGLISH ONLY: single instant ack (also mirrors to per-request ctx so /api/result returns it)
+            reply_f = "I'm functioning well. What do you need?"
             _cf = self._cur_ctx()
             if _cf is not None:
                 _cf.summary = reply_f
@@ -2619,7 +2615,7 @@ class VoiceOrchestrator:
         if _low_fast in ("hello","hello.","hi","hi.","hey","hey.","yeah","yeah.","yep","yep.","ok","ok.","okay","okay."):
             if _low_fast in ("hello","hello.","hi","hi.","hey","hey."):
                 _low_fast = "hello"
-            _reply_f = "Sunt bine. Cu ce te pot ajuta?" if any(w in _low_fast for w in ("salut","buna")) else "I'm functioning well. What do you need?"
+            _reply_f = "I'm functioning well. What do you need?"
             # For hello/yeah the intent is filler — bypass LLM and go straight to _handle_conversation's fast path
             # but we can short-circuit here to avoid the 4.6s LLM entirely
             log_event("routing.filler_fast", text=text[:60])
@@ -3247,26 +3243,16 @@ class VoiceOrchestrator:
     def _transcribe_with_fallback(self, wav_path: str):
         """Primary ASR (parakeet/moonshine) + one low-cost fallback when it returns empty on a real wav.
         Moonshine is fastest fallback (~0.05s) so retries stay snappy even on empty captures.
+        ENGLISH ONLY (user decision): no multilingual tier.
         Returns the transcript that has text, or the original empty one if fallback also empty.
         """
         tr = self._asr.transcribe(wav_path)
-        # Suspicious transcript: the EN-only sherpa models mangle Romanian (and
-        # heavily accented English) into a couple of junk words. If the words/sec
-        # rate is implausibly low for real speech, treat it like an empty result
-        # and let the multilingual tier re-recognise it.
-        def _suspicious(t) -> bool:
-            dur = float(getattr(t, "duration_s", 0) or 0)
-            words = len(((getattr(t, "text", "") or "").strip()).split())
-            if dur >= 1.2 and words <= max(1, int(dur * 0.9)):
-                return True
-            return False
-        if not tr.empty and not _suspicious(tr):
+        if not tr.empty:
             return tr
-        _why = "empty" if tr.empty else "suspicious"
-        # Only fallback when the wav had energy (peak_rms already logged as >=0.055 in the capture path) —
-        # i.e. mic heard something but parakeet/moonshine blanked. Don't retry pure silence.
+        # Only fallback when the wav had energy (peak_rms already logged in the
+        # capture path) — i.e. mic heard something but the engine blanked. Don't
+        # retry pure silence.
         try:
-            kind = getattr(tr, "text", "") or ""
             cur_engine = getattr(self._asr, "engine", "") or self.cfg.get("asr","engine","parakeet")
             # Honor the configured fallback engine; default to the opposite engine.
             fb_engine = self.cfg.get("asr", "fallback_engine", default="") or (
@@ -3289,46 +3275,7 @@ class VoiceOrchestrator:
             log_event("asr.fallback.empty", primary=cur_engine, fallback=fb_engine)
         except Exception as exc:
             log_event("asr.fallback.failed", error=str(exc)[:160])
-        # Third tier — multilingual: the sherpa engines are English-only. If the
-        # mic heard real speech but sherpa blanked OR mangled it (suspicious),
-        # re-recognise with a multilingual model (auto-detect) so Romanian and
-        # accented speech is transcribed correctly instead of junk English.
-        if self.cfg.get("asr", "multilingual_fallback", default=True):
-            try:
-                mlt = self._get_multilingual_asr()
-                trm = mlt.transcribe(Path(wav_path))
-                _mtext = (getattr(trm, "text", "") or "").strip()
-                # Accept only a clearly better result (more words than the
-                # suspicious primary, or non-empty when primary was empty).
-                better = bool(_mtext) and (tr.empty or len(_mtext.split()) > len((tr.text or "").split()))
-                if better:
-                    log_event("asr.multilingual.success", text=_mtext[:120],
-                              language=getattr(trm, "language", None), why=_why)
-                    return trm
-                log_event("asr.multilingual.empty", language=getattr(trm, "language", None), why=_why)
-            except Exception as exc:
-                log_event("asr.multilingual.failed", error=str(exc)[:160])
         return tr
-
-    def _get_multilingual_asr(self):
-        """Return a cached multilingual faster-whisper recogniser (shared across
-        utterances — never rebuilt per call)."""
-        cached = getattr(self, "_multilingual_asr", None)
-        if cached is not None:
-            return cached
-        from .asr.whisper import FasterWhisperASR
-        from .asr.whisper import bootstrap_cuda_libs
-        bootstrap_cuda_libs()
-        _dir = self.cfg.model_dir()
-        # Prefer the already-downloaded large-v3-turbo; fall back to small.
-        model = self.cfg.get("asr", "multilingual_model", default="large-v3-turbo")
-        cached = FasterWhisperASR(model=model, device="cpu", compute_type="int8",
-                                  language=None,       # auto-detect (ro/en/...)
-                                  beam_size=int(self.cfg.get("asr", "beam_size", default=5)),
-                                  model_dir=_dir)
-        cached.load()
-        self._multilingual_asr = cached
-        return cached
 
     def _process_utterance(self, wav_path: str) -> None:
         t0 = time.time()

@@ -9,9 +9,6 @@ DIALOG_EXAMPLES = """
 U: Hey, how are you?
 A: I'm functioning well. What do you need?
 
-U: Salut, cum te simti astazi?
-A: Sunt bine, multumesc. Cu ce te pot ajuta?   # Romanian when user speaks Romanian
-
 U: What's 17 times 23?
 A: 391.
 

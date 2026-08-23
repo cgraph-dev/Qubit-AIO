@@ -73,9 +73,7 @@ DEFAULTS: Dict[str, Any] = {
         "compute_type": "float16",
         "language": "en",
         "beam_size": 4,          # 4 = much better accent/broken-English, still <0.3s
-        "fallback_engine": "moonshine",  # when primary returns 0 chars on a real wav, retry once with this (low resources, fastest)          # 4 = much better accent/broken-English, still <0.3s
-        "multilingual_fallback": True,  # if sherpa (EN-only) blanks real speech, try faster-whisper (auto-detect) — enables Romanian/accents
-        "multilingual_model": "large-v3-turbo",  # already-downloaded multilingual model (language auto-detect)
+        "fallback_engine": "moonshine",  # when primary returns 0 chars on a real wav, retry once with this (low resources, fastest)
         "min_confidence": 0.02,     # ~off: whisper avg_logprob for REAL mic speech is 0.05-0.2;
                                     # a higher gate rejects perfect transcripts ("didn't catch that" bug)
                                     # empty-text + filler-word checks handle real silence
@@ -133,7 +131,7 @@ DEFAULTS: Dict[str, Any] = {
         "local_llm": {
             "enabled": True,           # bridge responds to ALL chat itself (<0.5s);
                                         # only tasks dispatch to OpenClaw/Hermes
-            "model": "qubit-brain",  # 3B default: native Romanian + smaller (2.6GB resident).
+            "model": "qubit-brain",  # baked EN-only brain (2.6GB resident).
                                     # phi-4-mini-abliterated is smarter in EN but BROKEN at RO (echoes/
                                     # wrong dates/hallucinates) — kept as optional EN-only smart mode.
             "url": "http://127.0.0.1:11434",

@@ -20,11 +20,8 @@ SYSTEM_PROMPT = (
     "sentences unless asked for detail. Be direct: no emojis, no pleasantries, "
     "no filler words - say only what\u0027s needed. Remember: you are Qubit, your human is Tricky, main project is CGraph. "
     "You understand broken English, heavy accents, and typos — infer the intended meaning and respond helpfully (never mock). "
-    "CRITICAL LANGUAGE RULE: Reply in the EXACT SAME language as the CURRENT "
-    "User message (the last User: line). If the current User message is in English, "
-    "reply in English. If the current User message is in Romanian, reply in Romanian. "
-    "Ignore the language of previous turns — only the current User message matters. "
-    "Never mix languages. Never respond in Romanian to an English question."
+    "LANGUAGE: You speak ENGLISH ONLY. Always reply in plain English, regardless of "
+    "what language the user used. Never reply in Romanian or any other language."
 )
 
 # Few-shot dialog examples (style teaching). Loaded from config/dialogs.md —
@@ -52,8 +49,8 @@ _DIALOGS = _load_dialogs()
 if _DIALOGS:
     SYSTEM_PROMPT = SYSTEM_PROMPT + "\n\n# Example dialogs (match this style)\n" + _DIALOGS
 
-# --- language guard -----------------------------------------------------------
-# Common high-frequency words per ALLOWED language (EN + RO only).
+# --- language guard (ENGLISH ONLY) -------------------------------------------
+# Common high-frequency English words — a real English reply is full of them.
 _EN_COMMON = {"the","be","to","of","and","a","in","that","have","i","it","for","not",
               "on","with","he","as","you","do","at","this","but","his","by","from",
               "they","we","say","her","she","or","an","will","my","one","all","would",
@@ -62,31 +59,16 @@ _EN_COMMON = {"the","be","to","of","and","a","in","that","have","i","it","for","
               "take","people","into","year","your","good","some","could","them","see",
               "other","than","then","now","look","only","come","its","over","think",
               "also","back","after","use","two","how","our","work","first","well",
-              "way","even","new","want","because","any","these","give","day","most","is","are"}
-_RO_COMMON = {"si","și","este","sunt","nu","da","ce","care","pentru","din","în","la",
-              "pe","cu","un","una","o","mai","cel","cea","ale","meu","mea","ta","tău",
-              "nostru","vostru","lor","acest","aceasta","acum","azi","bine","salut",
-              "mulțumesc","poate","foarte","dar","cum","unde","cand","când","vrea",
-              "vreau","pot","face","facut","făcut","trebuie","om","zi","ziua","an"}
-# Words from languages we do NOT speak (sample: fr/de/es/it/hu/ru translit).
-_FOREIGN_HINTS = {"je","tu","il","elle","nous","vous","sont","avec","pour","dans",
-                  "etre","être","cette","tout","tous","ich","bin","und","nicht",
-                  "ein","eine","ist","das","mit","auch","pero","porque","muy","sono",
-                  "questa","non","perché","che","per","gli","és","vagy",
-                  "nincs","и","да","нет","что","это","el","los","del","como",
-                  "para","con","une","deux","langues","parle",
-                  "puedo","puede","hablar","español","mucho","siento","por","qué",
-                  "yo","mi","sus","ese","esta","aqui","aquí","bien","gracias",
-                  "sprechen","danke","vielleicht","francais","français","parlez"}
-
+              "way","even","new","want","because","any","these","give","day","most",
+              "is","are","yes"}
 def _reply_is_other_language(text: str) -> bool:
-    """True when the reply looks like a language we DON'T speak (not EN, not RO)."""
+    """True when the reply does NOT look like plain English (ENGLISH ONLY rule)."""
     if not text:
         return False
-    # Non-Latin scripts (Cyrillic/CJK/Arabic/...) => definitely not EN/RO.
+    # Non-Latin / Romanian-diacritic scripts => not English.
     for ch in text[:400]:
         o = ord(ch)
-        if o > 0x2FF and not (0x1E00 <= o <= 0x1EFF):   # outside Latin + Latin-Ext
+        if o > 0x24F:   # beyond Latin Extended-A (covers ă â ș ț î, Cyrillic, CJK…)
             return True
     low = text.lower()
     tokens = [w.strip(".,!?;:'\"()[]") for w in low.split()]
@@ -94,14 +76,11 @@ def _reply_is_other_language(text: str) -> bool:
     if not tokens:
         return False
     en = sum(1 for t in tokens if t in _EN_COMMON)
-    ro = sum(1 for t in tokens if t in _RO_COMMON)
-    known = en + ro
-    foreign = sum(1 for t in tokens
-                  if t in _FOREIGN_HINTS and t not in _EN_COMMON and t not in _RO_COMMON)
-    # Heavily foreign: more foreign than known signals, with a minimum mass.
-    if len(tokens) >= 5 and foreign >= 2 and foreign > known:
+    # A genuine English reply contains common English words; foreign text almost
+    # none. Short replies (<4 tokens) can't be judged reliably -> allow.
+    if len(tokens) >= 4 and en == 0:
         return True
-    if len(tokens) >= 8 and known == 0 and foreign >= 1:
+    if len(tokens) >= 6 and en <= 1:
         return True
     return False
 
@@ -120,37 +99,10 @@ def chat_local(text: str, conversation_prompt: str = "",
     user_content = f"Recent conversation:\n{conversation_prompt}\n\n"
     if context:
         user_content += (f"<about-the-user>\n{context[:2500]}\n</about-the-user>\n\n")
-    # Explicit per-turn language lock (defense against Romanian context bleed):
-    # Detect the CURRENT message language and force it — history/personal-knowledge
-    # may contain Romanian, but the reply must match THIS message only.
-    _ro_markers = ("ă","â","ș","ş","ț","ţ","î","ă")
-    # High-signal Romanian tokens (not substrings of common English words).
-    # Ensures "care este fusul meu orar" etc. are classified RO.
-    _ro_words = {
-        "salut","buna","bună","sal","hei","ce","faci","fac","cum","esti","ești","sunt",
-        "bine","multumesc","mulțumesc","mersi","azi","astazi","astăzi","da","nu","te",
-        "ma","mă","vreau","vrei","pot","ajuta","ajutor","vorbesti","vorbești","romana",
-        "română","românește","româneşte","care","este","eşti","esti","meu","mea","mos",
-        "fost","unde","cand","când","dece","de ce","cine","ceva","nimic","astfel","prin",
-        "pentru","despre","între","acum","azi","ieri","mâine","main","merge","gust","vorbesc",
-        "frumos","dragut","drăguț","copil","mama","mamă","tata","tata","să","sa","ca",
-        "ca","cu","la","pe","din","în","in","sunt","esti","ești","e","sînt","nu","da",
-    }
-    _low = text.lower()
-    _tokens = [w for w in _low.split() if w.isalpha()]
-    # Score: RO words present (weighted), minus over-generic single/double-letter ones.
-    _strong = {t for t in _tokens if t in _ro_words and len(t) > 2}
-    _is_ro = bool(any(c in _low for c in _ro_markers)) or len(_strong) >= 2 or \
-        ("care" in _tokens and any(t in _tokens for t in ("este","e","ești","fus","ora","orar")))
-    # ASR-detected language wins when provided (the recogniser is authoritative):
-    # "ro" -> Romanian, anything else explicit -> English.
-    if language:
-        _is_ro = language.lower().startswith("ro")
-    _lang_directive = "Reply ONLY in Romanian (diacritics included)." if _is_ro \
-        else "Reply ONLY in English. Do NOT reply in any other language."
+    # ENGLISH ONLY (user decision): no Romanian, no other language. The guard
+    # below retries if the model drifts out of English.
     user_content += (
-        f"{_lang_directive} The user's current message is in "
-        f"{'Romanian' if _is_ro else 'English'} — ignore previous turns' language.\n"
+        "Reply ONLY in plain English. Do NOT reply in any other language.\n"
         "FACTS OVERRIDE HISTORY: the <about-the-user> facts above are ALWAYS true. "
         "If older conversation turns contain a different or refusing answer "
         "(e.g. \"I'm not capable\"), correct it now with the real fact and do not repeat the old mistake."
@@ -186,11 +138,11 @@ def chat_local(text: str, conversation_prompt: str = "",
     # reply drifted into another language, retry ONCE with an explicit lock;
     # if it still drifts, keep the retry (best effort) but log it.
     if reply and _reply_is_other_language(reply):
-        log_event("conversation.local.lang_drift", lang="other", chars=len(reply),
+        log_event("conversation.local.lang_drift", lang="non-english", chars=len(reply),
                   preview=reply[:80])
         payload["messages"] = payload["messages"][:-1] + [
             {"role": "user", "content": user_content +
-             "\n[STRICT: answer in English or Romanian only. No other language.]"},
+             "\n[STRICT: answer in plain ENGLISH only. No other language.]"},
         ]
         try:
             req2 = urllib.request.Request(

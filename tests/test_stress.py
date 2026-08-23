@@ -560,80 +560,39 @@ def test_fallback_asr_honors_config_engine_and_num_threads():
     assert "_fallback_asr" in src, "must cache the fallback recognizer"
 
 
-def test_multilingual_asr_wiring():
-    """config exposes multilingual fallback flags, and _get_multilingual_asr is
-    cached (loads once, shared across utterances) + uses language=None (auto-detect)."""
-    import pathlib, tempfile
-    from voicebridge.config import Config
-    with tempfile.TemporaryDirectory() as td:
-        cfg = Config.load(pathlib.Path(td) / "none.yaml")
-        assert cfg.get("asr", "multilingual_fallback", default=True) is True
-        assert cfg.get("asr", "multilingual_model", default="large-v3-turbo") == "large-v3-turbo"
+def test_english_only_no_multilingual_tier():
+    """ENGLISH ONLY (user decision): the multilingual ASR tier must be gone from
+    the orchestrator and its config keys removed."""
+    import pathlib
     src_o = pathlib.Path("voicebridge/orchestrator.py").read_text()
-    assert "_get_multilingual_asr" in src_o, "must have the multilingual helper"
-    assert '_multilingual_asr' in src_o, "must cache the multilingual recognizer"
-    assert 'language=None' in src_o, "auto-detect language"
-    # config defaults present
+    assert "_get_multilingual_asr" not in src_o, "multilingual tier must be removed"
+    assert "asr.multilingual" not in src_o, "no multilingual events"
     src_c = pathlib.Path("voicebridge/config.py").read_text()
-    assert "multilingual_fallback" in src_c and "multilingual_model" in src_c
+    assert "multilingual_fallback" not in src_c, "config key removed"
 
 
-def test_whisper_language_none_is_auto_detect():
-    """whisper must pass language=None to faster-whisper so it auto-detects
-    (ro/en). The transcriber must not hardcode English."""
+def test_english_only_language_guard():
+    """The reply guard must flag any non-English reply (RO/FR/DE/ES/RU) and allow
+    plain English; retry instruction must say ENGLISH only."""
     import pathlib
-    src = pathlib.Path("voicebridge/asr/whisper.py").read_text()
-    # transcribe passes self.language (None -> auto-detect)
-    assert "language=self.language" in src
-    # and returns detected info.language
-    assert 'getattr(info, "language"' in src
-
-
-def test_romanian_language_detection():
-    """The local LLM must detect Romanian (incl. no-diacritic RO like 'care este
-    fusul meu orar') and keep English as English — no false RO on EN phrases."""
-    import pathlib
+    from voicebridge.local_llm import _reply_is_other_language as f
+    english = ["Hello, how are you today?",
+               "Yes I can hear you fine.",
+               "Your Instagram is https://www.instagram.com/tr.cky/.",
+               "Europe/Bucharest (EEST, UTC+3).",
+               "I don't understand Romanian. Can you please rephrase in English?"]
+    foreign = ["Fusul orar al tău este aproximativ 20 de minute.",   # RO
+               "Je parle uniquement deux langues.",                   # FR
+               "Ich spreche nur Deutsch und das ist gut.",            # DE
+               "No puedo hablar español, lo siento amigo.",           # ES
+               "Привет как дела"]                                     # RU
+    for t in english:
+        assert not f(t), f"English wrongly flagged: {t!r}"
+    for t in foreign:
+        assert f(t), f"non-English not detected: {t!r}"
     src = pathlib.Path("voicebridge/local_llm.py").read_text()
-    assert "care" in src and "este" in src, "detector must contain RO tokens care/este"
-    assert "len(_strong) >= 2" in src, "must use a 2+ strong-word threshold (no false positives)"
-    assert "_ro_markers" in src and "_ro_words" in src
-    # Replicate the detector logic to assert behaviour.
-    _ro_markers=("ă","â","ș","ş","ț","ţ","î")
-    _ro_words={"salut","buna","bună","ce","faci","cum","esti","ești","sunt","bine","mulțumesc","azi","astăzi","vreau","pot","ajuta","vorbesti","română","care","este","meu","mea","fost","unde","cand","când","pentru","despre","acum","ieri","mâine","vorbesc","frumos","copil","mama","să","între"}
-    def is_ro(text):
-        low=text.lower(); toks=[w for w in low.split() if w.isalpha()]
-        strong={t for t in toks if t in _ro_words and len(t)>2}
-        return bool(any(c in low for c in _ro_markers)) or len(strong)>=2 or ('care' in toks and any(t in toks for t in ('este','e','fus','ora','orar')))
-    assert is_ro("care este fusul meu orar") is True
-    assert is_ro("cum esti astazi") is True
-    assert is_ro("what timezone am I in") is False
-    assert is_ro("can you help me") is False
-    assert is_ro("play despacito on youtube") is False
-
-
-def test_tts_language_aware_voice_switch():
-    """Piper TTS must pick the Romanian voice for RO text (EN voice mangles it)
-    and the default EN voice for English; RO voice file must exist locally."""
-    import pathlib
-    from voicebridge.tts.piper import PiperTTS, _is_romanian, _RO_VOICE
-    assert _is_romanian("Fusul tău orar este Europe/Bucharest") is True
-    assert _is_romanian("what timezone am I in") is False
-    assert _is_romanian("care este fusul meu orar") is True
-    models = pathlib.Path.home() / ".local/share/openclaw-voice-bridge/models"
-    assert (models / f"{_RO_VOICE}.onnx").exists(), "Romanian piper voice missing"
-    src = pathlib.Path("voicebridge/tts/piper.py").read_text()
-    assert "_SECONDARY" in src and 'startswith("ro")' in src
-
-
-def test_chat_local_accepts_language_hint():
-    """chat_local takes an explicit language hint that overrides heuristics."""
-    import pathlib
-    src = pathlib.Path("voicebridge/local_llm.py").read_text()
-    assert "language: Optional[str] = None" in src
-    assert 'language.lower().startswith("ro")' in src
-    # orchestrator passes the ASR-detected language through
-    o = pathlib.Path("voicebridge/orchestrator.py").read_text()
-    assert "_last_spoken_language" in o and "language=getattr(self" in o
+    assert "answer in plain ENGLISH only" in src
+    assert "You speak ENGLISH ONLY" in src
 
 
 def test_routing_success_rate_95():
@@ -677,25 +636,3 @@ def test_routing_success_rate_95():
         assert rate >= 0.95, f"routing success {rate:.0%} < 95%: {misses}"
 
 
-def test_language_guard_only_en_ro():
-    """The agent speaks ONLY English and Romanian: the reply guard must flag other
-    languages (FR/DE/ES/RU) and never flag EN or RO replies."""
-    import importlib.util, pathlib
-    spec = importlib.util.spec_from_file_location("vbridge_llm", "voicebridge/local_llm.py")
-    # local_llm uses relative imports -> import via package instead
-    from voicebridge.local_llm import _reply_is_other_language as f
-    allowed = ["Hello, how are you today?",
-               "Fusul tău orar este Europe/Bucharest, UTC+3.",
-               "care este fusul meu orar",
-               "Yes I can hear you fine.",
-               "Sunt bine, multumesc! Ce faci?"]
-    other = ["Je parle uniquement deux langues.",           # FR
-             "Ich spreche nur Deutsch und das ist gut.",     # DE
-             "No puedo hablar español, lo siento amigo.",    # ES
-             "Привет как дела"]                              # RU
-    for t in allowed:
-        assert not f(t), f"EN/RO wrongly flagged foreign: {t!r}"
-    for t in other:
-        assert f(t), f"foreign not detected: {t!r}"
-    src = pathlib.Path("voicebridge/local_llm.py").read_text()
-    assert "lang_drift" in src and "STRICT: answer in English or Romanian only" in src
