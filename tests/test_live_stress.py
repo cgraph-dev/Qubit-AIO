@@ -226,7 +226,7 @@ def test_dashboard_endpoints_live_smoke():
     for ep in endpoints:
         try:
             with urllib.request.urlopen(base + ep, timeout=3) as r:
-                body = r.read().decode()[:2000]
+                body = r.read().decode()
                 data = json.loads(body)
                 assert isinstance(data, dict)
                 live += 1

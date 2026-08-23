@@ -1,6 +1,6 @@
 """LLM-assisted intent classification via the local Ollama API.
 
-Uses the fast fully-in-VRAM tier (qwen3-vl:8b, ~40-70 tok/s on this box) with
+Uses the resident 3B tier (huihui_ai/llama3.2-abliterate:3b, ~120 tok/s) with
 `think:false` and strict JSON output. Falls back gracefully (returns None) when
 Ollama is down so the deterministic router still works.
 """
@@ -37,7 +37,7 @@ Rules:
 
 
 def classify_with_ollama(text: str, url: str = "http://127.0.0.1:11434",
-                         model: str = "qwen3-vl:8b",
+                         model: str = "huihui_ai/llama3.2-abliterate:3b",
                          timeout_s: float = 8.0) -> Optional[Dict[str, Any]]:
     """Returns {kind, task, confidence, reason} or None if Ollama is unavailable."""
     payload = {

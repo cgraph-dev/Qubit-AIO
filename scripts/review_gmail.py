@@ -104,6 +104,51 @@ def try_cdp(n=10):
     except Exception:
         return None
 
+def _parse_date(date_str: str):
+    """Parse many email date formats to datetime, or None."""
+    if not date_str: return None
+    s = date_str.strip().replace(",", "")
+    # Try common formats
+    for fmt in ("%a %b %d %H:%M:%S %Y", "%a %d %b %Y %H:%M:%S %z", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S%z", "%d %b %Y %H:%M"):
+        try:
+            import datetime as _dt
+            d = _dt.datetime.strptime(s[:len(fmt)+10], fmt)
+            if d.tzinfo is None: d = d.replace(tzinfo=_dt.timezone.utc)
+            return d
+        except: pass
+    # Fallback: try email.utils
+    try:
+        import email.utils as _eu
+        t = _eu.parsedate_tz(s)
+        if t:
+            import datetime as _dt
+            ts = _eu.mktime_tz(t)
+            return _dt.datetime.fromtimestamp(ts, tz=_dt.timezone.utc)
+    except: pass
+    return None
+
+def _human_age(date_str: str) -> str:
+    d = _parse_date(date_str or "")
+    if not d:
+        # fallback: normalize date_str truncated
+        s = (date_str or "").strip()[:24]
+        return s if s else "recently"
+    import datetime as _dt
+    now = _dt.datetime.now(tz=_dt.timezone.utc)
+    try:
+        delta = now - d
+        secs = int(delta.total_seconds())
+        if secs < 0: secs = 0
+        if secs < 90: return "just now"
+        if secs < 3600: return f"{secs//60} minutes ago"
+        if secs < 7200: return "an hour ago"
+        if secs < 86400: return f"{secs//3600} hours ago"
+        if secs < 172800: return "yesterday"
+        if secs < 604800: return f"{secs//86400} days ago"
+        # older: show date
+        return d.strftime("%b %d")
+    except: return date_str[:24]
+
 def categorize(items):
     promo_domains = ("noreply", "no-reply", "marketing", "newsletter", "promo", "unsubscribe")
     social_domains = ("facebook", "instagram", "linkedin", "twitter", "x.com", "tiktok", "youtube")
@@ -170,11 +215,24 @@ def print_report(items, source: str, cache_age=None):
             flag_str = f" [{','.join(flags)}]" if flags else ""
             subj = (it.get("subject") or "(no subject)").strip()[:80]
             sender = (it.get("sender") or "?").strip()[:40]
+            age = _human_age(it.get("date") or "")
             date = (it.get("date") or "").strip()[:24]
             snippet = (it.get("snippet") or "").strip()[:90]
-            lines.append(f"{i}.{flag_str} From: {sender} | Subject: {subj} | Date: {date}")
+            lines.append(f"{i}.{flag_str} From: {sender} | Subject: {subj} | {age}")
+            lines.append(f"   When: {age} ({date})" if date != age else f"   When: {age}")
             if snippet:
                 lines.append(f"   Preview: {snippet}")
+    # Spoken hook: 2-sentence who+when so the voice actually says names and times (not just categories)
+    if items:
+        top = items[:3]
+        parts = []
+        for it in top:
+            who = (it.get("sender") or "?").split("<")[0].strip()[:32]
+            subj = (it.get("subject") or "(no subject)").strip()[:48]
+            when = _human_age(it.get("date") or "")
+            parts.append(f"{who} — {subj}, {when}")
+        lines.append("")
+        lines.append("Spoken: Latest — " + "; ".join(parts) + ".")
     lines.append("")
     lines.append(f"Source: {source}" + (f" (cache {cache_age}s old)" if cache_age is not None else ""))
     print("\n".join(lines))

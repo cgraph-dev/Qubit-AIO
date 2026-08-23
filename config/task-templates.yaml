@@ -174,10 +174,7 @@ templates:
   - (what|any) (new )?(email|emails|messages?) (did|have|do) i (get|receive)
   - latest (email|emails|mail)
   kind: coding
-  task: 'Run the social-inbox-check skill: read the Gmail inbox with read_gmail.py
-    3 (uses the logged-in Chromium profile over CDP, zero tokens). Then speak a 2-sentence
-    summary of the top 3 emails: sender, subject, and how recent. Mention unread/important
-    ones first.
+  task: 'Run the inbox script verbatim (no paraphrase): `python ~/Projects/Repos/openclaw-voice-bridge/scripts/review_gmail.py 12`. It outputs Categories, per-email From|Subject|When (e.g. 2 hours ago), and a final "Spoken:" line with the latest 3. Speak that Spoken line verbatim as your reply (who + subject + how long ago), then append the Categories line. Do NOT say "check notifications yourself".
 
     '
   ack: Checking your inbox.

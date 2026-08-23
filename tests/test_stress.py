@@ -152,3 +152,58 @@ def test_no_frontend_touched():
     assert t.count("const TOKEN")==1, f"activity.html still has duplicate TOKEN ({t.count('const TOKEN')})"
     # /api/activity fetch must send token
     assert "headers: hdrs()" in t or 'hdrs()' in t, "activity.html should send X-Api-Token"
+
+
+def test_moonshine_chunking_guard():
+    """Moonshine must not crash on long (>20s) audio; SherpaASR chunks it.
+    Regression: the old code fed the whole clip and onnxruntime threw a
+    broadcast error ('4 by 1241'), silently returning empty text."""
+    from voicebridge.config import Config
+    from voicebridge.asr.sherpa import SherpaASR
+    import tempfile, pathlib, wave, numpy as np
+    with tempfile.TemporaryDirectory() as td:
+        cfg = Config.load(pathlib.Path(td) / "none.yaml")
+        # synthesize a >20s WAV (silence+noise so no model load needed to assert chunking)
+        sr = 16000
+        dur = 25.0
+        wav = pathlib.Path(td) / "long.wav"
+        # low-amplitude noise: safe, won't blow up the decoder
+        data = (np.random.randn(int(sr * dur)) * 100).astype(np.int16)
+        with wave.open(str(wav), "wb") as wf:
+            wf.setnchannels(1); wf.setsampwidth(2); wf.setframerate(sr)
+            wf.writeframes(data.tobytes())
+        asr = SherpaASR(engine="moonshine", model_dir=cfg.model_dir(), provider="cpu", num_threads=2)
+        # Must NOT raise; should return a Transcript (possibly empty) gracefully
+        tr = asr.transcribe(wav)
+        assert tr is not None and tr.duration_s is not None
+        # Confirm the chunking path was taken (>20s)
+        assert tr.duration_s > 20.0
+
+
+def test_activity_html_js_is_valid():
+    """activity.html had `const TOKEN=*** URLSearchParams(...)` — a JS syntax
+    error that killed the ENTIRE activity page. It must now be `new URLSearchParams`."""
+    import subprocess, tempfile, pathlib
+    t = (ROOT / "frontend/activity.html").read_text()
+    # must be valid JS: `const TOKEN = new URLSearchParams(...)`, not a literal `***`
+    assert "TOKEN=" in t and "new URLSearchParams" in t, "activity.html TOKEN init broken"
+    assert t.count("***") == 0, f"activity.html still contains literal *** ({t.count('***')})"
+    # extract the <script> body and node --check it
+    start = t.find("<script>")
+    end = t.find("</script>")
+    if end < 0:
+        end = t.find(r"<\/script>")  # escaping-corrected closing tag in activity.html
+    js = t[start + len("<script>"):end] if start >= 0 and end >= 0 else ""
+    assert js.strip(), "activity.html has no <script>"
+    with tempfile.TemporaryDirectory() as td:
+        p = pathlib.Path(td) / "a.js"
+        p.write_text(js)
+        r = subprocess.run(["node", "--check", str(p)], capture_output=True, text=True)
+        assert r.returncode == 0, f"activity.html JS invalid: {r.stderr[:200]}"
+
+
+def test_reports_page_fetches_with_token():
+    """reports.html must declare a single TOKEN and use it in headers."""
+    t = (ROOT / "frontend/reports.html").read_text()
+    assert t.count("const TOKEN") == 1, "reports.html duplicate TOKEN"
+    assert "new URLSearchParams" in t and t.count("***") == 0

@@ -890,14 +890,11 @@ class WebUI:
         self._pending_lock = threading.Lock()
         self._results: Dict[str, Dict[str, Any]] = {}
         self._result_lock = threading.Lock()
-        # serve the shared frontend/ dir when it exists (Vercel-ready build),
-        # otherwise fall back to the embedded pages. Prefer the dedicated
-        # voice-dashboard repo (edits there apply live), then the bridge repo.
-        # Prefer the bridge's own small frontend (voice pages ~12KB, fast over tunnel).
-        # The voice-dashboard React build is 41MB and would make / on mobile brutally slow.
-        self._frontend_dir = Path(__file__).resolve().parents[1] / "frontend"
+        # Serve the Qubit dashboard (voice-dashboard/frontend) — the theme the
+        # user keeps. Fall back to the bridge's small pages only as a safety net.
+        self._frontend_dir = Path("/home/trick/Projects/Repos/voice-dashboard/frontend")
         if not (self._frontend_dir / "index.html").exists():
-            self._frontend_dir = Path.home() / "Projects" / "Repos" / "voice-dashboard" / "frontend"
+            self._frontend_dir = Path(__file__).resolve().parents[1] / "frontend"
         self._use_frontend_dir = (self._frontend_dir / "index.html").exists()
         # optional shared secret for tunneled/external access (config: webui.token)
         self.api_token: str = orchestrator.cfg.get("webui", "token", default="") if orchestrator is not None else ""

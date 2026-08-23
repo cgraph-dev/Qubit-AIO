@@ -138,13 +138,40 @@ class SherpaASR(ASRProvider):
         if len(audio) == 0:
             return Transcript(text="", provider=f"sherpa-{self.engine}", duration_s=0.0)
 
-        with self._lock:
-            stream = self._recognizer.create_stream()
-            stream.accept_waveform(sample_rate=sr, waveform=audio)
-            self._recognizer.decode_stream(stream)
-            text = stream.result.text.strip()
+        # Moonshine's decoder has a fixed sequence window (~20s, tokens ~1241)
+        # and CRASHES (onnxruntime broadcast "4 by <n>") on longer audio instead
+        # of returning empty. Chunk long clips into overlapping windows and
+        # concat the per-chunk text so continuous speech up to the VAD cap
+        # (~30s) transcribes reliably. Parakeet handles long clips natively.
+        MAX_CHUNK_S = 20.0
+        OVERLAP_S = 1.0
+        if self.engine == "moonshine" and len(audio) / max(sr, 1) > MAX_CHUNK_S:
+            parts = []
+            n = len(audio)
+            step = int(sr * (MAX_CHUNK_S - OVERLAP_S))
+            width = int(sr * MAX_CHUNK_S)
+            pos = 0
+            while pos < n:
+                chunk = audio[pos:pos + width]
+                if len(chunk) < int(sr * 0.5):
+                    break
+                with self._lock:
+                    stream = self._recognizer.create_stream()
+                    stream.accept_waveform(sample_rate=sr, waveform=chunk)
+                    self._recognizer.decode_stream(stream)
+                    txt = stream.result.text.strip()
+                    if txt:
+                        parts.append(txt)
+                pos += step
+            text = " ".join(parts).strip()
+        else:
+            with self._lock:
+                stream = self._recognizer.create_stream()
+                stream.accept_waveform(sample_rate=sr, waveform=audio)
+                self._recognizer.decode_stream(stream)
+                text = stream.result.text.strip()
         log_event("asr.transcribe", provider=self.name, engine=self.engine,
-                  device=self.provider, chars=len(text))
+                  device=self.provider, chars=len(text), raw_dur_s=round(dur_s, 2))
         # sherpa exposes no per-segment confidence; 1.0 = unknown-ok.
         return Transcript(text=text, language=self.language, confidence=1.0,
                           duration_s=dur_s, provider=f"sherpa-{self.engine}")
