@@ -609,3 +609,28 @@ def test_romanian_language_detection():
     assert is_ro("what timezone am I in") is False
     assert is_ro("can you help me") is False
     assert is_ro("play despacito on youtube") is False
+
+
+def test_tts_language_aware_voice_switch():
+    """Piper TTS must pick the Romanian voice for RO text (EN voice mangles it)
+    and the default EN voice for English; RO voice file must exist locally."""
+    import pathlib
+    from voicebridge.tts.piper import PiperTTS, _is_romanian, _RO_VOICE
+    assert _is_romanian("Fusul tău orar este Europe/Bucharest") is True
+    assert _is_romanian("what timezone am I in") is False
+    assert _is_romanian("care este fusul meu orar") is True
+    models = pathlib.Path.home() / ".local/share/openclaw-voice-bridge/models"
+    assert (models / f"{_RO_VOICE}.onnx").exists(), "Romanian piper voice missing"
+    src = pathlib.Path("voicebridge/tts/piper.py").read_text()
+    assert "_SECONDARY" in src and 'startswith("ro")' in src
+
+
+def test_chat_local_accepts_language_hint():
+    """chat_local takes an explicit language hint that overrides heuristics."""
+    import pathlib
+    src = pathlib.Path("voicebridge/local_llm.py").read_text()
+    assert "language: Optional[str] = None" in src
+    assert 'language.lower().startswith("ro")' in src
+    # orchestrator passes the ASR-detected language through
+    o = pathlib.Path("voicebridge/orchestrator.py").read_text()
+    assert "_last_spoken_language" in o and "language=getattr(self" in o

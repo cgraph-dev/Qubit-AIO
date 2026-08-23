@@ -22,6 +22,28 @@ log = get_logger()
 # the espeakbridge C extension. One global lock serializes ALL synthesis.
 _GLOBAL_TTS_LOCK = threading.Lock()
 
+# Language-specific voices: Romanian needs a RO phonemizer, an English voice
+# mangles it ("speaks romanian very bad"). Auto-switch per utterance.
+_RO_VOICE = "ro_RO-mihai-medium"
+_SECONDARY = {"ro": _RO_VOICE}
+
+
+def _is_romanian(text: str) -> bool:
+    """Cheap, high-signal RO detector (diacritics or 2+ strong RO tokens).
+    Mirrors the reply-language rule so TTS matches the text's language."""
+    low = (text or "").lower()
+    if any(c in low for c in ("ă", "â", "ș", "ş", "ț", "ţ", "î")):
+        return True
+    tokens = [w for w in low.split() if w.isalpha()]
+    strong = {t for t in tokens if t in {
+        "salut", "buna", "bună", "faci", "cum", "esti", "ești", "sunt", "bine",
+        "mulțumesc", "multumesc", "azi", "astăzi", "vreau", "ajuta", "vorbesti",
+        "română", "care", "este", "meu", "mea", "fost", "unde", "cand", "când",
+        "pentru", "despre", "acum", "ieri", "mâine", "vorbesc", "frumos", "mama",
+        "fusul", "orar", "tău", "ta", "nostru", "vostru",
+    } and len(t) > 2}
+    return len(strong) >= 2
+
 
 class PiperTTS(TTSProvider):
     name = "piper"
@@ -32,41 +54,62 @@ class PiperTTS(TTSProvider):
         self.voice = voice
         self.sample_rate = sample_rate
         self._voice_obj = None
+        self._voices: dict[str, object] = {}   # per-voice cache {voice_name: PiperVoice}
         self._lock = threading.Lock()
 
-    def _model_paths(self) -> tuple[Path, Path]:
-        onnx = self.model_dir / f"{self.voice}.onnx"
-        jsonp = self.model_dir / f"{self.voice}.onnx.json"
+    def _model_paths(self, voice: Optional[str] = None) -> tuple[Path, Path]:
+        v = voice or self.voice
+        onnx = self.model_dir / f"{v}.onnx"
+        jsonp = self.model_dir / f"{v}.onnx.json"
         if not onnx.exists():
             raise TTSUnavailable(
                 f"piper voice not found: {onnx}\n"
                 "Download it (see README): "
                 "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/"
-                f"en/en_US/{self.voice.split('-', 2)[2] if '-' in self.voice else 'medium'}/"
-                f"{self.voice}.onnx")
+                f"en/en_US/{v.split('-', 2)[2] if '-' in v else 'medium'}/"
+                f"{v}.onnx")
         return onnx, jsonp
 
-    def load(self) -> None:
+    def _get_voice(self, voice_name: str):
+        """Load (and cache) a PiperVoice for the given voice name."""
         with self._lock:
-            if self._voice_obj is not None:
-                return
+            if voice_name in self._voices:
+                return self._voices[voice_name]
             try:
                 from piper import PiperVoice
             except Exception as exc:  # pragma: no cover
                 raise TTSUnavailable(f"piper-tts not installed: {exc}") from exc
-            onnx, _ = self._model_paths()
-            self._voice_obj = PiperVoice.load(str(onnx))
-            log_event("tts.load", provider=self.name, voice=self.voice)
+            onnx, _ = self._model_paths(voice_name)
+            obj = PiperVoice.load(str(onnx))
+            self._voices[voice_name] = obj
+            log_event("tts.load", provider=self.name, voice=voice_name)
+            return obj
 
-    def synthesize(self, text: str, out_path: Optional[Path | str] = None) -> Path:
-        self.load()
+    def load(self) -> None:
+        """Preload the default voice (lazy-loads others on first use)."""
+        self._get_voice(self.voice)
+
+    def synthesize(self, text: str, out_path: Optional[Path | str] = None,
+                   language: Optional[str] = None) -> Path:
+        # Language-aware voice pick: Romanian text through an English voice
+        # sounds broken; switch to the RO voice when the text is Romanian.
+        chosen = self.voice
+        if (language or "").lower().startswith("ro") or (language is None and _is_romanian(text)):
+            alt = _SECONDARY.get("ro")
+            try:
+                self._model_paths(alt)
+                chosen = alt
+            except Exception:
+                chosen = self.voice   # RO voice missing -> fall back to default
+        obj = self._get_voice(chosen)
         out_path = Path(out_path) if out_path else Path(f"/tmp/openclaw-voice-bridge/tts-{abs(hash(text))%10**8}.wav")
         out_path.parent.mkdir(parents=True, exist_ok=True)
         with _GLOBAL_TTS_LOCK:
             with self._lock:
                 with wave.open(str(out_path), "wb") as wf:
-                    self._voice_obj.synthesize_wav(text, wf)
-        log_event("tts.synthesize", provider=self.name, chars=len(text), path=str(out_path))
+                    obj.synthesize_wav(text, wf)
+        log_event("tts.synthesize", provider=self.name, chars=len(text),
+                  path=str(out_path), voice=chosen)
         return out_path
 
     def available(self) -> bool:

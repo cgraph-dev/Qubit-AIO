@@ -2158,7 +2158,8 @@ class VoiceOrchestrator:
                     url=llm_cfg.get("url", "http://127.0.0.1:11434"),
                     timeout_s=float(llm_cfg.get("timeout_s", 4.0)),
                     max_tokens=int(llm_cfg.get("max_tokens", 100)),
-                    context=_mem_ctx)
+                    context=_mem_ctx,
+                    language=getattr(self, "_last_spoken_language", None) or None)
             except Exception as exc:
                 reply = ""
                 log_event("conversation.local.skip", error=str(exc)[:120])
@@ -3333,6 +3334,9 @@ class VoiceOrchestrator:
             self.speak("Sorry, I didn't catch that. Could you repeat it?")
             return
         log_event("routing.input", text=transcript.text, confidence=round(transcript.confidence, 3))
+        # Remember the ASR-detected language so replies match the SPOKEN language
+        # (the recogniser is authoritative over text heuristics).
+        self._last_spoken_language = getattr(transcript, "language", None) or ""
         self._push_input(transcript.text, transcript.confidence, "mic")
         if transcript.text.strip().lower() in ("uh", "um", "hmm", "ah", "mm", "aah", "okay", "ok"):
             self.speak("I didn't catch that. Try again.")

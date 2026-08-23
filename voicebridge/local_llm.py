@@ -56,11 +56,13 @@ if _DIALOGS:
 def chat_local(text: str, conversation_prompt: str = "",
                model: str = "qwen3:4b", url: str = "http://127.0.0.1:11434",
                timeout_s: float = 4.0, max_tokens: int = 100,
-               context: str = "") -> str:
+               context: str = "", language: Optional[str] = None) -> str:
     """Return a short local reply, or "" on any failure (caller falls back).
 
     `context` = personal knowledge (MEMORY.md, personal-knowledge.md) the
     model should use when answering about the user's world.
+    `language` = explicit ASR-detected hint ("ro"/"en"); overrides text
+    heuristics when provided (the recogniser knows better than a word list).
     """
     user_content = f"Recent conversation:\n{conversation_prompt}\n\n"
     if context:
@@ -87,7 +89,12 @@ def chat_local(text: str, conversation_prompt: str = "",
     _strong = {t for t in _tokens if t in _ro_words and len(t) > 2}
     _is_ro = bool(any(c in _low for c in _ro_markers)) or len(_strong) >= 2 or \
         ("care" in _tokens and any(t in _tokens for t in ("este","e","ești","fus","ora","orar")))
-    _lang_directive = "Reply in Romanian." if _is_ro else "Reply in English. Do NOT reply in Romanian."
+    # ASR-detected language wins when provided (the recogniser is authoritative):
+    # "ro" -> Romanian, anything else explicit -> English.
+    if language:
+        _is_ro = language.lower().startswith("ro")
+    _lang_directive = "Reply ONLY in Romanian (diacritics included)." if _is_ro \
+        else "Reply ONLY in English. Do NOT reply in any other language."
     user_content += f"User: {text}\n[{_lang_directive} The user's current message is in {'Romanian' if _is_ro else 'English'} — ignore previous turns' language.]"
     payload = {
         "model": model,
