@@ -14,13 +14,13 @@ agents/browsers/tools. Runs on the RTX 3070 Ti 8 GB + Ryzen 5700X.
 
 ### The pipeline (each turn)
 ```
-mic (HyperX on Scarlett 2i2) --gain 3x + Air mode--> 16k WAV
+mic (HyperX USB mono) --> 16k WAV
    -> ASR sherpa parakeet (fallback moonshine) (0.5s, 0 VRAM)
    -> [if empty: cached fallback]
    -> classifier (heuristic + optional LLM)
    -> route (local | openclaw | hermes | browser | coding | conversation)
    -> local model qubit-brain (3.6B, resident) answers chat (~0.5s)
-   -> TTS piper en_US-amy (22050Hz) -> resample -> headphones (device 5, 44100)
+   -> TTS piper en_US-amy (22050Hz) -> resample -> default sink (HyperX IEC958)
 ```
 
 ### Key files
@@ -49,11 +49,19 @@ mic (HyperX on Scarlett 2i2) --gain 3x + Air mode--> 16k WAV
 - **English only.** All Romanian removed (TTS voice, ASR multilingual tier, RO
   detector, dialogs, baked rule). A reply-guard retries if the model drifts out
   of English.
-- **Mic = HyperX headset on Scarlett 2i2.** `mic.gain: 3.0` (over-gain 8x/64x
-  amplified hiss + clipped -> ASR returned empty). Scarlett `Air` mode ON,
-  Line In 1/2 gain 100%, autogain ON, phantom OFF.
-- **Output pinned to headphone device 5** (`audio.output_device: 5`,
-  motherboard ALC892). `audio.output_volume: 80`.
+- **Mic = HyperX Cloud III (USB, mono).** `mic.channels: 1` (it's mono; the
+  unplugged Scarlett needed 4). `mic.gain: 3.0` + a peak-normalizer (clip to
+  ~0.35 before ASR) so a quiet/variable mic transcribes consistently.
+- **Output = HyperX USB digital (iec958)** — the same sink YouTube/browser use,
+  so the agent is audible there too. The bridge now follows the DEFAULT sink
+  (unreliable raw-ALSA device indices/churn caused 'can't hear the agent').
+  `speak_web_locally: false` -> the browser plays audio_b64 once = single speech
+  (was double-speaking on web). Playback has a watchdog (a wedged device can't
+  freeze a request) and falls back to the default sink on device-open failure.
+- **USB port speed matters**: audio USB devices on a slow USB1.1 (12M) port
+  freeze the moment a stream opens. `scripts/diagnose_audio_usb.py` detects this
+  (we hit it with the HyperX until it was moved to a fast port). `Audio` device
+  churn (indices shift on each reconnect) is why we resolve BY NAME.
 
 ---
 
