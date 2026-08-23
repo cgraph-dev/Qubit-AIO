@@ -87,12 +87,6 @@ def _hermes_default_model() -> str:
         pass
     return ""
 
-BEEP_START = np.array([], dtype=np.int16)   # placeholder; real beeps via piper
-_SAMPLE_TASK = (
-    "Open the current project, inspect the Stripe webhook flow, and "
-    "patch the signature verification and add structured logs."
-)
-
 # Boss-talk + humming while thinking (characterful, not spammy)
 _BOSS_PHRASES = [
     "I'm on it boss",
@@ -1838,7 +1832,9 @@ class VoiceOrchestrator:
         # Only satisfy a waiting web poll if a web request is actually waiting;
         # otherwise a Right Ctrl task would overwrite a concurrent dashboard request's
         # _last_web_summary before it polls it (the "delay / wrong answer" bug).
-        if self._web_active or self._web_mode:
+        with self._web_lock:
+            _waiting_web = self._web_active > 0
+        if _waiting_web or self._web_mode:
             self._last_web_summary = summary
         self.speak(summary)
         # A task finished — start the next queued one (if any).

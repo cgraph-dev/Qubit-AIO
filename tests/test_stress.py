@@ -368,3 +368,40 @@ def test_web_replies_speak_locally_by_default():
     orb2.speak("hello there")
     orb2.playback.play.assert_not_called()
     assert orb2._web_spoken == ["hello there"]
+
+
+def test_orb_freeze_regression_node():
+    """Atomic: the guarded audio-await must resolve even when interrupt() pauses
+    mid-play (pause() never fires 'ended'). Regression for the orb freeze."""
+    import subprocess, os
+    r = subprocess.run(["node", "scripts/test_orb_frozen.mjs"],
+                       capture_output=True, text=True, timeout=30)
+    assert r.returncode == 0, f"orb freeze regression: {r.stderr[-400:]}\n{r.stdout[-400:]}"
+    assert "ALL PASS" in r.stdout, r.stdout[-400:]
+
+
+def test_webui_results_pruned_both_paths():
+    """webui must bound _results (keep last N) on BOTH talk and type paths."""
+    import pathlib, tempfile
+    from voicebridge.config import Config
+    from unittest import mock
+    import threading, time
+    from voicebridge.webui import WebUI
+    with tempfile.TemporaryDirectory() as td:
+        cfg = Config.load(pathlib.Path(td) / "none.yaml")
+        cfg.data.setdefault("webui", {})["enabled"] = False
+        orb = mock.MagicMock()
+        orb.cfg = cfg
+        orb._cur_ctx = mock.MagicMock(return_value=None)
+        orb.shared = mock.MagicMock()
+        orb._needs_answer = mock.MagicMock(return_value=False)
+        orb.process_web_utterance = mock.MagicMock(return_value={"summary": "x", "route": "local"})
+        w = WebUI(orb, host="127.0.0.1", port=0, state_dir=pathlib.Path(td))
+        # Insert many results directly and prune
+        with w._result_lock:
+            for i in range(120):
+                w._results[f"rid{i}"] = {"x": i}
+        w._prune_results(keep=50)
+        with w._result_lock:
+            n = len(w._results)
+        assert n <= 50, f"results not bounded: {n}"

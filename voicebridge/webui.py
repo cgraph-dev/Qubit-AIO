@@ -1003,6 +1003,7 @@ class WebUI:
                 self._results[rid] = result
             with self._pending_lock:
                 self._pending.pop(rid, None)
+            self._prune_results()
 
         threading.Thread(target=_run, daemon=True, name=f"webui-type-{rid}").start()
         return rid
@@ -1033,14 +1034,17 @@ class WebUI:
                 self._results[rid] = result
             with self._pending_lock:
                 self._pending.pop(rid, None)
-            # prune old results (keep last 50)
-            with self._result_lock:
-                if len(self._results) > 50:
-                    for k in list(self._results)[:-50]:
-                        self._results.pop(k, None)
+            self._prune_results()
 
         threading.Thread(target=_run, daemon=True, name=f"webui-talk-{rid}").start()
         return rid
+
+    def _prune_results(self, keep: int = 50) -> None:
+        """Bound the in-memory result map so the web server never grows unbounded."""
+        with self._result_lock:
+            if len(self._results) > keep:
+                for k in list(self._results)[:-keep]:
+                    self._results.pop(k, None)
 
     def result(self, rid: str) -> Dict[str, Any]:
         """Poll endpoint: pending -> {"status": "pending"} until done."""
