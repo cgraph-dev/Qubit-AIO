@@ -20,7 +20,7 @@ mic:
   channels: 4             # capture ALL channels of the Scarlett's 4ch profile;
                           # per-channel max picks whichever has the mic
   blocksize: 480          # ~10 ms at 48 kHz
-  gain: 8.0               # AT2020 + 2i2 gain knob up: 64x would hard-clip
+  gain: 3.0               # HyperX headset mic: over-gain (8x+) amplifies hiss + distorts ASR (returns empty) — ~3x is clean
   min_rms: 0.0008         # below this RMS the capture counts as silence
   max_capture_s: 30.0     # watchdog: force-close a wedged mic stream
 

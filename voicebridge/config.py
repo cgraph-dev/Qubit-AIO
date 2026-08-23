@@ -37,7 +37,7 @@ DEFAULTS: Dict[str, Any] = {
         "sample_rate": 48000,  # device rate; resampled to 16k for ASR
         "channels": 2,         # capture N channels, use the loudest
         "blocksize": 480,      # ~10ms at 48k
-        "gain": 64.0,           # pre-amplify quiet interfaces (Focusrite needs this)
+        "gain": 3.0,           # pre-amplify quiet mics (too high (8x+64x) amplifies hiss and distorts ASR -> empty transcripts)
         "min_rms": 0.0005,          # lowered from 0.0008 — quiet tap speech peaked at 0.006 but was still gated          # below this the capture is treated as silence
                 "max_capture_s": 30.0,       # watchdog: force-close a wedged mic stream
     },

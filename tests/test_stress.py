@@ -636,3 +636,19 @@ def test_routing_success_rate_95():
         assert rate >= 0.95, f"routing success {rate:.0%} < 95%: {misses}"
 
 
+
+
+def test_mic_gain_avoids_over_amp():
+    """mic.gain must not be set so high it distorts ASR (a quiet HyperX returns
+    empty at x8+; ~x3 transcribes). Guard the config/main defaults."""
+    import pathlib, tempfile
+    from voicebridge.config import Config
+    with tempfile.TemporaryDirectory() as td:
+        cfg = Config.load(pathlib.Path(td) / "none.yaml")
+        g = float(cfg.get("mic", "gain", default=4.0))
+        assert 1.0 <= g <= 6.0, f"mic gain {g} risks over-amplification/distortion"
+    repo = pathlib.Path("config/voice.yaml").read_text()
+    # the shipped config must not default to the distorting x8
+    import re
+    m = re.search(r"gain:\s*([\d.]+)", repo)
+    assert m and float(m.group(1)) <= 6.0, f"repo config gain too high: {m.group(0) if m else 'none'}"
