@@ -444,3 +444,52 @@ def test_play_tab_path_no_unbound():
              open_url=mock.MagicMock(return_value={"error": None, "url": "https://yt/1"}))}, **__import__("sys").modules}):
         res = A._yt_launch("queen", [{"title": "Queen", "url": "https://yt/1", "views": 1}], 0, "tab")
     assert "in a tab" in res, res
+
+
+def test_orb_rapid_press_stress_node():
+    """Atomic: the orb must NOT freeze under adversarial rapid taps (busy/ptt/recording
+    always recover). Regression for 'orb freezes when I press too many times'."""
+    import subprocess
+    r = subprocess.run(["node", "scripts/test_orb_stress.mjs"],
+                       capture_output=True, text=True, timeout=40)
+    assert r.returncode == 0, f"orb stress failed: {r.stderr[-400:]}\n{r.stdout[-400:]}"
+    assert "ALL PASS" in r.stdout, r.stdout[-400:]
+
+
+def test_report_generator_rich_format():
+    """generate_report auto-build must emit a RICH report with the key detailed
+    sections (Agent/Route, Files table, Verification+test output, References,
+    Screenshots, Commands, spoken summary last) and infer status correctly."""
+    import importlib.util, argparse, pathlib, sys
+    spec = importlib.util.spec_from_file_location("gen", "scripts/generate_report.py")
+    g = importlib.util.module_from_spec(spec); spec.loader.exec_module(g)
+    class A: pass
+    a = A(); a.task="fix login"; a.project="~/x"; a.status=""; a.elapsed="2s"
+    a.agent="hermes"; a.route="hermes"; a.summary=""; a.actions=""; a.files=""
+    a.verify="pytest 12 passed"; a.risks=""; a.next=""; a.questions=""
+    a.objectives=""; a.references="https://a.ref/x"; 
+    raw=("Fixed auth.py. Ran: pytest backend -q (12 passed, 0 failed). "
+         "Screenshot: /tmp/ss.png. Ref https://github.com/cgraph-dev/cgraph. "
+         "All tests green, system works. Files: backend/app/sec/auth.py frontend/src/login.tsx")
+    a.raw=raw
+    md, spoken = g.auto_build(raw, a)
+    for sec in ("## Executive Summary","## Actions Taken","## Files Changed",
+                "## Verification","## Risks / Blockers","## Next Steps",
+                "## Appendix","### References / Sources","### Screenshots / Evidence",
+                "**Spoken Summary"):
+        assert sec in md, f"missing section {sec}"
+    assert "**Agent:** hermes" in md and "**Route:** hermes" in md
+    assert "**Status:** completed" in md, "should infer completed (0 failures)"
+    assert len(spoken.split()) <= 40, "spoken summary >40 words"
+    # spoken summary is the last line
+    assert md.rstrip().endswith(spoken), "spoken summary must be last"
+
+
+def test_report_infers_status():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("gen", "scripts/generate_report.py")
+    g = importlib.util.module_from_spec(spec); spec.loader.exec_module(g)
+    assert g.infer_status("12 passed, 0 failed. done") == "completed"
+    assert g.infer_status("Traceback: ZeroDivisionError") == "partial"
+    assert g.infer_status("3 tests FAILED on deploy") == "partial"
+    assert g.infer_status("worked fine") == "completed"
