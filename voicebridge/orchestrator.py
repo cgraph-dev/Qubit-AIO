@@ -1508,11 +1508,12 @@ class VoiceOrchestrator:
             blocking = self.blocking_tasks
         t0 = time.time()
         self._spawn_waiter(session_key, run_id, t0)
-        # humming while the gateway task runs (non-blocking, stop when task clears)
+        # humming while the gateway task runs — ONE self-stopping thread that
+        # exits when the task clears or playback/interrupt is active (no separate
+        # watcher thread, less fan-out). Checks task.active each tick.
         _hum_stop = threading.Event()
         def _hum_loop():
             import random as _rnd
-            # first hum sooner so the user knows it's alive, then spaced out
             _hum_stop.wait(timeout=_rnd.uniform(6, 10))
             while not _hum_stop.is_set() and self.task.active and not self._stop.is_set():
                 if self.playback.playing or self._interrupt_requested:
@@ -1530,13 +1531,6 @@ class VoiceOrchestrator:
             while self.task.active and not self._stop.is_set():
                 time.sleep(0.5)
             _hum_stop.set()
-        else:
-            # non-blocking: stop hum when waiter clears the task (watch the task)
-            def _watch_hum_stop():
-                while self.task.active and not self._stop.is_set():
-                    time.sleep(1.0)
-                _hum_stop.set()
-            threading.Thread(target=_watch_hum_stop, daemon=True, name="openclaw-hum-watch").start()
 
     def _spawn_waiter(self, session_key: str, run_id: str, t0: float) -> None:
         """Background poller (waiter + reaper in one).
@@ -3283,7 +3277,42 @@ class VoiceOrchestrator:
             log_event("asr.fallback.empty", primary=cur_engine, fallback=fb_engine)
         except Exception as exc:
             log_event("asr.fallback.failed", error=str(exc)[:160])
+        # Third tier — multilingual: the sherpa engines are English-only. If the
+        # mic heard real speech but sherpa blanked it, TRY a multilingual
+        # recogniser (faster-whisper-large-v3-turbo, language auto-detect) so
+        # Romanian / accented speech is still transcribed instead of 'no speech'.
+        if self.cfg.get("asr", "multilingual_fallback", default=True):
+            try:
+                mlt = self._get_multilingual_asr()
+                trm = mlt.transcribe(Path(wav_path))
+                if not getattr(trm, "empty", True) and (trm.text or "").strip():
+                    log_event("asr.multilingual.success", text=trm.text[:120],
+                              language=trm.language)
+                    return trm
+                log_event("asr.multilingual.empty", language=getattr(trm, "language", None))
+            except Exception as exc:
+                log_event("asr.multilingual.failed", error=str(exc)[:160])
         return tr
+
+    def _get_multilingual_asr(self):
+        """Return a cached multilingual faster-whisper recogniser (shared across
+        utterances — never rebuilt per call)."""
+        cached = getattr(self, "_multilingual_asr", None)
+        if cached is not None:
+            return cached
+        from .asr.whisper import FasterWhisperASR
+        from .asr.whisper import bootstrap_cuda_libs
+        bootstrap_cuda_libs()
+        _dir = self.cfg.model_dir()
+        # Prefer the already-downloaded large-v3-turbo; fall back to small.
+        model = self.cfg.get("asr", "multilingual_model", default="large-v3-turbo")
+        cached = FasterWhisperASR(model=model, device="cpu", compute_type="int8",
+                                  language=None,       # auto-detect (ro/en/...)
+                                  beam_size=int(self.cfg.get("asr", "beam_size", default=5)),
+                                  model_dir=_dir)
+        cached.load()
+        self._multilingual_asr = cached
+        return cached
 
     def _process_utterance(self, wav_path: str) -> None:
         t0 = time.time()

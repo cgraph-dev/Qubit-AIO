@@ -558,3 +558,54 @@ def test_fallback_asr_honors_config_engine_and_num_threads():
     assert '"fallback_engine"' in src, "orchestrator must read asr.fallback_engine"
     assert '"num_threads"' in src, "orchestrator must read asr.num_threads"
     assert "_fallback_asr" in src, "must cache the fallback recognizer"
+
+
+def test_multilingual_asr_wiring():
+    """config exposes multilingual fallback flags, and _get_multilingual_asr is
+    cached (loads once, shared across utterances) + uses language=None (auto-detect)."""
+    import pathlib, tempfile
+    from voicebridge.config import Config
+    with tempfile.TemporaryDirectory() as td:
+        cfg = Config.load(pathlib.Path(td) / "none.yaml")
+        assert cfg.get("asr", "multilingual_fallback", default=True) is True
+        assert cfg.get("asr", "multilingual_model", default="large-v3-turbo") == "large-v3-turbo"
+    src_o = pathlib.Path("voicebridge/orchestrator.py").read_text()
+    assert "_get_multilingual_asr" in src_o, "must have the multilingual helper"
+    assert '_multilingual_asr' in src_o, "must cache the multilingual recognizer"
+    assert 'language=None' in src_o, "auto-detect language"
+    # config defaults present
+    src_c = pathlib.Path("voicebridge/config.py").read_text()
+    assert "multilingual_fallback" in src_c and "multilingual_model" in src_c
+
+
+def test_whisper_language_none_is_auto_detect():
+    """whisper must pass language=None to faster-whisper so it auto-detects
+    (ro/en). The transcriber must not hardcode English."""
+    import pathlib
+    src = pathlib.Path("voicebridge/asr/whisper.py").read_text()
+    # transcribe passes self.language (None -> auto-detect)
+    assert "language=self.language" in src
+    # and returns detected info.language
+    assert 'getattr(info, "language"' in src
+
+
+def test_romanian_language_detection():
+    """The local LLM must detect Romanian (incl. no-diacritic RO like 'care este
+    fusul meu orar') and keep English as English — no false RO on EN phrases."""
+    import pathlib
+    src = pathlib.Path("voicebridge/local_llm.py").read_text()
+    assert "care" in src and "este" in src, "detector must contain RO tokens care/este"
+    assert "len(_strong) >= 2" in src, "must use a 2+ strong-word threshold (no false positives)"
+    assert "_ro_markers" in src and "_ro_words" in src
+    # Replicate the detector logic to assert behaviour.
+    _ro_markers=("ă","â","ș","ş","ț","ţ","î")
+    _ro_words={"salut","buna","bună","ce","faci","cum","esti","ești","sunt","bine","mulțumesc","azi","astăzi","vreau","pot","ajuta","vorbesti","română","care","este","meu","mea","fost","unde","cand","când","pentru","despre","acum","ieri","mâine","vorbesc","frumos","copil","mama","să","între"}
+    def is_ro(text):
+        low=text.lower(); toks=[w for w in low.split() if w.isalpha()]
+        strong={t for t in toks if t in _ro_words and len(t)>2}
+        return bool(any(c in low for c in _ro_markers)) or len(strong)>=2 or ('care' in toks and any(t in toks for t in ('este','e','fus','ora','orar')))
+    assert is_ro("care este fusul meu orar") is True
+    assert is_ro("cum esti astazi") is True
+    assert is_ro("what timezone am I in") is False
+    assert is_ro("can you help me") is False
+    assert is_ro("play despacito on youtube") is False

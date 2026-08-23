@@ -69,9 +69,24 @@ def chat_local(text: str, conversation_prompt: str = "",
     # Detect the CURRENT message language and force it — history/personal-knowledge
     # may contain Romanian, but the reply must match THIS message only.
     _ro_markers = ("ă","â","ș","ş","ț","ţ","î","ă")
-    _ro_words = {"salut","buna","bună","ce","faci","cum","esti","ești","sunt","bine","multumesc","mulțumesc","azi","astazi","astăzi","da","nu","te","ma","vreau","pot","ajuta","vorbesti","vorbești","romana","română","românește","româneşte"}
+    # High-signal Romanian tokens (not substrings of common English words).
+    # Ensures "care este fusul meu orar" etc. are classified RO.
+    _ro_words = {
+        "salut","buna","bună","sal","hei","ce","faci","fac","cum","esti","ești","sunt",
+        "bine","multumesc","mulțumesc","mersi","azi","astazi","astăzi","da","nu","te",
+        "ma","mă","vreau","vrei","pot","ajuta","ajutor","vorbesti","vorbești","romana",
+        "română","românește","româneşte","care","este","eşti","esti","meu","mea","mos",
+        "fost","unde","cand","când","dece","de ce","cine","ceva","nimic","astfel","prin",
+        "pentru","despre","între","acum","azi","ieri","mâine","main","merge","gust","vorbesc",
+        "frumos","dragut","drăguț","copil","mama","mamă","tata","tata","să","sa","ca",
+        "ca","cu","la","pe","din","în","in","sunt","esti","ești","e","sînt","nu","da",
+    }
     _low = text.lower()
-    _is_ro = any(c in _low for c in _ro_markers) or any(w in _low.split() for w in _ro_words)
+    _tokens = [w for w in _low.split() if w.isalpha()]
+    # Score: RO words present (weighted), minus over-generic single/double-letter ones.
+    _strong = {t for t in _tokens if t in _ro_words and len(t) > 2}
+    _is_ro = bool(any(c in _low for c in _ro_markers)) or len(_strong) >= 2 or \
+        ("care" in _tokens and any(t in _tokens for t in ("este","e","ești","fus","ora","orar")))
     _lang_directive = "Reply in Romanian." if _is_ro else "Reply in English. Do NOT reply in Romanian."
     user_content += f"User: {text}\n[{_lang_directive} The user's current message is in {'Romanian' if _is_ro else 'English'} — ignore previous turns' language.]"
     payload = {

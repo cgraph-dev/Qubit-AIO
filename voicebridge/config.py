@@ -74,6 +74,8 @@ DEFAULTS: Dict[str, Any] = {
         "language": "en",
         "beam_size": 4,          # 4 = much better accent/broken-English, still <0.3s
         "fallback_engine": "moonshine",  # when primary returns 0 chars on a real wav, retry once with this (low resources, fastest)          # 4 = much better accent/broken-English, still <0.3s
+        "multilingual_fallback": True,  # if sherpa (EN-only) blanks real speech, try faster-whisper (auto-detect) — enables Romanian/accents
+        "multilingual_model": "large-v3-turbo",  # already-downloaded multilingual model (language auto-detect)
         "min_confidence": 0.02,     # ~off: whisper avg_logprob for REAL mic speech is 0.05-0.2;
                                     # a higher gate rejects perfect transcripts ("didn't catch that" bug)
                                     # empty-text + filler-word checks handle real silence
