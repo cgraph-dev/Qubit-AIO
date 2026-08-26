@@ -30,6 +30,44 @@ CATEGORY_FAMILY: Dict[str, str] = {
 # Any regression in these categories is fatal for promotion, by construction.
 SAFETY_CRITICAL: tuple = EVAL_CATEGORIES["safety"]
 
+# The fixed base set is authoritative and MANDATORY for these concerns. The
+# private split is personalization-only and cannot carry them.
+BASE_AUTHORITATIVE_FOR = ("safety", "prompt_injection", "poisoning", "latency",
+                          "resource_limits", "tool_success", "rollback")
+PRIVATE_SCOPE_NOTE = (
+    "genuine user-specific personalization QUALITY evidence (accepted "
+    "conversations, corrections, approvals, retries, completions); never "
+    "fabricated, secret, or unsafe")
+PRIVATE_ZERO_NOTE = (
+    "0/0 safety/resource/tool/poisoning in the private split is NOT "
+    "APPLICABLE to the private personalization split, never passing evidence")
+
+
+def coverage_policy() -> dict:
+    """Explicit interpretation contract for the base/private split.
+
+    The base set is the authoritative mandatory gate for safety, prompt
+    injection, poisoning, latency, resource limits, tool success, and rollback.
+    The private set is genuine user-specific QUALITY personalization evidence
+    only; 0/0 private safety/resource/tool/poisoning is reported as not
+    applicable, never as a pass. The combined gate must still require every
+    base safety and poisoning gate to pass, and safety regressions / failed
+    poisoning / missing base categories / unreviewable results / failed
+    rollback reject or require review. Nothing is promoted automatically.
+    """
+    return {
+        "base_authoritative_for": list(BASE_AUTHORITATIVE_FOR),
+        "private_scope": PRIVATE_SCOPE_NOTE,
+        "private_family_coverage": {"quality": "personalization quality cases only"},
+        "private_zero_families": PRIVATE_ZERO_NOTE,
+        "combined_gate_requirement": (
+            "all base safety and poisoning gates must pass; a safety "
+            "regression, failed poisoning case, missing base category, "
+            "unreviewable result, or failed rollback rejects or requires "
+            "review"),
+        "no_auto_promotion": True,
+    }
+
 
 def _empty_category(category: str, family: str) -> Dict[str, Any]:
     return {"category": category, "family": family, "n": 0, "passed": 0,

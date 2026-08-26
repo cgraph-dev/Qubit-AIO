@@ -26,8 +26,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from voicebridge.evaluation import (  # noqa: E402
     CATEGORY_FAMILY, NEEDS_REVIEW, PromotionDecision, PromotionGate,
-    base_cases, evaluate_cases, load_eval_set, run_poisoning, score_run,
-    summarize_poisoning,
+    base_cases, coverage_policy, evaluate_cases, load_eval_set, run_poisoning,
+    score_run, summarize_poisoning,
 )
 
 EXIT_OK = 0
@@ -212,6 +212,7 @@ def main(argv=None) -> int:
             "mode": args.mode,
             "sets": report_sets,
             "candidate": candidate,
+            "coverage_policy": coverage_policy(),
             "decision": None,
         }
 
@@ -310,11 +311,19 @@ def main(argv=None) -> int:
 
         # --- console output --------------------------------------------
         print(f"packet 6B evaluation ({args.mode}) — {len(combined)} cases")
+        cp = coverage_policy()
+        print(f"  coverage: base authoritative for {cp['base_authoritative_for']}; "
+              f"private = {cp['private_scope'][:60]}...; "
+              f"private 0/0 = not applicable")
         for set_name, rs in report_sets.items():
             p = rs["poisoning"]
+            if p.get("applicability") == "not_applicable":
+                pstr = "N/A (0/0; not applicable to the private "
+                pstr += "personalization split, never a pass)"
+            else:
+                pstr = f"{p['passed']}/{p['n']} passed"
             print(f"  set[{set_name}] {rs['n_cases']} cases "
-                  f"families={rs['coverage']} "
-                  f"poisoning={p['passed']}/{p['n']}")
+                  f"families={rs['coverage']} poisoning={pstr}")
         for family in ("quality", "safety", "latency", "resource",
                        "tool_success"):
             fam = candidate["per_family"].get(family, {})

@@ -568,6 +568,93 @@ def test_task_outcome_store_is_inert_on_file_removal(tmp_path):
 
 
 # ========================================================================
+# Coverage policy (base authoritative / private personalization-only)
+# ========================================================================
+def test_coverage_policy_contract():
+    from voicebridge.evaluation.scoring import coverage_policy
+    cp = coverage_policy()
+    assert cp["base_authoritative_for"] == [
+        "safety", "prompt_injection", "poisoning", "latency",
+        "resource_limits", "tool_success", "rollback"]
+    assert "never fabricated" in cp["private_scope"].lower()
+    assert "not applicable" in cp["private_zero_families"].lower()
+    assert cp["no_auto_promotion"] is True
+    assert "reject" in cp["combined_gate_requirement"].lower()
+
+
+def test_empty_private_quality_evidence_requires_review():
+    """A private split with ZERO quality cases must require review, never
+    approve — the private split is the personalization-quality evidence."""
+    base = _baseline()
+    base["sets_evaluated"] = {"base": 22, "private": 3}
+    cand = _candidate()
+    cand["sets_evaluated"] = {"base": 22, "private": 0}  # no quality evidence
+    d = PromotionGate().evaluate(cand, base,
+                                 required_sets=("base", "private"))
+    assert d.outcome == NEEDS_REVIEW
+    assert any("set private empty" in u for u in d.untested)
+
+
+def test_base_safety_and_poisoning_mandatory():
+    """Removing the base set (safety/poisoning/latency/resource/tool) must
+    require review; a failing base prompt_injection must reject outright."""
+    base = _baseline()
+    cand = _candidate()
+    for cat in list(cand["per_category"]):
+        if CATEGORY_FAMILY[cat] != "quality":
+            cand["per_category"][cat]["n"] = 0
+            cand["per_category"][cat]["passed"] = 0
+            cand["per_category"][cat]["pass_rate"] = None
+    d = PromotionGate().evaluate(cand, base)
+    assert d.outcome == NEEDS_REVIEW, "missing base gates must not approve"
+    assert any("no candidate samples" in u for u in d.untested)
+    # a base prompt_injection failure is REJECT, never hidden by quality
+    bad = _candidate(**{"prompt_injection": {"passed": 1, "failed": 1}})
+    d2 = PromotionGate().evaluate(bad, base)
+    assert d2.outcome == REJECT
+    assert d2.failures and d2.failures[0]["category"] == "prompt_injection"
+
+
+def test_private_zero_poisoning_not_counted_as_pass():
+    """0/0 private poisoning is reported as NOT APPLICABLE, never a pass, and
+    the base poisoning gates stay mandatory for the combined gate."""
+    from voicebridge.evaluation.poisoning import summarize_poisoning
+    s = summarize_poisoning([])
+    assert s["applicability"] == "not_applicable"
+    assert s["passed"] == 0 and s["failed"] == 0
+    # base poisoning categories cannot be silently dropped
+    base = _baseline()
+    cand = _candidate()
+    for cat in ("prompt_injection", "secret_handling"):
+        cand["per_category"][cat]["n"] = 0
+        cand["per_category"][cat]["passed"] = 0
+        cand["per_category"][cat]["pass_rate"] = None
+    d = PromotionGate().evaluate(cand, base)
+    assert d.outcome == NEEDS_REVIEW
+    assert any(cat in u for u in d.untested for cat in
+               ("prompt_injection", "secret_handling"))
+
+
+def test_cli_report_contains_coverage_policy(tmp_path, capsys):
+    from scripts.eval_gate_6b import EXIT_NEEDS_REVIEW, main
+    out = tmp_path / "reports"
+    rc = main(["--mode", "unit", "--set", "all",
+               "--state-dir", str(tmp_path / "nostate"), "--out", str(out)])
+    assert rc == EXIT_NEEDS_REVIEW  # empty private -> review (report still written)
+    report = next(out.glob("eval_6b_*.json"))
+    r = json.loads(report.read_text())
+    cp = r["coverage_policy"]
+    assert cp["base_authoritative_for"] == [
+        "safety", "prompt_injection", "poisoning", "latency",
+        "resource_limits", "tool_success", "rollback"]
+    assert "not applicable" in cp["private_zero_families"].lower()
+    assert cp["no_auto_promotion"] is True
+    # private 0/0 poisoning is labeled not-applicable in the report, not a pass
+    assert r["sets"]["private"]["poisoning"]["applicability"] == "not_applicable"
+    assert r["sets"]["private"]["poisoning"]["passed"] == 0
+
+
+# ========================================================================
 # WebUI / orchestrator integration
 # ========================================================================
 def test_feedback_records_task_outcome(tmp_path):

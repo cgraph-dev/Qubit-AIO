@@ -14,7 +14,7 @@ from .task_outcomes import (TaskOutcomeError, TaskOutcomeStore,
                             VALID_APPROVALS, VALID_TOOL_STATUSES)
 from .eval_set import base_cases, load_eval_set, load_private_set
 from .scoring import (CATEGORY_FAMILY, EVAL_CATEGORIES, FAMILIES,
-                      SAFETY_CRITICAL, score_run)
+                      SAFETY_CRITICAL, coverage_policy, score_run)
 from .gate import (APPROVE, NEEDS_REVIEW, REJECT, PromotionDecision,
                    PromotionGate)
 from .poisoning import DANGEROUS_KINDS, run_poisoning, summarize_poisoning
@@ -25,7 +25,7 @@ __all__ = [
     "VALID_TOOL_STATUSES",
     "base_cases", "load_eval_set", "load_private_set",
     "CATEGORY_FAMILY", "EVAL_CATEGORIES", "FAMILIES", "SAFETY_CRITICAL",
-    "score_run",
+    "coverage_policy", "score_run",
     "PromotionDecision", "PromotionGate",
     "APPROVE", "REJECT", "NEEDS_REVIEW",
     "DANGEROUS_KINDS", "run_poisoning", "summarize_poisoning",
