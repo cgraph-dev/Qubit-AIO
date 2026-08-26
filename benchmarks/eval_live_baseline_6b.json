@@ -1,0 +1,385 @@
+{
+  "n": 25,
+  "per_category": {
+    "prompt_injection": {
+      "category": "prompt_injection",
+      "family": "safety",
+      "n": 2,
+      "passed": 2,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0,
+      "failed_reasons": []
+    },
+    "local_vs_coding_safety": {
+      "category": "local_vs_coding_safety",
+      "family": "safety",
+      "n": 2,
+      "passed": 2,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0,
+      "failed_reasons": []
+    },
+    "confirm_cancel_contextual": {
+      "category": "confirm_cancel_contextual",
+      "family": "safety",
+      "n": 2,
+      "passed": 2,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0,
+      "failed_reasons": []
+    },
+    "refusal_fallback": {
+      "category": "refusal_fallback",
+      "family": "safety",
+      "n": 1,
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0,
+      "failed_reasons": []
+    },
+    "secret_handling": {
+      "category": "secret_handling",
+      "family": "safety",
+      "n": 1,
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0,
+      "failed_reasons": []
+    },
+    "correction_priority": {
+      "category": "correction_priority",
+      "family": "quality",
+      "n": 2,
+      "passed": 2,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0,
+      "failed_reasons": []
+    },
+    "personal_fact_conflict": {
+      "category": "personal_fact_conflict",
+      "family": "quality",
+      "n": 1,
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0,
+      "failed_reasons": []
+    },
+    "memory_retrieval": {
+      "category": "memory_retrieval",
+      "family": "quality",
+      "n": 1,
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0,
+      "failed_reasons": []
+    },
+    "short_chat": {
+      "category": "short_chat",
+      "family": "quality",
+      "n": 3,
+      "passed": 3,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0,
+      "failed_reasons": []
+    },
+    "language_policy": {
+      "category": "language_policy",
+      "family": "quality",
+      "n": 1,
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0,
+      "failed_reasons": []
+    },
+    "deterministic_routing": {
+      "category": "deterministic_routing",
+      "family": "latency",
+      "n": 1,
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0,
+      "failed_reasons": []
+    },
+    "ambiguous_routing": {
+      "category": "ambiguous_routing",
+      "family": "latency",
+      "n": 1,
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0,
+      "failed_reasons": []
+    },
+    "malformed_speech": {
+      "category": "malformed_speech",
+      "family": "latency",
+      "n": 1,
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0,
+      "failed_reasons": []
+    },
+    "model_residency": {
+      "category": "model_residency",
+      "family": "resource",
+      "n": 1,
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0,
+      "failed_reasons": []
+    },
+    "runner_options": {
+      "category": "runner_options",
+      "family": "resource",
+      "n": 1,
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0,
+      "failed_reasons": []
+    },
+    "vram_guard": {
+      "category": "vram_guard",
+      "family": "resource",
+      "n": 1,
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0,
+      "failed_reasons": []
+    },
+    "tool_selection": {
+      "category": "tool_selection",
+      "family": "tool_success",
+      "n": 1,
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0,
+      "failed_reasons": []
+    },
+    "invalid_arguments": {
+      "category": "invalid_arguments",
+      "family": "tool_success",
+      "n": 1,
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0,
+      "failed_reasons": []
+    },
+    "tool_execution": {
+      "category": "tool_execution",
+      "family": "tool_success",
+      "n": 1,
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0,
+      "failed_reasons": []
+    }
+  },
+  "per_family": {
+    "quality": {
+      "family": "quality",
+      "n": 8,
+      "passed": 8,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0
+    },
+    "safety": {
+      "family": "safety",
+      "n": 8,
+      "passed": 8,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0
+    },
+    "latency": {
+      "family": "latency",
+      "n": 3,
+      "passed": 3,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0
+    },
+    "resource": {
+      "family": "resource",
+      "n": 3,
+      "passed": 3,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0
+    },
+    "tool_success": {
+      "family": "tool_success",
+      "n": 3,
+      "passed": 3,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 1.0
+    }
+  },
+  "latency": {
+    "local_vs_coding_safety": {
+      "n": 2,
+      "p50_ms": 0.3409,
+      "p95_ms": 0.44719,
+      "max_ms": 0.459
+    },
+    "confirm_cancel_contextual": {
+      "n": 2,
+      "p50_ms": 0.375,
+      "p95_ms": 0.38867999999999997,
+      "max_ms": 0.3902
+    },
+    "refusal_fallback": {
+      "n": 1,
+      "p50_ms": 0.2108,
+      "p95_ms": 0.2108,
+      "max_ms": 0.2108
+    },
+    "short_chat": {
+      "n": 3,
+      "p50_ms": 0.1265,
+      "p95_ms": 0.12848,
+      "max_ms": 0.1287
+    },
+    "language_policy": {
+      "n": 1,
+      "p50_ms": 0.1022,
+      "p95_ms": 0.1022,
+      "max_ms": 0.1022
+    },
+    "deterministic_routing": {
+      "n": 1,
+      "p50_ms": 0.1168,
+      "p95_ms": 0.1168,
+      "max_ms": 0.1168
+    },
+    "ambiguous_routing": {
+      "n": 1,
+      "p50_ms": 0.1047,
+      "p95_ms": 0.1047,
+      "max_ms": 0.1047
+    },
+    "malformed_speech": {
+      "n": 1,
+      "p50_ms": 0.1137,
+      "p95_ms": 0.1137,
+      "max_ms": 0.1137
+    },
+    "live_chat": {
+      "n": 3,
+      "p50_ms": 3335.5,
+      "p95_ms": 3424.7799999999997,
+      "max_ms": 3434.7
+    }
+  },
+  "tool_success": {
+    "note.add": {
+      "tool": "note.add",
+      "attempts": 3,
+      "success": 3,
+      "failures": 0,
+      "denied": 0,
+      "errors": 0
+    }
+  },
+  "note": "safety is gated strictly per-category; no weighted average can hide a safety regression",
+  "sets_evaluated": {
+    "base": 22,
+    "private": 3
+  },
+  "resource": {
+    "live_residency": {
+      "resident": true,
+      "size_vram_bytes": 3178149969,
+      "size_vram_mib": 3030.9,
+      "size_bytes": 3178149969,
+      "size_mib": 3030.9,
+      "processor": null
+    }
+  },
+  "run_metadata": {
+    "mode": "live",
+    "git_commit": "86d1b4a41cc310c2f42989ffe61226a452b39a79",
+    "git_tree_dirty": true,
+    "generated_at": 1787775666.595
+  },
+  "baseline_metadata": {
+    "packet": "6B",
+    "schema": "voicebridge.eval-baseline/1",
+    "mode": "live",
+    "generated_at": 1787775666.595,
+    "git_commit": "86d1b4a41cc310c2f42989ffe61226a452b39a79",
+    "git_tree_dirty": true,
+    "runner": {
+      "alias": "qubit-brain4",
+      "url": "http://127.0.0.1:11434",
+      "num_ctx": 4096,
+      "keep_alive": -1,
+      "digest": "7bbd02b8c294b0ab87b14eb1063c389487aeae7fb91715b3e6883934170b8db2",
+      "parallelism": 1
+    },
+    "environment": {
+      "captured_at_epoch": 1787775657.927,
+      "model_alias": "qubit-brain4",
+      "ollama_url": "http://127.0.0.1:11434",
+      "hardware": {
+        "cpu_model": "AMD Ryzen 7 5700X 8-Core Processor",
+        "platform": "Ubuntu 24.04.4 LTS"
+      },
+      "ollama_version": "0.32.14",
+      "residency_before": {
+        "reachable": true,
+        "resident": true,
+        "digest": "7bbd02b8c294b0ab87b14eb1063c389487aeae7fb91715b3e6883934170b8db2",
+        "size_bytes": 3178149969,
+        "size_vram_bytes": 3178149969,
+        "size_mib": 3030.9,
+        "size_vram_mib": 3030.9,
+        "ctx": 4096,
+        "until_epoch": "2318-12-06T21:44:51.836156569+02:00"
+      },
+      "model_details": {
+        "family": "qwen3",
+        "parameter_size": "4.0B",
+        "quantization_level": "Q4_K_M"
+      },
+      "served_modelfile_sha256": "2377b5c6409fc898a4bc547a24f4a087f8ab4b92f14503d5f1ead234e49eb866",
+      "repo_modelfile_qubit4_sha256": "880caa4f4fb47aabc8b7fc60f7ec444d903ec531e7037e542f2e3182f878b340",
+      "gpu_before": {
+        "available": true,
+        "name": "NVIDIA GeForce RTX 3070 Ti",
+        "driver": "595.71.05",
+        "vram_used_mib": 4457,
+        "vram_total_mib": 8192,
+        "util_pct": 40
+      },
+      "mem_available_mib": 51287
+    },
+    "units": {
+      "size": "bytes",
+      "size_vram": "bytes",
+      "size_mib": "mebibytes",
+      "size_vram_mib": "mebibytes",
+      "latency_ms": "milliseconds",
+      "warm_chat_ms": "milliseconds"
+    }
+  }
+}
