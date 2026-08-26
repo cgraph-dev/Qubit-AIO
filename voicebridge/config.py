@@ -42,6 +42,7 @@ DEFAULTS: Dict[str, Any] = {
     },
     "mic": {
         "device": None,        # None = system default input
+        "device_name": "",     # stable name pin (Packet 7C audio contract); "" = default
         "sample_rate": 48000,  # device rate; resampled to 16k for ASR
         "channels": 2,         # capture N channels, use the loudest
         "blocksize": 480,      # ~10ms at 48k

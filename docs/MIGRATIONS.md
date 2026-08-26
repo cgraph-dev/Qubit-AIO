@@ -868,3 +868,46 @@ require/compat, CLI surface. All hermetic (tmp state dir, never the real one).
 Rollback: revert the Packet 7C commit; remove the new modules/CLI/docs/tests.
 No pre-existing state is altered; any `import-state --apply` keeps a
 pre-restore backup under the state dir that can be copied back.
+
+## MIG-018 — Packet 7C remediation: audio settings contract, model verification, distributable completeness (2026-08-27)
+
+Status: **IMPLEMENTED** — additive config key + new modules + read-only CLI;
+no user config, service, timer, model, browser, or audio state is modified by
+any command. Audio selection writes are pure config writes with a timestamped
+backup; nothing is restarted, enabled, or recorded.
+
+Decision:
+- **Audio settings contract** (`voicebridge/audio/settings.py`): enumerate
+  inputs/outputs by stable name/role/backend; select by name; reset to OS
+  defaults; persist by NAME (never numeric PortAudio indices or raw ALSA
+  paths); never guess when a selected device disappears (typed MISSING with
+  "no silent fallback"); report OK/DEGRADED/MISSING/PERMISSION_DENIED. Additive
+  `mic.device_name` default. Preserves the HyperX mono-mic + default-output
+  rules. No service restart or recording enable on settings change.
+- **Model metadata verification** (`voicebridge/distribution.py`): the model
+  digest/revision is the ACTUAL Ollama digest (`/api/show` header, fallback
+  `/api/tags`); the record fails closed (MISSING, revision/checksum None) when
+  the digest cannot be obtained — never a fabricated placeholder. Records
+  license + source provenance. `artifact_checksum`/`verify_artifact` provide
+  SHA-256 verification for every downloaded artifact with typed
+  OK/MISSING/FAIL (tampered).
+- **Distributable completeness** (`distribution.distributable_manifest`):
+  explicitly lists launcher/installer/config-template/systemd-template/
+  metadata with SHA-256; install/launch proven relocatable (outside repo and
+  developer home); no universal-binary claim.
+- **Digest fallback** (`runner_contract._fetch_digest`): adds `/api/tags`
+  fallback for Ollama versions that omit the `X-Ollama-Digest` header.
+
+Rationale: the 7C verifier required a user-facing audio settings contract,
+fail-closed model metadata, checksum verification, and a provably complete,
+relocatable distributable.
+
+Tests: `tests/test_packet7c_audio.py` (30) — enumeration, selection, reset,
+persistence, hot-plug, missing, permission, invalid selection, reconnect,
+model digest fail-closed/OK, artifact checksum OK/tampered/missing,
+distributable manifest + external install/launch, CLI. Full suite 762 passed /
+0 failed / 0 skipped.
+
+Rollback: revert the remediation commit; restore `mic.device_name` default if
+present. No pre-existing state is altered; audio `.bak` backups and pre-restore
+backups preserve prior config/state.

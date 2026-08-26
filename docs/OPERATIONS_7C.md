@@ -73,22 +73,101 @@ voicebridge device enroll     # EXPLICIT authorization of THIS device
 - No live browser profile, cookie, credential, or secret is ever copied;
   `device.json` is 0600 under the private state root.
 
+## User-facing audio settings contract (remediation)
+
+`voicebridge/audio/settings.py` + CLI:
+
+```bash
+voicebridge audio list            # enumerate inputs/outputs by stable name/role/backend
+voicebridge audio select mic <name>      # persist a stable NAME (never an index)
+voicebridge audio select output <name>
+voicebridge audio reset           # clear pins -> OS defaults
+voicebridge audio status          # typed OK/DEGRADED/MISSING/PERMISSION_DENIED
+```
+
+- Devices are identified by a **stable name/role/backend** (e.g.
+  `input:HyperX Cloud III: USB Audio (hw:1,0)` backend `ALSA`) — never a
+  transient numeric PortAudio index or a raw ALSA `(hw:N,M)` path.
+- Selection is persisted to the config by **name** with a timestamped backup;
+  legacy numeric index keys are cleared so a shifting index is never stored.
+- A configured device that disappears (hot unplug) is reported **MISSING with
+  "no silent fallback"** — the contract never guesses a replacement.
+- `reset` returns output to the system default sink and mic to the default
+  source, preserving the working HyperX rules (mono USB mic, empty output pins).
+- Changing settings is a pure config write: **no service restart, no recording
+  stream is started/stopped, no subprocess is spawned**.
+- Enabling the HyperX mono input and default output rules is preserved by the
+  existing `mic.channels: 1` + empty `audio.output_device*` pins; the settings
+  module only manages the name pins.
+
+## Model metadata verification (remediation)
+
+```bash
+voicebridge package model            # model artifact record (fail closed)
+voicebridge package doctor           # includes a typed `model` check
+```
+
+- The model digest/revision is the **actual Ollama digest** resolved at runtime
+  (`/api/show` `X-Ollama-Digest`, falling back to `/api/tags` digest). It is
+  never a fabricated placeholder.
+- When the digest cannot be obtained the record **fails closed** with state
+  `MISSING` (revision/checksum `None`) and the doctor's `model` check is
+  MISSING — no claim of verification without evidence.
+- License and source provenance are recorded (`Apache-2.0 (Qwen3-4B-Instruct-
+  2507-derived; see docs/UPSTREAM_REUSE.md)`).
+- `verify_artifact(path, expected_sha256)` and `artifact_checksum(path)`
+  provide SHA-256 verification for every downloaded model artifact, with typed
+  `OK / MISSING / FAIL` (tampered) results.
+
+## Distributable artifact completeness (remediation)
+
+```bash
+voicebridge package distributable     # manifest + completeness check
+```
+
+- `distribution.distributable_manifest()` explicitly lists the launcher
+  (`scripts/run.sh`), installer (`scripts/install.sh`,
+  `scripts/install_systemd_unit.sh`), config template
+  (`config/voice.example.yaml`), systemd template, and metadata
+  (`pyproject.toml`, `docs/OPERATIONS_7C.md`) with SHA-256 of each.
+- The install/launch paths are relocatable: `PROJECT_DIR` is derived from the
+  script location and state/config/data use `XDG_*`/`$HOME` — proven by tests
+  that stage the distributable outside the repository and outside the
+  developer home and launch it there.
+- **No universal binary is claimed**; Ubuntu x86_64 is the single supported
+  target, Windows/macOS are documented future targets.
+
 ## Tests
 
 `tests/test_packet7c.py` (30): manifest versioning/platform explicitness,
 typed doctor states (all-OK, CPU-only + missing deps, GPU-OK), model artifact
-metadata (never a fake checksum), launcher/upgrade/uninstall contracts,
-export/import roundtrip with sanitization, wrong-passphrase rejection,
-corrupted-bundle rejection, bad-magic, unsupported schema, machine-path and
-secret-section exclusion, low-disk rejection, dry-run writes nothing, atomic
-apply + backup, restore-failure rollback, bundle-info header read, device
-profile/enroll/require-enrolled/compatibility, CLI doctor/export/import/device.
+metadata (never a fake checksum, fail-closed without a digest), launcher/
+upgrade/uninstall contracts, export/import roundtrip with sanitization,
+wrong-passphrase rejection, corrupted-bundle rejection, bad-magic, unsupported
+schema, machine-path and secret-section exclusion, low-disk rejection, dry-run
+writes nothing, atomic apply + backup, restore-failure rollback, bundle-info
+header read, device profile/enroll/require-enrolled/compatibility, CLI
+doctor/export/import/device.
+
+`tests/test_packet7c_audio.py` (30, remediation): audio enumeration with stable
+name/role/backend identifiers, default flags, permission-denied typing, select
+by name/substring/stable-id, invalid-selection rejection, never-match-by-index,
+reset-to-defaults, persistence across restart, hot-plug MISSING (never a
+silent fallback), OK status for present devices, no-restart/no-recording on
+settings change, model digest fail-closed vs OK, artifact checksum
+OK/tampered/missing, model doctor check fail-closed, distributable manifest
+completeness, missing-file reporting, no-universal-binary claim,
+relocatable install/launch from outside repo+home, and the CLI audio/package
+surfaces.
 
 ## Rollback
 
 Revert the Packet 7C commit and remove `voicebridge/distribution.py`,
-`voicebridge/portable.py`, `voicebridge/device.py`, the new CLI commands,
-`tests/test_packet7c.py`, and `docs/OPERATIONS_7C.md`. No service, timer,
-model, browser, audio, config, or state data is changed by any 7C command;
-export/import only reads the state dir and (on `--apply`) keeps a pre-restore
-backup that can restore the prior state.
+`voicebridge/portable.py`, `voicebridge/device.py`,
+`voicebridge/audio/settings.py`, the new CLI commands,
+`tests/test_packet7c.py`, `tests/test_packet7c_audio.py`, and
+`docs/OPERATIONS_7C.md`. No service, timer, model, browser, audio, config, or
+state data is changed by any 7C command; export/import only reads the state
+dir and (on `--apply`) keeps a pre-restore backup that can restore the prior
+state. Audio settings changes keep `<config>.audio.<ts>.bak` backups and are
+pure config writes.

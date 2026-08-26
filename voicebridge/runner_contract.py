@@ -46,16 +46,35 @@ class RunnerContract:
 
 
 def _fetch_digest(url: str, alias: str, timeout_s: float = 1.0) -> Optional[str]:
-    """Best-effort digest lookup; never blocks startup (typed None)."""
+    """Best-effort digest lookup; never blocks startup (typed None).
+
+    Tries the /api/show ``X-Ollama-Digest`` header first, then falls back to
+    the per-model digest in /api/tags (Ollama versions that omit the header).
+    Never fabricates a value: None means the digest could not be obtained and
+    callers must fail closed."""
+    base = url.rstrip("/")
     try:
         req = urllib.request.Request(
-            f"{url.rstrip('/')}/api/show",
+            f"{base}/api/show",
             data=json.dumps({"model": alias}).encode(),
             headers={"Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=timeout_s) as resp:
-            return resp.headers.get("X-Ollama-Digest") or None
+            d = resp.headers.get("X-Ollama-Digest")
+            if d:
+                return d or None
     except Exception:
-        return None
+        pass
+    try:
+        with urllib.request.urlopen(f"{base}/api/tags", timeout=timeout_s) as resp:
+            tags = json.loads(resp.read().decode())
+        for m in tags.get("models", []):
+            name = str(m.get("name") or "")
+            want = alias.split(":")[0]
+            if name.split(":")[0] == want:
+                return m.get("digest") or None
+    except Exception:
+        pass
+    return None
 
 
 _KNOWN_DIGESTS: dict = {}

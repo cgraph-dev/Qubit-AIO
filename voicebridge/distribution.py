@@ -166,18 +166,62 @@ def gpu_present() -> bool:
 
 def model_artifact_record(cfg: Any) -> Dict[str, Any]:
     """Resolve the model artifact contract: config alias + live Ollama digest
-    when available (never a baked fake checksum)."""
-    from .runner_contract import resolve
+    from /api/show. FAILS CLOSED: if the digest cannot be obtained the record
+    reports a typed MISSING state with the reason — never a fabricated
+    revision/checksum. Records license and source provenance."""
+    from .runner_contract import resolve, _fetch_digest
     rc = resolve(cfg)
     rec = dict(MODEL_ARTIFACT)
     rec["alias"] = rc.alias or rec["alias"]
     rec["url"] = rc.url
     rec["num_ctx"] = rc.num_ctx
     rec["keep_alive"] = rc.keep_alive
-    if rc.digest:
-        rec["revision"] = rc.digest
-        rec["checksum"] = rc.digest
+    digest = _fetch_digest(rc.url, rc.alias, timeout_s=3.0) or rc.digest
+    if not digest:
+        rec["state"] = "MISSING"
+        rec["revision"] = None
+        rec["checksum"] = None
+        rec["detail"] = f"model digest unavailable from {rc.url} for " \
+                        f"{rc.alias!r} (fail closed)"
+        rec["license"] = MODEL_ARTIFACT.get("license", "")
+        rec["source"] = "resolved-at-runtime (Ollama /api/show digest)"
+        return rec
+    rec["state"] = "OK"
+    rec["revision"] = digest
+    rec["checksum"] = digest
+    rec["detail"] = f"digest verified via {rc.url} (X-Ollama-Digest)"
+    rec["license"] = MODEL_ARTIFACT.get("license", "")
+    rec["source"] = "resolved-at-runtime (Ollama /api/show digest)"
     return rec
+
+
+def artifact_checksum(path: Path) -> Optional[str]:
+    """SHA-256 of a downloaded model artifact file; None when missing."""
+    try:
+        import hashlib
+        h = hashlib.sha256()
+        with open(path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 16), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return None
+
+
+def verify_artifact(path: Path, expected_sha256: Optional[str]) -> Dict[str, str]:
+    """Checksum verification for a downloaded artifact.
+    Returns typed {state, detail}: OK / MISSING / FAIL."""
+    if not Path(path).exists():
+        return {"state": "MISSING",
+                "detail": f"artifact missing: {path}"}
+    actual = artifact_checksum(path)
+    if expected_sha256 is None:
+        return {"state": "OK", "detail": "no pinned checksum to compare"}
+    if actual == expected_sha256.lower():
+        return {"state": "OK", "detail": "sha256 verified"}
+    return {"state": "FAIL",
+            "detail": f"sha256 mismatch (tampered): expected "
+                      f"{expected_sha256[:16]}… got {actual[:16]}…"}
 
 
 def doctor(cfg: Any) -> List[Dict[str, Any]]:
@@ -215,6 +259,14 @@ def doctor(cfg: Any) -> List[Dict[str, Any]]:
         "name": "ollama",
         "state": "OK" if ollama_available() else "MISSING",
         "detail": "127.0.0.1:11434",
+    })
+    model_rec = model_artifact_record(cfg)
+    checks.append({
+        "name": "model",
+        "state": model_rec.get("state", "MISSING"),
+        "detail": f"{model_rec.get('alias')} digest="
+                  f"{(model_rec.get('checksum') or 'unavailable')[:16]}… "
+                  f"({model_rec.get('detail', '')})",
     })
     checks.append({
         "name": "browser_cdp",
@@ -304,3 +356,56 @@ def uninstall_plan(cfg: Any) -> Dict[str, Any]:
                                  "browser profiles"],
         "rollback": "re-run install.sh after re-cloning; state dir untouched",
     }
+
+
+# ---------------------------------------------------------------------------
+# Distributable artifact completeness (Packet 7C remediation)
+# ---------------------------------------------------------------------------
+DISTRIBUTABLE_FILES = [
+    ("scripts/install.sh", "installer"),
+    ("scripts/install_systemd_unit.sh", "installer"),
+    ("scripts/run.sh", "launcher"),
+    ("config/voice.example.yaml", "config-template"),
+    ("systemd/openclaw-voice-bridge.service", "systemd-template"),
+    ("pyproject.toml", "metadata"),
+    ("docs/OPERATIONS_7C.md", "metadata"),
+]
+
+
+def distributable_manifest(repo: Optional[Path] = None) -> Dict[str, Any]:
+    """The explicit list of files a download-and-run distribution must carry:
+    launcher, installer, config template, systemd template, and metadata.
+    No universal binary is claimed; Ubuntu is the single supported target."""
+    root = Path(repo) if repo else Path(__file__).resolve().parents[1]
+    entries = []
+    for rel, role in DISTRIBUTABLE_FILES:
+        p = root / rel
+        entries.append({
+            "path": rel,
+            "role": role,
+            "present": p.exists(),
+            "sha256": artifact_checksum(p) if p.exists() else None,
+        })
+    return {
+        "name": PACKAGE_NAME,
+        "version": PACKAGE_VERSION,
+        "target": SUPPORTED_TARGET,
+        "binary_claim": "none (not a universal binary; Ubuntu x86_64 only)",
+        "files": entries,
+        "complete": all(e["present"] for e in entries),
+    }
+
+
+def verify_distributable(repo: Optional[Path] = None) -> Dict[str, str]:
+    """Typed completeness check for the distributable artifact."""
+    m = distributable_manifest(repo)
+    missing = [e["path"] for e in m["files"] if not e["present"]]
+    if not m["complete"]:
+        return {"state": "MISSING",
+                "detail": "missing required files: " + ", ".join(missing)}
+    bad = [e for e in m["files"] if e["sha256"] is None]
+    if bad:
+        return {"state": "DEGRADED",
+                "detail": f"{len(bad)} files unreadable for checksum"}
+    return {"state": "OK", "detail": f"{len(m['files'])} files present with "
+                                     f"sha256; version {m['version']}"}

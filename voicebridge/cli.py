@@ -83,6 +83,19 @@ def build_parser() -> argparse.ArgumentParser:
                                 help="upgrade behavior plan (read-only)")
     pkg_un = pkg_sub.add_parser("uninstall", parents=[common],
                                 help="uninstall behavior plan (read-only, confirms)")
+    pkg_model = pkg_sub.add_parser("model", parents=[common],
+                                   help="model artifact metadata + digest (fail closed)")
+    pkg_dist = pkg_sub.add_parser("distributable", parents=[common],
+                                  help="distributable artifact completeness check")
+    aud = add("audio", help="user-facing audio settings contract (list/select/reset/status)")
+    aud_sub = aud.add_subparsers(dest="audio_command")
+    aud_list = aud_sub.add_parser("list", parents=[common], help="list audio devices")
+    aud_list.add_argument("--json", action="store_true")
+    aud_sel = aud_sub.add_parser("select", parents=[common], help="select a device by stable name")
+    aud_sel.add_argument("kind", choices=["mic", "output"])
+    aud_sel.add_argument("name")
+    aud_sub.add_parser("reset", parents=[common], help="reset audio to OS defaults")
+    aud_sub.add_parser("status", parents=[common], help="typed audio state (OK/DEGRADED/MISSING/PERMISSION_DENIED)")
     export = add("export-state", help="encrypt + export portable state (memory/lessons/reports/config/model)")
     export.add_argument("--out", type=Path, default=None,
                         help="output file (default: <state_dir>/portable-<ts>.vbp)")
@@ -133,6 +146,8 @@ def main(argv=None) -> int:
         return _cmd_flag_drill(cfg)
     if command == "package":
         return _cmd_package(cfg, args)
+    if command == "audio":
+        return _cmd_audio(cfg, args)
     if command == "export-state":
         return _cmd_export_state(cfg, args)
     if command == "import-state":
@@ -565,7 +580,74 @@ def _cmd_package(cfg, args) -> int:
         print("NOTE: uninstall requires explicit operator confirmation; "
               "state is preserved by default.")
         return 0
+    if cmd == "model":
+        rec = D.model_artifact_record(cfg)
+        print(_json.dumps(rec, indent=2, sort_keys=True))
+        return 0 if rec.get("state") == "OK" else 1
+    if cmd == "distributable":
+        m = D.distributable_manifest()
+        print(_json.dumps(m, indent=2, sort_keys=True))
+        return 0 if m["complete"] else 1
     print(f"ERROR: unknown package command {cmd!r}")
+    return 2
+
+
+def _cmd_audio(cfg, args) -> int:
+    """voicebridge audio list|select|reset|status — user-facing settings."""
+    import json as _json
+    from .audio import settings as AS
+    cmd = getattr(args, "audio_command", None) or "status"
+    if cmd == "list":
+        try:
+            devs = AS.list_devices()
+        except AS.AudioSettingsError as exc:
+            print(f"ERROR: {exc}")
+            return 2
+        if getattr(args, "json", False):
+            out = {"inputs": [d.__dict__ for d in devs["inputs"]],
+                   "outputs": [d.__dict__ for d in devs["outputs"]]}
+            print(_json.dumps(out, indent=2, sort_keys=True))
+            return 0
+        print("INPUT devices:")
+        for d in devs["inputs"]:
+            flag = " *" if d.is_default else "  "
+            print(f"{flag} {d.stable_id:<45} backend={d.backend}")
+        print("OUTPUT devices:")
+        for d in devs["outputs"]:
+            flag = " *" if d.is_default else "  "
+            print(f"{flag} {d.stable_id:<45} backend={d.backend}")
+        return 0
+    if cmd == "select":
+        try:
+            if args.kind == "mic":
+                dev = AS.select_microphone(cfg, args.name)
+            else:
+                dev = AS.select_output(cfg, args.name)
+        except AS.InvalidSelectionError as exc:
+            print(f"ERROR: {exc}")
+            return 2
+        except AS.AudioSettingsError as exc:
+            print(f"ERROR: {exc}")
+            return 2
+        print(f"selected {args.kind}: {dev.stable_id} (persisted by name)")
+        return 0
+    if cmd == "reset":
+        try:
+            bak = AS.reset_to_defaults(cfg)
+        except Exception as exc:
+            print(f"ERROR: {exc}")
+            return 2
+        print(f"reset audio to OS defaults (backup {bak})")
+        return 0
+    if cmd == "status":
+        st = AS.status(cfg)
+        if getattr(args, "json", False):
+            print(_json.dumps(st, indent=2, sort_keys=True))
+            return 0
+        print(f"mic    : [{st['mic']['state']:>16}] {st['mic']['detail']}")
+        print(f"output : [{st['output']['state']:>16}] {st['output']['detail']}")
+        return 0 if all(v["state"] == "OK" for v in st.values()) else 1
+    print(f"ERROR: unknown audio command {cmd!r}")
     return 2
 
 

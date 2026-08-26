@@ -94,6 +94,9 @@ def test_doctor_reports_cpu_only_and_missing_deps(tmp_path, monkeypatch):
 
 
 def test_doctor_gpu_ok_state(tmp_path, monkeypatch):
+    import voicebridge.runner_contract as RC
+    monkeypatch.setattr(RC, "_fetch_digest",
+                        lambda url, alias, timeout_s=3.0: "sha256:ok")
     cfg = Config.load(tmp_path / "none.yaml")
     monkeypatch.setattr(D, "os_target_ok", lambda: True)
     monkeypatch.setattr(D, "gpu_present", lambda: True)
@@ -119,12 +122,18 @@ def test_model_artifact_has_revision_checksum_license(tmp_path):
     assert rec["kind"] == "ollama-model"
 
 
-def test_model_artifact_never_bakes_fake_checksum(tmp_path):
+def test_model_artifact_never_bakes_fake_checksum(tmp_path, monkeypatch):
+    import voicebridge.runner_contract as RC
+    RC.reset_cache()
+    monkeypatch.setattr(RC, "_fetch_digest",
+                        lambda url, alias, timeout_s=3.0: None)
     cfg = Config.load(tmp_path / "none.yaml")
     rec = D.model_artifact_record(cfg)
-    # without a live digest the record stays honest, never a fabricated value
-    assert rec["revision"] in ("resolved-at-runtime", rec["revision"])
-    assert "deadbeef" not in rec["checksum"].lower()
+    # without a live digest the record FAILS CLOSED (state MISSING, no
+    # fabricated revision/checksum) — never a fake placeholder value
+    assert rec["state"] == "MISSING"
+    assert rec["revision"] is None and rec["checksum"] is None
+    assert "deadbeef" not in str(rec.get("checksum", "")).lower()
 
 
 # ========================================================================
