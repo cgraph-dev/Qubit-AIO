@@ -1,5 +1,5 @@
 {
-  "n": 22,
+  "n": 25,
   "per_category": {
     "prompt_injection": {
       "category": "prompt_injection",
@@ -54,8 +54,8 @@
     "correction_priority": {
       "category": "correction_priority",
       "family": "quality",
-      "n": 1,
-      "passed": 1,
+      "n": 2,
+      "passed": 2,
       "failed": 0,
       "errors": 0,
       "pass_rate": 1.0,
@@ -84,8 +84,8 @@
     "short_chat": {
       "category": "short_chat",
       "family": "quality",
-      "n": 1,
-      "passed": 1,
+      "n": 3,
+      "passed": 3,
       "failed": 0,
       "errors": 0,
       "pass_rate": 1.0,
@@ -195,8 +195,8 @@
   "per_family": {
     "quality": {
       "family": "quality",
-      "n": 5,
-      "passed": 5,
+      "n": 8,
+      "passed": 8,
       "failed": 0,
       "errors": 0,
       "pass_rate": 1.0
@@ -237,51 +237,51 @@
   "latency": {
     "local_vs_coding_safety": {
       "n": 2,
-      "p50_ms": 0.23525000000000001,
-      "p95_ms": 0.310985,
-      "max_ms": 0.3194
+      "p50_ms": 0.28095000000000003,
+      "p95_ms": 0.364155,
+      "max_ms": 0.3734
     },
     "confirm_cancel_contextual": {
       "n": 2,
-      "p50_ms": 0.26849999999999996,
-      "p95_ms": 0.27363,
-      "max_ms": 0.2742
+      "p50_ms": 0.31525000000000003,
+      "p95_ms": 0.335095,
+      "max_ms": 0.3373
     },
     "refusal_fallback": {
       "n": 1,
-      "p50_ms": 0.1366,
-      "p95_ms": 0.1366,
-      "max_ms": 0.1366
+      "p50_ms": 0.1473,
+      "p95_ms": 0.1473,
+      "max_ms": 0.1473
     },
     "short_chat": {
-      "n": 1,
-      "p50_ms": 0.1154,
-      "p95_ms": 0.1154,
-      "max_ms": 0.1154
+      "n": 3,
+      "p50_ms": 0.126,
+      "p95_ms": 0.15875999999999998,
+      "max_ms": 0.1624
     },
     "language_policy": {
       "n": 1,
-      "p50_ms": 0.097,
-      "p95_ms": 0.097,
-      "max_ms": 0.097
+      "p50_ms": 0.1831,
+      "p95_ms": 0.1831,
+      "max_ms": 0.1831
     },
     "deterministic_routing": {
       "n": 1,
-      "p50_ms": 0.0831,
-      "p95_ms": 0.0831,
-      "max_ms": 0.0831
+      "p50_ms": 0.0765,
+      "p95_ms": 0.0765,
+      "max_ms": 0.0765
     },
     "ambiguous_routing": {
       "n": 1,
-      "p50_ms": 0.1014,
-      "p95_ms": 0.1014,
-      "max_ms": 0.1014
+      "p50_ms": 0.0843,
+      "p95_ms": 0.0843,
+      "max_ms": 0.0843
     },
     "malformed_speech": {
       "n": 1,
-      "p50_ms": 0.1108,
-      "p95_ms": 0.1108,
-      "max_ms": 0.1108
+      "p50_ms": 0.092,
+      "p95_ms": 0.092,
+      "max_ms": 0.092
     }
   },
   "tool_success": {
@@ -296,21 +296,22 @@
   },
   "note": "safety is gated strictly per-category; no weighted average can hide a safety regression",
   "sets_evaluated": {
-    "base": 22
+    "base": 22,
+    "private": 3
   },
   "run_metadata": {
     "mode": "unit",
-    "git_commit": "86d1b4a41cc310c2f42989ffe61226a452b39a79",
-    "git_tree_dirty": true,
-    "generated_at": 1787775657.614
+    "git_commit": "3c1229053c58bdc96861497ada429efcd5190da6",
+    "git_tree_dirty": false,
+    "generated_at": 1787778413.07
   },
   "baseline_metadata": {
     "packet": "6B",
     "schema": "voicebridge.eval-baseline/1",
     "mode": "unit",
-    "generated_at": 1787775657.614,
-    "git_commit": "86d1b4a41cc310c2f42989ffe61226a452b39a79",
-    "git_tree_dirty": true,
+    "generated_at": 1787778413.07,
+    "git_commit": "3c1229053c58bdc96861497ada429efcd5190da6",
+    "git_tree_dirty": false,
     "runner": {
       "alias": "qubit-brain4",
       "url": "http://127.0.0.1:11434",

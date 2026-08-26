@@ -237,57 +237,57 @@
   "latency": {
     "local_vs_coding_safety": {
       "n": 2,
-      "p50_ms": 0.3409,
-      "p95_ms": 0.44719,
-      "max_ms": 0.459
+      "p50_ms": 0.257,
+      "p95_ms": 0.33539,
+      "max_ms": 0.3441
     },
     "confirm_cancel_contextual": {
       "n": 2,
-      "p50_ms": 0.375,
-      "p95_ms": 0.38867999999999997,
-      "max_ms": 0.3902
+      "p50_ms": 0.2853,
+      "p95_ms": 0.29583,
+      "max_ms": 0.297
     },
     "refusal_fallback": {
       "n": 1,
-      "p50_ms": 0.2108,
-      "p95_ms": 0.2108,
-      "max_ms": 0.2108
+      "p50_ms": 0.1426,
+      "p95_ms": 0.1426,
+      "max_ms": 0.1426
     },
     "short_chat": {
       "n": 3,
-      "p50_ms": 0.1265,
-      "p95_ms": 0.12848,
-      "max_ms": 0.1287
+      "p50_ms": 0.1137,
+      "p95_ms": 0.13269,
+      "max_ms": 0.1348
     },
     "language_policy": {
       "n": 1,
-      "p50_ms": 0.1022,
-      "p95_ms": 0.1022,
-      "max_ms": 0.1022
+      "p50_ms": 0.1021,
+      "p95_ms": 0.1021,
+      "max_ms": 0.1021
     },
     "deterministic_routing": {
       "n": 1,
-      "p50_ms": 0.1168,
-      "p95_ms": 0.1168,
-      "max_ms": 0.1168
+      "p50_ms": 0.1132,
+      "p95_ms": 0.1132,
+      "max_ms": 0.1132
     },
     "ambiguous_routing": {
       "n": 1,
-      "p50_ms": 0.1047,
-      "p95_ms": 0.1047,
-      "max_ms": 0.1047
+      "p50_ms": 0.0917,
+      "p95_ms": 0.0917,
+      "max_ms": 0.0917
     },
     "malformed_speech": {
       "n": 1,
-      "p50_ms": 0.1137,
-      "p95_ms": 0.1137,
-      "max_ms": 0.1137
+      "p50_ms": 0.0932,
+      "p95_ms": 0.0932,
+      "max_ms": 0.0932
     },
     "live_chat": {
       "n": 3,
-      "p50_ms": 3335.5,
-      "p95_ms": 3424.7799999999997,
-      "max_ms": 3434.7
+      "p50_ms": 3307.5,
+      "p95_ms": 3315.33,
+      "max_ms": 3316.2
     }
   },
   "tool_success": {
@@ -317,17 +317,17 @@
   },
   "run_metadata": {
     "mode": "live",
-    "git_commit": "86d1b4a41cc310c2f42989ffe61226a452b39a79",
-    "git_tree_dirty": true,
-    "generated_at": 1787775666.595
+    "git_commit": "3c1229053c58bdc96861497ada429efcd5190da6",
+    "git_tree_dirty": false,
+    "generated_at": 1787778423.29
   },
   "baseline_metadata": {
     "packet": "6B",
     "schema": "voicebridge.eval-baseline/1",
     "mode": "live",
-    "generated_at": 1787775666.595,
-    "git_commit": "86d1b4a41cc310c2f42989ffe61226a452b39a79",
-    "git_tree_dirty": true,
+    "generated_at": 1787778423.29,
+    "git_commit": "3c1229053c58bdc96861497ada429efcd5190da6",
+    "git_tree_dirty": false,
     "runner": {
       "alias": "qubit-brain4",
       "url": "http://127.0.0.1:11434",
@@ -337,7 +337,7 @@
       "parallelism": 1
     },
     "environment": {
-      "captured_at_epoch": 1787775657.927,
+      "captured_at_epoch": 1787778413.318,
       "model_alias": "qubit-brain4",
       "ollama_url": "http://127.0.0.1:11434",
       "hardware": {
@@ -354,7 +354,7 @@
         "size_mib": 3030.9,
         "size_vram_mib": 3030.9,
         "ctx": 4096,
-        "until_epoch": "2318-12-06T21:44:51.836156569+02:00"
+        "until_epoch": "2318-12-06T22:53:59.24315088+02:00"
       },
       "model_details": {
         "family": "qwen3",
@@ -362,16 +362,16 @@
         "quantization_level": "Q4_K_M"
       },
       "served_modelfile_sha256": "2377b5c6409fc898a4bc547a24f4a087f8ab4b92f14503d5f1ead234e49eb866",
-      "repo_modelfile_qubit4_sha256": "880caa4f4fb47aabc8b7fc60f7ec444d903ec531e7037e542f2e3182f878b340",
+      "repo_modelfile_qubit4_sha256": null,
       "gpu_before": {
         "available": true,
         "name": "NVIDIA GeForce RTX 3070 Ti",
         "driver": "595.71.05",
-        "vram_used_mib": 4457,
+        "vram_used_mib": 4725,
         "vram_total_mib": 8192,
-        "util_pct": 40
+        "util_pct": 29
       },
-      "mem_available_mib": 51287
+      "mem_available_mib": 51035
     },
     "units": {
       "size": "bytes",
