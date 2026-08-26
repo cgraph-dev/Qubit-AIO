@@ -13,10 +13,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from ..local import actions as local_actions
-from ..logging_setup import get_logger, log_event
+from ..logging_setup import get_logger
 from .llm import classify_with_ollama
 from .state import ConfirmationState, ConversationState
 
@@ -110,6 +110,21 @@ TASK_HINTS = [
 
 SYSTEM_STOP_WORDS = {"the", "a", "an", "is", "are", "to", "of", "in", "on", "for", "and", "or"}
 
+# Obvious conversational openers with ZERO task signal skip the ~0.7s LLM
+# classifier round-trip entirely ("responds a little slow" fix). Anything
+# containing a TASK_HINTS word still goes through the full pipeline.
+CHITCHAT_RE = re.compile(
+    r"^(?:how\s+(?:are|r|is)\s+(?:you|u|it|things|life|your day)"
+    r"|what(?:'s| is)?\s+(?:up|the time|time|your name|today)"
+    r"|who\s+(?:are|r)\s+(?:you|u)"
+    r"|are\s+you\s+(?:there|ok|okay|good|fine|alive|working|listening)"
+    r"|good\s+(?:morning|afternoon|evening|night)"
+    r"|thanks?(?:\s+you)?|sorry|please"
+    r"|hello+|hi+|hey+"
+    r"|(?:what(?:'s| is)?|who(?:'s| is)?)\s+(?:your|my)\s+(?:name|handle)"
+    r"|who\s+(?:are|r|made|created|built)\s+(?:you|u|this))\b",
+    re.I)
+
 
 @dataclass
 class Intent:
@@ -134,20 +149,51 @@ def normalize_broken_english(text: str) -> str:
     low = re.sub(r"\s+", " ", low).strip()
     return low
 
+# Minimal English function words — real English input almost always contains
+# at least one; garbled/foreign input typically none.
+_INPUT_EN_WORDS = {
+    "the", "a", "an", "is", "are", "am", "was", "were", "what", "when",
+    "where", "who", "how", "why", "which", "my", "your", "his", "her",
+    "i", "you", "we", "they", "he", "she", "it", "to", "for", "of", "in",
+    "on", "at", "and", "or", "but", "please", "can", "could", "would",
+    "should", "do", "does", "did", "tell", "know", "about", "me", "us",
+    "need", "want", "give", "show", "find", "open", "make", "lets", "let",
+}
+
+
+def _input_looks_non_english(text: str) -> bool:
+    """True when input is clearly NOT plain English: any character beyond
+    Latin Extended-A (ă ș т cyrillic CJK...) or zero English function words
+    across >=3 alphabetic tokens."""
+    for ch in text[:200]:
+        if ord(ch) > 0x24F:
+            return True
+    toks = [w for w in re.findall(r"[a-z]+", text.lower()) if len(w) > 1]
+    if len(toks) >= 3 and not any(w in _INPUT_EN_WORDS for w in toks):
+        return True
+    return False
+
+
 class Classifier:
     def __init__(self, cfg: Dict[str, Any], confirmations: ConfirmationState,
-                 conversation: ConversationState) -> None:
+                 conversation: ConversationState,
+                 busy_fn: Optional[Callable[[], bool]] = None) -> None:
         self.cfg = cfg
         self.confirmations = confirmations
         self.conversation = conversation
+        # True while a Hermes/OpenClaw task is actually running — "stop"/"cancel"
+        # must ABORT then, even with no pending confirmation (2026-08-24 bug:
+        # 'stop the task' was downgraded to chitchat and Hermes kept running).
+        self.busy_fn = busy_fn or (lambda: False)
         self.llm_enabled = bool(cfg.get("llm_classifier", True))
-        self.ollama_url = cfg.get("ollama_url", "http://127.0.0.1:11434")
-        # Default the classifier to the SAME resident model the bridge uses for
-        # chat (local_llm.model / intent.ollama_model), not a hardcoded qwen3-vl
-        # which is never pulled/resident on this box. Falls back gracefully.
-        _local = (cfg.get("local_llm") or {}).get("model") or cfg.get("ollama_model") or "qubit-brain"
-        self.ollama_model = cfg.get("ollama_model") or _local
+        # Packet 4B: alias/url come from the ONE canonical runner contract
+        # (same source as chat/summary/planner) — no per-caller chain.
+        from ..runner_contract import resolve as _rc_resolve
+        _rc = _rc_resolve(cfg)
+        self.ollama_url = _rc.url
+        self.ollama_model = _rc.alias
         self.timeout = float(cfg.get("classify_timeout_s", 8.0))
+        _local = self.ollama_model
         # Tier map: local tiers resolve to the resident local model; cloud tiers
         # to deepseek (already configured). Kept as labels, not hardcoded emojis.
         self._tier_map = {
@@ -157,6 +203,13 @@ class Classifier:
             "deepseek": cfg.get("deepseek_model", "deepseek/deepseek-v4-flash"),
             "default": None,
         }
+        # Packet 4C: optional router pipeline (None = feature disabled).
+        self._router: Any = None
+
+    def attach_router(self, pipeline) -> None:
+        """Attach a flag-gated RouterPipeline (Packet 4C). Callers keep full
+        responsibility for building it only when intent.router.enabled."""
+        self._router = pipeline
 
     # ---- deterministic checks -------------------------------------------------
     def _system_command(self, text: str) -> Optional[Intent]:
@@ -227,11 +280,25 @@ class Classifier:
         orig = text.strip()
         if not orig:
             return Intent("conversation", confidence=0.0, reason="empty")
+        # Packet 4C: flag-gated router pipeline (default OFF). When enabled,
+        # L0 deterministic decisions short-circuit here and L1 semantic
+        # no-match simply falls through to the legacy path unchanged.
+        if getattr(self, "_router", None) is not None:
+            d0, d1 = self._router.route(
+                orig, pending_confirmation=self.confirmations.pending,
+                busy=self.busy_fn())
+            if d0 is not None:
+                return Intent(d0.kind, confidence=d0.confidence,
+                              task_text=text, params=dict(d0.params or {}),
+                              reason=f"l0:{d0.rule}", source="router")
+            if d1 is not None:
+                return Intent(d1.route, confidence=round(d1.score, 3),
+                              task_text=text,
+                              reason=f"l1:{d1.score:.2f}/{d1.margin:.2f}",
+                              source="router")
         # keep original for speaking/task but use normalized for decisions
         norm = normalize_broken_english(orig)
         text = norm  # downstream heuristics see cleaned form
-        # preserve original for task_text when we emit intents (swap back)
-        _orig_text = orig
 
         sys_i = self._system_command(text)
         if sys_i:
@@ -242,7 +309,14 @@ class Classifier:
             return cc
 
         # Direct PC action (whitelist) beats everything except system/confirm.
-        local_match = local_actions.match(text)
+        # Packet 4D destructive screen: destruction text never takes the
+        # immediate-action whitelist; it falls through to coding hints
+        # (confirmation-gated agent path).
+        from ..safety.destructive_screen import screen_destructive
+        if not screen_destructive(orig).matched:
+            local_match = local_actions.match(text)
+        else:
+            local_match = None
         if local_match:
             return Intent("local", confidence=0.95, task_text=text,
                           params={"action": local_match.name,
@@ -263,7 +337,45 @@ class Classifier:
         if hermes_i:
             return hermes_i
 
+        # Weather/forecast fast-path: ALWAYS live-web info (Perplexity), never
+        # the coding agent and never the baked brain (which can't know today's
+        # forecast). _needs_web() on the orchestrator side completes the route.
+        if re.search(r"\b(weather|forecast|meteo)\b|\b(temperature|rain|snow)\s+(outside|today|tomorrow|in\s+\w+)", text, re.I):
+            return Intent("conversation", confidence=0.9, task_text=text,
+                          reason="weather/forecast -> live web")
+
+        # Identity-fact fast-path: "what's my instagram/github/phone/..."
+        # are served from compiled core-fact context (Packet 4B; formerly baked). Routing them to the
+        # coding agent made Qubit spin up Hermes for a fact it knows cold.
+        if re.search(r"(?:what(?:'?s| is)|whats|tell\s+me|give\s+me|remind\s+me|"
+                     r"do\s+you\s+(?:know|remember)|which\s+is)[^.?!]{0,28}"
+                     r"\b(my|mi)\s+(instagram|insta|github|discord|telegram|"
+                     r"whatsapp|email|e-mail|phone|number|handle|socials?)\b",
+                     text, re.I):
+            return Intent("conversation", confidence=0.9, task_text=text,
+                          reason="identity fact (baked) -> answer locally")
+
         task_score = self._task_hint_score(text)
+        # Chitchat fast-path: pure conversational openers never need the model
+        # (task_score==0 guarantees no coding/domain signal was matched).
+        if task_score == 0.0 and CHITCHAT_RE.match(text):
+            return Intent("conversation", confidence=0.62, task_text=text,
+                          reason="chitchat fast-path (skip LLM)")
+        # Explicit STOP while something is actually running -> cancel NOW,
+        # never a chitchat answer claiming the task was stopped (2026-08-24:
+        # 'stop the task' reached the LLM, got downgraded to chat, and Hermes
+        # kept grinding while Qubit said "I'll stop it").
+        if task_score == 0.0 and self.busy_fn() and re.search(
+                r"\b(stop|cancel|abort|kill|halt)\b.*\b(task|work|it|that|them|this|job|agent)\b|\b(stop it|stop now|abort)\b",
+                text, re.I):
+            return Intent("cancel", confidence=0.92, task_text=text,
+                          reason="explicit stop while task running")
+        # Non-English / unintelligible guard: garbage-in must NEVER become a
+        # coding task (a garbled Romanian sentence once dispatched Hermes to
+        # "understand the code"). Ask for clarification instead.
+        if task_score == 0.0 and len(text) > 8 and _input_looks_non_english(text):
+            return Intent("clarify", confidence=0.7, task_text=text,
+                          reason="non-english/unclear input (no task signal)")
         # Strong task signal -> coding without a model round-trip.
         if task_score >= 1.0:
             return Intent("coding", confidence=0.85, task_text=text,
@@ -275,9 +387,14 @@ class Classifier:
             if llm:
                 kind = llm["kind"]
                 conf = float(llm.get("confidence", 0.6))
-                # confirm/cancel only make sense with a pending confirmation;
-                # without one, an LLM "confirm"/"cancel" guess is just chat.
-                if kind in ("confirm", "cancel") and not self.confirmations.pending:
+                # confirm needs a pending confirmation; cancel needs a pending
+                # confirmation OR a running task. Downgrading 'cancel' to chat
+                # while Hermes was mid-task made "stop the task" a lie — the
+                # agent kept working and Qubit claimed it had stopped.
+                if kind == "confirm" and not self.confirmations.pending:
+                    kind = "conversation"
+                elif kind == "cancel" and not self.confirmations.pending \
+                        and not self.busy_fn():
                     kind = "conversation"
                 if kind == "coding":
                     task = llm.get("task") or text

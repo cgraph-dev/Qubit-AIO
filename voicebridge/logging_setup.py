@@ -49,9 +49,17 @@ def get_logger() -> logging.Logger:
 
 
 def log_event(event: str, **fields: Any) -> None:
-    """Write a structured event to the JSONL journal (and a debug log line)."""
-    record = {"ts": time.time(), "event": event}
-    record.update(fields)
+    """Write a structured event to the JSONL journal (and a debug log line).
+
+    Packet 1B: every field value passes through centralized redaction BEFORE
+    touching the journal or the debug log — this is the single choke point for
+    worker logs, orchestrator events, and tool output.
+    """
+    from .redaction import redact_obj
+    import os as _os
+    record = {"ts": time.time(), "event": event,
+              "pid": _os.getpid()}
+    record.update(redact_obj(fields))
     if _EVENT_FILE:
         try:
             with _EVENT_FILE.open("a") as fh:
@@ -59,7 +67,10 @@ def log_event(event: str, **fields: Any) -> None:
         except OSError:
             pass
     if _LOGGER:
-        compact = {k: (str(v)[:200] if isinstance(v, str) else v) for k, v in fields.items()}
+        # Packet 1B repair: derive from the ALREADY-REDACTED record — the
+        # original fields must never reach the debug sink.
+        compact = {k: (str(v)[:200] if isinstance(v, str) else v)
+                   for k, v in record.items() if k not in ("ts", "event")}
         _LOGGER.debug("%s %s", event, json.dumps(compact, default=str))
 
 

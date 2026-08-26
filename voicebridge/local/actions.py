@@ -113,8 +113,8 @@ def _a_open_project(params: Dict[str, Any]) -> str:
                 root = path
                 break
     if not root:
-        return (f"I know these projects: CGraph, RankValut, Qubit, voice bridge. "
-                f"Which one should I open?")
+        return ("I know these projects: CGraph, RankValut, Qubit, voice bridge. "
+                "Which one should I open?")
     try:
         subprocess.Popen(["code", root], stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL)
@@ -175,7 +175,6 @@ def _yt_launch(query: str, ranked: list, idx: int, mode: str) -> str:
 
 def _a_play_youtube_params(params: Dict[str, Any]) -> str:
     """Resolve search + start playback in the stored mode (or first ask)."""
-    global _YT_PENDING, _YT_MODE
     query = (params.get("query") or params.get("text") or "").strip()
     if not query:
         return "What would you like me to play?"
@@ -273,7 +272,6 @@ def _a_youtube_resume(_: Dict[str, Any]) -> str:
     return "Resumed."
 
 def _a_youtube_next(_: Dict[str, Any]) -> str:
-    global _YT_PLAYING, _YT_MODE
     if not _YT_PLAYING:
         return "Nothing is playing right now."
     ranked = _YT_PLAYING.get("ranked") or []
@@ -524,7 +522,10 @@ ACTIONS: Dict[str, LocalAction] = {
                                   patterns=[r"\b(resume|continue|unpause|unmute)\s+(the\s+)?(youtube|music|song|video)\b",
                                             r"\b(resume|continue) (it|the music)\b"]),
     "youtube_next": LocalAction("youtube_next", "play the next youtube result", _a_youtube_next,
-                                patterns=[r"\b(next|skip|next song|next video|next one)\b"],
+                                # media noun REQUIRED: bare "next" hijacked phrases
+                                # like "forecast for the next seven days"
+                                patterns=[r"\b(next|skip)\s+(the\s+)?(song|video|track|one|result|youtube)\b",
+                                          r"\b(youtube|music|video)(?:'s)?\s+next\b"],
                                 confirm=False),
     "youtube_stop": LocalAction("youtube_stop", "stop youtube playback and close tabs", _a_youtube_stop,
                                 patterns=[r"\b(stop|close)\s+(the\s+)?(youtube|music|song|video)\b",

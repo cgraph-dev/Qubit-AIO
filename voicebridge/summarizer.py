@@ -1,7 +1,7 @@
 """Spoken summaries: long tool outputs -> 2-3 short spoken sentences.
 
 Two providers:
-  * ollama   — qwen3-vl:8b via the raw local API (fast, structured, preferred)
+  * ollama   — the resident baked brain (qubit-brain4) via the raw local API
   * extractive — deterministic fallback (first + last sentences, key numbers)
 
 Always strips markdown/code-fence noise before speaking.
@@ -30,15 +30,20 @@ def _strip_markdown(text: str) -> str:
     return text.strip()
 
 
-def summarize_ollama(text: str, url: str = "http://127.0.0.1:11434",
-                     model: str = "qubit-brain", timeout_s: float = 5.0,
+def summarize_ollama(text: str, url: Optional[str] = None,
+                     model: Optional[str] = None, timeout_s: float = 5.0,
                      max_chars: int = 900) -> Optional[str]:
+    from .runner_contract import resolve
+    _rc = resolve()
+    url = url or _rc.url
+    model = model or _rc.alias
     text = text[:max_chars]
-    payload = {"model": model, "prompt": f"Agent output:\n{text}",
+    payload = {"model": model,
+               "prompt": f"Agent output:\n{text} /no_think",
                "system": SUMMARY_PROMPT, "stream": False, "format": "json",
-               "keep_alive": -1,          # never eject the resident model (avoids cold reload)
-               "options": {"think": False, "temperature": 0.2,
-                           "num_ctx": 4096,       # stop instruction truncation
+               "keep_alive": _rc.keep_alive,   # canonical contract (4B)
+               "options": {"temperature": 0.2,
+                           "num_ctx": _rc.num_ctx,   # single runner contract
                            "num_predict": 90}}    # cap generation (<=40w summary + json)
     req = urllib.request.Request(f"{url}/api/generate",
                                  data=json.dumps(payload).encode(),
@@ -92,7 +97,7 @@ def summarize(text: str, cfg: Optional[dict] = None,
         cfg = cfg or {}
         provider = cfg.get("provider", "extractive")
         url = ollama_url or "http://127.0.0.1:11434"
-        model = ollama_model or cfg.get("ollama_model", "qubit-brain")
+        model = ollama_model or cfg.get("ollama_model", "qubit-brain4")
         max_chars = int(cfg.get("max_chars", 900))
         max_words = int(cfg.get("max_words", 40))
         if not text or not text.strip():

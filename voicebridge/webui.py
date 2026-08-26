@@ -33,13 +33,13 @@ import struct
 import threading
 import time
 import uuid
-import wave
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional
 
 from .logging_setup import log_event, get_logger
+from .redaction import redact_obj
 
 log = get_logger()
 
@@ -63,8 +63,13 @@ class ActivityFeed:
         with self._lock:
             self._items.appendleft(item)
 
-    def recent(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def recent(self, limit: int = 100, since: float = 0.0) -> List[Dict[str, Any]]:
+        """Newest-first items, optionally only those newer than `since`
+        (delta polling — STEAL_LIST item 5: fewer bytes per poll)."""
         with self._lock:
+            if since > 0:
+                return [it for it in self._items
+                        if float(it.get("ts") or 0) > since][:limit]
             return list(self._items)[:limit]
 
     def get(self, item_id: str) -> Optional[Dict[str, Any]]:
@@ -488,7 +493,8 @@ ACTIVITY_PAGE = r"""<!doctype html>
 </div>
 <script>
 const BASE = (new URLSearchParams(location.search).get('api') || localStorage.getItem('vdb_api') || '').replace(/\/$/, '');
-const TOKEN = new URLSearchParams(location.search).get('token') || localStorage.getItem('vdb_token') || '';
+// Packet 1B: tokens come from localStorage only; ?token= URLs are rejected server-side.
+const TOKEN = localStorage.getItem('vdb_token') || '';
 function hdrs(extra) { const h = Object.assign({}, extra || {}); if (TOKEN) h['X-Api-Token'] = TOKEN; return h; }
 
 const feed = document.getElementById('feed');
@@ -556,24 +562,29 @@ class WebUIHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
-            # CORS: the Vercel-hosted frontend calls the PC API cross-origin.
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Api-Token")
-            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            # CORS (Packet 1B): only exact configured origins; no wildcard.
+            origin = self.headers.get("Origin", "")
+            for k, v in cors_headers_for(self.app.allowed_origins, origin):
+                self.send_header(k, v)
             self.end_headers()
             self.wfile.write(body)
         except (BrokenPipeError, ConnectionResetError, OSError):
             pass  # client disconnected (refresh/cancel/navigate) — not an error
 
     def _api_token_ok(self) -> bool:
-        """Gate API endpoints: no token configured = open (localhost/LAN);
-        token configured = must match X-Api-Token header or ?token= param."""
-        token = self.app.api_token
-        if not token:
-            return True
-        header = self.headers.get("X-Api-Token", "")
-        query = self.path.split("token=")[1].split("&")[0] if "token=" in self.path else ""
-        return header == token or query == token
+        """Packet 1B contract: query-string tokens are ALWAYS rejected; a
+        configured token must arrive via the X-Api-Token header. With no
+        configured token, non-loopback peers are refused (fail closed)."""
+        cfg = self.app.api_token
+        qp = "token=" in self.path.split("?", 1)[-1]
+        ok, _reason = token_ok(cfg, self.headers.get("X-Api-Token", ""), qp)
+        if not ok:
+            return False
+        if not cfg:
+            peer = self.client_address[0] if self.client_address else ""
+            if peer not in ("127.0.0.1", "::1", "localhost"):
+                return False
+        return True
 
     def _json(self, obj: Any, code: int = 200) -> None:
         self._send(code, json.dumps(obj).encode(), "application/json")
@@ -589,11 +600,66 @@ class WebUIHandler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self) -> None:  # noqa: N802  (CORS preflight)
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Api-Token")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        origin = self.headers.get("Origin", "")
+        hdrs_ = cors_headers_for(self.app.allowed_origins, origin)
+        for k, v in hdrs_:
+            self.send_header(k, v)
         self.send_header("Content-Length", "0")
         self.end_headers()
+
+    def _events_stream(self) -> None:  # noqa: N802 (GET /api/events/stream)
+        """SSE loop with journal-backed replay (Packet 2B).
+
+        Frame contract: ``id: <journal seq>`` + ``data: <AG-UI wire json>``
+        (R1 framing); heartbeat as ``: ping`` comments; overflow asks the
+        client to reconnect — replay then comes from the journal, so no event
+        is lost or duplicated across reconnects.
+        """
+        hub = self.app._events_hub
+        if hub is None:
+            self._send(503, b"event stream unavailable")
+            return
+        last_id = self.headers.get("Last-Event-ID", "")
+        try:
+            q = self.path.split("?", 1)[-1]
+            if not last_id and "last_seq=" in q:
+                last_id = q.split("last_seq=")[1].split("&")[0]
+        except Exception:
+            last_id = ""
+        run_filter = None
+        if "run_id=" in self.path:
+            run_filter = self.path.split("run_id=")[1].split("&")[0] or None
+        cursor = int(last_id) if str(last_id).isdigit() else None
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Accel-Buffering", "no")
+        for k, v in cors_headers_for(self.app.allowed_origins,
+                                     self.headers.get("Origin", "")):
+            self.send_header(k, v)
+        self.end_headers()
+        sub = hub.subscribe(last_event_id=cursor, run_id=run_filter)
+        try:
+            self.wfile.write(b"retry: 3000\n\n")
+            self.wfile.flush()
+            while not sub.closed and self.app._server is not None:
+                items = sub.drain(timeout=15.0)
+                out = []
+                if sub.overflow:
+                    sub.overflow = False
+                    out.append(": resync\nevent: resync\ndata: {}\n\n")
+                for rec in items:
+                    out.append(hub.wire_frame(rec))
+                if not out:
+                    out.append(": ping\n\n")
+                self.wfile.write("".join(out).encode("utf-8"))
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass  # client disconnected — normal lifecycle, not an error
+        finally:
+            hub.unsubscribe(sub)
+
 
     def do_HEAD(self) -> None:  # noqa: N802  (some browsers preload with HEAD)
         # Reuse GET logic but don't send body
@@ -614,7 +680,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self.send_header("Content-Type", ctype)
                 self.send_header("Content-Length", str(fpath.stat().st_size))
                 self.send_header("Cache-Control", "public, max-age=86400")
-                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Allow-Origin", o)
                 self.end_headers()
                 return
         # fallback: try GET path handling but just send headers
@@ -633,6 +699,24 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self._file(self.app._frontend_dir / "index.html", "text/html; charset=utf-8")
             else:
                 self._html(CHAT_PAGE)
+        elif path == "/token-setup" or path == "/token-setup.html":
+            # No-auth BY DESIGN: storing a token grants nothing by itself; the
+            # API still rejects every request lacking the correct header.
+            fp = self.app._frontend_dir / "token-setup.html"
+            if not fp.exists():
+                fp = Path(__file__).resolve().parents[1] / "frontend" / "token-setup.html"
+            if self.app._use_frontend_dir or fp.exists():
+                self._file(fp, "text/html; charset=utf-8")
+            else:
+                self._send(404, b"not found")
+        elif path == "/approvals" or path == "/approvals.html":
+            fp = self.app._frontend_dir / "approvals.html"
+            if not fp.exists():
+                fp = Path(__file__).resolve().parents[1] / "frontend" / "approvals.html"
+            if self.app._use_frontend_dir or fp.exists():
+                self._file(fp, "text/html; charset=utf-8")
+            else:
+                self._send(404, b"approvals page not found")
         elif path == "/reports" or path == "/reports.html":
             if self.app._use_frontend_dir and (self.app._frontend_dir / "reports.html").exists():
                 self._file(self.app._frontend_dir / "reports.html", "text/html; charset=utf-8")
@@ -653,7 +737,49 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self._send(401, b"unauthorized")
                 return
             limit = int(self.path.split("limit=")[1].split("&")[0]) if "limit=" in self.path else 100
-            self._json({"items": self.app.feed.recent(min(limit, 300))})
+            # ?since=<unix ts> -> only items newer than the client's watermark
+            # (delta polling); ETag/If-None-Match short-circuits unchanged polls.
+            since = 0.0
+            if "since=" in self.path:
+                try:
+                    since = float(self.path.split("since=")[1].split("&")[0])
+                except Exception:
+                    since = 0.0
+            items = self.app.feed.recent(min(limit, 300), since=since)
+            etag = 'W/"%d-%d"' % (len(items),
+                                  int(float(items[0].get("ts") or 0) * 1000)
+                                  if items else 0)
+            inm = self.headers.get("If-None-Match", "")
+            try:
+                if inm == etag:
+                    self.send_response(304)
+                    self.send_header("ETag", etag)
+                    for k, v in cors_headers_for(self.app.allowed_origins,
+                        self.headers.get("Origin", "")):
+                        self.send_header(k, v)
+                    self.end_headers()
+                    return
+                body = json.dumps({"items": items}).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("ETag", etag)
+                for k, v in cors_headers_for(self.app.allowed_origins,
+                    self.headers.get("Origin", "")):
+                    self.send_header(k, v)
+                self.end_headers()
+                self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                pass
+        elif path == "/api/events/stream":
+            # Packet 2B: typed event stream over the EXISTING server. Replay
+            # from the durable journal via Last-Event-ID header or ?last_seq=
+            # (id is not a secret; query-string TOKENS stay forbidden).
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            self._events_stream()
+
         elif path.startswith("/api/result/"):
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
@@ -670,6 +796,48 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self._send(404, b"not found")
                 return
             self._json(item)
+        elif path == "/api/approvals":
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            if self.app.approvals is None:
+                self._json({"items": []})
+                return
+            items = [{"id": a.id, "capability": a.capability, "summary": a.summary,
+                      "state": a.state, "created_at": a.created_at,
+                      "expires_at": a.expires_at}
+                     for a in self.app.approvals.pending()]
+            self._json({"items": items})
+        elif path == "/api/approvals/respond" and self.command == "POST":
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length).decode() or "{}")
+                rec = self.app.approvals.respond(str(body.get("id")),
+                                                 str(body.get("decision")))
+                self._json({"id": rec.id, "state": rec.state,
+                            "decision": rec.decision})
+            except KeyError:
+                self._json({"error": "unknown approval id"}, 404)
+            except Exception as exc:
+                self._json({"error": redact_obj(str(exc))}, 400)
+        elif path == "/api/lessons":
+            # Packet 6A: learned preferences with stored provenance, plus the
+            # review/staged items. Explanations come from the ledger, never
+            # invented by the model.
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            led = getattr(getattr(self.app, "orch", None), "learning", None)
+            if led is None:
+                self._json({"lessons": [], "reviews": []})
+                return
+            self._json({
+                "lessons": led.lessons(),
+                "reviews": led.reviews(),
+            })
         elif path == "/api/reports":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
@@ -830,6 +998,27 @@ class WebUIHandler(BaseHTTPRequestHandler):
             except Exception as exc:
                 log.exception("webui /api/interrupt failed")
                 self._json({"error": str(exc)[:200]}, 500)
+        elif path.startswith("/api/runs/") and path.endswith("/cancel"):
+            # Packet 2B: cancellation emits exactly ONE terminal event per run
+            # (idempotent across restarts via the journal) and best-effort
+            # aborts the active orchestrator task when the ids match.
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            run_id = path[len("/api/runs/"):-len("/cancel")]
+            if not run_id or self.app.runs is None:
+                self._json({"error": "run coordinator unavailable"}, 503)
+                return
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length).decode() or "{}") \
+                    if length else {}
+            except Exception:
+                body = {}
+            emitted = self.app.runs.cancel(
+                run_id, reason=str(body.get("reason") or "user"))
+            self._json({"ok": True, "run_id": run_id,
+                        "terminal_emitted": bool(emitted)})
         elif path == "/api/prune" or path == "/api/reports/prune":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
@@ -862,6 +1051,37 @@ class WebUIHandler(BaseHTTPRequestHandler):
             except Exception as exc:
                 log_event("webui.type.error", error=str(exc)[:200])
                 self._json({"error": str(exc)[:300]}, 500)
+        elif path in ("/api/lessons/remove", "/api/lessons/promote"):
+            # Packet 6A: explicit lesson removal / promotion. Only review or
+            # staged model-inference items can be promoted; everything is
+            # tombstoned with stored provenance, never deleted wholesale.
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                data = json.loads(self.rfile.read(length).decode() or "{}")
+            except Exception:
+                data = {}
+            lid = str(data.get("lesson_id") or "").strip()
+            led = getattr(getattr(self.app, "orch", None), "learning", None)
+            if led is None or not lid:
+                self._json({"error": "unknown lesson id"}, 404)
+                return
+            if path.endswith("/remove"):
+                if not led.remove(lid):
+                    self._json({"error": "unknown lesson id"}, 404)
+                    return
+                log_event("lessons.remove", lesson_id=lid[:16])
+                self._json({"ok": True, "lesson_id": lid})
+            else:
+                promoted = led.promote(lid)
+                if promoted is None:
+                    self._json({"error": "unknown lesson id"}, 404)
+                    return
+                log_event("lessons.promote", lesson_id=lid[:16])
+                self._json({"ok": True, "lesson_id": lid,
+                            "lesson": promoted})
         elif path == "/api/feedback":
             # CLHF: user rates the last answer (good/bad) or offers a correction.
             if not self._api_token_ok():
@@ -885,8 +1105,29 @@ class WebUIHandler(BaseHTTPRequestHandler):
                         answer=str(data.get("answer", ""))[:500],
                         feedback=fb,
                         corrected=str(data.get("corrected", ""))[:500])
+                # Packet 6B: every correction/rating is also a structured
+                # task outcome (approval/retry/correction/completion), the raw
+                # material for the private held-out evaluation set.
+                _oc = getattr(_orch, "task_outcomes", None)
+                if _oc is not None:
+                    try:
+                        _oc.record(
+                            request_id=str(data.get("request_id", ""))[:64],
+                            intent_kind="conversation", route="conversation",
+                            tool_status="",
+                            approval="",
+                            correction=(fb == "correction"),
+                            completed=(fb == "good"),
+                            outcome=fb,
+                            user_text=str(data.get("user", ""))[:300],
+                        )
+                    except Exception:
+                        pass
+                # rich log line so the dashboard Logs view shows WHAT was rated
                 log_event("feedback.recorded", feedback=fb,
-                          user=str(data.get("user", ""))[:80])
+                          user=str(data.get("user", ""))[:80],
+                          answer=str(data.get("answer", ""))[:120],
+                          corrected=bool(str(data.get("corrected", "")).strip()))
                 self._json({"ok": True, "feedback": fb})
             except Exception as exc:
                 log_event("feedback.error", error=str(exc)[:160])
@@ -895,14 +1136,58 @@ class WebUIHandler(BaseHTTPRequestHandler):
             self._send(404, b"not found")
 
 
+def resolve_frontend_dir(explicit: Optional[str]):
+    """Resolve the dashboard frontend directory.
+
+    Order: explicit config value (webui.frontend_dir) if it serves index.html,
+    else this repository's frontend/. No user-home or sibling-repo path is
+    hardcoded (Packet 0B); machine-specific themes go through config.
+    Returns (path, serves_index).
+    """
+    repo_frontend = Path(__file__).resolve().parents[1] / "frontend"
+    if explicit:
+        p = Path(explicit).expanduser()
+        try:
+            if (p / "index.html").is_file():
+                return p, True
+        except OSError:
+            pass
+    return repo_frontend, (repo_frontend / "index.html").is_file()
+
+
+def token_ok(cfg_token: str, header_token: str,
+             query_token_present: bool) -> tuple[bool, str]:
+    """Packet 1B auth contract. Query-string tokens are ALWAYS rejected.
+    With no configured token only loopback callers may pass (caller checks
+    peer address); with a configured token the X-Api-Token header must match."""
+    if query_token_present:
+        return False, "query-token-rejected"
+    if not cfg_token:
+        return True, "loopback-open"
+    return (header_token == cfg_token), ("ok" if header_token == cfg_token
+                                         else "bad-or-missing-header")
+
+
+def cors_headers_for(allowed_origins, request_origin: str) -> list:
+    """Configured-origin CORS: no header without an exact configured match."""
+    origins = [o for o in (allowed_origins or []) if o and o != "*"]
+    if request_origin and request_origin in origins:
+        return [("Access-Control-Allow-Origin", request_origin),
+                ("Access-Control-Allow-Headers", "Content-Type, X-Api-Token"),
+                ("Access-Control-Allow-Methods", "GET, POST, OPTIONS"),
+                ("Vary", "Origin")]
+    return []
+
+
 class WebUI:
     """Thin HTTP layer around the orchestrator's processing pipeline."""
 
-    def __init__(self, orchestrator: Any, host: str = "0.0.0.0", port: int = 8890,
+    def __init__(self, orchestrator: Any, host: Optional[str] = None, port: int = 8890,
                  asr_factory: Any = None, tts: Any = None,
                  state_dir: Optional[Path] = None) -> None:
         self.orch = orchestrator
-        self.host = host
+        cfg_host = orchestrator.cfg.get("webui", "host") if orchestrator is not None else None
+        self.host = host or cfg_host or "127.0.0.1"   # loopback by default (Packet 1B)
         self.port = port
         self.feed = ActivityFeed()
         self._asr_factory = asr_factory or _default_asr_factory(orchestrator)
@@ -919,17 +1204,104 @@ class WebUI:
         self._pending_lock = threading.Lock()
         self._results: Dict[str, Dict[str, Any]] = {}
         self._result_lock = threading.Lock()
-        # Serve the Qubit dashboard (voice-dashboard/frontend) — the theme the
-        # user keeps. Fall back to the bridge's small pages only as a safety net.
-        self._frontend_dir = Path("/home/trick/Projects/Repos/voice-dashboard/frontend")
-        if not (self._frontend_dir / "index.html").exists():
-            self._frontend_dir = Path(__file__).resolve().parents[1] / "frontend"
-        self._use_frontend_dir = (self._frontend_dir / "index.html").exists()
+        # Dashboard frontend: optional webui.frontend_dir config key wins,
+        # otherwise serve this repository's frontend/. To keep an external
+        # dashboard theme, set webui.frontend_dir in the user config.
+        self._frontend_dir, self._use_frontend_dir = resolve_frontend_dir(
+            orchestrator.cfg.get("webui", "frontend_dir") if orchestrator is not None else None)
         # optional shared secret for tunneled/external access (config: webui.token)
         self.api_token: str = orchestrator.cfg.get("webui", "token", default="") if orchestrator is not None else ""
+        self.allowed_origins = orchestrator.cfg.get("webui", "allowed_origins", default=[]) if orchestrator is not None else []
+        _sd = state_dir or Path("/tmp")
+        try:
+            from .approvals import ApprovalJournal
+            self.approvals = ApprovalJournal(_sd / "approvals.jsonl")
+        except Exception:
+            self.approvals = None
+        # Packet 2B: typed event stream (journal + hub + run coordination).
+        # Additive: the legacy events.jsonl activity journal is untouched.
+        self._events_hub: Optional[Any] = None
+        try:
+            from .events import EventJournal, EventHub, make_event
+            from .events.runs import RunCoordinator, StateTracker
+            typed = EventJournal(_sd / "typed-events.jsonl")
+            self._events_hub = EventHub(typed)
+            self.runs = RunCoordinator(
+                self._events_hub,
+                abort_hook=self._abort_hook_for_cancel())
+            self.state_tracker = StateTracker(self._events_hub)
+            if self.approvals is not None:
+                hub = self._events_hub
+
+                def _approval_sink(name: str, item: Any) -> None:
+                    hub.publish(make_event(
+                        "CUSTOM", name=name,
+                        value={"approval_id": item.id,
+                               "capability": item.capability,
+                               "state": item.state,
+                               "decision": item.decision}))
+
+                self.approvals.event_sink = _approval_sink
+        except Exception:
+            log.exception("typed event stream init failed; SSE disabled")
+            self._events_hub = None
+            self.runs = None
+            self.state_tracker = None
+
+    def _abort_hook_for_cancel(self):
+        """Best-effort hook: dashboard cancel also aborts the active task."""
+        orch = self.orch
+
+        def _hook(run_id: str) -> None:
+            task = getattr(orch, "task", None)
+            if task is not None and getattr(task, "run_id", None) == run_id \
+                    and getattr(task, "active", False):
+                abort = getattr(orch, "_abort_task", None)
+                if abort is not None:
+                    abort("dashboard-cancel")
+        return _hook
+
+    # -- Packet 2B repair: orchestrator -> typed stream integration hooks --
+
+    def typed_task_started(self, session_key: str, run_id: str,
+                           description: str = "", **_extra: Any) -> None:
+        """RUN_STARTED + baseline snapshot for a real dispatched task."""
+        if self.runs is None or not run_id:
+            return
+        self.runs.start(run_id, thread_id=session_key or "task")
+        self.state_tracker.snapshot(
+            run_id, {"stage": "running", "description": description[:200]})
+
+    def typed_task_finished(self, session_key: str, run_id: str,
+                            description: str = "", status: str = "ok",
+                            detail: str = "", **_extra: Any) -> None:
+        """Terminal event + final state delta for a real task result."""
+        if self.runs is None or not run_id:
+            return
+        ok = status == "ok"
+        self.state_tracker.update(run_id, {
+            "stage": "done" if ok else "failed", "status": status})
+        if ok:
+            self.runs.finish(run_id, result={"status": status,
+                                             "reply_len": len(detail)})
+        else:
+            self.runs.fail(run_id, message=detail[:300] or f"task {status}",
+                           code=status)
+
+    def typed_task_cancelled(self, session_key: str, run_id: str,
+                             reason: str = "user", **_extra: Any) -> None:
+        """Idempotent RUN_CANCELLED (single terminal, restart-safe)."""
+        if self.runs is None:
+            return
+        self.runs.cancel(run_id, reason=reason)
 
     # -- lifecycle --------------------------------------------------------
     def start(self) -> None:
+        loopback = self.host in ("127.0.0.1", "localhost", "::1")
+        if not loopback and not self.api_token:
+            raise RuntimeError(
+                "webui refuses to start: non-loopback host "
+                f"'{self.host}' requires webui.token (Packet 1B fail-closed)")
         handler = type("W", (WebUIHandler,), {})  # subclass per instance
         handler.app = self  # type: ignore[attr-defined]  # keep for direct class access
         self._server = ThreadingHTTPServer((self.host, self.port), handler)
@@ -1141,8 +1513,8 @@ class WebUI:
                 ev = json.loads(l)
             except Exception:
                 continue
-            if since and float(ev.get("ts") or 0) < since:
-                continue
+            if since and float(ev.get("ts") or 0) <= since:
+                continue   # exclusive watermark: never re-send the boundary item
             if ql and ql not in json.dumps(ev).lower():
                 continue
             out.append(ev)
@@ -1273,4 +1645,6 @@ def _default_asr_factory(orchestrator: Any):
         provider=cfg.get("asr", "provider_ep", default="cpu"),
         num_threads=int(cfg.get("asr", "num_threads", default=4)),
         language=cfg.get("asr", "language", default="en"),
+        hotwords=cfg.get("asr", "hotwords", default=""),
+        hotwords_score=float(cfg.get("asr", "hotwords_score", default=1.5)),
     )

@@ -3,7 +3,11 @@
 Load order:
   1. defaults (this module)
   2. YAML file at ~/.config/openclaw-voice-bridge/voice.yaml (or $VOICE_BRIDGE_CONFIG)
-  3. environment overrides: VOICE_BRIDGE_<SECTION>_<KEY> (uppercase, dotted paths)
+  3. environment overrides: VOICE_BRIDGE__SECTION__KEY (double underscores nest;
+     single "_" inside a segment stays part of the key, e.g.
+     VOICE_BRIDGE__INTENT__LOCAL_LLM__MODEL -> intent.local_llm.model).
+     Legacy VOICE_BRIDGE_SECTION_KEY form still works but cannot reach keys
+     that contain underscores.
 
 All sections map 1:1 to the example config in config/voice.example.yaml.
 """
@@ -11,7 +15,7 @@ from __future__ import annotations
 
 import copy
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -124,7 +128,7 @@ DEFAULTS: Dict[str, Any] = {
         "llm_classifier": True,     # enabled: +~0.3-0.6s but fixes broken-English routing (user approved 20-30% cost) — heuristic only (fast);
                                     # ambiguous taps default to conversation
         "ollama_url": "http://127.0.0.1:11434",
-        "ollama_model": "qubit-brain",
+        "ollama_model": "qubit-brain4",
         "classify_timeout_s": 8.0,
         "conversation_backend": "local",
         "templates_path": "~/.config/openclaw-voice-bridge/task-templates.yaml",  # daily-task templates (spoken phrase -> known task)    # bridge IS the voice: local model answers ALL chat instantly
@@ -136,7 +140,7 @@ DEFAULTS: Dict[str, Any] = {
         "local_llm": {
             "enabled": True,           # bridge responds to ALL chat itself (<0.5s);
                                         # only tasks dispatch to OpenClaw/Hermes
-            "model": "qubit-brain",  # baked EN-only brain (2.6GB resident).
+            "model": "qubit-brain4",  # baked EN-only brain, no-think template (3.2GB resident).
                                     # phi-4-mini-abliterated is smarter in EN but BROKEN at RO (echoes/
                                     # wrong dates/hallucinates) — kept as optional EN-only smart mode.
             "url": "http://127.0.0.1:11434",
@@ -183,10 +187,15 @@ DEFAULTS: Dict[str, Any] = {
         ],
         "dry_run_first": False,   # prepend "dry run first" to agent coding tasks
         "spoken_confirmation": True,
+        # Packet 3A: route local actions + local-script templates through the
+        # capability broker (argv-only). false selects the LEGACY DIRECT PATH:
+        # an UNSECURED ROLLBACK mode with no policy decisions — never describe
+        # it as secured.
+        "tool_broker": True,
     },
     "summarizer": {
         "provider": "ollama",   # ollama | extractive
-        "ollama_model": "qubit-brain",
+        "ollama_model": "qubit-brain4",
         "max_chars": 900,       # extractive/summarizer input budget
         "max_words": 40,         # HARD cap on every spoken response (save time)
     },
@@ -198,6 +207,15 @@ DEFAULTS: Dict[str, Any] = {
         "level": "INFO",
         "jsonl": True,          # structured event log (observability)
         "jsonl_path": None,     # default: $STATE_DIR/events.jsonl
+    },
+    "webui": {
+        "host": "127.0.0.1",    # loopback default; LAN requires host override + token
+        "token": "",            # REQUIRED when host is non-loopback (Packet 1B)
+        "allowed_origins": [],  # exact Origin list for CORS; empty = no cross-origin
+        # Dashboard frontend directory. Empty = repository-relative frontend/.
+        # Set to an absolute path to serve an external dashboard checkout
+        # (machine-specific value; keep it in the user config, not here).
+        "frontend_dir": "",
     },
 }
 
@@ -213,12 +231,23 @@ def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]
 
 
 def _env_overrides() -> Dict[str, Any]:
-    """Read VOICE_BRIDGE_* env vars into a nested dict."""
+    """Read VOICE_BRIDGE_* env vars into a nested dict.
+
+    Double underscores separate nesting levels so keys containing underscores
+    stay addressable: VOICE_BRIDGE__INTENT__LOCAL_LLM__MODEL ->
+    intent.local_llm.model. The legacy single-underscore form still works but
+    cannot reach underscored keys (plan P0-B).
+    """
     out: Dict[str, Any] = {}
     for key, val in os.environ.items():
         if not key.startswith("VOICE_BRIDGE_"):
             continue
-        path = key[len("VOICE_BRIDGE_"):].lower().split("_")
+        if "__" in key:
+            path = [p.lower() for p in key[len("VOICE_BRIDGE"):].split("__") if p]
+        else:
+            path = key[len("VOICE_BRIDGE_"):].lower().split("_")
+        if not path:
+            continue
         node = out
         for part in path[:-1]:
             node = node.setdefault(part, {})
