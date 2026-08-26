@@ -822,3 +822,49 @@ Rollback: revert this commit and delete the `.bak` files only if the operator
 explicitly asked; flag `set --apply` writes always keep a backup, so restoring
 a `.bak` over `voice.yaml` is the documented one-command rollback. No state
 data is deleted by any 7B command.
+
+## MIG-017 — Packet 7C: download-and-run distribution, portable-state export/import, trusted-device enrollment (2026-08-27)
+
+Status: **IMPLEMENTED** — additive modules + read-only CLI surfaces; no user
+config, service, timer, model, browser, or audio state is modified by any
+command. Restore (`import-state --apply`) writes only to the state dir and
+always keeps a pre-restore backup; nothing is enabled or deleted silently.
+
+Decision:
+- **Distribution surface** (`voicebridge/distribution.py`): versioned manifest,
+  typed hardware/resource doctor, model-artifact record (live digest, never a
+  fake checksum), launcher argv, upgrade/uninstall behavior plans. Ubuntu
+  x86_64 is the only supported target; Windows/macOS are documented future
+  targets — no universal-binary claim.
+- **Portable-state contract** (`voicebridge/portable.py`, schema v1): bundles
+  memory, lessons/preferences, reports, non-secret config, model metadata, and
+  migration history; EXCLUDES tokens, cookies, Chromium profiles, CDP URLs,
+  active approvals, credentials, machine-specific audio/GPU paths, and the
+  secret-bearing `webui`/`openclaw`/`logging` config sections.
+- **Audited encryption — no home-grown crypto, no new dependency.** Key
+  derivation = PBKDF2-HMAC-SHA256 (RFC 8018, stdlib); cipher = AES-256-CBC via
+  the system OpenSSL CLI (pinned ≥ 3.0.0, recorded in the bundle header);
+  integrity = HMAC-SHA256 (RFC 2104) encrypt-then-MAC. Deterministic
+  wrong-passphrase/tamper rejection. Recorded in `docs/UPSTREAM_REUSE_7C.md`
+  R16.
+- **Restore safety**: MAC verified before any write; atomic per-file staging
+  (tmp + fsync + os.replace); pre-restore backup preserved; failure rolls back.
+  `--apply` requires explicit device enrollment.
+- **Trusted-device enrollment** (`voicebridge/device.py`): never automatic;
+  re-checks hardware/model/deps/capabilities; never copies browser profiles or
+  secrets; `device.json` is 0600.
+
+Rationale: Phase 7 requires a verified download-and-run distribution, an
+audited encrypted portable-state bundle that excludes secrets/browser-session
+material, atomic rollback, and explicit new-device enrollment.
+
+Tests: `tests/test_packet7c.py` (30) — manifest, doctor typed states
+(OK/CPU-only/missing-*), model artifact metadata, launcher/upgrade/uninstall
+plans, export/import roundtrip + sanitization, wrong-passphrase, corrupted
+bundle, bad magic, unsupported schema, low-disk, dry-run no-write, atomic
+apply + backup, restore rollback, bundle-info, device profile/enroll/
+require/compat, CLI surface. All hermetic (tmp state dir, never the real one).
+
+Rollback: revert the Packet 7C commit; remove the new modules/CLI/docs/tests.
+No pre-existing state is altered; any `import-state --apply` keeps a
+pre-restore backup under the state dir that can be copied back.

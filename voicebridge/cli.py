@@ -70,6 +70,36 @@ def build_parser() -> argparse.ArgumentParser:
     froll.add_argument("--apply", action="store_true",
                        help="write the config with a timestamped backup (default: dry-run)")
     drill = add("flag-drill", help="hermetic rollback drill: toggle + restore every flag on a temp config/state")
+    pkg = add("package", help="download-and-run distribution surface (read-only)")
+    pkg_sub = pkg.add_subparsers(dest="package_command")
+    pkg_sub.add_parser("manifest", parents=[common],
+                       help="print the versioned package manifest")
+    pkg_doctor = pkg_sub.add_parser("doctor", parents=[common],
+                                    help="hardware/resource doctor (typed states)")
+    pkg_doctor.add_argument("--json", action="store_true")
+    pkg_launch = pkg_sub.add_parser("launch", parents=[common],
+                                    help="print the verified launch command")
+    pkg_up = pkg_sub.add_parser("upgrade", parents=[common],
+                                help="upgrade behavior plan (read-only)")
+    pkg_un = pkg_sub.add_parser("uninstall", parents=[common],
+                                help="uninstall behavior plan (read-only, confirms)")
+    export = add("export-state", help="encrypt + export portable state (memory/lessons/reports/config/model)")
+    export.add_argument("--out", type=Path, default=None,
+                        help="output file (default: <state_dir>/portable-<ts>.vbp)")
+    export.add_argument("--passphrase", default=None,
+                        help="passphrase (required; prefer VOICE_BRIDGE_PASSPHRASE env)")
+    imp = add("import-state", help="verify + restore a portable-state bundle (dry-run by default)")
+    imp.add_argument("bundle", type=Path)
+    imp.add_argument("--passphrase", default=None,
+                     help="passphrase (required; prefer VOICE_BRIDGE_PASSPHRASE env)")
+    imp.add_argument("--apply", action="store_true",
+                     help="actually restore (default: dry-run/preview)")
+    dev = add("device", help="trusted-device enrollment (explicit; read-only about host)")
+    dev_sub = dev.add_subparsers(dest="device_command")
+    dev_sub.add_parser("status", parents=[common], help="print the current device profile")
+    dev_enroll = dev_sub.add_parser("enroll", parents=[common],
+                                    help="explicitly authorize THIS device")
+    dev_enroll.add_argument("--model-alias", default=None)
     return p
 
 
@@ -101,6 +131,14 @@ def main(argv=None) -> int:
         return _cmd_flags(cfg, args, args.config)
     if command == "flag-drill":
         return _cmd_flag_drill(cfg)
+    if command == "package":
+        return _cmd_package(cfg, args)
+    if command == "export-state":
+        return _cmd_export_state(cfg, args)
+    if command == "import-state":
+        return _cmd_import_state(cfg, args)
+    if command == "device":
+        return _cmd_device(cfg, args)
 
     from .orchestrator import VoiceOrchestrator
     orch = VoiceOrchestrator(cfg, no_hotkey=args.no_hotkey, dry_run=args.dry_run)
@@ -496,6 +534,139 @@ def _cmd_flag_drill(cfg) -> int:
             return 2
         print(f"flag drill: {len(FF.FLAGS)} flags flipped+rolled back; user data intact")
         return 0
+
+
+def _cmd_package(cfg, args) -> int:
+    """voicebridge package manifest|doctor|launch|upgrade|uninstall."""
+    import json as _json
+    from . import distribution as D
+    cmd = getattr(args, "package_command", None) or "manifest"
+    if cmd == "manifest":
+        print(_json.dumps(D.manifest(), indent=2, sort_keys=True))
+        return 0
+    if cmd == "doctor":
+        checks = D.doctor(cfg)
+        if getattr(args, "json", False):
+            print(_json.dumps(checks, indent=2, sort_keys=True))
+        else:
+            for c in checks:
+                print(f"[{c['state']:>13}] {c['name']:<12} {c['detail']}")
+            print(D.doctor_summary(checks))
+        return 0 if all(c["state"] == "OK" for c in checks) else 1
+    if cmd == "launch":
+        print(" ".join(D.launcher_command(cfg, no_hotkey=args.no_hotkey)))
+        return 0
+    if cmd == "upgrade":
+        print(_json.dumps(D.upgrade_plan(cfg), indent=2, sort_keys=True))
+        return 0
+    if cmd == "uninstall":
+        plan = D.uninstall_plan(cfg)
+        print(_json.dumps(plan, indent=2, sort_keys=True))
+        print("NOTE: uninstall requires explicit operator confirmation; "
+              "state is preserved by default.")
+        return 0
+    print(f"ERROR: unknown package command {cmd!r}")
+    return 2
+
+
+def _passphrase(args, env: str = "VOICE_BRIDGE_PASSPHRASE") -> str:
+    import os as _os
+    pw = getattr(args, "passphrase", None) or _os.environ.get(env, "")
+    if not pw:
+        raise ValueError(f"passphrase required (--passphrase or {env})")
+    return pw
+
+
+def _cmd_export_state(cfg, args) -> int:
+    from . import portable as P
+    out = args.out or (cfg.state_dir() / f"portable-{int(__import__('time').time())}.vbp")
+    try:
+        pw = _passphrase(args)
+        bundle = P.export_bundle(cfg, pw)
+        out.write_bytes(bundle)
+        try:
+            import os as _os
+            _os.chmod(out, 0o600)
+        except OSError:
+            pass
+    except Exception as exc:
+        print(f"ERROR: {exc}")
+        return 2
+    print(f"exported encrypted portable state: {out}")
+    return 0
+
+
+def _cmd_import_state(cfg, args) -> int:
+    from . import portable as P
+    from . import device as Dev
+    try:
+        if not args.bundle.exists():
+            print(f"ERROR: bundle not found: {args.bundle}")
+            return 2
+        bundle = args.bundle.read_bytes()
+        info = P.bundle_info(bundle)
+        print(f"bundle: schema v{info.schema_version} "
+              f"openssl {info.openssl_version} kdf_iter {info.kdf_iter}")
+        pw = _passphrase(args)
+        payload = P.read_bundle(bundle, pw)
+        plan = P.plan_restore(cfg, payload, dry_run=not args.apply)
+        # trusted-device enrollment gate: a restore to a NEW device requires
+        # an explicitly enrolled device; never automatic.
+        try:
+            Dev.require_enrolled(cfg)
+        except Dev.DeviceNotEnrolledError:
+            if args.apply:
+                raise
+            print("WARN: device not enrolled — `voicebridge device enroll` "
+                  "must run before an applied restore")
+        print("restore plan:")
+        for a in plan.actions:
+            print(f"  - {a}")
+        if not args.apply:
+            print("dry-run/preview (no files written) — pass --apply to restore")
+            return 0
+        result = P.restore_state(cfg, payload, dry_run=False)
+        print(f"restored; pre-restore backup at {result['backup']}")
+        return 0
+    except P.WrongPassphraseError:
+        print("ERROR: wrong passphrase or tampered bundle")
+        return 2
+    except P.CorruptedBundleError as exc:
+        print(f"ERROR: corrupted bundle: {exc}")
+        return 2
+    except P.UnsupportedSchemaError as exc:
+        print(f"ERROR: {exc}")
+        return 2
+    except P.LowDiskError as exc:
+        print(f"ERROR: {exc}")
+        return 2
+    except Dev.DeviceNotEnrolledError as exc:
+        print(f"ERROR: {exc}")
+        return 2
+    except Exception as exc:
+        print(f"ERROR: {exc}")
+        return 2
+
+
+def _cmd_device(cfg, args) -> int:
+    import json as _json
+    from . import device as Dev
+    cmd = getattr(args, "device_command", None) or "status"
+    if cmd == "status":
+        print(_json.dumps(Dev.profile(cfg), indent=2, sort_keys=True))
+        return 0
+    if cmd == "enroll":
+        try:
+            rec = Dev.enroll(cfg, model_alias=args.model_alias,
+                             require_new_authorization=False)
+        except Exception as exc:
+            print(f"ERROR: {exc}")
+            return 2
+        print(_json.dumps(rec, indent=2, sort_keys=True))
+        print("device enrolled (explicit authorization recorded)")
+        return 0
+    print(f"ERROR: unknown device command {cmd!r}")
+    return 2
 
 
 if __name__ == "__main__":
