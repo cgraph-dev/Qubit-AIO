@@ -48,18 +48,48 @@ def get_logger() -> logging.Logger:
     return _LOGGER
 
 
+def _json_safe(value: Any, _depth: int = 0) -> Any:
+    """Coerce a value to a JSON-serializable form WITHOUT hiding it.
+
+    JSON-native scalars pass through; containers are walked with depth/item
+    bounds; ANY other object (a mock, Path, bytes, enum, ...) becomes a visible
+    typed marker so the journal stays valid and the offending value/type is
+    never silently dropped or flattened behind a blanket ``default=str``.
+    """
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if _depth > 6:
+        return f"<depth:{_depth}>"
+    if isinstance(value, dict):
+        items = list(value.items())[:200]
+        return {str(k): _json_safe(v, _depth + 1) for k, v in items}
+    if isinstance(value, (list, tuple, set)):
+        seq = list(value)[:200]
+        out = [_json_safe(v, _depth + 1) for v in seq]
+        return out if isinstance(value, (list, tuple)) else out
+    try:
+        marker = repr(value)
+    except Exception:
+        marker = ""
+    return f"<{type(value).__name__}: {marker[:200]}>"
+
+
 def log_event(event: str, **fields: Any) -> None:
     """Write a structured event to the JSONL journal (and a debug log line).
 
     Packet 1B: every field value passes through centralized redaction BEFORE
     touching the journal or the debug log — this is the single choke point for
-    worker logs, orchestrator events, and tool output.
+    worker logs, orchestrator events, and tool output. Field values are then
+    coerced to JSON-native forms so a non-serializable value (e.g. a mock in a
+    test) can never crash the journal write; the coercion surfaces the type
+    instead of hiding it.
     """
     from .redaction import redact_obj
     import os as _os
     record = {"ts": time.time(), "event": event,
               "pid": _os.getpid()}
     record.update(redact_obj(fields))
+    record = _json_safe(record)
     if _EVENT_FILE:
         try:
             with _EVENT_FILE.open("a") as fh:
@@ -71,7 +101,7 @@ def log_event(event: str, **fields: Any) -> None:
         # original fields must never reach the debug sink.
         compact = {k: (str(v)[:200] if isinstance(v, str) else v)
                    for k, v in record.items() if k not in ("ts", "event")}
-        _LOGGER.debug("%s %s", event, json.dumps(compact, default=str))
+        _LOGGER.debug("%s %s", event, json.dumps(compact))
 
 
 class Timing:

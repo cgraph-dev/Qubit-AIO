@@ -232,6 +232,120 @@ def _probe_http(url: str, timeout: float) -> dict | None:
         return None
 
 
+def check_reconcile(cfg, results) -> None:
+    """Packet 7B: final runtime/documentation reconciliation for Phase 0-7A.
+
+    Cross-checks the feature-flag registry vs the resolved config, the
+    documented model alias vs the config vs the runner contract, the AUDIO_SETUP
+    rules vs the resolved config, the documented ops commands vs run_tests, and
+    MIGRATIONS coverage. Read-only; never writes or restarts anything."""
+    sys.path.insert(0, str(REPO))
+    # 1. feature-flag registry defaults must match the config source of truth
+    try:
+        from voicebridge import feature_flags as FF
+        from voicebridge.config import DEFAULTS as _D
+        mismatches = []
+        for f in FF.FLAGS:
+            node: object = _D
+            for seg in f.config_path:
+                node = node.get(seg) if isinstance(node, dict) else None
+            if node != f.default:
+                mismatches.append(f"{f.name}: config default {node!r} != "
+                                  f"registry default {f.default!r}")
+        if mismatches:
+            results.append(("reconcile.flags_defaults", FAIL,
+                            "; ".join(mismatches)))
+        else:
+            results.append(("reconcile.flags_defaults", PASS,
+                            f"{len(FF.FLAGS)} flags agree with config defaults"))
+        # effective values all resolve
+        eff = FF.effective_all(cfg)
+        if len(eff) != len(FF.FLAGS):
+            results.append(("reconcile.flags_resolve", FAIL, "not all flags resolve"))
+        else:
+            results.append(("reconcile.flags_resolve", PASS,
+                            f"{len(eff)} flags resolve to effective values"))
+    except Exception as exc:
+        results.append(("reconcile.flags_defaults", DEGRADED,
+                        f"flag registry unavailable: {exc}"))
+
+    # 2. model alias: docs claim (example), config, and runner contract agree
+    doc_alias = None
+    for doc in (REPO / "docs" / "AUDIO_SETUP.md",
+                REPO / "docs" / "VOICE_BRIDGE_SYSTEM.md",
+                REPO / "README.md"):
+        try:
+            for line in doc.read_text().splitlines():
+                if "qubit-brain4" in line:
+                    doc_alias = "qubit-brain4"
+        except OSError:
+            pass
+    cfg_alias = cfg.get("intent", "local_llm", "model")
+    try:
+        from voicebridge.runner_contract import DEFAULT_ALIAS
+    except Exception:
+        DEFAULT_ALIAS = None
+    # runner-contract precedence WITHOUT the digest HTTP probe (hermetic):
+    rc_alias = (cfg.get("intent", "runner", "alias")
+                or cfg.get("intent", "ollama_model")
+                or cfg_alias or DEFAULT_ALIAS)
+    aliases = {a for a in (doc_alias, cfg_alias, rc_alias) if a}
+    if len(aliases) > 1:
+        results.append(("reconcile.model_alias", FAIL,
+                        f"docs={doc_alias} config={cfg_alias} "
+                        f"runner_contract={rc_alias}"))
+    else:
+        results.append(("reconcile.model_alias", PASS,
+                        f"single alias everywhere: {sorted(aliases)}"))
+
+    # 3. AUDIO_SETUP critical rules vs resolved config
+    ch = cfg.get("mic", "channels")
+    gain = cfg.get("mic", "gain")
+    od = cfg.get("audio", "output_device")
+    odn = cfg.get("audio", "output_device_name")
+    violations = []
+    if ch != 1:
+        violations.append(f"mic.channels={ch} (AUDIO_SETUP rule 2: 1)")
+    if not (0 < float(gain) <= 16):
+        violations.append(f"mic.gain={gain} (AUDIO_SETUP rule 3)")
+    if od not in (None, "") or odn not in (None, ""):
+        violations.append("audio output pins must stay EMPTY (rule 1)")
+    if violations:
+        results.append(("reconcile.audio_rules", FAIL, "; ".join(violations)))
+    else:
+        results.append(("reconcile.audio_rules", PASS,
+                        "mono mic, sane gain, empty output pins"))
+
+    # 4. documented ops commands exist in run_tests
+    try:
+        from scripts import run_tests as RT
+        for cmd in ("unit", "contract", "integration", "smoke", "live-model",
+                    "live-dashboard", "monitor"):
+            if cmd not in RT.CATEGORIES:
+                results.append(("reconcile.ops_categories", FAIL,
+                                f"run_tests missing category {cmd}"))
+                break
+        else:
+            results.append(("reconcile.ops_categories", PASS,
+                            "all documented test categories exist"))
+    except Exception as exc:
+        results.append(("reconcile.ops_categories", DEGRADED,
+                        f"run_tests unavailable: {exc}"))
+
+    # 5. MIGRATIONS coverage: the feature-flag change has an entry
+    try:
+        mig = (REPO / "docs" / "MIGRATIONS.md").read_text()
+        if "## MIG-016" not in mig:
+            results.append(("reconcile.migrations", FAIL,
+                            "missing MIG-016 (feature-flag registry) entry"))
+        else:
+            results.append(("reconcile.migrations", PASS,
+                            "MIG-016 present"))
+    except OSError as exc:
+        results.append(("reconcile.migrations", DEGRADED,
+                        f"MIGRATIONS.md unreadable: {exc}"))
+
+
 def check_runtime(cfg, results) -> None:
     url = cfg.get("intent", "ollama_url") or "http://127.0.0.1:11434"
     tags = _probe_http(f"{url}/api/tags", 2.0)
@@ -382,6 +496,8 @@ def main(argv: list[str] | None = None) -> int:
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--static", action="store_true", help="files/contracts only (CI-safe)")
     g.add_argument("--runtime", action="store_true", help="static + live probes (typed degraded)")
+    g.add_argument("--reconcile", action="store_true",
+                   help="static + final runtime/documentation reconciliation (Phase 0-7A)")
     ap.add_argument("--config", help="explicit config path (else VOICE_BRIDGE_CONFIG/default)")
     args = ap.parse_args(argv)
 
@@ -396,6 +512,8 @@ def main(argv: list[str] | None = None) -> int:
     check_static(cfg, results)
     if args.runtime:
         check_runtime(cfg, results)
+    if args.reconcile:
+        check_reconcile(cfg, results)
 
     order = {FAIL: 0, WARN: 1, DEGRADED: 2, MISSING: 2}
     for name, state, detail in results:

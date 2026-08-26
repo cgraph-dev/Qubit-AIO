@@ -12,6 +12,7 @@ hermetic path:
   python scripts/run_tests.py monitor         opt-in monitor/clean-venv checks
   python scripts/run_tests.py all             full suite (includes live)
   python scripts/run_tests.py health          run config doctor --runtime
+  python scripts/run_tests.py reconcile       run config doctor --reconcile
 
 Live/monitor commands that result in skipped checks are reported as DEGRADED,
 never as a pass. The operator watchdog is a separate process:
@@ -46,6 +47,8 @@ CATEGORIES = {
                  "-k", _LIVE_K],
     "integration": ["-q", "-p", "no:cacheprovider", "tests/test_webui.py",
                     "tests/test_events_agui_conformance.py"],
+    "smoke": ["-q", "-p", "no:cacheprovider", "tests/test_smoke.py",
+              "-k", _LIVE_K],
     "live-model": ["-q", "-p", "no:cacheprovider",
                    "tests/test_live_stress.py",
                    "tests/test_steal_list_strict.py", "-k", "AirLLMLive"],
@@ -97,17 +100,18 @@ def _degraded_on_skip(args: list[str]) -> int:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Packet 7A separated test commands")
     ap.add_argument("category",
-                    choices=sorted(CATEGORIES) + ["health"])
+                    choices=sorted(CATEGORIES) + ["health", "reconcile"])
     ap.add_argument("--extra", nargs="*", default=[],
                     help="extra pytest args appended (e.g. -k, -x)")
     args = ap.parse_args(argv)
-    if args.category == "health":
+    if args.category in ("health", "reconcile"):
         cmd = [sys.executable, str(REPO / "scripts" / "config_doctor.py"),
-               "--runtime"]
+               "--runtime" if args.category == "health" else "--reconcile"]
         print("[run_tests] " + " ".join(cmd), flush=True)
         return subprocess.call(cmd, cwd=str(REPO))
     base = list(CATEGORIES[args.category]) + list(args.extra)
-    if args.category in OPT_IN:
+    # Smoke: a skipped voice check (no piper voice) is DEGRADED, never a pass.
+    if args.category in OPT_IN or args.category == "smoke":
         return _degraded_on_skip(base)
     return _run(base)
 

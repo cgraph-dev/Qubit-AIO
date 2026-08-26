@@ -52,6 +52,24 @@ def build_parser() -> argparse.ArgumentParser:
     verify = add("verify", help="diagnostic: score a WAV against the enrolled speaker")
     verify.add_argument("file", type=Path)
     verify.add_argument("--name", default=None)
+    flags = add("flags", help="inspect/toggle reversible feature flags (dry-run by default)")
+    flags_sub = flags.add_subparsers(dest="flags_command")
+    flags_list = flags_sub.add_parser("list", parents=[common],
+                                      help="show every flag + effective value")
+    flags_list.add_argument("--json", action="store_true", help="machine-readable output")
+    fget = flags_sub.add_parser("get", parents=[common], help="show one flag's effective value")
+    fget.add_argument("name")
+    fset = flags_sub.add_parser("set", parents=[common], help="set a flag value (dry-run unless --apply)")
+    fset.add_argument("name")
+    fset.add_argument("value")
+    fset.add_argument("--apply", action="store_true",
+                      help="write the config with a timestamped backup (default: dry-run)")
+    froll = flags_sub.add_parser("rollback", parents=[common],
+                                 help="restore a flag's rollback value (dry-run unless --apply)")
+    froll.add_argument("name")
+    froll.add_argument("--apply", action="store_true",
+                       help="write the config with a timestamped backup (default: dry-run)")
+    drill = add("flag-drill", help="hermetic rollback drill: toggle + restore every flag on a temp config/state")
     return p
 
 
@@ -79,6 +97,10 @@ def main(argv=None) -> int:
         return _cmd_enroll(cfg, args.file, args.name, args.seconds)
     if command == "verify":
         return _cmd_verify(cfg, args.file, args.name)
+    if command == "flags":
+        return _cmd_flags(cfg, args, args.config)
+    if command == "flag-drill":
+        return _cmd_flag_drill(cfg)
 
     from .orchestrator import VoiceOrchestrator
     orch = VoiceOrchestrator(cfg, no_hotkey=args.no_hotkey, dry_run=args.dry_run)
@@ -340,6 +362,140 @@ def _cmd_verify(cfg, file: Path, name: str | None) -> int:
     print(f"score vs '{name}': {score:.3f}  (threshold {sv.threshold}) -> "
           f"{'MATCH (your voice)' if accepted else 'REJECT (not you)'}")
     return 0
+
+
+def _cmd_flags(cfg, args, explicit_config: Path | None) -> int:
+    """voicebridge flags list|get|set|rollback. Read-only unless --apply."""
+    from . import feature_flags as FF
+    import json as _json
+
+    cmd = getattr(args, "flags_command", None) or "list"
+    if cmd == "list":
+        rows = [(f.name, f.category, str(FF.effective(cfg, f.name)),
+                 str(f.default), str(f.rollback_value), ".".join(f.config_path))
+                for f in FF.FLAGS]
+        if getattr(args, "json", False):
+            print(_json.dumps([{"name": r[0], "category": r[1], "effective": r[2],
+                                "default": r[3], "rollback": r[4], "config_path": r[5]}
+                               for r in rows], indent=2, sort_keys=True))
+            return 0
+        print(f"{'flag':<16} {'category':<10} {'effective':<12} "
+              f"{'default':<12} {'rollback':<12} config_path")
+        for r in rows:
+            print(f"{r[0]:<16} {r[1]:<10} {r[2]:<12} {r[3]:<12} {r[4]:<12} {r[5]}")
+        return 0
+
+    if cmd == "get":
+        try:
+            f = FF._by_name(args.name)
+        except KeyError as exc:
+            print(f"ERROR: {exc}")
+            return 2
+        print(FF.effective(cfg, f.name))
+        return 0
+
+    target = explicit_config or cfg.path
+    if target is None:
+        from .config import DEFAULT_CONFIG_PATH
+        target = Path(DEFAULT_CONFIG_PATH).expanduser()
+    target = Path(target)
+
+    if cmd == "set":
+        try:
+            f = FF._by_name(args.name)
+        except KeyError as exc:
+            print(f"ERROR: {exc}")
+            return 2
+        value: object
+        if isinstance(f.default, bool):
+            value = str(args.value).lower() in ("1", "true", "yes", "on")
+        elif isinstance(f.default, (int, float)):
+            value = type(f.default)(args.value)
+        else:
+            value = args.value
+        if getattr(args, "apply", False):
+            if not target.exists():
+                print(f"ERROR: config file not found: {target}")
+                return 2
+            bak = FF.apply_flag(target, f.name, value)
+            print(f"applied {f.name}={value} -> {target} (backup {bak})")
+        else:
+            print(f"[dry-run] would set {f.name}={value} in {target}")
+            print(f"  env override: {' '.join(f'{k}={v}' for k, v in FF.to_env(f, value).items())}")
+            print(f"  rollback    : voicebridge flags rollback {f.name} --apply --config {target}")
+        return 0
+
+    if cmd == "rollback":
+        try:
+            f = FF._by_name(args.name)
+        except KeyError as exc:
+            print(f"ERROR: {exc}")
+            return 2
+        if getattr(args, "apply", False):
+            if not target.exists():
+                print(f"ERROR: config file not found: {target}")
+                return 2
+            bak = FF.rollback_flag(target, f.name)
+            print(f"rolled back {f.name}={f.rollback_value} -> {target} (backup {bak})")
+        else:
+            print(f"[dry-run] would restore {f.name}={f.rollback_value} in {target}")
+            print(f"  env override: {' '.join(f'{k}={v}' for k, v in FF.to_env(f, f.rollback_value).items())}")
+        return 0
+    print(f"ERROR: unknown flags command {cmd!r}")
+    return 2
+
+
+def _cmd_flag_drill(cfg) -> int:
+    """Hermetic rollback drill on throwaway config/state (never the live one)."""
+    from . import feature_flags as FF
+    import tempfile as _tf
+    import os as _os
+    from .config import Config as _Config
+
+    with _tf.TemporaryDirectory(prefix="vb-flag-drill-") as td:
+        tdp = Path(td)
+        cfg_path = tdp / "voice.yaml"
+        cfg_path.write_text(FF.redact_config_yaml(cfg))
+        state = tdp / "state"
+        state.mkdir()
+        # seed user data (memory + report + cursor) that rollback must preserve
+        mem = state / "memory.db"
+        mem.write_bytes(b"\x00MEMORY\x01")
+        rep = state / "reports"
+        rep.mkdir()
+        (rep / "manifest.json").write_text('{"id":"x"}')
+        cur = state / "cursors.jsonl"
+        cur.write_text('{"account":"gmail","cursor":7}\n')
+
+        cfg2 = _Config.load(cfg_path)
+        before = FF.state_snapshot(state)
+        for f in FF.FLAGS:
+            flip = (not f.default) if isinstance(f.default, bool) else (
+                f.rollback_value if f.rollback_value != f.default else f.default)
+            FF.apply_flag(cfg_path, f.name, flip)
+            cfg3 = _Config.load(cfg_path)
+            if FF.effective(cfg3, f.name) == f.default:
+                print(f"DRILL FAIL: {f.name} did not flip to {flip}")
+                return 2
+            FF.rollback_flag(cfg_path, f.name)
+            cfg4 = _Config.load(cfg_path)
+            if FF.effective(cfg4, f.name) != f.rollback_value:
+                print(f"DRILL FAIL: {f.name} did not roll back to "
+                      f"{f.rollback_value}")
+                return 2
+            FF.apply_flag(cfg_path, f.name, f.default)
+            cfg5 = _Config.load(cfg_path)
+            if FF.effective(cfg5, f.name) != f.default:
+                print(f"DRILL FAIL: {f.name} did not restore default "
+                      f"{f.default}")
+                return 2
+            print(f"DRILL OK: {f.name} flip->rollback preserved state")
+        after = FF.state_snapshot(state)
+        if before != after:
+            print(f"DRILL FAIL: user data changed: {set(before) ^ set(after)}")
+            return 2
+        print(f"flag drill: {len(FF.FLAGS)} flags flipped+rolled back; user data intact")
+        return 0
 
 
 if __name__ == "__main__":

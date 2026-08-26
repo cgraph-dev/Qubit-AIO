@@ -127,6 +127,22 @@ DEFAULTS: Dict[str, Any] = {
     "intent": {
         "llm_classifier": True,     # enabled: +~0.3-0.6s but fixes broken-English routing (user approved 20-30% cost) — heuristic only (fast);
                                     # ambiguous taps default to conversation
+        # Packet 4C routing cascade (feature-flagged; default OFF = pre-4C).
+        "router": {
+            "enabled": False,       # true = L0 deterministic rules run first
+            "l1_enabled": False,    # true = also try CPU semantic matching
+            "embed_model": "nomic-embed-text",
+        },
+        # Packet 5A opt-in Q5 canary (reversible; default OFF).
+        "canary": {
+            "q5_enabled": False,
+        },
+        # Packet 5C live integration (default ON; rollback flag).
+        "compiler": {
+            "mode": "5c",           # 5c = bounded FTS5 compiler; 4b = old
+            "evidence_sources": [],
+            "observe": True,
+        },
         "ollama_url": "http://127.0.0.1:11434",
         "ollama_model": "qubit-brain4",
         "classify_timeout_s": 8.0,

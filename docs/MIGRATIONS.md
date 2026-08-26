@@ -777,3 +777,48 @@ Rollback: revert the baseline-provenance block in `gate.py`/CLI, restore
 `harness.py::resident_state` byte-valued fields, delete the committed
 baselines (revert commit `cf585bf`), and remove the outcome-recording hook if
 desired. `task_outcomes.jsonl` is inert when the store is removed.
+
+## MIG-016 — Packet 7B: typed feature-flag registry + ops hardening (2026-08-27)
+
+Status: **IMPLEMENTED** — additive defaults and new operational tooling; no
+live user config, service, model, timer, or audio state is modified by any
+command without an explicit `--apply` (which keeps a timestamped `.bak`).
+
+Decision:
+- **Additive config defaults.** `voicebridge/config.py::DEFAULTS` now declares
+  `intent.router.{enabled,l1_enabled,embed_model}`, `intent.canary.q5_enabled`,
+  and `intent.compiler.{mode,evidence_sources,observe}`. Every value equals the
+  code-level fallback already used by `router/pipeline.py`,
+  `intent/classifier.py`, `canary.py` and `local_llm._configured_compiler`, so
+  effective behavior is unchanged; the flags registry has an explicit single
+  source of truth instead of hidden per-reader defaults.
+- **`voicebridge/feature_flags.py`** registers each reversible Phase 0–7A gate
+  (`broker`, `compiler_5c`, `canary_q5`, `router_l0`, `router_l1`,
+  `llm_classifier`) with config path, default, rollback value, and category.
+  `apply_flag`/`rollback_flag` write the config atomically and keep a
+  timestamped `.bak`; they never touch the state dir (memory/reports/cursors).
+- **CLI.** `voicebridge flags list|get|set|rollback` is dry-run by default and
+  only writes with `--apply`. `voicebridge flag-drill` runs the hermetic
+  rollback drill. `scripts/rollback_drill.py` toggles every flag on a throwaway
+  config and proves user data (memory db, report manifest, cursor file) is
+  byte-identical before/after.
+- **Smoke + reports + reconcile.** `tests/test_smoke.py` covers
+  startup/dashboard/task/cancellation/voice paths hermetically (a missing
+  piper voice is a DEGRADED skip, never a pass); `scripts/run_tests.py smoke`
+  runs it; `scripts/change_report.py` emits a change report; `config_doctor.py
+  --reconcile` cross-checks flags/config/docs/ops for Phase 0–7A.
+
+Rationale: Phase 7 acceptance requires every feature behind a flag with a
+one-command rollback, smoke coverage for the five release paths, a change
+report, and docs/config/service reconciliation.
+
+Tests: `tests/test_packet7b.py` (16) — registry completeness/type/defaults,
+resolution + env-override key format, atomic write + backup + state
+preservation, rollback drill (script + CLI), smoke category/marker/paths/live-
+service isolation, change-report generation + secret scan, doctor reconcile
+PASS, CLI list/get/dry-run/apply/drill. `tests/test_smoke.py` (6).
+
+Rollback: revert this commit and delete the `.bak` files only if the operator
+explicitly asked; flag `set --apply` writes always keep a backup, so restoring
+a `.bak` over `voice.yaml` is the documented one-command rollback. No state
+data is deleted by any 7B command.
