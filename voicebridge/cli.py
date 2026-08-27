@@ -96,6 +96,63 @@ def build_parser() -> argparse.ArgumentParser:
     aud_sel.add_argument("name")
     aud_sub.add_parser("reset", parents=[common], help="reset audio to OS defaults")
     aud_sub.add_parser("status", parents=[common], help="typed audio state (OK/DEGRADED/MISSING/PERMISSION_DENIED)")
+    prof = add("profile", help="provider/profile registry (brain/STT/TTS/voice/audio)")
+    prof_sub = prof.add_subparsers(dest="profile_command")
+    prof_list = prof_sub.add_parser("list", parents=[common],
+                                    help="list registered profiles + active selection")
+    prof_list.add_argument("--json", action="store_true")
+    prof_show = prof_sub.add_parser("show", parents=[common],
+                                    help="show the active profile for one component")
+    prof_show.add_argument("kind", choices=["brain", "stt", "tts", "voice", "audio"])
+    prof_check = prof_sub.add_parser("check", parents=[common],
+                                     help="run every gate for a profile (read-only)")
+    prof_check.add_argument("kind", choices=["brain", "stt", "tts", "voice", "audio"])
+    prof_check.add_argument("--profile", default=None)
+    prof_install = prof_sub.add_parser("install", parents=[common],
+                                       help="register a profile manifest (JSON, read-only)")
+    prof_install.add_argument("manifest", type=Path, help="path to a manifest JSON")
+    prof_select = prof_sub.add_parser("select", parents=[common],
+                                      help="activate a profile (dry-run unless --apply)")
+    prof_select.add_argument("kind", choices=["brain", "stt", "tts", "voice", "audio"])
+    prof_select.add_argument("profile")
+    prof_select.add_argument("--apply", action="store_true",
+                             help="actually apply (default: dry-run)")
+    prof_select.add_argument("--confirm", action="store_true",
+                             help="confirm the side effect")
+    prof_reset = prof_sub.add_parser("reset", parents=[common],
+                                     help="reset one component to its default")
+    prof_reset.add_argument("kind", choices=["brain", "stt", "tts", "voice", "audio"])
+    prof_reset.add_argument("--apply", action="store_true",
+                            help="actually apply (default: dry-run)")
+    prof_up = prof_sub.add_parser("upgrade", parents=[common],
+                                  help="re-verify a profile's gates")
+    prof_up.add_argument("kind", choices=["brain", "stt", "tts", "voice", "audio"])
+    prof_up.add_argument("--profile", default=None)
+    prof_up.add_argument("--apply", action="store_true",
+                         help="actually re-verify (default: dry-run)")
+    prof_rm = prof_sub.add_parser("remove", parents=[common],
+                                  help="remove a non-default profile from the registry")
+    prof_rm.add_argument("kind", choices=["brain", "stt", "tts", "voice", "audio"])
+    prof_rm.add_argument("profile")
+    prof_rm.add_argument("--apply", action="store_true",
+                         help="actually remove (default: dry-run)")
+    prof_roll = prof_sub.add_parser("rollback", parents=[common],
+                                    help="restore a component's previous profile")
+    prof_roll.add_argument("kind", choices=["brain", "stt", "tts", "voice", "audio"])
+    prof_roll.add_argument("--backup", type=Path, default=None)
+    prof_roll.add_argument("--apply", action="store_true",
+                           help="actually roll back (default: dry-run)")
+    brand = add("branding", help="Qubit Voice Agent branding migration (dry-run/backup/verify/rollback)")
+    brand_sub = brand.add_subparsers(dest="branding_command")
+    brand_plan = brand_sub.add_parser("plan", parents=[common],
+                                      help="prepare the openclaw-voice-bridge -> qubit-voice-agent migration")
+    brand_plan.add_argument("--apply", action="store_true", default=False,
+                            help="create the backup (default: dry-run plan only)")
+    brand_plan.add_argument("--backup-dir", type=Path, default=None)
+    brand_sub.add_parser("verify", parents=[common], help="read-only branding consistency check")
+    brand_roll = brand_sub.add_parser("rollback", parents=[common],
+                                      help="restore branding backups (reversible)")
+    brand_roll.add_argument("--backup-dir", type=Path, required=True)
     export = add("export-state", help="encrypt + export portable state (memory/lessons/reports/config/model)")
     export.add_argument("--out", type=Path, default=None,
                         help="output file (default: <state_dir>/portable-<ts>.vbp)")
@@ -148,6 +205,10 @@ def main(argv=None) -> int:
         return _cmd_package(cfg, args)
     if command == "audio":
         return _cmd_audio(cfg, args)
+    if command == "profile":
+        return _cmd_profile(cfg, args)
+    if command == "branding":
+        return _cmd_branding(cfg, args)
     if command == "export-state":
         return _cmd_export_state(cfg, args)
     if command == "import-state":
@@ -656,6 +717,94 @@ def _cmd_audio(cfg, args) -> int:
         print(f"output : [{st['output']['state']:>16}] {st['output']['detail']}")
         return 0 if all(v["state"] == "OK" for v in st.values()) else 1
     print(f"ERROR: unknown audio command {cmd!r}")
+    return 2
+
+
+def _cmd_profile(cfg, args) -> int:
+    """voicebridge profile list|show|check|install|select|reset|upgrade|
+    remove|rollback. Dry-run by default; JSON output."""
+    import json as _json
+    from . import profiles as P
+    cmd = getattr(args, "profile_command", None) or "list"
+    if cmd == "list":
+        out = P.profiles_list(cfg)
+        if getattr(args, "json", False):
+            print(_json.dumps(out, indent=2, sort_keys=True))
+            return 0
+        print(f"{'id':<22} {'kind':<6} {'state':<8} {'active':<6} rollback")
+        for p in out["profiles"]:
+            print(f"{p['id']:<22} {p['kind']:<6} {p['gate']:<8} "
+                  f"{'*' if p['active'] else '':<6} {p['rollback_to']}")
+        print("active:", _json.dumps(out["active"]))
+        return 0
+    if cmd == "show":
+        out = P.profiles_show(cfg, args.kind)
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    if cmd == "check":
+        out = P.profile_check(cfg, args.kind, args.profile)
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] == "OK" else 1
+    if cmd == "install":
+        try:
+            data = _json.loads(Path(args.manifest).read_text())
+            man = P.ProviderManifest(**data)
+        except Exception as exc:
+            print(_json.dumps({"state": "MISSING",
+                               "detail": f"manifest error: {exc}"},
+                              indent=2))
+            return 2
+        out = P.install_manifest(cfg, man)
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] == "OK" else 1
+    if cmd == "select":
+        out = P.apply_profile(cfg, args.kind, args.profile,
+                              dry_run=not args.apply,
+                              require_confirmation=not args.confirm)
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] == "OK" else 2
+    if cmd == "reset":
+        out = P.reset_profile(cfg, args.kind, dry_run=not args.apply)
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] == "OK" else 2
+    if cmd == "upgrade":
+        out = P.upgrade_profile(cfg, args.kind, args.profile or "",
+                                dry_run=not args.apply)
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] == "OK" else 1
+    if cmd == "remove":
+        out = P.remove_profile(cfg, args.kind, args.profile,
+                               dry_run=not args.apply)
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] == "OK" else 2
+    if cmd == "rollback":
+        out = P.rollback_profile(cfg, args.kind, dry_run=not args.apply,
+                                 backup=args.backup)
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] == "OK" else 2
+    print(f"ERROR: unknown profile command {cmd!r}")
+    return 2
+
+
+def _cmd_branding(cfg, args) -> int:
+    """voicebridge branding plan|verify|rollback — Qubit migration."""
+    import json as _json
+    from . import profiles as P
+    cmd = getattr(args, "branding_command", None) or "plan"
+    if cmd == "plan":
+        out = P.branding_plan(cfg, dry_run=not args.apply,
+                              backup_dir=args.backup_dir)
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    if cmd == "verify":
+        out = P.branding_verify(cfg)
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    if cmd == "rollback":
+        out = P.branding_rollback(cfg, args.backup_dir)
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] == "OK" else 2
+    print(f"ERROR: unknown branding command {cmd!r}")
     return 2
 
 

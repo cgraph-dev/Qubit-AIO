@@ -722,6 +722,16 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self._file(self.app._frontend_dir / "reports.html", "text/html; charset=utf-8")
             else:
                 self._send(404, b"reports page not found")
+        elif path == "/settings" or path == "/settings.html":
+            # Packet 7D: beginner/advanced control center (every control calls
+            # a real /api/* endpoint; no frontend-only state).
+            fp = self.app._frontend_dir / "settings.html"
+            if not fp.exists():
+                fp = Path(__file__).resolve().parents[1] / "frontend" / "settings.html"
+            if fp.exists():
+                self._file(fp, "text/html; charset=utf-8")
+            else:
+                self._send(404, b"settings page not found")
         elif path == "/activity":
             if self.app._use_frontend_dir and (self.app._frontend_dir / "activity.html").exists():
                 self._file(self.app._frontend_dir / "activity.html", "text/html; charset=utf-8")
@@ -913,6 +923,90 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 merged.append({"kind": ev.get("event"), "text": str(ev.get("text","")), "summary": str(ev.get("summary","")), "route": ev.get("route",""), "ts": ev.get("ts"), "category": c, "raw_log": ev})
             merged.sort(key=lambda x: float(x.get("ts") or 0), reverse=True)
             self._json({"items": merged[:limit], "pruned_available": True})
+        elif path == "/api/profiles":
+            # Packet 7D: provider/profile registry (read-only list/show/check).
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            from . import profiles as P
+            kind = None
+            qs = self.path.split("?", 1)[1] if "?" in self.path else ""
+            for kv in qs.split("&"):
+                if kv.startswith("kind="):
+                    kind = kv.split("=", 1)[1]
+            if kind and kind in ("brain", "stt", "tts", "voice", "audio"):
+                self._json(P.profiles_show(self.app.orch.cfg, kind))
+                return
+            self._json(P.profiles_list(self.app.orch.cfg))
+        elif path == "/api/profiles/check":
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            from . import profiles as P
+            kind = None
+            pid = None
+            qs = self.path.split("?", 1)[1] if "?" in self.path else ""
+            for kv in qs.split("&"):
+                if kv.startswith("kind="):
+                    kind = kv.split("=", 1)[1]
+                if kv.startswith("profile="):
+                    pid = kv.split("=", 1)[1]
+            if kind not in ("brain", "stt", "tts", "voice", "audio"):
+                self._json({"state": "MISSING", "detail": "kind required"}, 400)
+                return
+            self._json(P.profile_check(self.app.orch.cfg, kind, pid))
+        elif path == "/api/audio/status" or path == "/api/audio/list":
+            # Packet 7D: audio settings contract exposed to the dashboard.
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            from .audio import settings as AS
+            try:
+                if path.endswith("/status"):
+                    self._json(AS.status(self.app.orch.cfg))
+                else:
+                    devs = AS.list_devices()
+                    self._json({"inputs": [{"stable_id": d.stable_id,
+                                            "name": d.name, "backend": d.backend,
+                                            "is_default": d.is_default}
+                                           for d in devs["inputs"]],
+                                "outputs": [{"stable_id": d.stable_id,
+                                             "name": d.name, "backend": d.backend,
+                                             "is_default": d.is_default}
+                                            for d in devs["outputs"]]})
+            except AS.AudioSettingsError as exc:
+                self._json({"state": "MISSING", "detail": str(exc)[:200]}, 503)
+        elif path == "/api/permissions":
+            # Packet 7D: read-only permission review (from the safety policy).
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            try:
+                from .safety import policy as _pol
+                perms = getattr(_pol, "REVIEW_ITEMS", None)
+                if perms is None:
+                    perms = [{"capability": "shell.exec", "tier": "mutating"},
+                             {"capability": "file.write", "tier": "mutating"},
+                             {"capability": "browser.navigate", "tier": "mutating"}]
+                self._json({"items": perms, "source": "safety policy"})
+            except Exception:
+                self._json({"items": [], "source": "safety policy"})
+        elif path == "/api/device/status":
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            try:
+                from . import device as Dev
+                self._json(Dev.profile(self.app.orch.cfg))
+            except Exception as exc:
+                self._json({"enrolled": False, "detail": str(exc)[:120]})
+        elif path == "/api/branding":
+            # Packet 7D: Qubit branding plan/verify (read-only; rollback via POST).
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            from . import profiles as P
+            self._json(P.branding_verify(self.app.orch.cfg))
         elif path == "/api/logs":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
@@ -1019,6 +1113,153 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 run_id, reason=str(body.get("reason") or "user"))
             self._json({"ok": True, "run_id": run_id,
                         "terminal_emitted": bool(emitted)})
+        elif path == "/api/profiles/apply":
+            # Packet 7D: explicit, confirmed profile activation (dry-run or
+            # apply via body). Never trusts a provider without gates.
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            from . import profiles as P
+            try:
+                body = json.loads(
+                    self.rfile.read(int(self.headers.get("Content-Length", 0))
+                                    if self.headers.get("Content-Length") else 0)
+                    or b"{}")
+            except Exception:
+                self._json({"state": "FAILED", "detail": "bad JSON body"}, 400)
+                return
+            kind = body.get("kind")
+            profile = body.get("profile")
+            if kind not in ("brain", "stt", "tts", "voice", "audio") or not profile:
+                self._json({"state": "MISSING",
+                            "detail": "kind + profile required"}, 400)
+                return
+            dry = bool(body.get("dry_run", True))
+            confirm = bool(body.get("confirm", False))
+            out = P.apply_profile(self.app.orch.cfg, kind, profile,
+                                  dry_run=dry, require_confirmation=not confirm)
+            code = 200 if out["state"] in ("OK", "DENIED", "PARTIAL") else \
+                (400 if out["state"] == "MISSING" else 409)
+            self._json(out, code)
+        elif path == "/api/profiles/reset":
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            from . import profiles as P
+            try:
+                body = json.loads(
+                    self.rfile.read(int(self.headers.get("Content-Length", 0))
+                                    if self.headers.get("Content-Length") else 0)
+                    or b"{}")
+            except Exception:
+                self._json({"state": "FAILED", "detail": "bad JSON body"}, 400)
+                return
+            kind = body.get("kind")
+            if kind not in ("brain", "stt", "tts", "voice", "audio"):
+                self._json({"state": "MISSING", "detail": "kind required"}, 400)
+                return
+            out = P.reset_profile(self.app.orch.cfg, kind,
+                                  dry_run=not bool(body.get("apply", False)))
+            self._json(out, 200 if out["state"] == "OK" else 409)
+        elif path == "/api/profiles/rollback":
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            from . import profiles as P
+            try:
+                body = json.loads(
+                    self.rfile.read(int(self.headers.get("Content-Length", 0))
+                                    if self.headers.get("Content-Length") else 0)
+                    or b"{}")
+            except Exception:
+                self._json({"state": "FAILED", "detail": "bad JSON body"}, 400)
+                return
+            kind = body.get("kind")
+            if kind not in ("brain", "stt", "tts", "voice", "audio"):
+                self._json({"state": "MISSING", "detail": "kind required"}, 400)
+                return
+            out = P.rollback_profile(self.app.orch.cfg, kind,
+                                     dry_run=not bool(body.get("apply", False)),
+                                     backup=None)
+            self._json(out, 200 if out["state"] == "OK" else 409)
+        elif path == "/api/profiles/remove":
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            from . import profiles as P
+            try:
+                body = json.loads(
+                    self.rfile.read(int(self.headers.get("Content-Length", 0))
+                                    if self.headers.get("Content-Length") else 0)
+                    or b"{}")
+            except Exception:
+                self._json({"state": "FAILED", "detail": "bad JSON body"}, 400)
+                return
+            kind = body.get("kind")
+            profile = body.get("profile")
+            if kind not in ("brain", "stt", "tts", "voice", "audio") or not profile:
+                self._json({"state": "MISSING",
+                            "detail": "kind + profile required"}, 400)
+                return
+            out = P.remove_profile(self.app.orch.cfg, kind, profile,
+                                   dry_run=not bool(body.get("apply", False)))
+            self._json(out, 200 if out["state"] == "OK" else 409)
+        elif path == "/api/audio/reset":
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            from .audio import settings as AS
+            try:
+                bak = AS.reset_to_defaults(self.app.orch.cfg)
+                self._json({"state": "OK", "detail": "reset to OS defaults",
+                            "backup": str(bak)})
+            except Exception as exc:
+                self._json({"state": "FAILED", "detail": str(exc)[:160]}, 409)
+        elif path == "/api/device/enroll":
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            try:
+                from . import device as Dev
+                rec = Dev.enroll(self.app.orch.cfg, require_new_authorization=False)
+                self._json({"enrolled": True, "detail": "device enrolled",
+                            "machine_id": rec.get("machine_id")})
+            except Exception as exc:
+                self._json({"enrolled": False, "detail": str(exc)[:160]}, 403)
+        elif path == "/api/export-state":
+            # Packet 7D: dashboard export calls the real encrypted exporter.
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            try:
+                from . import portable as P
+                from . import device as Dev
+                try:
+                    Dev.require_enrolled(self.app.orch.cfg)
+                except Dev.DeviceNotEnrolledError as exc:
+                    self._json({"state": "DENIED",
+                                "detail": str(exc)[:160]}, 403)
+                    return
+                out = self.app.orch.cfg.state_dir() / \
+                    f"portable-{int(__import__('time').time())}.vbp"
+                # explicit passphrase: read from the request, never stored
+                try:
+                    body = json.loads(
+                        self.rfile.read(int(self.headers.get("Content-Length", 0))
+                                        if self.headers.get("Content-Length") else 0)
+                        or b"{}")
+                except Exception:
+                    body = {}
+                pw = str(body.get("passphrase") or "")
+                if not pw:
+                    self._json({"state": "DENIED",
+                                "detail": "passphrase required"}, 403)
+                    return
+                bundle = P.export_bundle(self.app.orch.cfg, pw)
+                out.write_bytes(bundle)
+                self._json({"state": "OK", "detail": str(out)})
+            except Exception as exc:
+                self._json({"state": "FAILED", "detail": str(exc)[:160]}, 409)
         elif path == "/api/prune" or path == "/api/reports/prune":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")

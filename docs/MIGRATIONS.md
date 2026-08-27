@@ -950,3 +950,46 @@ Full suite 765 passed / 0 failed / 0 skipped.
 Rollback: revert this commit; restore the pre-normalization
 `voicebridge/audio/settings.py`. Audio `.bak` backups preserve prior config;
 no state data is altered.
+
+## MIG-020 — Packet 7D: provider/profile registry, dashboard/CLI parity, Qubit branding (2026-08-27)
+
+Status: **IMPLEMENTED** — additive modules + CLI + authenticated dashboard
+endpoints; no user config, service, timer, model, browser, or audio state is
+modified by any command. Profile operations are dry-run by default, atomically
+written with a `.profile.*.bak` backup, and reversible; branding apply copies
+config/state/data to a backup dir and never moves/deletes live state.
+
+Decision:
+- **Provider/profile registry** (`voicebridge/profiles.py`): versioned
+  manifests for brain (reasoning model), stt, tts provider, voice artifact,
+  and audio devices. Every manifest records source+revision, license,
+  checksum/digest, hardware/language, VRAM/RAM, latency, quality/safety
+  evidence, and rollback target. Gates (manifest, artifact/digest,
+  hardware/language, 5 GB VRAM ceiling) fail closed and leave the previous
+  profile active. One approved resident generative model by default; defaults
+  unchanged (qubit-brain4, sherpa CPU, Piper, en_US-amy-medium, OS-default
+  audio).
+- **CLI** (`voicebridge profile list|show|check|install|select|reset|upgrade|
+  remove|rollback`, dry-run by default, JSON output) and **branding**
+  (`plan|verify|rollback`).
+- **Dashboard** (`/settings` + `/api/profiles*`, `/api/audio*`,
+  `/api/permissions`, `/api/device*`, `/api/export-state`, `/api/branding`):
+  beginner onboarding + advanced mode; every control calls a real authenticated
+  backend endpoint; no frontend-only source of truth; typed unavailable/
+  degraded/denied/partial/failed states; escaped untrusted text; no secret/
+  path/credential leakage.
+- **Independence**: changing the voice does not change the TTS provider, model,
+  or audio devices; provider changes never alter memory/reports/approvals; no
+  service restart or recording enablement during settings changes.
+
+Rationale: Packet 7D makes Qubit Voice Agent beginner-friendly while providing
+advanced, fully reversible customization through CLI + dashboard, and prepares
+the `openclaw-voice-bridge -> qubit-voice-agent` branding migration separately.
+
+Tests: `tests/test_packet7d.py` (39). Full suite 804 passed / 0 failed /
+0 skipped. clean-venv PASS; check_deployment 0 fail; compileall + pip check +
+git diff --check OK.
+
+Rollback: revert this commit; remove the 7D modules/CLI/routes/page/tests. No
+pre-existing state is altered; `.profile.*.bak` and branding backup dirs
+preserve prior config/state.

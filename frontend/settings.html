@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings — Qubit Voice Agent</title>
+<style>
+ body{font:14px/1.5 system-ui,sans-serif;background:#0b0e14;color:#dbe2ef;margin:0;padding:24px;max-width:900px}
+ h1{font-size:20px;margin:0 0 4px} h2{font-size:15px;margin:18px 0 6px;border-bottom:1px solid #22304a;padding-bottom:4px}
+ .card{background:#131a26;border:1px solid #22304a;border-radius:10px;padding:12px;margin-bottom:10px}
+ button{margin-right:8px;padding:6px 14px;border-radius:6px;border:0;cursor:pointer}
+ .ok{background:#1f7a4d;color:#fff}.warn{background:#8a6d1f;color:#fff}.no{background:#7a1f2d;color:#fff}
+ .muted{color:#7f8ca3}.err{color:#ff8080}.tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;margin-left:6px}
+ .tag.OK{background:#1f7a4d}.tag.DENIED,.tag.FAILED{background:#7a1f2d}.tag.DEGRADED,.tag.PARTIAL{background:#8a6d1f}.tag.MISSING,.tag.UNAVAILABLE{background:#444}
+ .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap} select{padding:6px;border-radius:6px;background:#0b0e14;color:#dbe2ef;border:1px solid #22304a}
+ .advanced{display:none} .advanced.open{display:block} .hidden{display:none}
+ a{color:#6db3ff} code{background:#0b0e14;padding:1px 4px;border-radius:4px}
+</style></head><body>
+<h1>Qubit Voice Agent</h1>
+<div class="muted">Settings · beginner mode by default; <button class="warn" onclick="toggleAdvanced()">Advanced</button></div>
+
+<div id="onboarding" class="card">
+ <b>Welcome</b> — you're already set up with the safe, verified defaults:
+ <div class="muted">Qubit brain · CPU speech-to-text · Piper voice · your current audio devices.</div>
+ <button class="ok" onclick="loadAll()">Check health</button>
+ <button onclick="branding()">Branding plan</button>
+ <span id="health" class="muted">—</span>
+</div>
+
+<div class="advanced">
+ <h2>Reasoning model (brain)</h2>
+ <div class="card row">
+   <select id="brain-sel"></select>
+   <button class="ok" onclick="applyProfile('brain')">Select</button>
+   <button onclick="resetProfile('brain')">Reset</button>
+   <button class="warn" onclick="checkProfile('brain')">Check</button>
+   <span id="brain-state" class="muted"></span>
+ </div>
+
+ <h2>Speech-to-text</h2>
+ <div class="card row">
+   <select id="stt-sel"></select>
+   <button class="ok" onclick="applyProfile('stt')">Select</button>
+   <button onclick="resetProfile('stt')">Reset</button>
+   <span id="stt-state" class="muted"></span>
+ </div>
+
+ <h2>Text-to-speech provider</h2>
+ <div class="card row">
+   <select id="tts-sel"></select>
+   <button class="ok" onclick="applyProfile('tts')">Select</button>
+   <button onclick="resetProfile('tts')">Reset</button>
+   <span id="tts-state" class="muted"></span>
+ </div>
+
+ <h2>Voice artifact</h2>
+ <div class="card row">
+   <select id="voice-sel"></select>
+   <button class="ok" onclick="applyProfile('voice')">Select</button>
+   <button onclick="resetProfile('voice')">Reset</button>
+   <span id="voice-state" class="muted"></span>
+ </div>
+
+ <h2>Audio devices</h2>
+ <div class="card row">
+   <button onclick="audioStatus()">Status</button>
+   <button onclick="audioList()">List devices</button>
+   <button onclick="audioReset()">Reset to OS defaults</button>
+   <span id="audio-state" class="muted"></span>
+ </div>
+
+ <h2>Permissions</h2>
+ <div class="card"><button onclick="permissions()">Review permissions</button><span id="perm-state" class="muted"></span></div>
+
+ <h2>Device enrollment</h2>
+ <div class="card row">
+   <button onclick="deviceStatus()">Status</button>
+   <button class="ok" onclick="deviceEnroll()">Enroll this device</button>
+   <span id="device-state" class="muted"></span>
+ </div>
+
+ <h2>Task progress, approvals, reports</h2>
+ <div class="card row">
+   <button onclick="taskStatus()">Task progress</button>
+   <button onclick="approvals()">Approvals</button>
+   <button onclick="reports()">Reports</button>
+   <span id="misc-state" class="muted"></span>
+ </div>
+
+ <h2>Export / import / upgrade / rollback</h2>
+ <div class="card">
+   <div class="row">
+     <button class="ok" onclick="exportState()">Export state</button>
+     <button onclick="upgradeAll()">Upgrade checks</button>
+     <button onclick="rollbackProfile('brain')">Rollback brain</button>
+     <button onclick="removeProfile('brain')">Remove brain (demo)</button>
+   </div>
+   <div class="muted" id="state-out"></div>
+ </div>
+</div>
+
+<script>
+const API = localStorage.getItem('vdb_api') || '';
+const hdrs = () => ({'Content-Type':'application/json','X-Api-Token':localStorage.getItem('vdb_token')||''});
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function show(id,text){const el=document.getElementById(id);if(el)el.textContent=text;}
+function tag(state){return '<span class="tag '+esc(state)+'">'+esc(state)+'</span>';}
+async function api(path,opts){
+ const r = await fetch(API+path,Object.assign({headers:hdrs()},opts||{}));
+ let body=null; try{body=await r.json();}catch(e){body=null;}
+ return {status:r.status,body};
+}
+function toggleAdvanced(){
+ document.querySelector('.advanced').classList.toggle('open');
+}
+async function loadAll(){
+ const {status,body} = await api('/api/status');
+ show('health', status===200 && body && body.bridge==='up'
+   ? 'bridge up ✓' : 'unavailable / degraded');
+ loadProfiles();
+}
+async function loadProfiles(){
+ const {body} = await api('/api/profiles');
+ if(!body||!body.profiles){show('health','profiles unavailable');return;}
+ for(const kind of ['brain','stt','tts','voice']){
+   const sel = document.getElementById(kind+'-sel');
+   if(!sel)continue;
+   const list = body.profiles.filter(p=>p.kind===kind);
+   const active = body.active ? body.active[kind] : '';
+   sel.innerHTML = list.map(p=>`<option value="${esc(p.id)}"${p.id===active?' selected':''}>${esc(p.id)} (${esc(p.gate)})</option>`).join('');
+   show(kind+'-state', 'active: '+esc(active||'—'));
+ }
+}
+async function applyProfile(kind){
+ const profile = document.getElementById(kind+'-sel').value;
+ const {body} = await api('/api/profiles/apply',{method:'POST',
+   body:JSON.stringify({kind,profile,dry_run:false,confirm:true})});
+ const st = body && body.state;
+ show(kind+'-state', (body&&body.detail?esc(body.detail)+' ':'') + tag(st));
+ loadProfiles();
+}
+async function resetProfile(kind){
+ const {body} = await api('/api/profiles/reset',{method:'POST',
+   body:JSON.stringify({kind,apply:true})});
+ show(kind+'-state', body&&body.detail?esc(body.detail):'reset '+esc(body&&body.state));
+ loadProfiles();
+}
+async function checkProfile(kind){
+ const {body} = await api('/api/profiles/check?kind='+kind);
+ show(kind+'-state', JSON.stringify(body&&body.gates||body));
+}
+async function rollbackProfile(kind){
+ const {body} = await api('/api/profiles/rollback',{method:'POST',
+   body:JSON.stringify({kind,apply:true})});
+ show(kind+'-state', body&&body.detail?esc(body.detail):'rollback');
+ loadProfiles();
+}
+async function removeProfile(kind){
+ const {body} = await api('/api/profiles/remove?kind='+kind+'&profile=qubit-brain4',
+   {method:'POST',body:'{}'});
+ show(kind+'-state', body&&body.detail?esc(body.detail):'remove');
+}
+async function audioStatus(){
+ const {body} = await api('/api/audio/status');
+ show('audio-state', body?JSON.stringify(body):'audio status unavailable');
+}
+async function audioList(){
+ const {body} = await api('/api/audio/list');
+ show('audio-state', body && body.inputs ? ('inputs '+body.inputs.length+' outputs '+body.outputs.length)
+   : 'audio list unavailable');
+}
+async function audioReset(){
+ const {body} = await api('/api/audio/reset',{method:'POST',body:'{}'});
+ show('audio-state', body&&body.detail?esc(body.detail):'audio reset');
+}
+async function permissions(){
+ const {body} = await api('/api/permissions');
+ show('perm-state', body&&body.items?('permissions: '+body.items.length):'unavailable');
+}
+async function deviceStatus(){
+ const {body} = await api('/api/device/status');
+ show('device-state', body&&body.enrolled!=null?('enrolled: '+body.enrolled):'unavailable');
+}
+async function deviceEnroll(){
+ const {body} = await api('/api/device/enroll',{method:'POST',body:'{}'});
+ show('device-state', body&&body.detail?esc(body.detail):'enrolled');
+}
+async function taskStatus(){
+ const {body} = await api('/api/status');
+ show('misc-state', body&&body.task_active!=null?('task_active: '+body.task_active):'unavailable');
+}
+async function approvals(){
+ const {body} = await api('/api/approvals');
+ show('misc-state', body&&body.items?('approvals pending: '+body.items.length):'unavailable');
+}
+async function reports(){
+ const {body} = await api('/api/reports?limit=5&days=30');
+ show('misc-state', body&&body.items?('reports: '+body.items.length):'unavailable');
+}
+async function exportState(){
+ const {body} = await api('/api/export-state',{method:'POST',body:'{}'});
+ show('state-out','export: '+(body&&body.detail?esc(body.detail):'unavailable'));
+}
+async function upgradeAll(){
+ const {body} = await api('/api/profiles');
+ if(!body||!body.profiles)return;
+ const kinds=[...new Set(body.profiles.map(p=>p.kind))];
+ const out=[];
+ for(const k of kinds){
+   const {body:b}=await api('/api/profiles/check?kind='+k);
+   out.push(k+':'+((b&&b.state)||'?'));
+ }
+ show('state-out','upgrade checks: '+out.join(', '));
+}
+async function branding(){
+ const {body} = await api('/api/branding');
+ show('health','branding: '+(body&&body.refs?JSON.stringify(body.refs):'unavailable'));
+}
+loadAll();
+</script>
+</body></html>
