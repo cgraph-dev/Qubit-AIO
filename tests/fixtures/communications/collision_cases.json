@@ -1,0 +1,44 @@
+{
+  "_synthetic": true,
+  "_comment": "Synthetic fallback-fingerprint collision vectors for Packet 8A. Items without platform IDs use the versioned fallback fingerprint. identical snippets in different threads must NOT collide; exact duplicates must dedupe.",
+  "adapter": "gmail_cdp",
+  "adapter_version": "8a-1",
+  "cases": [
+    {
+      "name": "identical_snippet_different_thread_no_platform_id",
+      "account_scope": "synth-gmail-a",
+      "sender": "Synthetic Sender Hotel",
+      "preview": "identical snippet across threads",
+      "expect_same_identity": false,
+      "reason": "different thread_id => different fallback fingerprint => distinct identities",
+      "items": [
+        {"thread": "syn-thread-a", "ts": "2026-08-08T10:00:00Z"},
+        {"thread": "syn-thread-b", "ts": "2026-08-08T10:00:00Z"}
+      ]
+    },
+    {
+      "name": "exact_duplicate_no_platform_id",
+      "account_scope": "synth-gmail-a",
+      "sender": "Synthetic Sender India",
+      "preview": "exact duplicate preview",
+      "expect_same_identity": true,
+      "reason": "same thread + sender + ts + content => same fingerprint => dedupe (not new twice)",
+      "items": [
+        {"thread": "syn-thread-c", "ts": "2026-08-08T11:00:00Z"},
+        {"thread": "syn-thread-c", "ts": "2026-08-08T11:00:00Z"}
+      ]
+    },
+    {
+      "name": "same_thread_different_content",
+      "account_scope": "synth-gmail-a",
+      "sender": "Synthetic Sender Juliet",
+      "preview": "edited preview body differs",
+      "expect_same_identity": true,
+      "reason": "thread identity wins even when preview is edited; the fallback fingerprint would differ, but the thread ID keeps the stable identity stable",
+      "items": [
+        {"thread": "syn-thread-d", "ts": "2026-08-08T12:00:00Z", "preview": "original preview body"},
+        {"thread": "syn-thread-d", "ts": "2026-08-08T12:05:00Z", "preview": "edited preview body"}
+      ]
+    }
+  ]
+}
