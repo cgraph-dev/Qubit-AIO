@@ -78,6 +78,26 @@ TTS is 22050 Hz mono. The bridge **resamples to the sink's native rate** before
 playing; if it ever sounds pitch-shifted/robotic, a wrong sample rate is the cause
 (fixed by the resample in `voicebridge/audio/playback.py`).
 
+## Hotkeys (Right Ctrl PTT)
+- Hold **Right Ctrl** to talk (config `hotkey.hold_key: ctrl_r`). A quick tap
+  toggles listen; **Esc** cancels speech/task.
+- The hotkey uses the `xinput test-xi2 --root` XI2 backend (reliable on this
+  Ubuntu 24.04 X11 session). It is self-healing: if the xinput child ever goes
+  stale (alive but not delivering events), the bridge restarts the listener
+  automatically within ~30s — you should never have to restart the service
+  just to regain PTT.
+- If Right Ctrl does nothing: first check the bridge is up
+  (`systemctl --user is-active openclaw-voice-bridge`) and that the mic pin is
+  the Scarlett (`voicebridge audio status`). If the beep sounds but there is
+  no spoken reply, the AT2020 is silent — enable 48V phantom power on the
+  Scarlett front panel and confirm the input gain knob is up (the digital
+  `Line In 1 Gain` is already at max 70/69 dB in ALSA).
+- Troubleshoot PTT events with:
+  ```
+  voicebridge audio status
+  journalctl --user -u openclaw-voice-bridge --since "5 min ago" | grep -i hotkey
+  ```
+
 ## References
 - Repo: `~/Projects/Repos/openclaw-voice-bridge`
 - Playback + device resolution: `voicebridge/audio/playback.py`

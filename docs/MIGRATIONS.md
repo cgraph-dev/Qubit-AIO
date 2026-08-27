@@ -1091,3 +1091,38 @@ silent test clip (a spoken PTT clip is required from a human for a final WER).
 Rollback: revert this commit (restores mic.py + docs); restore the user config
 `device_name` to the previous value and `pactl set-default-source` to the prior
 source. The Scarlett gain change is a hardware control, reversible with `amixer`.
+
+## MIG-023 — Hotkey xinput listener robustness + Right-Ctrl PTT fix (2026-08-27)
+
+Status: **IMPLEMENTED** — repository code + docs updated; the bridge was
+restarted (authorized) so the fix is live.
+
+Decision:
+- **Root cause of "rctrl doesn't start":** the `xinput test-xi2 --root` child
+  could go WEDGED — process alive but its stdout never delivered a line. The
+  old `ensure_alive` only restarted after the loop thread exited, which a
+  wedged child never does, so the hotkey silently died until a full service
+  restart. (Separately, a press DID capture but ASR returned empty when the
+  AT2020 was silent — no 48V phantom.)
+- **Fix** (`voicebridge/hotkeys.py`): `_xinput_loop` now uses a non-blocking
+  `select` read with a heartbeat (`_last_xinput_line_ts`) instead of a blocking
+  `for line in stdout`; `ensure_alive` restarts the listener when a freshly
+  started child has produced NO output within 30s (stale) or when the loop
+  exited. `_restart_xinput` kills any stale child and starts a fresh one.
+  Added `_stopped`, `_xinput_start_ts`, `_xinput_dead` init in `__init__`/
+  `_start_xinput`.
+- **Tests** (`tests/test_hotkeys.py`, 5): heartbeat tracked, stale child
+  restarted, healthy-idle child not restarted, dead-loop restarted, and the
+  non-blocking loop parses RawKeyPress/Release (keycode 105 = ctrl_r) into
+  ptt_start/ptt_end.
+
+Tests: `tests/test_hotkeys.py` (5) + mic/packet7c/7D (88) + full suite 815
+passed / 0 failed / 0 skipped (live voice-turn test passed once the bridge
+finished restarting; the one earlier flake was a restart race, not a code
+regression).
+
+Live: bridge restarted (PID 88914), `hotkey.active` + `mic.pin_source`
+(Scarlett) logged at startup; a fresh `xinput test-xi2 --root` child attached.
+
+Rollback: revert this commit; restore the blocking `_xinput_loop` if needed.
+The hotkey fix is purely in-process and reversible by restarting the service.

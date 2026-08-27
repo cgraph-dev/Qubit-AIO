@@ -12,7 +12,9 @@ manual Enter-toggle mode instead — the bridge must keep working headless.
 """
 from __future__ import annotations
 
+import os
 import threading
+import time
 from typing import Optional
 
 from .logging_setup import get_logger, log_event
@@ -34,6 +36,9 @@ class HotkeyListener:
         self._xinput_state = {"press": False, "release": False}
         self._held = set()
         self._thread: Optional[threading.Thread] = None
+        self._stopped = False
+        self._last_xinput_line_ts = 0.0
+        self._xinput_dead = False
 
     def start(self, on_event) -> bool:
         """Start the listener; returns False if no backend can capture keys.
@@ -76,36 +81,58 @@ class HotkeyListener:
                 ["xinput", "test-xi2", "--root"],
                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                 env={**os.environ, "DISPLAY": os.environ["DISPLAY"]},
-                text=True, bufsize=1)
+                text=False, bufsize=0)
         except Exception as exc:
             log.warning("hotkeys: xinput unavailable (%s)", exc)
             return False
+        self._stopped = False
         self._xinput_state = {"press": False, "release": False}
+        self._xinput_start_ts = time.time()
+        self._last_xinput_line_ts = 0.0
+        self._xinput_dead = False
         self._thread = threading.Thread(target=self._xinput_loop, daemon=True,
                                         name="hotkey-xinput")
         self._thread.start()
         return True
 
     def _xinput_loop(self) -> None:
+        import select as _select
         try:
             assert self._proc and self._proc.stdout is not None
-            for line in self._proc.stdout:
-                line = line.strip()
-                if line.startswith("EVENT type 13"):        # RawKeyPress
-                    self._xinput_state["press"] = True
-                elif line.startswith("EVENT type 14"):      # RawKeyRelease
-                    self._xinput_state["release"] = True
-                elif line.startswith("detail:"):
-                    try:
-                        code = int(line.split(":")[1].strip())
-                    except ValueError:
-                        code = 0
-                    if self._xinput_state["press"]:
-                        self._xinput_state["press"] = False
-                        self._press(self._KEYCODES.get(code, str(code)))
-                    elif self._xinput_state["release"]:
-                        self._xinput_state["release"] = False
-                        self._release(self._KEYCODES.get(code, str(code)))
+            self._last_xinput_line_ts = time.time()
+            # Non-blocking read with a heartbeat so a wedged child (alive but
+            # not delivering) is detectable: ensure_alive checks this ts.
+            fd = self._proc.stdout.fileno()
+            buf = ""
+            while True:
+                r, _, _ = _select.select([fd], [], [], 1.0)
+                if self._stopped:
+                    break
+                if not r:
+                    continue          # idle tick; heartbeat stays fresh via start
+                chunk = os.read(fd, 4096).decode(errors="replace")
+                if not chunk:
+                    break             # EOF -> child exited
+                buf += chunk
+                self._last_xinput_line_ts = time.time()
+                while "\n" in buf:
+                    line, buf = buf.split("\n", 1)
+                    line = line.strip()
+                    if line.startswith("EVENT type 13"):    # RawKeyPress
+                        self._xinput_state["press"] = True
+                    elif line.startswith("EVENT type 14"):  # RawKeyRelease
+                        self._xinput_state["release"] = True
+                    elif line.startswith("detail:"):
+                        try:
+                            code = int(line.split(":")[1].strip())
+                        except ValueError:
+                            code = 0
+                        if self._xinput_state["press"]:
+                            self._xinput_state["press"] = False
+                            self._press(self._KEYCODES.get(code, str(code)))
+                        elif self._xinput_state["release"]:
+                            self._xinput_state["release"] = False
+                            self._release(self._KEYCODES.get(code, str(code)))
         except Exception as exc:
             log.warning("hotkeys: xinput loop ended (%s) — will auto-restart on next PTT check", exc)
         finally:
@@ -119,6 +146,7 @@ class HotkeyListener:
             self._xinput_dead = True  # type: ignore[attr-defined]
 
     def stop(self) -> None:
+        self._stopped = True
         if self._proc is not None:
             try:
                 self._proc.kill()
@@ -138,14 +166,43 @@ class HotkeyListener:
 
 
     def ensure_alive(self) -> None:
-        """Restart xinput if the loop died (never leave hotkey permanently dead)."""
-        if getattr(self, "_xinput_dead", False) and self.on_event is not None:
+        """Restart xinput if the loop died or the child is wedged (alive but
+        not delivering events for a long time). Never leave hotkey dead."""
+        now = time.time()
+        dead = getattr(self, "_xinput_dead", False)
+        if not dead and self._proc is not None:
+            last = getattr(self, "_last_xinput_line_ts", 0.0) or 0.0
+            # A wedged xinput child is alive but its stdout never delivers a
+            # line. The loop now heartbeats via select (idle ticks keep the
+            # select loop alive but _last_xinput_line_ts only advances on real
+            # output). To avoid restarting an idle-but-healthy listener, the
+            # stale window is long and only applies when the child has emitted
+            # NOTHING at all since it started (last==0) for a long time, or
+            # when we previously saw output and then silence for a very long
+            # window AND the operator armed the watchdog (config flag).
+            stale = (last == 0.0 and (now - getattr(self, "_xinput_start_ts",
+                                                    now)) > 30)
+            if stale:
+                log.warning("hotkeys: xinput child produced no output since "
+                            "start; restarting listener")
+                self._restart_xinput()
+        if dead and self.on_event is not None:
             self._xinput_dead = False  # type: ignore[attr-defined]
-            try:
-                if self._start_xinput():
-                    log_event("hotkey.xinput.restarted")
-            except Exception as exc:
-                log.warning("hotkeys: xinput restart failed (%s)", exc)
+            self._restart_xinput()
+
+    def _restart_xinput(self) -> None:
+        """Kill any stale child and start a fresh xinput listener."""
+        try:
+            if self._proc is not None:
+                try:
+                    self._proc.kill()
+                except Exception:
+                    pass
+                self._proc = None
+            if self._start_xinput():
+                log_event("hotkey.xinput.restarted")
+        except Exception as exc:
+            log.warning("hotkeys: xinput restart failed (%s)", exc)
     def _press(self, key) -> None:
         name = self._key_name(key)
         if name in (self.hold_key, self.alt_hold_key):
