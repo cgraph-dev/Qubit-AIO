@@ -993,3 +993,56 @@ git diff --check OK.
 Rollback: revert this commit; remove the 7D modules/CLI/routes/page/tests. No
 pre-existing state is altered; `.profile.*.bak` and branding backup dirs
 preserve prior config/state.
+
+## MIG-021 — Packet 7D remediation: real branding migration, complete provider gates, dashboard parity (2026-08-27)
+
+Status: **IMPLEMENTED** — corrects the 7D implementation gaps found by
+verification. No user config, service, timer, model, browser, or audio state is
+modified by any command; the live repo/config/state stay on
+`openclaw-voice-bridge` until an operator runs the migration.
+
+Decision:
+- **Real branding migration.** `branding_plan --apply --backup-dir <dir>`
+  rewrites the repository files (package metadata, systemd unit content AND
+  filename rename to `qubit-voice-agent.service`, launchers, docs, config
+  template) atomically with a full backup. `branding_verify` scans every file
+  and runtime path and returns VERIFIED / PARTIAL / PLANNED (exit 0 only on
+  VERIFIED). `branding_rollback` restores every repo file + runtime
+  config/state/data, renames the unit back, and removes compat aliases. The
+  live config/state/data path migration is an EXPLICIT separate step
+  (`--migrate-paths`); a plain repo apply or staged test never touches real
+  paths (this prevents the path bug where a test renamed the real
+  ~/.config/openclaw-voice-bridge).
+- **Complete provider gates.** STT/TTS/VOICE artifacts are resolved to their
+  on-disk files and sha256-verified (or reported runtime-only/unmeasured).
+  Latency uses recorded measured values or a bounded live synthesis (a 0.0
+  unmeasured value is PARTIAL, never a silent pass). Quality/safety evidence
+  files must exist and be non-empty (validated). A replacement (non-default)
+  profile must pass EVERY gate; PARTIAL blocks activation (only the verified
+  default may run with a caveat).
+- **Dashboard parity.** Added real `/api/import-state` (preview + apply,
+  enrollment + passphrase + integrity gates), `/api/profiles/upgrade` (a real
+  re-verify + registry-metadata refresh), real non-default removal, a
+  confirmation dialog gating every side effect (maps to the backend confirm
+  flag), and a typed-state interpreter that never shows generic success on
+  unavailable/degraded/denied/partial/failed. Frontend no longer contains a
+  hardcoded "demo" removal.
+- **Path bug fixed.** `remove_profile` passes the caller's config to
+  `_registry_path(cfg)` so a temp/test config can never write the real default
+  registry.
+
+Rationale: the 7D verifier rejected the incomplete branding (verify always
+PLANNED, apply only backed up, rollback only one file, package manifest still
+old), incomplete gates (empty checksums, 0.0 latency, unvalidated evidence,
+non-brain artifacts unchecked), dashboard gaps (no confirmation/import/real
+upgrade/real remove, generic success), and the real path bug.
+
+Tests: `tests/test_packet7d.py` (44) — including real branding apply->verify
+VERIFIED->rollback on a staged repo, real import preview+apply+wrong-pass,
+real upgrade (manifest refresh), real removal, confirmation gate, and
+no-demo/no-frontend-state assertions. Full suite 809 passed / 0 failed /
+0 skipped.
+
+Rollback: revert this commit; the 7D code remains additive and reversible.
+`.profile.*.bak` backups and branding backup dirs preserve prior
+config/state; live config/state/data are untouched by all commands.

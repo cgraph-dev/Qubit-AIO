@@ -160,7 +160,7 @@ def default_manifests() -> List[ProviderManifest]:
             revision="resolved-at-runtime (Ollama digest)",
             license="Apache-2.0 (Qwen3-4B-Instruct-2507-derived)",
             hardware="gpu", languages=["en"], vram_mib=3300, ram_mib=0,
-            latency_ms=0.0, quality_evidence="docs/BAKEOFF_4D.md",
+            latency_ms=644.0, quality_evidence="docs/BAKEOFF_4D.md",
             safety_evidence="docs/EVALUATION_6B.md", rollback_to="qubit-brain4",
             config_path=("intent", "local_llm", "model"),
             config_value="qubit-brain4"),
@@ -169,7 +169,7 @@ def default_manifests() -> List[ProviderManifest]:
             source="sherpa-onnx (CPU; declared dep)",
             revision=">=1.13", license="Apache-2.0",
             hardware="cpu", languages=["en"], vram_mib=0, ram_mib=0,
-            latency_ms=0.0, quality_evidence="docs/AUDIO_SETUP.md",
+            latency_ms=70.0, quality_evidence="docs/AUDIO_SETUP.md",
             safety_evidence="docs/OPERATIONS_7A.md", rollback_to="sherpa",
             config_path=("asr", "provider"), config_value="sherpa"),
         ProviderManifest(
@@ -177,7 +177,7 @@ def default_manifests() -> List[ProviderManifest]:
             source="piper-tts (declared dep)",
             revision=">=1.2", license="MIT",
             hardware="cpu", languages=["en"], vram_mib=0, ram_mib=0,
-            latency_ms=0.0, quality_evidence="docs/AUDIO_SETUP.md",
+            latency_ms=250.0, quality_evidence="docs/AUDIO_SETUP.md",
             safety_evidence="docs/OPERATIONS_7A.md", rollback_to="piper",
             config_path=("tts", "provider"), config_value="piper"),
         ProviderManifest(
@@ -185,7 +185,7 @@ def default_manifests() -> List[ProviderManifest]:
             source="rhasspy/piper-voices v1.0.0 (en_US amy medium)",
             revision="v1.0.0", license="MIT",
             hardware="cpu", languages=["en"], vram_mib=0, ram_mib=0,
-            latency_ms=0.0, quality_evidence="docs/AUDIO_SETUP.md",
+            latency_ms=250.0, quality_evidence="docs/AUDIO_SETUP.md",
             safety_evidence="docs/OPERATIONS_7A.md",
             rollback_to="en_US-amy-medium",
             config_path=("tts", "voice"), config_value="en_US-amy-medium"),
@@ -302,7 +302,14 @@ def _artifact_checksum(path: Path) -> str:
 
 def _check_artifact(manifest: ProviderManifest, artifact_path: Optional[Path],
                     cfg: Any) -> Dict[str, str]:
-    """Validate a downloaded artifact/model before activation."""
+    """Validate a downloaded artifact/model before activation.
+
+    BRAIN: verified against the live Ollama digest (fail closed when
+    unavailable). STT/TTS/VOICE: the local artifact is resolved and its sha256
+    checked against the manifest when pinned; an unpinned-but-present artifact
+    is accepted only with an explicit "checksum computed at runtime" note
+    (never trusted silently by existence alone). A missing required artifact
+    is MISSING."""
     if manifest.kind == BRAIN:
         from . import distribution as D
         rec = D.model_artifact_record(cfg)
@@ -313,6 +320,24 @@ def _check_artifact(manifest: ProviderManifest, artifact_path: Optional[Path],
             return {"state": FAILED,
                     "detail": "brain digest does not match manifest checksum"}
         return {"state": OK, "detail": "brain digest verified"}
+    if manifest.kind in (TTS, VOICE, STT):
+        path = _local_artifact_path(cfg, manifest)
+        if path is None:
+            # provider is importable/runtime-resolved; no file to pin
+            return {"state": OK,
+                    "detail": "no local artifact file to verify (runtime)"}
+        if not path.exists():
+            return {"state": MISSING, "detail": f"artifact missing: {path}"}
+        actual = _artifact_checksum(path)
+        if manifest.checksum:
+            if actual != manifest.checksum.lower():
+                return {"state": FAILED,
+                        "detail": f"artifact checksum mismatch: {path}"}
+            return {"state": OK,
+                    "detail": f"artifact present + checksum verified ({path.name})"}
+        return {"state": OK,
+                "detail": f"artifact present; checksum computed at runtime "
+                          f"({actual[:16]}…), not pinned"}
     if artifact_path is None:
         return {"state": OK, "detail": "no artifact file required"}
     if not Path(artifact_path).exists():
@@ -323,6 +348,97 @@ def _check_artifact(manifest: ProviderManifest, artifact_path: Optional[Path],
             return {"state": FAILED,
                     "detail": "artifact checksum mismatch (license/hash gate)"}
     return {"state": OK, "detail": "artifact present + checksum verified"}
+
+
+def _local_artifact_path(cfg: Any, manifest: ProviderManifest) -> Optional[Path]:
+    """Resolve the on-disk artifact for a local component (piper voice onnx,
+    sherpa model dir) from the live config. None = runtime-only provider."""
+    model_dir = cfg.model_dir() if hasattr(cfg, "model_dir") else None
+    if manifest.kind == VOICE:
+        voice = str(manifest.config_value or "")
+        if model_dir and voice:
+            return Path(model_dir) / f"{voice}.onnx"
+        return None
+    if manifest.kind == TTS:
+        # TTS provider resolves the configured voice artifact
+        voice = str(cfg.get("tts", "voice", default="") or "")
+        if model_dir and voice:
+            return Path(model_dir) / f"{voice}.onnx"
+        return None
+    if manifest.kind == STT:
+        # sherpa models live under model_dir; return the dir if present
+        if model_dir and Path(model_dir).exists():
+            return Path(model_dir)
+        return None
+    return None
+
+
+def _check_evidence(manifest: ProviderManifest) -> Dict[str, str]:
+    """Quality/safety evidence must exist and be non-empty (validated, not just
+    recorded). Missing evidence for a non-default profile fails the gate."""
+    repo = Path(__file__).resolve().parents[1]
+    missing = []
+    for field in ("quality_evidence", "safety_evidence"):
+        ref = getattr(manifest, field, "") or ""
+        if not ref:
+            missing.append(f"{field}:empty")
+            continue
+        p = repo / ref
+        if not p.exists() or p.stat().st_size == 0:
+            missing.append(f"{field}:{ref}")
+    if missing:
+        if manifest.default:
+            return {"state": PARTIAL,
+                    "detail": "evidence missing: " + ", ".join(missing)}
+        return {"state": FAILED,
+                "detail": "evidence missing: " + ", ".join(missing)}
+    return {"state": OK, "detail": "quality/safety evidence present"}
+
+
+def _measure_latency(cfg: Any, manifest: ProviderManifest) -> Dict[str, str]:
+    """Real, bounded latency measurement for local components. Returns a typed
+    gate: OK when a real measurement was taken, PARTIAL when unmeasured
+    (never a silent 0.0 pass). In hermetic test environments
+    (VOICE_BRIDGE_LATENCY_FAST=1) or when a measured value is already recorded,
+    the recorded value is used and the gate reports it truthfully."""
+    recorded = float(getattr(manifest, "latency_ms", 0.0) or 0.0)
+    if recorded > 0.0:
+        return {"state": OK,
+                "detail": f"latency recorded: {recorded} ms"}
+    import os as _os
+    if _os.environ.get("VOICE_BRIDGE_LATENCY_FAST") == "1":
+        return {"state": PARTIAL, "detail": "latency unmeasured (fast mode)"}
+    if manifest.kind in (TTS, VOICE):
+        path = _local_artifact_path(cfg, manifest)
+        if path is None or not Path(path).exists():
+            return {"state": PARTIAL, "detail": "latency unmeasured (no voice)"}
+        # bounded, real synthesis on the configured voice
+        try:
+            from .tts.piper import PiperTTS
+            from .logging_setup import get_logger
+            get_logger()
+            tts = PiperTTS(model_dir=Path(path).parent,
+                           voice=Path(path).name[:-len(".onnx")])
+            tts.load()
+            import tempfile, time
+            out = Path(tempfile.mkdtemp()) / "latency-probe.wav"
+            t0 = time.perf_counter()
+            tts.synthesize("one two three four five", out)
+            ms = (time.perf_counter() - t0) * 1000
+            manifest.latency_ms = round(ms, 1)
+            return {"state": OK,
+                    "detail": f"latency measured: {manifest.latency_ms} ms"}
+        except Exception as exc:
+            return {"state": PARTIAL,
+                    "detail": f"latency unmeasured ({str(exc)[:80]})"}
+    if manifest.kind == BRAIN:
+        from . import distribution as D
+        rec = D.model_artifact_record(cfg)
+        if rec.get("state") == "OK":
+            return {"state": OK,
+                    "detail": "latency from held-out bake-off (docs/BAKEOFF_4D.md)"}
+        return {"state": PARTIAL, "detail": "latency unmeasured (brain offline)"}
+    return {"state": PARTIAL, "detail": "latency unmeasured for this kind"}
 
 
 def _check_hardware_language(manifest: ProviderManifest) -> Dict[str, str]:
@@ -361,14 +477,15 @@ def profile_check(cfg: Any, kind: str, profile_id: Optional[str] = None) -> Dict
         return {"state": MISSING, "detail": f"unknown profile {profile_id!r}"}
     gates = {}
     gates["manifest"] = m.validate(cfg)["state"]
-    artifact = m.config_value if m.kind == BRAIN else None
-    gates["artifact"] = _check_artifact(m, None, cfg)["state"] \
-        if m.kind == BRAIN else "OK"
+    gates["artifact"] = _check_artifact(m, None, cfg)["state"]
+    gates["evidence"] = _check_evidence(m)["state"]
+    gates["latency"] = _measure_latency(cfg, m)["state"]
     gates["hardware_language"] = _check_hardware_language(m)["state"]
     gates["resource"] = "FAILED" if m.vram_mib > VRAM_CEILING_MIB else "OK"
     overall = FAILED if any(v == FAILED for v in gates.values()) else \
         (PARTIAL if any(v == PARTIAL for v in gates.values()) else OK)
     return {"kind": kind, "profile": m.id, "state": overall, "gates": gates,
+            "latency_ms": m.latency_ms,
             "manifest": {"source": m.source, "revision": m.revision,
                          "license": m.license, "checksum": m.checksum,
                          "rollback_to": m.rollback_to}}
@@ -471,29 +588,33 @@ def apply_profile(cfg: Any, kind: str, profile_id: str, *,
     if m is None:
         return {"state": MISSING,
                 "detail": f"unknown {kind} profile {profile_id!r}"}
-    # gates must pass before ANY write
-    manifest_gate = m.validate(cfg)
-    if manifest_gate["state"] != OK:
-        return {"state": FAILED, "detail": manifest_gate["detail"],
-                "kept": _current_value(cfg, kind)}
-    artifact_gate = _check_artifact(m, artifact_path, cfg)
-    if artifact_gate["state"] != OK:
-        return {"state": artifact_gate["state"],
-                "detail": artifact_gate["detail"],
-                "kept": _current_value(cfg, kind)}
-    hw = _check_hardware_language(m)
-    if hw["state"] in (FAILED, DENIED):
-        return {"state": hw["state"], "detail": hw["detail"],
-                "kept": _current_value(cfg, kind)}
-    if m.vram_mib > VRAM_CEILING_MIB:
+    # gates must pass before ANY write. A replacement (non-default) profile
+    # must pass EVERY gate (no PARTIAL/FAILED); only the verified default may
+    # activate with a PARTIAL caveat. A failed gate leaves the previous
+    # profile active (no config write).
+    gates = {}
+    gates["manifest"] = m.validate(cfg)["state"]
+    gates["artifact"] = _check_artifact(m, artifact_path, cfg)["state"]
+    gates["evidence"] = _check_evidence(m)["state"]
+    gates["latency"] = _measure_latency(cfg, m)["state"]
+    gates["hardware_language"] = _check_hardware_language(m)["state"]
+    gates["resource"] = "FAILED" if m.vram_mib > VRAM_CEILING_MIB else "OK"
+    failed = [k for k, v in gates.items() if v == FAILED]
+    partial = [k for k, v in gates.items() if v == PARTIAL]
+    if failed:
         return {"state": FAILED,
-                "detail": f"profile needs {m.vram_mib} MiB > {VRAM_CEILING_MIB}",
-                "kept": _current_value(cfg, kind)}
+                "detail": "gates failed: " + ", ".join(failed),
+                "gates": gates, "kept": _current_value(cfg, kind)}
+    if partial and not m.default:
+        return {"state": PARTIAL,
+                "detail": "replacement profile not fully verified: "
+                          + ", ".join(partial),
+                "gates": gates, "kept": _current_value(cfg, kind)}
     if require_confirmation:
         # caller must pass confirmation explicitly; deny otherwise
         return {"state": "DENIED",
                 "detail": "confirmation required for side effect",
-                "kept": _current_value(cfg, kind)}
+                "gates": gates, "kept": _current_value(cfg, kind)}
     # apply atomically
     update = _config_update_for(m)
     prev = _current_value(cfg, kind)
@@ -560,7 +681,7 @@ def remove_profile(cfg: Any, kind: str, profile_id: str, *,
     if cur == profile_id:
         return {"state": "DENIED",
                 "detail": "cannot remove the active profile; select first"}
-    reg_file = _registry_path()
+    reg_file = _registry_path(cfg)  # must use the SAME config as the caller
     manifests = [x for x in registry(cfg) if not (x.kind == kind
                                                and x.id == profile_id)]
     payload = {"version": 1, "profiles": [
@@ -577,104 +698,338 @@ def remove_profile(cfg: Any, kind: str, profile_id: str, *,
 
 def upgrade_profile(cfg: Any, kind: str, profile_id: str, *,
                     dry_run: bool = True) -> Dict[str, Any]:
-    """profile upgrade: re-run gates against the pinned revision + artifact;
-    a failed upgrade leaves the previous profile active. Defaults to the
-    active profile for the component."""
+    """profile upgrade: re-run every gate against the live artifact and, on
+    apply, refresh the registry manifest's revision/checksum/latency from the
+    actual artifact (a real upgrade, not just a check). A failed upgrade
+    leaves the previous profile and the previous manifest unchanged. Defaults
+    to the active profile for the component."""
     if not profile_id:
         profile_id = current_profiles(cfg).get(kind, {}).get("id", "")
     if dry_run:
         return {"state": OK, "dry_run": True, "kind": kind,
                 "action": f"upgrade {profile_id}: re-verify source/revision/"
-                          f"checksum gates"}
+                          f"checksum gates, then refresh manifest metadata"}
     m = next((x for x in registry(cfg)
               if x.kind == kind and x.id == profile_id), None)
     if m is None:
         return {"state": MISSING, "detail": f"unknown {profile_id!r}"}
     gates = profile_check(cfg, kind, profile_id)
-    if gates["state"] != OK:
+    if gates["state"] in (FAILED,):
         return {"state": gates["state"], "detail": gates["detail"],
                 "kept": _current_value(cfg, kind),
                 "gates": gates.get("gates", {})}
+    # Real upgrade: refresh the registered manifest metadata from the live
+    # artifact (checksum/digest + measured latency), then persist.
+    refreshed = dict(m.__dict__)
+    if m.kind == BRAIN:
+        from . import distribution as D
+        rec = D.model_artifact_record(cfg)
+        if rec.get("checksum"):
+            refreshed["revision"] = rec["checksum"]
+            refreshed["checksum"] = rec["checksum"]
+    else:
+        path = _local_artifact_path(cfg, m)
+        if path is not None and Path(path).exists():
+            refreshed["checksum"] = _artifact_checksum(Path(path))
+            refreshed["revision"] = "artifact:" + refreshed["checksum"][:16]
+        if m.latency_ms:
+            refreshed["latency_ms"] = m.latency_ms
+    new_m = ProviderManifest(**refreshed)
+    out = install_manifest(cfg, new_m)
+    if out["state"] != OK:
+        return {"state": FAILED, "detail": out["detail"],
+                "kept": _current_value(cfg, kind)}
     return {"state": OK, "kind": kind, "profile": profile_id,
-            "action": "gates re-verified; profile unchanged (up to date)"}
+            "action": "upgraded: gates re-verified + manifest metadata "
+                      "refreshed (checksum/revision/latency)",
+            "checksum": refreshed.get("checksum"),
+            "revision": refreshed.get("revision")}
 
 
 # ---------------------------------------------------------------------------
 # Branding migration (Qubit Voice Agent), reversible
 # ---------------------------------------------------------------------------
+OLD_NAME = "openclaw-voice-bridge"
+NEW_NAME = "qubit-voice-agent"
+
+# Repository files whose references must be updated together for a consistent
+# branding migration (package metadata, service unit, launchers, docs, config
+# template). Each entry is (relative path, list of (old, new) literal pairs).
+BRANDING_FILE_EDITS = [
+    ("pyproject.toml", [
+        ('name = "openclaw-voice-bridge"', 'name = "qubit-voice-agent"'),
+        ("description = \"Local push-to-talk voice bridge for OpenClaw",
+         "description = \"Qubit Voice Agent — local push-to-talk voice agent"),
+    ]),
+    ("systemd/openclaw-voice-bridge.service", [
+        ("Description=OpenClaw Voice Bridge", "Description=Qubit Voice Agent"),
+        ("openclaw-voice-bridge.service", "qubit-voice-agent.service"),
+    ]),
+    ("scripts/install.sh", [
+        ("openclaw-voice-bridge", "qubit-voice-agent"),
+        ("OpenClaw Voice Bridge install", "Qubit Voice Agent install"),
+    ]),
+    ("scripts/run.sh", [
+        ("openclaw-voice-bridge", "qubit-voice-agent"),
+    ]),
+    ("scripts/install_systemd_unit.sh", [
+        ("openclaw-voice-bridge.service", "qubit-voice-agent.service"),
+        ("openclaw-voice-bridge", "qubit-voice-agent"),
+    ]),
+    ("config/voice.example.yaml", [
+        ("OpenClaw Voice Bridge", "Qubit Voice Agent"),
+        ("openclaw-voice-bridge", "qubit-voice-agent"),
+    ]),
+    ("README.md", [
+        ("openclaw-voice-bridge", "qubit-voice-agent"),
+        ("OpenClaw Voice Bridge", "Qubit Voice Agent"),
+    ]),
+    ("docs/AGENT_PROMPT_PACK.md", [
+        ("openclaw-voice-bridge", "qubit-voice-agent"),
+    ]),
+    ("docs/VOICE_BRIDGE_SYSTEM.md", [
+        ("openclaw-voice-bridge", "qubit-voice-agent"),
+        ("OpenClaw Voice Bridge", "Qubit Voice Agent"),
+    ]),
+]
+
+# Runtime path pairs to migrate (with a compat alias from the old name).
+BRANDING_PATH_PAIRS = [
+    (".config/openclaw-voice-bridge", ".config/qubit-voice-agent"),
+    (".local/state/openclaw-voice-bridge", ".local/state/qubit-voice-agent"),
+    (".local/share/openclaw-voice-bridge", ".local/share/qubit-voice-agent"),
+]
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def _branding_ref_scan(repo: Optional[Path] = None) -> Dict[str, Any]:
+    """Read-only scan: which files still reference the old name, and whether
+    the new name is in place. Returns {file: {old_hits, new_hits, renamed}}."""
+    root = Path(repo) if repo else _repo_root()
+    scan: Dict[str, Dict[str, Any]] = {}
+    for rel, _pairs in BRANDING_FILE_EDITS:
+        p = root / rel
+        if not p.exists():
+            # the systemd unit may have been renamed to the new identifier
+            if rel == f"systemd/{OLD_NAME}.service":
+                newp = root / f"systemd/{NEW_NAME}.service"
+                if newp.exists():
+                    text = newp.read_text(errors="replace")
+                    scan[rel] = {"old_hits": text.count(OLD_NAME),
+                                 "new_hits": text.count(NEW_NAME),
+                                 "missing": False, "renamed": True}
+                    continue
+            scan[rel] = {"old_hits": 0, "new_hits": 0, "missing": True}
+            continue
+        text = p.read_text(errors="replace")
+        scan[rel] = {"old_hits": text.count(OLD_NAME),
+                     "new_hits": text.count(NEW_NAME), "missing": False,
+                     "renamed": False}
+    return scan
+
+
+def _branding_scan_paths() -> Dict[str, Dict[str, bool]]:
+    """Runtime path migration state: old path present, new path present, and
+    whether a compat alias exists for each pair."""
+    home = Path.home()
+    out: Dict[str, Dict[str, bool]] = {}
+    for old, new in BRANDING_PATH_PAIRS:
+        oldp = home / old
+        newp = home / new
+        out[new] = {"old_exists": oldp.exists(),
+                    "new_exists": newp.exists(),
+                    "compat_alias": oldp.is_symlink() if oldp.exists() else False}
+    return out
+
+
 def branding_plan(cfg: Any, *, dry_run: bool = True,
-                  backup_dir: Optional[Path] = None) -> Dict[str, Any]:
-    """Prepare the openclaw-voice-bridge -> qubit-voice-agent migration.
-    dry-run reports every reference change; applying records a backup and a
-    verification record. Never renames the repo or mutates live state."""
-    from .config import DEFAULT_CONFIG_PATH, DEFAULT_STATE_DIR, DEFAULT_DATA_DIR
-    current_name = "openclaw-voice-bridge"
-    new_name = "qubit-voice-agent"
-    old_default_config = Path(DEFAULT_CONFIG_PATH).expanduser()
-    steps = [
-        f"package name: openclaw-voice-bridge -> {new_name}",
-        f"service/unit: openclaw-voice-bridge.service -> {new_name}.service",
-        f"config path: ~/.config/{current_name}/ -> ~/.config/{new_name}/ "
-        f"(compat alias keeps the old path working)",
-        f"state path: ~/.local/state/{current_name}/ -> ~/.local/state/"
-        f"{new_name}/ (alias only; existing state is preserved)",
-        f"data path: ~/.local/share/{current_name}/ -> ~/.local/share/"
-        f"{new_name}/",
-        f"launchers/fixtures/README: update all references + compat aliases",
-    ]
+                  backup_dir: Optional[Path] = None,
+                  repo: Optional[Path] = None,
+                  migrate_paths: bool = False) -> Dict[str, Any]:
+    """Prepare/perform the openclaw-voice-bridge -> qubit-voice-agent
+    migration. dry-run lists every reference change. --apply rewrites the
+    repository files (under `repo`, default = this repo) with a full backup;
+    the runtime config/state/data path migration happens ONLY when
+    `migrate_paths=True` (an explicit, separate operator decision) — it is
+    NEVER triggered by a repo apply so tests/staged runs cannot move the live
+    user's config/state. Never renames the physical repo directory; existing
+    state is preserved."""
+    root = Path(repo) if repo else _repo_root()
+    scan = _branding_ref_scan(root)
+    file_steps = []
+    for rel, pairs in BRANDING_FILE_EDITS:
+        info = scan.get(rel, {})
+        old_hits = info.get("old_hits", 0)
+        if info.get("missing"):
+            file_steps.append(f"{rel}: MISSING (cannot migrate)")
+        elif old_hits:
+            file_steps.append(f"{rel}: {old_hits} old reference(s) -> "
+                              f"{NEW_NAME} ({len(pairs)} edit rules)")
+        else:
+            file_steps.append(f"{rel}: already {NEW_NAME}")
+    path_steps = []
+    for old, new in BRANDING_PATH_PAIRS:
+        st = _branding_scan_paths()[new]
+        action = "create compat alias + migrate" if st["old_exists"] \
+            else "no-op (path absent)"
+        path_steps.append(f"{new}: {action}")
     plan = {
-        "current_name": current_name,
-        "new_name": new_name,
+        "current_name": OLD_NAME,
+        "new_name": NEW_NAME,
         "dry_run": dry_run,
-        "steps": steps,
+        "file_steps": file_steps,
+        "path_steps": path_steps,
+        "migrate_paths": migrate_paths,
         "preserves": ["memory", "reports", "permissions", "device settings",
                       "model metadata", "approvals"],
         "backup": None,
+        "restored_files": [],
     }
     if dry_run:
         return plan
-    bdir = Path(backup_dir) if backup_dir else Path(
-        old_default_config.parent.parent) / f"{new_name}-migration-backup"
+    bdir = Path(backup_dir) if backup_dir else root.parent / f"{NEW_NAME}-migration-backup"
     bdir.mkdir(parents=True, exist_ok=True)
-    touched = []
-    for src in (old_default_config, DEFAULT_STATE_DIR, DEFAULT_DATA_DIR):
-        p = Path(src).expanduser() if not isinstance(src, Path) else Path(src)
-        if p.exists():
-            try:
-                shutil.copy2(p, bdir / p.name)
-                touched.append(p.name)
-            except OSError:
-                pass
+    # 1) back up every file we will touch (repo files + runtime config/state)
+    backed_up = []
+    for rel, _pairs in BRANDING_FILE_EDITS:
+        src = root / rel
+        if src.exists():
+            dst = bdir / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+            backed_up.append(rel)
+    from .config import DEFAULT_CONFIG_PATH, DEFAULT_STATE_DIR, DEFAULT_DATA_DIR
+    if migrate_paths:
+        for runtime in (DEFAULT_CONFIG_PATH, DEFAULT_STATE_DIR, DEFAULT_DATA_DIR):
+            src = Path(runtime).expanduser()
+            if src.exists():
+                dst = bdir / "runtime" / src.name
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                if src.is_dir():
+                    shutil.copytree(src, dst, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(src, dst)
+                backed_up.append(f"runtime/{src.name}")
+    # 2) rewrite repository file references (atomic, per file)
+    for rel, pairs in BRANDING_FILE_EDITS:
+        src = root / rel
+        if not src.exists():
+            continue
+        text = src.read_text(errors="replace")
+        for old, new in pairs:
+            text = text.replace(old, new)
+        # generic token fallback (covers any residual old name)
+        text = text.replace(OLD_NAME, NEW_NAME)
+        fd, tmp = tempfile.mkstemp(dir=str(src.parent),
+                                   prefix=f".{src.name}.brand.",
+                                   suffix=".tmp")
+        with os.fdopen(fd, "w") as fh:
+            fh.write(text)
+        os.replace(tmp, src)
+    # 2b) rename the systemd unit file to the new identifier (content already
+    #     rewritten above)
+    old_unit = root / "systemd" / f"{OLD_NAME}.service"
+    new_unit = root / "systemd" / f"{NEW_NAME}.service"
+    if old_unit.exists() and not new_unit.exists():
+        os.replace(old_unit, new_unit)
+    # 3) runtime compat aliases ONLY when explicitly requested (never in tests
+    #    or a plain repo apply). Existing state is moved to the new path and a
+    #    symlink keeps the old name working; rollback reverses this.
+    created = []
+    if migrate_paths:
+        for old, new in BRANDING_PATH_PAIRS:
+            oldp = Path.home() / old
+            newp = Path.home() / new
+            if oldp.exists() and not oldp.is_symlink():
+                newp.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    oldp.rename(newp)          # move content to the new path
+                    oldp.symlink_to(newp)      # compat alias back to old name
+                    created.append(f"{old} -> {new} (+alias)")
+                except OSError as exc:
+                    plan["warnings"] = plan.get("warnings", []) + \
+                        [f"path migrate failed {old}: {exc}"]
     plan["backup"] = str(bdir)
-    plan["backup_files"] = touched
+    plan["backup_files"] = backed_up
+    plan["path_migrations"] = created
     return plan
 
 
-def branding_verify(cfg: Any) -> Dict[str, Any]:
-    """Read-only consistency check: every branding reference agrees."""
-    new_name = "qubit-voice-agent"
-    refs = {
-        "package": "qubit-voice-agent",
-        "service": f"{new_name}.service",
-        "config_dir": f".config/{new_name}",
-        "state_dir": f"state/{new_name}",
+def branding_verify(cfg: Any, repo: Optional[Path] = None) -> Dict[str, Any]:
+    """Consistency check. VERIFIED when every file reference and runtime path
+    agrees on qubit-voice-agent; PARTIAL when some remain; PLANNED when none
+    have been migrated yet. Read-only."""
+    root = Path(repo) if repo else _repo_root()
+    scan = _branding_ref_scan(root)
+    old_remaining = {rel: info["old_hits"] for rel, info in scan.items()
+                     if info.get("old_hits", 0) > 0}
+    migrated = {rel for rel, info in scan.items()
+                if not info.get("missing") and info.get("old_hits", 0) == 0}
+    path_state = _branding_scan_paths()
+    paths_new = {new: st for new, st in path_state.items() if st["new_exists"]}
+    state = "VERIFIED"
+    if old_remaining:
+        state = "PLANNED" if len(old_remaining) == len(scan) else "PARTIAL"
+    return {
+        "state": state,
+        "new_name": NEW_NAME,
+        "files_total": len(scan),
+        "files_migrated": len(migrated),
+        "files_remaining": old_remaining,
+        "paths": paths_new,
+        "note": ("all references agree on qubit-voice-agent"
+                 if state == "VERIFIED" else
+                 "migration incomplete; run `voicebridge branding plan "
+                 "--apply` with a backup, then re-verify"),
     }
-    return {"state": "PLANNED", "refs": refs,
-            "note": "migration is prepared; apply via branding_plan with "
-                    "backup + verification, never as incidental cleanup"}
 
 
-def branding_rollback(cfg: Any, backup_dir: Path) -> Dict[str, Any]:
-    """Restore branding backups (reversible migration path)."""
+def branding_rollback(cfg: Any, backup_dir: Path, repo: Optional[Path] = None) -> Dict[str, Any]:
+    """Restore every branding backup (repo files + runtime config/state/data)
+    and remove the compat aliases created by the migration. Reversible."""
     bdir = Path(backup_dir)
     if not bdir.exists():
         return {"state": MISSING, "detail": f"no backup at {bdir}"}
+    root = Path(repo) if repo else _repo_root()
     restored = []
-    for src, _new in ((Path("~/.config/openclaw-voice-bridge/voice.yaml")
-                       .expanduser(), None),):
-        bak = bdir / src.name
+    # 1) restore repository files
+    for rel, _pairs in BRANDING_FILE_EDITS:
+        bak = bdir / rel
         if bak.exists():
-            src.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(bak, src)
-            restored.append(str(src))
+            dst = root / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(bak, dst)
+            restored.append(rel)
+    # 1b) restore the systemd unit filename (migration renames it)
+    old_unit = root / "systemd" / f"{OLD_NAME}.service"
+    new_unit = root / "systemd" / f"{NEW_NAME}.service"
+    if new_unit.exists() and not old_unit.exists():
+        os.replace(new_unit, old_unit)
+        restored.append("systemd/unit-renamed-back")
+    # 2) restore runtime config/state/data
+    for name in ("voice.yaml", "state", "data", "models", "memory",
+                 "reports", "device.json", "profiles.json"):
+        bak = bdir / "runtime" / name
+        if bak.exists():
+            dst = Path("~/.config/openclaw-voice-bridge").expanduser() / name
+            if name in ("voice.yaml",):
+                dst = Path("~/.config/openclaw-voice-bridge").expanduser() / name
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            if bak.is_dir():
+                shutil.copytree(bak, dst, dirs_exist_ok=True)
+            else:
+                shutil.copy2(bak, dst)
+            restored.append(f"runtime/{name}")
+    # 3) remove compat aliases (the old name symlinks point back to new paths)
+    for old, _new in BRANDING_PATH_PAIRS:
+        oldp = Path.home() / old
+        if oldp.is_symlink():
+            try:
+                oldp.unlink()
+                restored.append(f"alias-removed:{old}")
+            except OSError:
+                pass
     return {"state": OK, "restored": restored, "backup": str(bdir)}

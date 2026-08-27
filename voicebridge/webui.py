@@ -1161,6 +1161,27 @@ class WebUIHandler(BaseHTTPRequestHandler):
             out = P.reset_profile(self.app.orch.cfg, kind,
                                   dry_run=not bool(body.get("apply", False)))
             self._json(out, 200 if out["state"] == "OK" else 409)
+        elif path == "/api/profiles/upgrade":
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            from . import profiles as P
+            try:
+                body = json.loads(
+                    self.rfile.read(int(self.headers.get("Content-Length", 0))
+                                    if self.headers.get("Content-Length") else 0)
+                    or b"{}")
+            except Exception:
+                self._json({"state": "FAILED", "detail": "bad JSON body"}, 400)
+                return
+            kind = body.get("kind")
+            profile = body.get("profile")
+            if kind not in ("brain", "stt", "tts", "voice", "audio"):
+                self._json({"state": "MISSING", "detail": "kind required"}, 400)
+                return
+            out = P.upgrade_profile(self.app.orch.cfg, kind, profile or "",
+                                    dry_run=not bool(body.get("apply", False)))
+            self._json(out, 200 if out["state"] == "OK" else 409)
         elif path == "/api/profiles/rollback":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
@@ -1258,6 +1279,67 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 bundle = P.export_bundle(self.app.orch.cfg, pw)
                 out.write_bytes(bundle)
                 self._json({"state": "OK", "detail": str(out)})
+            except Exception as exc:
+                self._json({"state": "FAILED", "detail": str(exc)[:160]}, 409)
+        elif path == "/api/import-state":
+            # Packet 7D: dashboard import — restore a portable-state bundle
+            # (b64 in the body) with an explicit passphrase; dry-run by
+            # default, --apply/apply:true performs a real (backed-up, atomic,
+            # rollback-safe) restore after the enrollment + integrity gates.
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            from . import portable as P
+            from . import device as Dev
+            try:
+                body = json.loads(
+                    self.rfile.read(int(self.headers.get("Content-Length", 0))
+                                    if self.headers.get("Content-Length") else 0)
+                    or b"{}")
+            except Exception:
+                self._json({"state": "FAILED", "detail": "bad JSON body"}, 400)
+                return
+            b64 = body.get("bundle_b64")
+            pw = str(body.get("passphrase") or "")
+            if not b64 or not pw:
+                self._json({"state": "DENIED",
+                            "detail": "bundle + passphrase required"}, 403)
+                return
+            try:
+                import base64 as _b64
+                bundle = _b64.b64decode(b64)
+            except Exception:
+                self._json({"state": "FAILED", "detail": "bundle not base64"},
+                           400)
+                return
+            try:
+                try:
+                    Dev.require_enrolled(self.app.orch.cfg)
+                except Dev.DeviceNotEnrolledError as exc:
+                    self._json({"state": "DENIED", "detail": str(exc)[:160]},
+                               403)
+                    return
+                payload = P.read_bundle(bundle, pw)
+                apply = bool(body.get("apply", False))
+                if not apply:
+                    plan = P.plan_restore(self.app.orch.cfg, payload,
+                                          dry_run=True)
+                    self._json({"state": "OK", "dry_run": True,
+                                "detail": "preview", "actions": plan.actions})
+                    return
+                result = P.restore_state(self.app.orch.cfg, payload,
+                                         dry_run=False)
+                self._json({"state": "OK", "detail": "restored",
+                            "backup": result.get("backup")})
+            except P.WrongPassphraseError:
+                self._json({"state": "FAILED",
+                            "detail": "wrong passphrase"}, 403)
+            except P.CorruptedBundleError as exc:
+                self._json({"state": "FAILED", "detail": str(exc)[:160]}, 400)
+            except P.UnsupportedSchemaError as exc:
+                self._json({"state": "FAILED", "detail": str(exc)[:160]}, 400)
+            except P.LowDiskError as exc:
+                self._json({"state": "FAILED", "detail": str(exc)[:160]}, 409)
             except Exception as exc:
                 self._json({"state": "FAILED", "detail": str(exc)[:160]}, 409)
         elif path == "/api/prune" or path == "/api/reports/prune":

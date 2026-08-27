@@ -147,12 +147,21 @@ def build_parser() -> argparse.ArgumentParser:
     brand_plan = brand_sub.add_parser("plan", parents=[common],
                                       help="prepare the openclaw-voice-bridge -> qubit-voice-agent migration")
     brand_plan.add_argument("--apply", action="store_true", default=False,
-                            help="create the backup (default: dry-run plan only)")
+                            help="perform the migration with a backup (default: dry-run plan only)")
+    brand_plan.add_argument("--migrate-paths", action="store_true", default=False,
+                            help="ALSO move live config/state/data paths (explicit, separate operator step)")
     brand_plan.add_argument("--backup-dir", type=Path, default=None)
-    brand_sub.add_parser("verify", parents=[common], help="read-only branding consistency check")
+    brand_plan.add_argument("--repo", type=Path, default=None,
+                            help="target repository root (default: this repo)")
+    brand_verify = brand_sub.add_parser("verify", parents=[common],
+                                        help="read-only branding consistency check")
+    brand_verify.add_argument("--repo", type=Path, default=None,
+                              help="target repository root (default: this repo)")
     brand_roll = brand_sub.add_parser("rollback", parents=[common],
                                       help="restore branding backups (reversible)")
     brand_roll.add_argument("--backup-dir", type=Path, required=True)
+    brand_roll.add_argument("--repo", type=Path, default=None,
+                            help="target repository root (default: this repo)")
     export = add("export-state", help="encrypt + export portable state (memory/lessons/reports/config/model)")
     export.add_argument("--out", type=Path, default=None,
                         help="output file (default: <state_dir>/portable-<ts>.vbp)")
@@ -793,15 +802,17 @@ def _cmd_branding(cfg, args) -> int:
     cmd = getattr(args, "branding_command", None) or "plan"
     if cmd == "plan":
         out = P.branding_plan(cfg, dry_run=not args.apply,
-                              backup_dir=args.backup_dir)
+                              backup_dir=args.backup_dir,
+                              repo=args.repo,
+                              migrate_paths=args.migrate_paths)
         print(_json.dumps(out, indent=2, sort_keys=True))
         return 0
     if cmd == "verify":
-        out = P.branding_verify(cfg)
+        out = P.branding_verify(cfg, repo=args.repo)
         print(_json.dumps(out, indent=2, sort_keys=True))
-        return 0
+        return 0 if out["state"] == "VERIFIED" else 1
     if cmd == "rollback":
-        out = P.branding_rollback(cfg, args.backup_dir)
+        out = P.branding_rollback(cfg, args.backup_dir, repo=args.repo)
         print(_json.dumps(out, indent=2, sort_keys=True))
         return 0 if out["state"] == "OK" else 2
     print(f"ERROR: unknown branding command {cmd!r}")

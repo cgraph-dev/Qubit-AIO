@@ -37,15 +37,22 @@ Every `ProviderManifest` records and validates:
 - checksum/digest (sha256 hex when present);
 - supported hardware (cpu/gpu/any) and languages;
 - VRAM/RAM usage (5 GB ceiling enforced, fail closed);
-- latency;
-- quality and safety evidence references;
+- latency (measured: recorded default values or a bounded live synthesis;
+  a 0.0/unmeasured value is PARTIAL, never a silent pass);
+- quality and safety evidence (the referenced files must exist and be
+  non-empty — validated, not just recorded);
 - rollback target.
 
 A downloaded file or model name is never trusted automatically: install/select/
-upgrade run manifest, artifact (digest/checksum), hardware/language, and
-resource gates. A failed gate leaves the previous profile active (no config
-write). **One approved resident generative model by default**; any replacement
-that exceeds the 5 GB VRAM ceiling or fails a gate is rejected.
+upgrade run manifest, artifact (local sha256 or live Ollama digest),
+evidence, latency, hardware/language, and resource gates. A failed gate leaves
+the previous profile active (no config write). A replacement (non-default)
+profile must pass EVERY gate — a PARTIAL gate blocks activation; only the
+verified default may activate with a PARTIAL caveat. **One approved resident
+generative model by default**; any replacement that exceeds the 5 GB VRAM
+ceiling or fails a gate is rejected. Non-brain STT/TTS/voice artifacts are
+resolved to their on-disk files and checksum-verified (or reported as
+runtime-only / unmeasured).
 
 Operations are dry-run by default, explicitly applied, staged atomically with a
 timestamped backup, and reversible via rollback. **Changing one component never
@@ -62,47 +69,65 @@ token, preserving Packet 1B). It provides:
 - an **Advanced** toggle exposing technical details;
 - model/brain, STT, TTS provider, voice, and audio-device selection;
 - permission review, device enrollment, health/hardware status, task progress,
-  approvals, reports/audit, export/import, upgrade, reset, remove, rollback.
+  approvals, reports/audit, **export and import**, per-component upgrade
+  (a real re-verify + manifest-metadata refresh), reset, **non-default profile
+  removal**, and rollback.
 
 Every control calls a real authenticated backend endpoint (`/api/profiles/*`,
 `/api/audio/*`, `/api/permissions`, `/api/device/*`, `/api/export-state`,
-`/api/branding`, `/api/status`, `/api/approvals`, `/api/reports`). No
-frontend-only localStorage is used as a source of truth (only the existing
-`vdb_token` auth token is read from localStorage). Success is never shown when
-the backend returns unavailable/degraded/denied/partial/failed; each control
-renders the typed state. Untrusted text is escaped (`esc()`); no secrets,
-credentials, prompts, raw filesystem paths, or CDP URLs are exposed.
+`/api/import-state`, `/api/branding`, `/api/status`, `/api/approvals`,
+`/api/reports`). No frontend-only localStorage is used as a source of truth
+(only the existing `vdb_token` auth token is read from localStorage). A
+**confirmation dialog** gates every side-effecting action (provider change,
+reset, rollback, remove, enrollment, export, import restore) and maps to the
+backend `confirm` flag — the backend DENIED path is exercised. Success is never
+shown when the backend returns unavailable/degraded/denied/partial/failed; a
+typed-state interpreter renders each state and marks failures with "no change
+made". Untrusted text is escaped (`esc()`); no secrets, credentials, prompts,
+raw filesystem paths, or CDP URLs are exposed.
 
 ## Qubit branding migration
 
-`voicebridge branding plan|verify|rollback` prepares the
+`voicebridge branding plan|verify|rollback` performs the
 `openclaw-voice-bridge -> qubit-voice-agent` rename as a **separate reversible
 migration** (not incidental cleanup):
 
-- `branding plan` (dry-run) lists every reference change: package name, service
-  unit, config/state/data paths, launchers, fixtures, compatibility aliases.
-- `branding plan --apply --backup-dir <dir>` copies the current config/state/
-  data to a timestamped backup without moving or deleting live state.
-- `branding verify` is a read-only consistency check (package, service,
-  config_dir, state_dir refs).
-- `branding rollback --backup-dir <dir>` restores the backups.
+- `branding plan` (dry-run) lists every file reference change and the runtime
+  path steps.
+- `branding plan --apply --backup-dir <dir>` rewrites the repository files
+  (package metadata, systemd unit content + **renames the unit file** to
+  `qubit-voice-agent.service`, launchers, docs, config template) atomically,
+  backing up every touched file. The live config/state/data path migration is
+  an **explicit separate step** (`--migrate-paths`): it moves the content to
+  the new path and creates a compat alias, and is never triggered by a repo
+  apply or a staged test.
+- `branding verify` scans every file and path and returns **VERIFIED** when all
+  references agree on `qubit-voice-agent`, **PARTIAL** when some remain, or
+  **PLANNED** when none are migrated (read-only; exit 0 only when VERIFIED).
+- `branding rollback --backup-dir <dir>` restores every backed-up repo file
+  and runtime config/state/data, renames the unit back, and removes compat
+  aliases.
 
 The repository is never physically renamed as incidental cleanup; existing
 memory, reports, permissions, device settings, and model metadata are
-preserved.
+preserved. The real repo stays on `openclaw-voice-bridge` until an operator
+runs the migration; verification reports PARTIAL in that state, never VERIFIED.
 
 ## Tests
 
-`tests/test_packet7d.py` (39): registry safe defaults + required metadata,
+`tests/test_packet7d.py` (44): registry safe defaults + required metadata,
 manifest validation (invalid/checksum/VRAM/hardware), profile check gates
-(typed), dry-run no-write, confirmation DENIED, unknown profile MISSING, apply
-+ backup, reset, rollback (backup + default), remove default/active DENIED,
-restart persistence, independent component changes, branding plan/apply/
-verify/rollback, CLI list/show/check/install/select/reset/rollback/upgrade,
-dashboard auth (401 on wrong token), profiles list/show/check/apply/reset/
-rollback, audio/permissions/device endpoints, branding + export-state DENIED,
-settings page served, no secret/path leakage, and no-frontend-only-state /
-escaping assertions. Full suite 804 passed / 0 failed / 0 skipped.
+(typed, incl. evidence + latency), dry-run no-write, confirmation DENIED,
+unknown profile MISSING, apply + backup, reset, rollback (backup + default),
+remove default/active DENIED + real non-default removal, restart persistence,
+independent component changes, **real branding migration applied/verified/
+rolled back on a staged repo** (verify returns VERIFIED after apply, PARTIAL/
+PLANNED before), CLI list/show/check/install/select/reset/rollback/upgrade,
+**real dashboard import (preview + apply + wrong-passphrase)**, **real
+upgrade (refreshes manifest metadata)**, **real removal**, dashboard auth
+(401 on wrong token), profiles/audio/permissions/device/export endpoints,
+no-leak/no-fake-success, settings page + no-frontend-only-state / confirmation
+dialog / no-demo assertions. Full suite 809 passed / 0 failed / 0 skipped.
 
 ## Rollback
 

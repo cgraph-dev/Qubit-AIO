@@ -85,28 +85,50 @@
    <span id="misc-state" class="muted"></span>
  </div>
 
- <h2>Export / import / upgrade / rollback</h2>
- <div class="card">
-   <div class="row">
-     <button class="ok" onclick="exportState()">Export state</button>
-     <button onclick="upgradeAll()">Upgrade checks</button>
-     <button onclick="rollbackProfile('brain')">Rollback brain</button>
-     <button onclick="removeProfile('brain')">Remove brain (demo)</button>
-   </div>
-   <div class="muted" id="state-out"></div>
- </div>
+<h2>Export / import / upgrade / rollback</h2>
+  <div class="card">
+    <div class="row">
+      <button class="ok" onclick="exportState()">Export state</button>
+      <input type="file" id="import-file" accept=".vbp" style="font-size:12px">
+      <button class="ok" onclick="importState()">Import state</button>
+      <button onclick="upgradeAll()">Upgrade checks</button>
+      <button onclick="upgradeProfile('brain')">Upgrade brain</button>
+      <button onclick="upgradeProfile('tts')">Upgrade TTS</button>
+      <button onclick="rollbackProfile('brain')">Rollback brain</button>
+      <select id="remove-kind" style="font-size:12px"></select>
+      <button onclick="removeProfile()">Remove profile</button>
+    </div>
+    <div class="muted" id="state-out"></div>
+  </div>
 </div>
 
 <script>
 const API = localStorage.getItem('vdb_api') || '';
 const hdrs = () => ({'Content-Type':'application/json','X-Api-Token':localStorage.getItem('vdb_token')||''});
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function show(id,text){const el=document.getElementById(id);if(el)el.textContent=text;}
+function show(id,html){const el=document.getElementById(id);if(el)el.innerHTML=html;}
 function tag(state){return '<span class="tag '+esc(state)+'">'+esc(state)+'</span>';}
 async function api(path,opts){
  const r = await fetch(API+path,Object.assign({headers:hdrs()},opts||{}));
  let body=null; try{body=await r.json();}catch(e){body=null;}
  return {status:r.status,body};
+}
+// ---- typed-state interpreter: only OK/dry-run count as success; every other
+// state is rendered explicitly (never a generic "worked").
+function renderResult(out){
+ if(!out||out==null) return tag('UNAVAILABLE');
+ const st = out.state || (out.enrolled!=null ? (out.enrolled?'OK':'DENIED') : 'UNAVAILABLE');
+ const detail = out.detail || out.action || '';
+ let html = tag(st);
+ if(detail) html += ' <span class="muted">'+esc(detail)+'</span>';
+ if(out.backup) html += ' <span class="muted">backup '+esc(out.backup)+'</span>';
+ if(st==='FAILED'||st==='DENIED'||st==='MISSING'||st==='UNAVAILABLE') html += ' <span class="err">(no change made)</span>';
+ return html;
+}
+// ---- real confirmation dialog before any side-effecting action
+function confirmDialog(message, fn){
+ if(!window.confirm(message)) return;
+ fn();
 }
 function toggleAdvanced(){
  document.querySelector('.advanced').classList.toggle('open');
@@ -114,90 +136,161 @@ function toggleAdvanced(){
 async function loadAll(){
  const {status,body} = await api('/api/status');
  show('health', status===200 && body && body.bridge==='up'
-   ? 'bridge up ✓' : 'unavailable / degraded');
+   ? tag('OK')+' bridge up' : tag('UNAVAILABLE')+' bridge offline / degraded');
  loadProfiles();
 }
 async function loadProfiles(){
  const {body} = await api('/api/profiles');
- if(!body||!body.profiles){show('health','profiles unavailable');return;}
+ if(!body||!body.profiles){show('health',tag('UNAVAILABLE')+' profiles unavailable');return;}
  for(const kind of ['brain','stt','tts','voice']){
-   const sel = document.getElementById(kind+'-sel');
-   if(!sel)continue;
-   const list = body.profiles.filter(p=>p.kind===kind);
-   const active = body.active ? body.active[kind] : '';
-   sel.innerHTML = list.map(p=>`<option value="${esc(p.id)}"${p.id===active?' selected':''}>${esc(p.id)} (${esc(p.gate)})</option>`).join('');
-   show(kind+'-state', 'active: '+esc(active||'—'));
+  const sel = document.getElementById(kind+'-sel');
+  if(!sel)continue;
+  const list = body.profiles.filter(p=>p.kind===kind);
+  const active = body.active ? body.active[kind] : '';
+  sel.innerHTML = list.map(p=>`<option value="${esc(p.id)}"${p.id===active?' selected':''}>${esc(p.id)} (${esc(p.gate)})</option>`).join('');
+  show(kind+'-state', 'active: '+esc(active||'—'));
+ }
+ // populate the removable list (non-default only)
+ const rem = document.getElementById('remove-kind');
+ if(rem){
+  rem.innerHTML = ['brain','stt','tts','voice','audio']
+    .map(k=>{const opts=body.profiles.filter(p=>p.kind===k&&!p.default)
+      .map(p=>`<option value="${esc(k)}:${esc(p.id)}">${esc(k)} ${esc(p.id)}</option>`).join('');
+      return opts;}).join('');
  }
 }
 async function applyProfile(kind){
  const profile = document.getElementById(kind+'-sel').value;
- const {body} = await api('/api/profiles/apply',{method:'POST',
-   body:JSON.stringify({kind,profile,dry_run:false,confirm:true})});
- const st = body && body.state;
- show(kind+'-state', (body&&body.detail?esc(body.detail)+' ':'') + tag(st));
- loadProfiles();
+ const doIt = async () => {
+   const {status,body} = await api('/api/profiles/apply',{method:'POST',
+     body:JSON.stringify({kind,profile,dry_run:false,confirm:true})});
+   show(kind+'-state', renderResult(body));
+   loadProfiles();
+ };
+ confirmDialog('Replace '+kind+' with '+profile+'? (side effect, reversible with rollback)', doIt);
 }
 async function resetProfile(kind){
- const {body} = await api('/api/profiles/reset',{method:'POST',
-   body:JSON.stringify({kind,apply:true})});
- show(kind+'-state', body&&body.detail?esc(body.detail):'reset '+esc(body&&body.state));
- loadProfiles();
+ const doIt = async () => {
+   const {status,body} = await api('/api/profiles/reset',{method:'POST',
+     body:JSON.stringify({kind,apply:true})});
+   show(kind+'-state', renderResult(body));
+   loadProfiles();
+ };
+ confirmDialog('Reset '+kind+' to its verified default?', doIt);
 }
 async function checkProfile(kind){
  const {body} = await api('/api/profiles/check?kind='+kind);
- show(kind+'-state', JSON.stringify(body&&body.gates||body));
+ const st = body && body.state ? body.state : 'UNAVAILABLE';
+ show(kind+'-state', tag(st)+' <span class="muted">'+esc(JSON.stringify(body&&body.gates||{}))+'</span>');
 }
 async function rollbackProfile(kind){
- const {body} = await api('/api/profiles/rollback',{method:'POST',
-   body:JSON.stringify({kind,apply:true})});
- show(kind+'-state', body&&body.detail?esc(body.detail):'rollback');
- loadProfiles();
+ const doIt = async () => {
+   const {status,body} = await api('/api/profiles/rollback',{method:'POST',
+     body:JSON.stringify({kind,apply:true})});
+   show(kind+'-state', renderResult(body));
+   loadProfiles();
+ };
+ confirmDialog('Roll back '+kind+' to its previous profile?', doIt);
 }
-async function removeProfile(kind){
- const {body} = await api('/api/profiles/remove?kind='+kind+'&profile=qubit-brain4',
-   {method:'POST',body:'{}'});
- show(kind+'-state', body&&body.detail?esc(body.detail):'remove');
+async function upgradeProfile(kind){
+ const profile = document.getElementById(kind+'-sel').value;
+ const doIt = async () => {
+   const {status,body} = await api('/api/profiles/upgrade',{method:'POST',
+     body:JSON.stringify({kind,profile,apply:true})});
+   show(kind+'-state', renderResult(body));
+ };
+ confirmDialog('Upgrade '+kind+' ('+profile+')? Re-verifies gates and refreshes artifact metadata.', doIt);
+}
+async function removeProfile(){
+ const val = document.getElementById('remove-kind').value;
+ if(!val) return;
+ const [kind, profile] = val.split(':');
+ const doIt = async () => {
+   const {status,body} = await api('/api/profiles/remove',{method:'POST',
+     body:JSON.stringify({kind,profile,apply:true})});
+   show('misc-state', renderResult(body));
+   loadProfiles();
+ };
+ confirmDialog('Remove profile '+profile+' ('+kind+') from the registry?', doIt);
 }
 async function audioStatus(){
- const {body} = await api('/api/audio/status');
- show('audio-state', body?JSON.stringify(body):'audio status unavailable');
+ const {status,body} = await api('/api/audio/status');
+ const st = body && body.mic ? (body.mic.state + ' / ' + body.output.state) : 'UNAVAILABLE';
+ show('audio-state', tag(st)+' <span class="muted">'+esc(JSON.stringify(body||{}))+'</span>');
 }
 async function audioList(){
- const {body} = await api('/api/audio/list');
- show('audio-state', body && body.inputs ? ('inputs '+body.inputs.length+' outputs '+body.outputs.length)
-   : 'audio list unavailable');
+ const {status,body} = await api('/api/audio/list');
+ if(!body) { show('audio-state', tag('UNAVAILABLE')); return; }
+ show('audio-state', tag('OK')+' inputs '+body.inputs.length+' outputs '+body.outputs.length);
 }
 async function audioReset(){
- const {body} = await api('/api/audio/reset',{method:'POST',body:'{}'});
- show('audio-state', body&&body.detail?esc(body.detail):'audio reset');
+ const doIt = async () => {
+   const {status,body} = await api('/api/audio/reset',{method:'POST',body:'{}'});
+   show('audio-state', renderResult(body));
+ };
+ confirmDialog('Reset audio devices to OS defaults?', doIt);
 }
 async function permissions(){
- const {body} = await api('/api/permissions');
- show('perm-state', body&&body.items?('permissions: '+body.items.length):'unavailable');
+ const {status,body} = await api('/api/permissions');
+ const st = body && body.items ? 'OK' : 'UNAVAILABLE';
+ show('perm-state', tag(st)+' <span class="muted">'+esc((body&&body.items||[]).map(i=>i.capability||i.name||'').join(', '))+'</span>');
 }
 async function deviceStatus(){
- const {body} = await api('/api/device/status');
- show('device-state', body&&body.enrolled!=null?('enrolled: '+body.enrolled):'unavailable');
+ const {status,body} = await api('/api/device/status');
+ show('device-state', (body&&body.enrolled!=null?tag(body.enrolled?'OK':'DENIED'):tag('UNAVAILABLE'))
+   +' <span class="muted">'+esc((body&&body.detail)||'')+'</span>');
 }
 async function deviceEnroll(){
- const {body} = await api('/api/device/enroll',{method:'POST',body:'{}'});
- show('device-state', body&&body.detail?esc(body.detail):'enrolled');
+ const doIt = async () => {
+   const {status,body} = await api('/api/device/enroll',{method:'POST',body:'{}'});
+   show('device-state', body&&body.enrolled ? tag('OK')+' device enrolled' : tag('DENIED')+' '+esc(body&&body.detail||''));
+ };
+ confirmDialog('Enroll this device as trusted? (explicit authorization)', doIt);
 }
 async function taskStatus(){
- const {body} = await api('/api/status');
- show('misc-state', body&&body.task_active!=null?('task_active: '+body.task_active):'unavailable');
+ const {status,body} = await api('/api/status');
+ show('misc-state', body&&body.task_active!=null ? tag('OK')+' task_active: '+body.task_active : tag('UNAVAILABLE'));
 }
 async function approvals(){
- const {body} = await api('/api/approvals');
- show('misc-state', body&&body.items?('approvals pending: '+body.items.length):'unavailable');
+ const {status,body} = await api('/api/approvals');
+ show('misc-state', body&&body.items ? tag('OK')+' approvals pending: '+body.items.length : tag('UNAVAILABLE'));
 }
 async function reports(){
- const {body} = await api('/api/reports?limit=5&days=30');
- show('misc-state', body&&body.items?('reports: '+body.items.length):'unavailable');
+ const {status,body} = await api('/api/reports?limit=5&days=30');
+ show('misc-state', body&&body.items ? tag('OK')+' reports: '+body.items.length : tag('UNAVAILABLE'));
 }
 async function exportState(){
- const {body} = await api('/api/export-state',{method:'POST',body:'{}'});
- show('state-out','export: '+(body&&body.detail?esc(body.detail):'unavailable'));
+ const pw = window.prompt('Export passphrase (required):','');
+ if(pw==null) return;
+ const doIt = async () => {
+   const {status,body} = await api('/api/export-state',{method:'POST',
+     body:JSON.stringify({passphrase:pw})});
+   show('state-out', renderResult(body));
+ };
+ confirmDialog('Export encrypted portable state? (side effect)', doIt);
+}
+async function importState(){
+ const pw = window.prompt('Import passphrase (required):','');
+ if(pw==null) return;
+ const fileEl = document.getElementById('import-file');
+ const f = fileEl && fileEl.files && fileEl.files[0];
+ if(!f){ show('state-out', tag('MISSING')+' choose a .vbp bundle first'); return; }
+ const reader = new FileReader();
+ reader.onload = async () => {
+   const b64 = btoa(String.fromCharCode.apply(null, new Uint8Array(reader.result)));
+   const preview = await api('/api/import-state',{method:'POST',
+     body:JSON.stringify({bundle_b64:b64,passphrase:pw})});
+   show('state-out', renderResult(preview.body));
+   if(preview.body && preview.body.state==='OK' && preview.body.dry_run){
+     const doRestore = async () => {
+       const r = await api('/api/import-state',{method:'POST',
+         body:JSON.stringify({bundle_b64:b64,passphrase:pw,apply:true})});
+       show('state-out', renderResult(r.body));
+     };
+     confirmDialog('Preview OK. Apply this restore now? (atomic + backed up + rollback-safe)', doRestore);
+   }
+ };
+ reader.readAsArrayBuffer(f);
 }
 async function upgradeAll(){
  const {body} = await api('/api/profiles');
@@ -206,13 +299,14 @@ async function upgradeAll(){
  const out=[];
  for(const k of kinds){
    const {body:b}=await api('/api/profiles/check?kind='+k);
-   out.push(k+':'+((b&&b.state)||'?'));
+   out.push(k+':'+((b&&b.state)||'UNAVAILABLE'));
  }
- show('state-out','upgrade checks: '+out.join(', '));
+ show('state-out','upgrade checks: '+out.join(', ')+' — use per-component Upgrade to apply');
 }
 async function branding(){
- const {body} = await api('/api/branding');
- show('health','branding: '+(body&&body.refs?JSON.stringify(body.refs):'unavailable'));
+ const {status,body} = await api('/api/branding');
+ const st = body && body.state ? body.state : 'UNAVAILABLE';
+ show('health', tag(st)+' <span class="muted">'+esc(JSON.stringify({new_name:body&&body.new_name,files_migrated:body&&body.files_migrated,remaining:body&&body.files_remaining}))+'</span>');
 }
 loadAll();
 </script>

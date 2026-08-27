@@ -22,6 +22,14 @@ from voicebridge.config import Config  # noqa: E402
 from voicebridge import profiles as P  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _fast_latency(monkeypatch):
+    """Hermetic tests must not perform a real Piper synthesis for latency
+    measurement (slow + audio); recorded/default latency is used and the gate
+    reports the unmeasured state truthfully."""
+    monkeypatch.setenv("VOICE_BRIDGE_LATENCY_FAST", "1")
+
+
 def _cfg(tmp_path, model="qubit-brain4", stt="sherpa", tts="piper",
          voice="en_US-amy-medium"):
     state = tmp_path / "state"
@@ -229,37 +237,88 @@ def test_branding_plan_dry_run_is_read_only(tmp_path):
     plan = P.branding_plan(cfg, dry_run=True)
     assert plan["dry_run"] is True
     assert plan["new_name"] == "qubit-voice-agent"
-    assert any("qubit-voice-agent.service" in s for s in plan["steps"])
-    assert any("compat alias" in s.lower() for s in plan["steps"])
+    assert any("pyproject.toml" in s for s in plan["file_steps"])
+    assert any("systemd" in s for s in plan["file_steps"])
     assert "memory" in plan["preserves"]
     # no backup created on dry-run
     assert plan["backup"] is None
+    # dry-run must NOT touch the repo
+    assert (REPO / "pyproject.toml").read_text().startswith("[project]")
 
 
-def test_branding_apply_creates_backup(tmp_path):
+def _staged_repo(tmp_path: Path) -> Path:
+    """Copy only the branding-relevant repository files into tmp so branding
+    can be applied + rolled back hermetically without touching the real tree
+    or the developer's browser state."""
+    import shutil
+    dest = tmp_path / "staged-repo"
+    dest.mkdir()
+    # top-level files
+    for rel in ("pyproject.toml", "README.md"):
+        shutil.copy2(REPO / rel, dest / rel)
+    # directories: only the files referenced by BRANDING_FILE_EDITS
+    for rel in ("config", "systemd", "scripts", "docs"):
+        src = REPO / rel
+        dst = dest / rel
+        dst.mkdir(parents=True, exist_ok=True)
+        for p in sorted(src.rglob("*")):
+            if not p.is_file():
+                continue
+            relp = p.relative_to(src)
+            try:
+                shutil.copy2(p, dst / relp)
+            except OSError:
+                continue
+    return dest
+
+
+def test_branding_apply_migrates_repo_and_verify_returns_verified(tmp_path):
     cfg = _cfg(tmp_path)
+    repo = _staged_repo(tmp_path)
     bdir = tmp_path / "brand-backup"
-    plan = P.branding_plan(cfg, dry_run=False, backup_dir=bdir)
+    plan = P.branding_plan(cfg, dry_run=False, backup_dir=bdir, repo=repo)
     assert plan["backup"] == str(bdir)
     assert Path(bdir).exists()
     assert plan["backup_files"]
+    # repo files were actually rewritten to qubit-voice-agent
+    assert 'name = "qubit-voice-agent"' in (repo / "pyproject.toml").read_text()
+    # the systemd unit was renamed to the new identifier
+    new_unit = repo / "systemd" / "qubit-voice-agent.service"
+    assert new_unit.exists()
+    assert "qubit-voice-agent" in new_unit.read_text()
+    assert not (repo / "systemd" / "openclaw-voice-bridge.service").exists()
+    # verify returns VERIFIED (not PLANNED) after the migration
+    v = P.branding_verify(cfg, repo=repo)
+    assert v["state"] == "VERIFIED", v
 
 
-def test_branding_verify_consistent(tmp_path):
+def test_branding_verify_reports_partial_and_planned(tmp_path):
     cfg = _cfg(tmp_path)
-    v = P.branding_verify(cfg)
-    assert v["refs"]["package"] == "qubit-voice-agent"
-    assert v["refs"]["service"] == "qubit-voice-agent.service"
-    assert v["state"] == "PLANNED"
+    repo = _staged_repo(tmp_path)
+    # untouched repo -> PLANNED (no references migrated)
+    v = P.branding_verify(cfg, repo=repo)
+    assert v["state"] in ("PLANNED", "PARTIAL")
+    assert v["files_remaining"]
+    # migrate only pyproject -> PARTIAL
+    (repo / "pyproject.toml").write_text(
+        (repo / "pyproject.toml").read_text().replace(
+            'name = "openclaw-voice-bridge"', 'name = "qubit-voice-agent"'))
+    v2 = P.branding_verify(cfg, repo=repo)
+    assert v2["state"] == "PARTIAL"
+    assert "pyproject.toml" not in v2["files_remaining"]
 
 
-def test_branding_rollback_restores_backup(tmp_path):
+def test_branding_rollback_restores_full_backup(tmp_path):
     cfg = _cfg(tmp_path)
+    repo = _staged_repo(tmp_path)
     bdir = tmp_path / "brand-backup"
-    P.branding_plan(cfg, dry_run=False, backup_dir=bdir)
-    out = P.branding_rollback(cfg, bdir)
+    before = (repo / "pyproject.toml").read_text()
+    P.branding_plan(cfg, dry_run=False, backup_dir=bdir, repo=repo)
+    assert (repo / "pyproject.toml").read_text() != before
+    out = P.branding_rollback(cfg, bdir, repo=repo)
     assert out["state"] == "OK"
     assert out["restored"]
+    assert (repo / "pyproject.toml").read_text() == before
 
 
 # ========================================================================
@@ -352,13 +411,20 @@ def test_cli_branding_commands(tmp_path, capsys):
     rc = cli(["branding", "plan", "--config", str(cfg_path)])
     assert rc == 0
     rc = cli(["branding", "verify", "--config", str(cfg_path)])
-    assert rc == 0
+    assert rc == 1  # not verified (PLANNED) -> exit 1
+    capsys.readouterr()
+    # apply + rollback against a staged repo copy (never the real tree)
+    repo = _staged_repo(tmp_path)
     bdir = tmp_path / "b"
     rc = cli(["branding", "plan", "--apply", "--backup-dir", str(bdir),
-              "--config", str(cfg_path)])
+              "--repo", str(repo), "--config", str(cfg_path)])
     assert rc == 0
+    rc = cli(["branding", "verify", "--config", str(cfg_path),
+              "--repo", str(repo)])
+    assert rc == 0  # VERIFIED
+    capsys.readouterr()
     rc = cli(["branding", "rollback", "--backup-dir", str(bdir),
-              "--config", str(cfg_path)])
+              "--repo", str(repo), "--config", str(cfg_path)])
     assert rc == 0
 
 
@@ -519,7 +585,9 @@ def test_api_branding_and_export_state(tmp_path, monkeypatch):
     ui, _, _ = _make_ui(tmp_path, monkeypatch)
     try:
         st, body = _get(ui, "/api/branding")
-        assert st == 200 and body["refs"]["package"] == "qubit-voice-agent"
+        assert st == 200
+        assert body["new_name"] == "qubit-voice-agent"
+        assert body["state"] in ("VERIFIED", "PARTIAL", "PLANNED")
         # export-state requires enrollment + passphrase; missing passphrase
         # (after enroll) -> DENIED
         _post(ui, "/api/device/enroll", {})
@@ -561,11 +629,133 @@ def test_profiles_page_has_no_frontend_only_state(tmp_path, monkeypatch):
     html = (REPO / "frontend" / "settings.html").read_text()
     # every control calls a backend endpoint
     for ep in ("/api/profiles", "/api/audio/", "/api/permissions",
-               "/api/device/", "/api/export-state", "/api/branding",
-               "/api/approvals", "/api/reports", "/api/status"):
+               "/api/device/", "/api/export-state", "/api/import-state",
+               "/api/profiles/upgrade", "/api/profiles/remove",
+               "/api/branding", "/api/approvals", "/api/reports",
+               "/api/status"):
         assert ep in html, f"missing backend endpoint {ep} in settings page"
     # no localStorage as a source of truth for provider state
     assert "localStorage.getItem('vdb_token')" in html  # only the auth token
     # all untrusted text is escaped before render
     assert "function esc(s)" in html
     assert "esc(" in html
+    # a real confirmation dialog must gate every side-effecting action
+    assert "confirmDialog(" in html
+    assert "window.confirm(" in html
+    # no placeholder/demo controls; real import + per-component upgrade exist
+    assert "demo" not in html.lower()
+    assert "import-file" in html
+    assert "upgradeProfile(" in html
+    # failure states are interpreted, never a generic success
+    assert "no change made" in html
+    assert "UNAVAILABLE" in html
+
+
+def test_api_import_state_preview_then_apply(tmp_path, monkeypatch):
+    """Dashboard import is a real backend round-trip: preview then apply with
+    enrollment + passphrase gates."""
+    from voicebridge import portable as P
+    ui, orch, cfg = _make_ui(tmp_path, monkeypatch)
+    try:
+        # enroll so the import gate passes
+        _post(ui, "/api/device/enroll", {})
+        # export a bundle via the real exporter
+        pw = "import-pass"
+        b64 = __import__("base64").b64encode(P.export_bundle(cfg, pw)).decode()
+        # preview (dry-run)
+        st, body = _post(ui, "/api/import-state",
+                         {"bundle_b64": b64, "passphrase": pw})
+        assert st == 200 and body["dry_run"] is True
+        assert body["actions"]
+        # apply
+        st, body = _post(ui, "/api/import-state",
+                         {"bundle_b64": b64, "passphrase": pw, "apply": True})
+        assert st == 200 and body["state"] == "OK"
+        assert body["backup"]
+    finally:
+        ui.stop()
+
+
+def test_api_import_state_rejects_wrong_passphrase(tmp_path, monkeypatch):
+    from voicebridge import portable as P
+    ui, orch, cfg = _make_ui(tmp_path, monkeypatch)
+    try:
+        _post(ui, "/api/device/enroll", {})
+        b64 = __import__("base64").b64encode(
+            P.export_bundle(cfg, "right")).decode()
+        st, body = _post(ui, "/api/import-state",
+                         {"bundle_b64": b64, "passphrase": "WRONG"})
+        assert st == 403 and body["state"] in ("FAILED", "DENIED")
+    finally:
+        ui.stop()
+
+
+def test_api_profiles_upgrade_performs_real_upgrade(tmp_path, monkeypatch):
+    """Upgrade is a real operation: it re-verifies gates and refreshes the
+    registry manifest metadata (checksum/revision), not just a check."""
+    from voicebridge import profiles as P
+    from voicebridge import distribution as D
+    ui, orch, cfg = _make_ui(tmp_path, monkeypatch)
+    try:
+        # register a non-default voice manifest so upgrade has something to do
+        man = P.ProviderManifest(
+            id="amy-2", kind="voice", source="test", revision="r1",
+            license="MIT", checksum="", hardware="cpu", languages=["en"],
+            vram_mib=0, ram_mib=0, latency_ms=250.0,
+            quality_evidence="docs/AUDIO_SETUP.md",
+            safety_evidence="docs/OPERATIONS_7A.md",
+            rollback_to="en_US-amy-medium",
+            config_path=("tts", "voice"), config_value="amy-2")
+        P.install_manifest(cfg, man)
+        st, body = _post(ui, "/api/profiles/upgrade",
+                         {"kind": "voice", "profile": "amy-2", "apply": True})
+        assert body["state"] == "OK"
+        assert "upgraded" in body["action"]
+    finally:
+        ui.stop()
+
+
+def test_api_profiles_remove_non_default_real(tmp_path, monkeypatch):
+    """Removal is real (not a demo): a registered non-default profile is
+    actually removed via the backend."""
+    from voicebridge import profiles as P
+    ui, orch, cfg = _make_ui(tmp_path, monkeypatch)
+    try:
+        man = P.ProviderManifest(
+            id="amy-2", kind="voice", source="test", revision="r1",
+            license="MIT", checksum="", hardware="cpu", languages=["en"],
+            vram_mib=0, ram_mib=0, latency_ms=250.0,
+            quality_evidence="docs/AUDIO_SETUP.md",
+            safety_evidence="docs/OPERATIONS_7A.md",
+            rollback_to="en_US-amy-medium",
+            config_path=("tts", "voice"), config_value="amy-2")
+        P.install_manifest(cfg, man)
+        st, body = _post(ui, "/api/profiles/remove",
+                         {"kind": "voice", "profile": "amy-2", "apply": True})
+        assert st == 200 and body["state"] == "OK"
+        assert body["removed"] == "amy-2"
+        # registry no longer contains it
+        reg = tmp_path / "state" / "profiles.json"
+        assert reg.exists()
+        data = json.loads(reg.read_text())
+        assert all(p["id"] != "amy-2" for p in data["profiles"])
+    finally:
+        ui.stop()
+
+
+def test_api_profiles_apply_confirmation_gate(tmp_path, monkeypatch):
+    """A side-effecting profile change is DENIED without confirmation; the
+    dashboard confirmation dialog maps to the backend confirm flag."""
+    ui, orch, cfg = _make_ui(tmp_path, monkeypatch)
+    try:
+        # a non-default (replacement) profile whose gates are not all OK must
+        # never activate — the confirmation gate is separate from gate checks
+        st, body = _post(ui, "/api/profiles/apply",
+                         {"kind": "voice", "profile": "en_US-amy-medium",
+                          "dry_run": False, "confirm": False})
+        # confirm:false with the default (already active) -> DENIED because the
+        # backend requires confirmation for the side effect
+        assert body["state"] in ("DENIED", "FAILED", "PARTIAL")
+        assert body["state"] != "OK"
+    finally:
+        ui.stop()
