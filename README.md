@@ -1,4 +1,4 @@
-# OpenClaw Voice Bridge
+# Qubit Voice Agent
 
 > 📘 **Read `docs/VOICE_BRIDGE_SYSTEM.md`** for the full system map, what we
 > cherry-picked from open-source (CopilotKit/AirLLM/OpenSandbox), the roadmap,
@@ -42,17 +42,19 @@ long coding output, and can be interrupted mid-speech — **only by your voice**
 | VAD (Silero v5) | **local, CPU** | neural endpointing, far better than webrtcvad |
 | Voice-ID (eres2net) | **local, CPU** | ~50ms/check; self 0.72-0.96 vs strangers ~0.3 |
 | TTS (piper amy) | **local, CPU** | Kokoro-82M optional (`tts.provider: kokoro`) |
-| Chat (all questions) | **local, GPU, 2.6 GB** | `huihui_ai/llama3.2-abliterate:3b` — uncensored llama3.2:3b, EN/RO only, personal-knowledge.md injected, 24/7 |
+| Chat (all questions) | **local, GPU, ~3 GB** | `qubit-brain4` (Qwen3-4B) — English-only replies, 24/7 resident |
 | Task execution | **your OpenClaw** | only TASKS go here (coding, files, terminal, browser, repos); "ask Hermes" → Hermes CLI |
 | Cloud APIs | **fallback only** | DeepSeek/Perplexity when the local model or gateway is down |
 
 ## Personal knowledge
 
-The bridge reads `~/.config/openclaw-voice-bridge/personal-knowledge.md` (shipped as
-`config/personal-knowledge.md`, installed by `install.sh`) and injects it into every
-chat turn — the local model knows your projects, preferences, and how you want answers.
-Edit the file freely, then `systemctl --user restart openclaw-voice-bridge`. The model
-answers **only in English or Romanian** (EN by default, RO when you write in Romanian).
+The bridge reads `~/.config/qubit-voice-agent/personal-knowledge.md` (shipped as
+`config/personal-knowledge.md`, installed by `install.sh`) and serves it through the
+bounded context compiler (Packet 4B): each chat turn gets a secret-stripped,
+size-capped excerpt of your facts — no whole-file injection and no restart needed,
+since the file is re-read per turn. The model knows your projects, preferences, and
+how you want answers, and replies **only in English** (documented language policy;
+see docs/VOICE_BRIDGE_SYSTEM.md). Nothing personal is baked into the model artifact.
 
 Without the two API keys the bridge still fully works for local chat + all
 OpenClaw task routing; only long/web conversational answers fall back.
@@ -60,8 +62,8 @@ OpenClaw task routing; only long/web conversational answers fall back.
 ## Install on a fresh PC
 
 ```bash
-git clone https://github.com/cgraph-dev/openclaw-voice-bridge.git
-cd openclaw-voice-bridge
+git clone https://github.com/cgraph-dev/qubit-voice-agent.git
+cd qubit-voice-agent
 
 # prereqs (one-time): uv, ollama
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -72,7 +74,7 @@ curl -fsSL https://ollama.com/install.sh | sh      # then: ollama serve
 
 The installer (idempotent) creates the venv, installs deps, downloads the
 models (piper voice, Moonshine ASR, Silero VAD, eres2net voice-ID), pulls
-llama3.2:3b into ollama, and writes `~/.config/openclaw-voice-bridge/voice.yaml`
+llama3.2:3b into ollama, and writes `~/.config/qubit-voice-agent/voice.yaml`
 from `config/voice.example.yaml`.
 
 Optional keys for the cloud paths:
@@ -99,7 +101,7 @@ Auto-start (optional):
 
 ```bash
 ./scripts/install.sh --with-systemd     # renders + enables the user service
-systemctl --user status openclaw-voice-bridge
+systemctl --user status qubit-voice-agent
 ```
 
 Headless / SSH (no X11): `voicebridge run --no-hotkey` and press Enter to
@@ -121,7 +123,7 @@ start/stop capture, or `voicebridge once` for a single utterance.
 
 ## Capabilities (voiced)
 
-The local agent (cripped `qubit-brain` baked model) + the bridge can do these by
+The local agent (`qubit-brain4` model) + the bridge can do these by
 voice, fast and low-resource (no GPU training):
 
 - **Play YouTube / YouTube Music**: `play <song/video> on youtube` resolves the
@@ -170,12 +172,11 @@ what the agent is doing live.
 - **Chat page**: `http://<this-pc-ip>:8890/` — hold/tap the button, speak,
   hear the reply (audio comes back to the phone; the PC speakers stay
   silent unless `webui.speak_web_locally` is on). Same pipeline as the mic:
-  ASR → route → OpenClaw/local → **the local 3B model's ≤40-word summary** → TTS.
-- **Audio on the PC too**: by default a web/dashboard request ALSO speaks the
-  reply through the PC speakers (`webui.speak_web_locally: true` in config), so
-  replies, summaries, and action results (playing a song, a finished report,
-  inbox/research results) are both shown on the dashboard AND spoken aloud.
-  Set it to `false` to keep the phone the only audio output.
+  ASR → route → OpenClaw/local → **the local brain's (qubit-brain4) ≤40-word summary** → TTS.
+- **Audio on the PC (opt-in)**: web/dashboard requests play in the browser once;
+  they also speak through the PC speakers ONLY when `webui.speak_web_locally:
+  true` is explicitly set. The tuned setup keeps it `false` so nothing
+  double-speaks (docs/AUDIO_SETUP.md rule 5).
 - **Activity dashboard**: `http://<this-pc-ip>:8890/activity` — live feed
   of what the agent did: recognized text, routing decision, status, the
   final spoken summary, latency, and (for tool runs) the raw output behind
@@ -200,24 +201,27 @@ CORS is enabled on the bridge so the Vercel origin can call the PC API.
 **Summarize-first workflow (why it feels smart):** recurring tool tasks are
 `local-script` templates — the bridge runs the tool itself (Perplexity
 browser search, graphify graph queries, …), feeds the raw output to the
-LOCAL 3B model (`summarizer.provider: ollama`), and speaks ONLY the summary.
+local ollama model (`summarizer.provider: ollama`, default qubit-brain4), and speaks ONLY the summary.
 The phone/dashboard shows the raw result as reference, but the voice never
 reads it out. Zero API cost, ~0.3s for the compression step.
 
 ## Configuration
 
 Full reference: `config/voice.example.yaml` (installed to
-`~/.config/openclaw-voice-bridge/voice.yaml`). Key knobs:
+`~/.config/qubit-voice-agent/voice.yaml`). Key knobs:
 
 | Key | Default | Meaning |
 |---|---|---|
 | `asr.provider` / `asr.engine` | `sherpa` / `moonshine` | `parakeet` = max English accuracy; `whisper` = old fallback |
 | `vad.backend` | `silero` | `webrtc` fallback |
 | `tts.provider` | `piper` | `kokoro` = quality voice (~1s/reply CPU) |
-| `intent.local_llm.model` | `llama3.2:3b` | local short-turn model (non-thinking!) |
+| `intent.local_llm.model` | `qubit-brain4` | local short-turn model (non-thinking) |
 | `speaker_verify.threshold` | `0.65` | voice-ID strictness (0.7-0.96 self / ~0.3 strangers) |
-| `mic.gain` / `mic.channels` | `1.0` / `2` | tune to YOUR mic (Scarlett+AT2020: `8.0` / `4`) |
+| `mic.gain` / `mic.channels` | `1.0` / `1` | tune to YOUR mic (~3.0 mono suits USB headsets; high gain adds hiss) |
 | `safety.dry_run_first` | `false` | `true` = coding tasks plan first, ask before applying |
+
+Validate configuration any time: `.venv/bin/python scripts/config_doctor.py --static` (offline)
+or `--runtime` (adds typed live probes: Ollama residency, gateway, CDP, isolation, audio).
 
 ## Safety
 
@@ -233,10 +237,10 @@ Full reference: `config/voice.example.yaml` (installed to
 ## Observability
 
 Every turn is logged as structured events to
-`~/.local/state/openclaw-voice-bridge/events.jsonl`:
+`~/.local/state/qubit-voice-agent/events.jsonl`:
 
 ```bash
-tail -f ~/.local/state/openclaw-voice-bridge/events.jsonl | jq -c '{t:.ts, e:.event}'
+tail -f ~/.local/state/qubit-voice-agent/events.jsonl | jq -c '{t:.ts, e:.event}'
 ```
 
 Watch for `mic.utterance`, `asr.transcribe`, `routing.decision`,
@@ -246,7 +250,7 @@ Watch for `mic.utterance`, `asr.transcribe`, `routing.decision`,
 ## Troubleshooting
 
 - **"It doesn't talk back"** — check the SERVICE journal first, not the
-  events file: `journalctl --user -u openclaw-voice-bridge.service -n 50`.
+  events file: `journalctl --user -u qubit-voice-agent.service -n 50`.
   A crash-restart loop looks like silence; the traceback is in the journal.
 - **`vad.silero.unavailable` at startup** — Silero failed to load, you're on
   webrtcvad. Check `silero_vad_v5.onnx` exists under the models dir.
@@ -279,8 +283,8 @@ Watch for `mic.utterance`, `asr.transcribe`, `routing.decision`,
    CPU; on a 4090 you can run the fp32 model GPU-side via a CUDA build of
    sherpa-onnx for ~10× headroom).
 2. **Parakeet-TDT 0.6B v3** — `asr.engine: parakeet` for maximum ASR accuracy.
-3. **Bigger local LLM** — swap `intent.local_llm.model` to `qwen3:14b`-class
-   once VRAM allows (keep it non-thinking).
+3. **Smarter local LLM** — evaluate pinned 4B challengers only via the plan's
+   Phase-4 bake-off gates; never co-load an 8B model on this 8 GB GPU.
 4. **PersonaPlex / realtime duplex** — the bridge's route layer was
    PersonaPlex-ready and the adapter point is preserved; on a 12 GB+ GPU or
    rented box you can re-add the duplex lane without touching the local stack.

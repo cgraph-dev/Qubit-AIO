@@ -1,10 +1,15 @@
-# OpenClaw Voice Bridge — portable example configuration.
-# Install copies this to ~/.config/openclaw-voice-bridge/voice.yaml on a fresh
+# Qubit Voice Agent — portable example configuration.
+# Install copies this to ~/.config/qubit-voice-agent/voice.yaml on a fresh
 # machine (scripts/install.sh). Every value is optional; the bridge has sane
 # defaults. Tune AFTER first boot: mic levels, silence timing, keys.
 #
-# On this machine the tuned copy lives in config/voice.local.yaml (per-machine
-# overrides: Scarlett 4ch, gain, silence_timeout).
+# Per-machine overrides (mic layout, device names, themes) live ONLY in your
+# user config — portable examples never describe specific hardware.
+#
+# Environment overrides use double underscores between levels so keys that
+# contain underscores stay addressable, e.g.
+#   VOICE_BRIDGE__INTENT__LOCAL_LLM__MODEL=qubit-brain4
+# Legacy single-underscore form still works but cannot reach such keys.
 
 # ---------------------------------------------------------------------------
 # Audio output — optionally PIN the TTS to a specific device (e.g. your
@@ -31,9 +36,9 @@ hotkey:
 mic:
   device: null            # null = system default input
   sample_rate: 48000      # device rate; resampled to 16 kHz for ASR
-  channels: 2             # capture N channels, use the loudest
+  channels: 1             # mono input is the norm (USB headsets); use the loudest channel
   blocksize: 480          # ~10 ms at 48 kHz
-  gain: 1.0               # digital pre-amplify (tune to your mic! 4-16 for quiet mics)
+  gain: 1.0               # digital pre-amplify; ~3.0 suits most USB headsets (higher adds hiss)
   min_rms: 0.0008
   max_capture_s: 30.0   # watchdog: force-close a wedged mic stream         # below this RMS the capture counts as silence
 
@@ -94,15 +99,32 @@ tts:
 # Intent routing
 intent:
   llm_classifier: false   # heuristic router only (fast; ambiguous -> conversation)
+  # Packet 4C routing cascade (feature-flagged; default OFF = pre-4C behavior).
+  router:
+    enabled: false        # true = L0 deterministic rules run before the classifier
+    l1_enabled: false     # true = ALSO try CPU semantic matching (nomic-embed-text)
+    embed_model: nomic-embed-text
+  # Packet 5A opt-in Q5 canary (reversible; default OFF).
+  # When ON, scripts/canary_run_4d.py drives the SEPARATE
+  # qubit-cand-q5 alias for latency/error/planner/safety/audio
+  # logging. Never replaces qubit-brain4; flip off to rollback.
+  canary:
+    q5_enabled: false
+  # Packet 5C live integration (default ON; rollback flag).
+  compiler:
+    mode: 5c              # 5c = bounded FTS5 compiler wired
+                          # into chat turns; 4b = old compiler
+    evidence_sources: []  # optional 5A adapter names (bounded)
+    observe: true         # surface omissions/failures to the model
   local_llm:
     enabled: true         # bridge answers ALL chat itself (<0.5s); only tasks -> OpenClaw/Hermes
                           # DeepSeek API handles long/complex/web asks
-    model: huihui_ai/llama3.2-abliterate:3b  # 3B: native Romanian + smaller (2.6GB). phi-4-mini broken at RO
+    model: qubit-brain4  # current default local model (English-only replies)
     url: http://127.0.0.1:11434
     timeout_s: 8.0     # local model chat timeout (was 4s — journal showed real timeouts)
     max_tokens: 100
   conversation_backend: local      # bridge answers ALL chat (<0.5s); only tasks -> OpenClaw/Hermes
-  templates_path: ~/.config/openclaw-voice-bridge/task-templates.yaml  # daily-task templates
+  templates_path: ~/.config/qubit-voice-agent/task-templates.yaml  # daily-task templates
   deepseek_url: https://api.deepseek.com/chat/completions
   deepseek_model: deepseek-v4-flash
   deepseek_env: ~/.hermes/.env     # DEEPSEEK_API_KEY lives here
@@ -157,8 +179,13 @@ safety:
   never_confirm: []             # patterns that skip confirmation
   dry_run_first: false          # true = coding tasks start as dry runs
   spoken_confirmation: true
+  tool_broker: true             # Packet 3A: local actions + script templates run
+                                # through the capability broker (argv-only).
+                                # false = LEGACY DIRECT PATH: UNSECURED ROLLBACK
+                                # ONLY (executions carry no policy decisions) —
+                                # never treat or describe this mode as secured.
 
-# Spoken summaries — the LOCAL 3B model compresses tool output into ≤40 words.
+# Spoken summaries — the local ollama model compresses tool output into ≤40 words.
 # provider: ollama uses the local chat model (fast, ~0.3s, smarter feel);
 # extractive is the no-model fallback (auto-used if ollama is down).
 summarizer:
@@ -173,6 +200,7 @@ summarizer:
 #   http://<this-pc-ip>:8890   (chat)   ·   /activity  (agent dashboard)
 webui:
   enabled: true
+  speak_web_locally: false # browser plays the reply once; keep false to avoid double-speech
   host: 0.0.0.0            # 0.0.0.0 = reachable from the LAN (phone)
   port: 8890
   script_timeout_s: 60     # local-script tools (e.g. Perplexity search) cap
@@ -181,4 +209,4 @@ webui:
 logging:
   level: INFO
   jsonl: true               # structured event journal (observability)
-  jsonl_path: null          # default: ~/.local/state/openclaw-voice-bridge/events.jsonl
+  jsonl_path: null          # default: ~/.local/state/qubit-voice-agent/events.jsonl

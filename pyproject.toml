@@ -1,7 +1,7 @@
 [project]
-name = "openclaw-voice-bridge"
+name = "qubit-voice-agent"
 version = "1.0.0"
-description = "Local push-to-talk voice bridge for OpenClaw: Moonshine ASR, Silero VAD, voice-ID, local LLM, piper TTS — 8 GB GPU safe."
+description = "Qubit Voice Agent — local push-to-talk voice agent: Moonshine ASR, Silero VAD, voice-ID, local LLM, piper TTS — 5 GB VRAM budget."
 requires-python = ">=3.11"
 dependencies = [
     "sherpa-onnx>=1.13",      # Moonshine ASR + Silero VAD + eres2net voice-ID + Kokoro
@@ -12,6 +12,7 @@ dependencies = [
     "piper-tts>=1.2",         # default TTS
     "faster-whisper>=1.1",    # optional ASR fallback (asr.provider: whisper)
     "webrtcvad>=2.0.10",      # optional VAD fallback (vad.backend: webrtc)
+    "onnx>=1.14",             # Parakeet ONNX metadata patcher (scripts/install.sh) + guarded sherpa fallback
     "playwright>=1.49",       # browser inbox reader (Gmail/IG/FB/TikTok via persistent profiles)
 ]
 

@@ -1,4 +1,4 @@
-"""openclaw-voice-bridge: local push-to-talk voice interface for OpenClaw.
+"""qubit-voice-agent: local push-to-talk voice interface for OpenClaw.
 
 Layers:
   audio/    microphone capture, VAD endpointing, playback + interrupt

@@ -13,15 +13,15 @@ set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="$PROJECT_DIR/.venv"
-DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/openclaw-voice-bridge"
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/qubit-voice-agent"
 MODELS="$DATA_DIR/models"
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/openclaw-voice-bridge"
-STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/openclaw-voice-bridge"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/qubit-voice-agent"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/qubit-voice-agent"
 OLLAMA_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
 
 SR="https://github.com/k2-fsa/sherpa-onnx/releases/download"
 
-echo "==> OpenClaw Voice Bridge install"
+echo "==> Qubit Voice Agent install"
 echo "    project : $PROJECT_DIR"
 echo "    models  : $MODELS"
 echo "    config  : $CONFIG_DIR/voice.yaml"
@@ -35,10 +35,10 @@ fi
 echo "==> installing python deps"
 uv pip install --python "$VENV/bin/python" \
   sherpa-onnx sounddevice numpy pyyaml websockets piper-tts \
-  faster-whisper webrtcvad setuptools pynput pytest 2>/dev/null \
+  faster-whisper webrtcvad setuptools pynput pytest playwright edge-tts onnx 2>/dev/null \
   || uv pip install --python "$VENV/bin/python" \
      sherpa-onnx sounddevice numpy pyyaml websockets piper-tts \
-     faster-whisper webrtcvad setuptools pynput pytest
+     faster-whisper webrtcvad setuptools pynput pytest playwright edge-tts onnx
 # webrtcvad needs the legacy pkg_resources API (removed in setuptools 81+)
 "$VENV/bin/python" -m pip install 'setuptools<81' -q 2>/dev/null || true
 
@@ -82,7 +82,12 @@ else
   echo "    have   $PKT"
 fi
 # sherpa 1.13.6 hard-errors without vocab_size/context_size metadata on the
-# decoder/joiner ONNX — patch them in if missing (idempotent).
+# decoder/joiner ONNX — patch them in if missing (idempotent). Requires the
+# optional 'onnx' package; skipping the patch only risks a sherpa load error,
+# never a broken install.
+if ! "$VENV/bin/python" -c 'import onnx' 2>/dev/null; then
+  echo "    [warn] onnx not installed — skipping Parakeet metadata patch"
+else
 "$VENV/bin/python" - "$MODELS/$PKT" <<'PYEOF'
 import sys, onnx
 from pathlib import Path
@@ -105,6 +110,7 @@ for fname in ("decoder.int8.onnx", "joiner.int8.onnx"):
         onnx.save(m, str(p))
         print(f"    patched {fname} metadata (vocab_size={n_tokens}, context_size=1)")
 PYEOF
+fi
 
 # Silero VAD v5 (sherpa-onnx)
 dl "$MODELS/silero_vad_v5.onnx" "$SR/asr-models/silero_vad_v5.onnx"
@@ -176,13 +182,7 @@ fi
 # ------------------------------------------------------------- systemd (opt)
 if [ "${1:-}" = "--with-systemd" ] || [ "${1:-}" = "-s" ]; then
   echo "==> installing systemd user service"
-  mkdir -p "$HOME/.config/systemd/user"
-  sed "s|__PROJECT_DIR__|$PROJECT_DIR|g" \
-    "$PROJECT_DIR/systemd/openclaw-voice-bridge.service" \
-    > "$HOME/.config/systemd/user/openclaw-voice-bridge.service"
-  systemctl --user daemon-reload
-  systemctl --user enable --now openclaw-voice-bridge.service
-  echo "    enabled: systemctl --user status openclaw-voice-bridge"
+  "$PROJECT_DIR/scripts/install_systemd_unit.sh" "$PROJECT_DIR"
 else
   echo
   echo "==> done. Run:"

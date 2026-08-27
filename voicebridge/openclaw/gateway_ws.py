@@ -20,7 +20,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
@@ -111,7 +110,7 @@ class GatewayClient:
             "role": "operator", "scopes": SCOPES,
             "caps": [], "commands": [], "permissions": {},
             "auth": {"token": self.token}, "locale": "en-US",
-            "userAgent": "openclaw-voice-bridge/0.1.0",
+            "userAgent": "qubit-voice-agent/0.1.0",
         }
         await self.ws.send(json.dumps({"type": "req", "id": "connect",
                                        "method": "connect", "params": params}))

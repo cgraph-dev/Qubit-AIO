@@ -189,7 +189,7 @@ def check_static(cfg, results) -> None:
     if not failures and not warns:
         results.append(("deps.declared", PASS, "no undeclared imports"))
 
-    tmpl = REPO / "systemd/openclaw-voice-bridge.service"
+    tmpl = REPO / "systemd/qubit-voice-agent.service"
     installed = Path.home() / ".config/systemd/user/openclaw-voice-bridge.service"
     if not tmpl.exists():
         results.append(("systemd.template", MISSING, "repository template absent"))

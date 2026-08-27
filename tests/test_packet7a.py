@@ -92,8 +92,8 @@ def test_pytest_never_starts_watchdog_or_restarts_service():
     bridge service. Managing a test's OWN transient systemd unit (Packet 3B
     isolation lifecycle) is NOT a service restart and is allowed."""
     forbidden = (
-        # exact bridge-service restart argv: systemctl --user restart openclaw-voice-bridge
-        re.compile(r"[\"']systemctl[\"']\s*,\s*[\"']--user[\"']\s*,\s*[\"']restart[\"']\s*,\s*[\"']openclaw-voice-bridge"),
+        # exact bridge-service restart argv: systemctl --user restart qubit-voice-agent
+        re.compile(r"[\"']systemctl[\"']\s*,\s*[\"']--user[\"']\s*,\s*[\"']restart[\"']\s*,\s*[\"']qubit-voice-agent"),
         # starting the dashboard_stress watchdog with --watch inside a test
         re.compile(r"dashboard_stress[\"']\s*,\s*[\"']--watch[\"']"),
         re.compile(r"dashboard_stress[\"']\s+[\"']?--watch[\"']?"),
@@ -169,7 +169,7 @@ def test_doctor_journal_probe_is_transient(tmp_path, monkeypatch):
 # Deployment template contract
 # ========================================================================
 def test_deployment_template_contract_passes():
-    results = CD.check_deployment(ROOT / "systemd/openclaw-voice-bridge.service")
+    results = CD.check_deployment(ROOT / "systemd/qubit-voice-agent.service")
     assert not any(s == "FAIL" for _, s, _ in results), results
     by = {r[0]: r[1] for r in results}
     assert by["systemd.restart"] == "PASS"

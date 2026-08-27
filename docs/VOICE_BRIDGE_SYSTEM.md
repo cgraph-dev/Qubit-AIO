@@ -10,17 +10,20 @@
 ## 1. What this system IS (current)
 
 A **local, low-resource, English-only voice assistant** bridging your mic to
-agents/browsers/tools. Runs on the RTX 3070 Ti 8 GB + Ryzen 5700X.
+agents/browsers/tools. Runs on the RTX 3070 Ti 8 GB + Ryzen 5700X, with a hard
+whole-agent budget of 5 GB VRAM maximum and a 4 GB steady-state target.
 
 ### The pipeline (each turn)
 ```
 mic (HyperX USB mono) --> 16k WAV
-   -> ASR sherpa parakeet (fallback moonshine) (0.5s, 0 VRAM)
+   -> ASR sherpa parakeet (fallback moonshine) (0.5s, CPU / 0 VRAM)
    -> [if empty: cached fallback]
    -> classifier (heuristic + optional LLM)
    -> route (local | openclaw | hermes | browser | coding | conversation)
-   -> local model qubit-brain (3.6B, resident) answers chat (~0.5s)
-   -> TTS piper en_US-amy (22050Hz) -> resample -> default sink (HyperX IEC958)
+   -> local model qubit-brain4 (Qwen3-4B sanitized artifact, resident)
+      answers chat (~0.5s warm; personal facts served per-turn by the
+      bounded context compiler — Packet 4B)
+   -> TTS piper en_US-amy (CPU, 22050Hz) -> resample -> default sink (HyperX IEC958)
 ```
 
 ### Key files
@@ -36,7 +39,8 @@ mic (HyperX USB mono) --> 16k WAV
 | `voicebridge/webui.py` | dashboard server + REST API |
 | `scripts/browser_auto.py` | read/scrape/open Chromium tabs (CDP) |
 | `scripts/generate_report.py` | deterministic rich reports |
-| `Modelfile.qubit` → `qubit-brain` | the baked identity/behavior/model |
+| `Modelfile.qubit` → `qubit-brain` | LEGACY 3B artifact (superseded; kept for rollback history) |
+| `Modelfile.qubit4` → `qubit-brain4` | sanitized 4B persona (Packet 4B): no private data baked |
 
 ### Health / watching it
 - `qubit-dev` terminal: `/status`, `/health` (status + recent errors + timing),
@@ -46,9 +50,16 @@ mic (HyperX USB mono) --> 16k WAV
 ---
 
 ## 2. Language & mic (current decisions)
-- **English only.** All Romanian removed (TTS voice, ASR multilingual tier, RO
-  detector, dialogs, baked rule). A reply-guard retries if the model drifts out
-  of English.
+- **English only — THE single language policy** (decided Packet 0B; this file is
+  its authoritative statement): replies are English-only regardless of input
+  language; Romanian/mixed input is understood and answered in English; the
+  reply-guard retries if the model drifts out of English.
+  Resolved in Packet 4B: the baked Modelfile.qubit4 memory blocks (which
+  contained EN+RO rules) were REMOVED — the artifact is now a minimal English
+  persona and personal facts reach the model only through the bounded context
+  compiler reading user-local personal-knowledge.md per turn. Remaining known
+  disagreement (tracked incomplete work): cloud-path prompts in orchestrator
+  DeepSeek/Perplexity builders still say 'reply in the user's language'.
 - **Mic = HyperX Cloud III (USB, mono).** `mic.channels: 1` (it's mono; the
   unplugged Scarlett needed 4). `mic.gain: 3.0` + a peak-normalizer (clip to
   ~0.35 before ASR) so a quiet/variable mic transcribes consistently.
@@ -91,10 +102,68 @@ mic (HyperX USB mono) --> 16k WAV
 
 ---
 
+## 3b. Capability broker (Packet 3A) — CURRENT BEHAVIOR
+
+Every voice-dispatched execution now carries a recorded policy Decision from
+one shared capability registry (`voicebridge/broker.py`):
+
+- **Host tools**: all whitelisted local actions are registered as
+  `local.<name>` capabilities with tier, side-effect declaration, timeout,
+  scalar input schema, preview/dry-run, cancellation id, and redacted audit
+  events. `empty_trash` is DESTRUCTIVE and requires the spoken two-step
+  confirmation; its broker confirmation id is single-use and target-bound.
+- **Script templates**: `local-script` templates register as `script.<slug>`
+  argv capabilities at load time. The script line is tokenized once with
+  shlex into a fixed argv skeleton ({question}/{text} become whole argv
+  elements); shell metacharacters outside quotes fail registration. No
+  shell string from any source is ever executed by the broker.
+- **Workers**: OpenClaw/Hermes dispatch shares the SAME engine/store via
+  `WorkerGuard(cfg, engine=broker.engine)`; worker executions emit
+  `worker.exec.start/finish` audit events with correlation ids.
+- **Fail-closed denials**: unknown tool, malformed args, out-of-scope,
+  replayed/expired/target-mismatched confirmations, model/automation sources
+  carrying approvals.
+- Config: `safety.tool_broker: true` (default). `false` selects the legacy
+  direct execution path for local actions/scripts — an UNSECURED ROLLBACK
+  mode in which executions carry NO policy decisions; it must never be
+  treated or described as secured.
+- NOT yet security isolation: Bubblewrap/systemd untrusted isolation is
+  Packet 3B. Operator-run shells, `terminal.py`, manual script invocations,
+  and systemd timers remain outside the broker; no whole-PC security claim
+  is made (DEFERRED-005).
+
+---
+
+## 3c. Isolated execution (Packet 3B) — CURRENT BEHAVIOR
+
+`voicebridge/isolated.py` (OpenSandbox-adapted, see UPSTREAM_REUSE.md R3):
+
+- **Startup probe**: bwrap version + namespace smoke test + user-systemd
+  capability, cached per process; any failure is a typed
+  `ISOLATION_UNAVAILABLE` — untrusted code NEVER falls back to host exec.
+- **Workload sandbox**: argv-only specs (no shell strings), network-none,
+  private /proc, minimal filesystem (/usr ro + workspace rw + tmpfs),
+  clearenv with allowlist and secret-shaped env deny, realpath resolution
+  with symlink-escape rejection.
+- **Per-run unit**: each run lives in its own `vb-iso-<id>.service`
+  user-systemd transient unit with MemoryMax/TasksMax/CPUQuota — outside the
+  bridge cgroup; cgroup evidence via /proc/<pid>/cgroup.
+- **Lifecycle**: pending → starting → running (⇄ paused) → stopping →
+  terminated/failed with upstream terminal reason codes (`user_delete`,
+  `ttl_expiry`, `runtime_error`, `provision_timeout`; local `invalid_spec`);
+  bounded idempotent stop; TTL expiry; no orphan processes after cancel,
+  timeout, or crash.
+- **Wiring status**: consumed by tests and the doctor's typed probe row;
+  production dispatch wiring awaits a real untrusted-code path (PLANNED —
+  same deliberate-unwired precedent as Packets 1A/2A).
+
+---
+
 ## 4. What we DIDN'T take (and why)
+
 - **CopilotKit full framework**: huge React/state layer — overkill; our dashboard
   is a lean static page. We cherry-picked the *learning loop* idea only.
-- **AirLLM runtime**: our 3B is tiny + resident; layer-streaming is for running
+- **AirLLM runtime**: our 4B is small + resident; layer-streaming is for running
   huge models slowly. Wrong trade for low-latency voice.
 - **OpenSandbox Docker/K8 sandboxes**: heavy VM overhead per call; our tool calls
   are local + whitelisted.
@@ -115,9 +184,9 @@ mic (HyperX USB mono) --> 16k WAV
    conflicting rows (avoid oscillating lessons).
 
 ### Medium
-5. **Bigger model quality tier** (AirLLM idea): when GPU is free and the task is
-   hard, `normal/turbo` tiers could use a larger resident model (e.g. Qwen3-8B
-   Q4) that AirLLM-style compression fits in 8GB — better answers, still fast.
+5. **Bigger model quality tier** (AirLLM idea): only evaluate a larger tier if
+   the complete agent remains under the 5 GB VRAM hard cap; no 8B co-resident
+   model is currently allowed.
 6. **Inbox/report enhancements**: richer per-account tab reads (multi inbox),
    auto-route "check my {platform}" to the right review script with the handle.
 7. **Sandboxed script execution** (OpenSandbox idea): run generated code in a
@@ -132,7 +201,7 @@ mic (HyperX USB mono) --> 16k WAV
 ---
 
 ## 6. Config reference (live, tuned)
-Provided in `~/.config/openclaw-voice-bridge/voice.yaml` + defaults in
+Provided in `~/.config/qubit-voice-agent/voice.yaml` + defaults in
 `config/voice.yaml` + `voicebridge/config.py` (read the file for exact values).
 
 ---
@@ -148,10 +217,11 @@ state-machine proofs.
 
 ---
 ## 8. The one "bigger" idea we keep circling
-**A smarter local model without losing speed.** The 3B is fast (~0.5s) but not
-deep. AirLLM shows you can run a **7-8B Q4 on 8GB**. Plan:
-- Load `Qwen3-8B` (Q4) resident on the GPU for `hard/pro` tier and hard questions.
-- Keep the 3B as the fast default chit-chat model.
-- Route by complexity (heuristic + feedback), keep `keep_alive -1`.
-- Validate on your box: measure tokens/s + VRAM before switching the default.
+**A smarter local model without losing speed.** brain4 is fast warm but has
+quality ceilings. An 8B cannot be co-resident under the 5 GB whole-agent
+budget, so per
+docs/UNIFIED_AGENT_PLAN.md Phase 4 the path is: benchmark PINNED official
+Qwen3-4B challengers under one runner contract, keep candidate aliases
+separate, and switch defaults only after held-out quality + latency + VRAM
+gates pass. No second resident model, no in-place alias swaps.
 This is the highest-leverage "make it much smarter" improvement available.

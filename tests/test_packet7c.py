@@ -28,7 +28,7 @@ from voicebridge import distribution as D  # noqa: E402
 # ========================================================================
 def test_manifest_versioned_and_platform_explicit():
     m = D.manifest()
-    assert m["name"] == "openclaw-voice-bridge"
+    assert m["name"] == "qubit-voice-agent"
     assert m["version"] == "1.0.0"
     assert m["target"]["os"] == "ubuntu"
     assert "x86_64" in m["target"]["arches"]

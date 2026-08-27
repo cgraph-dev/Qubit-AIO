@@ -249,7 +249,9 @@ def test_branding_plan_dry_run_is_read_only(tmp_path):
 def _staged_repo(tmp_path: Path) -> Path:
     """Copy only the branding-relevant repository files into tmp so branding
     can be applied + rolled back hermetically without touching the real tree
-    or the developer's browser state."""
+    or the developer's browser state. The staged copy is normalized to the
+    PRE-branding identity (openclaw-voice-bridge) so the apply/verify/rollback
+    transition is always exercised regardless of the live repo's state."""
     import shutil
     dest = tmp_path / "staged-repo"
     dest.mkdir()
@@ -269,6 +271,22 @@ def _staged_repo(tmp_path: Path) -> Path:
                 shutil.copy2(p, dst / relp)
             except OSError:
                 continue
+    # normalize to the pre-branding identity so the transition is observable
+    for p in dest.rglob("*"):
+        if p.is_file() and p.suffix in (".toml", ".md", ".yaml", ".sh", ".service"):
+            try:
+                text = p.read_text()
+            except OSError:
+                continue
+            text = text.replace("qubit-voice-agent", "openclaw-voice-bridge")
+            text = text.replace("qubit_voice_agent", "openclaw_voice_bridge")
+            p.write_text(text)
+    # restore the pre-branding systemd unit FILENAME (the edit rules target the
+    # old-named template; apply renames it to qubit-voice-agent.service)
+    new_unit = dest / "systemd" / "qubit-voice-agent.service"
+    old_unit = dest / "systemd" / "openclaw-voice-bridge.service"
+    if new_unit.exists() and not old_unit.exists():
+        new_unit.rename(old_unit)
     return dest
 
 
@@ -285,7 +303,7 @@ def test_branding_apply_migrates_repo_and_verify_returns_verified(tmp_path):
     # the systemd unit was renamed to the new identifier
     new_unit = repo / "systemd" / "qubit-voice-agent.service"
     assert new_unit.exists()
-    assert "qubit-voice-agent" in new_unit.read_text()
+    assert "Qubit Voice Agent" in new_unit.read_text()
     assert not (repo / "systemd" / "openclaw-voice-bridge.service").exists()
     # verify returns VERIFIED (not PLANNED) after the migration
     v = P.branding_verify(cfg, repo=repo)
@@ -411,7 +429,9 @@ def test_cli_branding_commands(tmp_path, capsys):
     rc = cli(["branding", "plan", "--config", str(cfg_path)])
     assert rc == 0
     rc = cli(["branding", "verify", "--config", str(cfg_path)])
-    assert rc == 1  # not verified (PLANNED) -> exit 1
+    # the LIVE repo is branded -> VERIFIED (rc 0). The staged-repo section
+    # below exercises the actual pre->post transition hermetically.
+    assert rc == 0
     capsys.readouterr()
     # apply + rollback against a staged repo copy (never the real tree)
     repo = _staged_repo(tmp_path)

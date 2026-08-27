@@ -101,17 +101,23 @@ migration** (not incidental cleanup):
   an **explicit separate step** (`--migrate-paths`): it moves the content to
   the new path and creates a compat alias, and is never triggered by a repo
   apply or a staged test.
+- **Applied 2026-08-27**: the LIVE repository is now branded (`branding verify`
+  returns **VERIFIED**, 9/9 files) with a complete timestamped backup under
+  `packet7d-branding-backup-20260827-174709/` (repo.bundle, worktree tar, and
+  runtime config/state/data). The migration was run WITHOUT `--migrate-paths`,
+  so the **running bridge and its user config/state remain at
+  `openclaw-voice-bridge`** (`~/.config/openclaw-voice-bridge`,
+  `~/.local/state/openclaw-voice-bridge`, installed unit
+  `openclaw-voice-bridge.service`). The product identity (package name, repo
+  systemd template `systemd/qubit-voice-agent.service`, launchers, docs)
+  now says `qubit-voice-agent`; the live runtime paths are the documented
+  pre-migration compatibility location and were NOT moved. To move the runtime
+  to the new paths, run `branding plan --apply --migrate-paths` as a separate,
+  explicitly authorized step (backed up and reversible).
 - `branding verify` scans every file and path and returns **VERIFIED** when all
   references agree on `qubit-voice-agent`, **PARTIAL** when some remain, or
-  **PLANNED** when none are migrated (read-only; exit 0 only when VERIFIED). On
-  the LIVE repository it returns **PARTIAL with an explicit `limitation`
-  field** documenting that the migration is implemented and verified on a
-  staged repo, but the live tree is intentionally kept on
-  `openclaw-voice-bridge` because applying would rename the package, systemd
-  unit, launchers, config template, and runtime paths the running bridge
-  depends on. That operator action (`branding plan --apply --backup-dir`) is
-  the required step to move 7D branding to VERIFIED — this is a documented
-  limitation, not a silent pass.
+  **PLANNED** when none are migrated (read-only; exit 0 only when VERIFIED).
+  After the 2026-08-27 apply it returns **VERIFIED** on the live repo.
 - `branding rollback --backup-dir <dir>` restores every backed-up repo file
   and runtime config/state/data, renames the unit back, and removes compat
   aliases.
