@@ -1046,3 +1046,48 @@ no-demo/no-frontend-state assertions. Full suite 809 passed / 0 failed /
 Rollback: revert this commit; the 7D code remains additive and reversible.
 `.profile.*.bak` backups and branding backup dirs preserve prior
 config/state; live config/state/data are untouched by all commands.
+
+## MIG-022 — Scarlett 2i2 + AT2020 audio reconfigure (2026-08-27)
+
+Status: **IMPLEMENTED** — live user config + repository code/docs updated to the
+currently connected Focusrite Scarlett 2i2 4th Gen with an Audio-Technica
+AT2020 XLR condenser. Authorized explicitly by the user; the bridge service was
+restarted.
+
+Decision:
+- **Effective config** (`~/.config/openclaw-voice-bridge/voice.yaml`, user-local,
+  not committed): `mic.device_name: 'Scarlett 2i2 4th Gen: USB Audio'`
+  (stable name, never a transient PortAudio index; `mic.device: null`),
+  `mic.channels: 1` (mono, loudest channel = XLR input 1), `mic.gain: 3.0`,
+  empty `audio.output_device*` (follow the Scarlett iec958 default sink).
+- **Pulse default source** pinned to
+  `alsa_input.usb-Focusrite_Scarlett_2i2_4th_Gen_...analog-surround-40` so the
+  bridge capture (pulse aggregate) routes to the AT2020 input.
+- **Pin matching fix** (`voicebridge/audio/mic.py`):
+  `pin_pulse_default_source` now matches the stored PortAudio display name
+  ("Scarlett 2i2 4th Gen: USB Audio") to the pactl source name
+  ("..._Scarlett_2i2_4th_Gen_...") via case/space/underscore/punctuation-
+  insensitive token comparison, ignoring generic words (audio/usb/analog/...).
+  This restores startup re-pinning for the new hardware.
+- **Scarlett gain**: the Scarlett "Line In 1 Gain" hardware control was raised
+  to 62/70 (≈61 dB) so the AT2020 level peaks healthily (captured peak ~0.05).
+  48V phantom power is a physical front-panel switch on the Scarlett and cannot
+  be toggled by software; it must be enabled by hand for the AT2020.
+- **Docs**: `docs/AUDIO_SETUP.md` rewritten HyperX → Scarlett 2i2 + AT2020
+  (hardware, live config, critical rules, gain/48V guidance, pinning commands).
+
+Tests: `tests/test_mic_resolve.py` (6) — includes a new Scarlett
+PortAudio-name→pactl-name pin regression; `tests/test_packet7c_audio.py` +
+`tests/test_packet7d.py` (84 combined) green; full suite 810 passed / 0 failed /
+0 skipped. Config doctor `--runtime`/`--reconcile` report audio combo OK (mono
+mic, sane gain, empty output pins) with 12 devices enumerated.
+
+Verification (live): bridge restarted and active; `mic.pin_source` = the Scarlett
+source; ZERO capture/timeout/playback errors in the event journal since restart;
+a real 2-channel capture shows the AT2020 signal on input 1 (ch1 peak ~0.05,
+ch2 silent); ASR pipeline runs (parakeet/CPU) and returned empty only for a
+silent test clip (a spoken PTT clip is required from a human for a final WER).
+
+Rollback: revert this commit (restores mic.py + docs); restore the user config
+`device_name` to the previous value and `pactl set-default-source` to the prior
+source. The Scarlett gain change is a hardware control, reversible with `amixer`.

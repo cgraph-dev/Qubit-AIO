@@ -5,49 +5,69 @@
 > audio/mic/TTS setting. It took many hours to stabilise — do not reinvent it.
 
 ## Hardware (currently connected)
-- **Mic**: HyperX Cloud III headset — **USB, MONO** (its own USB audio device).
-  The Focusrite Scarlett 2i2 / AT2020 are **unplugged**.
-- **Output**: HyperX Cloud III **USB digital (iec958)** — same sink the browser
-  (YouTube) uses, so the agent + browser audio stay on the same device.
+- **Mic**: **Focusrite Scarlett 2i2 4th Gen** USB interface into **AT2020
+  (Audio-Technica) XLR condenser microphone**. The AT2020 needs **48V phantom
+  power** enabled on the Scarlett (the front panel 48V switch) and the
+  Scarlett's hardware gain knob set so spoken speech peaks healthily without
+  clipping. The AT2020 is analog XLR, so it does NOT appear as its own device
+  — it arrives as the Scarlett's USB input.
+- **Output**: **Scarlett 2i2 4th Gen** USB digital (iec958) — the same sink the
+  browser (YouTube) uses, so the agent + browser audio stay on the same device.
+- The **HyperX Cloud III headset** is no longer the active input; the effective
+  config now pins the Scarlett by stable name.
 
 ## The live config — `~/.config/openclaw-voice-bridge/voice.yaml`
 ```yaml
 mic:
-  device: null        # system default = HyperX mono mic
+  device: null              # never a transient PortAudio index
+  device_name: 'Scarlett 2i2 4th Gen: USB Audio'   # stable name pin (Packet 7C)
   sample_rate: 48000
-  channels: 1         # HyperX is MONO (was 4 for the unplugged Scarlett)
+  channels: 1               # capture the loudest channel (XLR on input 1)
   blocksize: 480
-  gain: 3.0
+  gain: 3.0                 # digital pre-amplify; hardware gain does the rest
   min_rms: 0.0005
-  normalize_target: 0.35   # peak-normalize clip to 0.35 before ASR (stable for quiet mic)
+  normalize_target: 0.35    # peak-normalize clip to 0.35 before ASR
 
 audio:
-  output_device: ""        # EMPTY = follow the working default sink (do NOT hardcode an index)
-  output_device_name: ""   # EMPTY = follow default (HyperX iec958)
+  output_device: ""         # EMPTY = follow the working default sink (do NOT hardcode an index)
+  output_device_name: ""    # EMPTY = follow default (Scarlett iec958)
   output_volume: 100
+```
+
+To (re)pin the microphone by stable name (never by index):
+```
+voicebridge audio select mic "Scarlett 2i2 4th Gen: USB Audio"
+voicebridge audio status
+systemctl --user restart openclaw-voice-bridge.service
 ```
 
 ## Critical rules (do NOT break)
 1. **`audio.output_device` / `output_device_name` must stay EMPTY.** Device
    indices shift on every reconnect; pinning an index is what caused "I can't
-   hear the agent." The bridge follows the default sink (HyperX) — same as
-   YouTube — so it always matches where the browser plays.
-2. **`mic.channels: 1`** (mono). Setting 4 breaks capture (that was for the
-   Scarlett).
-3. **`mic.gain: 3.0`** — too high (8x+) amplifies hiss → ASR returns empty.
+   hear the agent." The resolver (2026-08-23) follows the **system default
+   sink** when nothing is pinned, and NEVER guesses a device when a pinned
+   name matches nothing — guessing once routed beeps+TTS to the silent ALC892
+   line-out instead of the real sink, which made PTT look dead while the web
+   dashboard (browser audio) worked fine.
+2. **`mic.channels: 1`** (mono). The bridge captures the loudest channel, so
+   the XLR AT2020 on input 1 arrives cleanly. Do not set 4.
+3. **The Scarlett hardware gain + 48V phantom** are the source of a healthy
+   AT2020 signal: enable 48V (XLR condenser needs it), set the input gain so
+   normal speech peaks without clipping, and keep `mic.gain: 3.0` as a modest
+   digital pre-amp. Too high (8x+) amplifies hiss → ASR returns empty.
 4. **The bridge peak-normalizes** the clip (`normalize_target: 0.35`) so a quiet
    mic transcribes reliably — do not remove it.
 5. **`webui.speak_web_locally: false`** — the **browser plays the reply once**
    (audio_b64). Keep it false so it doesn't double-speak on the PC. Voice/PTT
    (Right Ctrl) speaks via the normal path, once.
-6. **Output `swap` on unplug**: after unplugging the Scarlett, audio "came back"
-   when the HyperX digital profile was active. If audio stops, check
-   `pactl get-default-sink` = HyperX + run `scripts/diagnose_audio_usb.py`.
+6. **Output `swap` on unplug**: after swapping interfaces, audio "came back"
+   when the active digital profile was set. If audio stops, check
+   `pactl get-default-sink` = Scarlett and run `scripts/diagnose_audio_usb.py`.
 
 ## USB port speed (the silent killer)
 Audio USB devices on a **USB 1.1 (12M) full-speed port** FREEZE the moment a
-stream opens (mic capture, playback, browser). We hit this with the HyperX until
-it was moved to a fast (480M USB2/USB3) port. Detect it:
+stream opens (mic capture, playback, browser). We hit this until the interface
+was moved to a fast (480M USB2/USB3) port. Detect it:
 ```
 python scripts/diagnose_audio_usb.py
 ```
@@ -62,4 +82,5 @@ playing; if it ever sounds pitch-shifted/robotic, a wrong sample rate is the cau
 - Repo: `~/Projects/Repos/openclaw-voice-bridge`
 - Playback + device resolution: `voicebridge/audio/playback.py`
 - Mic capture + normalize: `voicebridge/audio/mic.py`
+- Stable audio settings contract: `voicebridge/audio/settings.py`
 - Bridge rebuild: `systemctl --user restart openclaw-voice-bridge`

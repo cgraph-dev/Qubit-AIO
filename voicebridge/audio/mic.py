@@ -38,6 +38,113 @@ class CaptureResult:
     peak_rms: float = 0.0
 
 
+def pin_pulse_default_source(device_name: str | None) -> str | None:
+    """Pin the Pulse default SOURCE to the configured mic name.
+
+    The capture path opens the ``pulse``/default aggregate, which routes to
+    Pulse's default source. If that default source drifts (monitor, dead
+    codec, another app) capture yields zeros or a device error. Bounded,
+    non-fatal; returns the matched Pulse source name or None. Requires
+    ``pactl`` (standard on PipeWire/Pulse desktops); failure is a no-op so
+    the bridge keeps running (typed DEGRADED, never a crash).
+    """
+    if not device_name:
+        return None
+    try:
+        import subprocess
+        import re as _re
+        src = subprocess.run(["pactl", "list", "sources", "short"],
+                             capture_output=True, text=True, timeout=6)
+        if src.returncode != 0:
+            return None
+        # Normalize both sides so PortAudio display names ("Scarlett 2i2 4th
+        # Gen: USB Audio") match pactl names ("..._Scarlett_2i2_4th_Gen_..."):
+        # case/space/underscore/punctuation-insensitive token comparison.
+        # Generic device words are ignored so only the identifying tokens must
+        # match (the pactl name usually drops "audio"/"usb" as a literal word).
+        _GENERIC = {"audio", "usb", "digital", "analog", "input", "output",
+                    "monitor", "capture", "device", "interface", "usbaudio",
+                    "multichannel"}
+        want_tokens = [t for t in _re.split(r"[\s_:.-]+", device_name.lower())
+                       if t and t not in _GENERIC]
+        match = None
+        for line in src.stdout.splitlines():
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+            name = parts[1]   # column 0 is the numeric source index
+            # ONLY input sources: monitors are alsa_output.*.monitor loopbacks
+            # (the output monitor sorts BEFORE its input source and
+            # delivers pure zeros to the capture path).
+            if not name.startswith("alsa_input."):
+                continue
+            have = _re.split(r"[\s_:.-]+", name.lower())
+            have = [t for t in have if t]
+            # every significant token of the configured name must appear in
+            # the pactl source name (order-insensitive, punctuation-insensitive)
+            if all(t in have for t in want_tokens):
+                match = name
+                break
+        if not match:
+            return None
+        cur = subprocess.run(["pactl", "info"], capture_output=True,
+                             text=True, timeout=6)
+        if match not in (cur.stdout or ""):
+            subprocess.run(["pactl", "set-default-source", match],
+                           capture_output=True, timeout=6)
+        return match
+    except Exception:
+        return None
+
+
+def resolve_input_device(name: str | None) -> int | None:
+    """Resolve a mic by (sub)string to a sounddevice input index.
+
+    The system default INPUT can silently point at a monitor/loopback or the
+    dead motherboard codec after device churn — capture then yields pure zeros
+    while the browser (which picks its own device) works fine. Pinning by name
+    fixes it the same way playback.device_name does for output.
+
+    Packet 5C/release fix: NEVER return a raw ALSA ``(hw:N,M)`` index for a
+    Pulse-managed USB mic. On PipeWire/Pulse systems those raw indices fail
+    to open via PortAudio with -9993/-9985 ("Illegal combination of I/O
+    devices" / "Device unavailable") even though the SAME device works
+    perfectly through the ``pulse``/``default`` aggregate. Resolution here
+    therefore prefers the stable ``pulse`` aggregate and falls back to the
+    default source (None) when only a raw hw device matches.
+    """
+    if not name:
+        return None
+    try:
+        import sounddevice as _sd
+        devs = _sd.query_devices()
+        needle = name.lower()
+        # Does the name match any PHYSICAL (raw ALSA hw) input? If so this is
+        # a Pulse-managed device whose raw index is not openable via
+        # PortAudio; route capture through the stable aggregate instead.
+        raw_hit = any(
+            needle in d["name"].lower() and "(hw:" in d["name"]
+            and d["max_input_channels"] > 0
+            for d in devs)
+        if raw_hit:
+            for i, d in enumerate(devs):
+                if d["name"].lower() == "pulse" and d["max_input_channels"] > 0:
+                    return i
+            for i, d in enumerate(devs):
+                if d["name"].lower() in ("pipewire", "default") \
+                        and d["max_input_channels"] > 0:
+                    return i
+            # only raw hw available -> fall back to the default source
+            return None
+        for i, d in enumerate(devs):
+            if (needle in d["name"].lower()
+                    and d["max_input_channels"] > 0):
+                return i
+    except Exception:
+        pass
+    return None
+
+
 class MicCapture:
     def __init__(self, device: Optional[int] = None, sample_rate: int = 48000,
                  channels: int = 2, blocksize: int = 480,
