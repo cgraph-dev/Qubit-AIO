@@ -911,3 +911,42 @@ distributable manifest + external install/launch, CLI. Full suite 762 passed /
 Rollback: revert the remediation commit; restore `mic.device_name` default if
 present. No pre-existing state is altered; audio `.bak` backups and pre-restore
 backups preserve prior config/state.
+
+## MIG-019 — Packet 7C audio-identifier audit fix (2026-08-27)
+
+Status: **IMPLEMENTED** — normalized stable identifiers only; no user config,
+service, timer, model, browser, or audio state is modified by any command.
+
+Decision:
+- **Normalize device identities.** `voicebridge/audio/settings.py` now builds
+  every stable identifier (`role:name:backend`) from a NORMALIZED name:
+  raw ALSA `(hw:N,M)` suffixes and naked `hw:N,M` tokens are stripped, bare
+  numeric PortAudio indices are never a name, and trailing separators are
+  trimmed. `raw_name`/`index` remain as report-only diagnostic fields and are
+  never exposed by the CLI/JSON (`audio list --json` returns only stable
+  fields) or persisted.
+- **Persist-time guard.** `write_audio_config` rejects any value containing an
+  `hw:` path or a numeric index (`InvalidSelectionError`) before writing;
+  legacy numeric index keys are cleared.
+- **Matching.** `_match` matches by full stable id, name (exact/substring),
+  role-prefixed name (`input:pulse`), or a full `role:name:backend` id; a bare
+  backend name (`ALSA`) is a last-resort identity match so it never shadows an
+  explicit device name. Numeric selectors never match.
+- **Kept behaviors.** OS defaults on first run, explicit selection, explicit
+  reset-to-default, MISSING (no silent fallback) when a selected device
+  disappears, HyperX mono mic + empty output pins, and no service restart or
+  recording during settings changes.
+
+Rationale: the 7C verifier found raw ALSA `(hw:N,M)` paths leaking into the
+stable identifier and persisted config. Normalizing at the source and guarding
+the write makes the contract stable and auditable.
+
+Tests: `tests/test_packet7c_audio.py` (33) — stable-id/name normalization,
+persisted-config and stable-ID audit (no `(hw:`, `hw:`, numeric index),
+selection by name/substring/stable-id/backend, hw-path and numeric selector
+rejection, reset, persistence, hot-plug, permission, no-restart/no-recording.
+Full suite 765 passed / 0 failed / 0 skipped.
+
+Rollback: revert this commit; restore the pre-normalization
+`voicebridge/audio/settings.py`. Audio `.bak` backups preserve prior config;
+no state data is altered.

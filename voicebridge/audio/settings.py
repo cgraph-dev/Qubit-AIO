@@ -22,6 +22,7 @@ driven through ``sounddevice.query_devices`` so it can be stubbed.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import tempfile
 import time
@@ -38,6 +39,13 @@ MIC_LEGACY_INDEX_KEY = ("mic", "device")
 OUTPUT_NAME_KEY = ("audio", "output_device_name")
 OUTPUT_LEGACY_INDEX_KEY = ("audio", "output_device")
 
+# Raw ALSA path fragments that must NEVER survive as a stable identifier:
+# "(hw:1,0)", "hw:1,0", or a bare transient numeric index.
+_HW_PATH_RE = re.compile(r"\(\s*hw:\d+,\s*\d+\s*\)")
+_HW_NAKED_RE = re.compile(r"(^|\s)hw:\d+,\s*\d+")
+_TRAILING_SEP_RE = re.compile(r"[\s:]+$")
+_NUMERIC_ONLY_RE = re.compile(r"^\d+$")
+
 
 class AudioSettingsError(Exception):
     pass
@@ -52,21 +60,55 @@ _UNSET = object()   # "leave this side untouched" sentinel (vs None = clear)
 
 @dataclass
 class DeviceInfo:
-    """One enumerable audio device. ``stable_id`` is role+name (never index)."""
+    """One enumerable audio device. ``stable_id`` is role+name+backend built
+    ONLY from the NORMALIZED name — never a raw ALSA (hw:N,M) path and never a
+    transient PortAudio index. ``raw_name``/``index`` are report-only fields
+    for diagnostics and are never persisted or used for matching/selection."""
 
-    name: str
-    role: str                 # "input" | "output" | "duplex"
-    backend: str              # hostapi name, e.g. "MME", "ALSA", "Pulse"
+    name: str                      # normalized stable name (no hw path, no index)
+    role: str                      # "input" | "output" | "duplex"
+    backend: str                   # hostapi name, e.g. "MME", "ALSA", "Pulse"
     channels: int
     default_samplerate: int
     is_default: bool
     stable_id: str = ""
-    index: Optional[int] = None   # present for the report only; never persisted
+    raw_name: str = ""             # report-only; never a stable identifier
+    index: Optional[int] = None    # report-only; never persisted or selected
     state: str = OK
 
     def __post_init__(self) -> None:
         if not self.stable_id:
-            self.stable_id = f"{self.role}:{self.name}"
+            self.stable_id = f"{self.role}:{self.name}:{self.backend}"
+
+
+def normalize_device_name(raw: Optional[str]) -> str:
+    """Turn a raw sounddevice name into a stable, friendly identifier that
+    NEVER contains a raw ALSA ``(hw:N,M)`` path, a naked ``hw:N,M`` token, or a
+    transient numeric index. Approved aggregate identities (``pulse``,
+    ``pipewire``, ``default``) pass through unchanged."""
+    if not raw:
+        return ""
+    name = str(raw)
+    name = _HW_PATH_RE.sub("", name)        # drop "(hw:1,0)" suffixes
+    name = _HW_NAKED_RE.sub("", name)       # drop bare "hw:1,0" tokens
+    name = _TRAILING_SEP_RE.sub("", name).strip()   # trailing " :" leftovers
+    name = re.sub(r"\s{2,}", " ", name).strip()
+    if _NUMERIC_ONLY_RE.match(name or ""):
+        return ""                           # a bare index is not a name
+    return name
+
+
+def is_clean_identifier(name: Optional[str]) -> bool:
+    """True when a name/selector is a stable identifier: no hw path, no
+    numeric index."""
+    if not name:
+        return True
+    s = str(name).strip()
+    if _NUMERIC_ONLY_RE.match(s):
+        return False
+    if _HW_PATH_RE.search(s) or _HW_NAKED_RE.search(s):
+        return False
+    return True
 
 
 def _query_devices() -> Tuple[List[Dict[str, Any]], Dict[int, str], Tuple[Any, Any]]:
@@ -88,7 +130,8 @@ def _query_devices() -> Tuple[List[Dict[str, Any]], Dict[int, str], Tuple[Any, A
 
 def _device_info(dev: Dict[str, Any], index: int, role: str,
                  is_default: bool, backend: str) -> DeviceInfo:
-    name = str(dev.get("name") or f"device-{index}")
+    raw_name = str(dev.get("name") or f"device-{index}")
+    name = normalize_device_name(raw_name) or backend or f"device-{index}"
     return DeviceInfo(
         name=name,
         role=role,
@@ -96,6 +139,7 @@ def _device_info(dev: Dict[str, Any], index: int, role: str,
         channels=int(dev.get(f"max_{role}_channels") or 0),
         default_samplerate=int(dev.get("default_samplerate") or 0),
         is_default=is_default,
+        raw_name=raw_name,
         index=index,
     )
 
@@ -127,8 +171,11 @@ def list_devices() -> Dict[str, List[DeviceInfo]]:
 
 
 def _match(devices: List[DeviceInfo], selector: str) -> Optional[DeviceInfo]:
-    """Match by stable_id, exact name, or name substring (case-insensitive).
-    Never matches by numeric index. Returns None when nothing matches."""
+    """Match by stable_id (exact), name (exact/substring), a role-prefixed
+    name like ``input:pulse``, or a FULL stable id (role:name:backend). A bare
+    backend name is only used as a LAST-RESORT match so it never shadows an
+    explicit device name. Never matches by numeric index. Returns None when
+    nothing matches."""
     if not selector:
         return None
     sel = selector.strip()
@@ -136,8 +183,19 @@ def _match(devices: List[DeviceInfo], selector: str) -> Optional[DeviceInfo]:
     for d in devices:
         if d.stable_id == sel or d.name == sel:
             return d
+    # role-prefixed partial stable id: "input:pulse" -> match name "pulse"
+    if ":" in sel:
+        _role, _, _rest = sel.partition(":")
+        if _role in ("input", "output", "duplex") and _rest:
+            for d in devices:
+                if d.role == _role and _rest.lower() in d.name.lower():
+                    return d
     for d in devices:
         if low in d.name.lower():
+            return d
+    # last resort: an explicit backend identity (only if no name matched)
+    for d in devices:
+        if d.backend.lower() == low:
             return d
     return None
 
@@ -166,8 +224,14 @@ def write_audio_config(cfg: Any, *, mic_name: Any = _UNSET,
     """Persist name-based audio selection to the config with a timestamped
     backup. ``_UNSET`` leaves that side untouched; ``None`` clears it; a str
     pins it. Clears the legacy numeric index keys so a transient index is
-    never persisted. Returns the backup path."""
+    never persisted. Rejects any value that is not a clean stable identifier
+    (raw ALSA hw path or numeric index). Returns the backup path."""
     import yaml
+    for label, value in (("mic", mic_name), ("output", output_name)):
+        if value is not _UNSET and value is not None and not is_clean_identifier(value):
+            raise InvalidSelectionError(
+                f"refusing to persist {label} device {value!r}: not a clean "
+                "stable identifier (no hw path / numeric index allowed)")
     path = _config_path(cfg)
     path.parent.mkdir(parents=True, exist_ok=True)
     data: Dict[str, Any] = {}

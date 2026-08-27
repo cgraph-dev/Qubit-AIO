@@ -66,13 +66,67 @@ def test_list_devices_returns_stable_identifiers(monkeypatch):
     devs = AS.list_devices()
     inputs = {d.stable_id for d in devs["inputs"]}
     outputs = {d.stable_id for d in devs["outputs"]}
-    assert "input:HyperX Cloud III: USB Audio (hw:1,0)" in inputs
-    assert "output:HD-Audio Generic: ALC892 Analog (hw:2,0)" in outputs
-    # never a numeric index in the stable id
+    assert "input:HyperX Cloud III: USB Audio:ALSA" in inputs
+    assert "output:HD-Audio Generic: ALC892 Analog:ALSA" in outputs
+    # never a numeric index or a raw ALSA path in the stable id
     for d in devs["inputs"] + devs["outputs"]:
+        assert "hw:" not in d.stable_id.lower()
+        assert "(hw:" not in d.stable_id.lower()
         assert not d.stable_id.startswith("input:" + str(d.index))
         assert d.index is None or isinstance(d.index, int)
         assert d.state == "OK"
+
+
+def test_normalize_device_name_strips_alsa_paths_and_indices():
+    assert AS.normalize_device_name("HyperX Cloud III: USB Audio (hw:1,0)") \
+        == "HyperX Cloud III: USB Audio"
+    assert AS.normalize_device_name("HD-Audio Generic: ALC892 Analog (hw:2,0)") \
+        == "HD-Audio Generic: ALC892 Analog"
+    assert AS.normalize_device_name("pulse") == "pulse"
+    assert AS.normalize_device_name("default") == "default"
+    assert AS.normalize_device_name("7") == ""          # bare index -> no name
+    assert AS.normalize_device_name("") == ""
+    assert "hw:" not in AS.normalize_device_name("Foo (hw:3,1)").lower()
+
+
+def test_persisted_stable_ids_and_config_contain_no_hw_or_index(monkeypatch, tmp_path):
+    """The audit rule: persisted config and stable IDs contain no '(hw:',
+    'hw:', numeric index selection, or guessed ALSA path."""
+    _patch_sd(monkeypatch)
+    cfg = _cfg_with(tmp_path)
+    mic = AS.select_microphone(cfg, "HyperX")
+    out = AS.select_output(cfg, "ALC892 Analog")
+    assert "hw:" not in mic.stable_id.lower()
+    assert "hw:" not in out.stable_id.lower()
+    assert "(hw:" not in mic.stable_id.lower()
+    assert mic.name.isdigit() is False and out.name.isdigit() is False
+    persisted = Config.load(tmp_path / "voice.yaml")
+    mic_val = persisted.get("mic", "device_name")
+    out_val = persisted.get("audio", "output_device_name")
+    for val in (mic_val, out_val):
+        assert "hw:" not in str(val).lower()
+        assert "(hw:" not in str(val).lower()
+        assert str(val).strip().isdigit() is False
+    # legacy numeric index keys are cleared, never persisted
+    assert persisted.get("mic", "device") is None
+    assert persisted.get("audio", "output_device") == ""
+
+
+def test_select_never_persists_hw_path_or_numeric_index(monkeypatch, tmp_path):
+    _patch_sd(monkeypatch)
+    cfg = _cfg_with(tmp_path)
+    # a selector that IS an hw path must not match a clean device
+    with pytest.raises(AS.InvalidSelectionError):
+        AS.select_microphone(cfg, "hw:1,0")
+    with pytest.raises(AS.InvalidSelectionError):
+        AS.select_microphone(cfg, "(hw:1,0)")
+    with pytest.raises(AS.InvalidSelectionError):
+        AS.select_output(cfg, "hw:2,0")
+    # numeric selector never matches by index
+    with pytest.raises(AS.InvalidSelectionError):
+        AS.select_microphone(cfg, "3")
+    persisted = Config.load(tmp_path / "voice.yaml")
+    assert "hw:" not in str(persisted.data).lower()
 
 
 def test_list_defaults_flagged(monkeypatch):
@@ -125,6 +179,12 @@ def test_select_matches_by_stable_id_and_substring(monkeypatch, tmp_path):
     assert "pulse" in d1.name
     d2 = AS.select_microphone(cfg, "HYPER")
     assert "HyperX" in d2.name
+    # a full stable id (role:name:backend) also selects
+    d3 = AS.select_microphone(cfg, "input:HyperX Cloud III: USB Audio:ALSA")
+    assert "HyperX" in d3.name
+    # an explicit backend identity works only when no name matches
+    d4 = AS.select_output(cfg, "ALSA")
+    assert d4.backend == "ALSA"
 
 
 def test_invalid_selection_rejected(monkeypatch, tmp_path):
@@ -164,7 +224,7 @@ def test_selection_persists_across_restart(monkeypatch, tmp_path):
     AS.select_output(cfg, "pulse")
     # new Config object == restart
     cfg2 = Config.load(tmp_path / "voice.yaml")
-    assert cfg2.get("mic", "device_name") == "HyperX Cloud III: USB Audio (hw:1,0)"
+    assert cfg2.get("mic", "device_name") == "HyperX Cloud III: USB Audio"
     assert cfg2.get("audio", "output_device_name") == "pulse"
 
 

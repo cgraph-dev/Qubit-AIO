@@ -85,11 +85,15 @@ voicebridge audio reset           # clear pins -> OS defaults
 voicebridge audio status          # typed OK/DEGRADED/MISSING/PERMISSION_DENIED
 ```
 
-- Devices are identified by a **stable name/role/backend** (e.g.
-  `input:HyperX Cloud III: USB Audio (hw:1,0)` backend `ALSA`) — never a
-  transient numeric PortAudio index or a raw ALSA `(hw:N,M)` path.
-- Selection is persisted to the config by **name** with a timestamped backup;
-  legacy numeric index keys are cleared so a shifting index is never stored.
+- Devices are identified by a **stable role/name/backend** identifier built
+  ONLY from a NORMALIZED name (e.g. `input:HyperX Cloud III: USB Audio:ALSA`).
+  Raw ALSA `(hw:N,M)` paths and naked `hw:N,M` tokens are stripped, and a bare
+  numeric PortAudio index is never a name. `raw_name`/`index` exist only for
+  diagnostics and are never exposed by the CLI/JSON or persisted.
+- Selection is persisted to the config by the **normalized stable name** with
+  a timestamped backup; legacy numeric index keys are cleared so a shifting
+  index is never stored, and a persist-time guard rejects any value containing
+  `hw:` or a numeric index.
 - A configured device that disappears (hot unplug) is reported **MISSING with
   "no silent fallback"** — the contract never guesses a replacement.
 - `reset` returns output to the system default sink and mic to the default
@@ -149,11 +153,13 @@ writes nothing, atomic apply + backup, restore-failure rollback, bundle-info
 header read, device profile/enroll/require-enrolled/compatibility, CLI
 doctor/export/import/device.
 
-`tests/test_packet7c_audio.py` (30, remediation): audio enumeration with stable
-name/role/backend identifiers, default flags, permission-denied typing, select
-by name/substring/stable-id, invalid-selection rejection, never-match-by-index,
-reset-to-defaults, persistence across restart, hot-plug MISSING (never a
-silent fallback), OK status for present devices, no-restart/no-recording on
+`tests/test_packet7c_audio.py` (33, remediation): audio enumeration with stable
+name/role/backend identifiers, **normalization that strips raw ALSA
+`(hw:N,M)` paths and bare numeric indices**, persisted-config/stable-ID audit
+(no `hw:`, no index selection), default flags, permission-denied typing, select
+by name/substring/stable-id/backend, invalid-selection rejection, never-match-
+by-index, reset-to-defaults, persistence across restart, hot-plug MISSING (never
+a silent fallback), OK status for present devices, no-restart/no-recording on
 settings change, model digest fail-closed vs OK, artifact checksum
 OK/tampered/missing, model doctor check fail-closed, distributable manifest
 completeness, missing-file reporting, no-universal-binary claim,

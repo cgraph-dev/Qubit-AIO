@@ -604,8 +604,16 @@ def _cmd_audio(cfg, args) -> int:
             print(f"ERROR: {exc}")
             return 2
         if getattr(args, "json", False):
-            out = {"inputs": [d.__dict__ for d in devs["inputs"]],
-                   "outputs": [d.__dict__ for d in devs["outputs"]]}
+            # only STABLE fields are exposed — never raw_name (may contain an
+            # ALSA hw path) or the transient PortAudio index
+            def _stable(d):
+                return {"stable_id": d.stable_id, "name": d.name,
+                        "role": d.role, "backend": d.backend,
+                        "channels": d.channels,
+                        "default_samplerate": d.default_samplerate,
+                        "is_default": d.is_default, "state": d.state}
+            out = {"inputs": [_stable(d) for d in devs["inputs"]],
+                   "outputs": [_stable(d) for d in devs["outputs"]]}
             print(_json.dumps(out, indent=2, sort_keys=True))
             return 0
         print("INPUT devices:")
