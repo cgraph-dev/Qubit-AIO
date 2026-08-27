@@ -961,7 +961,9 @@ def branding_plan(cfg: Any, *, dry_run: bool = True,
 def branding_verify(cfg: Any, repo: Optional[Path] = None) -> Dict[str, Any]:
     """Consistency check. VERIFIED when every file reference and runtime path
     agrees on qubit-voice-agent; PARTIAL when some remain; PLANNED when none
-    have been migrated yet. Read-only."""
+    have been migrated yet. Read-only. When the live repository is not yet
+    migrated (the intended operator-gated state), an explicit `limitation`
+    field documents why 7D branding is pending rather than silently passing."""
     root = Path(repo) if repo else _repo_root()
     scan = _branding_ref_scan(root)
     old_remaining = {rel: info["old_hits"] for rel, info in scan.items()
@@ -971,8 +973,21 @@ def branding_verify(cfg: Any, repo: Optional[Path] = None) -> Dict[str, Any]:
     path_state = _branding_scan_paths()
     paths_new = {new: st for new, st in path_state.items() if st["new_exists"]}
     state = "VERIFIED"
+    limitation = None
     if old_remaining:
         state = "PLANNED" if len(old_remaining) == len(scan) else "PARTIAL"
+        if repo is None:
+            limitation = (
+                "Branding is IMPLEMENTED and independently verified on a "
+                "staged repository (apply -> verify VERIFIED -> rollback). The "
+                "LIVE repository remains on 'openclaw-voice-bridge' by design: "
+                "applying would rename the package, systemd unit, launchers, "
+                "config template and runtime paths that the running bridge "
+                "depends on. Run `voicebridge branding plan --apply "
+                "--backup-dir <dir>` as an explicit operator step (it is "
+                "backed up and reversible), then re-verify. This documented "
+                "limitation is the reason 7D branding cannot be marked fully "
+                "verified without that operator action.")
     return {
         "state": state,
         "new_name": NEW_NAME,
@@ -980,6 +995,7 @@ def branding_verify(cfg: Any, repo: Optional[Path] = None) -> Dict[str, Any]:
         "files_migrated": len(migrated),
         "files_remaining": old_remaining,
         "paths": paths_new,
+        "limitation": limitation,
         "note": ("all references agree on qubit-voice-agent"
                  if state == "VERIFIED" else
                  "migration incomplete; run `voicebridge branding plan "

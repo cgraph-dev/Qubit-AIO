@@ -810,6 +810,8 @@ def _cmd_branding(cfg, args) -> int:
     if cmd == "verify":
         out = P.branding_verify(cfg, repo=args.repo)
         print(_json.dumps(out, indent=2, sort_keys=True))
+        if out.get("limitation"):
+            print("\nLIMITATION: " + out["limitation"])
         return 0 if out["state"] == "VERIFIED" else 1
     if cmd == "rollback":
         out = P.branding_rollback(cfg, args.backup_dir, repo=args.repo)

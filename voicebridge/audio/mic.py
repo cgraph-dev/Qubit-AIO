@@ -64,9 +64,11 @@ def pin_pulse_default_source(device_name: str | None) -> str | None:
         # match (the pactl name usually drops "audio"/"usb" as a literal word).
         _GENERIC = {"audio", "usb", "digital", "analog", "input", "output",
                     "monitor", "capture", "device", "interface", "usbaudio",
-                    "multichannel"}
-        want_tokens = [t for t in _re.split(r"[\s_:.-]+", device_name.lower())
-                       if t and t not in _GENERIC]
+                    "multichannel", "hw"}
+        _sig = lambda t: bool(t) and t not in _GENERIC and not t.isdigit()
+        want_tokens = [t for t in _re.split(r"[\s_:.,()\-]+",
+                                            device_name.lower())
+                       if _sig(t)]
         match = None
         for line in src.stdout.splitlines():
             parts = line.split()
@@ -78,8 +80,8 @@ def pin_pulse_default_source(device_name: str | None) -> str | None:
             # delivers pure zeros to the capture path).
             if not name.startswith("alsa_input."):
                 continue
-            have = _re.split(r"[\s_:.-]+", name.lower())
-            have = [t for t in have if t]
+            have = [t for t in _re.split(r"[\s_:.,()\-]+", name.lower())
+                    if _sig(t)]
             # every significant token of the configured name must appear in
             # the pactl source name (order-insensitive, punctuation-insensitive)
             if all(t in have for t in want_tokens):

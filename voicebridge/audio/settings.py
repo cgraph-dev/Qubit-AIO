@@ -128,6 +128,47 @@ def _query_devices() -> Tuple[List[Dict[str, Any]], Dict[int, str], Tuple[Any, A
     return list(devs), host_by_idx, (d_in, d_out)
 
 
+def _pulse_input_source_names() -> List[str]:
+    """Names of Pulse/PipeWire INPUT sources (alsa_input.*). A device that
+    PortAudio lists with 0 input channels (e.g. the Scarlett 2i2, whose input
+    is a separate ALSA PCM) is still a valid mic when its name tokens match a
+    real Pulse input source — the bridge captures through that aggregate."""
+    try:
+        import subprocess
+        out = subprocess.run(["pactl", "list", "sources", "short"],
+                             capture_output=True, text=True, timeout=6)
+        names = []
+        for line in (out.stdout or "").splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[1].startswith("alsa_input."):
+                names.append(parts[1])
+        return names
+    except Exception:
+        return []
+
+
+def _name_tokens_match(a: str, b: str) -> bool:
+    """Punctuation/space/underscore-insensitive token overlap: every
+    significant token of `a` appears in `b` (used to match a PortAudio name to
+    a pactl source name). ALSA hardware tokens (``hw`` and bare digits from
+    ``(hw:1,0)``) are ignored — they are transient indices, never stable
+    identifiers."""
+    import re as _re
+    _GENERIC = {"audio", "usb", "digital", "analog", "input", "output",
+                "monitor", "capture", "device", "interface", "usbaudio",
+                "multichannel", "alsa", "hw"}
+    split = r"[\s_:.,()\-]+"
+
+    def _sig(tok):
+        return bool(tok) and tok not in _GENERIC and not tok.isdigit()
+
+    at = [t for t in _re.split(split, a.lower()) if _sig(t)]
+    bt = [t for t in _re.split(split, b.lower()) if _sig(t)]
+    if not at:
+        return False
+    return all(t in bt for t in at)
+
+
 def _device_info(dev: Dict[str, Any], index: int, role: str,
                  is_default: bool, backend: str) -> DeviceInfo:
     raw_name = str(dev.get("name") or f"device-{index}")
@@ -147,11 +188,19 @@ def _device_info(dev: Dict[str, Any], index: int, role: str,
 def list_devices() -> Dict[str, List[DeviceInfo]]:
     """List all audio devices, split by usable role. Returns typed descriptors
     keyed by stable name/role/backend. Raises AudioSettingsError on a
-    permission or enumeration failure (typed below as PERMISSION_DENIED)."""
+    permission or enumeration failure (typed below as PERMISSION_DENIED).
+
+    A device whose raw PortAudio input-channel count is 0 is STILL listed as an
+    input when its name tokens match a real Pulse/PipeWire input source (the
+    Scarlett 2i2 input is a separate ALSA PCM that PortAudio surfaces as 0
+    channels but PipeWire exposes as analog-surround-40). This is NOT a silent
+    fallback or a numeric index — it is the same capture route the bridge
+    already uses (the pulse/default aggregate)."""
     try:
         devs, host_by_idx, (d_in, d_out) = _query_devices()
     except Exception as exc:
         raise AudioSettingsError(f"cannot enumerate audio devices: {exc}") from exc
+    pulse_inputs = _pulse_input_source_names()
     inputs, outputs = [], []
     for i, dev in enumerate(devs):
         in_ch = int(dev.get("max_input_channels") or 0)
@@ -161,7 +210,14 @@ def list_devices() -> Dict[str, List[DeviceInfo]]:
         backend = host_by_idx.get(int(dev.get("hostapi")
                                       if dev.get("hostapi") is not None else -1),
                                   "unknown")
-        if in_ch > 0:
+        raw_name = str(dev.get("name") or f"device-{i}")
+        # Enrich: if PortAudio shows 0 input channels but the device's name
+        # tokens match a real Pulse input source, treat it as an input (this is
+        # how the Scarlett 2i2 / AT2020 is actually captured).
+        has_pulse_input = bool(
+            pulse_inputs and any(_name_tokens_match(raw_name, src)
+                                 for src in pulse_inputs))
+        if in_ch > 0 or has_pulse_input:
             inputs.append(_device_info(dev, i, "input",
                                        i == d_in, backend))
         if out_ch > 0:

@@ -103,7 +103,15 @@ migration** (not incidental cleanup):
   apply or a staged test.
 - `branding verify` scans every file and path and returns **VERIFIED** when all
   references agree on `qubit-voice-agent`, **PARTIAL** when some remain, or
-  **PLANNED** when none are migrated (read-only; exit 0 only when VERIFIED).
+  **PLANNED** when none are migrated (read-only; exit 0 only when VERIFIED). On
+  the LIVE repository it returns **PARTIAL with an explicit `limitation`
+  field** documenting that the migration is implemented and verified on a
+  staged repo, but the live tree is intentionally kept on
+  `openclaw-voice-bridge` because applying would rename the package, systemd
+  unit, launchers, config template, and runtime paths the running bridge
+  depends on. That operator action (`branding plan --apply --backup-dir`) is
+  the required step to move 7D branding to VERIFIED — this is a documented
+  limitation, not a silent pass.
 - `branding rollback --backup-dir <dir>` restores every backed-up repo file
   and runtime config/state/data, renames the unit back, and removes compat
   aliases.

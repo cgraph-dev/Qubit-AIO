@@ -256,6 +256,49 @@ def test_status_reports_ok_for_present_device(monkeypatch, tmp_path):
     assert st["output"]["state"] == "OK"
 
 
+def test_scarlett_input_listed_when_portaudio_shows_zero_input_channels(
+        monkeypatch, tmp_path):
+    """Packet 7D blocker: the Scarlett 2i2 input is a separate ALSA PCM that
+    PortAudio surfaces as 0 input channels, but PipeWire exposes it as
+    analog-surround-40. The settings contract must list it as an INPUT (and
+    allow selection by the exact PortAudio name) via the Pulse-source token
+    match — NOT a silent fallback or a numeric index."""
+    import subprocess
+
+    devs = [_mk("Scarlett 2i2 4th Gen: USB Audio (hw:1,0)", 0, 2, hostapi=0),
+            _mk("pulse", 32, 32, hostapi=1),
+            _mk("default", 64, 64, hostapi=1)]
+    monkeypatch.setattr("sounddevice.query_devices", lambda: devs)
+    monkeypatch.setattr("sounddevice.query_hostapis", lambda: [
+        {"name": "ALSA"}, {"name": "Pulse"}])
+    monkeypatch.setattr("sounddevice.default", type("D", (), {
+        "device": (1, 0)})())
+
+    class R:
+        returncode = 0
+        stdout = (
+            "58\talsa_input.usb-Focusrite_Scarlett_2i2_4th_Gen_S2F35P9350962D-00.analog-surround-40\tPipeWire\ts32le 4ch 48000Hz\tSUSPENDED\n"
+        )
+        stderr = ""
+
+    monkeypatch.setattr(subprocess, "run",
+                        lambda *a, **k: R())
+    devs_out = AS.list_devices()
+    scarlett = [d for d in devs_out["inputs"]
+                if "Scarlett" in d.name]
+    assert scarlett, "Scarlett must be listed as an input via Pulse source"
+    # exact-name selection works now (no numeric index / silent fallback)
+    cfg = _cfg_with(tmp_path)
+    dev = AS.select_microphone(cfg, "Scarlett 2i2 4th Gen: USB Audio")
+    assert "Scarlett" in dev.name
+    # status resolves OK
+    st = AS.status(cfg)
+    assert st["mic"]["state"] == "OK"
+    # never a numeric index / raw ALSA path in the stable id
+    assert "hw:" not in dev.stable_id.lower()
+    assert not dev.stable_id.split(":")[-1].isdigit()
+
+
 def test_status_default_when_no_pin(monkeypatch, tmp_path):
     _patch_sd(monkeypatch)
     cfg = _cfg_with(tmp_path)
