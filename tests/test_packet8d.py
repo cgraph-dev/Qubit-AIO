@@ -546,7 +546,20 @@ def test_hourly_voice_notify_quiet_suppresses_voice_only(tmp_path, monkeypatch):
 
 def test_hourly_voice_notify_outside_quiet_records_sent(tmp_path, monkeypatch):
     """Regression: outside quiet hours a genuinely-new report with voice
-    notifications enabled records VOICE=SENT (synthesis+playback both OK)."""
+    notifications enabled records VOICE=SENT (synthesis+playback both OK).
+
+    Deterministic: a fixed 12:00 (non-quiet) clock is injected so the test does
+    not depend on the real time of day (it must pass during 22:00–07:00 too)."""
+    from datetime import datetime as _real_dt
+
+    class _FixedNoon(_real_dt):
+        @classmethod
+        def now(cls, tz=None):
+            # fixed 12:00 local — outside the 22:00–07:00 quiet window
+            return cls(2026, 8, 28, 12, 0, 0)
+
+    monkeypatch.setattr("voicebridge.communications.monitor.datetime",
+                        _FixedNoon)
     class _FakeTTS:
         def synthesize(self, text, out):
             out.write_bytes(b"\x00" * 512)
