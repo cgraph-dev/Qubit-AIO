@@ -31,10 +31,22 @@ def _fake_proc():
             os.write(self._w, data)
 
         def kill(self):
+            # close the WRITE end only -> reader sees EOF (loop reads the
+            # already-buffered events, then exits cleanly)
             try:
                 os.close(self._w)
             except OSError:
                 pass
+
+        def close(self):
+            self.kill()
+            try:
+                self.stdout.close()      # release the read end too
+            except Exception:
+                pass
+
+        def __del__(self):
+            self.close()                 # GC safety net: never leak the pipe
 
         @property
         def poll(self):
@@ -123,5 +135,6 @@ def test_xinput_loop_parses_raw_key_events(monkeypatch):
     proc.write(b"EVENT type 14 (RawKeyRelease)\n  detail: 105\n")
     proc.kill()  # closes the write end -> loop sees EOF and exits
     hk._xinput_loop()
+    proc.close()   # release the read end (no ResourceWarning leak)
     assert ("ptt_start", "ctrl_r") in events, events
     assert ("ptt_end", "ctrl_r") in events, events

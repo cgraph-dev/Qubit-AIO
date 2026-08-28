@@ -74,6 +74,10 @@ class HotkeyListener:
     def _start_xinput(self) -> bool:
         import os
         import subprocess
+        # Portable DISPLAY: keep a valid one, else derive the active X session
+        # from /tmp/.X11-unix (headless stays unset -> manual PTT mode).
+        from .display import ensure_session_display
+        ensure_session_display()
         if not os.environ.get("DISPLAY"):
             return False
         try:

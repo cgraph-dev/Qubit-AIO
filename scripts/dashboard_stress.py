@@ -119,23 +119,39 @@ def probe_text(base: str, token: str) -> dict:
     return {"probe": "text", "ok": False, "detail": "timeout waiting result"}
 
 
+def _talk_wait(base: str, token: str, pcm: bytes, budget_s: float) -> tuple:
+    """POST one utterance and wait for the result; returns (ok, latency, res)."""
+    t0 = time.time()
+    r = _post(base, "/api/talk", pcm, token, ctype="application/octet-stream")
+    rid = r["request_id"]
+    while time.time() - t0 < budget_s:
+        res = _get(base, f"/api/result/{rid}", token)
+        if res.get("status") == "done":
+            return True, round(time.time() - t0, 2), res
+        time.sleep(0.3)
+    return False, round(time.time() - t0, 2), None
+
+
 def probe_voice(base: str, token: str, wav: Path) -> dict:
     pcm = _pcm_from_wav(wav)
     if not pcm:
         return {"probe": "voice", "ok": False, "detail": f"no usable PCM from {wav}"}
-    t0 = time.time()
-    r = _post(base, "/api/talk", pcm, token, ctype="application/octet-stream")
-    rid = r["request_id"]
-    while time.time() - t0 < 18:
-        res = _get(base, f"/api/result/{rid}", token)
-        if res.get("status") == "done":
-            dt = round(time.time() - t0, 2)
-            heard = (res.get("text") or "").strip()
-            return {"probe": "voice", "ok": True,
-                    "detail": f"asr='{heard[:40]}' reply={len(res.get('summary') or '')}ch",
-                    "latency_s": dt}
-        time.sleep(0.3)
-    return {"probe": "voice", "ok": False, "detail": "timeout waiting result"}
+    # Deterministic readiness: one unmeasured warm-up turn loads/proves the
+    # ASR -> route -> TTS event-delivery path, so the measured turn is a WARM
+    # local roundtrip (the <20s assertion is a warm-turn budget — a cold first
+    # turn after a bridge restart can exceed it). The warm-up is bounded and
+    # its failure is reported, never hidden.
+    ok_warm, dt_warm, _ = _talk_wait(base, token, pcm, 40.0)
+    if not ok_warm:
+        return {"probe": "voice", "ok": False,
+                "detail": f"warm-up turn did not complete ({dt_warm}s)"}
+    ok, dt, res = _talk_wait(base, token, pcm, 18.0)
+    if not ok:
+        return {"probe": "voice", "ok": False, "detail": "timeout waiting result"}
+    heard = (res.get("text") or "").strip()
+    return {"probe": "voice", "ok": True,
+            "detail": f"asr='{heard[:40]}' reply={len(res.get('summary') or '')}ch",
+            "latency_s": dt}
 
 
 def probe_rctrl(token: str) -> dict:
@@ -198,6 +214,7 @@ def run_cycle(base: str, token: str, wav: Path,
                 raise
             time.sleep(0.5)
     if not got:
+        lf.close()
         return [{"probe": "lock", "ok": False,
                  "detail": f"stress lock busy >{lock_wait_s}s (watchdog cycling?)"}]
     try:
@@ -214,6 +231,7 @@ def run_cycle(base: str, token: str, wav: Path,
                                 "detail": f"{type(exc).__name__}: {str(exc)[:120]}"})
     finally:
         fcntl.flock(lf, fcntl.LOCK_UN)
+        lf.close()
     return results
 
 

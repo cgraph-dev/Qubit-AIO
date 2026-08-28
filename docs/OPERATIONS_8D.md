@@ -83,8 +83,10 @@ Templates live in `systemd/`:
 - `openclaw-communications-monitor.service` — `Type=oneshot`, bounded
   resources (`MemoryHigh=300M`, `MemoryMax=400M`, `TimeoutStartSec=300`), no
   restart loop, same user config as the bridge; the template's `DISPLAY`/
-  `XAUTHORITY` must match the operator's X session (`echo $DISPLAY`) or
-  timer-run desktop notifications stay `PENDING` (the scan itself still works);
+  `XAUTHORITY` should match the operator's X session (`echo $DISPLAY`). The
+  notify-send path self-heals to the ACTIVE X session at runtime
+  (`voicebridge/display.py`), so a stale unit value no longer leaves
+  timer-run desktop notifications `PENDING`;
 - `openclaw-communications-monitor.timer` — `OnCalendar=hourly`,
   `Persistent=true` (catches up once after downtime), `AccuracySec=1min`.
 
@@ -133,8 +135,10 @@ instance when CDP is absent but Chromium is running, and is off by default.
 ## 7. Rollback
 
 1. `voicebridge monitor rollback` (or `scripts/communications_monitor.py
-   --rollback`) disables the timer — cursors, reports, memory, and evidence
-   are preserved.
+   --rollback`) STOPS and DISABLES the timer — cursors, reports, memory, and
+   evidence are preserved. The stop is essential: `systemctl disable` alone
+   leaves an already-running timer active, so it would keep firing; a true
+   rollback halts the hourly schedule immediately.
 2. Installed unit backups are `<unit>.bak.<timestamp>`; restoring them is the
    documented unit rollback.
 3. Store schema v2 is additive (`ALTER TABLE evidence_asset ADD COLUMN data

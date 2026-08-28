@@ -154,6 +154,11 @@ def _send_notify_send(title: str, body: str) -> Dict[str, Any]:
     """Run notify-send with a typed result (OK only on exit 0)."""
     if not shutil.which("notify-send"):
         return {"state": "unavailable", "reason": "notify-send missing"}
+    # Portable DISPLAY: keep a valid one, else derive the active X session so
+    # timer-run notifications reach the real desktop even if the installed unit
+    # has a stale DISPLAY value.
+    from ..display import ensure_session_display
+    ensure_session_display()
     try:
         proc = subprocess.run(["notify-send", title, body],
                               stdout=subprocess.DEVNULL,
@@ -710,7 +715,7 @@ def install_monitor(cfg, *, dry_run: bool = True,
 
 
 def disable_monitor() -> Dict[str, Any]:
-    """Disable the timer WITHOUT deleting units/cursors/reports/evidence."""
+    """Stop + disable the timer WITHOUT deleting units/cursors/reports/evidence."""
     out: Dict[str, Any] = {}
     try:
         r = subprocess.run(["systemctl", "--user", "disable", TIMER_NAME],
@@ -726,12 +731,27 @@ def disable_monitor() -> Dict[str, Any]:
                               "detail": err[:160]}
     except Exception as exc:
         out["disable"] = {"state": "failed", "detail": str(exc)[:120]}
+    # `disable` alone leaves an ALREADY-RUNNING timer active (it keeps firing);
+    # a true rollback must also STOP it so the hourly schedule actually halts.
+    try:
+        r2 = subprocess.run(["systemctl", "--user", "stop", TIMER_NAME],
+                            capture_output=True, text=True, timeout=10)
+        err2 = (r2.stderr or "")
+        if r2.returncode != 0 and "does not exist" in err2:
+            out["stop"] = {"state": "OK",
+                           "detail": "timer not installed; nothing to stop"}
+        else:
+            out["stop"] = {"state": "OK" if r2.returncode == 0 else "failed",
+                           "detail": err2[:160]}
+    except Exception as exc:
+        out["stop"] = {"state": "failed", "detail": str(exc)[:120]}
     return out
 
 
 def rollback_monitor(cfg) -> Dict[str, Any]:
-    """Rollback: disable the timer, keep all state (cursors, reports, memory,
-    evidence). Restoration of prior unit files is documented (backup paths)."""
+    """Rollback: stop + disable the timer, keep all state (cursors, reports,
+    memory, evidence). Restoration of prior unit files is documented (backup
+    paths)."""
     return {"state": "OK", "disable": disable_monitor()}
 
 

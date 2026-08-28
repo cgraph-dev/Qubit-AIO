@@ -56,6 +56,16 @@ Close it normally, then start it with the command above. If the old
 denied`, do not use that directory; use the existing Snap profile above or
 repair ownership only after inspecting it.
 
+### Graphical-session DISPLAY is self-healing
+
+The bridge's hotkey listener and the monitor's notify-send use
+`voicebridge/display.py` to resolve the ACTIVE graphical session: an already
+valid `DISPLAY` is kept, otherwise the real X11 socket under `/tmp/.X11-unix`
+is used (this host runs `:1`; a systemd unit left at `:0` is corrected
+automatically). The installed units still document the expected value
+(`echo $DISPLAY`), but a stale value no longer breaks PTT or desktop
+notifications. Headless (no sockets) keeps DISPLAY unset and manual PTT mode.
+
 ### Confirm the endpoint and logged-in tabs
 
 ```bash

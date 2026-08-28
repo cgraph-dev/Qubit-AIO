@@ -126,9 +126,11 @@ class StickyRouteState:
                 except Exception: pass
                 return
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            _js.dump({"target": self._route.target, "reason": self._route.reason,
-                      "set_at": self._route.set_at, "turns": self._route.turns},
-                     open(self._path,"w", errors="replace"))
+            with open(self._path, "w", errors="replace") as fh:
+                _js.dump({"target": self._route.target,
+                          "reason": self._route.reason,
+                          "set_at": self._route.set_at,
+                          "turns": self._route.turns}, fh)
         except Exception:
             pass
 

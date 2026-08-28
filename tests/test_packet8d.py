@@ -949,6 +949,30 @@ def test_disable_monitor_reports_ok_when_timer_never_installed(tmp_path,
     assert "Operation refused" in out2["disable"]["detail"]
 
 
+def test_rollback_stops_and_disables_live_timer(tmp_path, monkeypatch):
+    """Regression: a true rollback must STOP an already-running timer (`disable`
+    alone leaves it active/waiting so it keeps firing) AND disable it — while
+    never touching the service unit or any state."""
+    import voicebridge.communications.monitor as M
+    calls: list = []
+
+    def _fake(cmd, **kw):
+        calls.append(list(cmd))
+        return type("R", (), {"returncode": 0, "stderr": "", "stdout": ""})()
+
+    monkeypatch.setattr(M.subprocess, "run", _fake)
+    out = M.disable_monitor()
+    assert out["disable"]["state"] == "OK"
+    assert out["stop"]["state"] == "OK"
+    cmds = [c for c in calls if any(x in c for x in ("disable", "stop"))]
+    assert any("disable" in c and "openclaw-communications-monitor.timer" in c
+               for c in cmds)
+    assert any("stop" in c and "openclaw-communications-monitor.timer" in c
+               for c in cmds)
+    # the SERVICE unit is never disabled/stopped by a monitor rollback
+    assert not any("openclaw-communications-monitor.service" in c for c in cmds)
+
+
 def test_rollback_preserves_cursors_reports_evidence_notifications(tmp_path,
                                                                    monkeypatch):
     """Rollback must NOT touch cursors, reports, evidence bytes, memory, or
