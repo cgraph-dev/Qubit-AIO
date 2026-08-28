@@ -1,0 +1,26 @@
+[Unit]
+Description=Qubit Voice Agent - hourly communications monitor (oneshot, read-only)
+# Runs one bounded inbox scan + report bundle + notifications, then exits.
+After=network.target
+Wants=network.target
+ConditionPathExists=__PROJECT_DIR__/scripts/communications_monitor.py
+
+[Service]
+Type=oneshot
+WorkingDirectory=__PROJECT_DIR__
+ExecStart=__PROJECT_DIR__/.venv/bin/python scripts/communications_monitor.py --hourly
+# Never a watchdog restart loop: a oneshot that fails is surfaced by the timer
+# status + the monitor health command, not auto-restarted.
+# Bounded resources (repository defaults; tune per host in the INSTALLED unit).
+MemoryHigh=300M
+MemoryMax=400M
+TimeoutStartSec=300
+# Desktop notify-send needs the user's X session. Set DISPLAY/XAUTHORITY to the
+# OPERATOR's session values (check: echo $DISPLAY; echo $XAUTHORITY) — a wrong
+# display silently makes notifications PENDING (the scan still succeeds).
+Environment=DISPLAY=:1
+# Uses the SAME user config as the bridge (private state root is shared):
+Environment=VOICE_BRIDGE_CONFIG=%h/.config/openclaw-voice-bridge/voice.yaml
+
+[Install]
+WantedBy=default.target

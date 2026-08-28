@@ -1,0 +1,14 @@
+[Unit]
+Description=Qubit Voice Agent - hourly communications monitor trigger
+# OnCalendar=hourly + Persistent=true: catches up once after downtime, never
+# wakes a suspended machine. No automatic restart loop; overlap is guarded by
+# the application lease in voicebridge/communications/monitor.py.
+RefuseManualStart=false
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

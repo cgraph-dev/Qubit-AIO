@@ -29,9 +29,14 @@ from typing import Any, Dict, List, Optional, Sequence
 
 from .contracts import (
     AccountHealthRecord, AccountHealthStatus, CommunicationItem,
-    CursorRecord, EvidenceAssetRecord, NotificationRecord,
+    CursorRecord, EvidenceAssetRecord, NotificationKind, NotificationRecord,
     Platform, ReportManifest, ScanRecord, ScanStatus, _new_id,
 )
+
+# SQLite migration version (PRAGMA user_version). Independent of the report
+# manifest SCHEMA_VERSION: manifest v1 is unchanged; the store schema advanced
+# to v2 to persist evidence-asset BYTES durably (Packet 8D).
+STORE_SCHEMA_VERSION = 2
 
 # Retention defaults (plan Phase 8 task 18 — confirmed by Packet 8A).
 DEFAULT_RETENTION_SECONDS = {
@@ -199,6 +204,15 @@ CREATE TABLE IF NOT EXISTS retention_log(
 );
 """
 
+# Packet 8D: evidence asset BYTES become durable with the report commit so a
+# live scan persists the actual screenshot bytes (not metadata only) and a
+# bundle rendered later (render_from_store / regen) carries real .webp assets.
+# The existing 30-day evidence_asset retention prunes the bytes too; the report
+# bundle's own 90-day retention governs the rendered copy.
+_SCHEMA_V2 = """
+ALTER TABLE evidence_asset ADD COLUMN data BLOB;
+"""
+
 
 class CommunicationsStoreError(Exception):
     """Typed store failure (never a silent pass)."""
@@ -232,7 +246,7 @@ class CommunicationsStore:
     # ------------------------------------------------------------ schema
     def _migrate(self) -> None:
         version = self._conn.execute("PRAGMA user_version").fetchone()[0]
-        migrations = [_SCHEMA_V1]
+        migrations = [_SCHEMA_V1, _SCHEMA_V2]
         with self._conn:  # atomic migration transaction
             for i in range(version, len(migrations)):
                 self._conn.executescript(migrations[i])
@@ -328,6 +342,22 @@ class CommunicationsStore:
                 baseline=bool(row["baseline"]), committed_at=row["committed_at"],
                 report_id=row["report_id"], prior_cursor_id=row["prior_cursor_id"])
 
+    def asset_bytes_for_report(self, report_id: str
+                               ) -> Dict[str, bytes]:
+        """Durable screenshot bytes for a committed report (Packet 8D).
+
+        Returns ``{asset_id: bytes}`` for the assets that were actually
+        captured at scan time; assets with a typed missing-evidence reason have
+        no entry. Used by the report renderer so bundles produced from live
+        scans carry the real .webp bytes, not metadata only.
+        """
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT asset_id, data FROM evidence_asset WHERE report_id=?",
+                (report_id,)).fetchall()
+            return {r["asset_id"]: bytes(r["data"]) for r in rows
+                    if r["data"] is not None}
+
     def item_exists(self, platform: Platform, account_scope: str,
                     identity: str) -> bool:
         with self._lock:
@@ -363,7 +393,8 @@ class CommunicationsStore:
                        manifest: ReportManifest,
                        assets: Sequence[EvidenceAssetRecord],
                        notifications: Sequence[NotificationRecord],
-                       baseline: bool) -> int:
+                       baseline: bool,
+                       asset_bytes: Optional[Dict[str, bytes]] = None) -> int:
         """Single-transaction commit. Caller holds the store lock + txn."""
         if not isinstance(manifest, ReportManifest):
             raise CommunicationsStoreError("manifest must be a ReportManifest")
@@ -451,11 +482,12 @@ class CommunicationsStore:
             self._conn.execute(
                 "INSERT INTO evidence_asset(asset_id, report_id, item_identity,"
                 " source_item_id, mime, byte_count, sha256, captured_at,"
-                " redaction_status, width, height)"
-                " VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                " redaction_status, width, height, data)"
+                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                 (a.asset_id, a.report_id, a.item_identity, a.source_item_id,
                  a.mime, a.byte_count, a.sha256, a.captured_at,
-                 a.redaction_status.value, a.width, a.height))
+                 a.redaction_status.value, a.width, a.height,
+                 (asset_bytes or {}).get(a.asset_id)))
         for n in notifications:
             self._conn.execute(
                 "INSERT INTO notification(notification_id, report_id, kind,"
@@ -498,14 +530,16 @@ class CommunicationsStore:
                         items: Sequence[CommunicationItem],
                         manifest: ReportManifest,
                         assets: Sequence[EvidenceAssetRecord] = (),
-                        notifications: Sequence[NotificationRecord] = ()) -> int:
+                        notifications: Sequence[NotificationRecord] = (),
+                        asset_bytes: Optional[Dict[str, bytes]] = None) -> int:
         """First activation: record visible items as seen, no old-message alert."""
         with self._lock, self._conn:
             scan = self._with_cursor_bounds(scan)
             count = self._commit_locked(scan=scan, items=items,
                                         manifest=manifest, assets=assets,
                                         notifications=notifications,
-                                        baseline=True)
+                                        baseline=True,
+                                        asset_bytes=asset_bytes)
             self._conn.execute(
                 "UPDATE scan SET new_count=?, cursor_before=?, cursor_after=?,"
                 " report_id=? WHERE scan_id=?",
@@ -521,14 +555,16 @@ class CommunicationsStore:
                    items: Sequence[CommunicationItem],
                    manifest: ReportManifest,
                    assets: Sequence[EvidenceAssetRecord] = (),
-                   notifications: Sequence[NotificationRecord] = ()) -> int:
+                   notifications: Sequence[NotificationRecord] = (),
+                   asset_bytes: Optional[Dict[str, bytes]] = None) -> int:
         """Commit new items + report atomically and advance the cursor."""
         with self._lock, self._conn:
             scan = self._with_cursor_bounds(scan)
             count = self._commit_locked(scan=scan, items=items,
                                         manifest=manifest, assets=assets,
                                         notifications=notifications,
-                                        baseline=False)
+                                        baseline=False,
+                                        asset_bytes=asset_bytes)
             self._conn.execute(
                 "UPDATE scan SET new_count=?, cursor_before=?, cursor_after=?,"
                 " report_id=? WHERE scan_id=?",
@@ -690,6 +726,51 @@ class CommunicationsStore:
                 " notification_id=? AND status!='acked'",
                 (time.time(), notification_id))
             return cur.rowcount > 0
+
+    def record_notification(self, record: NotificationRecord) -> None:
+        """Persist one notification record (dedupe handled by the caller)."""
+        with self._lock, self._conn:
+            self._conn.execute(
+                "INSERT INTO notification(notification_id, report_id, kind,"
+                " status, dedupe_key, created_at, new_count, quiet_hours,"
+                " sent_at, acked_at, dedupe_of)"
+                " VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                (record.notification_id, record.report_id, record.kind.value,
+                 record.status.value, record.dedupe_key, record.created_at,
+                 record.new_count, int(record.quiet_hours), record.sent_at,
+                 record.acked_at, record.dedupe_of))
+
+    def notification_exists(self, dedupe_key: str, kind: NotificationKind,
+                            *, since: Optional[float] = None) -> bool:
+        """True when an equivalent notification was already recorded.
+
+        ``since`` bounds the dedupe window (default: any past record). Used so
+        a repeated scan / timer fire cannot spam the same desktop/dashboard
+        alert for the same report or the same auth failure.
+        """
+        with self._lock, self._conn:
+            sql = ("SELECT 1 FROM notification WHERE dedupe_key=? AND kind=?")
+            params: List[Any] = [dedupe_key, kind.value]
+            if since is not None:
+                sql += " AND created_at >= ?"
+                params.append(float(since))
+            return self._conn.execute(sql, params).fetchone() is not None
+
+    def recent_notifications(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Most-recent notification metadata (redacted view for the dashboard)."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT notification_id, report_id, kind, status, created_at,"
+                " new_count, quiet_hours, sent_at, acked_at, dedupe_of"
+                " FROM notification ORDER BY created_at DESC LIMIT ?",
+                (int(limit),)).fetchall()
+            return [dict(r) for r in rows]
+
+    def pending_notifications(self) -> int:
+        with self._lock:
+            return self._conn.execute(
+                "SELECT COUNT(*) FROM notification WHERE status IN"
+                " ('pending','sent')").fetchone()[0]
 
     def close(self) -> None:
         with self._lock:

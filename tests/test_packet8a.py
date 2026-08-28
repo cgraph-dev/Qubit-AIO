@@ -275,12 +275,13 @@ def _store(tmp_path):
 
 
 def test_store_migrates_and_private_file_modes(tmp_path):
+    from voicebridge.communications.store import STORE_SCHEMA_VERSION
     st = _store(tmp_path)
-    assert st.schema_version == SCHEMA_VERSION
+    assert st.schema_version == STORE_SCHEMA_VERSION   # 2 (Packet 8D asset bytes)
     st.close()
     # reopen on existing db is idempotent
     st2 = _store(tmp_path)
-    assert st2.schema_version == SCHEMA_VERSION
+    assert st2.schema_version == STORE_SCHEMA_VERSION
     st2.close()
     if os.name != "nt":
         assert oct(tmp_path.stat().st_mode & 0o777) == "0o700"
@@ -505,9 +506,17 @@ def test_commit_with_assets_roundtrip(tmp_path):
 
 
 def test_no_runtime_module_imports_communications_yet():
-    """Packet 8A must not change runtime behavior: nothing outside tests/fixtures
-    may import this package until 8B–8D wire it in."""
+    """Packet 8A must not change runtime behavior by itself; the communications
+    package is now wired into the authenticated dashboard by Packet 8C
+    (voicebridge/webui.py), the manual scan CLI by 8B, and the authorized
+    hourly monitor by Packet 8D (voicebridge/cli.py `monitor` subcommand).
+    NO other runtime module may import it."""
     runtime = ["voicebridge", "scripts", "systemd"]
+    allowlisted = {
+        "voicebridge/webui.py",        # Packet 8C report API routes
+        "voicebridge/cli.py",          # Packet 8D `monitor` subcommand
+        "scripts/communications_monitor.py",  # manual scan CLI (8B) + 8D
+    }
     offenders = []
     for root in runtime:
         base = REPO_ROOT / root
@@ -516,9 +525,12 @@ def test_no_runtime_module_imports_communications_yet():
         for path in sorted(base.rglob("*.py")):
             if "communications" in str(path):
                 continue
+            rel = str(path.relative_to(REPO_ROOT))
+            if rel in allowlisted:
+                continue
             text = path.read_text(errors="replace")
             if ("voicebridge.communications" in text
                     or "from .communications" in text
                     or "import communications" in text):
-                offenders.append(str(path.relative_to(REPO_ROOT)))
-    assert offenders == [], f"runtime imports of Packet 8A package: {offenders}"
+                offenders.append(rel)
+    assert offenders == [], f"unauthorized runtime imports of Packet 8A package: {offenders}"

@@ -234,6 +234,27 @@ DEFAULTS: Dict[str, Any] = {
         # (machine-specific value; keep it in the user config, not here).
         "frontend_dir": "",
     },
+    "communications": {
+        # Packet 8D: authorized hourly inbox monitor. The timer stays DISABLED
+        # until the user explicitly installs+enables the repository template;
+        # every mutate command is dry-run by default and audited.
+        "monitor": {
+            "enabled": False,
+            "platforms": ["gmail"],
+            "accounts": ["default"],
+            "lease_ttl_s": 120.0,
+            "retention_days": 90,
+            "screenshot_days": 30,
+            "desktop_notify": True,
+            "voice_notify": False,
+            "voice": {
+                "quiet_hours": "22:00-07:00",
+                "timezone": "Europe/Bucharest",
+                "max_words": 12,
+            },
+            "cdp_launch": False,      # optional approved Chromium launch hook
+        },
+    },
 }
 
 
