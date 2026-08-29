@@ -204,7 +204,10 @@ def environment_snapshot(url: str, model: str) -> Dict[str, Any]:
             hashlib.sha256(served.encode()).hexdigest() if served else None)
     except Exception as exc:
         env["model_details_error"] = str(exc)[:160]
-    repo_modelfile = REPO_ROOT / "Modelfile.qubit4"
+    # The bake artifact Modelfile.qubit4 is gitignored/generated (bake_brain.py);
+    # the tracked sanitized fixture is the canonical repo artifact a clean
+    # checkout can hash for comparison.
+    repo_modelfile = REPO_ROOT / "tests" / "fixtures" / "modelfiles" / "qubit4.sanitized"
     env["repo_modelfile_qubit4_sha256"] = modelfile_hash(repo_modelfile)
     env["gpu_before"] = gpu_sample()
     env["mem_available_mib"] = mem_available_mib()

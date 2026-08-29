@@ -26,7 +26,13 @@ import voicebridge.intent.llm as LLM  # noqa: E402
 from voicebridge.local_llm import _chat_payload  # noqa: E402
 from voicebridge.summarizer import summarize_ollama  # noqa: E402
 
-MODEFILE = REPO_ROOT / "Modelfile.qubit4"
+# The gitignored bake artifact Modelfile.qubit4 (generated/regenerated) is NOT
+# committed (plan P0-N / bake_brain.py). The tracked, deterministic SANITIZED
+# fixture below is the canonical persona artifact the tests guard — it mirrors
+# the bake artifact's structure (SYSTEM/TEMPLATE/no_think/num_ctx 4096) and
+# satisfies the measured EOS-stability basin, so a clean checkout is fully
+# reproducible without the machine-local file.
+MODEFILE = REPO_ROOT / "tests" / "fixtures" / "modelfiles" / "qubit4.sanitized"
 
 
 class _Cfg:
