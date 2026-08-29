@@ -1515,6 +1515,7 @@ def test_vb_api_non_json_and_error_statuses_never_throw():
 (async () => {
   const cases = [
     { status: 200, ct: 'text/plain',  text: 'hello' },
+    { status: 403, ct: 'text/plain',  text: 'forbidden' },
     { status: 404, ct: 'text/plain',  text: 'not found' },
     { status: 500, ct: 'text/html',   text: '<html>oops</html>' },
     { status: 429, ct: 'application/json', json: { retry_after: 30 } },
@@ -1540,10 +1541,11 @@ def test_vb_api_non_json_and_error_statuses_never_throw():
 """
     out = json.loads(_run_vbjs(scenario))
     assert out[0]["status"] == 200 and out[0]["ok"] is True and out[0]["isRaw"] is True
-    assert out[1]["status"] == 404 and out[1]["ok"] is False and out[1]["isRaw"] is True
-    assert out[2]["status"] == 500 and out[2]["ok"] is False and out[2]["isRaw"] is True
-    assert out[3]["status"] == 429 and out[3]["ok"] is False
-    assert out[4]["status"] == 409 and out[4]["ok"] is False
+    assert out[1]["status"] == 403 and out[1]["ok"] is False and out[1]["isRaw"] is True
+    assert out[2]["status"] == 404 and out[2]["ok"] is False and out[2]["isRaw"] is True
+    assert out[3]["status"] == 500 and out[3]["ok"] is False and out[3]["isRaw"] is True
+    assert out[4]["status"] == 429 and out[4]["ok"] is False
+    assert out[5]["status"] == 409 and out[5]["ok"] is False
 
 
 def test_vb_api_network_timeout_is_typed():
