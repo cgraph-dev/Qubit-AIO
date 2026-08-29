@@ -378,17 +378,52 @@ hashes):
 
 ```bash
 .venv/bin/python -m pytest -q -W error tests/test_packet8e.py            # 117 passed
-.venv/bin/python -m pytest -q -W error tests/test_packet8e.py \
-    tests/test_packet7e.py tests/test_packet8a.py tests/test_packet2b.py \
-    tests/test_packet7d.py tests/test_webui.py \
-    tests/test_webui_reports.py                                           # see handoff
-.venv/bin/python -m pytest -q -W error tests/                            # 1140 passed (latest run)
+.venv/bin/python -m pytest -q -W error tests/                            # hermetic default:
+                                                                         #   1116 passed, 0 skipped, 0 warnings
+                                                                         #   (37 live/dashboard/monitor tests deselected by default)
+.venv/bin/python -m pytest -q -W error -m live tests/                    # explicit live gate: 32 passed
+.venv/bin/python -m pytest -q -W error -m dashboard tests/test_dashboard_stress.py
+                                                                         # explicit live-dashboard gate: 4 passed
 .venv/bin/python -m pytest -q tests/test_packet0b.py                     # 19 passed (0B repro)
 .venv/bin/python -m compileall -q voicebridge scripts
 .venv/bin/python -m pip check
 git diff --check
 graft build
 ```
+
+## Release-readiness: hermetic default + explicit live gates
+
+The default `pytest tests/` run is deterministic and free of live-service,
+hardware, model, account, Chromium, sibling-repo, and user-home dependencies
+(plan Phase 7A separation):
+
+- `pytest.ini` registers `unit/contract/integration/smoke/live/monitor/
+  dashboard` markers and `addopts = -m "not live and not dashboard and not
+  monitor"`, so the DEFAULT run collects only hermetic tests. `scripts/
+  run_tests.py` runs the live gates explicitly (`live-model`, `live-dashboard`,
+  `monitor`) and `all` overrides the filter for the true full suite.
+- Live-marked tests (Ollama-model, audio-device, running-bridge, mic-hardware):
+  `TestItem1AirLLMLive` + `TestPTTStartBeep` in test_steal_list_strict.py,
+  test_live_stress.py, test_mic_health.py, and the `_ollama_up` /
+  `_voice_available`-gated tests in test_packet4b.py, test_packet4c.py,
+  test_packet5c_integration.py, test_release_smoke.py, test_smoke.py;
+  test_dashboard_stress.py is marked `dashboard`.
+- VRAM-gated latency test split honestly (no fake VRAM, no hidden skip):
+  `test_g02_warm_latency_budget_logic_hermetic` (default, no GPU) proves the
+  shared `_warm_latency_budget_issue` decision logic (0.85 s best / 1.8 s
+  median gates) deterministically; `test_g02_live_warm_latency_within_budget`
+  (explicit `-m live`) measures the real hardware envelope on the actual
+  GPU+model and skips only when VRAM is genuinely occupied (documented reason).
+- Dashboard-stress text probe uses deterministic bounded readiness (one
+  unmeasured warm-up turn, mirroring the voice probe) so the measured turn is
+  warm and the roundtrip no longer flakes under load (a real fix, not a
+  timeout bump).
+
+Evidence (fresh clone, own venv, `pip install -e '.[test]'`, no files from the
+original worktree): default suite **1116 passed, 0 skipped, 0 warnings** (two
+consecutive identical runs); explicit live gate **32 passed**; explicit
+live-dashboard gate **4 passed**; compileall / pip check / git diff --check /
+graft build all green.
 
 ## Clean-checkout reproducibility (baseline fix)
 
@@ -426,10 +461,13 @@ Required artifacts / install behavior:
 - The generated `Modelfile.qubit4` is NOT needed for tests (fixture covers it).
   Operators who bake the model run `scripts/bake_brain.py` after creating the
   (gitignored) `Modelfile.qubit4` from the tracked fixture content.
-- Live opt-in tests (Ollama `qubit-brain4`, audio devices, VRAM) are documented
-  prerequisites: when absent they skip with an explicit reason (e.g.
-  `test_steal_list_strict.py:250` "only N MiB VRAM free -> partial offload
-  expected"), never silently pass.
+- Live opt-in tests (Ollama `qubit-brain4`, audio devices, VRAM, a running
+  bridge) are DOCUMENTED PREREQUISITES and are EXCLUDED from the hermetic
+  default suite (markers `live` / `dashboard`). Run them explicitly with
+  `.venv/bin/python -m pytest -m live tests/` (and `-m dashboard`); when a
+  prerequisite is absent they skip with an explicit reason (e.g. the live VRAM
+  latency gate "only N MiB VRAM free -> partial offload expected"), never
+  silently pass, and a skipped live check is reported as DEGRADED, not PASS.
 - Machine-local live config/state under the user HOME (`~/.config`,
   `~/.local/state`) is a documented prerequisite only for tests that exercise
   real user files; those tests assert bounded/safe behavior and tolerate absence.
@@ -442,7 +480,9 @@ Clean-checkout commands (from a fresh clone):
 ```bash
 git clone <repo> freshclone && cd freshclone
 python3 -m venv .venv && .venv/bin/pip install -e '.[test]'
-.venv/bin/python -m pytest -q -W error tests/          # expect 1151 passed, 1 documented skip, 0 warnings
+.venv/bin/python -m pytest -q -W error tests/          # hermetic default: 1116 passed, 0 skipped, 0 warnings
+.venv/bin/python -m pytest -q -W error -m live tests/  # explicit live gate (operator, deps required)
+.venv/bin/python -m pytest -q -W error -m dashboard tests/test_dashboard_stress.py
 .venv/bin/python -m compileall -q voicebridge scripts
 .venv/bin/python -m pip check
 git diff --check
@@ -471,12 +511,13 @@ audio state is ever modified.
   nothing, output redacted. Other public sites remain operator-selected; the
   hermetic injected-probe suite covers all typed states, bounds, redaction,
   SSRF, HTTPS-only, fragment rejection, and content-type/redirect limits.
-- A Packet 4D live-model test (`tests/test_steal_list_strict.py:250`) is
-  CONDITIONALLY skipped by its own hardware gate when < 2500 MiB VRAM is free
-  ("partial offload expected"). It is unrelated to 8E and is left unchanged. In
-  the most recent full-suite run (1140 passed, `-W error`) it did NOT trigger
-  (0 skipped); when it does skip, it is an external Packet 4D hardware gate,
-  never a suppressed 8E failure.
+- The live VRAM-gated latency test is now an EXPLICIT operator gate
+  (`test_steal_list_strict.py::TestItem1AirLLMLive::test_g02_live_warm_latency_
+  within_budget`, run with `-m live`): it measures the real GPU envelope and
+  skips only when < 2500 MiB VRAM is free ("partial offload expected") — a
+  documented hardware condition, never a suppressed 8E failure. The default
+  suite instead proves the budget logic hermetically
+  (`test_g02_warm_latency_budget_logic_hermetic`).
 - Reported-but-unreproducible Packet 0B timeout (documented separately): an
   independent verifier reported `tests/test_packet0b.py::
   test_migration_idempotent_identical_unit` timing out on the second idempotent
@@ -488,7 +529,8 @@ audio state is ever modified.
   under the 30 s test timeout. No genuine hang exists in the script or test by
   inspection. This is a Packet 0B test (uncommitted, pre-existing dirty work)
   and is NOT caused by or fixable within 8E scope; it was not modified.
-  In THIS environment the full suite is clean (1140 passed, `-W error`), so 8E
+  In THIS environment the hermetic default suite is clean (1116 passed,
+  `-W error`, 0 skipped), and the explicit live gates pass (32 + 4), so 8E
   reports a clean suite here, with the verifier's 0B timeout recorded as an
   external environmental finding (e.g. a heavily loaded machine exceeding 30 s)
   that 8E cannot claim to resolve.
