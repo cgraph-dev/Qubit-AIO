@@ -11,3 +11,7 @@ browser_auto_state
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
+
+# PII bake artifact: composed from live personal files by scripts/bake_brain.py.
+# NEVER commit (plan rule 29). Superseded by the Packet 4B context compiler.
+Modelfile.qubit4

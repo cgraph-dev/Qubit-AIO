@@ -57,10 +57,12 @@
   <div id="bar"><span id="conn">connecting…</span> · <span id="count">—</span> · <label>show <select id="kindFilter"><option value="">all — everything</option><option value="asked">You said</option><option value="answered">Answered</option><option value="decided">Routed</option><option value="running">Working</option><option value="report">Reports</option><option value="failed">Failed</option></select></label> <input id="q" placeholder="search…" style="margin-left:8px;"> <button id="pauseBtn">pause</button></div>
   <div id="feed"><div id="empty">waiting for activity…</div></div>
 </div>
+<script src="/static/vb.js"></script>
 <script>
 const BASE = (new URLSearchParams(location.search).get('api') || localStorage.getItem('vdb_api') || '').replace(/\/$/, '');
-const TOKEN=new URLSearchParams(location.search).get('token') || localStorage.getItem('vdb_token') || '';
-function hdrs(extra) { const h = Object.assign({}, extra || {}); if (TOKEN) h['X-Api-Token'] = TOKEN; return h; }
+// Token comes ONLY from localStorage via the shared helper (frontend/vb.js).
+const TOKEN = vbToken();
+function hdrs(extra) { return vbHeaders(extra); }
 const feed = document.getElementById('feed');
 let paused=false;
 document.getElementById('pauseBtn').addEventListener('click', ()=>{ paused=!paused; document.getElementById('pauseBtn').textContent=paused?'resume':'pause'; });
@@ -105,5 +107,5 @@ async function refresh(){ if(paused) return; try { const r = await fetch(BASE + 
 document.getElementById('kindFilter').addEventListener('change', ()=>refresh());
 document.getElementById('q').addEventListener('input', ()=>refresh());
 setInterval(refresh, 2000); setInterval(refreshStatus, 5000); refresh(); refreshStatus();
-<\/script>
+</script>
 </body></html>

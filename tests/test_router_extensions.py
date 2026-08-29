@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from voicebridge.intent.classifier import Classifier, Intent  # noqa: E402
+from voicebridge.intent.classifier import Classifier  # noqa: E402
 from voicebridge.intent.state import ConfirmationState, ConversationState  # noqa: E402
 from voicebridge.local import actions as local_actions  # noqa: E402
 

@@ -800,6 +800,18 @@ BRANDING_PATH_PAIRS = [
     (".local/share/openclaw-voice-bridge", ".local/share/qubit-voice-agent"),
 ]
 
+# Docs that intentionally KEEP the old name as HISTORICAL MIGRATION TEXT — they
+# document the openclaw-voice-bridge -> qubit-voice-agent rename itself (e.g.
+# the Packet 7D prompt "rename from `openclaw-voice-bridge` to `qubit-voice-agent`").
+# Old-name references in these files are always REPORTED by the verifier and the
+# plan, but they never FAIL branding verification and are never rewritten by an
+# apply (preserving the migration history). Executable package/service/config/
+# launcher references (everything else in BRANDING_FILE_EDITS) remain strictly
+# checked and migrated.
+BRANDING_HISTORICAL_REFERENCE_FILES = (
+    "docs/AGENT_PROMPT_PACK.md",
+)
+
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
@@ -811,6 +823,7 @@ def _branding_ref_scan(repo: Optional[Path] = None) -> Dict[str, Any]:
     root = Path(repo) if repo else _repo_root()
     scan: Dict[str, Dict[str, Any]] = {}
     for rel, _pairs in BRANDING_FILE_EDITS:
+        historical = rel in BRANDING_HISTORICAL_REFERENCE_FILES
         p = root / rel
         if not p.exists():
             # the systemd unit may have been renamed to the new identifier
@@ -820,14 +833,16 @@ def _branding_ref_scan(repo: Optional[Path] = None) -> Dict[str, Any]:
                     text = newp.read_text(errors="replace")
                     scan[rel] = {"old_hits": text.count(OLD_NAME),
                                  "new_hits": text.count(NEW_NAME),
-                                 "missing": False, "renamed": True}
+                                 "missing": False, "renamed": True,
+                                 "historical": historical}
                     continue
-            scan[rel] = {"old_hits": 0, "new_hits": 0, "missing": True}
+            scan[rel] = {"old_hits": 0, "new_hits": 0, "missing": True,
+                         "historical": historical}
             continue
         text = p.read_text(errors="replace")
         scan[rel] = {"old_hits": text.count(OLD_NAME),
                      "new_hits": text.count(NEW_NAME), "missing": False,
-                     "renamed": False}
+                     "renamed": False, "historical": historical}
     return scan
 
 
@@ -865,6 +880,10 @@ def branding_plan(cfg: Any, *, dry_run: bool = True,
         old_hits = info.get("old_hits", 0)
         if info.get("missing"):
             file_steps.append(f"{rel}: MISSING (cannot migrate)")
+        elif rel in BRANDING_HISTORICAL_REFERENCE_FILES and old_hits:
+            file_steps.append(f"{rel}: {old_hits} historical migration "
+                              f"reference(s) KEPT (allowlisted, reported, "
+                              f"not migrated)")
         elif old_hits:
             file_steps.append(f"{rel}: {old_hits} old reference(s) -> "
                               f"{NEW_NAME} ({len(pairs)} edit rules)")
@@ -913,10 +932,14 @@ def branding_plan(cfg: Any, *, dry_run: bool = True,
                 else:
                     shutil.copy2(src, dst)
                 backed_up.append(f"runtime/{src.name}")
-    # 2) rewrite repository file references (atomic, per file)
+    # 2) rewrite repository file references (atomic, per file). Historical
+    #    reference files are NEVER rewritten: their old-name text documents the
+    #    migration itself and must be preserved (still reported, never hidden).
     for rel, pairs in BRANDING_FILE_EDITS:
         src = root / rel
         if not src.exists():
+            continue
+        if rel in BRANDING_HISTORICAL_REFERENCE_FILES:
             continue
         text = src.read_text(errors="replace")
         for old, new in pairs:
@@ -966,7 +989,13 @@ def branding_verify(cfg: Any, repo: Optional[Path] = None) -> Dict[str, Any]:
     field documents why 7D branding is pending rather than silently passing."""
     root = Path(repo) if repo else _repo_root()
     scan = _branding_ref_scan(root)
-    old_remaining = {rel: info["old_hits"] for rel, info in scan.items()
+    # Historical reference files are REPORTED but never fail branding; executable
+    # package/service/config/launcher references are strictly checked.
+    strict_scan = {rel: info for rel, info in scan.items()
+                   if not info.get("historical")}
+    historical = {rel: info["old_hits"] for rel, info in scan.items()
+                  if info.get("historical") and info.get("old_hits", 0) > 0}
+    old_remaining = {rel: info["old_hits"] for rel, info in strict_scan.items()
                      if info.get("old_hits", 0) > 0}
     migrated = {rel for rel, info in scan.items()
                 if not info.get("missing") and info.get("old_hits", 0) == 0}
@@ -975,7 +1004,7 @@ def branding_verify(cfg: Any, repo: Optional[Path] = None) -> Dict[str, Any]:
     state = "VERIFIED"
     limitation = None
     if old_remaining:
-        state = "PLANNED" if len(old_remaining) == len(scan) else "PARTIAL"
+        state = "PLANNED" if len(old_remaining) == len(strict_scan) else "PARTIAL"
         if repo is None:
             limitation = (
                 "Branding is IMPLEMENTED and independently verified on a "
@@ -994,6 +1023,7 @@ def branding_verify(cfg: Any, repo: Optional[Path] = None) -> Dict[str, Any]:
         "files_total": len(scan),
         "files_migrated": len(migrated),
         "files_remaining": old_remaining,
+        "historical_references": historical,
         "paths": paths_new,
         "limitation": limitation,
         "note": ("all references agree on qubit-voice-agent"

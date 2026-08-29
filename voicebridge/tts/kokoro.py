@@ -84,7 +84,7 @@ class KokoroTTS(TTSProvider):
     def synthesize(self, text: str, out_path: Optional[Path | str] = None) -> Path:
         self.load()
         out_path = Path(out_path) if out_path else Path(
-            f"/tmp/openclaw-voice-bridge/tts-{abs(hash(text))%10**8}.wav")
+            f"/tmp/qubit-voice-agent/tts-{abs(hash(text))%10**8}.wav")
         out_path.parent.mkdir(parents=True, exist_ok=True)
         with self._lock:
             audio = self._tts.generate(text, sid=self.voice_sid, speed=1.0)

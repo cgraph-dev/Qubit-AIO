@@ -6,7 +6,6 @@ No gateway/GPU/audio required.
 import sys
 from pathlib import Path
 
-import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -246,7 +245,6 @@ def test_whisper_vram_plan():
 
 
 def test_classify_continue_command():
-    from voicebridge.intent.classifier import Classifier
     clf, _ = _classifier()
     i = clf.classify("continue")
     assert i.kind == "system" and i.params.get("command") == "continue"
@@ -288,7 +286,7 @@ def test_realtime_config_defaults():
 def test_duplex_pending_flow():
     """Simulate the duplex PTT take-over flag flow (no mic conflict)."""
     from voicebridge.orchestrator import VoiceOrchestrator
-    import threading, time
+    import time
     o = VoiceOrchestrator.__new__(VoiceOrchestrator)
     o._duplex_ptt_pending = False
     o._duplex_ptt_until = 0.0

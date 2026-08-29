@@ -6,7 +6,6 @@ Uses the sherpa-onnx wespeaker model + the release test wavs:
 """
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 import pytest

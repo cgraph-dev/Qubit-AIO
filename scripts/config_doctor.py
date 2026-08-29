@@ -172,12 +172,16 @@ def check_static(cfg, results) -> None:
 
     explicit_fe = cfg.get("webui", "frontend_dir") or None
     try:
-        from voicebridge.webui import resolve_frontend_dir
-        fe, serves = resolve_frontend_dir(explicit_fe)
+        from voicebridge.webui import frontend_status
+        fe, serves, stale, version, active = frontend_status(explicit_fe)
+        note = f"{fe} (source: {active}; version {version or '?'}"
+        if stale:
+            note += "; configured frontend_dir is stale/version-mismatched, " \
+                    "serving repository UI (update the external checkout or " \
+                    "remove the override)"
         results.append(("frontend.active",
-                        HEALTHY if serves else DEGRADED,
-                        f"{fe} (source: {'config' if explicit_fe else 'repo-relative'})"
-                        + ("" if serves else " — no index.html, bridge pages only")))
+                        HEALTHY if serves and not stale else DEGRADED,
+                        note + ")"))
     except Exception as exc:
         results.append(("frontend.active", DEGRADED, f"resolver unavailable: {exc}"))
 

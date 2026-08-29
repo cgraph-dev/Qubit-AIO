@@ -1,4 +1,5 @@
-# OpenClaw Voice Bridge — THIS machine's tuned config (Scarlett 2i2 + AT2020).
+# OpenClaw Voice Bridge — repository tuned baseline (machine-agnostic;
+# per-machine values live only in the user config, see docs/AUDIO_SETUP.md).
 # Machine-agnostic defaults live in config/voice.example.yaml (installed to
 # ~/.config/openclaw-voice-bridge/voice.yaml on fresh machines by install.sh).
 
@@ -14,14 +15,18 @@ hotkey:
 
 # ---------------------------------------------------------------------------
 # Microphone
+audio:
+  output_device: ""        # EMPTY = follow the working default sink (do NOT pin an index)
+  output_device_name: ""   # EMPTY = follow default; pinning is machine-specific
+  output_volume: 100
+
 mic:
-  device: null            # null = system default (Focusrite Scarlett 2i2)
+  device: null            # null = system default input
   sample_rate: 48000      # device rate; resampled to 16 kHz for ASR
-  channels: 4             # capture ALL channels of the Scarlett's 4ch profile;
-                          # per-channel max picks whichever has the mic
+  channels: 1             # mono USB headset mics are the norm (AUDIO_SETUP rule 2)
   blocksize: 480          # ~10 ms at 48 kHz
-  gain: 3.0               # HyperX headset mic: over-gain (8x+) amplifies hiss + distorts ASR (returns empty) — ~3x is clean
-  min_rms: 0.0008         # below this RMS the capture counts as silence
+  gain: 3.0               # ~3x suits USB headsets; higher amplifies hiss and breaks ASR
+  min_rms: 0.0005         # below this RMS the capture counts as silence
   max_capture_s: 30.0     # watchdog: force-close a wedged mic stream
 
 # Voice activity detection / endpointing
@@ -33,7 +38,7 @@ vad:
   speech_start_ms: 280    # how much continuous speech before "started"
   silence_timeout_s: 1.2  # end-of-turn silence (research: 0.7-0.9s; 0.4s cut mid-thought pauses)
   max_utterance_s: 30.0
-  rms_gate: 0.004         # frame RMS floor for "voiced" (after gain) — stops hiss triggering VAD
+  rms_gate: 0.0015        # frame RMS floor for "voiced" (after gain) — stops hiss triggering VAD
   barge_in: true          # speech while TTS speaks -> cancel output (interrupt)
 
 # Speaker verification (voice-ID): only the ENROLLED voice can barge in.
@@ -53,7 +58,8 @@ feedback:
 # Speech-to-text (sherpa-onnx Moonshine: CPU, 0 VRAM, ~0.07s per utterance)
 asr:
   provider: sherpa        # sherpa (Moonshine, 0 VRAM CPU) | whisper (fallback)
-  engine: parakeet      # sherpa: parakeet v3 (max accuracy, 25 langs) | moonshine (fastest)
+  engine: parakeet
+  num_threads: 8      # sherpa: parakeet v3 (max accuracy, 25 langs) | moonshine (fastest)
   provider_ep: cpu        # sherpa onnxruntime EP: cpu | cuda
   # whisper fallback options (asr.provider: whisper)
   model: base             # tiny|base|small|medium
@@ -67,7 +73,7 @@ asr:
 # ---------------------------------------------------------------------------
 # Text-to-speech
 tts:
-  provider: openai         # piper (fast, local) | kokoro (quality, ~1x realtime CPU) | edge | gateway
+  provider: piper          # piper (fast, local) | kokoro (quality, ~1x realtime CPU) | edge | gateway
   voice: en_US-amy-medium # piper voice (downloaded by scripts/install.sh)
   sample_rate: 22050
   kokoro:
@@ -87,14 +93,19 @@ tts:
 # ---------------------------------------------------------------------------
 # Intent routing
 intent:
-  llm_classifier: true   # enabled for accent/broken-English (user approved ~20% cost)   # heuristic router only (fast; ambiguous -> conversation)
+  llm_classifier: true   # LLM fallback for accent/broken-English (user approved ~20% cost); deterministic heuristics run first
   local_llm:
     enabled: true         # bridge answers casual talk itself (<0.5s); rest -> OpenClaw/Hermes
                           # DeepSeek API handles long/complex/web asks
-    model: huihui_ai/llama3.2-abliterate:3b  # 3B: native Romanian + smaller (2.6GB). phi-4-mini broken at RO
+    model: qubit-brain4  # Qwen3-4B abliterated (Packet 4B sanitized artifact; /no_think via payload builders)
     url: http://127.0.0.1:11434
     timeout_s: 8.0     # local model chat timeout (was 4s — journal showed real timeouts)
     max_tokens: 100
+    # Packet 4B: personal facts come ONLY from the bounded context compiler
+    # (user-local personal-knowledge.md via load_core_facts); raw file slices
+    # are never injected. Legacy inject_memory key is no longer read.
+    num_ctx: 4096         # canonical runner contract (Packet 4B): compiled context + dialogs + history + output reserve fit with headroom
+
   conversation_backend: local      # bridge answers ALL chat (<0.5s); only tasks -> OpenClaw/Hermes
   templates_path: ~/.config/openclaw-voice-bridge/task-templates.yaml  # daily-task templates
   deepseek_url: https://api.deepseek.com/chat/completions
@@ -152,11 +163,11 @@ safety:
   dry_run_first: false          # true = coding tasks start as dry runs
   spoken_confirmation: true
 
-# Spoken summaries — the LOCAL 3B model compresses tool output into ≤40 words.
+# Spoken summaries — the resident brain (qubit-brain4) compresses tool output into ≤40 words.
 summarizer:
   provider: ollama              # ollama (local model) | extractive (no model)
   ollama_url: http://127.0.0.1:11434
-  ollama_model: huihui_ai/llama3.2-abliterate:3b   # the bridge's local chat model
+  ollama_model: qubit-brain4  # the bridge's local chat model
   max_chars: 900
   max_words: 40             # HARD cap on every spoken response (save time)
 

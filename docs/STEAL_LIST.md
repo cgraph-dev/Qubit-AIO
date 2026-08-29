@@ -36,7 +36,9 @@ same speed/size, better accuracy, LESS VRAM (one model, not two).
 ollama pull hf.co/bartowski/mlabonne_Qwen3-4B-abliterated-GGUF:Q4_K_M   # 2.5 GB, uncensored
 ```
 - Uncensored / abliterated Qwen3-4B (base model `mlabonne/Qwen3-4B-abliterated`).
-- Sits in the ~4.3GB free VRAM; cold load 2.3s, warm ~0.6s (≈ same as the 3B).
+- Sits in the ~4.3GB free VRAM; cold load ~2-3s. Warm median measured ≈1.27s for
+  the documented 40-token chat (2026-08-24 live check) — the 0.70s target FAILED;
+  see docs/PACKET_0A_MISMATCH_REPORT.md before quoting any latency number.
 - In the SAME speed class as the 3B → fits the "≤30% slower" budget.
 
 ### ⚠️ PITFALL found (MUST fix when baking)
@@ -70,7 +72,8 @@ return blank.
 ```
 # 1. baked model answers, never blank:
 ollama run qubit-brain4 "what is 12 times 8"   # must return text, not "" 
-# 2. speed vs 3B (warm): must be within 30% (≈≤0.7s for a 40-token chat)
+# 2. speed vs target (warm): 0.70s target NOT met — best ≤0.7s but median ≈1.27s
+     (acceptance gate still open, owned by Phase 4 benchmarks)
 # 3. VRAM: only ONE model resident (4B replaces 3B, no double-load)
 # 4. re-run the full 124-test suite + routing success ≥95%
 ```
@@ -132,9 +135,11 @@ and is unaffected by the model — that's the mic-gain fix (`mic.gain: 3.0` + Ai
 ---
 
 ## 4. Other speed/VRAM wins already in our stack (keep, don't regress)
-- `keep_alive: -1` on ALL local model calls (never eject -> no cold reload).
+- `keep_alive: -1` on chat/summary paths — but the classifier and fallback
+  generate-path omit it today (eviction/reload risk; unified in Packet 4B).
 - **Cached** ASR recognizers (fallback + main) — never reload per utterance.
-- `num_ctx: 4096`, `num_predict` capped (bounded output = faster + less memory).
+- `num_predict` capped everywhere; `num_ctx` is SPLIT today (classifier 4096 vs
+  chat defaults 8192 → option-driven runner reloads; unified in Packet 4B).
 - `top_p: 0.9`, `temperature 0.4` (deterministic-ish, fewer wasted tokens).
 - Playlist/summary via the deterministic `generate_report.py` (no model reasoning).
 - Mic `gain: 3.0` + Air mode (clean capture -> fewer ASR retries -> faster turns).
@@ -143,15 +148,38 @@ and is unaffected by the model — that's the mic-gain fix (`mic.gain: 3.0` + Ai
 ---
 
 ## 5. Concrete roadmap (ordered, minimal-risk first)
-1. **[DO] Bigger-model `pro` tier** (AirLLM) — highest "smarter" ROI. Validate 8B
-   fits + resident, else on-demand-with-evict. Bake EN-only.
-2. **[DO] Auto-preference from feedback** (CopilotKit CLHF) — small, immediate.
-3. **[DO] Tool schema for the classifier** (CopilotKit) — better routing, fewer calls.
-4. **[DO] Inline correction in same turn** (CopilotKit HITL) — faster fixes, feeds CLHF.
-5. **[DO] Delta polling + incremental activity streaming** (CopilotKit) — perceived speed.
-6. **[MAYBE] Preload TTS while model streams** — real 0.3-0.5s win.
-7. **[MAYBE] Sandbox-with-timeout helper** for scripts/scrapers (OpenSandbox shape).
+1. **[IMPLEMENTED 2026-08-23] Bigger-model default tier** (AirLLM) — `qubit-brain4`
+   baked from `mlabonne_Qwen3-4B-abliterated` Q4_K_M (`Modelfile.qubit4`) with a
+   PINNED TEMPLATE that pre-closes `<think>` (kills both the empty-content bug
+   AND the 2s thinking detour). Resident footprint ~3.2GB VRAM at 100% GPU.
+   Latency/residency numbers are per-caller and drift with options — treat the
+   Phase 4 benchmark gates as the only authoritative source. Config + repo defaults point at it; `local_llm._extract_reply`
+   falls back to thinking text so it can never answer blank. The on-demand 8B
+   stays a roadmap idea (still violates the latency budget).
+2. **[IMPLEMENTED 2026-08-23] Auto-preference from feedback** (CopilotKit CLHF) —
+   `LearningLedger._auto_preference_from_good`: 2 likes of the same normalized
+   question distill into one deduped permanent preference row.
+3. **[IMPLEMENTED 2026-08-23] Tool schema for the classifier** (CopilotKit) —
+   `intent/llm.py` SYSTEM_PROMPT now carries an explicit per-route tool schema;
+   parsing hardened against fences/prose (`_parse_json_loose`).
+4. **[IMPLEMENTED 2026-08-23] Inline correction in same turn** (CopilotKit HITL) —
+   dashboard 👎 opens an inline "What should Qubit have said?" input; submit
+   posts `feedback:"correction"` -> straight into CLHF lessons.
+5. **[IMPLEMENTED 2026-08-23] Delta polling + incremental activity** (CopilotKit) —
+   `/api/activity?since=<ts>` returns only newer items + ETag/304 short-circuit;
+   dashboard polls at 1.5s with watermark + If-None-Match.
+6. **[IMPLEMENTED 2026-08-23] Preload TTS while model streams** — real overlap:
+   `local_llm.chat_local_stream` streams NDJSON sentences while generating,
+   `Orchestrator._chat_local_reply` feeds them to `speak_stream` live (first
+   audio starts before generation ends).
+7. **[IMPLEMENTED 2026-08-23] Sandbox-with-timeout helper** (OpenSandbox shape) —
+   `voicebridge/sandbox.run_tool`: hard timeout w/ process-group SIGKILL,
+   bounded stdout/stderr capture, argv+shell support; `_dispatch_local_script`
+   uses it for every template script.
 8. **[SKIP] Whole frameworks / Docker sandboxes** — bloat, no benefit here.
+
+Tests: `tests/test_steal_list.py` (17 cases, passing); historical full-suite
+count (148) not re-verified during Packet 0A — rerun before relying on it.
 
 ---
 

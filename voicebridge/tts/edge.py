@@ -34,7 +34,7 @@ class EdgeTTS(TTSProvider):
         import edge_tts
         import asyncio
         self.load()
-        out_path = Path(out_path) if out_path else Path(f"/tmp/openclaw-voice-bridge/tts-edge-{abs(hash(text))%10**8}.wav")
+        out_path = Path(out_path) if out_path else Path(f"/tmp/qubit-voice-agent/tts-edge-{abs(hash(text))%10**8}.wav")
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
         async def _synth():

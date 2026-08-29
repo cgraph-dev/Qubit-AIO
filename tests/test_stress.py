@@ -4,12 +4,8 @@ Covers: RCtrl capture, thresholds, invisible crash logs, boss/hum, broken-Englis
 accent beam, crash-proof reports (raw + 40w), concurrency, long-task salvage, no regression.
 """
 import pathlib
-import re
-import json
 import subprocess
 import sys
-import threading
-import time
 import concurrent.futures
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -144,7 +140,6 @@ def test_report_persist_and_verify_present():
 def test_no_frontend_touched():
     # Frontend IS intentionally updated in this batch: activity.html bugfix + reports.html
     # Verify the expected frontend files exist and the duplicate-TOKEN bug is fixed.
-    import pathlib
     assert (ROOT/"frontend/reports.html").exists(), "frontend/reports.html must exist"
     assert (ROOT/"frontend/activity.html").exists()
     t=(ROOT/"frontend/activity.html").read_text()
@@ -182,19 +177,25 @@ def test_moonshine_chunking_guard():
 
 def test_activity_html_js_is_valid():
     """activity.html had `const TOKEN=*** URLSearchParams(...)` — a JS syntax
-    error that killed the ENTIRE activity page. It must now be `new URLSearchParams`."""
+    error that killed the ENTIRE activity page. It must now use the shared
+    authenticated helper (frontend/vb.js) and a valid `new URLSearchParams`
+    for the ?api= base — never a query-string token."""
     import subprocess, tempfile, pathlib
     t = (ROOT / "frontend/activity.html").read_text()
-    # must be valid JS: `const TOKEN = new URLSearchParams(...)`, not a literal `***`
-    assert "TOKEN=" in t and "new URLSearchParams" in t, "activity.html TOKEN init broken"
+    # shared helper loaded; token comes from vbToken() (browser storage only)
+    assert "/static/vb.js" in t and "vbToken" in t, "activity.html must load the shared vb.js helper"
+    # URLSearchParams still used for the ?api= BASE (not for a token)
+    assert "new URLSearchParams" in t, "activity.html BASE init broken"
+    # query-string tokens are never accepted
+    assert "get('token')" not in t and 'get("token")' not in t, \
+        "activity.html must not read a query-string token"
     assert t.count("***") == 0, f"activity.html still contains literal *** ({t.count('***')})"
-    # extract the <script> body and node --check it
-    start = t.find("<script>")
-    end = t.find("</script>")
-    if end < 0:
-        end = t.find(r"<\/script>")  # escaping-corrected closing tag in activity.html
-    js = t[start + len("<script>"):end] if start >= 0 and end >= 0 else ""
-    assert js.strip(), "activity.html has no <script>"
+    # extract the INLINE <script> body (skip the /static/vb.js loader) and
+    # node --check it
+    import re as _re
+    m = _re.search(r"<script(?![^>]*src=)[^>]*>([\s\S]*?)</script>", t)
+    js = m.group(1) if m else ""
+    assert js.strip(), "activity.html has no inline <script>"
     with tempfile.TemporaryDirectory() as td:
         p = pathlib.Path(td) / "a.js"
         p.write_text(js)
@@ -373,7 +374,6 @@ def test_web_replies_speak_locally_by_default():
 def test_orb_freeze_regression_node():
     """Atomic: the guarded audio-await must resolve even when interrupt() pauses
     mid-play (pause() never fires 'ended'). Regression for the orb freeze."""
-    import subprocess, os
     r = subprocess.run(["node", "scripts/test_orb_frozen.mjs"],
                        capture_output=True, text=True, timeout=30)
     assert r.returncode == 0, f"orb freeze regression: {r.stderr[-400:]}\n{r.stdout[-400:]}"
@@ -385,7 +385,6 @@ def test_webui_results_pruned_both_paths():
     import pathlib, tempfile
     from voicebridge.config import Config
     from unittest import mock
-    import threading, time
     from voicebridge.webui import WebUI
     with tempfile.TemporaryDirectory() as td:
         cfg = Config.load(pathlib.Path(td) / "none.yaml")
@@ -409,9 +408,9 @@ def test_webui_results_pruned_both_paths():
 
 def test_terminal_health_and_watch_tools():
     """qubit-dev /health and /watch must return a usable snapshot without crashing."""
-    import pathlib, tempfile, json
     from voicebridge.config import Config
     from voicebridge.terminal import _health_text, _watch_text
+    import tempfile, pathlib
     with tempfile.TemporaryDirectory() as td:
         cfg = Config.load(pathlib.Path(td) / "none.yaml")
         # health must never raise, even with no live bridge / no logs
@@ -425,7 +424,6 @@ def test_terminal_health_and_watch_tools():
 
 def test_actions_youtube_uses_module_path():
     """The windowed-tab path needs Path — regression for 'name Path is not defined'."""
-    import pathlib, subprocess
     src = pathlib.Path("voicebridge/local/actions.py").read_text()
     # Path must be imported at module top (not just locally) so all 4 call sites work
     assert "from pathlib import Path" in src
@@ -460,7 +458,7 @@ def test_report_generator_rich_format():
     """generate_report auto-build must emit a RICH report with the key detailed
     sections (Agent/Route, Files table, Verification+test output, References,
     Screenshots, Commands, spoken summary last) and infer status correctly."""
-    import importlib.util, argparse, pathlib, sys
+    import importlib.util
     spec = importlib.util.spec_from_file_location("gen", "scripts/generate_report.py")
     g = importlib.util.module_from_spec(spec); spec.loader.exec_module(g)
     class A: pass
@@ -515,15 +513,18 @@ def test_classifier_uses_config_model_not_hardcoded():
 
 
 def test_local_llm_options_have_num_ctx_and_keepalive():
-    """local_llm must send num_ctx=4096 + keep_alive=-1 to avoid instruction
-    truncation and model ejection (accuracy + latency)."""
-    import pathlib, re
+    """Packet 4B: local_llm and summarizer must source num_ctx + keep_alive
+    from the ONE canonical runner contract (no per-caller literals)."""
     src = pathlib.Path("voicebridge/local_llm.py").read_text()
-    assert '"num_ctx": 4096' in src, "local_llm missing num_ctx"
+    assert '"num_ctx": num_ctx' in src, "local_llm lost configurable num_ctx"
     assert '"keep_alive": -1' in src, "local_llm missing keep_alive"
     summ = pathlib.Path("voicebridge/summarizer.py").read_text()
-    assert '"num_ctx": 4096' in summ, "summarizer missing num_ctx"
-    assert '"keep_alive": -1' in summ, "summarizer missing keep_alive"
+    assert '"num_ctx": _rc.num_ctx' in summ, \
+        "summarizer must source num_ctx from the runner contract"
+    assert '"keep_alive": _rc.keep_alive' in summ, \
+        "summarizer missing contract keep_alive"
+    assert '"num_ctx": 4096' not in summ, \
+        "per-caller num_ctx literal must be gone (single-contract rule)"
 
 
 def test_mic_mono_takes_best_channel():
@@ -701,7 +702,6 @@ def test_learning_ledger_clhf():
 def test_playback_resamples_to_device_rate():
     """Pinned raw ALSA device rejects a mismatched sample rate (-9997). Playback
     must resample the TTS (22050) to the device's native (44100)."""
-    import pathlib
     from voicebridge.audio.playback import _resample
     import numpy as np
     src = (np.sin(np.linspace(0, 20, 22050)) * 32767).astype(np.int16)
@@ -714,28 +714,131 @@ def test_playback_resamples_to_device_rate():
     assert len(_resample(src, 22050, 22050)) == 22050
 
 
+def test_playback_resolves_target_rate_on_follow_default_path(monkeypatch):
+    """HDMI/TV sinks reject 22050 Hz (-9997). Even with NOTHING pinned (follow
+    the system default sink), playback must resample to the default output's
+    native rate instead of sending Piper's 22050 raw — this is what broke when
+    the OS output was switched to the TV."""
+    from voicebridge.audio.playback import _resolve_target_rate
+    import sounddevice as sd
+    fake = [
+        {"name": "HDA NVidia: Philips FTV (hw:0,3)",
+         "default_samplerate": 44100.0, "max_input_channels": 0,
+         "max_output_channels": 8},
+        {"name": "default", "default_samplerate": 44100.0,
+         "max_input_channels": 64, "max_output_channels": 64},
+    ]
+    monkeypatch.setattr(sd, "query_devices", lambda: fake)
+    old = sd.default.device
+    try:
+        sd.default.device = [1, 1]            # default output -> "default" @44100
+        assert _resolve_target_rate(None) == 44100   # follow-default resamples
+        assert _resolve_target_rate(0) == 44100      # pinned HDMI path resamples
+    finally:
+        sd.default.device = old
+
+
+def test_playback_target_rate_unknown_returns_zero(monkeypatch):
+    """If the native rate cannot be determined, _resolve_target_rate must return
+    0 (no resample, no crash) so playback keeps its old fallback behavior."""
+    from unittest import mock
+    from voicebridge.audio.playback import _resolve_target_rate
+    import sounddevice as sd
+    with mock.patch.object(sd, "query_devices",
+                           side_effect=Exception("no devices")):
+        assert _resolve_target_rate(None) == 0
+        assert _resolve_target_rate(5) == 0
+
+
+def test_play_try_sends_native_rate_when_following_default(monkeypatch, tmp_path):
+    """End-to-end: _play_try() must hand sd.play() the RESAMPLED native rate
+    (44100) even when dev is None (follow default), so a 22050 Hz TTS clip plays
+    on an HDMI/TV default sink instead of failing with -9997."""
+    from voicebridge.audio.playback import Playback
+    import sounddevice as sd, wave, numpy as np, pathlib
+    wav = pathlib.Path(tmp_path) / "t.wav"
+    with wave.open(str(wav), "wb") as wf:
+        wf.setnchannels(1); wf.setsampwidth(2); wf.setframerate(22050)
+        wf.writeframes(np.zeros(22050, dtype=np.int16).tobytes())  # 1.0 s @22050
+    fake = [
+        {"name": "default", "default_samplerate": 44100.0,
+         "max_input_channels": 64, "max_output_channels": 64},
+    ]
+    monkeypatch.setattr(sd, "query_devices", lambda: fake)
+    old = sd.default.device
+    played = {}
+    def fake_play(audio, sr, blocking=False, device=None):
+        played["len"] = len(audio); played["sr"] = sr; played["dev"] = device
+    calls = {"n": 0}
+    def fake_get_stream():
+        # active on the first poll, inactive after -> watchdog breaks fast
+        calls["n"] += 1
+        class _ST:
+            active = calls["n"] == 1
+        return _ST()
+    try:
+        sd.default.device = [0, 0]
+        monkeypatch.setattr(sd, "play", fake_play)
+        monkeypatch.setattr(sd, "get_stream", fake_get_stream)
+        pb = Playback(device=None, device_name="")
+        assert pb._play_try(wav, on_start=None) is True
+        assert played["sr"] == 44100, f"expected native 44100, got {played['sr']}"
+        assert played["len"] == 44100, "audio must be resampled 22050 -> 44100"
+    finally:
+        sd.default.device = old
+
+
 def test_playback_resolves_by_name_not_silent_index():
-    """Playback must resolve to a REAL output device (never a 0-output / HDMI-
-    only trap) when given a name; device indices shift so name matching wins."""
+    """Resolver contract: match by name/index when pinned, otherwise DEFER to
+    the system default sink. It must NEVER guess a device — guessing once sent
+    beeps+TTS to a silent ALC892 line-out while the real sink was the PipeWire
+    default (USB headset), making PTT feel completely dead."""
     from voicebridge.audio.playback import Playback
     import sounddevice as sd
-    # A 0-output device index traps the old code (silent); name-match must win.
-    for i, d in enumerate(sd.query_devices()):
-        if d["max_output_channels"] == 0:
-            pb = Playback(device=str(i), device_name="HyperX Cloud III")
-            dev = pb._resolve_device()
-            assert dev is not None and sd.query_devices(dev)["max_output_channels"] > 0, \
-                f"resolved to silent/None for name HyperX"
-            break
-    # named resolution for the actual headset (or fallback) always yields output
-    pb = Playback(device='', device_name='HyperX Cloud III')
-    dev = pb._resolve_device()
-    assert dev is not None and sd.query_devices(dev)["max_output_channels"] > 0
-    # a device with no name set still returns a real output, never silent
-    raw = Playback(device='', device_name='')
-    dev2 = raw._resolve_device()
-    if dev2 is not None:
-        assert sd.query_devices(dev2)["max_output_channels"] > 0
+    devs = sd.query_devices()
+    # 1) pinned name that EXISTS -> that exact device, and it can output
+    hit = next((i for i, d in enumerate(devs)
+                if d["max_output_channels"] > 0 and "HyperX" in d["name"]), None)
+    if hit is not None:
+        pb = Playback(device="", device_name="HyperX")
+        assert pb._resolve_device() == hit
+    # 2) explicit valid index -> honored (never swapped for something else)
+    out = next((i for i, d in enumerate(devs) if d["max_output_channels"] > 0), None)
+    if out is not None:
+        assert Playback(device=str(out), device_name="")._resolve_device() == out
+    # 3) UNMATCHED pin -> None (= system default sink), never a guessed port.
+    #    This is the anti-silent-port rule; returning any other index fails.
+    pb = Playback(device="", device_name="DefinitelyNotARealDeviceName12345")
+    miss = pb._resolve_device()
+    assert miss is None or devs[miss]["max_output_channels"] > 0
+    # 4) nothing pinned -> follow the system default via the pulse/pipewire
+    #    aggregate (audible by definition) or None on a bare-ALSA system; it
+    #    must never be a guessed silent port.
+    got = Playback(device="", device_name="")._resolve_device()
+    assert got is None or devs[got]["max_output_channels"] > 0
+
+
+def test_playback_follow_default_uses_aggregate_without_resample(monkeypatch):
+    """Follow-default must prefer the pulse/pipewire aggregate and play at the
+    SOURCE rate (no Python resample) so PipeWire converts at high quality —
+    this both fixes HDMI/TV (raw ALSA rejects 22050 with -9997) and avoids the
+    linear-resample 'robotic voice' on every sink."""
+    from voicebridge.audio.playback import (_aggregate_output_index,
+                                            _resolve_target_rate)
+    import sounddevice as sd
+    fake = [
+        {"name": "HDA NVidia: Philips FTV (hw:0,3)", "default_samplerate": 44100.0,
+         "max_input_channels": 0, "max_output_channels": 8},
+        {"name": "pulse", "default_samplerate": 44100.0,
+         "max_input_channels": 32, "max_output_channels": 32},
+    ]
+    monkeypatch.setattr(sd, "query_devices", lambda: fake)
+    assert _aggregate_output_index() == 1
+    assert _resolve_target_rate(1) == 0          # aggregate: no Python resample
+    assert _resolve_target_rate(0) == 44100      # raw hw: native-rate resample
+    # nothing pinned -> the aggregate index, not a silent hw port
+    from voicebridge.audio.playback import Playback
+    assert Playback(device="", device_name="")._resolve_device() == 1
 
 
 def test_audio_config_exposes_device_name():
@@ -754,10 +857,10 @@ def test_audio_config_exposes_device_name():
 def test_web_no_double_speak_when_local():
     """When speak_web_locally is on, the bridge plays on PC and must NOT also
     hand the browser audio_b64 (that's the 'responds twice' bug)."""
-    import pathlib, tempfile, base64
     from voicebridge.config import Config
     from unittest import mock
     from voicebridge.webui import WebUI
+    import tempfile, pathlib
     with tempfile.TemporaryDirectory() as td:
         cfg = Config.load(pathlib.Path(td) / "none.yaml")
         cfg.data.setdefault("webui", {})["speak_web_locally"] = True
@@ -773,9 +876,8 @@ def test_web_no_double_speak_when_local():
 def test_capture_peak_normalizes_for_asr():
     """Peak-normalize pre-amp: a quiet/variable mic must get a stable level before
     ASR (consistent transcription, no clipping)."""
-    import numpy as np, wave, pathlib, tempfile
-    from voicebridge.audio.mic import MicCapture
     # simulate the loop that normalizes the payload before writing the WAV
+    import numpy as np
     sr = 16000
     for raw_peak in (0.03, 0.12, 0.4):
         n = int(sr * 1.0)
@@ -802,7 +904,6 @@ def test_web_no_double_speak_returns_null_audio():
     import pathlib, tempfile
     from voicebridge.config import Config
     from unittest import mock
-    import threading, time
     from voicebridge.webui import WebUI
     with tempfile.TemporaryDirectory() as td:
         cfg = Config.load(pathlib.Path(td) / "none.yaml")
@@ -816,6 +917,7 @@ def test_web_no_double_speak_returns_null_audio():
         w = WebUI(orb, host="127.0.0.1", port=0, state_dir=pathlib.Path(td))
         # run the submit_text worker then read the result
         rid = w.submit_text("hi")
+        import time
         for _ in range(30):
             time.sleep(0.1)
             if w.result(rid).get("status") == "done": break

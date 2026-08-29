@@ -16,8 +16,8 @@ cancel. Nothing is executed until the confirmation resolves.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any, Dict, List
 
 from ..logging_setup import log_event
 

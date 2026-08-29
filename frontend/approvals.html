@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Approvals — Qubit</title>
+<style>
+ body{font:14px/1.5 system-ui,sans-serif;background:#0b0e14;color:#dbe2ef;margin:0;padding:24px}
+ h1{font-size:18px;margin:0 0 16px}
+ .card{background:#131a26;border:1px solid #22304a;border-radius:10px;padding:12px;margin-bottom:10px}
+ button{margin-right:8px;padding:6px 14px;border-radius:6px;border:0;cursor:pointer}
+ .ok{background:#1f7a4d;color:#fff}.no{background:#7a1f2d;color:#fff}
+ .muted{color:#7f8ca3}.err{color:#ff8080}
+</style></head><body>
+<h1>Pending approvals</h1>
+<div id="list" class="muted">loading…</div>
+<script src="/static/vb.js"></script>
+<script>
+const API = vbApiBase();
+const hdrs = (extra) => vbHeaders(extra);
+function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+async function load(){
+ try{
+  const r = await fetch(API+'/api/approvals',{headers:hdrs()});
+  if(r.status===401){document.getElementById('list').textContent='unauthorized — set vdb_token in localStorage';return;}
+  const j = await r.json();
+  const el = document.getElementById('list');
+  if(!j.items.length){el.textContent='nothing pending';return;}
+  el.innerHTML = j.items.map(a=>
+    `<div class="card" data-id="${esc(a.id)}">
+       <b>${esc(a.capability)}</b> <span class="muted">${new Date(a.created_at*1000).toLocaleString()}</span>
+       <div>${esc(a.summary)}</div>
+       <button class="ok" onclick="respond('${esc(a.id)}','approve')">Approve</button>
+       <button class="no" onclick="respond('${esc(a.id)}','deny')">Deny</button>
+     </div>`).join('');
+ }catch(e){document.getElementById('list').innerHTML='<span class="err">'+esc(String(e))+'</span>';}
+}
+async function respond(id,decision){
+ await fetch(API+'/api/approvals/respond',{method:'POST',headers:hdrs(),
+   body:JSON.stringify({id,decision})});
+ load();
+}
+load(); setInterval(load,3000);
+</script></body></html>

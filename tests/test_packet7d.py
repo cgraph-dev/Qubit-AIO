@@ -326,6 +326,73 @@ def test_branding_verify_reports_partial_and_planned(tmp_path):
     assert "pyproject.toml" not in v2["files_remaining"]
 
 
+def test_branding_historical_ref_reported_but_does_not_fail(tmp_path):
+    """Approved historical migration text in docs/AGENT_PROMPT_PACK.md (e.g.
+    'rename from openclaw-voice-bridge to qubit-voice-agent') is REPORTED by
+    the verifier but never fails branding, and apply preserves it."""
+    cfg = _cfg(tmp_path)
+    repo = _staged_repo(tmp_path)
+    hist = repo / "docs" / "AGENT_PROMPT_PACK.md"
+    hist_text = hist.read_text()
+    assert "openclaw-voice-bridge" in hist_text   # pre-staged repo has the text
+    bdir = tmp_path / "b"
+    P.branding_plan(cfg, dry_run=False, backup_dir=bdir, repo=repo)
+    v = P.branding_verify(cfg, repo=repo)
+    assert v["state"] == "VERIFIED", v
+    # the historical reference is REPORTED, not hidden
+    assert v["historical_references"].get("docs/AGENT_PROMPT_PACK.md", 0) > 0
+    # and the intentional historical migration text was preserved (not rewritten)
+    assert "openclaw-voice-bridge" in hist.read_text()
+
+
+def test_branding_unapproved_old_name_reference_still_fails(tmp_path):
+    """Any old-name reference in an executable package/service/config/launcher
+    file still fails branding (PARTIAL), even when historical refs exist."""
+    cfg = _cfg(tmp_path)
+    repo = _staged_repo(tmp_path)
+    bdir = tmp_path / "b"
+    P.branding_plan(cfg, dry_run=False, backup_dir=bdir, repo=repo)
+    # reintroduce an UNapproved old-name reference in an executable file
+    pp = repo / "pyproject.toml"
+    pp.write_text(pp.read_text().replace('name = "qubit-voice-agent"',
+                                         'name = "openclaw-voice-bridge"'))
+    v = P.branding_verify(cfg, repo=repo)
+    assert v["state"] == "PARTIAL", v
+    assert "pyproject.toml" in v["files_remaining"]
+
+
+def test_branding_cli_verify_succeeds_on_current_repository(tmp_path, capsys):
+    """`voicebridge branding verify` on the CURRENT repository returns success
+    (rc 0, state VERIFIED) now that the prompt-pack historical migration text
+    is allowlisted, while still reporting the historical reference."""
+    from voicebridge.cli import main as cli
+    cfg_path = tmp_path / "voice.yaml"
+    cfg_path.write_text("logging:\n  jsonl_path: '" +
+                        str(tmp_path / "state") + "'\n")
+    rc = cli(["branding", "verify", "--config", str(cfg_path)])
+    out = json.loads(capsys.readouterr().out)
+    assert rc == 0, out
+    assert out["state"] == "VERIFIED", out
+    assert out["historical_references"]   # reported, not hidden
+
+
+def test_branding_staged_apply_verify_rollback_cycle(tmp_path):
+    """Staged apply -> verify (VERIFIED) -> rollback (OK) still works after the
+    historical-reference allowlist change."""
+    cfg = _cfg(tmp_path)
+    repo = _staged_repo(tmp_path)
+    bdir = tmp_path / "b"
+    before = (repo / "pyproject.toml").read_text()
+    P.branding_plan(cfg, dry_run=False, backup_dir=bdir, repo=repo)
+    assert (repo / "pyproject.toml").read_text() != before
+    v = P.branding_verify(cfg, repo=repo)
+    assert v["state"] == "VERIFIED", v
+    out = P.branding_rollback(cfg, bdir, repo=repo)
+    assert out["state"] == "OK"
+    assert out["restored"]
+    assert (repo / "pyproject.toml").read_text() == before
+
+
 def test_branding_rollback_restores_full_backup(tmp_path):
     cfg = _cfg(tmp_path)
     repo = _staged_repo(tmp_path)
@@ -489,7 +556,10 @@ def _get(ui, path, token="test-token"):
         with urllib.request.urlopen(req, timeout=5) as r:
             return r.status, json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read().decode() or "{}")
+        try:
+            return e.code, json.loads(e.read().decode() or "{}")
+        finally:
+            e.close()
 
 
 def _post(ui, path, body, token="test-token"):
@@ -502,7 +572,10 @@ def _post(ui, path, body, token="test-token"):
         with urllib.request.urlopen(req, timeout=5) as r:
             return r.status, json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read().decode() or "{}")
+        try:
+            return e.code, json.loads(e.read().decode() or "{}")
+        finally:
+            e.close()
 
 
 def test_api_profiles_requires_auth(tmp_path, monkeypatch):
@@ -517,6 +590,7 @@ def test_api_profiles_requires_auth(tmp_path, monkeypatch):
         with pytest.raises(urllib.error.HTTPError) as ei:
             urllib.request.urlopen(req, timeout=5)
         assert ei.value.code == 401
+        ei.value.close()                               # release the socket
     finally:
         ui.stop()
 
@@ -654,8 +728,11 @@ def test_profiles_page_has_no_frontend_only_state(tmp_path, monkeypatch):
                "/api/branding", "/api/approvals", "/api/reports",
                "/api/status"):
         assert ep in html, f"missing backend endpoint {ep} in settings page"
-    # no localStorage as a source of truth for provider state
-    assert "localStorage.getItem('vdb_token')" in html  # only the auth token
+# no browser storage as a source of truth for provider state — settings.html
+        # never reads token/state storage directly; it goes through the shared
+        # /static/vb.js helper (Packet 8E serving fix).
+        assert "/static/vb.js" in html
+        assert "localStorage" not in html
     # all untrusted text is escaped before render
     assert "function esc(s)" in html
     assert "esc(" in html

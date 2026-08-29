@@ -24,7 +24,7 @@ You are the implementation agent. Implement ONLY the packet named below.
 
 Before any search, edit, model load/download, dependency install, browser
 access, service operation, or state-changing command:
-
+he sa
 1. Read AGENTS.md completely.
 2. Read docs/UNIFIED_AGENT_PLAN.md completely.
 3. Read this prompt pack and the selected packet prompt completely.
@@ -520,142 +520,6 @@ and confirm failed or unreviewable candidates cannot be promoted. Test rollback
 and removal of a bad lesson.
 ```
 
-## Packet 6C — Piper voice-quality layer, informed by Fish Audio
-
-The goal is to make the existing lightweight Piper path sound better, not to
-pretend that Piper's small acoustic model can become Fish S2 Pro by copying
-unrelated model code. Fish S2 Pro is a separate large speech model. Reuse
-compatible TTS engineering ideas around it—text normalization, phrase/sentence
-segmentation, prosody metadata, streaming, reference handling, and evaluation—
-while keeping Piper fast, offline, and the safe fallback. This packet must not
-change the reasoning model, ASR, router, permissions, or memory.
-
-### Hard resource rule
-
-The complete local agent must remain within **5 GB VRAM maximum**, with a target
-of **4 GB or less steady-state**. The resident Qubit model, ASR, TTS, CUDA
-libraries, temporary allocations, and all local workers count toward the same
-budget. Piper and the default ASR path should run on CPU. Loading Fish S2 Pro,
-a large Whisper model, or any second GPU model is out of scope for this PC.
-Any benchmark over 5 GB is a packet failure and must not be hidden by unloading
-the model after the measurement.
-
-### Implementation prompt
-
-```text
-Implement ONLY Packet 6C: create a small Piper voice-quality layer behind the
-existing TTSProvider contract. Inspect the pinned Fish Audio source first and
-write a source-to-feature mapping before coding. Implement only compatible,
-measurable ideas: safe text normalization; punctuation-aware sentence/phrase
-segmentation; optional approved prosody markers mapped to Piper-safe text;
-pronunciation overrides; bounded sentence streaming; cross-fade or silence
-handling where it improves joins; and deterministic audio loudness/resampling.
-Do not claim that Piper supports Fish's emotion tags, voice cloning,
-multi-speaker generation, or model intelligence unless a real implementation
-and test proves it. Unsupported tags must be removed or spoken safely.
-
-For this private, noncommercial school project, a pinned local Fish Speech
-checkout may be inspected and its TTS source/weights may be evaluated or
-adapted under the Fish Audio Research License. Do not make Fish a runtime
-dependency for this packet and do not redistribute that checkout, weights, or a
-derivative product. Keep the license and required attribution/notice files with
-the local project. For every copied line or dependency, record the exact
-upstream URL, commit/version, file, license, and required notices. Do not use
-Fish outputs to create or improve a foundational generative model. If this
-ever becomes a paid, hosted, or distributed product, stop and obtain a
-separate commercial license before shipping Fish materials. Fish-derived
-preprocessing must remain independently testable and must not require Fish at
-runtime. Fish provides TTS ideas here; it does not supply our STT engine.
-
-Keep Piper offline and default. Preserve cancellation, barge-in, bounded
-buffers, output-device behavior, and the existing playback retry path. Add
-configuration for the enhancement layer with a safe off switch. Add unit and
-integration tests for normalization, marker handling, segmentation, ordering,
-joins, cancellation, malformed text, non-English text, secret/reference
-redaction, WAV validity, latency/resource limits, and unchanged raw-Piper
-behavior. Add documentation and a reversible migration. Do not add Fish API
-credentials or a remote dependency in this packet.
-```
-
-### Verification prompt
-
-```text
-Verify ONLY Packet 6C. Inspect the source-to-feature mapping, exact upstream
-revisions, license records, notices, and diff before running tests. Prove the
-enhancement layer is local, opt-in, reversible, and independent of Fish at
-runtime; raw Piper still works when it is disabled. Prove normalization and
-prosody handling never inject unsafe control text, unsupported markers are
-handled safely, phrase streaming is ordered, joins are acceptable, barge-in
-stops output, and the final audio is valid mono WAV at the playback boundary.
-
-Measure raw Piper versus enhanced Piper for cold/warm latency, time-to-first
-audio, CPU/RAM/VRAM, output duration, and human listening quality. Prove the
-existing full suite and real PTT/audio smoke remain green. Do not claim Piper
-matches Fish S2 quality without a documented blind listening evaluation. Do
-not claim Fish source or weights are commercially redistributable without
-written licensing evidence. Report automated, live-audio, and human-listening
-evidence separately; skipped tests are not green.
-```
-
-## Packet 6D — sentiment-controlled single voice and STT quality
-
-This packet is the correct home for the user's single-voice and human-like
-delivery goal. Sentiment is a bounded delivery signal, not consciousness. The
-agent must not silently record ambient audio; recording requires a separate
-explicit permission and retention policy.
-
-### Implementation prompt
-
-```text
-Implement ONLY Packet 6D: add one canonical user-selected voice profile and a
-small deterministic sentiment/prosody controller. The controller may classify
-the reply into neutral, warm, calm, concerned, urgent, or excited using typed
-rules/metadata, then map it to controls that the selected Piper voice actually
-supports. Use Fish Speech source only as a documented TTS design reference;
-do not run Fish, use its brain/memory, or add its model weights to production.
-Piper must remain the one voice and must degrade to neutral when a control is
-unsupported. Do not promise literal feelings, voice cloning, or Fish-level
-quality without evidence.
-
-Improve STT separately using the existing Sherpa Moonshine/Parakeet and
-Faster-Whisper contracts: clean input audio, preserve VAD and interruptions,
-support user hotwords, and use an explicit resource-bounded fallback. Fish is
-not an STT dependency. Never load a second GPU model if doing so could exceed
-the whole-agent 5 GB VRAM limit; CPU placement is preferred.
-
-Do not add always-on recording. If background capture is implemented later,
-make it a separate opt-in capability with a visible active indicator, bounded
-local ring buffer, pause/delete controls, retention expiry, no upload by
-default, and redacted audit events. Do not feed ambient audio into memory or
-training without a separate user approval.
-
-Add a repeatable consented speech benchmark covering ordinary speech, names,
-commands, numbers, silence, noise, accents, and interruptions. Measure STT
-WER/CER, command accuracy, false activation, TTS intelligibility/naturalness,
-voice consistency, emotional-fit rating, end-to-end latency, CPU/RAM/VRAM, and
-time-to-first-audio. Add regression tests for voice immutability, sentiment
-validation, unsupported controls, STT fallback, recording consent/retention,
-redaction, and unchanged HyperX capture/playback. Document rollback.
-```
-
-### Verification prompt
-
-```text
-Verify ONLY Packet 6D. Prove all replies use exactly one configured voice,
-sentiment values are bounded and safe, unsupported prosody controls degrade
-without changing voice, and no Fish runtime/model/brain/memory is required.
-Run the consented speech benchmark and report STT WER/CER, command accuracy,
-false activations, TTS latency, resource use, naturalness, intelligibility,
-voice consistency, and emotional-fit scores separately.
-
-Prove ASR fallback is resource-bounded, VAD handles silence and interruptions,
-hotwords improve names without inventing content, and the HyperX path stays
-clean. If recording exists, prove it is visibly opt-in, local, bounded,
-deletable, expired on schedule, and absent from logs after deletion. Skipped
-human or live-audio checks are limitations, not passes. Do not claim real
-feelings or Fish-equivalent quality without measured evidence.
-```
-
 ## Packet 7A — operations and clean installation
 
 ### Implementation prompt
@@ -730,27 +594,12 @@ old state. Add clean-install, upgrade, interrupted-install, uninstall,
 wrong-passphrase, corrupted-bundle, schema-migration, rollback, low-disk,
 CPU-only, GPU, missing-Ollama, missing-browser, and missing-audio tests.
 
-Include a user-facing audio settings contract. On first run, the bridge must use
-the operating-system default microphone and default headphones/output. Settings
-must let the user view available input/output devices, choose a device, reset to
-OS default, and see typed unavailable/degraded states. Persist stable device
-names/roles or approved backend identifiers, never transient numeric indices or
-guessed raw ALSA hardware paths. An unavailable selected device must not silently
-switch to a different physical device; it must offer an explicit reset-to-default
-action. Preserve the verified HyperX mono-input and HyperX output defaults in
-the supported Ubuntu profile, keep microphone permission and output selection
-visible, and do not silently restart or rewrite the live service/config when a
-setting is edited. Add hot-plug, missing-device, permission-denied, invalid
-selection, reset-to-default, and restart-persistence tests without recording
-ambient audio.
-
 If adding the optional public-web extraction adapter, implement it in the Phase 5
 evidence boundary only: pin and document the exact Scrapling source/license,
 prefer bounded HTTP, enforce SSRF/domain/size/time/concurrency limits, redact and
 cite output, treat page text as untrusted evidence, and do not use stealth or
 proxy/CAPTCHA features to defeat access controls. Do not add Scrapling to
 personal-account monitoring or add a second agent framework.
-
 ```
 
 ### Verification prompt
@@ -763,15 +612,6 @@ package does not depend on the developer's home directory, undeclared packages,
 hidden services, copied secrets, or an unverified model alias. Verify upgrade,
 interrupted-install, uninstall, low-disk, CPU-only, GPU, missing-Ollama,
 missing-browser, and missing-audio states with typed outcomes.
-
-Verify the audio settings contract: a clean first run selects the OS default
-microphone and headphones/output; the settings path lists only valid devices,
-supports explicit selection and reset-to-default, persists across restart, and
-reports permission denied, device unavailable, and degraded states honestly.
-Prove device reconnects cannot misroute audio, transient indices and raw ALSA
-paths are not persisted, an unavailable selection is not guessed, the supported
-HyperX mono/USB profile remains intact, and editing settings does not implicitly
-restart a service or enable recording.
 
 Create a synthetic state bundle and prove encrypted export/import restores the
 documented memory, lessons, preferences, reports, non-secret config, model
@@ -794,7 +634,6 @@ Reject a claim of “portable” if only source files copy while state, migratio
 model compatibility, rollback, or device enrollment remain untested. Reject a
 claim of “better SLM” unless model quality and latency are separately benchmarked;
 packaging and tools improve the agent system, not the neural weights by themselves.
-
 ```
 
 ## Packet 7D — product customization, dashboard/CLI parity, and Qubit branding
@@ -821,31 +660,31 @@ trusted merely because it exists, and a failed gate must leave the previous
 profile active.
 
 Add beginner onboarding with plain-language safe defaults and an advanced
-settings mode that exposes the technical details only when requested. Expose
-stable machine-readable CLI commands for profile list/show/check/install/
-select/reset/upgrade/remove/rollback; changes are dry-run by default, explicitly
-applied, staged atomically, backed up, audited, and reversible. Keep voice
-selection separate from TTS provider, model, and audio-device selection.
+settings mode that exposes technical details only when requested. Expose stable
+machine-readable CLI commands for profile list/show/check/install/select/reset/
+upgrade/remove/rollback; changes are dry-run by default, explicitly applied,
+staged atomically, backed up, audited, and reversible. Keep voice selection
+separate from TTS provider, model, and audio-device selection.
 
 Make the authenticated web dashboard the primary control center with parity for
 all supported CLI operations: onboarding, model/STT/TTS/voice selection, audio
 devices, permissions, device enrollment, health, task progress, approvals,
 cancellation, reports, audit/provenance, export/import, upgrade, reset, and
-rollback. Every control must call a real backend contract and display typed
-success, unavailable, degraded, denied, partial, or failed state. Require
-confirmation for side effects, preserve loopback binding by default, escape
-untrusted text, and never expose secrets, private message bodies, prompts,
-credentials, or filesystem paths. Add API, negative/security, persistence,
-accessibility, and local UI smoke tests for every supported control. Reject
-placeholder buttons, frontend-only state, and fake success.
+rollback. Every control must call a real authenticated backend contract and
+display typed success, unavailable, degraded, denied, partial, or failed state.
+Require confirmation for side effects, preserve loopback binding by default,
+escape untrusted text, and never expose secrets, private message bodies,
+prompts, credentials, or filesystem paths. Add API, negative/security,
+persistence, accessibility, and local UI smoke tests for every supported
+control. Reject placeholder buttons, frontend-only state, and fake success.
 
 Brand the distributable as Qubit Voice Agent. Prepare the physical repository
-rename from `qubit-voice-agent` to `qubit-voice-agent` as a separate release
-migration, updating package metadata, docs, service/unit identifiers, configured
-paths, launchers, fixtures, and compatibility aliases together. Provide a
-dry-run, backup, migration, independent verification, and rollback path. Do not
-move, delete, or silently re-enroll existing user state, and do not perform the
-rename as incidental cleanup.
+rename from `openclaw-voice-bridge` to `qubit-voice-agent` as a separate release
+migration, updating package metadata, docs, service/unit identifiers,
+configured paths, launchers, fixtures, and compatibility aliases together.
+Provide a dry-run, backup, migration, independent verification, and rollback
+path. Do not move, delete, or silently re-enroll existing user state, and do
+not perform the rename as incidental cleanup.
 
 Inspect the relevant pinned upstream source/tests before coding, record
 provenance and licenses, use the smallest compatible local implementation, and
@@ -881,6 +720,108 @@ repository/package/service/config/launcher references agree, no developer-home
 path remains, compatibility aliases and rollback are recoverable, and a failed
 migration preserves memory, reports, permissions, device settings, and model
 metadata. Stop after the 7D verification result.
+```
+
+## Packet 7E — permission profiles and extension registry
+
+This is a new follow-up packet. It does not retroactively change the verified
+7D result. It is required before any new live website, desktop-app, editor, or
+marketplace integration is enabled.
+
+### Implementation prompt
+
+```text
+Implement ONLY Packet 7E: add a versioned capability/skill manifest and a
+permission-profile contract for future websites, desktop apps, editors,
+browser operations, and marketplace packages. Preserve the existing Python,
+static-JS, systemd, OpenClaw/Hermes, broker, audit, rollback, and 5 GB VRAM
+contracts. Do not implement Packet 8B adapters or any new live integration.
+
+Define a manifest containing stable skill ID/version, source/revision/license/
+hash, capabilities, domains/workspace/app scopes, read/write/destructive tier,
+data sensitivity, approval policy, timeout/resource limits, audit events,
+compatibility, and rollback/removal behavior. Validate every manifest before
+registration; stage new skills disabled until explicit user enablement. Do not
+execute arbitrary package hooks or trust a skill merely because it is installed.
+
+Implement two explicit permission modes:
+
+- restricted (default): only explicitly granted capabilities and scopes work;
+- unrestricted (opt-in): may pre-authorize routine non-destructive work only
+  inside user-selected scopes, with authentication, explicit confirmation,
+  expiry/reset, and audit.
+
+Unrestricted must never bypass hard-deny rules, schema validation, redaction,
+audit, isolation, resource limits, loopback-only boundaries, or confirmation for
+sending, publishing, purchasing, deleting, credential/account/security changes,
+or system-wide destructive operations. Model output, page text, tool results,
+skill instructions, and generated plans can never change the mode or widen a
+grant.
+
+Expose one backend contract through stable CLI commands:
+`permissions mode show|set restricted|unrestricted`,
+`permissions list|show|check`, `permissions grant`, `permissions revoke`,
+`permissions reset`, and
+`skills list|show|check|install|enable|disable|remove|rollback`.
+Mutating commands must support dry-run/preview, explicit confirmation, scope,
+expiry, audit output, atomic persistence, and rollback.
+
+Expose the same operations in the authenticated dashboard. The beginner view
+must show plain-language Restricted/Unrestricted choices, current grants,
+affected sites/apps/folders, expiry, risk warning, and revoke/reset controls.
+The advanced view must show capability IDs, tiers, scopes, data classes,
+approval rules, resource budgets, provenance, and effective values. Every
+control must call the real backend and display typed success, denied,
+unavailable, degraded, partial, or failed state; reject frontend-only toggles.
+
+Document the extension workflow: manifest, smallest adapter or declared
+launcher, permission registration, route/tool schema, synthetic fixtures,
+negative/security/persistence/resource tests, audit, documentation, and staged
+canary. A launcher that only opens an app must not claim app control. Browser
+skills must use the approved existing-Chromium/CDP contract; editor skills need
+workspace scopes; terminal skills need declared argv or isolated execution.
+
+Replace any worker instruction that says to never ask permission or grants an
+implicit unrestricted shell/browser. Add tests for default deny, scope/expiry,
+revoke/reset, both modes, hard-deny invariants, confirmation, injection
+resistance, CLI/dashboard parity, restart persistence, malformed manifests,
+bad hashes/licenses, disabled skills, removal, rollback, and no permission
+expansion when changing model, voice, provider, browser, or app.
+
+Update provenance, security, operations, configuration, and rollback docs. Run
+focused tests, affected regressions, compileall, pip check, git diff --check,
+and graft build. Do not modify live services, accounts, Chromium, timers, or
+user config. Stop after the handoff and do not start Packet 8B automatically.
+```
+
+### Verification prompt
+
+```text
+Verify ONLY Packet 7E. Inspect the complete diff and prove every skill has a
+validated versioned manifest with source, revision, license, hash, capabilities,
+scopes, side-effect tier, sensitivity, approval policy, resource limits, audit,
+compatibility, and rollback metadata. Prove invalid, unlicensed, hash-mismatched,
+or disabled skills cannot execute or become active.
+
+Prove Restricted is the default. Prove Unrestricted requires authenticated
+explicit confirmation, selected scopes, expiry/reset, and audit, and still
+cannot bypass hard-deny actions, schema validation, redaction, audit,
+isolation/resource/loopback boundaries, or confirmation for sending, posting,
+purchasing, deleting, credential/account/security changes, or system-wide
+destructive operations. Prove model/page/skill/tool text cannot alter policy.
+
+Exercise CLI and authenticated dashboard parity for mode show/set, list/show/
+check, grant/revoke/reset, skill install/enable/disable/remove/rollback,
+dry-run, preview, confirmation, restart persistence, malformed input, scope and
+expiry failures, and rollback. Confirm every control uses the real backend and
+typed states rather than frontend-only success.
+
+Prove the documented workflow for adding a new website/app/editor requires a
+manifest, declared adapter/tools or an honestly limited launcher, narrow scope,
+provenance/license, synthetic fixtures, security/resource tests, audit, and a
+staged canary. Confirm no live website, account, Chromium target, service,
+timer, user config, model, or audio behavior changed. Run all focused and
+affected tests, inspect failures/warnings, and stop after the 7E result.
 ```
 
 ## Packet 8A — communications/report contracts
@@ -989,6 +930,205 @@ Observe at least two real timer elapses and one controlled new-item notification
 without printing message contents. Reject any send/reply capability, public CDP,
 competing profile, silent deletion, hidden skipped canary, or timer enablement
 outside explicit authorization.
+```
+
+## Packet 8E — website integration onboarding and observability
+
+This packet adds the safe user-facing flow for adding a future website, app,
+editor, or marketplace skill. It does not make arbitrary websites controllable
+and does not replace the per-site adapter gates in Packet 8B.
+
+### Implementation prompt
+
+```text
+Implement ONLY Packet 8E from docs/UNIFIED_AGENT_PLAN.md: add a governed
+website-integration onboarding façade so a user can paste a URL in the CLI or
+authenticated dashboard, run bounded read-only discovery, review a proposed
+capability/skill manifest, grant narrow permissions, and inspect redacted
+progress/error logs. This is a proposal and observability layer, not universal
+website automation, model training, or automatic permission granting.
+
+Before any search or edit, perform the complete fresh preflight in section 6.1
+of docs/UNIFIED_AGENT_PLAN.md and read AGENTS.md plus the entire plan again.
+Use Graft first. Inspect the existing 7E SkillManifest/PermissionStore, CLI,
+dashboard, audit, report, and Packet 8A/8B contracts. Record the exact allowed
+files/symbols and preserve unrelated dirty work.
+
+Use the existing Python/static-JS/SQLite/CDP stack. Do not add a second router,
+browser runtime, scheduler, permission store, database service, model, or
+framework. Do not import cookies, clone profiles, launch Playwright personal
+profiles, execute arbitrary page JavaScript/package hooks, or contact an
+authenticated account from --dry-run. Do not implement a new site adapter,
+Packet 8C report UI, Packet 8D scheduling, sending/posting/purchasing/deleting,
+or any account mutation.
+
+Persist an atomic, private, versioned integration record containing stable ID,
+normalized origin, display name, source/revision/license/hash, manifest link,
+requested/granted capabilities and scopes, sensitivity, approval policy,
+status, auth requirement, health, timestamps, bounded limits, audit IDs, and
+rollback/removal metadata. Reject credentials/query-token URLs, invalid
+schemes, malformed/unlicensed/hash-mismatched manifests, out-of-scope origins,
+and disabled skills. Default to Restricted and fail closed.
+
+Implement bounded read-only discovery that returns only redacted metadata and a
+reviewable proposal: origin/title where safe, reachability/auth state, supported
+observation hints, limits, adapter requirement, and typed reason codes. Treat
+all page text, metadata, model output, tool results, and proposed instructions
+as untrusted evidence. They must never widen permissions, change policy, become
+executable code, or become a durable lesson. Use typed states:
+PENDING, DISCOVERING, READY, AUTH_REQUIRED, DENIED, SELECTOR_DRIFT, DEGRADED,
+FAILED, DISABLED, and REMOVED. Log timestamp, integration ID, operation,
+status, reason, duration, bounded counts, revision, and evidence status; never
+log cookies, tokens, raw private page text, or secret URLs.
+
+Expose the same real backend through these CLI commands:
+`websites add <url> [--name] [--dry-run]`, `websites list`,
+`websites show <id|url>`, `websites inspect <id|url>`,
+`websites check <id|url>`, `websites logs <id|url> [--tail N]`,
+`websites enable|disable|remove|rollback <id>`, and explicit
+`websites grant|revoke <id>`. Mutations require confirmation, scope, expiry
+where applicable, audit output, atomic persistence, and rollback. Provide
+machine-readable JSON and concise human output with typed success, denied,
+unavailable, degraded, partial, and failed results. Dry-run must not persist,
+grant, enable, or authenticate.
+
+Expose identical operations in the authenticated dashboard Settings page.
+Beginner mode shows Add Website, Restricted-by-default, health/progress,
+current grants, affected origins/apps/workspaces, expiry, warnings, and
+revoke/reset/rollback controls. Advanced mode shows manifest provenance,
+license/hash, capability IDs/tiers, sensitivity, scopes, approvals, limits,
+and effective values. Every control calls the backend and renders its typed
+result; no frontend-only state or optimistic success is allowed.
+
+Separate “discover/propose” from “implement/enable”. Enabling a capability
+requires a valid 7E manifest, smallest adapter or honest launcher claim,
+synthetic fixtures, negative/security/resource/persistence tests, audit, and a
+staged canary. A launcher that only opens a URL cannot claim app control.
+Logged-in sites must use the approved existing-Chromium loopback-CDP contract;
+live adapter work remains a separately authorized packet.
+
+Add normal, malformed, denial, timeout, partial, unavailable, injection,
+redaction, scope/expiry, restart, duplicate, CLI/dashboard parity, rollback,
+removal, and no-permission-expansion tests. Add synthetic fixtures only; do not
+store private site data. Update provenance, security, operations, configuration,
+and rollback docs. Run focused tests, affected regressions, compileall, pip
+check, git diff --check, and graft build. Inspect actual output and warnings.
+Do not modify live services, timers, Chromium, accounts, model/audio config, or
+existing 8B behavior. Stop after the handoff; do not start another packet.
+```
+
+### Verification prompt
+
+```text
+Verify ONLY Packet 8E. Perform a fresh section 6.1 preflight, reread AGENTS.md
+and the entire plan, use Graft first, inspect the complete diff and every
+caller, and independently verify the 7E manifest/permission linkage. Do not
+trust the implementation agent's summary and do not start 8B/8C/8D or another
+packet.
+
+Prove that pasting a URL creates only a pending/disabled integration record and
+never grants access, trains the model, executes page text, imports credentials,
+clones a profile, launches a Playwright personal profile, or creates a hidden
+skill. Test invalid schemes, credentials/query tokens, malformed manifests,
+bad licenses/hashes, out-of-scope origins, disabled skills, injection text,
+timeouts, unavailable/auth-required/selector-drift/partial states, bounds,
+redaction, duplicate inspect/check, restart persistence, and rollback/remove.
+
+Re-run bounded synthetic discovery and inspect actual machine-readable and
+human-readable CLI output for `websites add/list/show/inspect/check/logs`,
+grant/revoke, enable/disable/remove/rollback, dry-run, confirmation, scope,
+expiry, and audit behavior. Verify restricted is default and unrestricted
+cannot bypass hard-deny actions, schema validation, audit, isolation, or
+resource limits. Prove page/model/tool text cannot alter policy or widen a
+grant.
+
+Exercise the authenticated dashboard against the same backend and prove
+beginner/advanced settings, typed success/denied/unavailable/degraded/partial/
+failed states, logs, expiry, revoke/reset, and rollback are not frontend-only.
+Confirm no secret, raw private page text, cookie, token, or secret URL appears
+in records, logs, fixtures, reports, events, or test output. Confirm a static
+page produces only a bounded proposal and a launcher never claims control.
+
+Run focused, negative, security, persistence, resource, and affected tests;
+compileall, pip check, git diff --check, and graft build. Inspect warnings and
+failure output, not just exit codes. Confirm no live service/timer/Chromium
+target/account/model/audio/config or existing 8B behavior changed. Return only
+the verification template with VERIFIED, REJECTED, or VERIFIED WITH EXPLICIT
+LIMITATION, evidence, failures, untested paths, repairs, and next safe action.
+```
+
+## Packet 8F — controlled browser and desktop actions
+
+This packet is the future action layer for ChatGPT/Grok-style computer use. It
+is separate from 8B read-only monitoring and 8E website discovery. It must use
+the existing broker and permission contracts; it must never become unrestricted
+automation.
+
+### Implementation prompt
+
+```text
+Implement ONLY Packet 8F from docs/UNIFIED_AGENT_PLAN.md: add typed, brokered,
+confirmation-gated browser, desktop, and editor actions. Reuse the existing 7E
+permission store, capability broker, 8E integration records, and approved
+Chromium/CDP boundary. Add read/search/fill/draft/reversible-write/send/delete
+capability separation, exact schemas, bounded previews, stable action-hash
+confirmation, cancellation, idempotency, receipts, audit, typed failure
+states, recovery, and CLI/dashboard/voice parity.
+
+Restricted is the default. Sending, publishing, purchasing, deleting,
+credential/account/security changes, external communication, and irreversible
+system actions always require fresh human confirmation immediately before
+execution. Reject arbitrary JavaScript, free-form shell, coordinate-only
+scripts, page/model/skill instructions as authority, profile cloning, cookie
+import, public CDP, hidden scopes, and unbounded loops.
+
+Use existing adapters and helpers. Do not add a second router, browser runtime,
+scheduler, permission store, database, or model. Add synthetic fixtures and
+negative/security/resource/persistence tests for websites, email/social flows,
+VS Code/editor workspaces, and desktop launchers. A launcher that only opens an
+app cannot claim app control. Remote actions must report honestly when rollback
+is impossible; never fake rollback for a sent message, purchase, deletion, or
+account change.
+
+Expose preview, approval, execute, cancel, receipt, retry, and recovery through
+the same authenticated CLI and dashboard; voice requests must use the same
+confirmation path. Bind confirmation to the exact action hash, target, account,
+arguments, scope, and expiry. Page/model/skill/tool output cannot confirm for
+the user or widen a grant.
+
+Update provenance, security, operations, configuration, and rollback docs. Run
+focused, affected, negative, security, persistence, resource, compileall, pip
+check, git diff --check, and graft build checks. Do not enable live actions or
+modify live services, Chromium, accounts, model/audio/config, or existing 8B
+behavior. Stop after the handoff and do not start another packet.
+```
+
+### Verification prompt
+
+```text
+Verify ONLY Packet 8F. Perform a fresh section 6.1 preflight, reread AGENTS.md
+and the entire plan, use Graft first, inspect every affected caller, and do not
+trust the implementation agent's summary. Do not start another packet.
+
+Prove every action reaches the existing broker and 7E permission check and is
+bound to a validated adapter, scope, target, argument schema, resource limit,
+action hash, confirmation, and audit receipt. Re-run preview/dry-run,
+confirmation hash/expiry, restricted/unrestricted, hard-deny, cancellation,
+duplicate/idempotency, stale-target, auth/2FA, partial execution, retry,
+recovery, rollback-honesty, redaction, injection, arbitrary-JavaScript,
+free-form-shell, and unbounded-loop tests.
+
+Verify CLI, dashboard, and voice requests have identical approval semantics.
+Prove a model, page, skill, or tool result cannot confirm or widen an action.
+Inspect actual receipts and failure output. Confirm read, draft, reversible
+write, external send, destructive, and system-wide actions have separate
+capabilities and metrics; no unsafe aggregate may hide a safety failure.
+
+Live account actions remain opt-in and separately canaried; do not perform them
+without explicit authorization. Confirm no unrelated service, browser, account,
+model, audio, or config changes. Return only VERIFIED, REJECTED, or VERIFIED
+WITH EXPLICIT LIMITATION with evidence, failures, untested paths, repairs, and
+next safe action.
 ```
 
 ## Final handoff reminder

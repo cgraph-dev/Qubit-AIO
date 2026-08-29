@@ -15,18 +15,17 @@ Design notes (hard-won on the Focusrite Scarlett 2i2 4th Gen / PipeWire):
 """
 from __future__ import annotations
 
-import queue
 import threading
 import time
 import wave
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
 import sounddevice as sd
 
-from .vad import FRAME_MS, FRAME_RATE, FRAME_SIZE, Endpointer, FrameSplitter, pcm16, resample_linear
+from .vad import FRAME_MS, FRAME_RATE, Endpointer, FrameSplitter, resample_linear
 
 
 @dataclass
@@ -312,7 +311,7 @@ class MicCapture:
         except Exception:
             pass
 
-        out_dir = out_dir or Path("/tmp/openclaw-voice-bridge")
+        out_dir = out_dir or Path("/tmp/qubit-voice-agent")
         out_dir.mkdir(parents=True, exist_ok=True)
         wav_path = out_dir / f"utt-{int(time.time()*1000)}.wav"
         with wave.open(str(wav_path), "wb") as wf:

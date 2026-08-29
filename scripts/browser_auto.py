@@ -36,10 +36,6 @@ PROFILE = str(Path.home() / "snap/chromium/common/chromium")
 PORT = 9222
 
 
-def _g(engine: str, key: str):
-    return ENGINES[engine].get(key)
-
-
 def _launch() -> None:
     """Launch snap Chromium on its real profile with a CDP port if not already up."""
     if _cdp_alive(PORT):

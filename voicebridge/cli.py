@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -162,6 +163,139 @@ def build_parser() -> argparse.ArgumentParser:
     brand_roll.add_argument("--backup-dir", type=Path, required=True)
     brand_roll.add_argument("--repo", type=Path, default=None,
                             help="target repository root (default: this repo)")
+    perm = add("permissions", help="Packet 7E permission profiles + scoped grants")
+    perm_sub = perm.add_subparsers(dest="permissions_command")
+    perm_mode = perm_sub.add_parser("mode", parents=[common],
+                                    help="show or set the permission mode (restricted/unrestricted)")
+    perm_mode.add_argument("action", choices=["show", "set"])
+    perm_mode.add_argument("value", nargs="?", default=None,
+                           choices=["restricted", "unrestricted"],
+                           help="mode to set")
+    perm_mode.add_argument("--scope", action="append", default=[],
+                           help="user-selected scope (unrestricted pre-auth); repeatable")
+    perm_mode.add_argument("--ttl", type=float, default=None,
+                           help="mode TTL seconds (unrestricted, time-bounded)")
+    perm_mode.add_argument("--confirm", action="store_true",
+                           help="explicitly confirm the side effect")
+    perm_sub.add_parser("list", parents=[common], help="list grants")
+    perm_show = perm_sub.add_parser("show", parents=[common], help="show one grant")
+    perm_show.add_argument("grant_id")
+    perm_check = perm_sub.add_parser("check", parents=[common],
+                                     help="effective decision for a capability (read-only)")
+    perm_check.add_argument("capability")
+    perm_check.add_argument("--scope", action="append", default=[],
+                            help="requested scope; repeatable")
+    perm_grant = perm_sub.add_parser("grant", parents=[common],
+                                     help="grant a capability in scopes (dry-run unless --confirm)")
+    perm_grant.add_argument("capability")
+    perm_grant.add_argument("--scope", action="append", required=True)
+    perm_grant.add_argument("--ttl", type=float, default=None)
+    perm_grant.add_argument("--confirm", action="store_true")
+    perm_revoke = perm_sub.add_parser("revoke", parents=[common],
+                                      help="revoke a grant (dry-run unless --confirm)")
+    perm_revoke.add_argument("grant_id")
+    perm_revoke.add_argument("--confirm", action="store_true")
+    perm_reset = perm_sub.add_parser("reset", parents=[common],
+                                     help="reset to restricted + revoke all grants (dry-run unless --confirm)")
+    perm_reset.add_argument("--confirm", action="store_true")
+    sk = add("skills", help="Packet 7E skill manifests (install staged disabled)")
+    sk_sub = sk.add_subparsers(dest="skills_command")
+    sk_sub.add_parser("list", parents=[common], help="list installed skills")
+    sk_show = sk_sub.add_parser("show", parents=[common], help="show one skill manifest")
+    sk_show.add_argument("skill_id")
+    sk_check = sk_sub.add_parser("check", parents=[common],
+                                 help="validate a manifest file (read-only)")
+    sk_check.add_argument("manifest", type=Path)
+    sk_install = sk_sub.add_parser("install", parents=[common],
+                                   help="validate + stage a skill disabled (dry-run unless --confirm)")
+    sk_install.add_argument("manifest", type=Path)
+    sk_install.add_argument("--confirm", action="store_true")
+    sk_enable = sk_sub.add_parser("enable", parents=[common],
+                                  help="enable a staged/disabled skill (dry-run unless --confirm)")
+    sk_enable.add_argument("skill_id")
+    sk_enable.add_argument("--confirm", action="store_true")
+    sk_disable = sk_sub.add_parser("disable", parents=[common],
+                                   help="disable a skill (dry-run unless --confirm)")
+    sk_disable.add_argument("skill_id")
+    sk_disable.add_argument("--confirm", action="store_true")
+    sk_remove = sk_sub.add_parser("remove", parents=[common],
+                                  help="remove a skill (dry-run unless --confirm)")
+    sk_remove.add_argument("skill_id")
+    sk_remove.add_argument("--confirm", action="store_true")
+    sk_roll = sk_sub.add_parser("rollback", parents=[common],
+                                help="restore a skill's previous state (dry-run unless --confirm)")
+    sk_roll.add_argument("skill_id")
+    sk_roll.add_argument("--backup", type=Path, default=None)
+    sk_roll.add_argument("--confirm", action="store_true")
+    ws = add("websites", help="Packet 8E website-integration onboarding (proposal/observability, no live adapter)")
+    ws_sub = ws.add_subparsers(dest="websites_command")
+    ws_human = argparse.ArgumentParser(add_help=False)
+    ws_human.add_argument("--human", action="store_true",
+                          help="concise human-readable output (default: JSON)")
+    ws_add = ws_sub.add_parser("add", parents=[common, ws_human],
+                               help="validate + create a PENDING/disabled proposal (dry-run by default)")
+    ws_add.add_argument("url")
+    ws_add.add_argument("--name", default="", help="display name (default: host)")
+    ws_sub.add_parser("list", parents=[common, ws_human], help="list integration records")
+    ws_show = ws_sub.add_parser("show", parents=[common, ws_human],
+                                help="show one record + effective permissions")
+    ws_show.add_argument("id_or_url")
+    ws_ins = ws_sub.add_parser("inspect", parents=[common, ws_human],
+                               help="run bounded read-only discovery")
+    ws_ins.add_argument("id_or_url")
+    ws_ins.add_argument("--no-network", action="store_true",
+                        help="skip the network probe (typed offline result)")
+    ws_ins.add_argument("--fixture", type=Path, default=None,
+                        help="operator-supplied synthetic probe JSON (READY smoke path; never live)")
+    ws_probe = ws_sub.add_parser("probe", parents=[common, ws_human],
+                                 help="safe bounded LIVE probe of a public URL (requires --live; persists nothing)")
+    ws_probe.add_argument("url")
+    ws_probe.add_argument("--live", action="store_true",
+                          help="explicit opt-in to one bounded read-only network probe")
+    ws_chk = ws_sub.add_parser("check", parents=[common, ws_human],
+                               help="re-verify against current permissions (read-only)")
+    ws_chk.add_argument("id_or_url")
+    ws_link = ws_sub.add_parser("manifest-link", parents=[common, ws_human],
+                                help="link a valid, installed, active 7E skill manifest (dry-run unless --confirm)")
+    ws_link.add_argument("id_or_url")
+    ws_link.add_argument("skill_id", help="skill_id of an active installed 7E skill")
+    ws_link.add_argument("--artifact", type=Path, default=None,
+                         help="optional local artifact file whose bytes are SHA-256 verified")
+    ws_link.add_argument("--artifact-sha256", default=None,
+                         help="expected sha256 hex of the local artifact bytes")
+    ws_link.add_argument("--confirm", action="store_true")
+    ws_logs = ws_sub.add_parser("logs", parents=[common, ws_human],
+                                help="redacted progress/error log for one record")
+    ws_logs.add_argument("id_or_url")
+    ws_logs.add_argument("--tail", type=int, default=50)
+    ws_en = ws_sub.add_parser("enable", parents=[common, ws_human],
+                              help="mark a validated proposal active (never grants) (dry-run unless --confirm)")
+    ws_en.add_argument("id_or_url")
+    ws_en.add_argument("--confirm", action="store_true")
+    ws_dis = ws_sub.add_parser("disable", parents=[common, ws_human],
+                               help="disable the record (dry-run unless --confirm)")
+    ws_dis.add_argument("id_or_url")
+    ws_dis.add_argument("--confirm", action="store_true")
+    ws_grant = ws_sub.add_parser("grant", parents=[common, ws_human],
+                                 help="grant the proposed read-only capabilities (scoped+expiring) (dry-run unless --confirm)")
+    ws_grant.add_argument("id_or_url")
+    ws_grant.add_argument("--capability", action="append", default=[],
+                          help="restrict to a specific proposed capability; repeatable")
+    ws_grant.add_argument("--ttl", type=float, default=None,
+                          help="grant TTL seconds (default 7 days)")
+    ws_grant.add_argument("--confirm", action="store_true")
+    ws_rev = ws_sub.add_parser("revoke", parents=[common, ws_human],
+                               help="revoke grants linked to the record (dry-run unless --confirm)")
+    ws_rev.add_argument("id_or_url")
+    ws_rev.add_argument("--confirm", action="store_true")
+    ws_rem = ws_sub.add_parser("remove", parents=[common, ws_human],
+                               help="revoke linked grants + remove the record (dry-run unless --confirm)")
+    ws_rem.add_argument("id_or_url")
+    ws_rem.add_argument("--confirm", action="store_true")
+    ws_roll = ws_sub.add_parser("rollback", parents=[common, ws_human],
+                                help="restore the prior record state (grants not auto-restored) (dry-run unless --confirm)")
+    ws_roll.add_argument("id_or_url")
+    ws_roll.add_argument("--confirm", action="store_true")
     export = add("export-state", help="encrypt + export portable state (memory/lessons/reports/config/model)")
     export.add_argument("--out", type=Path, default=None,
                         help="output file (default: <state_dir>/portable-<ts>.vbp)")
@@ -179,6 +313,26 @@ def build_parser() -> argparse.ArgumentParser:
     dev_enroll = dev_sub.add_parser("enroll", parents=[common],
                                     help="explicitly authorize THIS device")
     dev_enroll.add_argument("--model-alias", default=None)
+    mon = add("monitor", help="Packet 8D: hourly inbox monitor (lease, bundles, notifications)")
+    mon_sub = mon.add_subparsers(dest="monitor_command")
+    mon_run = mon_sub.add_parser("run", parents=[common],
+                                 help="run one bounded hourly pass (oneshot)")
+    mon_run.add_argument("--canary", action="store_true",
+                         help="explicit opt-in live canary")
+    mon_run.add_argument("--no-notify", action="store_true",
+                         help="suppress notifications")
+    mon_sub.add_parser("health", parents=[common],
+                       help="typed monitor health (CDP, timer, backlog)")
+    mon_install = mon_sub.add_parser("install", parents=[common],
+                                     help="render/install systemd service+timer")
+    mon_install.add_argument("--enable", action="store_true",
+                             help="explicitly enable the hourly timer (live activation)")
+    mon_sub.add_parser("disable", parents=[common],
+                       help="disable the timer (keep all state)")
+    mon_sub.add_parser("rollback", parents=[common],
+                       help="rollback: disable timer, keep cursors/reports/evidence")
+    mon_sub.add_parser("launch", parents=[common],
+                       help="optional approved Chromium launch (cdp_launch must be on)")
     return p
 
 
@@ -218,12 +372,20 @@ def main(argv=None) -> int:
         return _cmd_profile(cfg, args)
     if command == "branding":
         return _cmd_branding(cfg, args)
+    if command == "permissions":
+        return _cmd_permissions(cfg, args)
+    if command == "skills":
+        return _cmd_skills(cfg, args)
+    if command == "websites":
+        return _cmd_websites(cfg, args)
     if command == "export-state":
         return _cmd_export_state(cfg, args)
     if command == "import-state":
         return _cmd_import_state(cfg, args)
     if command == "device":
         return _cmd_device(cfg, args)
+    if command == "monitor":
+        return _cmd_monitor(cfg, args)
 
     from .orchestrator import VoiceOrchestrator
     orch = VoiceOrchestrator(cfg, no_hotkey=args.no_hotkey, dry_run=args.dry_run)
@@ -253,7 +415,7 @@ def main(argv=None) -> int:
 def _cmd_status(cfg) -> int:
     from .openclaw.discovery import discover_gateway, current_vram_mb
     from .logging_setup import get_logger
-    log = get_logger()
+    get_logger()  # init handlers before discovery internals log
     info = discover_gateway(cfg)
     print(f"gateway url      : {info.url}")
     print(f"gateway token    : {'found' if info.token else 'MISSING'}")
@@ -268,7 +430,9 @@ def _cmd_status(cfg) -> int:
         try:
             asr = SherpaASR(engine=asr_cfg.get("engine", "moonshine"),
                             model_dir=cfg.model_dir(),
-                            provider=asr_cfg.get("provider_ep", "cpu"))
+                            provider=asr_cfg.get("provider_ep", "cpu"),
+                            hotwords=asr_cfg.get("hotwords", ""),
+                            hotwords_score=float(asr_cfg.get("hotwords_score", 1.5)))
             asr.load()
             print(f"ASR              : sherpa/{asr.engine} on {asr.provider}")
         except Exception as exc:
@@ -315,7 +479,6 @@ def _cmd_status(cfg) -> int:
 
 def _cmd_mic_test(cfg) -> int:
     import numpy as np
-    import sounddevice as sd
     from .audio.vad import Endpointer
     from .audio.mic import MicCapture
     mic_cfg = cfg.section("mic")
@@ -327,7 +490,7 @@ def _cmd_mic_test(cfg) -> int:
                      endpointer=Endpointer(aggressiveness=mic_cfg.get("aggressiveness", 1)),
                      gain=float(mic_cfg.get("gain", 4.0)),
                      min_rms=float(mic_cfg.get("min_rms", 0.0008)))
-    import threading, time
+    import time
     samples = []
     with mic.open():
         t0 = time.time()
@@ -372,16 +535,15 @@ def _cmd_tts_test(cfg, text: str, out: Path | None) -> int:
 def _cmd_roundtrip(cfg, text: str | None, model: str | None, orch) -> int:
     """End-to-end: TTS synth sample -> whisper ASR -> classify -> gateway task
     -> summarize -> TTS synth final. Prints each stage; returns 0 on success."""
-    import time
     from .tts.piper import PiperTTS
     from .asr.whisper import FasterWhisperASR
 
     sample = text or ("Open the current project, inspect the Stripe webhook flow, "
                       "and tell OpenClaw to patch the signature verification and add structured logs.")
-    print(f"[1/6] synth sample speech (piper) ...")
+    print("[1/6] synth sample speech (piper) ...")
     tts = PiperTTS(model_dir=cfg.model_dir(), voice=cfg.get("tts", "voice", default="en_US-amy-medium"))
     tts.load()
-    wav = tts.synthesize(sample, Path("/tmp/openclaw-voice-bridge/roundtrip-sample.wav"))
+    wav = tts.synthesize(sample, Path("/tmp/qubit-voice-agent/roundtrip-sample.wav"))
     print(f"      -> {wav}")
 
     print("[2/6] transcribe (whisper) ...")
@@ -408,7 +570,7 @@ def _cmd_roundtrip(cfg, text: str | None, model: str | None, orch) -> int:
     print("[5/6] final spoken summary rendered by piper ...")
     # The orchestrator already spoke the summary; render it to a file to verify.
     # Re-run the last summary from events is overkill — synthesize a fixed check line.
-    check = tts.synthesize("Round trip complete.", Path("/tmp/openclaw-voice-bridge/roundtrip-final.wav"))
+    check = tts.synthesize("Round trip complete.", Path("/tmp/qubit-voice-agent/roundtrip-final.wav"))
     print(f"      -> {check}")
 
     print("[6/6] roundtrip OK")
@@ -821,6 +983,455 @@ def _cmd_branding(cfg, args) -> int:
     return 2
 
 
+def _perm_preview_denied(exc) -> None:
+    import json as _json
+    code = getattr(exc, "code", None) or "CONFIRMATION_REQUIRED"
+    print(_json.dumps({"state": "denied", "code": code,
+                       "detail": str(exc)}, indent=2))
+
+
+def _cmd_permissions(cfg, args) -> int:
+    """voicebridge permissions mode/list/show/check/grant/revoke/reset.
+
+    Mutating commands are dry-run by default (--dry-run) and require --confirm
+    to persist; every mutation is backed up, atomic, and audited.
+    """
+    import json as _json
+    from . import permissions as P
+    from .broker import build_host_broker
+    cmd = getattr(args, "permissions_command", None) or "list"
+    store = P.permissions_store(cfg)
+    policy = P.PermissionPolicy(store, registry=build_host_broker().registry)
+    try:
+        if cmd == "mode":
+            if args.action == "show":
+                mode, scopes, expires = store.mode()
+                out = {"state": "OK", "mode": mode, "scopes": scopes,
+                       "expires_at": expires}
+            elif getattr(args, "dry_run", False):
+                out = {"state": "preview", "would_set_mode": args.value,
+                       "scopes": list(args.scope or ()), "ttl_s": args.ttl}
+            else:
+                out = store.set_mode(args.value, requested_by="cli:user",
+                                     confirmed=args.confirm,
+                                     scopes=tuple(args.scope or ()),
+                                     ttl_s=args.ttl)
+        elif cmd == "list":
+            out = {"state": "OK", "mode": store.mode()[0],
+                   "grants": [g.to_dict() for g in store.grants()]}
+        elif cmd == "show":
+            g = next((x for x in store.grants() if x.id == args.grant_id), None)
+            if g is None:
+                print(_json.dumps({"state": "MISSING",
+                                   "detail": f"no grant {args.grant_id}"},
+                                  indent=2))
+                return 1
+            out = g.to_dict()
+        elif cmd == "check":
+            out = policy.effective(args.capability, tuple(args.scope or ()))
+        elif cmd == "grant":
+            if getattr(args, "dry_run", False):
+                out = {"state": "preview", "would_grant": args.capability,
+                       "scopes": list(args.scope or ()), "ttl_s": args.ttl}
+            else:
+                g = store.grant(args.capability, requested_by="cli:user",
+                                confirmed=args.confirm,
+                                scopes=tuple(args.scope or ()),
+                                ttl_s=args.ttl)
+                out = {"state": "OK", "grant": g.to_dict()}
+        elif cmd == "revoke":
+            if getattr(args, "dry_run", False):
+                out = {"state": "preview", "would_revoke": args.grant_id}
+            else:
+                g = store.revoke(args.grant_id, requested_by="cli:user",
+                                 confirmed=args.confirm)
+                out = {"state": "OK", "revoked": g.to_dict()}
+        elif cmd == "reset":
+            if getattr(args, "dry_run", False):
+                out = {"state": "preview", "would_reset_mode": "restricted",
+                       "would_revoke_grants": len(store.grants())}
+            else:
+                out = store.reset(requested_by="cli:user",
+                                  confirmed=args.confirm)
+        else:
+            print(f"ERROR: unknown permissions command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except P.ConfirmationRequiredError as exc:
+        _perm_preview_denied(exc)
+        return 3
+    except (P.PermissionError, P.SkillValidationError) as exc:
+        print(_json.dumps({"state": "failed", "detail": str(exc)}, indent=2))
+        return 2
+
+
+def _cmd_skills(cfg, args) -> int:
+    """voicebridge skills list|show|check|install|enable|disable|remove|rollback.
+
+    install validates the manifest and stages the skill DISABLED; enable/disable/
+    remove/rollback are dry-run by default and require --confirm to persist.
+    """
+    import json as _json
+    from . import permissions as P
+    cmd = getattr(args, "skills_command", None) or "list"
+    store = P.permissions_store(cfg)
+    try:
+        if cmd == "list":
+            out = {"state": "OK",
+                   "skills": [s.to_dict() for s in store.skills()]}
+        elif cmd == "show":
+            s = store.skill(args.skill_id)
+            if s is None:
+                print(_json.dumps({"state": "MISSING",
+                                   "detail": f"no skill {args.skill_id}"},
+                                  indent=2))
+                return 1
+            out = s.to_dict()
+        elif cmd == "check":
+            man = P.SkillManifest.from_dict(
+                _json.loads(Path(args.manifest).read_text()))
+            out = {"state": "OK", "valid": True, "manifest": man.to_dict()}
+        elif cmd == "install":
+            man = P.SkillManifest.from_dict(
+                _json.loads(Path(args.manifest).read_text()))
+            if getattr(args, "dry_run", False):
+                out = {"state": "preview", "would_stage_disabled": man.skill_id,
+                       "version": man.version}
+            else:
+                rec = store.install_skill(man, requested_by="cli:user",
+                                          confirmed=args.confirm,
+                                          source_path=str(args.manifest))
+                out = {"state": "OK", "staged": rec.status, "skill": rec.to_dict()}
+        elif cmd == "enable":
+            if getattr(args, "dry_run", False):
+                out = {"state": "preview", "would_enable": args.skill_id}
+            else:
+                rec = store.enable_skill(args.skill_id, requested_by="cli:user",
+                                         confirmed=args.confirm)
+                out = {"state": "OK", "status": rec.status, "skill_id": rec.skill_id}
+        elif cmd == "disable":
+            if getattr(args, "dry_run", False):
+                out = {"state": "preview", "would_disable": args.skill_id}
+            else:
+                rec = store.disable_skill(args.skill_id, requested_by="cli:user",
+                                          confirmed=args.confirm)
+                out = {"state": "OK", "status": rec.status, "skill_id": rec.skill_id}
+        elif cmd == "remove":
+            if getattr(args, "dry_run", False):
+                out = {"state": "preview", "would_remove": args.skill_id}
+            else:
+                rec = store.remove_skill(args.skill_id, requested_by="cli:user",
+                                         confirmed=args.confirm)
+                out = {"state": "OK", "removed": rec.skill_id}
+        elif cmd == "rollback":
+            if getattr(args, "dry_run", False):
+                out = {"state": "preview", "would_rollback": args.skill_id}
+            else:
+                rec = store.rollback_skill(args.skill_id, requested_by="cli:user",
+                                           confirmed=args.confirm,
+                                           backup_path=args.backup)
+                out = {"state": "OK", "status": rec.status, "skill_id": rec.skill_id}
+        else:
+            print(f"ERROR: unknown skills command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except P.ConfirmationRequiredError as exc:
+        _perm_preview_denied(exc)
+        return 3
+    except (P.PermissionError, P.SkillValidationError) as exc:
+        print(_json.dumps({"state": "failed", "detail": str(exc)}, indent=2))
+        return 2
+
+
+def _cmd_websites(cfg, args) -> int:
+    """voicebridge websites add/list/show/inspect/check/logs/manifest-link/
+    enable/disable/grant/revoke/remove/rollback.
+
+    Packet 8E onboarding + observability. Adding a URL creates a PENDING,
+    disabled proposal and grants NOTHING; a valid, active 7E skill must be
+    explicitly linked (manifest-link) before enable/grant. Mutations are
+    dry-run by default and require --confirm to persist.
+    """
+    import json as _json
+    from . import permissions as P
+    from . import websites as W
+    cmd = getattr(args, "websites_command", None) or "list"
+    store = W.website_integrations_store(cfg)
+    perms = P.permissions_store(cfg)
+    try:
+        if cmd == "add":
+            if getattr(args, "dry_run", False):
+                out = W.add_preview(args.url, name=args.name or "")
+            else:
+                rec = store.add(args.url, requested_by="cli:user",
+                                display_name=args.name or "")
+                out = {"state": "OK", "status": rec.status,
+                       "granted": False, "integration": rec.to_dict()}
+        elif cmd == "list":
+            out = {"state": "OK", "mode": perms.mode()[0],
+                   "integrations": [r.to_dict() for r in store.integrations()]}
+        elif cmd == "show":
+            rec = store.lookup(args.id_or_url)
+            if rec is None:
+                print(_json.dumps({"state": "MISSING",
+                                   "detail": "no such integration"}, indent=2))
+                return 1
+            out = {"state": "OK", "integration": rec.to_dict(),
+                   "effective": W.effective_permissions(perms, store, rec)}
+        elif cmd == "inspect":
+            rec = store.lookup(args.id_or_url)
+            if rec is None:
+                print(_json.dumps({"state": "MISSING",
+                                   "detail": "no such integration"}, indent=2))
+                return 1
+            if getattr(args, "dry_run", False):
+                out = {"state": "preview", "would_inspect": rec.integration_id,
+                       "status": rec.status}
+            else:
+                fixture = getattr(args, "fixture", None)
+                if fixture is not None:
+                    fixture_path = Path(fixture)
+                    if not fixture_path.is_file():
+                        print(_json.dumps({"state": "failed",
+                                           "detail": f"fixture not found: "
+                                                     f"{fixture_path}"}, indent=2))
+                        return 2
+                    try:
+                        raw = _json.loads(fixture_path.read_text())
+                        validated = W.validate_probe_result(raw)
+                    except Exception as exc:
+                        print(_json.dumps({"state": "failed",
+                                           "detail": f"fixture invalid: {exc}"},
+                                          indent=2))
+                        return 2
+                    probe = lambda _url: validated  # noqa: E731
+                    source = "fixture"
+                else:
+                    probe = None if not args.no_network else _offline_website_probe
+                    source = "offline" if args.no_network else "live"
+                rec2 = store.run_discovery(rec.integration_id,
+                                           requested_by="cli:user",
+                                           probe=probe, probe_source=source)
+                out = {"state": "OK", "status": rec2.status,
+                       "reason": rec2.health.get("reason_code", ""),
+                       "probe_source": source,
+                       "integration": rec2.to_dict()}
+        elif cmd == "probe":
+            # Safe bounded LIVE probe of a public URL; explicit --live required;
+            # persists nothing; output is redacted and typed.
+            if not getattr(args, "live", False):
+                out = {"state": "denied", "code": "LIVE_REQUIRED",
+                       "detail": "websites probe requires explicit --live "
+                                 "(bounded read-only network access)"}
+                _print_website_out(args, cmd, out)
+                return 3
+            try:
+                result = W.probe_url(args.url)
+            except W.WebsiteValidationError as exc:
+                print(_json.dumps({"state": "failed", "detail": str(exc)},
+                                  indent=2))
+                return 2
+            out = {"state": "OK", "url": args.url,
+                   "result": W.result_code_for_status(result.status,
+                                                       result.reason_code),
+                   "probe": result.to_dict()}
+        elif cmd == "check":
+            out = store.check(args.id_or_url, requested_by="cli:user",
+                              perms=perms)
+        elif cmd == "logs":
+            rows = store.logs(args.id_or_url, tail=max(1, min(int(args.tail), 500)))
+            out = {"state": "OK", "integration_id": rows[-1]["integration_id"]
+                   if rows else None, "logs": rows}
+        elif cmd == "manifest-link":
+            if getattr(args, "dry_run", False):
+                out = {"state": "preview", "would_link": args.skill_id,
+                       "integration": args.id_or_url}
+            else:
+                rec = store.link_manifest(
+                    args.id_or_url, skill_id=args.skill_id,
+                    requested_by="cli:user", confirmed=args.confirm,
+                    perms=perms,
+                    artifact_path=str(args.artifact) if args.artifact else None,
+                    artifact_sha256=args.artifact_sha256)
+                out = {"state": "OK", "manifest_link": rec.manifest_link,
+                       "license": rec.license, "content_hash": rec.content_hash,
+                       "artifact_sha256": rec.artifact_sha256,
+                       "integration": rec.to_dict()}
+        elif cmd == "enable":
+            if getattr(args, "dry_run", False):
+                out = {"state": "preview", "would_enable": args.id_or_url}
+            else:
+                rec = store.enable(args.id_or_url, requested_by="cli:user",
+                                   confirmed=args.confirm, perms=perms)
+                out = {"state": "OK", "status": rec.status,
+                       "enabled": rec.enabled, "integration": rec.to_dict()}
+        elif cmd == "disable":
+            if getattr(args, "dry_run", False):
+                out = {"state": "preview", "would_disable": args.id_or_url}
+            else:
+                rec = store.disable(args.id_or_url, requested_by="cli:user",
+                                    confirmed=args.confirm)
+                out = {"state": "OK", "status": rec.status,
+                       "enabled": rec.enabled, "integration": rec.to_dict()}
+        elif cmd == "grant":
+            if getattr(args, "dry_run", False):
+                out = {"state": "preview", "would_grant": args.id_or_url,
+                       "capabilities": list(args.capability or ()),
+                       "ttl_s": args.ttl}
+            else:
+                out = store.grant(args.id_or_url, requested_by="cli:user",
+                                  confirmed=args.confirm,
+                                  capabilities=tuple(args.capability or ()),
+                                  ttl_s=args.ttl, perms=perms)
+        elif cmd == "revoke":
+            if getattr(args, "dry_run", False):
+                out = {"state": "preview", "would_revoke": args.id_or_url}
+            else:
+                out = store.revoke(args.id_or_url, requested_by="cli:user",
+                                   confirmed=args.confirm, perms=perms)
+        elif cmd == "remove":
+            if getattr(args, "dry_run", False):
+                out = {"state": "preview", "would_remove": args.id_or_url}
+            else:
+                out = store.remove(args.id_or_url, requested_by="cli:user",
+                                   confirmed=args.confirm, perms=perms)
+        elif cmd == "rollback":
+            if getattr(args, "dry_run", False):
+                out = {"state": "preview", "would_rollback": args.id_or_url}
+            else:
+                out = store.rollback(args.id_or_url, requested_by="cli:user",
+                                     confirmed=args.confirm)
+        else:
+            print(f"ERROR: unknown websites command {cmd!r}")
+            return 2
+        _print_website_out(args, cmd, out)
+        return 0
+    except W.ConfirmationRequiredError as exc:
+        print(_json.dumps({"state": "denied",
+                           "code": "CONFIRMATION_REQUIRED",
+                           "detail": str(exc)}, indent=2))
+        return 3
+    except (W.WebsiteIntegrationError, W.WebsiteValidationError) as exc:
+        print(_json.dumps({"state": "failed", "detail": str(exc)}, indent=2))
+        return 2
+    except P.PermissionError as exc:
+        print(_json.dumps({"state": "failed", "detail": str(exc)}, indent=2))
+        return 2
+
+
+def _print_website_out(args, cmd, out) -> None:
+    """Machine-readable JSON by default; concise human-readable with --human."""
+    import json as _json
+    if getattr(args, "human", False):
+        print(_human_websites(cmd, out))
+    else:
+        print(_json.dumps(out, indent=2, sort_keys=True))
+
+
+def _human_websites(cmd: str, out: dict) -> str:
+    """Concise, typed human-readable rendering of a websites command result."""
+    import json as _json
+    if out is None:
+        return "unavailable"
+    st = out.get("state", "unavailable")
+    detail = out.get("detail", "")
+    if cmd == "probe":
+        p = out.get("probe") or {}
+        code = out.get("code", "")
+        reason = code or p.get("reason_code") or detail
+        return (f"{out.get('url', '')} -> {out.get('result', p.get('status', st))} "
+                f"({reason}); reachable={bool(p.get('reachable'))} "
+                f"auth={bool(p.get('auth_required'))} "
+                f"title={p.get('title', '')[:40] or '—'}")
+    if cmd == "add":
+        i = out.get("integration") or {}
+        return (f"added {i.get('origin', out.get('would_add', '?'))} "
+                f"[{i.get('status', out.get('status', 'PENDING'))}] "
+                f"grants=none")
+    if cmd == "list":
+        rows = out.get("integrations") or []
+        lines = [f"{out.get('mode', 'restricted')} · {len(rows)} record(s)"]
+        for r in rows:
+            lines.append(f"  {r.get('integration_id')} {r.get('origin')} "
+                         f"[{r.get('status')}] caps="
+                         f"{len(r.get('requested_capabilities') or [])} "
+                         f"grants={len(r.get('grant_ids') or [])} "
+                         f"link={r.get('manifest_link') or 'none'}")
+        return "\n".join(lines)
+    if cmd == "show":
+        i = out.get("integration") or {}
+        eff = (out.get("effective") or {}).get("effective") or {}
+        grants = (out.get("effective") or {}).get("grants") or []
+        link = i.get("manifest_link") or "none"
+        if link != "none":
+            link = (f"{link} (license {i.get('license')}, hash "
+                    f"{(i.get('content_hash') or '')[:8]}, "
+                    f"artifact {(i.get('artifact_sha256') or '—')[:8]})")
+        return (f"{i.get('origin')} [{i.get('status')}] enabled="
+                f"{bool(i.get('enabled'))} link={link} "
+                f"caps={len(i.get('requested_capabilities') or [])} "
+                f"grants={len(grants)} "
+                f"effective=" + ", ".join(
+                    f"{c}={d.get('code')}" for c, d in eff.items()) or "—")
+    if cmd == "inspect":
+        i = out.get("integration") or {}
+        return (f"{i.get('origin')} -> {i.get('status')} "
+                f"({out.get('reason', '')}) probe={out.get('probe_source', '?')} "
+                f"caps-proposed={len(i.get('requested_capabilities') or [])}")
+    if cmd == "check":
+        m = out.get("manifest") or {}
+        mstate = "unlinked" if not m else ("active" if m.get("active") else "broken")
+        active = sum(1 for g in (out.get("grants") or []) if g.get("active"))
+        expired = sum(1 for g in (out.get("grants") or []) if not g.get("active"))
+        return (f"{out.get('origin')} [{out.get('status')}] check={out.get('state')} "
+                f"mode={out.get('mode')} manifest={mstate} "
+                f"grants-active={active} expired={expired}")
+    if cmd == "manifest-link":
+        return (f"linked {out.get('manifest_link')} (license {out.get('license')}, "
+                f"hash {(out.get('content_hash') or '')[:8]}, "
+                f"artifact {(out.get('artifact_sha256') or '—')[:8] or '—'})")
+    if cmd == "grant":
+        gs = out.get("grants") or []
+        i = out.get("integration") or {}
+        exp = gs[0].get("expires_at") if gs else None
+        import time as _t
+        exp_s = _t.strftime("%Y-%m-%d %H:%M", _t.localtime(exp)) if exp else "never"
+        return (f"granted {len(gs)} capability/ies for {i.get('origin')} "
+                f"scopes={gs[0].get('scopes') if gs else '—'} expires={exp_s}")
+    if cmd == "revoke":
+        return f"revoked {len(out.get('revoked') or [])} grant(s) for {out.get('integration', {}).get('origin', '?')}"
+    if cmd == "enable" or cmd == "disable":
+        i = out.get("integration") or {}
+        return f"{i.get('origin')} -> {i.get('status')} enabled={bool(i.get('enabled'))}"
+    if cmd == "remove":
+        r = out.get("removed") or {}
+        return f"removed {r.get('origin', '?')} [REMOVED]; revoked {len(out.get('revoked') or [])} grant(s)"
+    if cmd == "rollback":
+        i = out.get("integration") or {}
+        return f"rolled back {i.get('origin', '?')} -> {i.get('status')} (grants never auto-restored)"
+    if cmd == "logs":
+        rows = out.get("logs") or []
+        last = rows[-1] if rows else {}
+        return (f"{len(rows)} log entr{'y' if len(rows) == 1 else 'ies'}; last: "
+                f"{last.get('op', '—')} [{last.get('status', '—')}] "
+                f"{last.get('reason', '—')}")
+    return f"{st} {detail}"
+
+
+def _offline_website_probe(url: str) -> dict:
+    """--no-network probe: a typed offline result, never a fake success."""
+    from urllib.parse import urlsplit
+    p = urlsplit(url)
+    return {"status": "FAILED", "origin": f"{p.scheme}://{p.hostname}",
+            "title": "", "reachable": False, "auth_required": False,
+            "observation_hints": (), "adapter_requirement": "",
+            "reason_code": "NETWORK_DISABLED", "http_status": 0,
+            "duration_s": 0.0, "bytes_read": 0, "limits": {},
+            "evidence": {"reason": "NETWORK_DISABLED"}}
+
+
 def _passphrase(args, env: str = "VOICE_BRIDGE_PASSPHRASE") -> str:
     import os as _os
     pw = getattr(args, "passphrase", None) or _os.environ.get(env, "")
@@ -918,6 +1529,48 @@ def _cmd_device(cfg, args) -> int:
         print("device enrolled (explicit authorization recorded)")
         return 0
     print(f"ERROR: unknown device command {cmd!r}")
+    return 2
+
+
+def _cmd_monitor(cfg, args) -> int:
+    import json as _json
+    from .communications import monitor as M
+    cmd = getattr(args, "monitor_command", None) or "run"
+    if cmd == "run":
+        out = M.run_hourly(cfg, source="live", dry_run=args.dry_run,
+                           canary=args.canary,
+                           notify=not args.no_notify)
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out.get("state") in ("OK", "preview") else 1
+    if cmd == "health":
+        print(_json.dumps(M.monitor_health(cfg), indent=2, sort_keys=True))
+        return 0
+    if cmd == "install":
+        authorized = os.environ.get("VOICE_BRIDGE_MONITOR_ENABLE") == "1"
+        live = bool(args.enable) and authorized
+        out = M.install_monitor(cfg, dry_run=not live, enable=live)
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        if args.enable and not authorized:
+            print("\n# denied: live installation requires BOTH --enable AND "
+                  "VOICE_BRIDGE_MONITOR_ENABLE=1. Nothing was written or "
+                  "enabled.", file=sys.stderr)
+            return 1
+        if not args.enable:
+            print("\n# dry-run: nothing installed/enabled. To install AND "
+                  "enable the timer (live activation), run exactly:\n#   "
+                  "VOICE_BRIDGE_MONITOR_ENABLE=1 "
+                  "voicebridge monitor install --enable", file=sys.stderr)
+        return 0
+    if cmd == "disable":
+        print(_json.dumps(M.disable_monitor(), indent=2, sort_keys=True))
+        return 0
+    if cmd == "rollback":
+        print(_json.dumps(M.rollback_monitor(cfg), indent=2, sort_keys=True))
+        return 0
+    if cmd == "launch":
+        print(_json.dumps(M.optional_launch(cfg), indent=2, sort_keys=True))
+        return 0
+    print(f"ERROR: unknown monitor command {cmd!r}")
     return 2
 
 

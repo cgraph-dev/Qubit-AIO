@@ -78,6 +78,50 @@ TTS is 22050 Hz mono. The bridge **resamples to the sink's native rate** before
 playing; if it ever sounds pitch-shifted/robotic, a wrong sample rate is the cause
 (fixed by the resample in `voicebridge/audio/playback.py`).
 
+## HDMI / TV output and auto-detection (2026-08-27 fix)
+The bridge now auto-detects the OS **default output sink** and **default input
+source** (nothing pinned in config). It plays through the **pulse/pipewire
+aggregate** when following the default, so PipeWire converts the audio at high
+quality to whatever sink is active (headphones, TV/HDMI, speakers):
+
+- HDMI/TV sinks reject Piper's native 22050 Hz through PortAudio's raw ALSA
+  hostapi (`paInvalidSampleRate` -9997) while accepting 44100/48000. The
+  aggregate accepts any rate, so the TV works — and no Python resample is done
+  on that path (a linear resample here would add the "robotic voice" artifacts).
+- If no pulse/pipewire aggregate exists (bare ALSA), playback falls back to the
+  raw default device and resamples to its native rate
+  (`voicebridge/audio/playback.py::_resolve_target_rate` /
+  `_aggregate_output_index`).
+- Keeping `audio.output_device` / `output_device_name` EMPTY is still the
+  portable rule: the agent follows whatever sink the user picks.
+
+## Volume and beeps (2026-08-27)
+- On boot the bridge **unmutes** the default sink but no longer forces a fixed
+  volume over the one the user already chose (it used to blast
+  `audio.output_volume` = 100% on every restart — the "too loud" complaint). It
+  still applies `output_volume` when the sink is muted or at 0 so a fresh boot
+  is audible. Change your level normally (OS / TV volume) or via
+  `voicebridge audio status`.
+- The PTT start/end beeps are generated at 0.15 amplitude (was 0.25) so they are
+  clearly audible but no longer piercing.
+
+## Recovery: crashes and bad inputs (2026-08-27)
+- **Hard crashes** self-heal: the user systemd unit runs `Restart=always`, so if
+  the bridge ever dies it is relaunched automatically (see
+  `systemctl --user show openclaw-voice-bridge -p NRestarts`).
+- **Capture** already retries a failing stream open 3× (0.2 s backoff) and runs a
+  watchdog thread that force-closes a wedged device instead of freezing the PTT
+  loop; failures log `mic.capture.error`/`mic.capture.timeout` and the agent says
+  "I couldn't hear you." (`voicebridge/orchestrator.py` capture path).
+- **Playback** retries an open 3×, and if the resolved device fails it falls back
+  to the system default sink; total failure logs `playback.failed` so it is a
+  visible typed degraded state, not silence.
+- Device indices are never trusted: names are matched per play/capture and
+  nothing is persisted as a transient numeric index (`voicebridge/audio/settings.py`).
+- Diagnosis commands: `voicebridge audio status`, `pactl info` (default
+  sink/source), `scripts/diagnose_audio_usb.py`, and
+  `journalctl --user -u openclaw-voice-bridge --since "5 min ago"`.
+
 ## Hotkeys (Right Ctrl PTT)
 - Hold **Right Ctrl** to talk (config `hotkey.hold_key: ctrl_r`). A quick tap
   toggles listen; **Esc** cancels speech/task.

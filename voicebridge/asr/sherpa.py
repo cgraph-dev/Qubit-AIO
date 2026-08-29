@@ -19,7 +19,7 @@ from __future__ import annotations
 import threading
 import wave
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 import numpy as np
 
@@ -46,7 +46,8 @@ class SherpaASR(ASRProvider):
 
     def __init__(self, engine: str = "moonshine", model_dir: Optional[Path] = None,
                  provider: str = "cpu", num_threads: int = 4,
-                 language: Optional[str] = None) -> None:
+                 language: Optional[str] = None,
+                 hotwords: str = "", hotwords_score: float = 1.5) -> None:
         if engine not in _ENGINES:
             raise ASRUnavailable(f"sherpa engine unknown: {engine} (use moonshine|parakeet)")
         self.engine = engine
@@ -54,8 +55,34 @@ class SherpaASR(ASRProvider):
         self.provider = provider
         self.num_threads = num_threads
         self.language = language or "en"
+        # Hotword boosting (transducer engines only): bias decoding toward the
+        # user's world vocabulary — names/projects/jargon that generic models
+        # mangle (accuracy complaint: ~70% raw). Comma-separated phrases.
+        self.hotwords = (hotwords or "").strip()
+        self.hotwords_score = float(hotwords_score)
         self._recognizer = None
         self._lock = threading.Lock()
+
+    def _hotwords_file(self) -> Optional[str]:
+        """Materialize the hotword list for sherpa-onnx; None when unused.
+
+        With modeling_unit="bpe" + bpe_vocab=tokens.txt, sherpa encodes PLAIN
+        WORDS into BPE itself (verified: sherpa_onnx 1.13.6 signature). Hand-
+        encoding pieces ourselves fails — the C++ side strips/handles '▁'
+        markers differently than tokens.txt.
+        """
+        if not self.hotwords or self.engine != "parakeet":
+            return None      # moonshine factory has no hotwords support
+        try:
+            lines = [w.strip() for w in self.hotwords.split(",") if w.strip()]
+            if not lines:
+                return None
+            path = Path("/tmp/qubit-voice-agent") / "asr-hotwords.txt"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("\n".join(lines) + "\n")
+            return str(path)
+        except Exception:
+            return None
 
     # ---- model wiring -------------------------------------------------------
     def _paths(self):
@@ -119,11 +146,17 @@ class SherpaASR(ASRProvider):
                         provider=self.provider,
                         decoding_method="modified_beam_search",
                         max_active_paths=4,
-                        model_type="nemo_transducer")
+                        model_type="nemo_transducer",
+                        modeling_unit="bpe",
+                        bpe_vocab=str(p["tokens"]),
+                        **({"hotwords_file": hw, "hotwords_score": self.hotwords_score}
+                           if (hw := self._hotwords_file()) else {}))
             except Exception as exc:  # pragma: no cover
                 raise ASRUnavailable(f"sherpa {self.engine} load failed: {exc}") from exc
             log_event("asr.load", provider=self.name, engine=self.engine,
-                      device=self.provider, threads=self.num_threads)
+                      device=self.provider, threads=self.num_threads,
+                      hotwords=len([w for w in self.hotwords.split(",")
+                                    if w.strip()]) if self.hotwords else 0)
 
     def transcribe(self, audio_path: Path | str) -> Transcript:
         self.load()

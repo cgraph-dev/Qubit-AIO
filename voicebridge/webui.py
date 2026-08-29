@@ -598,6 +598,15 @@ class WebUIHandler(BaseHTTPRequestHandler):
         except OSError:
             self._send(404, b"not found")
 
+    def _frontend_file(self, name: str) -> Optional[Path]:
+        """Resolve a frontend file from the ACTIVE frontend dir, falling back
+        to the repository frontend when absent (Packet 8E serving fix)."""
+        p = self.app._frontend_dir / name
+        if p.is_file():
+            return p
+        repo = REPO_FRONTEND / name
+        return repo if repo.is_file() else None
+
     def do_OPTIONS(self) -> None:  # noqa: N802  (CORS preflight)
         self.send_response(204)
         origin = self.headers.get("Origin", "")
@@ -664,10 +673,10 @@ class WebUIHandler(BaseHTTPRequestHandler):
     def do_HEAD(self) -> None:  # noqa: N802  (some browsers preload with HEAD)
         # Reuse GET logic but don't send body
         path = self.path.split("?")[0]
-        if path.startswith("/static/") and self.app._use_frontend_dir:
+        if path.startswith("/static/"):
             name = path.split("/", 2)[-1]
-            fpath = self.app._frontend_dir / name
-            if fpath.exists():
+            fpath = self._frontend_file(name)
+            if fpath is not None:
                 low = name.lower()
                 if low.endswith(".gif"): ctype = "image/gif"
                 elif low.endswith(".png"): ctype = "image/png"
@@ -680,7 +689,6 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self.send_header("Content-Type", ctype)
                 self.send_header("Content-Length", str(fpath.stat().st_size))
                 self.send_header("Cache-Control", "public, max-age=86400")
-                self.send_header("Access-Control-Allow-Origin", o)
                 self.end_headers()
                 return
         # fallback: try GET path handling but just send headers
@@ -695,46 +703,45 @@ class WebUIHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         path = self.path.split("?")[0]
         if path in ("/", "/index.html"):
-            if self.app._use_frontend_dir:
-                self._file(self.app._frontend_dir / "index.html", "text/html; charset=utf-8")
+            fp = self._frontend_file("index.html")
+            if fp is not None:
+                self._file(fp, "text/html; charset=utf-8")
+            elif self.app._use_frontend_dir:
+                self._send(404, b"index not found")
             else:
                 self._html(CHAT_PAGE)
         elif path == "/token-setup" or path == "/token-setup.html":
             # No-auth BY DESIGN: storing a token grants nothing by itself; the
             # API still rejects every request lacking the correct header.
-            fp = self.app._frontend_dir / "token-setup.html"
-            if not fp.exists():
-                fp = Path(__file__).resolve().parents[1] / "frontend" / "token-setup.html"
-            if self.app._use_frontend_dir or fp.exists():
+            fp = self._frontend_file("token-setup.html")
+            if fp is not None:
                 self._file(fp, "text/html; charset=utf-8")
             else:
-                self._send(404, b"not found")
+                self._send(404, b"token-setup page not found")
         elif path == "/approvals" or path == "/approvals.html":
-            fp = self.app._frontend_dir / "approvals.html"
-            if not fp.exists():
-                fp = Path(__file__).resolve().parents[1] / "frontend" / "approvals.html"
-            if self.app._use_frontend_dir or fp.exists():
+            fp = self._frontend_file("approvals.html")
+            if fp is not None:
                 self._file(fp, "text/html; charset=utf-8")
             else:
                 self._send(404, b"approvals page not found")
         elif path == "/reports" or path == "/reports.html":
-            if self.app._use_frontend_dir and (self.app._frontend_dir / "reports.html").exists():
-                self._file(self.app._frontend_dir / "reports.html", "text/html; charset=utf-8")
+            fp = self._frontend_file("reports.html")
+            if fp is not None:
+                self._file(fp, "text/html; charset=utf-8")
             else:
                 self._send(404, b"reports page not found")
         elif path == "/settings" or path == "/settings.html":
-            # Packet 7D: beginner/advanced control center (every control calls
-            # a real /api/* endpoint; no frontend-only state).
-            fp = self.app._frontend_dir / "settings.html"
-            if not fp.exists():
-                fp = Path(__file__).resolve().parents[1] / "frontend" / "settings.html"
-            if fp.exists():
+            # Packet 7D/8E: beginner/advanced control center (every control
+            # calls a real /api/* endpoint; no frontend-only state).
+            fp = self._frontend_file("settings.html")
+            if fp is not None:
                 self._file(fp, "text/html; charset=utf-8")
             else:
                 self._send(404, b"settings page not found")
         elif path == "/activity":
-            if self.app._use_frontend_dir and (self.app._frontend_dir / "activity.html").exists():
-                self._file(self.app._frontend_dir / "activity.html", "text/html; charset=utf-8")
+            fp = self._frontend_file("activity.html")
+            if fp is not None:
+                self._file(fp, "text/html; charset=utf-8")
             else:
                 self._html(ACTIVITY_PAGE)
         elif path == "/api/status":
@@ -848,81 +855,78 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 "lessons": led.lessons(),
                 "reviews": led.reviews(),
             })
-        elif path == "/api/reports":
+        elif path == "/api/reports" or path.startswith("/api/reports/"):
+            # Packet 8C: canonical report bundle index / detail / asset / export.
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
                 return
-            qs = self.path.split("?", 1)[1] if "?" in self.path else ""
-            params: Dict[str, str] = {}
-            for kv in qs.split("&"):
-                if "=" in kv:
-                    k, v = kv.split("=", 1)
-                    params[k] = __import__("urllib.parse").parse.unquote_plus(v)
-            q = params.get("q", "").strip()[:120]
-            cat = params.get("category", "").strip()[:40]
-            days = int(params.get("days", "90") or 90)
-            limit = min(int(params.get("limit", "200") or 200), 500)
-            # merged activity + logs, categorized, with filters
-            activity = self.app.feed.recent(limit=300)
-            logs = self.app.logs(limit=300, q=q, since=0.0)
-            # tag categories
-            def _cat(it):
-                k = (it.get("kind") or "").lower()
-                r = (it.get("route") or it.get("detail") or "").lower()
-                txt = " ".join(str(it.get(x, "")) for x in ("text","summary","detail","route","kind")).lower()
-                if "weather" in txt: return "weather"
-                if any(x in k for x in ("interrupt","hotkey")): return "interrupt"
-                if "filler" in txt: return "filler"
-                if "hermes" in k or "hermes" in r: return "hermes"
-                if "openclaw" in k or "openclaw" in r: return "openclaw"
-                if "inbox" in txt or "gmail" in txt or "messenger" in txt or "instagram" in txt or "tiktok" in txt: return "inbox"
-                if k in ("summary","conversation","local","fallback"): return k
-                return k or "other"
-            import time as _time
-            cutoff = _time.time() - days * 86400 if days > 0 else 0
-            # shared ledger (durable across provider switches + reboots) — also visible in reports
             try:
-                _shared = self.app.orch.shared.recent(limit=300) if hasattr(self.app.orch, "shared") else []
-                for _r in _shared:
-                    _ts = float(_r.get("ts") or 0)
-                    if cutoff and _ts and _ts < cutoff:
-                        continue
-                    _it = {"kind": _r.get("route") or _r.get("role") or "shared", "text": _r.get("text","")[:600], "summary": _r.get("text","")[:600] if _r.get("role")=="agent" else "", "route": _r.get("route","") or _r.get("provider",""), "ts": _ts, "detail": f"shared:{_r.get('role','')}", "shared": True}
-                    c = _cat(_it)
-                    if cat and c != cat:
-                        continue
-                    if q and q.lower() not in __import__("json").dumps(_it).lower():
-                        continue
-                    _it["category"] = c
-                    merged_item_exists = any(abs(float(m.get("ts") or 0) - _ts) < 1.0 and m.get("text","")[:80]==_it["text"][:80] for m in activity)
-                    if not merged_item_exists:
-                        activity.append(_it)
-            except Exception:
-                pass
-            merged = []
-            for it in activity:
-                if cutoff and float(it.get("ts") or 0) < cutoff:
-                    continue
-                if cat and _cat(it) != cat:
-                    continue
-                if q and q.lower() not in __import__("json").dumps(it).lower():
-                    continue
-                it = dict(it); it["category"] = _cat(it)
-                merged.append(it)
-            # also include raw log events not yet in feed
-            for ev in logs:
-                if any(ev.get("ts") == m.get("ts") and ev.get("event") == m.get("kind") for m in merged):
-                    continue
-                if cutoff and float(ev.get("ts") or 0) < cutoff:
-                    continue
-                c = _cat({"kind": ev.get("event",""), "text": str(ev)})
-                if cat and c != cat:
-                    continue
-                if q and q.lower() not in __import__("json").dumps(ev).lower():
-                    continue
-                merged.append({"kind": ev.get("event"), "text": str(ev.get("text","")), "summary": str(ev.get("summary","")), "route": ev.get("route",""), "ts": ev.get("ts"), "category": c, "raw_log": ev})
-            merged.sort(key=lambda x: float(x.get("ts") or 0), reverse=True)
-            self._json({"items": merged[:limit], "pruned_available": True})
+                from .communications.reports import ReportStore, ReportStoreError
+                rstore = ReportStore(self.app.orch.cfg.state_dir() / "reports")
+                sub = path[len("/api/reports"):].strip("/")
+                if not sub:
+                    qs = self.path.split("?", 1)[1] if "?" in self.path else ""
+                    params = {}
+                    for kv in qs.split("&"):
+                        if "=" in kv:
+                            k, v = kv.split("=", 1)
+                            params[k] = __import__("urllib.parse").parse.unquote_plus(v)
+                    out = rstore.index(q=params.get("q", ""),
+                                       platform=params.get("platform", ""),
+                                       limit=int(params.get("limit", "100") or 100))
+                    self._json({"state": "OK", **out})
+                    return
+                parts = sub.split("/")
+                if parts[0] == "export" and len(parts) == 2:
+                    blob = rstore.export(parts[1])
+                    if blob is None:
+                        self._json({"state": "MISSING", "detail": "no such report"}, 404)
+                        return
+                    self._send(200, blob, "application/zip")
+                    return
+                if len(parts) == 2 and parts[1] == "html":
+                    # self-contained bundle HTML for the print / read view
+                    hp = rstore.bundle_dir(parts[0]) / "index.html"
+                    if not hp.exists():
+                        self._json({"state": "MISSING", "detail": "no such report"}, 404)
+                        return
+                    self._send(200, hp.read_bytes(), "text/html")
+                    return
+                if len(parts) == 3 and parts[1] == "assets":
+                    got = rstore.asset(parts[0], parts[2])
+                    if got is None:
+                        self._json({"state": "MISSING", "detail": "asset unavailable"},
+                                   404)
+                        return
+                    data, mime = got
+                    self._send(200, data, mime)
+                    return
+                if len(parts) == 1:
+                    det = rstore.detail(parts[0])
+                    if det is None:
+                        self._json({"state": "MISSING", "detail": "no such report"},
+                                   404)
+                        return
+                    self._json({"state": "OK", "report": det})
+                    return
+                self._json({"state": "failed", "detail": "unknown reports path"}, 400)
+            except ReportStoreError as exc:
+                self._json({"state": "failed", "detail": str(exc)[:160]}, 400)
+            except Exception as exc:
+                self._json({"state": "degraded", "detail": str(exc)[:200]})
+        elif path == "/api/notifications":
+            # Packet 8D: recent deduplicated monitor notifications (redacted).
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            try:
+                from .communications.adapters.registry import communications_store
+                store = communications_store(self.app.orch.cfg)
+                self._json({"state": "OK",
+                            "pending": store.pending_notifications(),
+                            "notifications": store.recent_notifications(limit=50)})
+            except Exception as exc:
+                self._json({"state": "degraded", "detail": str(exc)[:160]})
         elif path == "/api/profiles":
             # Packet 7D: provider/profile registry (read-only list/show/check).
             if not self._api_token_ok():
@@ -976,21 +980,86 @@ class WebUIHandler(BaseHTTPRequestHandler):
                                             for d in devs["outputs"]]})
             except AS.AudioSettingsError as exc:
                 self._json({"state": "MISSING", "detail": str(exc)[:200]}, 503)
-        elif path == "/api/permissions":
-            # Packet 7D: read-only permission review (from the safety policy).
+        elif path == "/api/permissions" and self.command == "GET":
+            # Packet 7E: permission profiles + scoped grants + skills. Read-only
+            # here; mutating actions go through POST with explicit confirmation.
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
                 return
             try:
-                from .safety import policy as _pol
-                perms = getattr(_pol, "REVIEW_ITEMS", None)
-                if perms is None:
-                    perms = [{"capability": "shell.exec", "tier": "mutating"},
-                             {"capability": "file.write", "tier": "mutating"},
-                             {"capability": "browser.navigate", "tier": "mutating"}]
-                self._json({"items": perms, "source": "safety policy"})
-            except Exception:
-                self._json({"items": [], "source": "safety policy"})
+                from . import permissions as P
+                from .broker import build_host_broker
+                store = P.permissions_store(self.app.orch.cfg)
+                mode, scopes, expires = store.mode()
+                grants = [g.to_dict() for g in store.grants()]
+                policy = P.PermissionPolicy(store,
+                                            registry=build_host_broker().registry)
+                effective = {
+                    g["capability"]: policy.effective(
+                        g["capability"], tuple(g["scopes"])) for g in grants}
+                self._json({
+                    "state": "OK",
+                    "mode": mode, "mode_scopes": scopes,
+                    "mode_expires_at": expires,
+                    "grants": grants,
+                    "skills": [s.to_dict() for s in store.skills()],
+                    "audit": store.audit(30),
+                    "effective": effective,
+                    # 7D-compatible review list (capability/tier view)
+                    "items": [{"capability": g["capability"],
+                               "tier": "granted", "scopes": g["scopes"]}
+                              for g in grants],
+                    "source": "permissions store",
+                })
+            except Exception as exc:
+                self._json({"state": "degraded",
+                            "detail": str(exc)[:200], "items": []})
+        elif path == "/api/websites":
+            # Packet 8E: website-integration onboarding/observability (read-only
+            # here; mutations go through POST). Never leaks page text/secrets.
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            try:
+                from . import permissions as P
+                from . import websites as W
+                store = W.website_integrations_store(self.app.orch.cfg)
+                perms = P.permissions_store(self.app.orch.cfg)
+                qs = self.path.split("?", 1)[1] if "?" in self.path else ""
+                params = {}
+                for kv in qs.split("&"):
+                    if "=" in kv:
+                        k, v = kv.split("=", 1)
+                        params[k] = __import__("urllib.parse").parse.unquote_plus(v)
+                if params.get("logs"):
+                    rows = store.logs(params["logs"],
+                                      tail=max(1, min(int(params.get("tail", "50") or 50), 500)))
+                    self._json({"state": "OK", "logs": rows})
+                    return
+                if params.get("id"):
+                    rec = store.lookup(params["id"])
+                    if rec is None:
+                        self._json({"state": "MISSING",
+                                    "detail": "no such integration"}, 404)
+                        return
+                    self._json({"state": "OK", "integration": rec.to_dict(),
+                                "effective": W.effective_permissions(
+                                    perms, store, rec)})
+                    return
+                self._json({"state": "OK", "mode": perms.mode()[0],
+                            "integrations": [r.to_dict()
+                                             for r in store.integrations()],
+                            "skills": [{"skill_id": s.skill_id,
+                                        "status": s.status,
+                                        "version": s.manifest.version,
+                                        "license": s.manifest.license,
+                                        "compatibility":
+                                            s.manifest.compatibility}
+                                       for s in perms.skills()]})
+            except W.WebsiteIntegrationError as exc:
+                self._json({"state": "failed", "detail": str(exc)[:200]})
+            except Exception as exc:
+                self._json({"state": "degraded", "detail": str(exc)[:200]})
         elif path == "/api/device/status":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
@@ -1041,8 +1110,12 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 items = []
             self._json({"items": items})
 
-        elif self.app._use_frontend_dir and path.startswith("/static/"):
+        elif path.startswith("/static/"):
             name = path.split("/", 2)[-1]
+            fp = self._frontend_file(name)
+            if fp is None:
+                self._send(404, b"not found")
+                return
             # correct MIME so browsers cache and render images properly
             low = name.lower()
             if low.endswith(".gif"): ctype = "image/gif"
@@ -1052,12 +1125,176 @@ class WebUIHandler(BaseHTTPRequestHandler):
             elif low.endswith(".css"): ctype = "text/css"
             elif low.endswith(".js"): ctype = "application/javascript"
             else: ctype = "application/octet-stream"
-            self._file(self.app._frontend_dir / name, ctype)
+            self._file(fp, ctype)
         else:
             self._send(404, b"not found")
 
     def do_POST(self) -> None:  # noqa: N802
         path = self.path.split("?")[0]
+        if path == "/api/permissions":
+            # Packet 7E: mutating permission/skill actions (explicit confirm).
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            try:
+                from . import permissions as P
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length).decode() or "{}")
+                store = P.permissions_store(self.app.orch.cfg)
+                action = str(body.get("action", ""))
+                confirmed = bool(body.get("confirmed", False))
+                actor = "dashboard"
+                if action == "set-mode":
+                    out = store.set_mode(
+                        str(body.get("mode")), requested_by=actor,
+                        confirmed=confirmed,
+                        scopes=tuple(body.get("scopes") or ()),
+                        ttl_s=body.get("ttl"))
+                elif action == "grant":
+                    g = store.grant(
+                        str(body.get("capability")), requested_by=actor,
+                        confirmed=confirmed,
+                        scopes=tuple(body.get("scopes") or ()),
+                        ttl_s=body.get("ttl"),
+                        note=str(body.get("note", ""))[:200])
+                    out = {"state": "OK", "grant": g.to_dict()}
+                elif action == "revoke":
+                    g = store.revoke(str(body.get("grant_id")),
+                                     requested_by=actor, confirmed=confirmed)
+                    out = {"state": "OK", "revoked": g.to_dict()}
+                elif action == "reset":
+                    out = store.reset(requested_by=actor, confirmed=confirmed)
+                elif action == "skill-install":
+                    man = P.SkillManifest.from_dict(body.get("manifest") or {})
+                    rec = store.install_skill(man, requested_by=actor,
+                                              confirmed=confirmed)
+                    out = {"state": "OK", "staged": rec.status,
+                           "skill": rec.to_dict()}
+                elif action == "skill-enable":
+                    rec = store.enable_skill(str(body.get("skill_id")),
+                                             requested_by=actor,
+                                             confirmed=confirmed)
+                    out = {"state": "OK", "status": rec.status,
+                           "skill_id": rec.skill_id}
+                elif action == "skill-disable":
+                    rec = store.disable_skill(str(body.get("skill_id")),
+                                              requested_by=actor,
+                                              confirmed=confirmed)
+                    out = {"state": "OK", "status": rec.status,
+                           "skill_id": rec.skill_id}
+                elif action == "skill-remove":
+                    rec = store.remove_skill(str(body.get("skill_id")),
+                                             requested_by=actor,
+                                             confirmed=confirmed)
+                    out = {"state": "OK", "removed": rec.skill_id}
+                elif action == "skill-rollback":
+                    rec = store.rollback_skill(str(body.get("skill_id")),
+                                               requested_by=actor,
+                                               confirmed=confirmed)
+                    out = {"state": "OK", "status": rec.status,
+                           "skill_id": rec.skill_id}
+                else:
+                    self._json({"state": "failed",
+                                "detail": f"unknown action {action}"}, 400)
+                    return
+                self._json(out)
+            except P.ConfirmationRequiredError as exc:
+                self._json({"state": "denied", "code": "CONFIRMATION_REQUIRED",
+                            "detail": str(exc)})
+            except (P.PermissionError, P.SkillValidationError) as exc:
+                self._json({"state": "failed", "detail": str(exc)})
+            except Exception as exc:
+                self._json({"state": "failed", "detail": str(exc)[:200]})
+            return
+        if path == "/api/websites":
+            # Packet 8E: mutating website-integration actions (explicit confirm).
+            # "add" persists a PENDING/disabled proposal and grants nothing.
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            try:
+                from . import permissions as P
+                from . import websites as W
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length).decode() or "{}")
+                store = W.website_integrations_store(self.app.orch.cfg)
+                perms = P.permissions_store(self.app.orch.cfg)
+                action = str(body.get("action", ""))
+                confirmed = bool(body.get("confirmed", False))
+                actor = "dashboard"
+                ident = str(body.get("id_or_url") or body.get("id") or "")
+                if action == "add":
+                    if bool(body.get("dry_run")):
+                        out = W.add_preview(str(body.get("url", "")),
+                                            name=str(body.get("name", "")))
+                    else:
+                        rec = store.add(str(body.get("url", "")),
+                                        requested_by=actor,
+                                        display_name=str(body.get("name", "")))
+                        out = {"state": "OK", "status": rec.status,
+                               "granted": False,
+                               "integration": rec.to_dict()}
+                elif action == "inspect":
+                    rec = store.lookup(ident)
+                    if rec is None:
+                        self._json({"state": "MISSING",
+                                    "detail": "no such integration"}, 404)
+                        return
+                    rec2 = store.run_discovery(rec.integration_id,
+                                               requested_by=actor)
+                    out = {"state": "OK", "status": rec2.status,
+                           "reason": rec2.health.get("reason_code", ""),
+                           "integration": rec2.to_dict()}
+                elif action == "check":
+                    out = store.check(ident, requested_by=actor, perms=perms)
+                elif action == "enable":
+                    rec = store.enable(ident, requested_by=actor,
+                                       confirmed=confirmed, perms=perms)
+                    out = {"state": "OK", "status": rec.status,
+                           "enabled": rec.enabled, "integration": rec.to_dict()}
+                elif action == "manifest-link":
+                    rec = store.link_manifest(
+                        ident, skill_id=str(body.get("skill_id", "")),
+                        requested_by=actor, confirmed=confirmed, perms=perms)
+                    out = {"state": "OK", "manifest_link": rec.manifest_link,
+                           "license": rec.license,
+                           "content_hash": rec.content_hash,
+                           "integration": rec.to_dict()}
+                elif action == "disable":
+                    rec = store.disable(ident, requested_by=actor,
+                                        confirmed=confirmed)
+                    out = {"state": "OK", "status": rec.status,
+                           "enabled": rec.enabled, "integration": rec.to_dict()}
+                elif action == "grant":
+                    out = store.grant(ident, requested_by=actor,
+                                      confirmed=confirmed,
+                                      capabilities=tuple(
+                                          body.get("capabilities") or ()),
+                                      ttl_s=body.get("ttl"), perms=perms)
+                elif action == "revoke":
+                    out = store.revoke(ident, requested_by=actor,
+                                       confirmed=confirmed, perms=perms)
+                elif action == "remove":
+                    out = store.remove(ident, requested_by=actor,
+                                       confirmed=confirmed, perms=perms)
+                elif action == "rollback":
+                    out = store.rollback(ident, requested_by=actor,
+                                         confirmed=confirmed)
+                else:
+                    self._json({"state": "failed",
+                                "detail": f"unknown action {action}"}, 400)
+                    return
+                self._json(out)
+            except W.ConfirmationRequiredError as exc:
+                self._json({"state": "denied", "code": "CONFIRMATION_REQUIRED",
+                            "detail": str(exc)})
+            except (W.WebsiteIntegrationError, W.WebsiteValidationError) as exc:
+                self._json({"state": "failed", "detail": str(exc)})
+            except (P.PermissionError, P.SkillValidationError) as exc:
+                self._json({"state": "failed", "detail": str(exc)})
+            except Exception as exc:
+                self._json({"state": "failed", "detail": str(exc)[:200]})
+            return
         if path == "/api/talk":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
@@ -1342,7 +1579,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self._json({"state": "FAILED", "detail": str(exc)[:160]}, 409)
             except Exception as exc:
                 self._json({"state": "FAILED", "detail": str(exc)[:160]}, 409)
-        elif path == "/api/prune" or path == "/api/reports/prune":
+        elif path == "/api/prune":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
                 return
@@ -1354,6 +1591,41 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 days = 90
             removed = self.app._prune_old_events(max_age_days=days)
             self._json({"ok": True, "removed": removed, "days": days})
+        elif path == "/api/reports/prune":
+            # Packet 8C: report-bundle retention (dry-run by default; `apply`
+            # actually removes EXPIRED bundles only). Never touches cursors,
+            # memory, evidence, legacy .md files, or user data.
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            try:
+                body = self.rfile.read(int(self.headers.get("Content-Length", 0)) if self.headers.get("Content-Length") else 0) or b"{}"
+                data = __import__("json").loads(body or b"{}")
+                days = int(data.get("days", 90))
+                apply_ = bool(data.get("apply", False))
+            except Exception:
+                days, apply_ = 90, False
+            from .communications.reports import ReportStore
+            rstore = ReportStore(self.app.orch.cfg.state_dir() / "reports")
+            out = rstore.retention(dry_run=not apply_, retention_days=days)
+            # propagate the REAL retention state (OK/BLOCKED/FAILED/DEGRADED) —
+            # never a top-level OK when the operation failed or was blocked.
+            self._json(out)
+        elif path.startswith("/api/reports/") and path.endswith("/ack"):
+            # Packet 8C: acknowledge a report (atomic manifest flag).
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            report_id = path[len("/api/reports/"):-len("/ack")]
+            from .communications.reports import ReportStore, ReportStoreError
+            rstore = ReportStore(self.app.orch.cfg.state_dir() / "reports")
+            try:
+                ok = rstore.acknowledge(report_id)
+            except ReportStoreError as exc:
+                self._json({"state": "failed", "detail": str(exc)[:160]}, 400)
+                return
+            self._json({"state": "OK" if ok else "MISSING",
+                        "acknowledged": ok})
         elif path == "/api/type":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
@@ -1459,23 +1731,60 @@ class WebUIHandler(BaseHTTPRequestHandler):
             self._send(404, b"not found")
 
 
-def resolve_frontend_dir(explicit: Optional[str]):
-    """Resolve the dashboard frontend directory.
+REPO_FRONTEND = Path(__file__).resolve().parents[1] / "frontend"
 
-    Order: explicit config value (webui.frontend_dir) if it serves index.html,
-    else this repository's frontend/. No user-home or sibling-repo path is
-    hardcoded (Packet 0B); machine-specific themes go through config.
-    Returns (path, serves_index).
+
+def _frontend_version(frontend_dir: Path) -> str:
+    """Read a frontend checkout's VERSION marker (empty when absent)."""
+    try:
+        return (Path(frontend_dir) / "VERSION").read_text().strip()
+    except OSError:
+        return ""
+
+
+def resolve_frontend_dir(explicit: Optional[str]):
+    """Resolve the ACTIVE dashboard frontend directory (Packet 8E serving fix).
+
+    Returns ``(active_path, serves_index)`` — the active path after the
+    stale/version check (a stale or unversioned external checkout falls back to
+    the repository frontend). Use ``frontend_status`` for the full state.
     """
-    repo_frontend = Path(__file__).resolve().parents[1] / "frontend"
+    p, serves, _stale, _ver, _active = frontend_status(explicit)
+    return p, serves
+
+
+def frontend_status(explicit: Optional[str]):
+    """Full frontend resolution state (Packet 8E serving fix).
+
+    Order:
+      - the repository ``frontend/`` is the canonical current UI and carries a
+        ``VERSION`` marker;
+      - an explicit ``webui.frontend_dir`` is honored ONLY when it serves
+        ``index.html`` AND carries a ``VERSION`` marker equal to the repository
+        version (i.e. it is a current checkout). A stale, unversioned, or
+        version-mismatched external checkout is NOT served: we safely fall back
+        to the repository frontend and report ``stale=True`` so the operator can
+        update the external checkout or remove the override. The external
+        checkout itself is never modified or overwritten.
+
+    Returns ``(path, serves_index, stale, version, active)`` where ``active`` is
+    ``"repo"`` or ``"external"``.
+    """
+    repo_version = _frontend_version(REPO_FRONTEND)
     if explicit:
         p = Path(explicit).expanduser()
         try:
             if (p / "index.html").is_file():
-                return p, True
+                ext_version = _frontend_version(p)
+                if ext_version and repo_version and ext_version == repo_version:
+                    return p, True, False, repo_version, "external"
+                # stale / unversioned / mismatched external checkout -> safe
+                # repository fallback (never serve an outdated UI).
+                return REPO_FRONTEND, True, True, repo_version, "repo"
         except OSError:
             pass
-    return repo_frontend, (repo_frontend / "index.html").is_file()
+    return REPO_FRONTEND, (REPO_FRONTEND / "index.html").is_file(), \
+        False, repo_version, "repo"
 
 
 def token_ok(cfg_token: str, header_token: str,
@@ -1527,11 +1836,22 @@ class WebUI:
         self._pending_lock = threading.Lock()
         self._results: Dict[str, Dict[str, Any]] = {}
         self._result_lock = threading.Lock()
-        # Dashboard frontend: optional webui.frontend_dir config key wins,
-        # otherwise serve this repository's frontend/. To keep an external
-        # dashboard theme, set webui.frontend_dir in the user config.
-        self._frontend_dir, self._use_frontend_dir = resolve_frontend_dir(
-            orchestrator.cfg.get("webui", "frontend_dir") if orchestrator is not None else None)
+        # Dashboard frontend: optional webui.frontend_dir config key is honored
+        # ONLY when it is a current (VERSION-matched) checkout; a stale or
+        # unversioned external frontend safely falls back to the repository
+        # frontend so the current Packet 8E Websites/Permissions UI is served.
+        self._frontend_dir, self._use_frontend_dir, self._frontend_stale, \
+            self._frontend_version, self._frontend_active = frontend_status(
+                orchestrator.cfg.get("webui", "frontend_dir")
+                if orchestrator is not None else None)
+        if getattr(self, "_frontend_stale", False):
+            log_event("webui.frontend.stale",
+                      configured=bool(orchestrator is not None and
+                                      orchestrator.cfg.get("webui", "frontend_dir")),
+                      version=self._frontend_version, active="repo",
+                      detail="configured webui.frontend_dir is stale, unversioned, "
+                             "or version-mismatched; serving the repository "
+                             "frontend (Packet 8E safe fallback)")
         # optional shared secret for tunneled/external access (config: webui.token)
         self.api_token: str = orchestrator.cfg.get("webui", "token", default="") if orchestrator is not None else ""
         self.allowed_origins = orchestrator.cfg.get("webui", "allowed_origins", default=[]) if orchestrator is not None else []
@@ -1641,6 +1961,10 @@ class WebUI:
     def stop(self) -> None:
         if self._server is not None:
             self._server.shutdown()
+            # server_close() is required to actually release the listening
+            # socket; shutdown() alone leaves it open (ResourceWarning + a real
+            # fd leak across start/stop cycles in a long-lived process).
+            self._server.server_close()
 
     # -- public API -------------------------------------------------------
     def status(self) -> Dict[str, Any]:
@@ -1668,6 +1992,13 @@ class WebUI:
             "sticky_route": sticky,
             "tts": getattr(getattr(self.orch, "_tts", None), "name", "") if hasattr(self.orch, "_tts") else "",
             "awaiting_input": bool(self.orch._needs_answer()) if hasattr(self.orch, "_needs_answer") else False,
+            "frontend": {
+                "version": getattr(self, "_frontend_version", ""),
+                "active": getattr(self, "_frontend_active", "repo"),
+                "stale": bool(getattr(self, "_frontend_stale", False)),
+                "configured": bool(getattr(getattr(self.orch, "cfg", None), "get", None) and
+                                  self.orch.cfg.get("webui", "frontend_dir")),
+            },
         }
 
     def interrupt(self, mode: str = "interrupt") -> None:

@@ -63,7 +63,6 @@ def _profile_dir(engine: str) -> Path:
 
 def _make_engine(browser, engine: str, headless: bool):
     """Return a persistent context for `engine`. Throws on launch failure."""
-    import playwright.sync_api as pw
 
     profile = _profile_dir(engine)
     profile.mkdir(parents=True, exist_ok=True)

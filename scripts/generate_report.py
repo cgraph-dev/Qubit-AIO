@@ -15,7 +15,7 @@ Also supports reading raw agent output and auto-extracting:
 Outputs a markdown report to stdout and to <state_dir>/reports/<task>.md.
 The spoken summary is ALWAYS the last paragraph (≤40w).
 """
-import argparse, re, json, sys, os, pathlib, datetime, textwrap, subprocess
+import argparse, re, sys, pathlib, datetime
 
 def clamp_words(text, max_words=40):
     w=text.split()

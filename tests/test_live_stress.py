@@ -11,7 +11,7 @@ Run:
 Also usable as a live connectivity probe:
   .venv/bin/python tests/test_live_stress.py --live-check
 """
-import sys, json, time, pathlib, subprocess, threading, re, tempfile
+import sys, json, pathlib, subprocess, tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))

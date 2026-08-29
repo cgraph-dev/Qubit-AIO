@@ -234,6 +234,13 @@ DEFAULTS: Dict[str, Any] = {
         # (machine-specific value; keep it in the user config, not here).
         "frontend_dir": "",
     },
+    "permissions": {
+        # Packet 7E: restricted (default) / unrestricted (opt-in) permission
+        # profiles, scoped grants, and skill manifests. state_path default =
+        # <state_dir>/permissions.json (private, atomic, audited).
+        "state_path": "",
+        "default_mode": "restricted",
+    },
     "communications": {
         # Packet 8D: authorized hourly inbox monitor. The timer stays DISABLED
         # until the user explicitly installs+enables the repository template;

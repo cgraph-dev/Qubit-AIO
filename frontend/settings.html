@@ -21,8 +21,26 @@
  <b>Welcome</b> — you're already set up with the safe, verified defaults:
  <div class="muted">Qubit brain · CPU speech-to-text · Piper voice · your current audio devices.</div>
  <button class="ok" onclick="loadAll()">Check health</button>
- <button onclick="branding()">Branding plan</button>
- <span id="health" class="muted">—</span>
+<button onclick="branding()">Branding plan</button>
+  <span id="health" class="muted">—</span>
+</div>
+
+<h2 style="border:0;margin-top:14px">Websites</h2>
+<div class="card">
+  <div class="row">
+    <input id="ws-url" placeholder="https://example.com" spellcheck="false"
+      style="flex:1;min-width:220px;padding:6px;border-radius:6px;background:#0b0e14;color:#dbe2ef;border:1px solid #22304a">
+    <button class="ok" onclick="wsAdd()">Add Website</button>
+    <button onclick="wsList()">Refresh list</button>
+  </div>
+  <div class="muted" style="margin-top:6px">Adding a URL only creates a pending, disabled proposal. It never grants access, never runs page instructions, and is restricted by default. To use a site you must first link an approved skill.</div>
+  <div class="row" style="margin-top:8px">
+    <select id="ws-skill-beginner" style="font-size:12px"></select>
+    <button class="ok" onclick="wsLinkBeginner()">Link skill</button>
+    <span id="ws-beginner-state" class="muted"></span>
+  </div>
+  <div id="ws-add-state" class="muted"></div>
+  <div id="ws-list"></div>
 </div>
 
 <div class="advanced">
@@ -67,8 +85,46 @@
    <span id="audio-state" class="muted"></span>
  </div>
 
- <h2>Permissions</h2>
- <div class="card"><button onclick="permissions()">Review permissions</button><span id="perm-state" class="muted"></span></div>
+<h2>Permissions</h2>
+  <div class="card"><button onclick="permissions()">Review permissions</button><span id="perm-state" class="muted"></span></div>
+
+ <h2>Websites (advanced)</h2>
+  <div class="card">
+    <p class="muted" style="margin:0 0 6px">Versioned integration records and redacted progress/error logs. Each control calls the real backend; enabling, grants, and manifest linking require confirmation.</p>
+    <div class="row">
+      <button onclick="wsList()">List</button>
+      <button onclick="wsDetail()">Show selected</button>
+      <button onclick="wsInspectSel()">Inspect</button>
+      <button onclick="wsCheckSel()">Check</button>
+      <button onclick="wsLogsSel()">Logs</button>
+      <button class="ok" onclick="wsGrantSel()">Grant</button>
+      <button onclick="wsRevokeSel()">Revoke</button>
+      <button class="ok" onclick="wsEnableSel()">Enable</button>
+      <button onclick="wsDisableSel()">Disable</button>
+      <button onclick="wsRemoveSel()">Remove</button>
+      <button onclick="wsRollbackSel()">Rollback</button>
+      <select id="ws-sel" style="font-size:12px"></select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <select id="ws-skill-adv" style="font-size:12px"></select>
+      <button class="ok" onclick="wsLinkSel()">Link manifest</button>
+      <span id="ws-link-state" class="muted"></span>
+    </div>
+    <div class="muted" id="ws-adv-state"></div>
+    <div class="muted" id="ws-detail"></div>
+  </div>
+
+ <h2>Permission mode (websites)</h2>
+  <div class="card">
+    <div class="row">
+      <button onclick="permModeShow()">Show mode</button>
+      <button class="ok" onclick="permModeSetRestricted()">Set Restricted</button>
+      <button onclick="permModeSetUnrestricted()">Set Unrestricted</button>
+      <button onclick="permReset()">Reset to restricted (revoke all grants)</button>
+      <span id="perm-mode-state" class="muted"></span>
+    </div>
+    <div class="muted" style="margin-top:6px">Restricted is the default. Unrestricted only pre-authorizes routine read-only work inside the scopes you choose; it never bypasses confirmation, hard-deny rules, audit, or limits. Mode is durable policy state — page/model text can never change it.</div>
+  </div>
 
  <h2>Device enrollment</h2>
  <div class="card row">
@@ -102,16 +158,19 @@
   </div>
 </div>
 
+<script src="/static/vb.js"></script>
 <script>
-const API = localStorage.getItem('vdb_api') || '';
-const hdrs = () => ({'Content-Type':'application/json','X-Api-Token':localStorage.getItem('vdb_token')||''});
+const API = vbApiBase();
+const hdrs = (extra) => vbHeaders(extra);
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function show(id,html){const el=document.getElementById(id);if(el)el.innerHTML=html;}
 function tag(state){return '<span class="tag '+esc(state)+'">'+esc(state)+'</span>';}
+// One shared authenticated helper (frontend/vb.js): sends X-Api-Token from the
+// browser-stored token on every request; a 401 shows the "Pair this dashboard"
+// hint and is reported as a typed authRequired result (never a bare HTTP 401).
 async function api(path,opts){
- const r = await fetch(API+path,Object.assign({headers:hdrs()},opts||{}));
- let body=null; try{body=await r.json();}catch(e){body=null;}
- return {status:r.status,body};
+ const r = await vbApi(path,opts||{});
+ return {status:r.status,body:r.body,authRequired:!!r.authRequired};
 }
 // ---- typed-state interpreter: only OK/dry-run count as success; every other
 // state is rendered explicitly (never a generic "worked").
@@ -134,9 +193,17 @@ function toggleAdvanced(){
  document.querySelector('.advanced').classList.toggle('open');
 }
 async function loadAll(){
- const {status,body} = await api('/api/status');
+ const {status,body,authRequired} = await api('/api/status');
+ if(authRequired){ show('health', tag('UNAVAILABLE')+' pair this dashboard (see the banner)'); return; }
  show('health', status===200 && body && body.bridge==='up'
    ? tag('OK')+' bridge up' : tag('UNAVAILABLE')+' bridge offline / degraded');
+ // Stale/version-mismatched external frontend warning with the repair path.
+ if(body && body.frontend && body.frontend.stale){
+   show('health', tag('DEGRADED')+' bridge up · frontend: serving repository UI because '
+     +'the configured webui.frontend_dir is stale/version-mismatched — update the '
+     +'external checkout to carry a matching frontend/VERSION marker or remove the '
+     +'override; the external checkout was not modified.');
+ }
  loadProfiles();
 }
 async function loadProfiles(){
@@ -304,9 +371,221 @@ async function upgradeAll(){
  show('state-out','upgrade checks: '+out.join(', ')+' — use per-component Upgrade to apply');
 }
 async function branding(){
- const {status,body} = await api('/api/branding');
- const st = body && body.state ? body.state : 'UNAVAILABLE';
- show('health', tag(st)+' <span class="muted">'+esc(JSON.stringify({new_name:body&&body.new_name,files_migrated:body&&body.files_migrated,remaining:body&&body.files_remaining}))+'</span>');
+  const {status,body} = await api('/api/branding');
+  const st = body && body.state ? body.state : 'UNAVAILABLE';
+  show('health', tag(st)+' <span class="muted">'+esc(JSON.stringify({new_name:body&&body.new_name,files_migrated:body&&body.files_migrated,remaining:body&&body.files_remaining}))+'</span>');
+}
+// ---- Packet 8E websites (beginner + advanced parity) ---------------------
+async function wsAdd(){
+  const url = (document.getElementById('ws-url').value||'').trim();
+  if(!url){ show('ws-add-state', tag('MISSING')+' paste a URL first'); return; }
+  const doIt = async () => {
+    const {status,body} = await api('/api/websites',{method:'POST',
+      body:JSON.stringify({action:'add',url})});
+    show('ws-add-state', renderResult(body));
+    wsList();
+  };
+  doIt();
+}
+function wsSelectValue(){
+  const el = document.getElementById('ws-sel');
+  return el ? el.value : '';
+}
+function wsPopulate(integrations){
+  const el = document.getElementById('ws-sel');
+  if(!el) return;
+  el.innerHTML = (integrations||[]).map(r=>{
+    const label = (r.display_name||r.origin)+' ['+esc(r.status)+']';
+    return '<option value="'+esc(r.integration_id)+'">'+label+'</option>';
+  }).join('');
+}
+async function wsList(){
+  const {status,body} = await api('/api/websites');
+  if(!body || !body.integrations){ show('ws-add-state', tag('UNAVAILABLE')); return; }
+  wsPopulate(body.integrations);
+  wsPopulateSkills(body.skills||[]);
+  const rows = body.integrations.map(r=>{
+    const caps = (r.requested_capabilities||[]).length;
+    const grants = (r.grant_ids||[]).length;
+    const link = r.manifest_link
+      ? ' <span class="tag OK">link:'+esc(r.manifest_link)+'</span>'
+      : ' <span class="tag UNAVAILABLE">unlinked</span>';
+    return '<div class="row" style="margin:6px 0">'+tag(r.status)
+      +' <b>'+esc(r.display_name||r.origin)+'</b>'
+      +' <span class="muted">'+esc(r.origin)+'</span>'
+      +' <span class="muted">caps:'+caps+' grants:'+grants+'</span>'
+      +link
+      +' <button onclick="wsDetail(\''+esc(r.integration_id)+'\')">Show</button>'
+      +' <button onclick="wsInspect(\''+esc(r.integration_id)+'\')">Inspect</button>'
+      +' <button onclick="wsLogs(\''+esc(r.integration_id)+'\')">Logs</button>'
+      +'</div>';
+  }).join('');
+  show('ws-list', rows || '<span class="muted">no integrations yet</span>');
+  show('ws-add-state', tag('OK')+' '+body.integrations.length+' record(s) · mode '+esc(body.mode||'restricted')+' · skills '+body.skills.length);
+}
+function wsPopulateSkills(skills){
+  const active = (skills||[]).filter(s=>s.status==='active');
+  const opts = active.map(s=>'<option value="'+esc(s.skill_id)+'">'+esc(s.skill_id)+' (v'+esc(s.version)+')</option>').join('')
+    || '<option value="">no active skills</option>';
+  ['ws-skill-beginner','ws-skill-adv'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.innerHTML=opts;
+  });
+}
+async function wsLink(id, skillId){
+  if(!skillId){ show('ws-beginner-state', tag('MISSING')+' no active skill selected'); return; }
+  const doIt = async () => {
+    const {status,body} = await api('/api/websites',{method:'POST',
+      body:JSON.stringify({action:'manifest-link',id_or_url:id||wsSelectValue(),skill_id:skillId})});
+    show('ws-link-state', renderResult(body));
+    show('ws-adv-state', renderResult(body));
+    wsList();
+  };
+  confirmDialog('Link the active skill "'+esc(skillId)+'" to this website? Grants and enabling stay impossible until the link is valid and active.', doIt);
+}
+async function wsLinkSel(){ await wsLink('', wsSkillValue('ws-skill-adv')); }
+async function wsLinkBeginner(){ await wsLink(wsSelectValue(), wsSkillValue('ws-skill-beginner')); }
+function wsSkillValue(id){
+  const el = document.getElementById(id);
+  return el ? el.value : '';
+}
+async function wsShow(id){
+  const {status,body} = await api('/api/websites?id='+encodeURIComponent(id||wsSelectValue()));
+  if(!body || !body.integration){ show('ws-adv-state', tag('MISSING')); return; }
+  const i = body.integration;
+  const eff = body.effective || {};
+  const effTxt = Object.keys(eff).map(c=>esc(c)+':'+tag((eff[c]||{}).code||'UNAVAILABLE')).join(' ');
+  const grants = (eff.grants||[]).map(g=>esc(g.capability)+' @'+esc((g.scopes||[]).join(','))+' exp:'+esc(g.expires_at?new Date(g.expires_at*1000).toISOString():'never')).join('\n');
+  const man = i.manifest_link
+    ? 'manifest: '+esc(i.manifest_link)+' · license '+esc(i.license||'?')+' · hash '+esc((i.content_hash||'').slice(0,16))+'…'
+    : 'manifest: <span class="tag UNAVAILABLE">unlinked</span>';
+  show('ws-detail', '<pre style="white-space:pre-wrap;font-size:12px">'+esc(JSON.stringify(i,null,1))+'</pre><div>'+effTxt+'</div><div>'+man+'</div><pre style="white-space:pre-wrap;font-size:11px">'+esc(grants||'(no grants)')+'</pre>');
+  show('ws-adv-state', tag('OK')+' '+esc(i.status)+' · '+esc(i.origin));
+}
+async function wsDetail(id){ await wsShow(id); }
+async function wsInspect(id){
+  const doIt = async () => {
+    const {status,body} = await api('/api/websites',{method:'POST',
+      body:JSON.stringify({action:'inspect',id_or_url:id||wsSelectValue()})});
+    show('ws-adv-state', renderResult(body));
+    wsList();
+  };
+  confirmDialog('Run bounded read-only discovery for this website? (public HTTP metadata only; never authenticates)', doIt);
+}
+async function wsInspectSel(){ await wsInspect(''); }
+async function wsCheck(id){
+  const {status,body} = await api('/api/websites',{method:'POST',
+    body:JSON.stringify({action:'check',id_or_url:id||wsSelectValue()})});
+  show('ws-adv-state', renderResult(body));
+  show('ws-detail', '<div class="muted">'+esc(JSON.stringify(body&&body.grants||{}))+'</div>');
+}
+async function wsCheckSel(){ await wsCheck(''); }
+async function wsLogs(id){
+  const {status,body} = await api('/api/websites?logs='+encodeURIComponent(id||wsSelectValue())+'&tail=40');
+  if(!body){ show('ws-detail', tag('UNAVAILABLE')); return; }
+  const rows = (body.logs||[]).map(l=>'['+esc(l.op)+'] '+tag(l.status)+' '+esc(l.reason||'')+' <span class="muted">'+esc(l.origin||'')+'</span>').join('\n');
+  show('ws-detail', '<pre style="white-space:pre-wrap;font-size:12px">'+esc(rows||'(empty)')+'</pre>');
+  show('ws-adv-state', tag('OK')+' '+(body.logs||[]).length+' log entr'+(body.logs&&body.logs.length===1?'y':'ies'));
+}
+async function wsLogsSel(){ await wsLogs(''); }
+async function wsGrant(id){
+  const doIt = async () => {
+    const {status,body} = await api('/api/websites',{method:'POST',
+      body:JSON.stringify({action:'grant',id_or_url:id||wsSelectValue(),ttl:7*24*3600})});
+    show('ws-adv-state', renderResult(body));
+    wsList();
+  };
+  confirmDialog('Grant the PROPOSED read-only observation capabilities for this site, scoped to its origin, expiring in 7 days?', doIt);
+}
+async function wsGrantSel(){ await wsGrant(''); }
+async function wsRevoke(id){
+  const doIt = async () => {
+    const {status,body} = await api('/api/websites',{method:'POST',
+      body:JSON.stringify({action:'revoke',id_or_url:id||wsSelectValue()})});
+    show('ws-adv-state', renderResult(body));
+    wsList();
+  };
+  confirmDialog('Revoke every grant linked to this website integration?', doIt);
+}
+async function wsRevokeSel(){ await wsRevoke(''); }
+async function wsEnable(id){
+  const doIt = async () => {
+    const {status,body} = await api('/api/websites',{method:'POST',
+      body:JSON.stringify({action:'enable',id_or_url:id||wsSelectValue()})});
+    show('ws-adv-state', renderResult(body));
+    wsList();
+  };
+  confirmDialog('Enable this proposal for observability? This does NOT grant any capability by itself.', doIt);
+}
+async function wsEnableSel(){ await wsEnable(''); }
+async function wsDisable(id){
+  const doIt = async () => {
+    const {status,body} = await api('/api/websites',{method:'POST',
+      body:JSON.stringify({action:'disable',id_or_url:id||wsSelectValue()})});
+    show('ws-adv-state', renderResult(body));
+    wsList();
+  };
+  confirmDialog('Disable this website integration?', doIt);
+}
+async function wsDisableSel(){ await wsDisable(''); }
+async function wsRemove(id){
+  const doIt = async () => {
+    const {status,body} = await api('/api/websites',{method:'POST',
+      body:JSON.stringify({action:'remove',id_or_url:id||wsSelectValue()})});
+    show('ws-adv-state', renderResult(body));
+    wsList();
+  };
+  confirmDialog('Remove this integration AND revoke its linked grants? (backed up; rollback restores the record but not grants)', doIt);
+}
+async function wsRemoveSel(){ await wsRemove(''); }
+async function wsRollback(id){
+  const doIt = async () => {
+    const {status,body} = await api('/api/websites',{method:'POST',
+      body:JSON.stringify({action:'rollback',id_or_url:id||wsSelectValue()})});
+    show('ws-adv-state', renderResult(body));
+    wsList();
+  };
+  confirmDialog('Roll back this integration to its previous state? (grants are never auto-restored)', doIt);
+}
+async function wsRollbackSel(){ await wsRollback(''); }
+// ---- Permission mode for websites (same 7E backend as the permissions CLI) --
+async function permModeShow(){
+  const {status,body} = await api('/api/permissions');
+  const st = body && body.mode ? body.mode : 'UNAVAILABLE';
+  show('perm-mode-state', tag(st)+' <span class="muted">scopes: '+esc((body&&body.mode_scopes||[]).join(', ')||'none')
+    +' · expires: '+esc(body&&body.mode_expires_at?new Date(body.mode_expires_at*1000).toISOString():'never')
+    +' · grants: '+((body&&body.grants||[]).length)+'</span>');
+}
+async function permModeSetRestricted(){
+  const doIt = async () => {
+    const {status,body} = await api('/api/permissions',{method:'POST',
+      body:JSON.stringify({action:'set-mode',mode:'restricted',confirmed:true})});
+    show('perm-mode-state', renderResult(body));
+  };
+  confirmDialog('Switch permission mode to Restricted (the safe default)?', doIt);
+}
+async function permModeSetUnrestricted(){
+  const scope = window.prompt('Unrestricted mode scopes (comma-separated, e.g. web:https://example.com):','');
+  if(scope==null) return;
+  const scopes = scope.split(',').map(s=>s.trim()).filter(Boolean);
+  const ttl = window.prompt('TTL hours (time-bounded; blank = until reset):','24');
+  if(ttl==null) return;
+  const doIt = async () => {
+    const {status,body} = await api('/api/permissions',{method:'POST',
+      body:JSON.stringify({action:'set-mode',mode:'unrestricted',
+        scopes, ttl: ttl.trim()? parseFloat(ttl)*3600 : null, confirmed:true})});
+    show('perm-mode-state', renderResult(body));
+  };
+  confirmDialog('Enable Unrestricted mode inside the chosen scopes only? It still never bypasses hard-deny, confirmation, audit, or limits.', doIt);
+}
+async function permReset(){
+  const doIt = async () => {
+    const {status,body} = await api('/api/permissions',{method:'POST',
+      body:JSON.stringify({action:'reset',confirmed:true})});
+    show('perm-mode-state', renderResult(body));
+    wsList();
+  };
+  confirmDialog('Reset to Restricted and revoke EVERY grant? (backed up, audited, reversible via the permission store backups)', doIt);
 }
 loadAll();
 </script>

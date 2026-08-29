@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-from typing import Dict, Optional
+from typing import Optional
 
 from ..logging_setup import get_logger, log_event
 
