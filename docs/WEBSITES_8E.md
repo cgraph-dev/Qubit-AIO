@@ -390,6 +390,73 @@ git diff --check
 graft build
 ```
 
+## Clean-checkout reproducibility (baseline fix)
+
+Root cause: the checkpoint commit excluded two gitignored/machine-local files that
+tests required — `Modelfile.qubit4` (the generated bake artifact, intentionally
+never committed per plan P0-N / `scripts/bake_brain.py`) and
+`tests/test_steal_list_strict.py` (which hardcoded `/home/trick` sibling paths).
+A fresh checkout therefore could not run `test_packet4b` (two `Modelfile.qubit4`
+reads + one read of `test_steal_list_strict.py`) or
+`test_steal_list_strict` itself (five `Modelfile.qubit4` reads).
+
+Chosen fix (no assertions weakened, no tests deleted, no PII committed):
+- Tracked deterministic SANITIZED fixtures:
+  - `tests/fixtures/modelfiles/qubit4.sanitized` — the canonical persona
+    artifact: minimal sanitized SYSTEM (measured 1800–6000-char EOS-stability
+    basin, trailing newline), `no_think` template, `num_ctx 4096`, and no
+    private/forbidden markers. Verified by the unchanged sanitized-artifact and
+    stability-basin tests.
+  - `tests/fixtures/dashboard/polling_contract.html` — the delta-polling
+    contract markers for the external dashboard integration
+    (`setInterval(refreshStrip, 1500)`, `setInterval(pollConversationLive,
+    1500)`, `'&since=' + encodeURIComponent(lastHistoryTs)`, `If-None-Match`).
+- `tests/test_packet4b.py` and `tests/test_steal_list_strict.py` now read the
+  tracked fixture instead of the gitignored `Modelfile.qubit4`; the sanitized +
+  stability + doc-param assertions are unchanged.
+- `tests/test_steal_list_strict.py` is included in the baseline; its two
+  `/home/trick` sibling-dashboard reads now target the repository frontend
+  (inline editor) and the tracked polling-contract fixture; the private test
+  handle `@tr.cky` is sanitized to `@demohandle`.
+- `voicebridge/benchmarking/harness.py` hashes the tracked fixture so a clean
+  checkout records a typed `repo_modelfile_qubit4_sha256` during benchmarks.
+
+Required artifacts / install behavior:
+- Project install: `python3 -m venv .venv && .venv/bin/pip install -e '.[test]'`.
+- The generated `Modelfile.qubit4` is NOT needed for tests (fixture covers it).
+  Operators who bake the model run `scripts/bake_brain.py` after creating the
+  (gitignored) `Modelfile.qubit4` from the tracked fixture content.
+- Live opt-in tests (Ollama `qubit-brain4`, audio devices, VRAM) are documented
+  prerequisites: when absent they skip with an explicit reason (e.g.
+  `test_steal_list_strict.py:250` "only N MiB VRAM free -> partial offload
+  expected"), never silently pass.
+- Machine-local live config/state under the user HOME (`~/.config`,
+  `~/.local/state`) is a documented prerequisite only for tests that exercise
+  real user files; those tests assert bounded/safe behavior and tolerate absence.
+
+Provenance/license: fixtures are derived from the repository's own Packet 4B
+sanitized artifact and the Packet 4B/6A dashboard contracts; no upstream code is
+copied (Apache-2.0/MIT project artifacts, see `THIRD_PARTY_NOTICES.md`).
+
+Clean-checkout commands (from a fresh clone):
+```bash
+git clone <repo> freshclone && cd freshclone
+python3 -m venv .venv && .venv/bin/pip install -e '.[test]'
+.venv/bin/python -m pytest -q -W error tests/          # expect 1151 passed, 1 documented skip, 0 warnings
+.venv/bin/python -m compileall -q voicebridge scripts
+.venv/bin/python -m pip check
+git diff --check
+graft build
+```
+
+Rollback: the two fix commits (baseline + reproducibility) are additive. Revert
+them (`git revert`) to restore the pre-commit state; the preserved excluded
+files (`scripts/review_gmail.py`, `scripts/review_tiktok.py`,
+`scripts/web_search.py`, `tests/test_new_features.py`,
+`docs/BAKEOFF_4D.json`, and the stray `106`) remain machine-local and untouched;
+no live service, config, Chromium, account, memory, report, cursor, model, or
+audio state is ever modified.
+
 ## Known limitations / next safe step
 
 - The 7E `skills install` CLI is the manifest installer; `websites
