@@ -65,6 +65,7 @@ def _seed_store(tmp_path):
     return store, compiler
 
 
+@pytest.mark.live
 @pytest.mark.skipif(not _ollama_up(), reason="Ollama unavailable (DEGRADED)")
 def test_real_model_smoke_with_payload_verification(tmp_path, monkeypatch):
     """REAL request to the production model; payload teed for verification."""
@@ -107,6 +108,7 @@ def test_real_model_smoke_with_payload_verification(tmp_path, monkeypatch):
     assert captured["payload"]["options"]["num_ctx"] == rc.num_ctx
 
 
+@pytest.mark.live
 @pytest.mark.skipif(not _ollama_up(), reason="Ollama unavailable (DEGRADED)")
 def test_restart_persistence_via_real_path(tmp_path):
     from voicebridge.context import ContextCompiler
@@ -122,6 +124,7 @@ def test_restart_persistence_via_real_path(tmp_path):
     store2.close()
 
 
+@pytest.mark.live
 @pytest.mark.skipif(not _ollama_up(), reason="Ollama unavailable (DEGRADED)")
 def test_cold_and_warm_latency_real(tmp_path, monkeypatch):
     from voicebridge.benchmarking import harness as H
@@ -143,6 +146,7 @@ def test_cold_and_warm_latency_real(tmp_path, monkeypatch):
     assert cold in (True, False)
 
 
+@pytest.mark.live
 @pytest.mark.skipif(not _ollama_up(), reason="Ollama unavailable (DEGRADED)")
 def test_timeout_returns_typed_empty(tmp_path, monkeypatch):
     """Tiny timeout -> typed empty result (cloud-fallback contract)."""
@@ -156,6 +160,7 @@ def test_timeout_returns_typed_empty(tmp_path, monkeypatch):
     assert reply == ""   # caller falls back to cloud path
 
 
+@pytest.mark.live
 @pytest.mark.skipif(not _ollama_up(), reason="Ollama unavailable (DEGRADED)")
 def test_4b_rollback_flag_real(tmp_path, monkeypatch):
     """mode=4b: real request uses the OLD compiler shape (no references)."""

@@ -103,20 +103,34 @@ def _pcm_from_wav(path: Path, max_s: float = 12.0) -> bytes | None:
 
 
 # -------------------------------------------------------------------- probes
-def probe_text(base: str, token: str) -> dict:
+def _type_wait(base: str, token: str, text: str, budget_s: float) -> tuple:
+    """POST one typed turn and wait for the result; returns (ok, latency, res)."""
     t0 = time.time()
-    r = _post(base, "/api/type",
-              json.dumps({"text": "what time is it?"}).encode(), token)
+    r = _post(base, "/api/type", json.dumps({"text": text}).encode(), token)
     rid = r["request_id"]
-    while time.time() - t0 < 14:
+    while time.time() - t0 < budget_s:
         res = _get(base, f"/api/result/{rid}", token)
         if res.get("status") == "done":
-            dt = round(time.time() - t0, 2)
-            summary = (res.get("summary") or res.get("reply") or "").strip()
-            return {"probe": "text", "ok": bool(summary),
-                    "detail": f"{len(summary)}ch reply", "latency_s": dt}
+            return True, round(time.time() - t0, 2), res
         time.sleep(0.3)
-    return {"probe": "text", "ok": False, "detail": "timeout waiting result"}
+    return False, round(time.time() - t0, 2), None
+
+
+def probe_text(base: str, token: str) -> dict:
+    # Deterministic readiness (mirrors probe_voice): one unmeasured warm-up
+    # turn loads/proves the route path so the measured turn is WARM — a cold
+    # first turn right after a bridge restart can exceed the warm budget. The
+    # warm-up is bounded and its failure is reported, never hidden.
+    ok_warm, dt_warm, _ = _type_wait(base, token, "what time is it?", 40.0)
+    if not ok_warm:
+        return {"probe": "text", "ok": False,
+                "detail": f"warm-up text turn did not complete ({dt_warm}s)"}
+    ok, dt, res = _type_wait(base, token, "what time is it?", 14.0)
+    if not ok:
+        return {"probe": "text", "ok": False, "detail": "timeout waiting result"}
+    summary = (res.get("summary") or res.get("reply") or "").strip()
+    return {"probe": "text", "ok": bool(summary),
+            "detail": f"{len(summary)}ch reply", "latency_s": dt}
 
 
 def _talk_wait(base: str, token: str, pcm: bytes, budget_s: float) -> tuple:

@@ -268,6 +268,7 @@ def _ollama_up() -> bool:
         return False
 
 
+@pytest.mark.live
 @pytest.mark.skipif(not _ollama_up(), reason="Ollama unavailable (DEGRADED)")
 def test_l1_live_embedding_gates():
     r = SemanticRouter(routes={

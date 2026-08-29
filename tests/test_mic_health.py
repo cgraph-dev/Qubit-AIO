@@ -8,6 +8,10 @@ silent pass.
 """
 from __future__ import annotations
 
+import pytest  # noqa: E402
+
+pytestmark = pytest.mark.live  # opt-in live/hardware tests (excluded from hermetic default)
+
 import sys
 from pathlib import Path
 

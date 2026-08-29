@@ -49,14 +49,19 @@ CATEGORIES = {
                     "tests/test_events_agui_conformance.py"],
     "smoke": ["-q", "-p", "no:cacheprovider", "tests/test_smoke.py",
               "-k", _LIVE_K],
-    "live-model": ["-q", "-p", "no:cacheprovider",
+    "live-model": ["-q", "-p", "no:cacheprovider", "-m", "live",
                    "tests/test_live_stress.py",
                    "tests/test_steal_list_strict.py", "-k", "AirLLMLive"],
-    "live-dashboard": ["-q", "-p", "no:cacheprovider",
+    "live-dashboard": ["-q", "-p", "no:cacheprovider", "-m", "dashboard",
                        "tests/test_dashboard_stress.py"],
     "monitor": ["-q", "-p", "no:cacheprovider", "tests/test_packet7a.py",
                 "-k", "monitor"],
-    "all": ["-q", "-p", "no:cacheprovider"],
+    # 'all' overrides the pytest.ini default marker filter (which keeps live/
+    # dashboard/monitor tests OUT of the hermetic default) so the operator
+    # command truly runs the whole suite.
+    "all": ["-q", "-p", "no:cacheprovider",
+            "-m", "live or dashboard or monitor or "
+                  "(not live and not dashboard and not monitor)"],
 }
 
 OPT_IN = {"live-model", "live-dashboard", "monitor"}

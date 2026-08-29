@@ -195,6 +195,49 @@ def _ollama_has_model(name: str) -> bool:
                           capture_output=True, timeout=30).returncode == 0
 
 
+def _warm_latency_budget_issue(times):
+    """Deterministic warm-latency budget decision (Packet 4B gate).
+
+    Returns None when the measured sorted warm samples pass the envelope, or a
+    human-readable reason string when they fail. Pure and hardware-free so the
+    decision logic is testable hermetically; the live test feeds it real
+    measurements.
+    """
+    if not times:
+        return "no latency samples measured"
+    t = sorted(float(x) for x in times)
+    # min over 5 = raw model capability (an occasional ignored-/no_think
+    # think-detour inflates single samples); median tolerates concurrent
+    # piper/ASR load from the stress watchdog running elsewhere on the box.
+    #
+    # GATE HONESTY (Packet 4B): the original 0.70 s figure was an aspirational
+    # STEAL_LIST number ALREADY RECORDED AS UNMET by the 2026-08-24 audit
+    # (plan section 2: warm median ~1.27 s). Asserting 0.70 here produced
+    # coin-flip failures around the boundary. The binding speed gates are the
+    # Phase-4 end-to-end voice budgets, verified separately on the fixed
+    # corpus; this assertion guards the MEASURED envelope instead.
+    if t[0] > 0.85:
+        return f"warm best {t[0]:.2f}s exceeds measured 0.85s envelope"
+    if t[len(t) // 2] > 1.8:
+        return f"warm median {t[len(t) // 2]:.2f}s exceeds loaded ceiling"
+    return None
+
+
+def test_g02_warm_latency_budget_logic_hermetic():
+    """HERMETIC (no GPU, no model): the warm-latency budget decision logic is
+    deterministic. Proves the gate accepts an in-envelope sample series and
+    rejects best/median violations. The real hardware envelope is validated
+    by the separate live test test_g02_live_warm_latency_within_budget."""
+    assert _warm_latency_budget_issue([0.6, 0.7, 0.8, 0.9, 1.0]) is None
+    assert _warm_latency_budget_issue([0.7, 0.8, 0.9, 1.0, 1.2]) is None
+    issue_best = _warm_latency_budget_issue([0.9, 1.0, 1.1, 1.2, 1.3])
+    assert issue_best and "best" in issue_best
+    issue_med = _warm_latency_budget_issue([0.7, 0.8, 1.9, 2.0, 2.1])
+    assert issue_med and "median" in issue_med
+    assert _warm_latency_budget_issue([]) == "no latency samples measured"
+
+
+@pytest.mark.live
 @pytest.mark.skipif(not _ollama_has_model("qubit-brain4"),
                     reason="live gate: ollama or qubit-brain4 not available")
 class TestItem1AirLLMLive:
@@ -234,10 +277,13 @@ class TestItem1AirLLMLive:
         assert "<think>" not in msg["content"]
         assert body.get("done_reason") == "stop"
 
-    def test_g02_warm_latency_within_budget(self):
-        """Doc budget: <=0.7s warm on full GPU. Skipped when VRAM is occupied
+    def test_g02_live_warm_latency_within_budget(self):
+        """LIVE hardware gate (opts in with -m live): the real warm-latency
+        envelope on the actual GPU+model. Skipped only when VRAM is occupied
         by something else (e.g. a running game forces partial CPU offload —
-        physics, not a regression)."""
+        physics, not a regression). The budget DECISION logic is proven
+        deterministically by test_g02_warm_latency_budget_logic_hermetic;
+        this test feeds real measurements into the same pure function."""
         try:
             import subprocess as _sp
             free = int(_sp.run(["nvidia-smi", "--query-gpu=memory.free",
@@ -255,24 +301,11 @@ class TestItem1AirLLMLive:
             _, dt = self._chat(f"what is {i + 2} times {i + 3}?")
             times.append(dt)
         times.sort()
-        # min over 5 = raw model capability (an occasional ignored-/no_think
-        # think-detour inflates single samples); median tolerates concurrent
-        # piper/ASR load from the stress watchdog running elsewhere on the box.
-        #
-        # GATE HONESTY (Packet 4B): the original 0.70 s figure was an
-        # aspirational STEAL_LIST number ALREADY RECORDED AS UNMET by the
-        # 2026-08-24 audit (plan section 2: warm median ~1.27 s). Asserting
-        # 0.70 here produced coin-flip failures around the boundary. The
-        # binding speed gates are the Phase-4 end-to-end voice budgets
-        # (first content/audio/full-turn), verified separately on the fixed
-        # corpus; this assertion now guards the MEASURED envelope instead.
         import sys as _sys
         print(f"[g02] warm sorted samples: {[round(t, 3) for t in times]}",
               file=_sys.stderr)
-        assert times[0] <= 0.85, \
-            f"warm best {times[0]:.2f}s exceeds measured 0.85s envelope"
-        assert times[2] <= 1.8, \
-            f"warm median {times[2]:.2f}s exceeds loaded ceiling"
+        issue = _warm_latency_budget_issue(times)
+        assert issue is None, issue
 
     def test_g03_personal_facts_from_local_context_only(self):
         """Packet 4B REVERSED baked-memory identity (MIG-005): the artifact no
@@ -775,6 +808,7 @@ def _has_output_device() -> bool:
         return False
 
 
+@pytest.mark.live
 @pytest.mark.skipif(not _has_output_device(),
                     reason="live gate: no audio output device")
 class TestPTTStartBeep:

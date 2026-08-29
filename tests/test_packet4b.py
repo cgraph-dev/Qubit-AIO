@@ -295,6 +295,7 @@ def _ollama_up() -> bool:
         return False
 
 
+@pytest.mark.live
 @pytest.mark.skipif(not _ollama_up(), reason="Ollama unavailable (DEGRADED)")
 def test_repeated_mixed_transitions_have_zero_reload_drift():
     """Live proof on the real runner: mixed classifier/chat/summary

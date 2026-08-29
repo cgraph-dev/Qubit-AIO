@@ -1,3 +1,6 @@
+import pytest  # noqa: E402
+pytestmark = pytest.mark.live  # opt-in live/hardware tests (excluded from hermetic default)
+
 """Live stress suite: continuous interrupts, route switches, inboxes, market reports, gmail filters.
 
 - No mocks where we can test live: uses real Classifier, SharedMemory, StickyRouteState,

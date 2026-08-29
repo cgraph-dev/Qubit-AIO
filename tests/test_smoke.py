@@ -189,6 +189,7 @@ def _voice_available() -> bool:
 
 
 @pytest.mark.smoke
+@pytest.mark.live
 @pytest.mark.skipif(not _voice_available(),
                     reason="DEGRADED: piper voice not installed; voice smoke not run")
 def test_voice_piper_wav_boundary(tmp_path):

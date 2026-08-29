@@ -97,6 +97,7 @@ def _capture(monkeypatch):
             reply)
 
 
+@pytest.mark.live
 @pytest.mark.skipif(not _ollama_up(), reason="Ollama unavailable (DEGRADED)")
 def test_live_5c_retrieval_with_citations_and_budget(tmp_path, monkeypatch):
     store, compiler = _build_compiler(tmp_path)
@@ -123,6 +124,7 @@ def test_live_5c_retrieval_with_citations_and_budget(tmp_path, monkeypatch):
     assert bool(reply.strip())
 
 
+@pytest.mark.live
 @pytest.mark.skipif(not _ollama_up(), reason="Ollama unavailable (DEGRADED)")
 def test_live_5c_injection_cannot_change_policy(tmp_path, monkeypatch):
     store, compiler = _build_compiler(tmp_path, with_hostile=True)
@@ -148,6 +150,7 @@ def test_live_5c_injection_cannot_change_policy(tmp_path, monkeypatch):
         "admin access.", "")
 
 
+@pytest.mark.live
 @pytest.mark.skipif(not _ollama_up(), reason="Ollama unavailable (DEGRADED)")
 def test_live_5c_partial_failure_visible(tmp_path, monkeypatch):
     store, compiler = _build_compiler(tmp_path)

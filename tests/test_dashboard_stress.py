@@ -1,3 +1,6 @@
+import pytest  # noqa: E402
+pytestmark = pytest.mark.dashboard  # live bridge probes (excluded from hermetic default)
+
 """Live stress probes for the web dashboard (text / voice / Right-Ctrl PTT).
 
 One cycle of scripts/dashboard_stress.py against the RUNNING bridge.
