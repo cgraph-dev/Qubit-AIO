@@ -12,13 +12,20 @@ def build_parser() -> argparse.ArgumentParser:
         prog="voicebridge",
         description="Local push-to-talk voice bridge for OpenClaw (ASR + intent + gateway + TTS).")
     common = argparse.ArgumentParser(add_help=False)
-    common.add_argument("--config", type=Path, default=None,
+    # NOTE: these options also exist at the top level so `voicebridge --config X
+    # <subcommand> …` works. Each subparser re-declares them via `parents=[common]`;
+    # without SUPPRESS the subparser default would clobber a value the top level
+    # already parsed (e.g. `--config X websites list` silently ignoring X).
+    common.add_argument("--config", type=Path, default=argparse.SUPPRESS,
                         help="path to voice.yaml (default ~/.config/openclaw-voice-bridge/voice.yaml)")
     common.add_argument("--no-hotkey", action="store_true",
+                        default=argparse.SUPPRESS,
                         help="disable hotkey; use manual Enter PTT (headless/SSH)")
     common.add_argument("--dry-run", action="store_true",
+                        default=argparse.SUPPRESS,
                         help="never dispatch to OpenClaw; only speak the plan")
     common.add_argument("--mute", action="store_true",
+                        default=argparse.SUPPRESS,
                         help="start muted (no spoken output; logs still work)")
     p.add_argument("--config", type=Path, default=None, help=argparse.SUPPRESS)
     p.add_argument("--no-hotkey", action="store_true", help=argparse.SUPPRESS)
@@ -1152,25 +1159,57 @@ def _cmd_websites(cfg, args) -> int:
     Packet 8E onboarding + observability. Adding a URL creates a PENDING,
     disabled proposal and grants NOTHING; a valid, active 7E skill must be
     explicitly linked (manifest-link) before enable/grant. Mutations are
-    dry-run by default and require --confirm to persist.
+    confirm-gated (--confirm) with an explicit --dry-run preview that persists
+    nothing.
     """
     import json as _json
     from . import permissions as P
     from . import websites as W
     cmd = getattr(args, "websites_command", None) or "list"
+
+    # Stateless paths run BEFORE any state store is opened: `add --dry-run`
+    # performs no DNS, no network, and writes no websites.json/permissions.json/
+    # backup/audit; `probe` persists nothing and only touches the network when
+    # the operator explicitly passes --live.
+    if cmd == "add" and getattr(args, "dry_run", False):
+        try:
+            out = W.add_preview(args.url, name=args.name or "")
+        except W.WebsiteValidationError as exc:
+            print(_json.dumps({"state": "failed", "detail": str(exc)}, indent=2))
+            return 2
+        _print_website_out(args, cmd, out)
+        return 0
+    if cmd == "probe":
+        if not getattr(args, "live", False):
+            out = {"state": "denied", "code": "LIVE_REQUIRED",
+                   "detail": "websites probe requires explicit --live "
+                             "(bounded read-only network access)"}
+            _print_website_out(args, cmd, out)
+            return 3
+        try:
+            result = W.probe_url(args.url)
+        except W.WebsiteValidationError as exc:
+            print(_json.dumps({"state": "failed", "detail": str(exc)},
+                              indent=2))
+            return 2
+        out = {"state": "OK", "url": args.url,
+               "result": W.result_code_for_status(result.status,
+                                                   result.reason_code),
+               "probe": result.to_dict()}
+        _print_website_out(args, cmd, out)
+        return 0
+
     store = W.website_integrations_store(cfg)
     perms = P.permissions_store(cfg)
     try:
         if cmd == "add":
-            if getattr(args, "dry_run", False):
-                out = W.add_preview(args.url, name=args.name or "")
-            else:
-                rec = store.add(args.url, requested_by="cli:user",
-                                display_name=args.name or "")
-                out = {"state": "OK", "status": rec.status,
-                       "granted": False, "integration": rec.to_dict()}
+            rec = store.add(args.url, requested_by="cli:user",
+                            display_name=args.name or "")
+            out = {"state": "OK", "status": rec.status,
+                   "granted": False, "integration": rec.to_dict()}
         elif cmd == "list":
             out = {"state": "OK", "mode": perms.mode()[0],
+                   "state_path": str(store.path),
                    "integrations": [r.to_dict() for r in store.integrations()]}
         elif cmd == "show":
             rec = store.lookup(args.id_or_url)
@@ -1218,25 +1257,6 @@ def _cmd_websites(cfg, args) -> int:
                        "reason": rec2.health.get("reason_code", ""),
                        "probe_source": source,
                        "integration": rec2.to_dict()}
-        elif cmd == "probe":
-            # Safe bounded LIVE probe of a public URL; explicit --live required;
-            # persists nothing; output is redacted and typed.
-            if not getattr(args, "live", False):
-                out = {"state": "denied", "code": "LIVE_REQUIRED",
-                       "detail": "websites probe requires explicit --live "
-                                 "(bounded read-only network access)"}
-                _print_website_out(args, cmd, out)
-                return 3
-            try:
-                result = W.probe_url(args.url)
-            except W.WebsiteValidationError as exc:
-                print(_json.dumps({"state": "failed", "detail": str(exc)},
-                                  indent=2))
-                return 2
-            out = {"state": "OK", "url": args.url,
-                   "result": W.result_code_for_status(result.status,
-                                                       result.reason_code),
-                   "probe": result.to_dict()}
         elif cmd == "check":
             out = store.check(args.id_or_url, requested_by="cli:user",
                               perms=perms)
@@ -1352,7 +1372,8 @@ def _human_websites(cmd: str, out: dict) -> str:
                 f"grants=none")
     if cmd == "list":
         rows = out.get("integrations") or []
-        lines = [f"{out.get('mode', 'restricted')} · {len(rows)} record(s)"]
+        lines = [f"{out.get('mode', 'restricted')} · {len(rows)} record(s)"
+                 f" · state={out.get('state_path') or '?'}"]
         for r in rows:
             lines.append(f"  {r.get('integration_id')} {r.get('origin')} "
                          f"[{r.get('status')}] caps="

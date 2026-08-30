@@ -151,11 +151,22 @@ voicebridge websites grant <id|url> [--capability CAP ...] [--ttl SECS] [--dry-r
 voicebridge websites revoke <id|url> [--dry-run] [--confirm] [--human]
 ```
 
-Mutating commands are dry-run by default (`--dry-run` preview) and require
-`--confirm` to persist. Output is machine-readable JSON by default and concise
-human-readable text with `--human`. `add --dry-run` neither persists nor
-contacts the network; `inspect --no-network` returns a typed
-`NETWORK_DISABLED` offline result.
+`websites add <url>` persists a PENDING/disabled proposal immediately (it
+grants nothing, so no confirmation is required); every other mutation
+(`enable|disable|grant|revoke|remove|rollback|manifest-link`) is confirm-gated
+and refuses to persist without `--confirm`. `--dry-run` on any command returns
+a preview that persists nothing. Output is machine-readable JSON by default
+and concise human-readable text with `--human`. `websites list` always shows
+the effective state path (`state_path`) so the operator can confirm which
+state store is in use. `add --dry-run` is genuinely side-effect-free: no DNS
+lookup, no network call, no state write, no backup, no audit record, no
+grant, and no hidden skill — only a validated preview is printed.
+`inspect --no-network` returns a typed `NETWORK_DISABLED` offline result.
+
+The `--config PATH` option works both before and after the subcommand
+(`voicebridge --config X websites list` == `voicebridge websites list
+--config X`); the effective state path in `websites list` output reflects
+whichever config won.
 
 - **`websites probe <url> --live`** is a safe, bounded LIVE probe of a public
   non-authenticated static **HTTPS** site (`--live` mandatory; `http` is
@@ -313,7 +324,7 @@ active grants). A failure never advances into a grant or a fake success.
 
 ## Tests
 
-`tests/test_packet8e.py` (117 tests) — synthetic/hermetic, injected probe; all
+`tests/test_packet8e.py` (120 tests) — synthetic/hermetic, injected probe; all
 manifest fixtures hash REAL temporary payload bytes (never fake all-zero
 hashes):
 
@@ -377,9 +388,9 @@ hashes):
 ## Commands run
 
 ```bash
-.venv/bin/python -m pytest -q -W error tests/test_packet8e.py            # 117 passed
+.venv/bin/python -m pytest -q -W error tests/test_packet8e.py            # 120 passed
 .venv/bin/python -m pytest -q -W error tests/                            # hermetic default:
-                                                                         #   1116 passed, 0 skipped, 0 warnings
+                                                                         #   1119 passed, 0 skipped, 0 warnings
                                                                          #   (37 live/dashboard/monitor tests deselected by default)
 .venv/bin/python -m pytest -q -W error -m live tests/                    # explicit live gate: 32 passed
 .venv/bin/python -m pytest -q -W error -m dashboard tests/test_dashboard_stress.py
@@ -420,7 +431,7 @@ hardware, model, account, Chromium, sibling-repo, and user-home dependencies
   timeout bump).
 
 Evidence (fresh clone, own venv, `pip install -e '.[test]'`, no files from the
-original worktree): default suite **1116 passed, 0 skipped, 0 warnings** (two
+original worktree): default suite **1119 passed, 0 skipped, 0 warnings** (two
 consecutive identical runs); explicit live gate **32 passed**; explicit
 live-dashboard gate **4 passed**; compileall / pip check / git diff --check /
 graft build all green.
@@ -436,6 +447,18 @@ reads + one read of `test_steal_list_strict.py`) or
 `test_steal_list_strict` itself (five `Modelfile.qubit4` reads).
 
 Chosen fix (no assertions weakened, no tests deleted, no PII committed):
+- Tests now use the ACTIVE interpreter: `tests/test_stress.py` and
+  `tests/test_live_stress.py` resolve subprocess Python via `sys.executable`
+  instead of a repository-local `.venv/bin/python`, so a clean clone running
+  any documented environment passes without requiring `.venv` at a specific
+  path. No virtual environment is committed.
+- `--config` is accepted both before and after a subcommand (argparse
+  subparser defaults no longer clobber the top-level value), and `websites
+  list` exposes the effective `state_path` so the operator sees which state
+  store is in use.
+- `websites add --dry-run` is side-effect-free: it performs no DNS lookup, no
+  network call, and writes no `websites.json`/`permissions.json`/backup/audit
+  (regression-tested with `socket.getaddrinfo` and `urlopen` patched to fail).
 - Tracked deterministic SANITIZED fixtures:
   - `tests/fixtures/modelfiles/qubit4.sanitized` — the canonical persona
     artifact: minimal sanitized SYSTEM (measured 1800–6000-char EOS-stability
@@ -480,7 +503,7 @@ Clean-checkout commands (from a fresh clone):
 ```bash
 git clone <repo> freshclone && cd freshclone
 python3 -m venv .venv && .venv/bin/pip install -e '.[test]'
-.venv/bin/python -m pytest -q -W error tests/          # hermetic default: 1116 passed, 0 skipped, 0 warnings
+.venv/bin/python -m pytest -q -W error tests/          # hermetic default: 1119 passed, 0 skipped, 0 warnings
 .venv/bin/python -m pytest -q -W error -m live tests/  # explicit live gate (operator, deps required)
 .venv/bin/python -m pytest -q -W error -m dashboard tests/test_dashboard_stress.py
 .venv/bin/python -m compileall -q voicebridge scripts
@@ -499,10 +522,15 @@ audio state is ever modified.
 
 ## Known limitations / next safe step
 
-- The 7E `skills install` CLI is the manifest installer; `websites
-  manifest-link` consumes an already-installed, active skill. Records created
-  by `add` keep `source_revision`/`license`/`content_hash` empty until a
-  manifest is linked.
+- The 7E `skills install` CLI is the narrow manifest installer: it validates
+  the Packet 7E `SkillManifest` (identity, version, source, revision, license
+  shape, content hash, capabilities, scopes, tier, sensitivity, approval,
+  resource limits, rollback metadata) and stages the skill DISABLED until
+  `skills enable --confirm`. There is deliberately NO broad package installer
+  anywhere in the plan: `websites manifest-link` only consumes an
+  already-installed, ACTIVE skill, and never downloads, executes, or unpacks
+  anything. Records created by `add` keep `source_revision`/`license`/
+  `content_hash` empty until a manifest is linked.
 - The live `websites probe --live` path was GENUINELY EXERCISED in this
   environment (network available) against the canonical public non-authenticated
   site:
@@ -529,7 +557,7 @@ audio state is ever modified.
   under the 30 s test timeout. No genuine hang exists in the script or test by
   inspection. This is a Packet 0B test (uncommitted, pre-existing dirty work)
   and is NOT caused by or fixable within 8E scope; it was not modified.
-  In THIS environment the hermetic default suite is clean (1116 passed,
+  In THIS environment the hermetic default suite is clean (1119 passed,
   `-W error`, 0 skipped), and the explicit live gates pass (32 + 4), so 8E
   reports a clean suite here, with the verifier's 0B timeout recorded as an
   external environmental finding (e.g. a heavily loaded machine exceeding 30 s)

@@ -1,6 +1,6 @@
 """Unit tests: classifier routing, safety policy, config merge, state machine.
 
-Run: .venv/bin/python -m pytest tests/ -q   (from the project root)
+Run: python -m pytest tests/ -q   (from the project root)
 No gateway/GPU/audio required.
 """
 import sys

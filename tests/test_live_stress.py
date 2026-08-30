@@ -9,17 +9,19 @@ pytestmark = pytest.mark.live  # opt-in live/hardware tests (excluded from herme
   and reports the lane as degraded instead of passing.
 
 Run:
-  .venv/bin/python -m pytest tests/test_live_stress.py -v --tb=short
+  python -m pytest tests/test_live_stress.py -v --tb=short
 
 Also usable as a live connectivity probe:
-  .venv/bin/python tests/test_live_stress.py --live-check
+  python tests/test_live_stress.py --live-check
 """
 import sys, json, pathlib, subprocess, tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 ROOT = Path(__file__).resolve().parents[1]
-VENV = ROOT / ".venv" / "bin" / "python"
+# Use the ACTIVE interpreter (sys.executable): the suite must not depend on a
+# repository-local .venv existing (see docs/WEBSITES_8E.md).
+VENV = sys.executable
 SCRIPTS_DIR = ROOT / "scripts"
 WEB_SEARCH = SCRIPTS_DIR / "web_search.py"
 REVIEW_GMAIL = SCRIPTS_DIR / "review_gmail.py"

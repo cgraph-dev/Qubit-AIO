@@ -7,7 +7,7 @@ Layers:
                                     qubit-brain4; skipped ONLY if ollama/the
                                     model is missing, enforced on this box.
 
-Run:  .venv/bin/python -m pytest tests/test_steal_list_strict.py -v
+Run:  python -m pytest tests/test_steal_list_strict.py -v
 """
 import json
 import re

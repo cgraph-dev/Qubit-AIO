@@ -1,5 +1,5 @@
 """Stress suite for the three fixes + hardening.
-This file is the proof-of-work — run with: .venv/bin/python -m pytest tests/test_stress.py -v
+This file is the proof-of-work — run with: python -m pytest tests/test_stress.py -v
 Covers: RCtrl capture, thresholds, invisible crash logs, boss/hum, broken-English routing,
 accent beam, crash-proof reports (raw + 40w), concurrency, long-task salvage, no regression.
 """
@@ -9,11 +9,14 @@ import sys
 import concurrent.futures
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-VENV = ROOT / ".venv" / "bin" / "python"
+# Use the ACTIVE interpreter (sys.executable) so the suite never depends on a
+# repository-local .venv existing — works from a clean clone with any
+# documented environment (see docs/WEBSITES_8E.md "Clean-checkout reproducibility").
+PY = sys.executable
 
 def test_py_compile_three_files():
     for p in [ROOT/"voicebridge/orchestrator.py", ROOT/"voicebridge/webui.py", ROOT/"voicebridge/hotkeys.py"]:
-        subprocess.check_call([str(VENV), "-m", "py_compile", str(p)])
+        subprocess.check_call([PY, "-m", "py_compile", str(p)])
 
 def test_mic_thresholds_and_audible_bypass():
     from voicebridge.config import Config
@@ -273,7 +276,7 @@ def test_browser_auto_module_surface():
 
 def test_browser_auto_compiles_and_ignores_state():
     import subprocess, pathlib
-    r = subprocess.run([".venv/bin/python", "-m", "py_compile", "scripts/browser_auto.py", "scripts/tab_report.py"],
+    r = subprocess.run([sys.executable, "-m", "py_compile", "scripts/browser_auto.py", "scripts/tab_report.py"],
                        capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     gi = pathlib.Path(".gitignore").read_text()
@@ -953,7 +956,7 @@ def test_playback_watchdog_no_freeze():
 def test_audio_diagnose_usb_script_runs():
     """The USB-speed diagnostic must run and report a result without crashing."""
     import subprocess
-    r = subprocess.run([".venv/bin/python", "scripts/diagnose_audio_usb.py"],
+    r = subprocess.run([sys.executable, "scripts/diagnose_audio_usb.py"],
                        capture_output=True, text=True, timeout=30)
     assert r.returncode in (0, 1, 2), r.stderr[-300:]
     assert ("USB" in r.stdout or "audio" in r.stdout), r.stdout

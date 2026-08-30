@@ -7,7 +7,7 @@ One cycle of scripts/dashboard_stress.py against the RUNNING bridge.
 Each probe skips (not fails) when its prerequisite is missing, so this file
 stays green on headless/CI boxes while still enforcing health on this box.
 
-Run: .venv/bin/python -m pytest tests/test_dashboard_stress.py -v
+Run: python -m pytest tests/test_dashboard_stress.py -v
 """
 import json
 import subprocess

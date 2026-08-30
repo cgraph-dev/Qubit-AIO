@@ -912,6 +912,92 @@ def test_cli_add_dry_run_persists_nothing(tmp_path, capsys):
     assert json.loads(capsys.readouterr().out)["integrations"] == []
 
 
+def test_cli_add_dry_run_is_side_effect_free(tmp_path, capsys, monkeypatch):
+    """`websites add --dry-run` is genuinely side-effect-free: no DNS lookup,
+    no network call, no websites.json/permissions.json/backup/audit write, no
+    grant, and no hidden skill."""
+    import socket as _socket
+    import urllib.request as _urlreq
+    import voicebridge.websites as _W
+
+    def _boom(*a, **k):
+        raise AssertionError("dry-run must not perform a DNS lookup")
+
+    def _net_boom(*a, **k):
+        raise AssertionError("dry-run must not touch the network")
+
+    monkeypatch.setattr(_socket, "getaddrinfo", _boom)
+    monkeypatch.setattr(_urlreq, "urlopen", _net_boom)
+    monkeypatch.setattr(_W, "urlopen", _net_boom)
+
+    rc = _cli(tmp_path, ["add", "https://example.com", "--dry-run"])
+    out = json.loads(capsys.readouterr().out)
+    assert rc == 0 and out["state"] == "preview"
+    assert out["would_add"] == "https://example.com"
+    assert out["granted"] is False
+
+    state = tmp_path / "state"
+    written = sorted(p.name for p in state.glob("*"))
+    assert "websites.json" not in written, written
+    assert "permissions.json" not in written, written
+    assert not [p for p in state.glob("*.bak")], written
+    ev = state / "events.jsonl"
+    if ev.exists():
+        blob = ev.read_text()
+        assert "websites." not in blob, "dry-run wrote websites audit events"
+
+
+def test_cli_add_preview_rejects_private_origins_without_dns(
+        tmp_path, capsys, monkeypatch):
+    """Even without DNS (patched to explode) a dry-run preview still rejects
+    literal private/loopback origins — no resolution needed for that check."""
+    import socket as _socket
+
+    monkeypatch.setattr(_socket, "getaddrinfo",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            AssertionError("unexpected DNS")))
+    rc = _cli(tmp_path, ["add", "http://localhost:8080/x", "--dry-run"])
+    out = json.loads(capsys.readouterr().out)
+    assert rc == 2 and out["state"] == "failed"
+    assert "private/out-of-scope" in out["detail"]
+    rc = _cli(tmp_path, ["add", "https://127.0.0.1/", "--dry-run"])
+    out = json.loads(capsys.readouterr().out)
+    assert rc == 2 and out["state"] == "failed"
+
+
+def test_cli_config_before_and_after_subcommand_use_effective_state(tmp_path,
+                                                                    capsys):
+    """Regression: `--config X` before the subcommand must NOT be silently
+    dropped by the subparser default, and `websites list` must expose the
+    effective state path in its output."""
+    from voicebridge.cli import main as cli
+    cfg_path = tmp_path / "voice.yaml"
+    state = tmp_path / "state"
+    cfg_path.write_text("logging:\n  jsonl_path: '" + str(state) + "'\n")
+
+    # --config BEFORE the subcommand: parsed at top level, must survive.
+    rc = cli(["--config", str(cfg_path), "websites", "list"])
+    out_before = json.loads(capsys.readouterr().out)
+    assert rc == 0 and out_before["state"] == "OK"
+    assert out_before["state_path"] == str(state / "websites.json")
+
+    # --config AFTER the subcommand: still works (subparser path).
+    rc = cli(["websites", "list", "--config", str(cfg_path)])
+    out_after = json.loads(capsys.readouterr().out)
+    assert rc == 0 and out_after["state"] == "OK"
+    assert out_after["state_path"] == str(state / "websites.json")
+
+    # A real add lands in the effective (tmp) state, proving the config won.
+    rc = cli(["--config", str(cfg_path), "websites", "add",
+              "https://configtest.example"])
+    assert rc == 0
+    capsys.readouterr()
+    assert (state / "websites.json").exists()
+    blob = (state / "websites.json").read_text()
+    assert "configtest.example" in blob
+    assert "www.g2g.com" not in blob  # never the default user store
+
+
 def test_cli_add_rejects_bad_url(tmp_path, capsys):
     rc = _cli(tmp_path, ["add", "https://user:pass@example.com"])
     out = json.loads(capsys.readouterr().out)

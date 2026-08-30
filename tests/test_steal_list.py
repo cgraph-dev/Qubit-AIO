@@ -4,7 +4,7 @@ Covers: qubit-brain4 thinking fallback (AirLLM), auto-preference CLHF
 (CopilotKit), classifier tool-schema parsing (CopilotKit), activity delta
 polling + ETag (CopilotKit), sandbox tool runner (OpenSandbox).
 
-Run: .venv/bin/python -m pytest tests/test_steal_list.py -v
+Run: python -m pytest tests/test_steal_list.py -v
 No gateway/GPU/audio required.
 """
 import json

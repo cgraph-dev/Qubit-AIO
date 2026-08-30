@@ -264,12 +264,17 @@ def _bound(text: Optional[str], limit: int) -> str:
 # ---------------------------------------------------------------------------
 # URL / origin validation (fail closed)
 # ---------------------------------------------------------------------------
-def normalize_origin(url: str) -> Tuple[str, str, str]:
+def normalize_origin(url: str, *, resolve: bool = True) -> Tuple[str, str, str]:
     """Return ``(origin, clean_url, name_hint)`` or raise.
 
     Origin is ``scheme://host[:port]`` (lower-cased host, no credentials, no
     query/fragment). The clean URL keeps scheme/host/path but drops query
     params and fragment. Query-token URLs are rejected outright.
+
+    ``resolve=True`` (default) also rejects hostnames that resolve to private
+    addresses (SSRF block). Preview-only paths pass ``resolve=False`` so a
+    ``--dry-run`` performs no DNS lookup and no network call while still
+    rejecting literal private/loopback origins.
     """
     raw = (url or "").strip()
     if not raw:
@@ -312,7 +317,7 @@ def normalize_origin(url: str) -> Tuple[str, str, str]:
         name_hint = _bound(host, MAX_DISPLAY_NAME)
     except ValueError as exc:
         raise WebsiteValidationError(f"malformed URL: {exc}") from None
-    reason = blocked_host_reason(host)
+    reason = blocked_host_reason(host, resolve=resolve)
     if reason == "PRIVATE_NETWORK":
         raise WebsiteValidationError("private/out-of-scope origins are rejected")
     return origin, clean_url, name_hint
@@ -329,8 +334,15 @@ def _split_qs(query: str) -> List[Tuple[str, str]]:
     return out
 
 
-def blocked_host_reason(host: str) -> Optional[str]:
-    """Return a reason string when ``host`` is private/out-of-scope, else None."""
+def blocked_host_reason(host: str, *, resolve: bool = True) -> Optional[str]:
+    """Return a reason string when ``host`` is private/out-of-scope, else None.
+
+    ``resolve=False`` skips the DNS resolution step entirely (literal private
+    IPs, loopback, link-local, reserved literals and known private host
+    suffixes are still rejected). It is used by preview-only paths so a
+    ``--dry-run`` never performs a DNS lookup. ``resolve=True`` (default) also
+    rejects any hostname that resolves to a private address (SSRF block).
+    """
     low = (host or "").lower().rstrip(".")
     if not low:
         return "EMPTY_HOST"
@@ -346,6 +358,8 @@ def blocked_host_reason(host: str) -> Optional[str]:
                 or ip_obj.is_unspecified:
             return "PRIVATE_NETWORK"
         return None
+    if not resolve:
+        return None   # preview path: no DNS, no network
     # Literal hostname: resolve once and reject if ANY address is private
     # (fail closed on mixed/rebinding DNS).
     try:
@@ -594,8 +608,13 @@ def proposed_for(result: DiscoveryResult) -> Tuple[Tuple[str, ...], Tuple[str, .
 
 
 def add_preview(url: str, name: str = "") -> Dict[str, Any]:
-    """Validate a URL and return a preview (no persistence, no network)."""
-    origin, clean_url, name_hint = normalize_origin(url)
+    """Validate a URL and return a preview (no persistence, no network).
+
+    Side-effect-free by contract: no DNS lookup, no network call, no state
+    write, no backup, no audit record, no grant, no skill, no page execution.
+    Private/loopback literal origins are still rejected without resolving.
+    """
+    origin, clean_url, name_hint = normalize_origin(url, resolve=False)
     return {"state": "preview", "would_add": origin, "url": clean_url,
             "name": name.strip() or name_hint, "status": STATUS_PENDING,
             "granted": False}
