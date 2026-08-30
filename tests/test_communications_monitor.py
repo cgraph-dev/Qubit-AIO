@@ -670,3 +670,179 @@ def test_monitor_cli_denies_live_without_canary(tmp_path, capsys):
     out2 = json.loads(r2.stdout)
     assert out2["commit"] == "preview" and out2["dry_run"] is True
     assert out2["would_commit"] in ("baseline", "new", "no-change")
+
+
+# -------------------------------------------------- Packet 8B evidence results
+def _eval_response(extraction, mid=1):
+    return json.dumps({"id": mid, "result": {"result": {
+        "type": "object", "value": extraction}}})
+
+
+def _shot_response(data, mid=2):
+    import base64 as b64
+    return json.dumps({"id": mid, "result": {
+        "data": b64.b64encode(data).decode()}})
+
+
+def _extraction(rows, *, vw=1280, vh=720):
+    return {"health": {"url": "https://mail.google.com/",
+                       "title": "Inbox (synthetic)",
+                       "vw": vw, "vh": vh,
+                       "hasLogin": False, "hasConsent": False,
+                       "bodyLen": 5000},
+            "rows": rows, "count": len(rows)}
+
+
+def _gmail_row(i, *, rect):
+    return {"sourceItemId": f"syn-e{i}", "threadId": f"syn-e{i}",
+            "sender": f"Synthetic Sender E{i}",
+            "subject": f"Synthetic subject {i}",
+            "preview": f"Synthetic preview {i}.", "timeText": f"Aug {i}",
+            "href": "https://mail.google.com/mail/u/0/#inbox",
+            "unread": True, "rect": rect}
+
+
+def test_live_run_valid_visible_row_yields_bounded_available_evidence():
+    """Regression: a valid visible row must produce a bounded clipped screenshot
+    AND the item must carry the typed AVAILABLE evidence result. Before the
+    fix the asset was AVAILABLE but the item always reported not_available
+    (scan output / store / report / dashboard all mislabelled captured rows)."""
+    import base64 as b64
+    ad = GmailAdapter("g")
+    row = _gmail_row(1, rect={"x": 10, "y": 20, "width": 300, "height": 40})
+    payload = b"\x00" * 1024
+    c = _client([_eval_response(_extraction([row])),
+                 _shot_response(payload)],
+                allowed_expressions=(ad.extract_js,))
+    scan = ad.run(c, ScanBounds(), report_id="r1")
+    assert scan.health_status is AccountHealthStatus.HEALTHY
+    assert len(scan.items) == 1 and len(scan.assets) == 1
+    assert scan.items[0].evidence_status is EvidenceStatus.AVAILABLE
+    assert scan.assets[0].redaction_status is EvidenceStatus.AVAILABLE
+    assert scan.asset_bytes[scan.assets[0].asset_id] == payload
+    # the wire clip is explicit and bounded to the 1280x720 viewport
+    clip = c._ws.sent[-1]["params"]["clip"]
+    assert clip["width"] == 300 and clip["height"] == 40
+    assert clip["x"] >= 0 and clip["y"] >= 0
+    assert clip["x"] + clip["width"] <= 1280
+    assert clip["y"] + clip["height"] <= 720
+    # no full-viewport capture is ever requested
+    assert not (clip["x"] <= 0.5 and clip["y"] <= 0.5
+                and 1280 - clip["width"] <= 0.5 and 720 - clip["height"] <= 0.5)
+
+
+def test_live_run_typed_evidence_variants_preserved_on_items():
+    """Regression: missing/off-screen geometry, CDP capture failure, and tiny
+    payloads preserve their typed state on BOTH the asset and the item; rows
+    beyond the bounded screenshot cap keep their default typed state."""
+    ad = GmailAdapter("g")
+
+    def run_rows(rows, responses):
+        c = _client(responses, allowed_expressions=(ad.extract_js,))
+        return ad.run(c, ScanBounds(), report_id="r1")
+
+    no_rect = _gmail_row(1, rect=None)
+    hidden = _gmail_row(2, rect={"x": 99999, "y": 99999, "width": 10,
+                                 "height": 10})
+    fail = _gmail_row(3, rect={"x": 10, "y": 20, "width": 300, "height": 40})
+    beyond_cap = _gmail_row(4, rect={"x": 10, "y": 20, "width": 300,
+                                     "height": 40})
+    rows = [no_rect, hidden, fail, beyond_cap]
+    scan = run_rows(
+        rows,
+        [_eval_response(_extraction(rows)),
+         json.dumps({"id": 2, "error": {"code": -32000,
+                                        "message": "Capture failed"}})])
+    assert [it.evidence_status for it in scan.items] == [
+        EvidenceStatus.NOT_AVAILABLE,   # no geometry
+        EvidenceStatus.TARGET_HIDDEN,   # off-screen
+        EvidenceStatus.CLIP_FAILED,     # CDP capture failure
+        EvidenceStatus.NOT_AVAILABLE,   # beyond the bounded screenshot cap
+    ]
+    assert [a.redaction_status for a in scan.assets] == [
+        EvidenceStatus.NOT_AVAILABLE,
+        EvidenceStatus.TARGET_HIDDEN,
+        EvidenceStatus.CLIP_FAILED,
+    ]
+    assert scan.asset_bytes == {}
+
+    tiny = _gmail_row(5, rect={"x": 10, "y": 20, "width": 300, "height": 40})
+    scan2 = run_rows(
+        [tiny],
+        [_eval_response(_extraction([tiny])), _shot_response(b"xx", mid=2)])
+    assert scan2.items[0].evidence_status is EvidenceStatus.TARGET_HIDDEN
+    assert scan2.assets[0].redaction_status is EvidenceStatus.TARGET_HIDDEN
+    assert scan2.asset_bytes == {}
+
+
+def test_live_run_malformed_and_oversized_geometry_never_captures():
+    """Regression: malformed and oversized row rects are rejected by
+    clamp_clip (NOT_AVAILABLE) and never reach capture_screenshot."""
+    import base64 as b64
+    ad = GmailAdapter("g")
+    rows = [
+        _gmail_row(1, rect={"x": "NaN", "y": 0, "width": 10, "height": 10}),
+        _gmail_row(2, rect={"x": 0, "y": 0, "width": 10000, "height": 10}),
+        _gmail_row(3, rect={"x": 0, "y": 0, "width": 1280, "height": 720}),
+    ]
+    c = _client([_eval_response(_extraction(rows))],
+                allowed_expressions=(ad.extract_js,))
+    scan = ad.run(c, ScanBounds(), report_id="r1")
+    assert [it.evidence_status for it in scan.items] == [
+        EvidenceStatus.NOT_AVAILABLE,
+        EvidenceStatus.NOT_AVAILABLE,
+        EvidenceStatus.NOT_AVAILABLE,
+    ]
+    assert len(scan.assets) == 3
+    assert all(a.redaction_status is EvidenceStatus.NOT_AVAILABLE
+               for a in scan.assets)
+    assert len(c._ws.sent) == 1            # only the extraction call; no capture
+    assert scan.asset_bytes == {}
+
+
+def test_fixture_items_carry_typed_evidence_from_screenshot_payload():
+    """Regression: fixture-mode items reflect the typed evidence outcome of
+    their screenshot payload (available / clip_failed / target_hidden /
+    not_available), never a blanket not_available."""
+    import base64 as b64
+    ad = GmailAdapter("g")
+    rows = json.loads((FIX / "new_items.json").read_text())["rows"]
+    rows[0]["screenshot"] = b64.b64encode(b"\x00" * 1024).decode()
+    rows[1]["screenshot"] = "not-base64!!"
+    rows[2]["screenshot"] = b64.b64encode(b"xx").decode()
+    rows.append({"sourceItemId": "syn-g4", "threadId": "syn-g4",
+                 "sender": "Synthetic Sender Four", "subject": "s",
+                 "preview": "p", "timeText": "Aug 4",
+                 "href": "https://mail.google.com/", "unread": False})
+    scan = ad.run_fixture(rows, ScanBounds(), report_id="r1")
+    assert [it.evidence_status for it in scan.items] == [
+        EvidenceStatus.AVAILABLE,
+        EvidenceStatus.CLIP_FAILED,
+        EvidenceStatus.TARGET_HIDDEN,
+        EvidenceStatus.NOT_AVAILABLE,
+    ]
+    assert [a.redaction_status for a in scan.assets] == [
+        EvidenceStatus.AVAILABLE,
+        EvidenceStatus.CLIP_FAILED,
+        EvidenceStatus.TARGET_HIDDEN,
+        EvidenceStatus.NOT_AVAILABLE,
+    ]
+
+
+def test_scan_output_evidence_status_matches_assets(tmp_path):
+    """Regression: the scan driver JSON reports the item's typed evidence
+    status exactly as its asset status — captured rows are never labelled
+    not_available."""
+    import base64 as b64
+    cfg = _cfg(tmp_path)
+    rows = json.loads((FIX / "new_items.json").read_text())["rows"]
+    rows[0]["screenshot"] = b64.b64encode(b"\x00" * 1024).decode()
+    fx = tmp_path / "evidence.json"
+    fx.write_text(json.dumps({"platform": "gmail", "rows": rows}))
+    r = run_scan(cfg, "gmail", account_scope="ev", source="fixture",
+                 fixture=fx)
+    assert r["state"] == "OK" and r["commit"] == "baseline"
+    assert [it["evidence_status"] for it in r["items"]] == \
+        ["available", "not_available", "not_available"]
+    assert {ev["status"] for ev in r["evidence"]} == \
+        {"available", "not_available"}

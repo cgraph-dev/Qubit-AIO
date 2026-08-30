@@ -10,6 +10,7 @@ focuses or closes a user tab.
 from __future__ import annotations
 
 import hashlib
+from dataclasses import replace
 from typing import Any, Dict, List, Optional, Tuple
 
 from .base import (AccountHealthStatus, AdapterScan, CdpClient, EvidenceStatus,
@@ -27,6 +28,24 @@ def _sender_from_text(text: str, thread_id: str) -> str:
     head = t.split(":")[0].split(",")[0].strip()
     head = " ".join(head.split()[:4])
     return head[:60] or f"thread-{thread_id}"
+
+
+def _apply_evidence(items: List[CommunicationItem],
+                    assets: List[EvidenceAssetRecord]
+                    ) -> List[CommunicationItem]:
+    """Copy each asset's typed redaction status onto its item's evidence_status.
+
+    The capture outcome is recorded on the EvidenceAssetRecord; without this
+    propagation the item (and therefore scan output, store, report bundle, and
+    dashboard) always reports the NOT_AVAILABLE default even when a bounded
+    clipped screenshot of a valid visible row succeeded. Items without an
+    asset (no evidence attempted) keep their default typed state; typed
+    unavailable/target_hidden/clip_failed states are preserved verbatim.
+    """
+    by_identity = {a.item_identity: a.redaction_status for a in assets}
+    return [replace(it, evidence_status=by_identity[it.identity])
+            if it.identity in by_identity else it
+            for it in items]
 
 
 class SiteAdapter(ReadOnlyAdapter):
@@ -158,6 +177,7 @@ class SiteAdapter(ReadOnlyAdapter):
         if hs is AccountHealthStatus.HEALTHY and items:
             assets, blobs = self._screenshots(client, bounds, pairs, report_id,
                                               viewport)
+            items = _apply_evidence(items, assets)
         status = ScanStatus.NEW_ITEMS if items else ScanStatus.NO_CHANGE
         if overflow:
             status = ScanStatus.OVERFLOW if items else ScanStatus.DEGRADED
@@ -208,6 +228,7 @@ class SiteAdapter(ReadOnlyAdapter):
                                       data=data)
                     assets.append(rec)
                     blobs[rec.asset_id] = data
+            items = _apply_evidence(items, assets)
         return AdapterScan(items=items, status=status, health_status=hs,
                            auth_ok=True if items else None, overflow=overflow,
                            reason="fixture", assets=assets, asset_bytes=blobs)
