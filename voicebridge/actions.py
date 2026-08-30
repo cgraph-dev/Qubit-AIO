@@ -49,7 +49,8 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from .broker import CapabilityBroker, ExecResult, ToolBinding
-from .capabilities import CapabilitySpec, Tier
+from .capabilities import (CapabilitySpec, ConfirmationRecord,
+                           ConfirmationStore, Tier)
 from .logging_setup import log_event
 from .permissions import (MODE_RESTRICTED, MODE_UNRESTRICTED,
                           is_hard_deny_auto, permissions_store)
@@ -91,6 +92,18 @@ RB_NONE = "none"
 RB_REVERSIBLE = "reversible"
 RB_IMPOSSIBLE = "impossible"
 RB_KINDS = (RB_NONE, RB_REVERSIBLE, RB_IMPOSSIBLE)
+
+# Confirmation issuer handling. Only the canonical authenticated human
+# principal may issue an action confirmation. The strict default-deny check
+# (``require_human_principal``) normalizes the authenticated CLI/dashboard
+# channels to this exact string and refuses model/page/skill/tool-result/
+# generated-plan/arbitrary caller text for EVERY action — a confirmation
+# record is always human authority.
+HUMAN_PRINCIPAL = "user"
+# Labels hard-coded by the authenticated human control surfaces themselves
+# (CLI ``actions prepare``, dashboard ``/api/actions``); the web/CLI never
+# accept an issuer label from client-supplied text.
+HUMAN_CHANNELS = frozenset({HUMAN_PRINCIPAL, "cli:user", "dashboard"})
 
 SCHEMA_VERSION = 1
 AUDIT_CAP = 400
@@ -160,6 +173,29 @@ def _new_id(prefix: str) -> str:
 
 def _bound(text: Optional[str], limit: int) -> str:
     return (text or "")[:limit]
+
+
+def require_human_principal(issued_by: str) -> str:
+    """Strict, default-deny confirmation-issuer check for the action layer.
+
+    Only the canonical authenticated human principal (``HUMAN_PRINCIPAL``) or
+    an explicit label of an authenticated human control surface (CLI ``actions
+    prepare``, dashboard ``/api/actions``) may issue an action confirmation.
+    Everything else — model, page, skill, tool-result, generated-plan, empty,
+    or arbitrary caller text — is refused with CONFIRMATION_SOURCE_FORBIDDEN
+    so non-human output can never confirm or widen an action. The returned
+    canonical principal is what the confirmation record and audit carry.
+    """
+    if issued_by not in HUMAN_CHANNELS:
+        log_event("actions.issuer.refused",
+                  issuer=redact_text(str(issued_by))[:40])
+        raise ActionDeniedError(
+            "CONFIRMATION_SOURCE_FORBIDDEN",
+            f"issuer {issued_by!r} is not an authenticated human channel")
+    if issued_by != HUMAN_PRINCIPAL:
+        log_event("actions.issuer.channel", channel=issued_by,
+                  principal=HUMAN_PRINCIPAL)
+    return HUMAN_PRINCIPAL
 
 
 # ---------------------------------------------------------------------------
@@ -862,7 +898,11 @@ class ActionGate:
                     "detail": "no matching grant; default deny"}
 
         if hard is not None or spec.needs_confirmation:
-            if source != "user":
+            # source="check" is the read-only preview/check probe (always
+            # human-facing); every other non-human source is refused as
+            # confirmation authority, so a model/page/skill/tool result can
+            # never confirm an action.
+            if source not in ("user", "check"):
                 return {"allowed": False, "code": "CONFIRMATION_SOURCE_FORBIDDEN",
                         "mode": mode,
                         "detail": f"source={source} cannot confirm actions"}
@@ -1102,12 +1142,96 @@ class ActionStore:
     def close(self) -> None:
         pass
 
+    # --------------------------------------------- confirmations (Packet 8F)
+    def save_confirmation(self, record: ConfirmationRecord) -> None:
+        """Persist one action confirmation so a ``prepare`` in one CLI process
+        or dashboard request is consumable by a later ``execute`` (single-use,
+        expiring, digest-bound). Only metadata is stored — the args/private
+        content never reaches the file. Consumed records are kept so replays
+        stay typed; expired records older than an hour are pruned and the
+        journal is size-capped."""
+        with self._lock:
+            confs = self._state.setdefault("confirmations", {})
+            confs[record.id] = {
+                "id": record.id, "capability": record.capability,
+                "args_digest": record.args_digest,
+                "issued_at": record.issued_at,
+                "expires_at": record.expires_at,
+                "issued_by": record.issued_by,
+                "consumed": bool(record.consumed),
+                "consumed_at": record.consumed_at}
+            self._prune_confirmations()
+            self._save()
+
+    def _prune_confirmations(self) -> None:
+        now = self._clock()
+        confs = self._state.get("confirmations", {})
+        stale = [rid for rid, c in confs.items()
+                 if not c.get("consumed")
+                 and now - float(c.get("expires_at", 0)) > 3600]
+        for rid in stale:
+            confs.pop(rid, None)
+        if len(confs) > 2000:
+            oldest = sorted(confs, key=lambda r: confs[r].get("issued_at", 0))
+            for rid in oldest[:len(confs) - 2000]:
+                confs.pop(rid, None)
+
+    def confirmations(self) -> List[Dict[str, Any]]:
+        """Current persisted confirmation metadata (for store reloads)."""
+        with self._lock:
+            return [dict(c)
+                    for c in self._state.get("confirmations", {}).values()]
+
 
 def actions_store(cfg) -> ActionStore:
     """Open (or create) the action receipt store at the configured path."""
     path = cfg.get("actions", "state_path", default="") or \
         (cfg.state_dir() / "actions.json")
     return ActionStore(Path(path).expanduser())
+
+
+class PersistentConfirmationStore(ConfirmationStore):
+    """ConfirmationStore persisted through the ActionStore.
+
+    The shared 1A store is in-memory, so a confirmation issued by
+    ``actions prepare`` in one CLI process (or one dashboard request) could
+    never be consumed by the later ``actions execute`` — the fresh broker in
+    the second invocation would report UNKNOWN_CONFIRMATION_ID. This subclass
+    keeps the exact single-use / expiry / digest-bound contract but persists
+    metadata through the action receipt file (args are never persisted), so
+    the two-step preview → prepare → execute flow works across process and
+    request boundaries.
+    """
+
+    def __init__(self, store: ActionStore, *,
+                 clock: Callable[[], float] = time.time,
+                 default_ttl_s: float = 300.0):
+        super().__init__(clock=clock, default_ttl_s=default_ttl_s)
+        self._pstore = store
+        for raw in store.confirmations():
+            self._records[str(raw.get("id", ""))] = ConfirmationRecord(
+                id=str(raw.get("id", "")),
+                capability=str(raw.get("capability", "")),
+                args_digest=str(raw.get("args_digest", "")),
+                issued_at=float(raw.get("issued_at", 0.0)),
+                expires_at=float(raw.get("expires_at", 0.0)),
+                issued_by=str(raw.get("issued_by", "")),
+                consumed=bool(raw.get("consumed", False)),
+                consumed_at=raw.get("consumed_at"))
+
+    def issue(self, capability: str, args: Dict[str, Any], *,
+              issued_by: str, ttl_s: Optional[float] = None
+              ) -> ConfirmationRecord:
+        rec = super().issue(capability, args, issued_by=issued_by,
+                            ttl_s=ttl_s)
+        self._pstore.save_confirmation(rec)
+        return rec
+
+    def consume(self, confirmation_id: str, capability: str,
+                args: Dict[str, Any]) -> ConfirmationRecord:
+        rec = super().consume(confirmation_id, capability, args)
+        self._pstore.save_confirmation(rec)
+        return rec
 
 
 # ---------------------------------------------------------------------------
@@ -1230,6 +1354,14 @@ class ActionRunner:
             confirmation_ttl_s if confirmation_ttl_s is not None else (
                 (cfg.get("actions", "confirmation_ttl_s", default=300.0)
                  if cfg is not None else 300.0)))
+        # Confirmations must span CLI processes / dashboard requests: the 1A
+        # in-memory store alone would reject a `prepare` confirmation on the
+        # later `execute` (UNKNOWN_CONFIRMATION_ID). Persist metadata through
+        # the ActionStore instead — the single-use/expiry/digest contract is
+        # unchanged and args/private content never reach the file.
+        self.broker.engine.confirmations = PersistentConfirmationStore(
+            self.store, clock=self.clock,
+            default_ttl_s=self.confirmation_ttl_s)
 
     # ------------------------------------------------------------ read-only
     def actions(self) -> List[Dict[str, Any]]:
@@ -1298,19 +1430,21 @@ class ActionRunner:
     def prepare(self, action_id: str, envelope: Dict[str, Any], *,
                 issued_by: str) -> Dict[str, Any]:
         """Issue a fresh, expiring, single-use confirmation bound to the exact
-        action envelope. ``issued_by`` must be a human (model issuance is
-        refused by the underlying store)."""
+        action envelope. The strict default-deny issuer check
+        (``require_human_principal``) normalizes the authenticated CLI/
+        dashboard/voice channels to the canonical human principal and refuses
+        model/page/skill/tool/arbitrary text for EVERY action — a
+        confirmation record is always human authority, never widened."""
         spec = action_spec(action_id)
         if spec is None:
             raise ActionError(f"unknown action {action_id!r}")
         env = validate_envelope(envelope, spec)
-        if spec.needs_confirmation and issued_by != "user":
-            raise ActionDeniedError("CONFIRMATION_SOURCE_FORBIDDEN",
-                                    "only a human can issue action confirmations")
+        issued_by = require_human_principal(issued_by)
         rec = self.broker.issue_confirmation(
             action_id, env, issued_by=issued_by, ttl_s=self.confirmation_ttl_s)
         return {"state": "prepared", "confirmation_id": rec.id,
                 "action_id": action_id, "action_hash": env["action_hash"],
+                "issued_by": issued_by,
                 "expires_at": rec.expires_at,
                 "ttl_s": round(rec.expires_at - rec.issued_at, 3)}
 
@@ -1566,6 +1700,14 @@ class ActionRunner:
                     "receipt_id": receipt_id,
                     "detail": "retry args differ from the original receipt; "
                               "this would be a new action, not a retry"}
+        if (receipt.target != (target or "")
+                or receipt.account_scope != (account_scope or "")
+                or receipt.scope != (scope or "")):
+            return {"state": ST_STALE_TARGET, "code": "TARGET_SCOPE_MISMATCH",
+                    "receipt_id": receipt_id,
+                    "detail": "retry target/account/scope differ from the "
+                              "original receipt; this would be a new action, "
+                              "not a retry"}
         return self.execute(receipt.action_id, args=dict(args or {}),
                             target=target, account_scope=account_scope,
                             scope=scope,

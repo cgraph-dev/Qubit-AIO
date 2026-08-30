@@ -30,6 +30,7 @@ sys.path.insert(0, str(REPO_ROOT))
 from voicebridge import actions as A  # noqa: E402
 from voicebridge.permissions import (  # noqa: E402
     MODE_RESTRICTED, MODE_UNRESTRICTED, PermissionsStore, is_hard_deny_auto,
+    permissions_store,
 )
 from voicebridge.capabilities import ConfirmationStore, Tier  # noqa: E402
 
@@ -953,3 +954,436 @@ def test_check_read_only_effective(tmp_path):
     assert c2["code"] == "NOT_GRANTED"
     assert c2["mode"] == MODE_RESTRICTED
     assert runner.check("act.nope")["code"] == "UNKNOWN_CAPABILITY"
+
+
+# ---------------------------------------------------------------------------
+# Packet 8F closure regressions: issuer handling + real-interface lifecycles
+# (repairs: CLI/dashboard prepare issuer CONFIRMATION_SOURCE_FORBIDDEN,
+# preview/check misreporting, retry target/scope redirect)
+# ---------------------------------------------------------------------------
+def test_issuer_missing_malformed_and_non_human_rejected(tmp_path):
+    """prepare refuses EVERY non-human / missing / arbitrary issuer for EVERY
+    action (including read-only) with CONFIRMATION_SOURCE_FORBIDDEN — a
+    confirmation record is always human authority."""
+    runner = _runner(tmp_path)
+    envelopes = (
+        ("act.mail.send", A.build_envelope(
+            A.action_spec("act.mail.send"), args=_MAIL_ARGS,
+            target="https://mail.google.com", scope="mail")),
+        ("act.browser.read", A.build_envelope(
+            A.action_spec("act.browser.read"), args={"selector": "#main"},
+            target="https://example.com", scope="web")),
+    )
+    for action_id, env in envelopes:
+        for bad in ("", "model", "page", "skill", "tool-result",
+                    "generated-plan", "automation", "attacker", None):
+            with pytest.raises(A.ActionDeniedError) as ei:
+                runner.prepare(action_id, env, issued_by=bad)
+            assert ei.value.code == "CONFIRMATION_SOURCE_FORBIDDEN", bad
+
+
+def test_issuer_channel_normalization_to_canonical_human(tmp_path):
+    """CLI/dashboard channel labels normalize to the canonical human
+    principal; the confirmation is bound to the exact envelope and single-use,
+    and the response carries the canonical issuer."""
+    runner = _runner(tmp_path, grants=(("act.mail.send", "mail"),))
+    env = A.build_envelope(A.action_spec("act.mail.send"), args=_MAIL_ARGS,
+                           target="https://mail.google.com", scope="mail")
+    for channel in ("user", "cli:user", "dashboard"):
+        prep = runner.prepare("act.mail.send", env, issued_by=channel)
+        assert prep["state"] == "prepared"
+        assert prep["issued_by"] == A.HUMAN_PRINCIPAL
+        r = runner.execute("act.mail.send", envelope=env, source="user",
+                           confirmation_id=prep["confirmation_id"])
+        assert r["state"] == "OK"
+        replay = runner.execute("act.mail.send", envelope=env, source="user",
+                                confirmation_id=prep["confirmation_id"])
+        assert replay["state"] == "replayed"
+
+
+def test_cli_preview_prepare_execute_lifecycle(tmp_path, capsys):
+    """Real CLI two-step prepare path: grant -> preview -> prepare (envelope)
+    -> execute with the fresh confirmation -> OK. Regression for the issuer
+    defect (prepare previously refused 'cli:user'); the prepared confirmation
+    is never auto-consumed and replay is refused."""
+    cfg = _cfg(tmp_path)
+    code, out = _cli(capsys, tmp_path, "--config", str(cfg.path),
+                     "permissions", "grant", "act.mail.send", "--scope",
+                     "mail", "--confirm")
+    assert code == 0
+    code, out = _cli(capsys, tmp_path, "--config", str(cfg.path), "actions",
+                     "preview", "act.mail.send", "--args",
+                     json.dumps(_MAIL_ARGS), "--target",
+                     "https://mail.google.com", "--scope", "mail")
+    assert code == 0
+    body = json.loads(out)
+    assert body["state"] == "preview"
+    assert body["confirmation_required"] is True
+    env = A.build_envelope(A.action_spec("act.mail.send"), args=_MAIL_ARGS,
+                           target="https://mail.google.com", scope="mail")
+    code, out = _cli(capsys, tmp_path, "--config", str(cfg.path), "actions",
+                     "prepare", "act.mail.send", "--envelope",
+                     json.dumps(env))
+    assert code == 0, out
+    prep = json.loads(out)
+    assert prep["state"] == "prepared"
+    assert prep["issued_by"] == "user"
+    # execute without the confirmation id -> CONFIRMATION_REQUIRED
+    code, out = _cli(capsys, tmp_path, "--config", str(cfg.path), "actions",
+                     "execute", "act.mail.send", "--args",
+                     json.dumps(_MAIL_ARGS), "--target",
+                     "https://mail.google.com", "--scope", "mail",
+                     "--fixture", str(FIXTURES / "outcomes.json"))
+    denied = json.loads(out)
+    assert denied["code"] == "CONFIRMATION_REQUIRED"
+    # execute with the fresh confirmation id -> OK (explicit synthetic fixture)
+    code, out = _cli(capsys, tmp_path, "--config", str(cfg.path), "actions",
+                     "execute", "act.mail.send", "--args",
+                     json.dumps(_MAIL_ARGS), "--target",
+                     "https://mail.google.com", "--scope", "mail",
+                     "--confirmation", prep["confirmation_id"],
+                     "--fixture", str(FIXTURES / "outcomes.json"))
+    assert code == 0, out
+    final = json.loads(out)
+    assert final["state"] == "OK"
+    assert final["receipt_id"]
+    # replay of the same confirmation id is refused
+    code, out = _cli(capsys, tmp_path, "--config", str(cfg.path), "actions",
+                     "execute", "act.mail.send", "--args",
+                     json.dumps(_MAIL_ARGS), "--target",
+                     "https://mail.google.com", "--scope", "mail",
+                     "--confirmation", prep["confirmation_id"],
+                     "--fixture", str(FIXTURES / "outcomes.json"))
+    replay = json.loads(out)
+    assert replay["state"] == "replayed"
+    # receipt read-back is redacted (no private body)
+    code, out = _cli(capsys, tmp_path, "--config", str(cfg.path), "actions",
+                     "receipt", final["receipt_id"])
+    assert code == 0
+    assert "hello" not in out
+
+
+def test_cli_changed_args_rejected_against_prepared_confirmation(
+        tmp_path, capsys):
+    """Changed target/args/scope against a prepared confirmation is refused as
+    stale through the real CLI (hash binding + consume guard)."""
+    cfg = _cfg(tmp_path)
+    _cli(capsys, tmp_path, "--config", str(cfg.path), "permissions", "grant",
+         "act.mail.send", "--scope", "mail", "--confirm")
+    env = A.build_envelope(A.action_spec("act.mail.send"), args=_MAIL_ARGS,
+                           target="https://mail.google.com", scope="mail")
+    code, out = _cli(capsys, tmp_path, "--config", str(cfg.path), "actions",
+                     "prepare", "act.mail.send", "--envelope",
+                     json.dumps(env))
+    prep = json.loads(out)
+    # changed args
+    changed = dict(_MAIL_ARGS, recipient="carol@example.com")
+    code, out = _cli(capsys, tmp_path, "--config", str(cfg.path), "actions",
+                     "execute", "act.mail.send", "--args",
+                     json.dumps(changed), "--target",
+                     "https://mail.google.com", "--scope", "mail",
+                     "--confirmation", prep["confirmation_id"],
+                     "--fixture", str(FIXTURES / "outcomes.json"))
+    body = json.loads(out)
+    assert body["state"] == "stale_target"
+    # changed target
+    code, out = _cli(capsys, tmp_path, "--config", str(cfg.path), "actions",
+                     "execute", "act.mail.send", "--args",
+                     json.dumps(_MAIL_ARGS), "--target",
+                     "https://mail.yahoo.com", "--scope", "mail",
+                     "--confirmation", prep["confirmation_id"],
+                     "--fixture", str(FIXTURES / "outcomes.json"))
+    body = json.loads(out)
+    assert body["state"] == "stale_target"
+
+
+def test_prepared_confirmation_expiry_via_cli(tmp_path, capsys, monkeypatch):
+    """A prepared confirmation expires after the TTL through the real CLI."""
+    monkeypatch.setenv("VOICE_BRIDGE__ACTIONS__CONFIRMATION_TTL_S", "1")
+    cfg = _cfg(tmp_path)
+    _cli(capsys, tmp_path, "--config", str(cfg.path), "permissions", "grant",
+         "act.mail.send", "--scope", "mail", "--confirm")
+    env = A.build_envelope(A.action_spec("act.mail.send"), args=_MAIL_ARGS,
+                           target="https://mail.google.com", scope="mail")
+    code, out = _cli(capsys, tmp_path, "--config", str(cfg.path), "actions",
+                     "prepare", "act.mail.send", "--envelope",
+                     json.dumps(env))
+    prep = json.loads(out)
+    assert prep["state"] == "prepared"
+    time.sleep(1.3)
+    code, out = _cli(capsys, tmp_path, "--config", str(cfg.path), "actions",
+                     "execute", "act.mail.send", "--args",
+                     json.dumps(_MAIL_ARGS), "--target",
+                     "https://mail.google.com", "--scope", "mail",
+                     "--confirmation", prep["confirmation_id"],
+                     "--fixture", str(FIXTURES / "outcomes.json"))
+    body = json.loads(out)
+    assert body["state"] == "expired"
+    assert body["code"] == "EXPIRED_CONFIRMATION"
+
+
+def test_dashboard_preview_prepare_execute_lifecycle(tmp_path):
+    """Real dashboard two-step prepare path over HTTP: grant -> preview ->
+    prepare -> execute with the fresh confirmation -> OK. Regression for the
+    issuer defect (prepare previously refused 'dashboard'); replay and stale
+    targets are refused and receipts stay redacted."""
+    ui, cfg = _make_ui(tmp_path)
+    try:
+        perms = permissions_store(cfg)
+        perms.grant("act.mail.send", requested_by="user", confirmed=True,
+                    scopes=("mail",))
+        out = _http(ui, "POST", "/api/actions", {
+            "action": "preview", "action_id": "act.mail.send",
+            "args": _MAIL_ARGS, "target": "https://mail.google.com",
+            "scope": "mail"})
+        assert out["state"] == "preview"
+        env = A.build_envelope(A.action_spec("act.mail.send"), args=_MAIL_ARGS,
+                               target="https://mail.google.com", scope="mail")
+        out = _http(ui, "POST", "/api/actions", {
+            "action": "prepare", "action_id": "act.mail.send",
+            "envelope": env})
+        assert out["state"] == "prepared", out
+        assert out["issued_by"] == "user"
+        prep_cid = out["confirmation_id"]
+        # execute without confirmation -> CONFIRMATION_REQUIRED
+        out = _http(ui, "POST", "/api/actions", {
+            "action": "execute", "action_id": "act.mail.send",
+            "args": _MAIL_ARGS, "target": "https://mail.google.com",
+            "scope": "mail", "fixture": str(FIXTURES / "outcomes.json")})
+        assert out["code"] == "CONFIRMATION_REQUIRED"
+        # changed args against the prepared confirmation -> stale
+        changed = dict(_MAIL_ARGS, recipient="carol@example.com")
+        out = _http(ui, "POST", "/api/actions", {
+            "action": "execute", "action_id": "act.mail.send",
+            "args": changed, "target": "https://mail.google.com",
+            "scope": "mail", "confirmation": prep_cid,
+            "fixture": str(FIXTURES / "outcomes.json")})
+        assert out["state"] == "stale_target"
+        # exact envelope with the fresh confirmation -> OK
+        out = _http(ui, "POST", "/api/actions", {
+            "action": "execute", "action_id": "act.mail.send",
+            "envelope": env, "confirmation": prep_cid,
+            "fixture": str(FIXTURES / "outcomes.json")})
+        assert out["state"] == "OK", out
+        rid = out["receipt_id"]
+        # replay refused
+        out = _http(ui, "POST", "/api/actions", {
+            "action": "execute", "action_id": "act.mail.send",
+            "envelope": env, "confirmation": prep_cid,
+            "fixture": str(FIXTURES / "outcomes.json")})
+        assert out["state"] == "replayed"
+        # receipt read-back is redacted
+        out = _http(ui, "GET", "/api/actions?receipt=" + rid)
+        assert "hello" not in json.dumps(out)
+    finally:
+        ui.stop()
+
+
+def test_dashboard_unauthenticated_actions_rejected(tmp_path):
+    """With a configured dashboard token, /api/actions (GET and POST) refuses
+    missing and wrong tokens with 401; the correct token works."""
+    from voicebridge.config import Config
+    from voicebridge.webui import WebUI
+    state = tmp_path / "state"
+    state.mkdir(exist_ok=True)
+    p = tmp_path / "voice.yaml"
+    p.write_text("logging:\n  jsonl_path: '" + str(state) + "'\n"
+                 "webui:\n  token: 'test-secret'\n")
+    cfg = Config.load(p)
+    ui = WebUI(_FakeOrch(cfg), host="127.0.0.1", port=0, state_dir=state)
+    ui.start()
+    try:
+        url = f"http://127.0.0.1:{ui._server.server_port}/api/actions"
+        for headers in ({}, {"X-Api-Token": "wrong"}):
+            req = urllib.request.Request(url, headers=headers)
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    assert False, f"expected 401 for {headers}"
+            except urllib.error.HTTPError as exc:
+                assert exc.code == 401
+        req = urllib.request.Request(url, headers={"X-Api-Token": "test-secret"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = json.loads(resp.read().decode())
+            assert body["state"] == "OK"
+        # POST mutation without a token is refused too
+        req = urllib.request.Request(
+            url, data=json.dumps({"action": "preview"}).encode(),
+            method="POST",
+            headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                assert False, "expected 401"
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 401
+    finally:
+        ui.stop()
+
+
+def test_cli_dashboard_voice_identical_approval_semantics(tmp_path, capsys):
+    """CLI, dashboard and voice resolve to the SAME ActionRunner approval path:
+    no fresh confirmation -> CONFIRMATION_REQUIRED; a fresh confirmed
+    execution is the same typed OK with the same action hash."""
+    cfg = _cfg(tmp_path)
+    _cli(capsys, tmp_path, "--config", str(cfg.path), "permissions", "grant",
+         "act.mail.send", "--scope", "mail", "--confirm")
+    req = A.voice_action_request(
+        "send an email to bob@example.com about hi saying hello there")
+    assert req is not None
+    mail_args = req["args"]
+    env_hash = A.build_envelope(
+        A.action_spec("act.mail.send"), args=mail_args, target=req["target"],
+        account_scope=req["account_scope"], scope=req["scope"])["action_hash"]
+    runner = A.action_runner(cfg,
+                             executors=A.make_fixture_executors(_outcomes()))
+    # voice: no confirmation -> CONFIRMATION_REQUIRED; confirmed -> OK
+    denied = runner.execute(req["action_id"], args=mail_args,
+                            target=req["target"], scope=req["scope"],
+                            account_scope=req["account_scope"], source="user")
+    assert denied["code"] == "CONFIRMATION_REQUIRED"
+    voice_ok = runner.execute(req["action_id"], args=mail_args,
+                              target=req["target"], scope=req["scope"],
+                              account_scope=req["account_scope"],
+                              source="user", confirmed=True)
+    assert voice_ok["state"] == "OK"
+    assert voice_ok["action_hash"] == env_hash
+    # CLI --confirm
+    code, out = _cli(capsys, tmp_path, "--config", str(cfg.path), "actions",
+                     "execute", "act.mail.send", "--args",
+                     json.dumps(mail_args), "--target", req["target"],
+                     "--account", req["account_scope"], "--scope",
+                     req["scope"], "--confirm",
+                     "--fixture", str(FIXTURES / "outcomes.json"))
+    cli_ok = json.loads(out)
+    assert cli_ok["state"] == "OK"
+    assert cli_ok["action_hash"] == env_hash
+    # dashboard confirmed:true
+    ui, _ = _make_ui(tmp_path)
+    try:
+        out = _http(ui, "POST", "/api/actions", {
+            "action": "execute", "action_id": "act.mail.send",
+            "args": mail_args, "target": req["target"],
+            "account_scope": req["account_scope"], "scope": req["scope"],
+            "confirmed": True, "fixture": str(FIXTURES / "outcomes.json")})
+        assert out["state"] == "OK"
+        assert out["action_hash"] == env_hash
+    finally:
+        ui.stop()
+
+
+def test_cli_lifecycle_receipts_and_audit_redacted(tmp_path, capsys):
+    """After a real CLI lifecycle, receipts and the on-disk audit carry no
+    private content (mandate item: receipts/audit remain redacted)."""
+    cfg = _cfg(tmp_path)
+    secret = "topsecret-private-body-content"
+    args = {"recipient": "bob@example.com", "subject": "hi", "body": secret}
+    _cli(capsys, tmp_path, "--config", str(cfg.path), "permissions", "grant",
+         "act.mail.send", "--scope", "mail", "--confirm")
+    code, out = _cli(capsys, tmp_path, "--config", str(cfg.path), "actions",
+                     "execute", "act.mail.send", "--args",
+                     json.dumps(args), "--target",
+                     "https://mail.google.com", "--scope", "mail", "--confirm",
+                     "--fixture", str(FIXTURES / "outcomes.json"))
+    rid = json.loads(out)["receipt_id"]
+    code, out = _cli(capsys, tmp_path, "--config", str(cfg.path), "actions",
+                     "receipt", rid)
+    assert secret not in out
+    code, out = _cli(capsys, tmp_path, "--config", str(cfg.path), "actions",
+                     "receipts")
+    assert secret not in out
+    store_file = cfg.state_dir() / "actions.json"
+    assert secret not in store_file.read_text()
+    reopened = A.ActionStore(store_file)
+    assert secret not in json.dumps(reopened.audit(50))
+    assert secret not in json.dumps(
+        [r.to_dict() for r in reopened.receipts(50)])
+
+
+def test_adapter_disabled_via_cli_and_dashboard_without_fixture(
+        tmp_path, capsys):
+    """actions.enabled=false: real CLI + dashboard execute WITHOUT an explicit
+    fixture return the typed ADAPTER_DISABLED; with the explicit synthetic
+    fixture the same path executes (fixtures remain test-only)."""
+    cfg = _cfg(tmp_path)
+    _cli(capsys, tmp_path, "--config", str(cfg.path), "permissions", "grant",
+         "act.browser.read", "--scope", "web", "--confirm")
+    code, out = _cli(capsys, tmp_path, "--config", str(cfg.path), "actions",
+                     "execute", "act.browser.read", "--args",
+                     json.dumps({"selector": "#main"}), "--target",
+                     "https://example.com", "--scope", "web")
+    assert json.loads(out)["code"] == "ADAPTER_DISABLED"
+    code, out = _cli(capsys, tmp_path, "--config", str(cfg.path), "actions",
+                     "execute", "act.browser.read", "--args",
+                     json.dumps({"selector": "#main"}), "--target",
+                     "https://example.com", "--scope", "web",
+                     "--fixture", str(FIXTURES / "outcomes.json"))
+    assert json.loads(out)["state"] == "OK"
+    ui, _ = _make_ui(tmp_path)
+    try:
+        perms = permissions_store(cfg)
+        perms.grant("act.browser.read", requested_by="user", confirmed=True,
+                    scopes=("web",))
+        out = _http(ui, "POST", "/api/actions", {
+            "action": "execute", "action_id": "act.browser.read",
+            "args": {"selector": "#main"}, "target": "https://example.com",
+            "scope": "web"})
+        assert out["code"] == "ADAPTER_DISABLED"
+        out = _http(ui, "POST", "/api/actions", {
+            "action": "execute", "action_id": "act.browser.read",
+            "args": {"selector": "#main"}, "target": "https://example.com",
+            "scope": "web", "fixture": str(FIXTURES / "outcomes.json")})
+        assert out["state"] == "OK"
+    finally:
+        ui.stop()
+
+
+def test_preview_and_check_report_confirmation_required(tmp_path):
+    """A granted sensitive action previews/checks as CONFIRMATION_REQUIRED
+    (the human can confirm) — not CONFIRMATION_SOURCE_FORBIDDEN; non-human
+    execute sources stay refused."""
+    runner = _runner(tmp_path, grants=(("act.mail.send", "mail"),))
+    p = runner.preview("act.mail.send", args=_MAIL_ARGS,
+                       target="https://mail.google.com", scope="mail")
+    assert p["would_decision"]["code"] == "CONFIRMATION_REQUIRED"
+    c = runner.check("act.mail.send", "mail")
+    assert c["code"] == "CONFIRMATION_REQUIRED"
+    d = runner.execute("act.mail.send", args=_MAIL_ARGS,
+                       target="https://mail.google.com", scope="mail",
+                       source="model", confirmed=True)
+    assert d["code"] == "CONFIRMATION_SOURCE_FORBIDDEN"
+
+
+def test_retry_refuses_changed_target_scope(tmp_path):
+    """Retry is bound to the original receipt: same args but a different
+    target/account/scope is refused as stale (regression: it previously
+    re-executed against the new target)."""
+    store, perms = _stores(tmp_path)
+    perms.grant("act.browser.fill", requested_by="user", confirmed=True,
+                scopes=("web",))
+    fails = A.ActionRunner(
+        store=store, perms=perms,
+        executors=A.make_fixture_executors(_outcomes("fail.json")))
+    first = fails.execute("act.browser.fill",
+                          args={"selector": "#email",
+                                "value": "bob@example.com"},
+                          target="https://example.com", scope="web")
+    assert first["state"] == "failed"
+    runner = A.ActionRunner(
+        store=store, perms=perms,
+        executors=A.make_fixture_executors(_outcomes("outcomes.json")))
+    bad = runner.retry(first["receipt_id"],
+                       args={"selector": "#email",
+                             "value": "bob@example.com"},
+                       target="https://evil.example.net", scope="web")
+    assert bad["state"] == "stale_target"
+    assert bad["code"] == "TARGET_SCOPE_MISMATCH"
+    bad2 = runner.retry(first["receipt_id"],
+                        args={"selector": "#email",
+                              "value": "bob@example.com"},
+                        target="https://example.com", scope="web",
+                        account_scope="gmail:secondary")
+    assert bad2["state"] == "stale_target"
+    ok = runner.retry(first["receipt_id"],
+                      args={"selector": "#email",
+                            "value": "bob@example.com"},
+                      target="https://example.com", scope="web")
+    assert ok["state"] == "OK"

@@ -67,14 +67,27 @@ double-underscore path (e.g. `VOICE_BRIDGE__ACTIONS__CONFIRMATION_TTL_S`).
    spoken "yes" (voice) issues a **fresh, expiring, single-use confirmation**
    bound to the exact envelope digest. Anything changed (target/args/scope/
    account) → `stale_target`; anything expired → `expired`; replay → `replayed`.
+   The two-step `actions prepare` → `actions execute --confirmation <id>`
+   (CLI, across separate processes) and dashboard `prepare` → `execute`
+   (across separate requests) also work: confirmation **metadata** (id,
+   capability, args digest, timestamps, issuer — never args/private content)
+   is persisted in `<state_dir>/actions.json`, so a fresh confirmation issued
+   by one process/request is consumable by the next. Issuance is strict and
+   default-deny: only the canonical authenticated human principal (`user`)
+   may issue an action confirmation. The CLI (`cli:user`) and dashboard
+   (`dashboard`) channels normalize to it; model/page/skill/tool-result/
+   generated-plan or any arbitrary issuer text is refused
+   (`CONFIRMATION_SOURCE_FORBIDDEN`) for every action — a confirmation record
+   is always human authority.
 3. The broker consumes the confirmation, executes the adapter under the
    contract timeout in a killable isolated child, and writes a redacted
    **receipt** (`<state_dir>/actions.json`): hash, preconditions, args digest,
    typed state, audit id, compensation. Private content is never persisted.
 4. `actions cancel <receipt>` cancels an in-flight action (idempotent);
-   `actions retry <receipt>` re-runs the same args (fresh confirmation for
-   sensitive actions); `actions recover <receipt>` applies the declared
-   compensation for reversible actions and returns the typed
+   `actions retry <receipt>` re-runs the SAME args/target/scope (any change is
+   refused as `stale_target` — a retry is never a new action; fresh
+   confirmation for sensitive actions); `actions recover <receipt>` applies
+   the declared compensation for reversible actions and returns the typed
    `ROLLBACK_IMPOSSIBLE` for sent messages, purchases, deletions, and account
    changes — rollback is never faked.
 
