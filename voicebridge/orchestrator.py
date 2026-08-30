@@ -251,6 +251,35 @@ def speech_direct(text: str) -> str:
     return " ".join(out.split()).strip()
 
 
+def _action_voice_text(out: dict) -> str:
+    """Short honest spoken summary of a typed action outcome (never private
+    message content; never a fake success)."""
+    state = out.get("state", "")
+    code = out.get("code", "")
+    action_id = out.get("action_id", "")
+    if state == "OK":
+        return f"{action_id} done."
+    if state == "preview":
+        return f"Prepared {action_id} for review."
+    if state in ("denied", "ROLLBACK_IMPOSSIBLE"):
+        return f"{action_id} was not performed ({code or state})."
+    if state == "ADAPTER_DISABLED":
+        return f"{action_id} is not enabled yet."
+    if state == "expired":
+        return f"The confirmation for {action_id} expired. Ask again."
+    if state == "stale_target":
+        return f"The details for {action_id} changed. Preview it again."
+    if state == "auth_required":
+        return f"{action_id} needs a signed-in account."
+    if state == "partial":
+        return f"{action_id} completed only partially."
+    if state == "recovered":
+        return f"{action_id} was rolled back."
+    if state == "cancelled":
+        return f"{action_id} was cancelled."
+    return f"{action_id} could not be completed ({code or state})."
+
+
 class VoiceOrchestrator:
     def __init__(self, config: Config, mic_only: bool = False,
                  no_hotkey: bool = False, dry_run: bool = False) -> None:
@@ -1235,6 +1264,14 @@ class VoiceOrchestrator:
             self._handle_hermes(_hw.task_text or text)
             self._web_wait_for_summary()
             return {"text": text, "route": "hermes", "summary": (self._cur_ctx().summary if self._cur_ctx() else "") or self._last_web_summary or "", "reply": (self._cur_ctx().summary if self._cur_ctx() else "") or self._last_web_summary or "", "confidence": 0.9}
+        # Packet 8F voice actions (web path): identical preview + confirmation
+        # semantics as CLI/dashboard. Fuzzy phrasing routes normally.
+        if self._maybe_voice_action(text):
+            c_actv = self._cur_ctx()
+            summ = (c_actv.summary if c_actv and c_actv.summary else self._last_web_summary) or ""
+            rout = (c_actv.route if c_actv and c_actv.route else "action") or ""
+            return {"text": text, "route": rout, "summary": summ,
+                    "reply": summ, "confidence": 1.0}
         tmpl = self._templates.match(text) if self._templates is not None else None
         if tmpl is not None:
             log_event("routing.template", name=tmpl.name, kind=tmpl.kind,
@@ -2316,6 +2353,40 @@ class VoiceOrchestrator:
             if msg:
                 self.speak(msg)
             return
+        if payload.get("kind") == "action":
+            # Packet 8F: the spoken "yes" is the fresh human confirmation for
+            # the exact action the bridge previewed. The SAME ActionRunner
+            # backend as CLI/dashboard executes it; live adapters are disabled
+            # so a non-fixture confirmation returns the typed ADAPTER_DISABLED
+            # result and speaks it honestly.
+            from . import actions as A
+            try:
+                runner = A.action_runner(self.cfg)
+                out = runner.execute(
+                    str(payload.get("action_id", "")),
+                    args=dict(payload.get("args") or {}),
+                    target=str(payload.get("target", "")),
+                    account_scope=str(payload.get("account_scope", "")),
+                    scope=str(payload.get("scope", "")),
+                    source="user", confirmed=True)
+            except Exception as exc:
+                self.speak("That action could not be completed.")
+                log_event("action.voice.execute_failed", error=str(exc)[:200])
+                return
+            msg = _action_voice_text(out)
+            self.speak(msg)
+            c_act = self._cur_ctx()
+            if c_act is not None:
+                c_act.summary = msg[:300]
+                c_act.route = "action"
+                c_act.done.set()
+            self.feed_push({"kind": "summary",
+                            "text": f"action:{payload.get('action_id', '')}",
+                            "summary": msg[:300], "route": "action",
+                            "raw": str(out)[:500]})
+            log_event("action.voice.confirmed", action_id=payload.get(
+                "action_id"), state=out.get("state"), code=out.get("code"))
+            return
         self.speak("Okay, going ahead.")
         self._launch_task(payload.get("task", ""), payload.get("model"))
 
@@ -2857,6 +2928,45 @@ class VoiceOrchestrator:
         self.feed_push({"kind": "summary", "text": f"local:{name}", "summary": msg[:300], "route": "local", "raw": msg[:50000]})
         self.speak(msg)
 
+    def _maybe_voice_action(self, text: str) -> bool:
+        """Packet 8F: route an EXACT voice action phrasing through the same
+        preview + confirmation backend as CLI/dashboard. Returns True when the
+        utterance was handled as an action request; fuzzy phrasing is never
+        guessed into an action."""
+        from . import actions as A
+        request = A.voice_action_request(text)
+        if request is None:
+            return False
+        log_event("routing.decision", text=text[:200], kind="action",
+                  confidence=1.0, reason="exact voice action request",
+                  source="mic")
+        try:
+            runner = A.action_runner(self.cfg)
+            prev = runner.preview(request["action_id"], request["args"],
+                                  target=request["target"],
+                                  account_scope=request.get("account_scope", ""),
+                                  scope=request["scope"])
+        except Exception as exc:
+            self.speak("That action could not be prepared.")
+            log_event("action.voice.preview_failed", error=str(exc)[:200])
+            return True
+        preview_text = prev.get("preview", "") or request["action_id"]
+        self.confirmations.request(
+            f"perform {request['action_id']}",
+            {"kind": "action", "action_id": request["action_id"],
+             "args": dict(request["args"]), "target": request["target"],
+             "account_scope": request.get("account_scope", ""),
+             "scope": request["scope"]},
+            reason="typed action requires confirmation")
+        self.speak(f"{preview_text[:200]}. Do you want me to go ahead? "
+                   "Say yes or no.")
+        c_actv = self._cur_ctx()
+        if c_actv is not None:
+            c_actv.summary = f"confirm: {preview_text[:160]}"
+            c_actv.route = "action"
+            c_actv.done.set()
+        return True
+
     def _handle_hermes(self, task: str, notice: str = "") -> None:
         """Explicit Hermes delegation (ask Hermes to ...) — background + interruptible.
 
@@ -3070,6 +3180,12 @@ class VoiceOrchestrator:
         # queued-task confirmation: answer to "should I start the queued task?"
         if self._queued_confirm:
             self._answer_queued_confirm(text)
+            return
+        # Packet 8F voice actions: EXACT action phrasings (draft/send/post)
+        # route through the same preview + confirmation path as CLI/dashboard.
+        # Fuzzy phrasing never becomes an action (voice_action_request returns
+        # None); existing local-action launchers are untouched.
+        if self._maybe_voice_action(text):
             return
         # Explicit hermes delegation wins over everything (templates/classifier) —
         # "ask hermes to check my inbox" must route to Hermes, not to the generic

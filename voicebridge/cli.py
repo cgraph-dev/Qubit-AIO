@@ -5,6 +5,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
+from typing import Any, Dict
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -303,6 +304,72 @@ def build_parser() -> argparse.ArgumentParser:
                                 help="restore the prior record state (grants not auto-restored) (dry-run unless --confirm)")
     ws_roll.add_argument("id_or_url")
     ws_roll.add_argument("--confirm", action="store_true")
+    act = add("actions", help="Packet 8F typed brokered actions (preview/approve/execute/cancel/receipt/retry/recover)")
+    act_sub = act.add_subparsers(dest="actions_command")
+    act_sub.add_parser("list", parents=[common],
+                       help="list action contracts + effective permissions")
+    act_show = act_sub.add_parser("show", parents=[common],
+                                  help="show one action contract")
+    act_show.add_argument("action_id")
+    act_chk = act_sub.add_parser("check", parents=[common],
+                                 help="read-only effective permission decision")
+    act_chk.add_argument("action_id")
+    act_chk.add_argument("--scope", default="")
+    act_prev = act_sub.add_parser("preview", parents=[common],
+                                  help="real no-side-effect preview + stable action hash")
+    act_prev.add_argument("action_id")
+    act_prev.add_argument("--args", default="{}", help="exact action args as JSON")
+    act_prev.add_argument("--target", default="", help="target URL/workspace/app")
+    act_prev.add_argument("--account", default="", help="account scope, e.g. gmail:default")
+    act_prev.add_argument("--scope", default="", help="7E scope tag (default: contract first scope)")
+    act_prev.add_argument("--idempotency-key", default="")
+    act_exec = act_sub.add_parser("execute", parents=[common],
+                                  help="gate+confirm+execute one action (dry-run by default; --confirm = fresh confirmation)")
+    act_exec.add_argument("action_id")
+    act_exec.add_argument("--args", default="{}", help="exact action args as JSON")
+    act_exec.add_argument("--envelope", default=None,
+                          help="full validated envelope JSON (two-step prepare path)")
+    act_exec.add_argument("--target", default="", help="target URL/workspace/app")
+    act_exec.add_argument("--account", default="", help="account scope")
+    act_exec.add_argument("--scope", default="", help="7E scope tag")
+    act_exec.add_argument("--idempotency-key", default="")
+    act_exec.add_argument("--confirmation", default=None,
+                          help="fresh confirmation id from `actions prepare`")
+    act_exec.add_argument("--confirm", action="store_true",
+                          help="explicit fresh human confirmation of this exact action")
+    act_exec.add_argument("--expected-hash", default="",
+                          help="action hash from a prior preview (stale-target guard)")
+    act_exec.add_argument("--fixture", type=Path, default=None,
+                          help="synthetic adapter outcomes JSON (explicit simulation; never live)")
+    act_prep = act_sub.add_parser("prepare", parents=[common],
+                                  help="issue a fresh expiring single-use confirmation bound to an envelope")
+    act_prep.add_argument("action_id")
+    act_prep.add_argument("--envelope", required=True, help="validated envelope JSON")
+    act_can = act_sub.add_parser("cancel", parents=[common],
+                                 help="cancel an in-flight action (idempotent)")
+    act_can.add_argument("receipt_id")
+    act_rec = act_sub.add_parser("receipt", parents=[common],
+                                 help="show one redacted action receipt")
+    act_rec.add_argument("receipt_id")
+    act_recs = act_sub.add_parser("receipts", parents=[common],
+                                  help="list recent action receipts")
+    act_recs.add_argument("--limit", type=int, default=30)
+    act_retry = act_sub.add_parser("retry", parents=[common],
+                                   help="re-execute a failed action with the SAME args (fresh confirmation if required)")
+    act_retry.add_argument("receipt_id")
+    act_retry.add_argument("--args", default="{}", help="exact original args as JSON")
+    act_retry.add_argument("--target", required=True)
+    act_retry.add_argument("--scope", required=True)
+    act_retry.add_argument("--account", default="")
+    act_retry.add_argument("--confirmation", default=None)
+    act_retry.add_argument("--confirm", action="store_true")
+    act_retry.add_argument("--fixture", type=Path, default=None)
+    act_recov = act_sub.add_parser("recover", parents=[common],
+                                   help="compensating rollback for a reversible action (honest ROLLBACK_IMPOSSIBLE otherwise)")
+    act_recov.add_argument("receipt_id")
+    act_recov.add_argument("--confirmation", default=None)
+    act_recov.add_argument("--confirm", action="store_true")
+    act_recov.add_argument("--fixture", type=Path, default=None)
     export = add("export-state", help="encrypt + export portable state (memory/lessons/reports/config/model)")
     export.add_argument("--out", type=Path, default=None,
                         help="output file (default: <state_dir>/portable-<ts>.vbp)")
@@ -385,6 +452,8 @@ def main(argv=None) -> int:
         return _cmd_skills(cfg, args)
     if command == "websites":
         return _cmd_websites(cfg, args)
+    if command == "actions":
+        return _cmd_actions(cfg, args)
     if command == "export-state":
         return _cmd_export_state(cfg, args)
     if command == "import-state":
@@ -1439,6 +1508,120 @@ def _human_websites(cmd: str, out: dict) -> str:
                 f"{last.get('op', '—')} [{last.get('status', '—')}] "
                 f"{last.get('reason', '—')}")
     return f"{st} {detail}"
+
+
+def _cmd_actions(cfg, args) -> int:
+    """voicebridge actions list/show/check/preview/prepare/execute/cancel/
+    receipt/receipts/retry/recover.
+
+    Packet 8F typed, brokered, confirmation-gated actions. Restricted is the
+    default; sending/publishing/purchasing/deleting/credential/account/system
+    actions always require a fresh human confirmation bound to the exact
+    action hash. Live adapters are DISABLED — ``--fixture`` is the explicit
+    synthetic-simulation path, and every other execute returns the typed
+    ADAPTER_DISABLED result.
+    """
+    import json as _json
+    from . import actions as A
+    cmd = getattr(args, "actions_command", None) or "list"
+
+    executors: Dict[str, Any] = {}
+    fixture = getattr(args, "fixture", None)
+    if fixture:
+        fpath = Path(fixture)
+        if not fpath.is_file():
+            print(_json.dumps({"state": "failed",
+                               "detail": f"fixture not found: {fpath}"},
+                              indent=2))
+            return 2
+        try:
+            executors = A.make_fixture_executors(
+                A.load_fixture_outcomes(fpath))
+        except Exception as exc:
+            print(_json.dumps({"state": "failed", "detail": f"fixture "
+                               f"invalid: {exc}"}, indent=2))
+            return 2
+    runner = A.action_runner(cfg, executors=executors)
+
+    def _args_json(raw: str) -> Dict[str, Any]:
+        try:
+            return _json.loads(raw or "{}")
+        except Exception as exc:
+            raise A.ActionValidationError(f"args JSON invalid: {exc}") from None
+
+    try:
+        if cmd == "list":
+            out = {"state": "OK", "mode": runner.perms.mode()[0],
+                   "state_path": str(runner.store.path),
+                   "actions": runner.actions()}
+        elif cmd == "show":
+            out = {"state": "OK", "action": runner.show(args.action_id)}
+        elif cmd == "check":
+            out = runner.check(args.action_id,
+                               getattr(args, "scope", "") or "")
+        elif cmd == "preview":
+            out = runner.preview(
+                args.action_id, _args_json(args.args), target=args.target,
+                account_scope=getattr(args, "account", "") or "",
+                scope=getattr(args, "scope", "") or "",
+                idempotency_key=getattr(args, "idempotency_key", "") or "")
+        elif cmd == "prepare":
+            out = runner.prepare(args.action_id,
+                                 _args_json(args.envelope),
+                                 issued_by="cli:user")
+        elif cmd == "execute":
+            if getattr(args, "dry_run", False):
+                out = runner.execute(
+                    args.action_id, args=_args_json(args.args),
+                    target=args.target,
+                    account_scope=getattr(args, "account", "") or "",
+                    scope=getattr(args, "scope", "") or "",
+                    idempotency_key=getattr(args, "idempotency_key", "") or "",
+                    source="user", dry_run=True)
+            else:
+                out = runner.execute(
+                    args.action_id,
+                    args=(None if args.envelope else _args_json(args.args)),
+                    envelope=(_args_json(args.envelope)
+                              if args.envelope else None),
+                    target=args.target,
+                    account_scope=getattr(args, "account", "") or "",
+                    scope=getattr(args, "scope", "") or "",
+                    idempotency_key=getattr(args, "idempotency_key", "") or "",
+                    source="user", confirmation_id=args.confirmation,
+                    confirmed=args.confirm,
+                    expected_hash=args.expected_hash or "")
+        elif cmd == "cancel":
+            out = runner.cancel(args.receipt_id)
+        elif cmd == "receipt":
+            out = {"state": "OK", "receipt": runner.receipt(args.receipt_id)}
+        elif cmd == "receipts":
+            out = runner.receipts(getattr(args, "limit", 30) or 30)
+        elif cmd == "retry":
+            out = runner.retry(
+                args.receipt_id, args=_args_json(args.args),
+                target=args.target, scope=args.scope,
+                account_scope=getattr(args, "account", "") or "",
+                source="user", confirmation_id=args.confirmation,
+                confirmed=args.confirm)
+        elif cmd == "recover":
+            out = runner.recover(args.receipt_id,
+                                 confirmation_id=args.confirmation,
+                                 confirmed=args.confirm)
+        else:
+            print(f"ERROR: unknown actions command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except (A.ActionError, A.ActionValidationError, A.ActionDeniedError) as exc:
+        code = getattr(exc, "code", None) or "ACTION_ERROR"
+        print(_json.dumps({"state": "failed", "code": code,
+                           "detail": str(exc)}, indent=2))
+        return 2
+    except Exception as exc:
+        print(_json.dumps({"state": "failed", "detail": str(exc)[:200]},
+                          indent=2))
+        return 2
 
 
 def _offline_website_probe(url: str) -> dict:

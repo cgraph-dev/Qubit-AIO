@@ -900,3 +900,53 @@ notice).
 - Nothing is IMPLEMENTED in production from this table yet; conformance-test obligations (plan
   §4.1 items 1–5) attach to the packets that perform each COPY/ADAPT.
 - Current-main comparisons were compatibility checks only; no pin was changed.
+
+## R15 — Packet 8F action layer (WRAP of existing verified local contracts)
+
+```text
+LOCAL REQUIREMENT: typed, brokered, confirmation-gated browser/desktop/editor
+  actions (8F) with preview/hash binding, cancellation, idempotency, receipts,
+  recovery honesty, and CLI/dashboard/voice parity — without a second broker,
+  permission store, router, scheduler, database, browser runtime, or model.
+UPSTREAM REPOSITORY + COMMIT: none copied/adapted. Reused local verified units:
+  CapabilityBroker (Packet 3A), ConfirmationStore/PolicyEngine (Packet 1A),
+  PermissionsStore/grants/mode (Packet 7E), websites.normalize_origin /
+  integration gate (Packet 8E), loopback-CDP read boundary (Packet 8B), and
+  the CopilotKit-derived human-in-the-loop approval pattern already adapted in
+  Packets 1B/2B (R2).
+SOURCE FILES + SYMBOLS: voicebridge/broker.py (CapabilityBroker.execute,
+  issue_confirmation, cancel, ExecResult), voicebridge/capabilities.py
+  (ConfirmationStore.issue/consume, PolicyEngine, Tier), voicebridge/
+  permissions.py (PermissionsStore grants/mode/is_hard_deny_auto),
+  voicebridge/websites.py (normalize_origin resolve=False), voicebridge/
+  communications/adapters/base.py (loopback CDP boundary), voicebridge/
+  orchestrator.py (_handle_confirm, ConfirmationState).
+UPSTREAM TESTS/FIXTURES: local conformance vectors ported from the verified
+  3A/7E/8E suites; synthetic adapter fixtures (tests/fixtures/actions/) that
+  control ONLY the simulated outcome while the contract/gate/hash/receipt/
+  audit stay real.
+LICENSE: N/A (no upstream code copied; all reused units already carry their
+  recorded provenance R1–R14).
+DECISION: WRAP — the 8F layer composes verified local contracts into a new
+  action surface; no upstream source was imported.
+LOCAL DESTINATION: voicebridge/actions.py (+ CLI actions subcommand, webui
+  /api/actions, settings.html Actions section, orchestrator voice hook,
+  tests/test_packet8f.py).
+DEPENDENCIES ADDED: none.
+BEHAVIOR KEPT: broker decision+confirmation+audit+bounded child+cancellation;
+  7E restricted/unrestricted + grants + scopes; hard-deny never auto-approved;
+  loopback-only CDP boundary; single confirmation consume point; model/skill/
+  page text never confirms.
+BEHAVIOR INTENTIONALLY OMITTED: no live action adapters (ADAPTER_DISABLED
+  until a separate approved rollout step); no free-text voice parsing beyond
+  three exact patterns; no changes to the 7E PermissionPolicy hard-deny
+  branch (the 8F ActionGate layers confirmation-gated hard-deny semantics on
+  top, documented divergence per plan §8F).
+WHY THIS IS THE SMALLEST FIT: every required primitive already existed and was
+  independently verified; adding a parallel policy/executor would duplicate
+  verified owners. The only new broker behavior is deny-first confirmation for
+  action capabilities (a ~10-line override on the same class), closing the
+  direct-broker bypass for send/purchase/delete/account/system actions.
+```
+
+---

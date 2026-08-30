@@ -43,6 +43,17 @@
   <div id="ws-list"></div>
 </div>
 
+<h2 style="border:0;margin-top:14px">Controlled actions</h2>
+<div class="card">
+  <div class="muted" style="margin-top:0">Typed browser/desktop/editor actions are restricted by default, always previewed, and confirmation-gated for sending, posting, purchasing, deleting, and account/system changes. Live adapters are disabled — previews, approvals, and receipts work today.</div>
+  <div class="row" style="margin-top:8px">
+    <button onclick="actList()">List actions</button>
+    <button onclick="actReceipts()">Recent receipts</button>
+    <span id="act-beginner-state" class="muted"></span>
+  </div>
+  <div id="act-beginner"></div>
+</div>
+
 <div class="advanced">
  <h2>Reasoning model (brain)</h2>
  <div class="card row">
@@ -114,16 +125,37 @@
     <div class="muted" id="ws-detail"></div>
   </div>
 
- <h2>Permission mode (websites)</h2>
+<h2>Permission mode (websites)</h2>
+   <div class="card">
+     <div class="row">
+       <button onclick="permModeShow()">Show mode</button>
+       <button class="ok" onclick="permModeSetRestricted()">Set Restricted</button>
+       <button onclick="permModeSetUnrestricted()">Set Unrestricted</button>
+       <button onclick="permReset()">Reset to restricted (revoke all grants)</button>
+       <span id="perm-mode-state" class="muted"></span>
+     </div>
+     <div class="muted" style="margin-top:6px">Restricted is the default. Unrestricted only pre-authorizes routine read-only work inside the scopes you choose; it never bypasses confirmation, hard-deny rules, audit, or limits. Mode is durable policy state — page/model text can never change it.</div>
+   </div>
+
+ <h2>Actions (advanced)</h2>
   <div class="card">
+    <p class="muted" style="margin:0 0 6px">Packet 8F typed actions. Preview always; execute only after reviewing the exact preview and confirming (sending/posting/purchasing/deleting/account/system always need confirmation). Every result is the real backend typed state.</p>
     <div class="row">
-      <button onclick="permModeShow()">Show mode</button>
-      <button class="ok" onclick="permModeSetRestricted()">Set Restricted</button>
-      <button onclick="permModeSetUnrestricted()">Set Unrestricted</button>
-      <button onclick="permReset()">Reset to restricted (revoke all grants)</button>
-      <span id="perm-mode-state" class="muted"></span>
+      <select id="act-sel" style="font-size:12px"></select>
+      <button onclick="actShow()">Show contract</button>
+      <button onclick="actCheck()">Check</button>
+      <button class="warn" onclick="actPreview()">Preview</button>
+      <button class="ok" onclick="actExecute()">Approve &amp; Execute</button>
+      <button onclick="actCancel()">Cancel last</button>
+      <button onclick="actRecover()">Recover</button>
+      <button onclick="actRetry()">Retry</button>
     </div>
-    <div class="muted" style="margin-top:6px">Restricted is the default. Unrestricted only pre-authorizes routine read-only work inside the scopes you choose; it never bypasses confirmation, hard-deny rules, audit, or limits. Mode is durable policy state — page/model text can never change it.</div>
+    <div class="row" style="margin-top:6px">
+      <input id="act-args" placeholder='{"recipient":"you@example.com","subject":"…","body":"…"}' spellcheck="false"
+        style="flex:1;min-width:240px;padding:6px;border-radius:6px;background:#0b0e14;color:#dbe2ef;border:1px solid #22304a;font-size:12px">
+    </div>
+    <div class="muted" id="act-adv-state"></div>
+    <div class="muted" id="act-detail"></div>
   </div>
 
  <h2>Device enrollment</h2>
@@ -586,6 +618,133 @@ async function permReset(){
     wsList();
   };
   confirmDialog('Reset to Restricted and revoke EVERY grant? (backed up, audited, reversible via the permission store backups)', doIt);
+}
+// ---- Packet 8F actions (same backend as the actions CLI / voice path) ------
+let ACT_LAST_RECEIPT = '';
+function actArgs(){ try { return JSON.parse(document.getElementById('act-args').value||'{}'); }
+  catch(e){ return null; } }
+function actSelValue(){ const s=document.getElementById('act-sel'); return s?s.value:''; }
+function actTargetFor(id){
+  // contract-first target hint; the user can refine after preview
+  const kind = (id||'').indexOf('editor')===0?'workspace'
+    : (id==='act.desktop.launch'?'desktop':'URL');
+  const hint = kind==='workspace'?'workspace.example'
+    : (kind==='desktop'?'desktop':'https://example.com');
+  const t = window.prompt('Target ('+kind+'):', hint);
+  return t||'';
+}
+function actScopeFor(id){
+  const map={'act.browser.read':'web','act.browser.search':'web','act.browser.fill':'web',
+    'act.browser.draft':'web','act.browser.write':'web','act.mail.send':'mail',
+    'act.social.post':'social','act.purchase':'web','act.editor.write':'workspace',
+    'act.editor.delete':'workspace','act.desktop.launch':'desktop',
+    'act.account.change':'account','act.system.setting':'system'};
+  return map[id]||'web';
+}
+async function actList(){
+  const {status,body,authRequired} = await api('/api/actions');
+  if(authRequired){ show('act-beginner-state', tag('UNAVAILABLE')+' pair this dashboard'); return; }
+  const rows = (body&&body.actions||[]);
+  const html = rows.map(a=>{
+    const eff = a.effective||{};
+    return '<div class="muted" style="margin:4px 0">'+esc(a.action_id)
+      +' <span class="tag '+esc(a.tier)+'">'+esc(a.tier)+'</span>'
+      +' <span class="tag '+esc(eff.code||'UNKNOWN')+'">'+esc(eff.code||'UNKNOWN')+'</span>'
+      +' · '+esc(a.executor||'disabled')+' · '+(a.confirmation_required?'confirm required':'')
+      +'<div style="margin-left:14px;color:#7f8ca3">'+esc((a.summary||'').slice(0,120))+'</div></div>';
+  }).join('')||'<span class="muted">no actions</span>';
+  show('act-beginner', '<div style="margin-top:6px">'+html+'</div>');
+  const sel = document.getElementById('act-sel');
+  if(sel) sel.innerHTML = rows.map(a=>'<option value="'+esc(a.action_id)+'">'+esc(a.action_id)+'</option>').join('');
+  show('act-beginner-state', ' '+rows.length+' action contract(s) · mode '+esc(body&&body.mode||'?'));
+}
+async function actReceipts(){
+  const {status,body} = await api('/api/actions?receipts=10');
+  const rows = body&&body.receipts||[];
+  show('act-beginner', '<div style="margin-top:6px">receipts: '
+    +(rows.map(r=>esc(r.receipt_id)+' <span class="tag '+esc(r.state)+'">'+esc(r.state)+'</span> '
+      +esc(r.action_id)+' · '+esc(r.action_hash.slice(0,10))).join('<br>')||'none')+'</div>');
+  if(rows.length) ACT_LAST_RECEIPT = rows[0].receipt_id;
+}
+async function actShow(){
+  const id = actSelValue(); if(!id) return;
+  const {status,body} = await api('/api/actions?id='+encodeURIComponent(id));
+  const a = body&&body.action||{};
+  show('act-adv-state', tag('OK')+' '+esc(a.action_id)+' v'+esc(a.version)
+    +' · '+esc(a.tier)+' · rollback '+esc(a.rollback_kind)
+    +' · confirm='+(a.confirmation_required?'yes':'no'));
+  show('act-detail', '<div class="muted">'+esc(a.summary)
+    +'<br>scopes: '+esc((a.scopes||[]).join(', '))
+    +'<br>side effects: '+esc(a.side_effects)
+    +'<br>rollback: '+esc(a.rollback)+'</div>');
+}
+async function actCheck(){
+  const id = actSelValue(); if(!id) return;
+  const {status,body} = await api('/api/actions?check='+encodeURIComponent(id)
+    +'&scope='+encodeURIComponent(actScopeFor(id)));
+  show('act-adv-state', tag(body&&body.code||'UNKNOWN')+' <span class="muted">'
+    +esc((body&&body.detail||'').slice(0,140))+'</span>');
+}
+async function actPreview(){
+  const id = actSelValue(); if(!id) return;
+  const args = actArgs(); if(args===null){ show('act-adv-state', tag('FAILED')+' invalid args JSON'); return; }
+  const target = actTargetFor(id); if(!target) return;
+  const {status,body} = await api('/api/actions',{method:'POST',
+    body:JSON.stringify({action:'preview',action_id:id,args,target,
+      scope:actScopeFor(id),idempotency_key:''})});
+  show('act-adv-state', renderResult(body));
+  show('act-detail', '<div class="muted">'+esc(body&&body.preview||'—')
+    +'<br>hash '+esc((body&&body.action_hash||'').slice(0,16))
+    +' · confirm='+(body&&body.confirmation_required?'required':'not required')
+    +'</div>');
+}
+async function actExecute(){
+  const id = actSelValue(); if(!id) return;
+  const args = actArgs(); if(args===null){ show('act-adv-state', tag('FAILED')+' invalid args JSON'); return; }
+  const target = actTargetFor(id); if(!target) return;
+  const doIt = async () => {
+    const {status,body} = await api('/api/actions',{method:'POST',
+      body:JSON.stringify({action:'execute',action_id:id,args,target,
+        scope:actScopeFor(id),confirmed:true})});
+    show('act-adv-state', renderResult(body));
+    if(body&&body.receipt_id){ ACT_LAST_RECEIPT = body.receipt_id;
+      show('act-detail','<div class="muted">receipt '+esc(body.receipt_id)
+        +' · state '+esc(body.state)+' · '+esc(body.detail||'')+'</div>'); }
+    else if(body&&body.state){ show('act-detail','<div class="muted">'+esc(body.state)
+      +' · '+esc((body.detail||body.code||'').slice(0,160))+'</div>'); }
+  };
+  confirmDialog('Execute '+id+' on '+target+' with the exact args shown in the args box? '
+    +'Sending/posting/purchasing/deleting/account/system actions cannot be rolled back remotely.', doIt);
+}
+async function actCancel(){
+  if(!ACT_LAST_RECEIPT){ show('act-adv-state', tag('UNAVAILABLE')+' no receipt selected'); return; }
+  const {status,body} = await api('/api/actions',{method:'POST',
+    body:JSON.stringify({action:'cancel',receipt_id:ACT_LAST_RECEIPT})});
+  show('act-adv-state', renderResult(body));
+}
+async function actRecover(){
+  if(!ACT_LAST_RECEIPT){ show('act-adv-state', tag('UNAVAILABLE')+' no receipt selected'); return; }
+  const doIt = async () => {
+    const {status,body} = await api('/api/actions',{method:'POST',
+      body:JSON.stringify({action:'recover',receipt_id:ACT_LAST_RECEIPT,confirmed:true})});
+    show('act-adv-state', renderResult(body));
+    show('act-detail','<div class="muted">'+esc(body&&body.detail||'')+'</div>');
+  };
+  confirmDialog('Run the compensating rollback for receipt '+ACT_LAST_RECEIPT
+    +'? (honest ROLLBACK_IMPOSSIBLE for sent/purchased/deleted actions)', doIt);
+}
+async function actRetry(){
+  if(!ACT_LAST_RECEIPT){ show('act-adv-state', tag('UNAVAILABLE')+' no receipt selected'); return; }
+  const args = actArgs(); if(args===null){ show('act-adv-state', tag('FAILED')+' invalid args JSON'); return; }
+  const id = actSelValue();
+  const doIt = async () => {
+    const {status,body} = await api('/api/actions',{method:'POST',
+      body:JSON.stringify({action:'retry',receipt_id:ACT_LAST_RECEIPT,args,
+        target:actTargetFor(id),scope:actScopeFor(id),confirmed:true})});
+    show('act-adv-state', renderResult(body));
+    if(body&&body.receipt){ ACT_LAST_RECEIPT = body.receipt.receipt_id; }
+  };
+  confirmDialog('Retry receipt '+ACT_LAST_RECEIPT+' with the exact original args?', doIt);
 }
 loadAll();
 </script>

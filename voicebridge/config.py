@@ -241,6 +241,17 @@ DEFAULTS: Dict[str, Any] = {
         "state_path": "",
         "default_mode": "restricted",
     },
+    "actions": {
+        # Packet 8F: typed, brokered, confirmation-gated browser/desktop/
+        # editor actions. Contracts, previews, approvals, receipts, and audit
+        # work with `enabled: false`; live adapter EXECUTION is a separate
+        # approved rollout step (fixture simulations are explicit operator
+        # paths and do not require this flag).
+        "state_path": "",
+        "enabled": False,
+        "confirmation_ttl_s": 300.0,
+        "max_preview_chars": 400,
+    },
     "communications": {
         # Packet 8D: authorized hourly inbox monitor. The timer stays DISABLED
         # until the user explicitly installs+enables the repository template;

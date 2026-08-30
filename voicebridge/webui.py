@@ -1060,6 +1060,50 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self._json({"state": "failed", "detail": str(exc)[:200]})
             except Exception as exc:
                 self._json({"state": "degraded", "detail": str(exc)[:200]})
+        elif path == "/api/actions":
+            # Packet 8F: typed action layer (read-only here; mutations go
+            # through POST). Same backend as the CLI/voice. Never leaks
+            # secrets or private content.
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            try:
+                from . import actions as A
+                runner = A.action_runner(self.app.orch.cfg)
+                qs = self.path.split("?", 1)[1] if "?" in self.path else ""
+                params = {}
+                for kv in qs.split("&"):
+                    if "=" in kv:
+                        k, v = kv.split("=", 1)
+                        params[k] = __import__("urllib.parse").parse.unquote_plus(v)
+                if params.get("id"):
+                    self._json({"state": "OK",
+                                "action": runner.show(params["id"])})
+                    return
+                if params.get("check"):
+                    self._json(runner.check(params["check"],
+                                            params.get("scope", "")))
+                    return
+                if params.get("receipt"):
+                    try:
+                        self._json({"state": "OK",
+                                    "receipt": runner.receipt(params["receipt"])})
+                    except A.ActionError as exc:
+                        self._json({"state": "MISSING", "detail": str(exc)}, 404)
+                    return
+                limit = max(1, min(int(params.get("receipts", "0") or "0"),
+                                   200))
+                out = {"state": "OK",
+                       "mode": runner.perms.mode()[0],
+                       "state_path": str(runner.store.path),
+                       "actions": runner.actions()}
+                if limit:
+                    out["receipts"] = runner.receipts(limit)["receipts"]
+                self._json(out)
+            except A.ActionError as exc:
+                self._json({"state": "failed", "detail": str(exc)[:200]})
+            except Exception as exc:
+                self._json({"state": "degraded", "detail": str(exc)[:200]})
         elif path == "/api/device/status":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
@@ -1292,6 +1336,100 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self._json({"state": "failed", "detail": str(exc)})
             except (P.PermissionError, P.SkillValidationError) as exc:
                 self._json({"state": "failed", "detail": str(exc)})
+            except Exception as exc:
+                self._json({"state": "failed", "detail": str(exc)[:200]})
+            return
+        if path == "/api/actions":
+            # Packet 8F: mutating action operations (explicit confirm).
+            # Sending/publishing/purchasing/deleting/account/system actions
+            # require confirmed=True (fresh human confirmation) or a
+            # confirmation id from `prepare`; the backend refuses anything else.
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            try:
+                from . import actions as A
+                from pathlib import Path as _Path
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length).decode() or "{}")
+                action = str(body.get("action", ""))
+                confirmed = bool(body.get("confirmed", False))
+                confirmation = body.get("confirmation") or None
+                actor = "dashboard"
+                executors: Dict[str, Any] = {}
+                fixture = body.get("fixture") or None
+                if fixture:
+                    fdir = (_Path(__file__).resolve().parents[1]
+                            / "tests" / "fixtures" / "actions")
+                    fpath = _Path(str(fixture)).expanduser()
+                    try:
+                        fpath.resolve().relative_to(fdir.resolve())
+                    except Exception:
+                        self._json({"state": "denied",
+                                    "code": "FIXTURE_OUT_OF_BOUNDS",
+                                    "detail": "dashboard fixtures must live "
+                                              "under tests/fixtures/actions"},
+                                   403)
+                        return
+                    if not fpath.is_file():
+                        self._json({"state": "failed",
+                                    "detail": f"fixture not found: "
+                                              f"{fpath.name}"}, 404)
+                        return
+                    executors = A.make_fixture_executors(
+                        A.load_fixture_outcomes(fpath))
+                runner = A.action_runner(self.app.orch.cfg,
+                                         executors=executors)
+                if action == "preview":
+                    out = runner.preview(
+                        str(body.get("action_id", "")),
+                        body.get("args") or {},
+                        target=str(body.get("target", "")),
+                        account_scope=str(body.get("account_scope", "")),
+                        scope=str(body.get("scope", "")),
+                        idempotency_key=str(body.get("idempotency_key", "")))
+                elif action == "prepare":
+                    out = runner.prepare(
+                        str(body.get("action_id", "")),
+                        body.get("envelope") or {}, issued_by=actor)
+                elif action == "execute":
+                    out = runner.execute(
+                        str(body.get("action_id", "")),
+                        args=body.get("args"),
+                        envelope=body.get("envelope"),
+                        target=str(body.get("target", "")),
+                        account_scope=str(body.get("account_scope", "")),
+                        scope=str(body.get("scope", "")),
+                        idempotency_key=str(body.get("idempotency_key", "")),
+                        source="user", confirmation_id=confirmation,
+                        confirmed=confirmed,
+                        dry_run=bool(body.get("dry_run", False)),
+                        expected_hash=str(body.get("expected_hash", "")))
+                elif action == "cancel":
+                    out = runner.cancel(str(body.get("receipt_id", "")))
+                elif action == "retry":
+                    out = runner.retry(
+                        str(body.get("receipt_id", "")),
+                        args=body.get("args") or {},
+                        target=str(body.get("target", "")),
+                        scope=str(body.get("scope", "")),
+                        account_scope=str(body.get("account_scope", "")),
+                        source="user", confirmation_id=confirmation,
+                        confirmed=confirmed)
+                elif action == "recover":
+                    out = runner.recover(str(body.get("receipt_id", "")),
+                                         confirmation_id=confirmation,
+                                         confirmed=confirmed)
+                else:
+                    self._json({"state": "failed",
+                                "detail": f"unknown action {action}"}, 400)
+                    return
+                self._json(out)
+            except (A.ActionError, A.ActionValidationError,
+                    A.ActionDeniedError) as exc:
+                code = getattr(exc, "code", None) or "ACTION_ERROR"
+                self._json({"state": "failed", "code": code,
+                            "detail": str(exc)[:200]})
             except Exception as exc:
                 self._json({"state": "failed", "detail": str(exc)[:200]})
             return
