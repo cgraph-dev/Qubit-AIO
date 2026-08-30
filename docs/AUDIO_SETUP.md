@@ -136,6 +136,16 @@ quality to whatever sink is active (headphones, TV/HDMI, speakers):
   no spoken reply, the AT2020 is silent — enable 48V phantom power on the
   Scarlett front panel and confirm the input gain knob is up (the digital
   `Line In 1 Gain` is already at max 70/69 dB in ALSA).
+- **Default-source drift (2026-08-30 fix)**: the capture path follows the
+  Pulse/PipeWire DEFAULT SOURCE. If it drifts after startup (headset plugged
+  in, GNOME input switch), PTT records pure zeros ("I didn't hear anything")
+  while the web dashboard keeps working. The bridge now re-asserts the
+  configured `mic.device_name` pin before every capture (a `mic.pin_source`
+  journal event appears when a drift is corrected), so PTT no longer depends
+  on a restart. To force a re-pin anyway, run:
+  ```
+  systemctl --user restart openclaw-voice-bridge
+  ```
 - Troubleshoot PTT events with:
   ```
   voicebridge audio status

@@ -138,3 +138,27 @@ def test_xinput_loop_parses_raw_key_events(monkeypatch):
     proc.close()   # release the read end (no ResourceWarning leak)
     assert ("ptt_start", "ctrl_r") in events, events
     assert ("ptt_end", "ctrl_r") in events, events
+
+
+def test_xinput_cancel_key_emits_cancel():
+    """Esc (keycode 9) is the tap-cancel key: a press must emit 'cancel' so
+    the bridge stops speaking / aborts the task. Release of a non-hold key
+    emits nothing."""
+    hk = HotkeyListener(hold_key="ctrl_r", tap_cancel="esc")
+    events = []
+    hk.on_event = lambda ev, key: events.append((ev, key))
+    hk._press("esc")
+    assert ("cancel", "esc") in events, events
+    hk._release("esc")
+    assert ("cancel", "esc") in events, events  # no duplicate from release
+
+
+def test_repeat_press_while_held_emits_ptt_start_once():
+    """A hold key pressed twice (auto-repeat / double event) must emit a
+    single ptt_start: the held-set guard is level-based, not one-shot."""
+    hk = HotkeyListener(hold_key="ctrl_r")
+    events = []
+    hk.on_event = lambda ev, key: events.append((ev, key))
+    hk._press("ctrl_r")
+    hk._press("ctrl_r")
+    assert events == [("ptt_start", "ctrl_r")], events

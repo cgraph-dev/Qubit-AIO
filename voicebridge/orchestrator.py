@@ -343,6 +343,7 @@ class VoiceOrchestrator:
             raise
         self._cli: Optional[CliBackend] = None
         self._mic: Optional[MicCapture] = None
+        self._mic_pin_source = ""   # last source re-pinned by capture (drift watch)
         self._barge: Optional[BargeInDetector] = None
         self._barge_stream = None
         self._barge_monitor = None
@@ -723,6 +724,7 @@ class VoiceOrchestrator:
         if self.cfg.get("vad", "barge_in", default=True):
             self._start_barge_stream(mic_cfg)
         _pinned = pin_pulse_default_source(mic_cfg.get("device_name"))
+        self._mic_pin_source = _pinned or ""
         if _pinned:
             log_event("mic.pin_source",
                       source=str(_pinned).split("/")[-1][:48])
@@ -3545,6 +3547,23 @@ class VoiceOrchestrator:
         if self._mic is None:
             log.error("mic not initialized")
             return None
+        # Re-assert the configured input pin before EVERY capture. The
+        # Pulse/PipeWire DEFAULT source can drift after startup (headset
+        # plugged in, GNOME input switch), silently rerouting the "default"
+        # capture stream to a mic the user is not using -> pure zeros and
+        # "I didn't hear anything" while the web dashboard (browser-side
+        # recording) keeps working. A service restart re-pins once at
+        # start(); re-pinning here removes the restart dependency. It is a
+        # no-op when the default already matches and degrades to the
+        # existing typed failure when the configured mic is absent (never
+        # guess another source).
+        pin_name = self.cfg.get("mic", "device_name", default="")
+        if pin_name:
+            _pinned = pin_pulse_default_source(pin_name)
+            if _pinned and _pinned != self._mic_pin_source:
+                self._mic_pin_source = _pinned
+                log_event("mic.pin_source",
+                          source=str(_pinned).split("/")[-1][:48])
         mic = self._mic
         stop_req = threading.Event()
         tap_ms = int(self.cfg.get("hotkey", "tap_ms", default=300))
