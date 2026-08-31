@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Voice Dashboard</title>
 <style>
   :root { color-scheme: dark; }
@@ -33,13 +33,14 @@
   .err { color:#f85149; }
   a { color:#58a6ff; text-decoration:none; }
   .row { display:flex; gap:8px; align-items:center; }
-</style></head><body>
-<div class="wrap">
+</style><link rel="stylesheet" href="/static/app.css"></head><body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<div class="wrap" id="main-content">
   <header>
-    <h1>🎙 Voice Dashboard</h1>
+    <h1><span class="brand-mark" aria-hidden="true">Q</span> Voice Dashboard</h1>
     <div class="row">
-      <span class="status" id="st">connecting…</span>
-      <a href="/activity">activity</a> · <a href="/reports">reports</a> · <a href="/settings">settings</a> · <a href="#" id="lessonslink">learned</a> <a href="#" id="permslink" style="margin-left:8px">permissions</a> <a href="#" id="reportslink" style="margin-left:8px">reports</a> <a href="#" id="gearlink" style="margin-left:8px">⚙</a>
+      <span class="status" id="st" aria-live="polite">connecting…</span>
+      <a href="/activity">activity</a> · <a href="/reports">reports</a> · <a href="/settings">settings</a> · <a href="#" id="lessonslink">learned</a> <a href="#" id="permslink" style="margin-left:8px">permissions</a> <a href="#" id="reportslink" style="margin-left:8px">inbox</a> <a href="#" id="gearlink" style="margin-left:8px" aria-label="Open talk settings">settings</a>
     </div>
   </header>
 
@@ -47,6 +48,7 @@
   <div class="hint">tap = toggle · release = send · esc = stop · <a href="#" id="interruptBtn" style="color:#f85149;">⏹ interrupt</a></div>
 
   <div class="row" style="margin-top:14px;">
+    <label class="sr-only" for="textin">Type a task</label>
     <input id="textin" type="text" placeholder="…or type a task (Enter to send)"
            style="flex:1; padding:10px 12px; background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:8px; font-size:15px;">
     <button id="textsend" style="padding:10px 16px; background:#238636; border:none; color:#fff; border-radius:8px; cursor:pointer;">Send</button>
@@ -58,12 +60,14 @@
 
 <div id="settings" style="display:none; border:1px solid #30363d; border-radius:10px; padding:10px; margin:10px 0; background:#161b22;">
   <div style="font-size:13px; margin-bottom:6px;">API server (from Vercel, paste your PC's tunnel URL, e.g. https://xxx.run.pinggy-free.link)</div>
+  <label class="sr-only" for="set-api">API server URL</label>
   <input id="set-api" type="text" placeholder="https://your-pc-tunnel-url" style="width:100%; padding:6px; margin-bottom:6px; background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:6px;">
+  <label class="sr-only" for="set-token">API token</label>
   <input id="set-token" type="text" placeholder="token (optional)" style="width:100%; padding:6px; margin-bottom:6px; background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:6px;">
   <div class="row"><button id="set-save" style="padding:6px 14px; background:#1f6feb; border:none; color:#fff; border-radius:6px; cursor:pointer;">Save</button>
   <span id="set-status" style="font-size:12px; color:#8b949e; margin-left:10px;"></span></div>
   <div style="font-size:13px; margin:6px 0 4px;">Voice (TTS provider) — pick higher quality (openai nova = premium, edge = free, piper = offline)</div>
-  <select id="voiceSel" style="width:100%; padding:6px; background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:6px; margin-bottom:6px;"><option value="piper">piper (offline, fast)</option><option value="openai">openai nova (highest quality, requires key)</option><option value="edge">edge JennyNeural (free, online)</option><option value="kokoro">kokoro (local quality)</option><option value="gateway">gateway</option></select>
+  <label class="sr-only" for="voiceSel">Voice provider</label><select id="voiceSel" style="width:100%; padding:6px; background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:6px; margin-bottom:6px;"><option value="piper">piper (offline, fast)</option><option value="openai">openai nova (highest quality, requires key)</option><option value="edge">edge JennyNeural (free, online)</option><option value="kokoro">kokoro (local quality)</option><option value="gateway">gateway</option></select>
   <div style="font-size:11px;color:#8b949e;margin-bottom:6px;">Change persists to voice.yaml on this PC; openai needs OPENAI_API_KEY in ~/.hermes/.env</div>
 </div>
 
@@ -131,6 +135,7 @@ let ctx=null, source=null, processor=null, chunks=[], recording=false, busy=fals
 let micStream=null;            // the getUserMedia stream; MUST be stopped on release
 let micBusy=false;             // a getUserMedia() is in flight (debounce rapid taps)
 let pushMode = 'hold';  // 'hold' = press-and-hold, 'tap' = one-tap toggle
+let sampleRate = 16000;  // the REAL AudioContext rate — sent to the backend
 
 function addMsg(cls, text) {
   const d = document.createElement('div');
@@ -146,6 +151,28 @@ function setPulse(on) {
   document.getElementById('pulse').style.display = 'none'; // unused fallback
 }
 
+function micError(err) {
+  const n = err && err.name;
+  if (n === 'NotAllowedError' || n === 'SecurityError')
+    return 'Microphone permission denied — allow mic access in the browser and retry.';
+  if (n === 'NotFoundError' || n === 'OverconstrainedError')
+    return 'No microphone found or it is unavailable — check the mic and retry.';
+  if (n === 'NotReadableError')
+    return 'Microphone is busy or blocked — close other apps using it and retry.';
+  return 'Mic error: ' + (err && err.message ? err.message : err);
+}
+
+/* Always release the mic tracks AND close the AudioContext (also used on the
+ * startRec error path so a failed getUserMedia never leaks the stream). */
+function releaseMic() {
+  try { if (micStream && micStream.getTracks) micStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+  micStream = null;
+  try { if (source) source.disconnect(); } catch (_) {}
+  try { if (processor) processor.disconnect(); } catch (_) {}
+  try { if (ctx) ctx.close(); } catch (_) {}
+  source = processor = ctx = null;
+}
+
 async function startRec() {
   if (recording || micBusy) return;   // already recording, or a mic request is in flight
   micBusy = true;
@@ -153,8 +180,13 @@ async function startRec() {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: {
       channelCount: 1, echoCancellation: true, noiseSuppression: true }});
     micStream = stream;                      // keep a handle so we can release it
-    // Ask for 16k — Chrome honours AudioContext({sampleRate:16000})
+    // Ask for 16k, but Chrome does NOT reliably honor it — record the REAL
+    // context rate and send it so the backend never misreads 48 kHz as 16 kHz.
     ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    sampleRate = ctx.sampleRate || 16000;
+    if (ctx.state === 'suspended') {
+      try { await ctx.resume(); } catch (_) {}
+    }
     source = ctx.createMediaStreamSource(stream);
     processor = ctx.createScriptProcessor(4096, 1, 1);
     processor.onaudioprocess = (e) => {
@@ -169,7 +201,8 @@ async function startRec() {
     recording = true;
     setStatus('listening…', true);
   } catch (err) {
-    addMsg('err', 'Mic error: ' + err.message);
+    releaseMic();
+    addMsg('err', micError(err));
     setStatus('mic error');
   } finally {
     micBusy = false;                     // allow the next tap now that this one resolved
@@ -184,21 +217,18 @@ async function stopRec() {
   let off = 0;
   for (const c of chunks) { out.set(c, off); off += c.length; }
   chunks = [];
-  try { source.disconnect(); processor.disconnect(); ctx.close(); } catch (_) {}
-  source = processor = ctx = null;
-  // Release the mic so a rapid re-start doesn't fight a held MediaTrack.
-  try { if (micStream && micStream.getTracks) micStream.getTracks().forEach(t => t.stop()); } catch (_) {}
-  micStream = null;
+  releaseMic();
   setStatus('thinking…');
-  if (total < 1600) {  // <0.1s of audio = accidental tap
+  const minSamples = Math.round((sampleRate || 16000) * 0.1); // 100ms @ actual rate
+  if (total < minSamples) {  // <0.1s of audio = accidental tap
     setStatus('too short — try again');
     setTimeout(() => setStatus('ready'), 1500);
     return;
   }
-  await sendAudio(out.buffer);
+  await sendAudio(out.buffer, sampleRate);
 }
 
-async function sendAudio(pcm) {
+async function sendAudio(pcm, rate) {
   busy = true;
   ptt.disabled = true;
   ptt.textContent = 'listening to result…';
@@ -207,9 +237,12 @@ async function sendAudio(pcm) {
     // 1. submit -> instant request_id (the bridge acks immediately)
     //    Binary PCM body preserved; the shared vbApi() helper sends
     //    X-Api-Token and checks Content-Type before parsing the JSON reply.
+    //    X-Audio-Rate carries the browser's REAL AudioContext rate so the
+    //    backend resamples 48 kHz instead of misreading it as 16 kHz.
     const res = await vbApi('/api/talk', {
       method: 'POST',
-      headers: vbHeaders({ 'Content-Type': 'application/octet-stream' }),
+      headers: vbHeaders({ 'Content-Type': 'application/octet-stream',
+                           'X-Audio-Rate': String(rate || 16000) }),
       body: pcm,
     });
     if (!res.ok) throw new Error(res.authRequired ? 'not paired' : ('HTTP ' + (res.status || 'network')));
@@ -241,6 +274,7 @@ async function sendAudio(pcm) {
     busy = false;
     ptt.disabled = false;
     ptt.textContent = 'Hold to talk';
+    setStatus('ready');
   }
 }
 
@@ -259,7 +293,10 @@ document.getElementById('set-save').addEventListener('click', () => {
 });
 
 async function playResult(data) {
-  addMsg('user', data.text || '(no speech recognized)');
+  // Typed no-speech / too-short results from the backend get a clear label
+  // instead of a generic "(no speech recognized)".
+  const noSpeech = data.reason === 'NO_SPEECH' || data.reason === 'SHORT';
+  addMsg('user', data.text || (noSpeech ? '(no speech detected)' : '(no speech recognized)'));
   if (data.events && data.events.length) {
     for (const ev of data.events) {
       if (ev.kind === 'meta') addMsg('meta', '· ' + ev.text);

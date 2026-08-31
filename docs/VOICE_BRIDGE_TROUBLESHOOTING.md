@@ -85,11 +85,14 @@ xinput list --short
 ps -ef | grep '[x]input test-xi2'
 ```
 
-The service normally uses:
+The service resolves the REAL X11 session at runtime (`voicebridge/display`) and
+only reports hotkeys active when that display is genuinely reachable. It no
+longer ships a hardcoded `DISPLAY`/`XAUTHORITY`. If your session environment is
+not inherited by the user systemd instance, import it once:
 
-```text
-DISPLAY=:1
-XAUTHORITY=/run/user/1000/gdm/Xauthority
+```bash
+systemctl --user import-environment DISPLAY XAUTHORITY
+systemctl --user restart openclaw-voice-bridge.service
 ```
 
 Check recent bridge events:
@@ -104,7 +107,9 @@ Interpretation:
 - `hotkey` with `ptt_start` and `ptt_end` means Right-Ctrl is working; the
   failure is later in audio capture or playback.
 - `hotkey.xinput.dead` or no hotkey events means restart the bridge and check
-  the `DISPLAY`/`XAUTHORITY` values.
+  the display resolution (`journalctl --user -u openclaw-voice-bridge | grep
+  hotkey`) and that your session env is inherited
+  (`systemctl --user import-environment DISPLAY XAUTHORITY`).
 - `feedback.beep` with `played=false` means the key was received but no output
   device opened.
 - If there is no X session, hotkeys are unavailable by design; use the manual

@@ -226,6 +226,67 @@ def pcm_to_wav(pcm: bytes, rate: int = PCM_RATE) -> bytes:
     return bytes(buf)
 
 
+def parse_audio_rate(raw: Any) -> int:
+    """Parse the browser's ACTUAL AudioContext sample-rate header.
+
+    Chrome does NOT always honor ``AudioContext({sampleRate:16000})`` — it
+    commonly delivers 48 kHz. The backend must never assume 16 kHz. Valid rates
+    are bounded to [8000, 48000]; anything else degrades to ``PCM_RATE``.
+    """
+    try:
+        rate = int(raw)
+    except (TypeError, ValueError):
+        return PCM_RATE
+    if not (8000 <= rate <= 48000):
+        return PCM_RATE
+    return rate
+
+
+def resample_pcm_int16(pcm: bytes, src_rate: int, dst_rate: int = PCM_RATE) -> bytes:
+    """Resample raw Int16 mono PCM from ``src_rate`` to ``dst_rate``.
+
+    Interpreting 48 kHz samples as 16 kHz corrupts duration/pitch and lets
+    near-silence be transcribed as invented speech. Linear interpolation is fine
+    for 48k->16k speech (same as the capture path). Pure resampling never
+    amplifies or creates signal.
+    """
+    import numpy as np
+    if src_rate == dst_rate or not pcm:
+        return pcm
+    from .audio.vad import resample_linear
+    samples = np.frombuffer(pcm, dtype=np.int16).astype(np.float32) / 32768.0
+    out = resample_linear(samples, src_rate, dst_rate)
+    return (np.clip(out, -1.0, 1.0) * 32767.0).astype(np.int16).tobytes()
+
+
+def pcm_rms(pcm: bytes) -> float:
+    """RMS of raw Int16 mono PCM in float [-1,1] scale (bounded)."""
+    import numpy as np
+    if not pcm or len(pcm) % 2:
+        return 0.0
+    samples = np.frombuffer(pcm, dtype=np.int16).astype(np.float32) / 32768.0
+    if samples.size == 0:
+        return 0.0
+    return float(np.sqrt((samples ** 2).mean()))
+
+
+def normalize_int16_bounded(pcm: bytes, *, target: float = 0.35,
+                            max_gain: float = 8.0) -> bytes:
+    """Peak-normalize REAL speech with a bounded gain; never amplifies silence.
+
+    Callers gate on energy first (near-silence is rejected before this runs),
+    so this only ever boosts genuine speech. The gain cap prevents hiss from
+    being amplified into a false transcript.
+    """
+    import numpy as np
+    samples = np.frombuffer(pcm, dtype=np.int16).astype(np.float32) / 32768.0
+    peak = float(np.max(np.abs(samples))) if samples.size else 0.0
+    if peak <= 0.001 or peak >= 0.98:
+        return pcm
+    scale = min(target / peak, max_gain)
+    return (np.clip(samples * scale, -1.0, 1.0) * 32767.0).astype(np.int16).tobytes()
+
+
 # --------------------------------------------------------------------------
 # The dashboard pages (static, self-contained)
 # --------------------------------------------------------------------------
@@ -287,6 +348,7 @@ const st = document.getElementById('st');
 const transcript = document.getElementById('transcript');
 let ctx=null, source=null, processor=null, chunks=[], recording=false, busy=false;
 let pushMode = 'hold';  // 'hold' = press-and-hold, 'tap' = one-tap toggle
+let sampleRate = 16000; // the REAL AudioContext rate, sent to the backend
 
 function addMsg(cls, text) {
   const d = document.createElement('div');
@@ -302,13 +364,29 @@ function setPulse(on) {
   document.getElementById('pulse').style.display = 'none'; // unused fallback
 }
 
+function micError(err) {
+  const n = err && err.name;
+  if (n === 'NotAllowedError' || n === 'SecurityError')
+    return 'Microphone permission denied — allow mic access in the browser and retry.';
+  if (n === 'NotFoundError' || n === 'OverconstrainedError')
+    return 'No microphone found or it is unavailable — check the mic and retry.';
+  if (n === 'NotReadableError')
+    return 'Microphone is busy or blocked — close other apps using it and retry.';
+  return 'Mic error: ' + (err && err.message ? err.message : err);
+}
+
 async function startRec() {
   if (recording) return;
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: {
       channelCount: 1, echoCancellation: true, noiseSuppression: true }});
-    // Ask for 16k — Chrome honours AudioContext({sampleRate:16000})
+    // Ask for 16k, but Chrome does NOT reliably honor it — record the REAL
+    // rate and send it so the backend never misreads 48 kHz as 16 kHz.
     ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    sampleRate = ctx.sampleRate || 16000;
+    if (ctx.state === 'suspended') {
+      try { await ctx.resume(); } catch (_) {}
+    }
     source = ctx.createMediaStreamSource(stream);
     processor = ctx.createScriptProcessor(4096, 1, 1);
     processor.onaudioprocess = (e) => {
@@ -323,7 +401,7 @@ async function startRec() {
     recording = true;
     setStatus('listening…', true);
   } catch (err) {
-    addMsg('err', 'Mic error: ' + err.message);
+    addMsg('err', micError(err));
     setStatus('mic error');
   }
 }
@@ -339,15 +417,16 @@ async function stopRec() {
   try { source.disconnect(); processor.disconnect(); ctx.close(); } catch (_) {}
   source = processor = ctx = null;
   setStatus('thinking…');
-  if (total < 1600) {  // <0.1s of audio = accidental tap
+  const minSamples = Math.round((sampleRate || 16000) * 0.1); // 100ms
+  if (total < minSamples) {  // <0.1s of audio = accidental tap
     setStatus('too short — try again');
     setTimeout(() => setStatus('ready'), 1500);
     return;
   }
-  await sendAudio(out.buffer);
+  await sendAudio(out.buffer, sampleRate);
 }
 
-async function sendAudio(pcm) {
+async function sendAudio(pcm, rate) {
   busy = true;
   ptt.disabled = true;
   ptt.textContent = 'listening to result…';
@@ -356,7 +435,10 @@ async function sendAudio(pcm) {
     // 1. submit -> instant request_id (the bridge acks immediately)
     const res = await fetch('/api/talk', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/octet-stream' },
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'X-Audio-Rate': String(rate || 16000),
+      },
       body: pcm,
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -388,22 +470,15 @@ async function sendAudio(pcm) {
 }
 
 async function playResult(data) {
-  addMsg('user', data.text || '(no speech recognized)');
-  if (data.events && data.events.length) {
-    for (const ev of data.events) {
-      if (ev.kind === 'meta') addMsg('meta', '· ' + ev.text);
-    }
-  }
+  addMsg('user', data.text || (data.reason === 'NO_SPEECH'
+    ? '(no speech detected)' : '(no speech recognized)'));
+  if (data.summary) addMsg('assistant', data.summary);
+  else if (data.error) addMsg('err', data.error);
   if (data.audio_b64) {
     const audio = new Audio('data:audio/wav;base64,' + data.audio_b64);
-    addMsg('assistant', data.summary || data.text || '');
     setStatus('speaking…', true);
     await audio.play();
     await new Promise(r => audio.onended = r);
-  } else if (data.summary) {
-    addMsg('assistant', data.summary);
-  } else if (data.error) {
-    addMsg('err', data.error);
   }
 }
 
@@ -1444,8 +1519,11 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 return
             try:
                 # async: return a request_id immediately (fast ack), the
-                # result (audio) is fetched via /api/result/<id>
-                rid = self.app.submit_talk(pcm)
+                # result (audio) is fetched via /api/result/<id>. The browser
+                # sends its ACTUAL AudioContext sample rate — Chrome does not
+                # reliably honor the requested 16 kHz.
+                rate = parse_audio_rate(self.headers.get("X-Audio-Rate"))
+                rid = self.app.submit_talk(pcm, rate=rate)
                 self._json({"request_id": rid})
             except Exception as exc:  # keep the phone page alive on bridge errors
                 log.exception("webui /api/talk failed")
@@ -2130,6 +2208,9 @@ class WebUI:
             "sticky_route": sticky,
             "tts": getattr(getattr(self.orch, "_tts", None), "name", "") if hasattr(self.orch, "_tts") else "",
             "awaiting_input": bool(self.orch._needs_answer()) if hasattr(self.orch, "_needs_answer") else False,
+            # Mic signal self-check from startup (typed HEALTHY/SILENT/DEGRADED/
+            # UNAVAILABLE) so the dashboard shows a silent mic at a glance.
+            "mic": getattr(self.orch, "_mic_selfcheck", None),
             "frontend": {
                 "version": getattr(self, "_frontend_version", ""),
                 "active": getattr(self, "_frontend_active", "repo"),
@@ -2207,13 +2288,14 @@ class WebUI:
         threading.Thread(target=_run, daemon=True, name=f"webui-type-{rid}").start()
         return rid
 
-    def submit_talk(self, pcm: bytes) -> str:
+    def submit_talk(self, pcm: bytes, rate: int = PCM_RATE) -> str:
         """Start a voice roundtrip in the background; returns a request id.
 
         The browser gets the id instantly (fast ack), then polls
         /api/result/<id>. The heavy work (ASR -> route -> script/OpenClaw
         -> local summary -> TTS) runs on a worker thread so the phone UI
-        never blocks on a 30s Perplexity search.
+        never blocks on a 30s Perplexity search. ``rate`` is the browser's
+        ACTUAL AudioContext sample rate (defaults to the 16 kHz contract).
         """
         rid = uuid.uuid4().hex[:12]
         with self._pending_lock:
@@ -2221,7 +2303,7 @@ class WebUI:
 
         def _run() -> None:
             try:
-                result = self.handle_talk(pcm)
+                result = self.handle_talk(pcm, rate=rate)
             except Exception as exc:
                 log.exception("webui talk worker failed")
                 log_event("webui.talk.error", error=str(exc)[:200])
@@ -2312,14 +2394,39 @@ class WebUI:
             out.append(ev)
         return out[-limit:]
 
-    def handle_talk(self, pcm: bytes) -> Dict[str, Any]:
-        """Full voice roundtrip: PCM -> text -> route -> summary -> TTS."""
+    def handle_talk(self, pcm: bytes, rate: int = PCM_RATE) -> Dict[str, Any]:
+        """Full voice roundtrip: PCM -> text -> route -> summary -> TTS.
+
+        ``rate`` is the browser's ACTUAL AudioContext sample rate. The audio is
+        resampled to the 16 kHz ASR contract when needed, gated for energy
+        (near-silence is rejected before ASR so it cannot hallucinate text), and
+        only genuine speech is bounded-normalized.
+        """
         t0 = time.time()
-        # reject empty/too-short audio before touching the ASR engine
-        if len(pcm) < 1600:  # <0.1s of Int16 @16k
-            return {"text": "", "summary": "I couldn't hear you. Try again.",
-                    "route": "none", "events": [], "audio_b64": None,
-                    "latency_s": round(time.time() - t0, 2)}
+        if rate != PCM_RATE:
+            try:
+                pcm = resample_pcm_int16(pcm, rate)
+            except Exception as exc:
+                log_event("webui.talk.resample.error", error=str(exc)[:120])
+                rate = PCM_RATE
+        n_samples = len(pcm) // 2
+        min_samples = max(800, int(PCM_RATE * 0.1))  # 100ms @16k
+        if n_samples < min_samples:
+            return self._typed_talk(
+                "I didn't catch that. The recording was too short — please try again.",
+                "SHORT", t0, push=True)
+        rms = pcm_rms(pcm)
+        if rms < self._web_min_rms():
+            # Bounded energy/silence gate BEFORE ASR: pure or near-silent audio
+            # must never reach the recognizer (it invents "thank you" on noise).
+            log_event("webui.talk.no_speech", rms=round(rms, 5),
+                      samples=n_samples)
+            return self._typed_talk(
+                "No speech detected. Please speak clearly into the microphone "
+                "and try again.", "NO_SPEECH", t0, push=True, rms=rms)
+        # Only real speech is normalized, with a bounded gain (never amplify
+        # silence into speech — silence was already rejected above).
+        pcm = normalize_int16_bounded(pcm)
         wav = pcm_to_wav(pcm)
         wav_path = self._state_dir / f"webui-{uuid.uuid4().hex[:10]}.wav"
         wav_path.write_bytes(wav)
@@ -2333,9 +2440,8 @@ class WebUI:
         text = (transcript.text or "").strip() if transcript else ""
         self.feed.push({"kind": "user", "text": text or "(no speech)", "route": "input"})
         if not text:
-            return {"text": "", "summary": "I couldn't hear you. Try again.",
-                    "route": "none", "events": [], "audio_b64": None,
-                    "latency_s": round(time.time() - t0, 2)}
+            return self._typed_talk("I couldn't hear you. Try again.",
+                                    "NO_TRANSCRIPT", t0, push=False)
         result = self.orch.process_web_utterance(text)
         self.feed.push({"kind": "routing", "text": text, "route": result.get("route", ""),
                         "conf": result.get("confidence", "")})
@@ -2376,6 +2482,32 @@ class WebUI:
         }
 
     # -- internals ---------------------------------------------------------
+    def _web_min_rms(self) -> float:
+        """Energy floor for the dashboard PCM gate (float [-1,1] RMS scale)."""
+        try:
+            return float(self.orch.cfg.get("asr", "web_min_rms", default=0.0008))
+        except Exception:
+            return 0.0008
+
+    def _typed_talk(self, summary: str, reason: str, t0: float, *,
+                    push: bool, rms: Optional[float] = None) -> Dict[str, Any]:
+        """Typed no-speech / too-short result with a clear recovery message.
+
+        ``push`` records a redacted feed entry so the user sees a reason, and
+        ``reason`` gives the dashboard a machine-readable typed outcome.
+        """
+        if push:
+            self.feed.push({"kind": "user", "text": "(no speech)",
+                            "route": "input", "reason": reason})
+        out: Dict[str, Any] = {
+            "text": "", "route": "none", "summary": summary, "reason": reason,
+            "events": [], "audio_b64": None,
+            "latency_s": round(time.time() - t0, 2),
+        }
+        if rms is not None:
+            out["rms"] = round(rms, 5)
+        return out
+
     def _speak_locally(self) -> bool:
         """True when the bridge plays TTS on the PC speakers (webui.speak_web_locally).
         When true, the dashboard must NOT also autoplay audio_b64 (responds twice)."""

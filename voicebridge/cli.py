@@ -105,6 +105,10 @@ def build_parser() -> argparse.ArgumentParser:
     aud_sel.add_argument("name")
     aud_sub.add_parser("reset", parents=[common], help="reset audio to OS defaults")
     aud_sub.add_parser("status", parents=[common], help="typed audio state (OK/DEGRADED/MISSING/PERMISSION_DENIED)")
+    aud_sub.add_parser("check", parents=[common],
+                       help="live mic signal self-check (typed HEALTHY/SILENT/"
+                            "DEGRADED/UNAVAILABLE); refused while the bridge "
+                            "holds the microphone")
     prof = add("profile", help="provider/profile registry (brain/STT/TTS/voice/audio)")
     prof_sub = prof.add_subparsers(dest="profile_command")
     prof_list = prof_sub.add_parser("list", parents=[common],
@@ -900,6 +904,18 @@ def _cmd_package(cfg, args) -> int:
     return 2
 
 
+def _bridge_service_active() -> bool:
+    """True when the voice-bridge user service is running (holds the mic)."""
+    try:
+        import subprocess
+        r = subprocess.run(["systemctl", "--user", "is-active",
+                            "openclaw-voice-bridge.service"],
+                           capture_output=True, text=True, timeout=5)
+        return (r.stdout or "").strip() == "active"
+    except Exception:
+        return True   # fail-safe: refuse the check rather than open a 2nd stream
+
+
 def _cmd_audio(cfg, args) -> int:
     """voicebridge audio list|select|reset|status — user-facing settings."""
     import json as _json
@@ -963,6 +979,31 @@ def _cmd_audio(cfg, args) -> int:
         print(f"mic    : [{st['mic']['state']:>16}] {st['mic']['detail']}")
         print(f"output : [{st['output']['state']:>16}] {st['output']['detail']}")
         return 0 if all(v["state"] == "OK" for v in st.values()) else 1
+    if cmd == "check":
+        from .audio.mic import mic_selfcheck
+        # The Scarlett tolerates ONE input stream at a time. If the bridge is
+        # already running it holds the mic (its own startup self-check runs
+        # before the barge stream opens) — refuse rather than open a second
+        # stream and risk the documented PortAudio corruption.
+        if _bridge_service_active():
+            msg = ("bridge is running and already holds the microphone "
+                   "(one input stream at a time); its startup mic self-check "
+                   "is in /api/status -> mic and the journal (mic.selfcheck)")
+            if getattr(args, "json", False):
+                print(_json.dumps({"state": "REFUSED", "detail": msg},
+                                  indent=2, sort_keys=True))
+            else:
+                print(f"mic self-check : [      REFUSED] {msg}")
+            return 1
+        res = mic_selfcheck(cfg, seconds=float(
+            cfg.get("mic", "selfcheck_seconds", default=1.0)))
+        if getattr(args, "json", False):
+            print(_json.dumps(res, indent=2, sort_keys=True))
+        else:
+            print(f"mic self-check : [{str(res.get('state')):>11}] "
+                  f"peak={res.get('peak')}")
+            print(f"  {res.get('hint', '')}")
+        return 0 if res.get("state") == "HEALTHY" else 1
     print(f"ERROR: unknown audio command {cmd!r}")
     return 2
 

@@ -162,3 +162,123 @@ def test_repeat_press_while_held_emits_ptt_start_once():
     hk._press("ctrl_r")
     hk._press("ctrl_r")
     assert events == [("ptt_start", "ctrl_r")], events
+
+
+# ----------------------------------------------------- display validation
+def test_start_fails_when_display_unreachable(monkeypatch):
+    """Hotkeys must NOT report active when the resolved display cannot be
+    reached (stale DISPLAY / wrong session)."""
+    import voicebridge.display as D
+    monkeypatch.setenv("DISPLAY", ":0")
+    monkeypatch.setattr(D, "display_reachable", lambda d, env=None: False)
+    monkeypatch.setattr(D, "ensure_session_display", lambda env=None: ":0")
+    hk = HotkeyListener(hold_key="ctrl_r")
+    assert hk._start_xinput() is False
+    assert getattr(hk, "_proc", None) is None
+
+
+def test_start_fails_when_no_graphical_session(monkeypatch):
+    import voicebridge.display as D
+    monkeypatch.delenv("DISPLAY", raising=False)
+    monkeypatch.setattr(D, "ensure_session_display", lambda env=None: None)
+    hk = HotkeyListener(hold_key="ctrl_r")
+    assert hk._start_xinput() is False
+
+
+def test_start_detects_xinput_immediate_exit(monkeypatch):
+    """An xinput child that cannot connect exits quickly; the listener must
+    detect that and report unavailable instead of a phantom 'active'."""
+    import subprocess
+    import voicebridge.display as D
+    monkeypatch.setenv("DISPLAY", ":0")
+    monkeypatch.setattr(D, "display_reachable", lambda d, env=None: True)
+    monkeypatch.setattr(D, "ensure_session_display", lambda env=None: ":0")
+
+    class _Exiting:
+        killed = False
+
+        def poll(self):
+            return 1   # exited (connect failure)
+
+        def kill(self):
+            _Exiting.killed = True
+
+    monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: _Exiting())
+    hk = HotkeyListener(hold_key="ctrl_r")
+    hk.XINPUT_READY_S = 0.05
+    assert hk._start_xinput() is False
+    assert _Exiting.killed is True
+
+
+def test_start_is_idempotent_no_duplicate_listener(monkeypatch):
+    """A live listener must never be duplicated by a second start()."""
+    hk = HotkeyListener(hold_key="ctrl_r")
+
+    class _AliveThread:
+        def is_alive(self):
+            return True
+
+    hk._thread = _AliveThread()
+    starts = []
+    monkeypatch.setattr(hk, "_start_xinput",
+                        lambda: starts.append(True) or True)
+    assert hk.start(lambda ev, key: None) is True
+    assert starts == [], "no second listener may be spawned"
+
+
+def test_ensure_alive_bounded_backoff(monkeypatch):
+    """A failed restart must back off — ensure_alive must not hot-loop."""
+    hk = HotkeyListener(hold_key="ctrl_r")
+    hk.on_event = lambda ev, key: None
+    hk._proc = None
+    hk._xinput_dead = True
+    hk._next_restart_ts = 0.0
+    calls = []
+
+    def fake_restart():
+        calls.append(True)
+        return False   # restart failed
+
+    monkeypatch.setattr(hk, "_restart_xinput", fake_restart)
+    hk.ensure_alive()
+    assert len(calls) == 1
+    # immediately again: the backoff window is active -> no new attempt
+    hk.ensure_alive()
+    assert len(calls) == 1
+    # after the interval elapses it may retry
+    hk._next_restart_ts = 0.0
+    hk.ensure_alive()
+    assert len(calls) == 2
+
+
+def test_restart_xinput_joins_old_thread_before_spawn(monkeypatch):
+    """A restart must join the previous loop thread before starting a new
+    listener so two xinput children never coexist."""
+    import threading
+    import time
+    hk = HotkeyListener(hold_key="ctrl_r")
+    started = threading.Event()
+
+    def _slow_start():
+        time.sleep(0.05)
+        started.set()
+        return True
+
+    monkeypatch.setattr(hk, "_start_xinput", _slow_start)
+    joined = []
+    old_thread = threading.Thread(target=lambda: time.sleep(0.2))
+    old_thread.daemon = True
+    old_thread.start()
+    # pretend the old thread is the live listener
+    hk._thread = old_thread
+    hk._proc = _fake_proc()
+
+    orig_join = old_thread.join
+    def _track_join(*a, **k):
+        joined.append(True)
+        return orig_join(*a, **k)
+    old_thread.join = _track_join
+
+    assert hk._restart_xinput() is True
+    started.wait(timeout=1.0)
+    assert joined, "old listener thread must be joined before the new one"

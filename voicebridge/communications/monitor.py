@@ -156,9 +156,12 @@ def _send_notify_send(title: str, body: str) -> Dict[str, Any]:
         return {"state": "unavailable", "reason": "notify-send missing"}
     # Portable DISPLAY: keep a valid one, else derive the active X session so
     # timer-run notifications reach the real desktop even if the installed unit
-    # has a stale DISPLAY value.
-    from ..display import ensure_session_display
-    ensure_session_display()
+    # has a stale DISPLAY value. notify-send only needs a live X socket, not
+    # XI2 reachability — use the non-probing resolver.
+    from ..display import session_display_socket
+    _disp = session_display_socket()
+    if _disp:
+        os.environ["DISPLAY"] = _disp
     try:
         proc = subprocess.run(["notify-send", title, body],
                               stdout=subprocess.DEVNULL,

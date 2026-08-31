@@ -146,6 +146,74 @@ def resolve_input_device(name: str | None) -> int | None:
     return None
 
 
+MIC_SELFCHECK_HINTS = {
+    "UNAVAILABLE": "microphone could not be opened — check the configured mic "
+                   "and that no other app holds it",
+    "SILENT": "microphone delivers ~no signal — enable 48V phantom power, raise "
+              "the Scarlett input gain, and check the USB port "
+              "(docs/AUDIO_SETUP.md)",
+    "DEGRADED": "microphone is very quiet — raise the input gain / check the "
+                "cable",
+    "HEALTHY": "microphone signal chain OK",
+}
+
+
+def mic_selfcheck(cfg, *, seconds: float = 1.0) -> Dict[str, Any]:
+    """Bounded live mic-signal self-check (ONE input stream at a time).
+
+    Opens the SAME capture route the bridge uses (default aggregate at
+    ``mic.sample_rate``/``mic.channels``) for ~``seconds`` and measures the
+    signal level. A working input chain has a measurable noise floor; a
+    silent/failed one is near digital zero or fails to open.
+
+    IMPORTANT: the Scarlett tolerates ONE InputStream at a time (two streams
+    corrupted PortAudio). Call this only while NO other input stream on the
+    device is open (the orchestrator runs it before the barge stream starts).
+
+    Returns a typed state (never raises, bounded by wall clock):
+
+    - ``UNAVAILABLE`` — the stream could not be opened (device missing or held);
+    - ``SILENT``      — opened but ~digital zero (48V phantom / gain / USB);
+    - ``DEGRADED``    — very quiet (device alive, low level);
+    - ``HEALTHY``     — clear signal chain.
+    """
+    import sounddevice as sd
+    rate = int(cfg.get("mic", "sample_rate", default=48000))
+    channels = int(cfg.get("mic", "channels", default=1))
+    device = cfg.get("mic", "device", default=None)
+    silent_floor = float(cfg.get("mic", "selfcheck_silent_floor", default=1e-5))
+    healthy_floor = float(cfg.get("mic", "selfcheck_healthy_floor", default=1e-3))
+    block = max(1, rate // 20)
+    try:
+        peak = 0.0
+        samples = 0
+        t0 = time.time()
+        with sd.InputStream(samplerate=rate, channels=channels,
+                            device=device, dtype="float32",
+                            blocksize=block) as stream:
+            while time.time() - t0 < float(seconds):
+                data, _ = stream.read(block)
+                mono = data[:, 0] if data.ndim > 1 else data
+                if mono.size:
+                    peak = max(peak, float(np.abs(mono).max()))
+                    samples += int(mono.size)
+        if peak < silent_floor:
+            state = "SILENT"
+        elif peak < healthy_floor:
+            state = "DEGRADED"
+        else:
+            state = "HEALTHY"
+        return {
+            "state": state, "peak": round(peak, 6),
+            "seconds": round(float(seconds), 2),
+            "channels": channels, "sample_rate": rate, "samples": samples,
+            "hint": MIC_SELFCHECK_HINTS[state],
+        }
+    except Exception as exc:
+        return {"state": "UNAVAILABLE", "error": str(exc)[:160],
+                "hint": MIC_SELFCHECK_HINTS["UNAVAILABLE"]}
+
+
 class MicCapture:
     def __init__(self, device: Optional[int] = None, sample_rate: int = 48000,
                  channels: int = 2, blocksize: int = 480,

@@ -344,6 +344,7 @@ class VoiceOrchestrator:
         self._cli: Optional[CliBackend] = None
         self._mic: Optional[MicCapture] = None
         self._mic_pin_source = ""   # last source re-pinned by capture (drift watch)
+        self._mic_selfcheck = None  # last startup mic signal self-check result
         self._barge: Optional[BargeInDetector] = None
         self._barge_stream = None
         self._barge_monitor = None
@@ -721,13 +722,31 @@ class VoiceOrchestrator:
             trigger_ms=int(self.cfg.get("vad", "barge_in", default=True)) and 150 or 999999,
             vad_backend=vad_backend, silero_model=silero_model)
         self._barge_stream = None
-        if self.cfg.get("vad", "barge_in", default=True):
-            self._start_barge_stream(mic_cfg)
         _pinned = pin_pulse_default_source(mic_cfg.get("device_name"))
         self._mic_pin_source = _pinned or ""
         if _pinned:
             log_event("mic.pin_source",
                       source=str(_pinned).split("/")[-1][:48])
+        # Automatic mic signal self-check BEFORE the barge stream opens (the
+        # Scarlett tolerates ONE InputStream at a time). Surfaces a silent /
+        # dead / quiet mic at boot instead of only discovering it on PTT, and
+        # is exposed via /api/status and `voicebridge audio check`.
+        try:
+            from .audio.mic import mic_selfcheck
+            self._mic_selfcheck = mic_selfcheck(
+                self.cfg, seconds=float(self.cfg.get(
+                    "mic", "selfcheck_seconds", default=1.0)))
+            log_event("mic.selfcheck",
+                      state=self._mic_selfcheck.get("state"),
+                      peak=self._mic_selfcheck.get("peak"),
+                      hint=self._mic_selfcheck.get("hint", "")[:160])
+        except Exception as exc:
+            self._mic_selfcheck = {"state": "UNAVAILABLE",
+                                   "error": str(exc)[:160]}
+            log_event("mic.selfcheck", state="UNAVAILABLE",
+                      error=str(exc)[:160])
+        if self.cfg.get("vad", "barge_in", default=True):
+            self._start_barge_stream(mic_cfg)
 
     def _start_barge_stream(self, mic_cfg=None) -> None:
         """Open the barge-in InputStream (one input stream at a time rule).
@@ -844,18 +863,6 @@ class VoiceOrchestrator:
         if hasattr(self, "hotkey"):
             self.hotkey.stop()
         self.playback.stop()
-
-    def _pause_barge_stream(self) -> bool:
-        """Stop+close the barge stream; returns True if it was open (restart it)."""
-        if self._barge_stream is None:
-            return False
-        try:
-            self._barge_stream.stop()
-            self._barge_stream.close()
-        except Exception:
-            pass
-        self._barge_stream = None
-        return True
 
     # ------------------------------------------------------------------ speak
     def speak(self, text: str, name: str = "assistant", interruptible: bool = True,
@@ -3564,6 +3571,13 @@ class VoiceOrchestrator:
                 self._mic_pin_source = _pinned
                 log_event("mic.pin_source",
                           source=str(_pinned).split("/")[-1][:48])
+            elif not _pinned:
+                # Bounded degraded diagnostic: the configured source could not
+                # be matched by pactl, so capture may follow the default
+                # source. Never guesses another device.
+                log_event("mic.input_source", state="degraded",
+                          detail="configured mic not matched by pactl; "
+                                 "capture follows the default source")
         mic = self._mic
         stop_req = threading.Event()
         tap_ms = int(self.cfg.get("hotkey", "tap_ms", default=300))
@@ -3782,11 +3796,28 @@ class VoiceOrchestrator:
             log_event("asr.fallback.failed", error=str(exc)[:160])
         return tr
 
+    def _remove_temp_wav(self, wav_path: str) -> None:
+        """Delete a transient capture WAV (best-effort, guaranteed by callers).
+
+        Only ever removes the short-lived capture/temp files this bridge wrote
+        under its temp dir; a missing path is a no-op.
+        """
+        try:
+            Path(wav_path).unlink(missing_ok=True)
+        except Exception:
+            pass
+
     def _process_utterance(self, wav_path: str) -> None:
         t0 = time.time()
         if self._asr is None:
+            self._remove_temp_wav(wav_path)
             return
-        transcript = self._transcribe_with_fallback(wav_path)
+        try:
+            transcript = self._transcribe_with_fallback(wav_path)
+        finally:
+            # Guaranteed cleanup: the raw capture must never accumulate in
+            # /tmp or be persisted in state/logs after transcription.
+            self._remove_temp_wav(wav_path)
         elapsed_asr = time.time() - t0
         log_event("orchestrator.timing", asr_ms=round(elapsed_asr * 1000, 1), text=transcript.text[:200])
         if transcript.empty:
