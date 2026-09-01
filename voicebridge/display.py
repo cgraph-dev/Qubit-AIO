@@ -165,3 +165,36 @@ def ensure_session_display(env: Optional[dict] = None) -> Optional[str]:
     if disp:
         os.environ["DISPLAY"] = disp
     return disp
+
+
+def resolve_notification_session(env: Optional[dict] = None) -> dict:
+    """Packet 8I: validate and resolve the real X11/Wayland notification
+    session for ``notify-send`` at run time.
+
+    Never trusts a hardcoded unit ``DISPLAY``. Returns a typed record:
+
+    - ``ok`` + ``session_type="x11"``: a reachable X11 display was resolved;
+    - ``ok`` + ``session_type="wayland"``: a Wayland session with a usable
+      user D-Bus/XDG_RUNTIME_DIR is present (no DISPLAY needed);
+    - ``unavailable``: headless / neither session is usable (typed failure,
+      never a silent guess).
+    """
+    env = os.environ if env is None else env
+    wayland = (env.get("WAYLAND_DISPLAY") or "").strip()
+    xdg = (env.get("XDG_RUNTIME_DIR") or "").strip()
+    dbus = (env.get("DBUS_SESSION_BUS_ADDRESS") or "").strip()
+    disp = session_display_socket(env)
+    bus_ok = bool(dbus) or (
+        bool(xdg) and os.path.isdir(xdg)
+        and os.path.exists(os.path.join(xdg, "bus")))
+    if wayland and bus_ok:
+        return {"state": "ok", "session_type": "wayland",
+                "wayland_display": wayland, "xdg_runtime_dir": xdg,
+                "display": disp or None, "wayland": True}
+    if disp:
+        return {"state": "ok", "session_type": "x11", "display": disp,
+                "wayland": False, "xdg_runtime_dir": xdg or None}
+    return {"state": "unavailable", "session_type": "headless",
+            "display": None, "wayland": bool(wayland),
+            "xdg_runtime_dir": xdg or None,
+            "detail": "no reachable X11 display and no usable Wayland session"}

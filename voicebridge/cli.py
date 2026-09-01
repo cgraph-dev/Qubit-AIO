@@ -1786,7 +1786,9 @@ def _cmd_monitor(cfg, args) -> int:
                            canary=args.canary,
                            notify=not args.no_notify)
         print(_json.dumps(out, indent=2, sort_keys=True))
-        return 0 if out.get("state") in ("OK", "preview") else 1
+        # Packet 8I: truthful aggregate exit code (degraded != OK).
+        return int(out.get("exit_code",
+                           0 if out.get("state") in ("OK", "preview") else 1))
     if cmd == "health":
         print(_json.dumps(M.monitor_health(cfg), indent=2, sort_keys=True))
         return 0

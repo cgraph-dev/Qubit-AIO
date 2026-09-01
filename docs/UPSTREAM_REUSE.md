@@ -871,6 +871,53 @@ or user config changed; no live site adapter exists yet.
 
 ---
 
+## R21 — Timer/notification/quiet-hours qualification (Packet 8I)
+
+```text
+LOCAL REQUIREMENT: qualify the existing user-systemd hourly oneshot/timer +
+notification path and close four configuration risks: quiet-hours/IANA-timezone
+validation (fail-closed `CONFIG_INVALID`), no hardcoded `DISPLAY=:1`, a
+monotonic/renewable/reboot-aware overlap lease that exceeds the oneshot runtime
+plus a safety margin, and truthful aggregate state/exit code. Reuses the
+already-pinned systemd timer semantics (R11) and the Packet 8C/8D stores.
+UPSTREAM REPOSITORY + COMMIT: systemd v255 @ db11bab38ccf1ed257f310d29070843d4c58ea01
+  — the R11 record already pins `OnCalendar=`, `Persistent=` catch-up and
+  `AccuracySec=` semantics; Packet 8I adds no new systemd directive.
+SOURCE FILES + SYMBOLS: R11 man/systemd.timer.xml facts (reused as-is);
+  stdlib `zoneinfo`/`time.monotonic`/`threading` for IANA validation and
+  monotonic deadlines (Python 3.11+, no third-party dependency).
+UPSTREAM TESTS/FIXTURES: n/a — qualification harness is local-design; the
+  pinned R11 facts are covered by the timer template assertions
+  (`OnCalendar=hourly`, `Persistent=true`) in the 8I harness.
+LICENSE: LGPL-2.1-or-later (systemd man page facts — attribution only, no
+  systemd source copied; unchanged from R11). zoneinfo is CPython stdlib
+  (PSF license).
+DECISION: WRAP (R11 timer semantics) + LOCAL (monotonic lease with boot_id,
+  strict quiet-hours/IANA validation, validated X11/Wayland session
+  resolution, bounded notification retry/dead-letter, truthful aggregate).
+LOCAL DESTINATION: systemd/openclaw-communications-monitor.{service,timer}
+  (DISPLAY hardcode removed; accelerated failure-path templates added as
+  {openclaw-communications-monitor-accel.{service,timer}), voicebridge/
+  communications/{monitor,store,contracts}.py, voicebridge/display.py,
+  voicebridge/communications/timer_qualify.py, scripts/timer_qualify.py,
+  tests/test_timer_qualify.py, docs/OPERATIONS_8I.md.
+DEPENDENCIES ADDED: none.
+BEHAVIOR KEPT: hourly `OnCalendar=hourly` + `Persistent=true` catch-up-once;
+  app lease as the second overlap guard; bounded resources; notify-send
+  plain-language redacted delivery; 8C/8D stores unchanged in purpose.
+BEHAVIOR INTENTIONALLY OMITTED: no new scheduler/notification database;
+  no timer enablement or live-unit edits by this packet; accelerated unit is
+  temporary and isolated and never substitutes for the hourly schedule;
+  no `WakeSystem`; no monotonic `On*Sec` timer variants.
+WHY THIS IS THE SMALLEST FIT: the timer semantics were already pinned (R11);
+  8I adds only validated local contracts (stdlib zoneinfo + monotonic +
+  boot_id lease, session resolution) and an operator-gated qualification
+  harness that composes the existing 8D notification path.
+COMPATIBILITY DRIFT: same as R11 (v255 directives stable).
+```
+
+---
+
 ## 15. License notice obligations (deferred until first COPY/ADAPT)
 
 `THIRD_PARTY_NOTICES.md` must be created in the same packet as the first substantial copy. Expected

@@ -3,6 +3,10 @@ Description=Qubit Voice Agent - hourly communications monitor trigger
 # OnCalendar=hourly + Persistent=true: catches up once after downtime, never
 # wakes a suspended machine. No automatic restart loop; overlap is guarded by
 # the application lease in voicebridge/communications/monitor.py.
+# OnCalendar is WALL-CLOCK local time: it follows the system timezone/DST
+# transitions (a spring-forward gap skips the 02:00 hour, a fall-back fold runs
+# the hour once). The quiet-hours window is evaluated in the configured IANA
+# timezone at run time, independent of this local wall clock.
 RefuseManualStart=false
 
 [Timer]

@@ -121,7 +121,10 @@ def main(argv=None) -> int:
         out = run_hourly(cfg, source="live", dry_run=args.dry_run,
                          notify=not args.no_notify, canary=args.canary)
         _print(out)
-        return 0 if out.get("state") in ("OK", "preview") else 1
+        # Packet 8I: truthful aggregate exit code — a degraded account, a
+        # failed delivery, or CONFIG_INVALID must NOT exit 0.
+        return int(out.get("exit_code",
+                           0 if out.get("state") in ("OK", "preview") else 1))
 
     if args.health:
         _print(monitor_health(_cfg(args)))

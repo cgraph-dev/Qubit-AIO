@@ -14,11 +14,19 @@ ExecStart=__PROJECT_DIR__/.venv/bin/python scripts/communications_monitor.py --h
 # Bounded resources (repository defaults; tune per host in the INSTALLED unit).
 MemoryHigh=300M
 MemoryMax=400M
+# Packet 8I: this is the MAXIMUM permitted oneshot runtime. The application
+# overlap lease must exceed it by a safety margin (default lease_ttl_s = 480 s
+# vs this 300 s) and is renewable (store.renew_lease) — a run can never
+# outlive its own overlap guard.
 TimeoutStartSec=300
-# Desktop notify-send needs the user's X session. Set DISPLAY/XAUTHORITY to the
-# OPERATOR's session values (check: echo $DISPLAY; echo $XAUTHORITY) — a wrong
-# display silently makes notifications PENDING (the scan still succeeds).
-Environment=DISPLAY=:1
+# Packet 8I: no hardcoded DISPLAY. Desktop notifications resolve the real
+# X11/Wayland session at runtime (voicebridge/display.py); the unit inherits
+# the user session environment. If your user-systemd instance does NOT import
+# the graphical session env, run once, as the operator:
+#   systemctl --user import-environment DISPLAY WAYLAND_DISPLAY \
+#       XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS
+# then `systemctl --user restart` this unit. Never ship a machine-specific
+# DISPLAY value in the repository template.
 # Uses the SAME user config as the bridge (private state root is shared):
 Environment=VOICE_BRIDGE_CONFIG=%h/.config/openclaw-voice-bridge/voice.yaml
 

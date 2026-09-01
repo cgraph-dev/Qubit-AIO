@@ -35,8 +35,10 @@ from .contracts import (
 
 # SQLite migration version (PRAGMA user_version). Independent of the report
 # manifest SCHEMA_VERSION: manifest v1 is unchanged; the store schema advanced
-# to v2 to persist evidence-asset BYTES durably (Packet 8D).
-STORE_SCHEMA_VERSION = 2
+# to v2 to persist evidence-asset BYTES durably (Packet 8D) and to v3 for the
+# monotonic, reboot-aware overlap lease + bounded notification retry/dead-letter
+# state (Packet 8I).
+STORE_SCHEMA_VERSION = 3
 
 # Retention defaults (plan Phase 8 task 18 — confirmed by Packet 8A).
 DEFAULT_RETENTION_SECONDS = {
@@ -213,6 +215,54 @@ _SCHEMA_V2 = """
 ALTER TABLE evidence_asset ADD COLUMN data BLOB;
 """
 
+# Packet 8I: lease deadlines become MONOTONIC and reboot-aware (boot_id), so a
+# wall-clock jump or a reboot cannot silently expire or pin a live overlap
+# lease; notifications gain a bounded retry count and a terminal dead-letter
+# timestamp so a failing delivery is retried at most N times and then recorded
+# as dead-letter (never dropped silently, never retried forever).
+_SCHEMA_V3 = """
+ALTER TABLE lease ADD COLUMN acquired_mono REAL NOT NULL DEFAULT 0;
+ALTER TABLE lease ADD COLUMN expires_mono REAL NOT NULL DEFAULT 0;
+ALTER TABLE lease ADD COLUMN boot_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE notification ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE notification ADD COLUMN dead_letter_at REAL;
+"""
+
+
+def _boot_id() -> str:
+    """Kernel boot identifier (stable per boot on Linux).
+
+    Used to make lease deadlines reboot-aware: monotonic time restarts at each
+    boot, so a lease persisted from a previous boot must never look alive.
+    Returns "" when the identifier cannot be read (defensive; an empty value
+    makes ``_lease_held`` fall back to monotonic expiry only).
+    """
+    try:
+        return Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+    except Exception:  # noqa: BLE001 - read is best-effort
+        return ""
+
+
+def _lease_held(row, now_wall: float, now_mono: float) -> bool:
+    """True when a lease row is currently held by a live process.
+
+    - a row from a DIFFERENT boot is never held (stale after reboot);
+    - a v3 row is held by its monotonic deadline only (wall jumps cannot
+      expire or extend it);
+    - a legacy v1/v2 row (no ``expires_mono``) is held by wall time so old
+      databases keep working while they migrate.
+    """
+    boot = row["boot_id"] if "boot_id" in row.keys() else ""
+    if boot and boot != _boot_id():
+        return False
+    try:
+        expires_mono = float(row["expires_mono"] or 0)
+    except (TypeError, ValueError):
+        expires_mono = 0.0
+    if expires_mono > 0:
+        return expires_mono > now_mono
+    return float(row["expires_at"] or 0) > now_wall
+
 
 class CommunicationsStoreError(Exception):
     """Typed store failure (never a silent pass)."""
@@ -246,7 +296,7 @@ class CommunicationsStore:
     # ------------------------------------------------------------ schema
     def _migrate(self) -> None:
         version = self._conn.execute("PRAGMA user_version").fetchone()[0]
-        migrations = [_SCHEMA_V1, _SCHEMA_V2]
+        migrations = [_SCHEMA_V1, _SCHEMA_V2, _SCHEMA_V3]
         with self._conn:  # atomic migration transaction
             for i in range(version, len(migrations)):
                 self._conn.executescript(migrations[i])
@@ -688,20 +738,53 @@ class CommunicationsStore:
 
     # ------------------------------------------------------------ lease
     def acquire_lease(self, name: str, owner: str, ttl_s: float = 3600) -> bool:
+        """Acquire or renew ``name`` for ``owner`` for ``ttl_s`` seconds.
+
+        Deadlines are MONOTONIC (``expires_mono``, compared against
+        ``time.monotonic()``) plus a wall ``expires_at`` for reporting. A lease
+        is held only while its ``boot_id`` matches the current boot — a stale
+        lease left by a previous boot or a process that died is immediately
+        acquirable (a reboot never pins the monitor into OVERLAP forever).
+        Wall-clock jumps never expire or extend a live lease.
+        """
         now = time.time()
+        mono = time.monotonic()
+        boot = _boot_id()
         with self._lock, self._conn:
             row = self._conn.execute(
                 "SELECT * FROM lease WHERE name=?", (name,)).fetchone()
-            if row is not None and row["expires_at"] > now \
-                    and row["owner"] != owner:
-                return False
+            if row is not None and row["owner"] != owner:
+                if _lease_held(row, now, mono):
+                    return False
             self._conn.execute(
-                "INSERT INTO lease(name, owner, acquired_at, expires_at)"
-                " VALUES(?,?,?,?)"
+                "INSERT INTO lease(name, owner, acquired_at, expires_at,"
+                " acquired_mono, expires_mono, boot_id)"
+                " VALUES(?,?,?,?,?,?,?)"
                 " ON CONFLICT(name) DO UPDATE SET owner=excluded.owner,"
                 " acquired_at=excluded.acquired_at,"
-                " expires_at=excluded.expires_at",
-                (name, owner, now, now + float(ttl_s)))
+                " expires_at=excluded.expires_at,"
+                " acquired_mono=excluded.acquired_mono,"
+                " expires_mono=excluded.expires_mono,"
+                " boot_id=excluded.boot_id",
+                (name, owner, now, now + float(ttl_s), mono,
+                 mono + float(ttl_s), boot))
+            return True
+
+    def renew_lease(self, name: str, owner: str, ttl_s: float = 3600) -> bool:
+        """Extend the deadline of a lease we already hold (Packet 8I renewable
+        lease). Returns False when no such lease is held by ``owner``."""
+        now = time.time()
+        mono = time.monotonic()
+        with self._lock, self._conn:
+            row = self._conn.execute(
+                "SELECT * FROM lease WHERE name=? AND owner=?",
+                (name, owner)).fetchone()
+            if row is None:
+                return False
+            self._conn.execute(
+                "UPDATE lease SET expires_at=?, expires_mono=?, acquired_mono=?"
+                " WHERE name=? AND owner=?",
+                (now + float(ttl_s), mono + float(ttl_s), mono, name, owner))
             return True
 
     def release_lease(self, name: str, owner: str) -> bool:
@@ -712,11 +795,16 @@ class CommunicationsStore:
             return cur.rowcount > 0
 
     def lease_ok(self, name: str, now: Optional[float] = None) -> bool:
-        now = time.time() if now is None else float(now)
+        """True when ``name`` is currently held by a live process of THIS boot."""
+        mono = time.monotonic()
         with self._lock:
             row = self._conn.execute(
                 "SELECT * FROM lease WHERE name=?", (name,)).fetchone()
-            return row is not None and row["expires_at"] > now
+            if row is None:
+                return False
+            if now is None:
+                now = time.time()
+            return _lease_held(row, now, mono)
 
     # ------------------------------------------------------ notification
     def acknowledge_notification(self, notification_id: str) -> bool:
@@ -771,6 +859,68 @@ class CommunicationsStore:
             return self._conn.execute(
                 "SELECT COUNT(*) FROM notification WHERE status IN"
                 " ('pending','sent')").fetchone()[0]
+
+    def notification_rows_retryable(self, max_retries: int = 3,
+                                    limit: int = 20) -> List[Dict[str, Any]]:
+        """PENDING notifications still inside their bounded retry budget.
+
+        Oldest first; ``dead_letter`` and exhausted retries are excluded. This
+        is the ONLY set the retry path may re-attempt — the bound is enforced
+        by ``apply_retry_result`` (Packet 8I).
+        """
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM notification WHERE status='pending'"
+                " AND retry_count < ? ORDER BY created_at ASC LIMIT ?",
+                (int(max_retries), int(limit))).fetchall()
+            return [dict(r) for r in rows]
+
+    def apply_retry_result(self, notification_id: str, ok: bool,
+                           max_retries: int = 3,
+                           now: Optional[float] = None) -> str:
+        """Record one bounded retry outcome.
+
+        - success -> status ``sent`` (+ ``sent_at``);
+        - failure within budget -> ``retry_count`` + 1 (still ``pending``);
+        - failure at the budget -> status ``dead_letter`` (+ ``dead_letter_at``).
+        Returns the resulting status, or "" when the record is unknown or
+        already terminal (Packet 8I retry/dead-letter bound).
+        """
+        now = time.time() if now is None else float(now)
+        with self._lock, self._conn:
+            row = self._conn.execute(
+                "SELECT retry_count, status FROM notification"
+                " WHERE notification_id=?",
+                (notification_id,)).fetchone()
+            if row is None or row["status"] != "pending":
+                return ""
+            rc = int(row["retry_count"]) + 1
+            if ok:
+                status = "sent"
+                self._conn.execute(
+                    "UPDATE notification SET status='sent', sent_at=?,"
+                    " retry_count=? WHERE notification_id=?",
+                    (now, rc, notification_id))
+            elif rc >= int(max_retries):
+                status = "dead_letter"
+                self._conn.execute(
+                    "UPDATE notification SET status='dead_letter',"
+                    " dead_letter_at=?, retry_count=? WHERE notification_id=?",
+                    (now, rc, notification_id))
+            else:
+                status = "pending"
+                self._conn.execute(
+                    "UPDATE notification SET retry_count=? WHERE"
+                    " notification_id=?", (rc, notification_id))
+            return status
+
+    def report_platforms(self, report_id: str) -> List[str]:
+        """Distinct platform keys recorded against a report (for retry copy)."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT DISTINCT platform FROM item WHERE report_id=?",
+                (report_id,)).fetchall()
+            return [str(r["platform"]) for r in rows]
 
     def close(self) -> None:
         with self._lock:

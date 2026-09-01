@@ -11,7 +11,9 @@ read-only CDP adapters, and Packet 8C report bundles.
 `scripts/communications_monitor.py --hourly` (also `voicebridge monitor run`)
 runs one bounded pass:
 
-1. acquires ONE global overlap lease (`monitor:hourly`, default TTL 120 s);
+1. acquires ONE global overlap lease (`monitor:hourly`, default TTL 480 s —
+   greater than the oneshot's 300 s `TimeoutStartSec` plus a safety margin,
+   MONOTONIC, renewable, and reboot-aware; see `docs/OPERATIONS_8I.md`);
 2. for each configured platform/account, runs the read-only CDP scan
    (attaches to the user's already-running Chromium on loopback `127.0.0.1`);
 3. persists **real screenshot bytes** with the report commit (store schema v2
@@ -68,7 +70,10 @@ served bytes and the bundle hash matches.
   records, and diagnostic logs — never in user-facing copy.
 - Opt-in voice summary (`communications.monitor.voice_notify: true`): a short
   count/platform phrase outside quiet hours (default 22:00–07:00 Europe/Bucharest);
-  suppressed inside quiet hours (`SUPPRESSED_QUIET_HOURS` status). The summary
+  suppressed inside quiet hours (`SUPPRESSED_QUIET_HOURS` status). **Fail-closed
+  (Packet 8I):** malformed quiet-hours syntax/range or an invalid IANA timezone
+  is `CONFIG_INVALID`, suppresses voice, and degrades the aggregate — it never
+  falls back to host-local time and never disables quiet hours. The summary
   is synthesized through the configured LOCAL Piper voice (CPU, 0 VRAM — never
   a second resident generative model) and played through the repository
   playback contract; `OK` is returned only when synthesis AND playback both
@@ -82,13 +87,15 @@ Templates live in `systemd/`:
 
 - `openclaw-communications-monitor.service` — `Type=oneshot`, bounded
   resources (`MemoryHigh=300M`, `MemoryMax=400M`, `TimeoutStartSec=300`), no
-  restart loop, same user config as the bridge; the template's `DISPLAY`/
-  `XAUTHORITY` should match the operator's X session (`echo $DISPLAY`). The
-  notify-send path self-heals to the ACTIVE X session at runtime
-  (`voicebridge/display.py`), so a stale unit value no longer leaves
-  timer-run desktop notifications `PENDING`;
+  restart loop, same user config as the bridge; the repository template ships
+  **no hardcoded `DISPLAY`** (Packet 8I). The notify-send path resolves the
+  real X11/Wayland user session at runtime (`voicebridge/display.py`), so a
+  missing/stale session value is a typed failure, never a silent PENDING;
 - `openclaw-communications-monitor.timer` — `OnCalendar=hourly`,
   `Persistent=true` (catches up once after downtime), `AccuracySec=1min`.
+  `OnCalendar` is wall-clock local time and follows the system timezone/DST
+  transitions; the quiet-hours window is evaluated in the configured IANA
+  timezone independently.
 
 Commands (`scripts/communications_monitor.py` or `voicebridge monitor`):
 

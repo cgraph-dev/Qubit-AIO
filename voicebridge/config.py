@@ -260,11 +260,17 @@ DEFAULTS: Dict[str, Any] = {
             "enabled": False,
             "platforms": ["gmail"],
             "accounts": ["default"],
-            "lease_ttl_s": 120.0,
+            # Packet 8I: the overlap lease MUST exceed the oneshot's
+            # TimeoutStartSec (300 s) by a safety margin (180 s). A configured
+            # value below the floor is clamped up at runtime; the effective
+            # value is reported truthfully.
+            "lease_ttl_s": 480.0,
             "retention_days": 90,
             "screenshot_days": 30,
             "desktop_notify": True,
             "voice_notify": False,
+            # Packet 8I: bounded notification retry with a dead-letter bound.
+            "notification_max_retries": 3,
             "voice": {
                 "quiet_hours": "22:00-07:00",
                 "timezone": "Europe/Bucharest",

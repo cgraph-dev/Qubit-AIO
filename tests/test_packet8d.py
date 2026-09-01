@@ -156,7 +156,8 @@ def test_asset_bytes_survive_restart_and_regen(tmp_path):
 
 
 def test_store_schema_v2_migrates_v1_db_in_place(tmp_path):
-    """A v1 store (no data column) opens as v2 with NULL bytes preserved."""
+    """A v1 store (no data column) opens as the current version (v3) with NULL
+    bytes and the Packet 8I lease/retry columns preserved."""
     from voicebridge.communications.store import (
         CommunicationsStore, STORE_SCHEMA_VERSION,
     )
@@ -169,10 +170,15 @@ def test_store_schema_v2_migrates_v1_db_in_place(tmp_path):
     conn.commit()
     conn.close()
     st = CommunicationsStore(db)
-    assert st.schema_version == STORE_SCHEMA_VERSION == 2
+    assert st.schema_version == STORE_SCHEMA_VERSION == 3
     cols = [r[1] for r in st._conn.execute(
         "PRAGMA table_info(evidence_asset)")]
     assert "data" in cols
+    lease_cols = [r[1] for r in st._conn.execute("PRAGMA table_info(lease)")]
+    assert {"acquired_mono", "expires_mono", "boot_id"} <= set(lease_cols)
+    notif_cols = [r[1] for r in st._conn.execute(
+        "PRAGMA table_info(notification)")]
+    assert {"retry_count", "dead_letter_at"} <= set(notif_cols)
     # old rows keep NULL bytes -> no fabricated evidence
     assert st.asset_bytes_for_report("nonexistent") == {}
     st.close()
@@ -237,7 +243,11 @@ def test_hourly_auth_required_never_advances_and_degrades(tmp_path, monkeypatch)
     run_hourly(cfg, platforms=["gmail"], source="fixture", fixture=fx)  # baseline
     monkeypatch.setattr(R, "find_target", lambda *a, **k: None)
     out = run_hourly(cfg, platforms=["gmail"], source="live", dry_run=True)
-    assert out["state"] == "OK"
+    # Packet 8I aggregate truthfulness: a degraded account must NEVER report a
+    # top-level OK; the typed state AND exit code must agree.
+    assert out["state"] == "degraded"
+    assert out.get("code") == "ACCOUNT_DEGRADED"
+    assert out.get("exit_code") == 1
     assert out["results"][0]["health"] == "unavailable"
     assert out["degraded_accounts"] == ["gmail/default"]
     st = communications_store(cfg)
@@ -272,10 +282,15 @@ def test_quiet_hours_respects_configured_timezone(tmp_path):
     # 2026-08-28 12:00 UTC == 15:00 Europe/Bucharest -> outside quiet hours
     now2 = datetime(2026, 8, 28, 12, 0, tzinfo=dt_tz.utc)
     assert quiet_hours_active(cfg, now=now2) is False
-    # an invalid zone falls back to local time without raising
+    # Packet 8I fail-closed: an invalid IANA zone is CONFIG_INVALID and
+    # suppresses voice; it NEVER falls back to host-local time.
     cfg_bad = _cfg(tmp_path, **{"communications": {"monitor": {"voice": {
         "quiet_hours": "22:00-07:00", "timezone": "Mars/Olympus"}}}})
-    assert quiet_hours_active(cfg_bad, now=now) in (True, False)
+    from voicebridge.communications.monitor import time_config_state
+    tcs = time_config_state(cfg_bad, now=now)
+    assert tcs["state"] == "config_invalid"
+    assert tcs["timezone_valid"] is False and tcs["suppress_voice"] is True
+    assert quiet_hours_active(cfg_bad, now=now) is True   # voice suppressed
 
 
 def test_notification_dedupe_and_voice_suppression(tmp_path, monkeypatch):

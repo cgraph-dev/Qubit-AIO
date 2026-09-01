@@ -22,6 +22,7 @@ Explicit live-activation contract:
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import threading
@@ -29,7 +30,8 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+from zoneinfo import ZoneInfo
 
 from ..events import EventJournal
 from .adapters.base import CDP_LOOPBACK, browser_ws_url
@@ -40,62 +42,120 @@ from .reports import ReportStore
 MONITOR_LEASE = "monitor:hourly"
 SERVICE_NAME = "openclaw-communications-monitor.service"
 TIMER_NAME = "openclaw-communications-monitor.timer"
+# Packet 8I: the oneshot's TimeoutStartSec (the maximum permitted service
+# runtime) and the default lease TTL. The lease MUST exceed the timeout by a
+# safety margin so a timer run can never outlive its own overlap lease. The
+# lease is ALSO renewable (store.renew_lease) for runs that approach the cap.
+SERVICE_TIMEOUT_S = 300
+LEASE_SAFETY_MARGIN_S = 180
+LEASE_MIN_TTL_S = float(SERVICE_TIMEOUT_S + LEASE_SAFETY_MARGIN_S)
 _VOICE_NOTIFY_TIMEOUT_S = 30.0   # bounded: a hung synth/playback cannot block
                                  # the hourly oneshot forever.
 
+# Strict quiet-hours grammar: HH:MM-HH:MM with 00-23 hours and 00-59 minutes.
+# Anything else (24:00, 07:60, free text) is CONFIG_INVALID, never a silent
+# "no quiet hours" fallback (Packet 8I).
+_QUIET_HOURS_RE = re.compile(
+    r"^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]):([0-5]\d)$")
+
 
 # --------------------------------------------------------------- notifications
-def _parse_quiet_hours(spec: str) -> Optional[tuple]:
-    """Parse ``"HH:MM-HH:MM"`` -> (start_min, end_min); None on malformed input."""
-    if not spec or ":" not in spec:
+def _parse_quiet_hours(spec: Any) -> Optional[Tuple[int, int]]:
+    """Strictly parse ``"HH:MM-HH:MM"`` -> (start_min, end_min).
+
+    Returns None on malformed or out-of-range input — the caller MUST treat
+    None as ``CONFIG_INVALID`` and fail closed (suppress voice), never as
+    "quiet hours disabled".
+    """
+    if not isinstance(spec, str):
+        return None
+    m = _QUIET_HOURS_RE.match(spec.strip())
+    if not m:
+        return None
+    sh, sm, eh, em = (int(g) for g in m.groups())
+    return sh * 60 + sm, eh * 60 + em
+
+
+def validate_timezone(name: Any) -> Optional[str]:
+    """Return the validated IANA timezone name, or None when invalid.
+
+    Validation uses the IANA tz database via ``zoneinfo``; a valid name is the
+    exact one the caller configured (no host-local fallback anywhere).
+    """
+    if not isinstance(name, str) or not name.strip():
         return None
     try:
-        start_s, end_s = [p.strip() for p in spec.split("-")]
-        sh, sm = start_s.split(":")
-        eh, em = end_s.split(":")
-        return int(sh) * 60 + int(sm), int(eh) * 60 + int(em)
+        ZoneInfo(name.strip())
+        return name.strip()
     except Exception:
         return None
 
 
-def quiet_hours_active(cfg, now: Optional[datetime] = None) -> bool:
-    """True when voice announcements should be suppressed (quiet hours).
+def time_config_state(cfg, now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Typed, fail-closed time configuration state (Packet 8I).
 
-    The window is evaluated in the configured ``communications.monitor.
-    voice.timezone`` (default ``Europe/Bucharest``); when that zone is missing
-    or invalid the host's local time is used (never an uncaught exception).
+    - ``state=ok``: quiet hours + IANA timezone are valid; ``active`` is the
+      wall-clock window membership in the configured zone.
+    - ``state=config_invalid``: quiet-hours syntax/range or timezone is
+      invalid. ``suppress_voice`` is always True (voice is suppressed until the
+      config is repaired) and the window is NEVER evaluated in host-local time.
     """
-    now = now or datetime.now()
     spec = cfg.get("communications", "monitor", "voice", "quiet_hours",
                    default="22:00-07:00")
-    bounds = _parse_quiet_hours(spec)
-    if bounds is None:
-        return False
     tz_name = cfg.get("communications", "monitor", "voice", "timezone",
                       default="")
-    cur = _wall_clock_minute(now, tz_name)
-    start, end = bounds
+    qh = _parse_quiet_hours(spec)
+    tz_ok = validate_timezone(tz_name)
+    if qh is None or tz_ok is None:
+        problems = []
+        if qh is None:
+            problems.append(
+                f"quiet_hours {spec!r} invalid (expected HH:MM-HH:MM with "
+                "00-23 hours, 00-59 minutes)")
+        if tz_ok is None:
+            problems.append(
+                f"timezone {tz_name!r} is not a valid IANA timezone")
+        return {"state": "config_invalid",
+                "quiet_hours_valid": qh is not None,
+                "timezone_valid": tz_ok is not None,
+                "detail": "; ".join(problems),
+                "suppress_voice": True, "active": True}
+    now = now or datetime.now()
+    cur = _wall_clock_minute(now, tz_ok)
+    start, end = qh
     if start < end:
-        return start <= cur < end
-    return cur >= start or cur < end   # overnight window
+        active = start <= cur < end
+    else:
+        active = cur >= start or cur < end   # overnight window
+    return {"state": "ok", "quiet_hours": qh, "timezone": tz_ok,
+            "spec": spec, "active": active, "suppress_voice": active}
 
 
-def _wall_clock_minute(now: datetime, tz_name: str) -> int:
-    """Wall-clock minute of ``now`` expressed in the configured zone.
+def quiet_hours_active(cfg, now: Optional[datetime] = None) -> bool:
+    """True when voice announcements should be suppressed.
 
-    A naive ``now`` is treated as the host's local wall clock and converted to
-    the configured zone; an invalid/unavailable zone falls back to local time.
+    Fail-closed (Packet 8I): malformed quiet-hours or an invalid IANA timezone
+    returns True (suppress voice) with the typed ``CONFIG_INVALID`` state
+    surfaced through ``time_config_state`` — it never disables quiet hours and
+    never falls back to host-local time.
     """
-    if tz_name:
-        try:
-            from zoneinfo import ZoneInfo
-            if now.tzinfo is None:
-                now = now.replace(tzinfo=datetime.now().astimezone().tzinfo)
-            now = now.astimezone(ZoneInfo(tz_name))
-            return now.hour * 60 + now.minute
-        except Exception:
-            pass
-    return now.hour * 60 + now.minute
+    return bool(time_config_state(cfg, now)["suppress_voice"])
+
+
+def _wall_clock_minute(now: datetime, tz_name: str) -> Optional[int]:
+    """Wall-clock minute of ``now`` expressed in the given IANA zone.
+
+    ``tz_name`` MUST already be validated (``validate_timezone``). A naive
+    ``now`` is treated as the host's local wall clock and converted. Returns
+    None only for an invalid zone — NEVER a host-local fallback.
+    """
+    try:
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=datetime.now().astimezone().tzinfo)
+        now = now.astimezone(ZoneInfo(tz_name))
+        return now.hour * 60 + now.minute
+    except Exception:
+        return None
 
 
 _PLATFORM_DISPLAY = {
@@ -154,14 +214,13 @@ def _send_notify_send(title: str, body: str) -> Dict[str, Any]:
     """Run notify-send with a typed result (OK only on exit 0)."""
     if not shutil.which("notify-send"):
         return {"state": "unavailable", "reason": "notify-send missing"}
-    # Portable DISPLAY: keep a valid one, else derive the active X session so
-    # timer-run notifications reach the real desktop even if the installed unit
-    # has a stale DISPLAY value. notify-send only needs a live X socket, not
-    # XI2 reachability — use the non-probing resolver.
-    from ..display import session_display_socket
-    _disp = session_display_socket()
-    if _disp:
-        os.environ["DISPLAY"] = _disp
+    # Packet 8I: resolve the real X11/Wayland notification session at runtime
+    # (validated, never the hardcoded unit DISPLAY). X11 sets DISPLAY to the
+    # reachable session; Wayland relies on the user D-Bus + XDG_RUNTIME_DIR.
+    from ..display import resolve_notification_session
+    session = resolve_notification_session()
+    if session.get("session_type") == "x11" and session.get("display"):
+        os.environ["DISPLAY"] = session["display"]
     try:
         proc = subprocess.run(["notify-send", title, body],
                               stdout=subprocess.DEVNULL,
@@ -330,26 +389,36 @@ def run_hourly(cfg, *, platforms: Optional[List[str]] = None,
                                      default=["gmail"])
     accounts = accounts or cfg.get("communications", "monitor", "accounts",
                                    default=["default"])
+    # Packet 8I: the overlap lease MUST exceed the maximum oneshot runtime
+    # (unit TimeoutStartSec) by a safety margin. A configured value below the
+    # floor is clamped up and the effective value reported truthfully.
     lease_ttl = float(cfg.get("communications", "monitor", "lease_ttl_s",
-                              default=120.0))
+                              default=LEASE_MIN_TTL_S))
+    lease_clamped = lease_ttl < LEASE_MIN_TTL_S
+    if lease_clamped:
+        lease_ttl = LEASE_MIN_TTL_S
     st = store or communications_store(cfg)
     owner = f"monitor-{uuid.uuid4().hex[:8]}"
     if not st.acquire_lease(MONITOR_LEASE, owner, ttl_s=lease_ttl):
         return {"state": "degraded", "code": "OVERLAP",
-                "detail": "another monitor run holds the hourly lease"}
+                "detail": "another monitor run holds the hourly lease",
+                "exit_code": 1}
     try:
         results: List[Dict[str, Any]] = []
         new_total = 0
         ready_reports: List[str] = []
         all_platforms: List[str] = []
         degraded: List[str] = []
+        failed_accounts: List[str] = []
         commits: List[str] = []
         new_commits: List[Dict[str, Any]] = []   # genuinely-new committed reports
+        delivery_failures: List[str] = []
         for platform in platforms:
             pl = PLATFORM_NAMES.get(platform)
             if pl is None:
                 results.append({"platform": platform, "state": "failed",
                                 "detail": "unknown platform"})
+                failed_accounts.append(f"{platform}/default")
                 continue
             for acct in accounts:
                 r = run_scan(cfg, platform, account_scope=acct,
@@ -375,6 +444,11 @@ def run_hourly(cfg, *, platforms: Optional[List[str]] = None,
                         r.get("health") in ("degraded", "unavailable",
                                             "auth_required", "failed"):
                     degraded.append(f"{platform}/{acct}")
+                if r.get("state") == "failed" or \
+                        r.get("health") in ("failed",):
+                    failed_accounts.append(f"{platform}/{acct}")
+        # Packet 8I: truthful time-config state (fail-closed quiet hours).
+        time_cfg = time_config_state(cfg)
         if dry_run:
             hourly_commit = "preview"
         elif commits:
@@ -390,10 +464,15 @@ def run_hourly(cfg, *, platforms: Optional[List[str]] = None,
             "results": results,
             "platforms": sorted(set(all_platforms)),
             "degraded_accounts": sorted(set(degraded)),
+            "failed_accounts": sorted(set(failed_accounts)),
+            "lease_ttl_s": round(lease_ttl, 1),
+            "lease_clamped": lease_clamped,
+            "time_config": {k: time_cfg[k] for k in
+                            ("state", "quiet_hours_valid", "timezone_valid",
+                             "active", "suppress_voice")
+                            if k in time_cfg},
             "canary": bool(canary),
         }
-        if dry_run:
-            return out
         # Notifications fire ONLY for genuinely committed new-item reports.
         # Baseline, no-change, and zero-new-item runs stay silent. The
         # `notify` flag (from --no-notify) suppresses all delivery.
@@ -402,7 +481,7 @@ def run_hourly(cfg, *, platforms: Optional[List[str]] = None,
                                     default=False))
         desktop_notify = bool(cfg.get("communications", "monitor",
                                       "desktop_notify", default=True))
-        quiet = quiet_hours_active(cfg)
+        quiet = bool(time_cfg["suppress_voice"])
         if notify and new_commits:
             # Group per platform for the plain-language copy. The notification
             # is deduplicated by report id so repeated scans never duplicate it.
@@ -418,6 +497,8 @@ def run_hourly(cfg, *, platforms: Optional[List[str]] = None,
                 recs: List[NotificationRecord] = []
                 if desktop_notify:
                     res = notify_desktop(cfg, rc_new, platform_names)
+                    if res.get("state") != "OK":
+                        delivery_failures.append(f"desktop:{rid}")
                     recs.append(NotificationRecord.create(
                         report_id=rid, kind=NotificationKind.DESKTOP,
                         status=NotificationStatus.SENT
@@ -439,6 +520,8 @@ def run_hourly(cfg, *, platforms: Optional[List[str]] = None,
                             quiet_hours=True))
                     else:
                         res = _notify_voice(cfg, rc_new, platform_names)
+                        if res.get("state") != "OK":
+                            delivery_failures.append(f"voice:{rid}")
                         recs.append(NotificationRecord.create(
                             report_id=rid, kind=NotificationKind.VOICE,
                             status=NotificationStatus.SENT
@@ -459,6 +542,8 @@ def run_hourly(cfg, *, platforms: Optional[List[str]] = None,
             dkey = "degraded:" + ",".join(deg_platforms)
             if not st.notification_exists(dkey, NotificationKind.DESKTOP):
                 res = notify_degraded(cfg, deg_platforms)
+                if res.get("state") != "OK":
+                    delivery_failures.append(f"desktop-degraded:{dkey}")
                 st.record_notification(NotificationRecord.create(
                     report_id="", kind=NotificationKind.DESKTOP,
                     status=NotificationStatus.SENT
@@ -469,14 +554,89 @@ def run_hourly(cfg, *, platforms: Optional[List[str]] = None,
                 degraded_notified.append(dkey)
             else:
                 degraded_notified.append(f"{dkey}:deduped")
+        # Packet 8I: truthful aggregate state + exit code. An account or a
+        # required delivery degrading is never hidden behind a top-level OK.
+        if failed_accounts:
+            out["state"] = "failed"
+            out["code"] = "ACCOUNT_FAILED"
+        elif degraded:
+            out["state"] = "degraded"
+            out["code"] = "ACCOUNT_DEGRADED"
+        elif delivery_failures:
+            out["state"] = "degraded"
+            out["code"] = "DELIVERY_FAILED"
+        elif time_cfg["state"] == "config_invalid":
+            out["state"] = "degraded"
+            out["code"] = "CONFIG_INVALID"
+        else:
+            out["state"] = "OK"
+        out["exit_code"] = 0 if out["state"] == "OK" else 1
         out["notified"] = notified
         out["degraded_notified"] = degraded_notified
         out["quiet_hours_active"] = quiet
-        # Bounded retention after a successful pass (dry-run default).
-        out["retention"] = apply_retention(cfg, st, dry_run=True)
+        out["delivery_failures"] = sorted(set(delivery_failures))
+        if not dry_run:
+            # Packet 8I: bounded retry of PENDING notifications before the run
+            # finishes; exhausted retries become DEAD_LETTER (never infinite).
+            out["retries"] = _retry_pending_notifications(cfg, st)
+            # Bounded retention after a successful pass (dry-run default).
+            out["retention"] = apply_retention(cfg, st, dry_run=True)
         return out
     finally:
         st.release_lease(MONITOR_LEASE, owner)
+
+
+def _retry_pending_notifications(cfg, st, *, max_retries: Optional[int] = None,
+                                 now: Optional[float] = None) -> List[Dict[str, Any]]:
+    """Packet 8I: bounded notification retry with a dead-letter bound.
+
+    Re-attempts ONLY PENDING notifications still inside ``max_retries``. A
+    success records ``sent``; an exhausted failure becomes ``dead_letter``.
+    Platforms for the retry copy are derived from the store (never a hidden
+    hardcode). Returns redacted typed per-attempt records.
+    """
+    max_retries = int(max_retries if max_retries is not None else
+                      cfg.get("communications", "monitor",
+                              "notification_max_retries", default=3))
+    out: List[Dict[str, Any]] = []
+    for row in st.notification_rows_retryable(max_retries, limit=20):
+        nid = row.get("notification_id")
+        kind = row.get("kind")
+        if kind not in (NotificationKind.DESKTOP.value,
+                        NotificationKind.VOICE.value):
+            continue
+        platforms = _retry_platforms(st, row)
+        count = int(row.get("new_count") or 0)
+        if kind == NotificationKind.DESKTOP.value:
+            res = notify_desktop(cfg, count, platforms)
+        else:
+            res = _notify_voice(cfg, count, platforms)
+        status = st.apply_retry_result(nid, res.get("state") == "OK",
+                                       max_retries, now=now)
+        out.append({"notification_id": nid, "kind": kind,
+                    "state": status or "terminal",
+                    "ok": res.get("state") == "OK"})
+    return out
+
+
+def _retry_platforms(st, row: Dict[str, Any]) -> List[str]:
+    """Platform keys for a retry attempt, derived from durable records.
+
+    Degraded-alert dedupe keys are ``degraded:<p1>,<p2>``; item notifications
+    look the report up in the item table. Never a silent hardcoded fallback.
+    """
+    dkey = str(row.get("dedupe_key") or "")
+    if dkey.startswith("degraded:"):
+        return [p for p in dkey.split(":", 1)[1].split(",") if p]
+    report_id = str(row.get("report_id") or "")
+    if report_id:
+        try:
+            plats = st.report_platforms(report_id)
+            if plats:
+                return plats
+        except Exception:
+            pass
+    return []
 
 
 def _notify_voice(cfg, new_count: int, platforms: List[str]) -> Dict[str, Any]:
@@ -766,9 +926,10 @@ def _atomic_write(path: Path, content: str) -> None:
 
 
 __all__ = [
-    "MONITOR_LEASE", "SERVICE_NAME", "TIMER_NAME", "apply_retention",
-    "cdp_precondition", "disable_monitor", "emit_report_ready",
-    "install_monitor", "monitor_health", "notify_degraded", "notify_desktop",
-    "optional_launch", "quiet_hours_active", "render_units",
-    "rollback_monitor", "run_hourly",
+    "LEASE_MIN_TTL_S", "LEASE_SAFETY_MARGIN_S", "MONITOR_LEASE", "SERVICE_NAME",
+    "SERVICE_TIMEOUT_S", "TIMER_NAME", "apply_retention", "cdp_precondition",
+    "disable_monitor", "emit_report_ready", "install_monitor",
+    "monitor_health", "notify_degraded", "notify_desktop", "optional_launch",
+    "quiet_hours_active", "render_units", "rollback_monitor", "run_hourly",
+    "time_config_state", "validate_timezone",
 ]

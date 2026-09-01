@@ -106,6 +106,9 @@ class NotificationStatus(str, Enum):
     ACKED = "acked"
     DEDUPED = "deduped"
     SUPPRESSED_QUIET_HOURS = "suppressed_quiet_hours"
+    # Packet 8I: bounded retries exhausted -> terminal dead-letter (never
+    # silently dropped, never retried forever).
+    DEAD_LETTER = "dead_letter"
 
 
 class Sensitivity(str, Enum):
