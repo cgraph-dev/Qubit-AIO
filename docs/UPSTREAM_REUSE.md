@@ -997,3 +997,62 @@ WHY THIS IS THE SMALLEST FIT: every required primitive already existed and was
 ```
 
 ---
+
+## R22 — End-to-end recovery rehearsal (Packet 8J)
+
+```text
+LOCAL REQUIREMENT: an isolated staging/recovery rehearsal that exercises crash,
+  restart, backup/restore, retention, deduplication, and degraded recovery
+  around the already-verified browser, audio, timer, notification, report,
+  cursor, and action contracts, plus the partial-rollback-visibility repair
+  (a failed rollback step must be a typed failure with the exact bounded paths
+  and must block resume — never swallowed or reported as success). Includes
+  deterministic child-process SIGKILL at every file/store crash boundary, real
+  fsync/os.replace/write failure injection, kernel-enforced RLIMIT_FSIZE
+  disk-full, corrupt-SQLite and newer-schema fail-closed, resource enforcement
+  with actual measurements, measurable RPO/RTO, and repeated-recovery dedupe /
+  no-loss / no-leak. Hermetic only: no live service, account, browser, timer,
+  or production state touched.
+UPSTREAM REPOSITORY + COMMIT: none copied/adapted. Reused verified local units:
+  CommunicationsStore atomic commit/rollback_cursor/lease/retention (Packet 8A/
+  8D), ReportStore atomic publish + integrity (Packet 8C), portable export/
+  read/plan_restore (Packet 7C), ActionStore receipt crash recovery (Packet 8F),
+  monitor run_hourly/notification retry (Packet 8D/8I), and the operator-gated
+  qualification harness pattern of Packet 8I (timer_qualify) / 8G (browser_qualify).
+SOURCE FILES + SYMBOLS: voicebridge/communications/recovery_qualify.py
+  (qualify_* stages, run_rehearsal, deny_live, isolate_cfg, _guard_newer_schema),
+  voicebridge/communications/recovery_crash.py (child-process worker: sigkill_file/
+  sigkill_store/fsync_fail/rename_fail/enospc/enospc_real/resource modes),
+  scripts/recovery_qualify.py, tests/test_recovery_qualify.py; repair:
+  voicebridge/portable.py restore_state (PartialRollbackError.failed_paths).
+UPSTREAM TESTS/FIXTURES: synthetic communications fixtures reused as-is
+  (tests/fixtures/communications/gmail_items.json, qualify_external_item.json);
+  failure injection is local (child subprocess + sqlite3 execute hooks + os-layer
+  fault injection + RLIMIT_FSIZE) and the PartialRollbackError contract is
+  tested directly.
+LICENSE: N/A (no upstream code copied; all reused units already carry their
+  recorded provenance R1–R21).
+DECISION: WRAP (compose verified recovery surfaces into an isolated rehearsal)
+  + LOCAL (PartialRollbackError repair in portable.restore_state; child-process
+  crash/fault worker).
+LOCAL DESTINATION: voicebridge/communications/recovery_qualify.py,
+  voicebridge/communications/recovery_crash.py, scripts/recovery_qualify.py,
+  tests/test_recovery_qualify.py, docs/OPERATIONS_8J.md, voicebridge/portable.py
+  (restore_state rollback loop).
+DEPENDENCIES ADDED: none.
+BEHAVIOR KEPT: atomic cursor/report commit, rollback_cursor from history, lease
+  monotonic/renewable/stale-recovery, report bundle atomic publish + integrity,
+  portable export/read/dry-run/restore, receipt running->interrupted recovery,
+  bounded notification retry/dead-letter, read-only store typed failure.
+BEHAVIOR INTENTIONALLY OMITTED: no live stages (--live fails closed); no
+  destructive account actions, real messages, or fake remote rollback; no
+  parallel persistence; production state is never a fixture; no 8K packaging.
+WHY THIS IS THE SMALLEST FIT: the recovery primitives were already verified in
+  Packets 7C/8A–8I; 8J adds only a bounded isolated rehearsal plus the one
+  explicit repair (partial-rollback visibility) the plan assigns to 8J.
+COMPATIBILITY DRIFT: none — restore_state now raises PartialRollbackError (a
+  PortableError subclass) instead of silently swallowing rollback OSErrors;
+  all existing callers already treat PortableError as a typed failure.
+```
+
+---

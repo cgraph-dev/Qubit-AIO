@@ -60,6 +60,16 @@ class LowDiskError(PortableError):
     pass
 
 
+class PartialRollbackError(PortableError):
+    """A restore failed AND at least one rollback step could not restore a
+    touched path. Carries the exact bounded paths that could not be restored;
+    the operation must never be reported as a successful rollback."""
+
+    def __init__(self, message: str, failed_paths: List[str]) -> None:
+        super().__init__(message)
+        self.failed_paths = failed_paths
+
+
 @dataclass
 class BundleInfo:
     schema_version: int
@@ -451,7 +461,11 @@ def restore_state(cfg: Any, payload: Dict[str, Any], *, dry_run: bool) -> Dict[s
         return {"dry_run": False, "actions": plan.actions,
                 "backup": str(plan.backup_dir)}
     except Exception as exc:
-        # rollback: restore the pre-restore backup over the touched files
+        # rollback: restore the pre-restore backup over the touched files.
+        # A rollback step that cannot restore its path is a TYPED failure with
+        # the exact bounded paths (Packet 8J finding #6): it must block resume
+        # and never be swallowed or reported as a successful rollback.
+        rollback_failures: List[str] = []
         if plan.backup_dir and plan.backup_dir.exists():
             for name in ("memory", "learning.jsonl", "reports", "shared_memory.jsonl"):
                 bak = plan.backup_dir / name
@@ -465,6 +479,12 @@ def restore_state(cfg: Any, payload: Dict[str, Any], *, dry_run: bool) -> Dict[s
                         shutil.copytree(bak, src)
                     else:
                         _write_file_atomic(src, bak.read_bytes())
-                except OSError:
-                    pass
+                except OSError as rb_exc:
+                    rollback_failures.append(
+                        f"{src}: {str(rb_exc)[:120]}")
+        if rollback_failures:
+            raise PartialRollbackError(
+                f"restore failed and rollback is INCOMPLETE; touched paths "
+                f"could not be restored: {rollback_failures}",
+                rollback_failures) from exc
         raise PortableError(f"restore failed and rolled back: {exc}") from exc

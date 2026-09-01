@@ -517,6 +517,7 @@ def test_no_runtime_module_imports_communications_yet():
         "voicebridge/cli.py",          # Packet 8D `monitor` subcommand
         "scripts/communications_monitor.py",  # manual scan CLI (8B) + 8D
         "scripts/timer_qualify.py",    # Packet 8I operator qualification harness
+        "scripts/recovery_qualify.py", # Packet 8J operator recovery rehearsal
     }
     offenders = []
     for root in runtime:
