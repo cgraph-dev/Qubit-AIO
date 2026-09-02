@@ -55,7 +55,7 @@ from voicebridge.communications.recovery_qualify import (  # noqa: E402
     qualify_lease, qualify_newer_schema, qualify_notify_retry,
     qualify_partial_rollback, qualify_portable_restore, qualify_preflight,
     qualify_rename_failure, qualify_repeat_recovery, qualify_report_bundle,
-    qualify_resources, qualify_rpo_rto, run_rehearsal,
+    qualify_resources, qualify_rpo_rto, qualify_hermetic, run_rehearsal,
 )
 
 EXIT_OK = 0
@@ -76,6 +76,7 @@ STAGES = {
     "atomic_boundaries": qualify_atomic_boundaries,
     "partial_rollback": qualify_partial_rollback,
     "repeat_recovery": qualify_repeat_recovery,
+    "hermetic": qualify_hermetic,
     "lease": qualify_lease,
     "notify_retry": qualify_notify_retry,
     "report_bundle": qualify_report_bundle,

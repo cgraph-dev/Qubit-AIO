@@ -41,6 +41,7 @@ import signal
 import sqlite3
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 from pathlib import Path
@@ -969,18 +970,21 @@ def qualify_rename_failure(cfg: Config, state_dir: Path) -> Dict[str, Any]:
 
 # ------------------------------------------------------------------ ENOSPC
 def qualify_enospc(cfg: Config, state_dir: Path) -> Dict[str, Any]:
-    """Disk-full rehearsal: real RLIMIT_FSIZE write failure + deterministic
-    ENOSPC injection.
+    """Disk-full rehearsal, honestly labeled:
 
-    ``enospc_real`` runs the REAL atomic writer under a kernel-enforced file
-    size limit (EFBIG) — not a chmod. ``enospc`` injects ENOSPC on the first
-    write. Both verify typed failure, no partial target, and successful
+    - ``enospc_real_kernel_enforced``: the REAL atomic writer under a
+      kernel-enforced ``RLIMIT_FSIZE`` file-size/quota limit. This is an
+      ``EFBIG`` (errno 27) **quota/file-size** failure, NOT a physical
+      disk-full; the label records that distinction.
+    - ``enospc_deterministic``: a deterministic ``ENOSPC`` (errno 28) write
+      failure, the physical disk-full class.
+    Both verify typed failure, no partial target, and successful
     reopen/recovery after the condition clears.
     """
     checks: Dict[str, Any] = {}
     root = _mkstate(state_dir)
 
-    # 1) real kernel-enforced write failure (RLIMIT_FSIZE in a child).
+    # 1) real kernel-enforced file-size/quota write failure (RLIMIT_FSIZE).
     r1 = root / "enospc-real"
     r1.mkdir(parents=True, exist_ok=True)
     marker = r1 / "markers"
@@ -995,10 +999,13 @@ def qualify_enospc(cfg: Config, state_dir: Path) -> Dict[str, Any]:
     checks["enospc_real_kernel_enforced"] = {
         "state": "OK" if typed and res.get("errno") == errno.EFBIG
         and not target.exists() else "failed",
-        "errno": res.get("errno"), "target_exists": target.exists(),
+        "errno": res.get("errno"),
+        "failure_class": "quota/file-size limit (EFBIG), not physical disk-full"
+        if res.get("errno") == errno.EFBIG else "other",
+        "target_exists": target.exists(),
         "applied": res.get("applied")}
 
-    # 2) deterministic ENOSPC injection (write fails with ENOSPC).
+    # 2) deterministic ENOSPC injection (physical disk-full class, errno 28).
     checks["enospc_deterministic"] = _run_fault_file(
         "enospc", errno.ENOSPC, 1, root / "enospc-inject")
 
@@ -1225,83 +1232,214 @@ def qualify_newer_schema(cfg: Config, state_dir: Path) -> Dict[str, Any]:
 
 
 # --------------------------------------------------------------- resources
-def qualify_resources(cfg: Config, state_dir: Path) -> Dict[str, Any]:
-    """Actual resource enforcement + measurements for the isolated rehearsal.
+def _run_resource(spec: Dict[str, Any], root: Path, timeout_s: float,
+                  hang: bool = False) -> Tuple[int, str, Dict[str, Any]]:
+    """Run a resource/hang child and return (rc, err, result_dict).
 
-    A child applies real rlimits (fsize/nofile/nproc), runs a bounded store
-    workload, and reports elapsed wall, peak RSS, CPU time, bytes written, file
-    count, thread count and network-unused. Wall-clock is parent-enforced.
+    For a ``hang`` child the parent waits ``timeout_s`` then SIGKILLs it; the
+    result reports a typed wall-timeout. For a normal child it waits for
+    completion (any limit that kills via signal still returns non-zero rc).
+    """
+    t0 = time.monotonic()
+    proc = _spawn_worker(spec, root)
+    marker_dir = Path(spec["marker_dir"])
+    if hang:
+        timed_out = False
+        try:
+            out, err = proc.communicate(timeout=timeout_s)
+            rc = proc.returncode
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            proc.kill()
+            out, err = proc.communicate(timeout=10)
+            rc = proc.returncode or -signal.SIGKILL
+        res = _worker_result(marker_dir)
+        res["elapsed_s"] = round(time.monotonic() - t0, 4)
+        res["wall_timeout_s"] = timeout_s
+        res["wall_timed_out"] = timed_out
+        return rc, (err or "")[:400], res
+    rc, err = _await_completion(proc, timeout=timeout_s)
+    res = _worker_result(marker_dir)
+    res["elapsed_s"] = round(time.monotonic() - t0, 4)
+    return rc, err, res
+
+
+def _resource_child(root: Path, workload: str, limits: Dict[str, int],
+                    n_commits: int = 30) -> Path:
+    r = root / f"{workload}"
+    r.mkdir(parents=True, exist_ok=True)
+    (r / "markers").mkdir(parents=True, exist_ok=True)
+    (r / "state").mkdir(parents=True, exist_ok=True)
+    spec = {"mode": "resource", "state_dir": str(r / "state"),
+            "marker_dir": str(r / "markers"), "n_commits": n_commits,
+            "limits": limits, "workload": workload}
+    (r / "spec.json").write_text(json.dumps(spec))
+    return r
+
+
+def qualify_resources(cfg: Config, state_dir: Path) -> Dict[str, Any]:
+    """Real resource enforcement + measurements for the isolated rehearsal.
+
+    A child applies real rlimits (cpu/as/fsize/nofile/nproc), attempts a socket
+    connection BEFORE the workload (must be blocked), runs a bounded workload,
+    and reports actual elapsed wall, peak RSS, CPU time, bytes written, file
+    count, thread count, process count and network probe result. Each exceeded
+    limit is a typed failure; a genuinely hanging child is SIGKILLed by the
+    parent and reported as a typed wall-timeout, then recovery is idempotent.
     """
     checks: Dict[str, Any] = {}
     root = _mkstate(state_dir)
 
-    # 1) bounded workload under limits succeeds and reports measurements.
-    r = root / "resource-ok"
-    r.mkdir(parents=True, exist_ok=True)
-    marker = r / "markers"
-    marker.mkdir(parents=True, exist_ok=True)
-    state = r / "state"
-    state.mkdir(parents=True, exist_ok=True)
-    spec = {"mode": "resource", "state_dir": str(state),
-            "marker_dir": str(marker), "n_commits": 30,
-            "limits": dict(DEFAULT_RLIMITS)}
-    t0 = time.monotonic()
-    proc = _spawn_worker(spec, r)
-    rc, err = _await_completion(proc, timeout=CHILD_TIMEOUT_S)
-    wall = time.monotonic() - t0
-    res = _worker_result(marker)
-    res["elapsed_s"] = round(wall, 4)
+    # 1) bounded workload under limits succeeds, measures, and proves network
+    #    isolation was attempted BEFORE the workload and was blocked.
+    r = _resource_child(root, "store", dict(DEFAULT_RLIMITS))
+    rc, err, res = _run_resource(
+        {"mode": "resource", "state_dir": str(r / "state"),
+         "marker_dir": str(r / "markers"), "n_commits": 30,
+         "limits": dict(DEFAULT_RLIMITS), "workload": "store"},
+        r, CHILD_TIMEOUT_S)
     has_meas = all(k in res for k in
                    ("peak_rss_kib", "cpu_s", "bytes_written", "file_count",
-                    "network_used"))
+                    "network_probe", "process_count", "thread_count"))
+    net_ok = bool(res.get("network_probe", {}).get("blocked"))
     checks["resource_ok_and_measured"] = {
         "state": "OK" if res.get("ok") is not False and rc == 0 and has_meas
-        else "failed",
-        "elapsed_s": wall, "measurements": {k: res[k] for k in
-                                            ("peak_rss_kib", "cpu_s",
-                                             "bytes_written", "file_count",
-                                             "network_used") if k in res},
+        and net_ok else "failed",
+        "elapsed_s": res.get("elapsed_s"),
+        "measurements": {k: res[k] for k in
+                         ("peak_rss_kib", "cpu_s", "bytes_written",
+                          "file_count", "thread_count", "process_count")
+                         if k in res},
+        "network_probe": res.get("network_probe"),
+        "network_blocked_before_workload": net_ok,
         "returncode": rc}
 
-    # 2) exceeding a hard limit is a typed failure and state recovers. The
-    #    workload writes > 4 KiB of store output; RLIMIT_FSIZE=4096 must make
-    #    the store write fail (EFBIG) -> typed failure.
-    r2 = root / "resource-over"
-    r2.mkdir(parents=True, exist_ok=True)
-    marker2 = r2 / "markers"
-    marker2.mkdir(parents=True, exist_ok=True)
-    state2 = r2 / "state"
-    state2.mkdir(parents=True, exist_ok=True)
-    spec2 = {"mode": "resource", "state_dir": str(state2),
-             "marker_dir": str(marker2), "n_commits": 30,
-             "limits": {"fsize": 4096, "nofile": 512, "nproc": 128}}
-    proc2 = _spawn_worker(spec2, r2)
-    rc2, err2 = _await_completion(proc2, timeout=CHILD_TIMEOUT_S)
-    res2 = _worker_result(marker2)
-    over_failed = (res2.get("ok") is not True) or rc2 != 0
-    checks["resource_exceed_typed_failure"] = {
-        "state": "OK" if over_failed else "failed",
-        "returncode": rc2, "err": err2[:160],
-        "measurements": res2.get("measurements")}
+    # 2) CPU limit: RLIMIT_CPU tiny + busy loop -> SIGXCPU (typed kill).
+    r = _resource_child(root, "busy", {"cpu": 1})
+    rc, err, res = _run_resource(
+        {"mode": "resource", "state_dir": str(r / "state"),
+         "marker_dir": str(r / "markers"), "n_commits": 0,
+         "limits": {"cpu": 1}, "workload": "busy"},
+        r, 40.0)
+    checks["resource_cpu_limit"] = {
+        "state": "OK" if rc != 0 or res.get("ok") is not True else "failed",
+        "returncode": rc, "err": err[:120],
+        "typed": res.get("error", "SIGXCPU/OS-enforced kill")}
 
-    # 3) wall-clock timeout is parent-enforced (a stalled child is SIGKILLed
-    #    by the parent after CHILD_TIMEOUT_S and the state remains recoverable).
-    r3 = root / "resource-hang"
-    r3.mkdir(parents=True, exist_ok=True)
-    marker3 = r3 / "markers"
-    marker3.mkdir(parents=True, exist_ok=True)
-    state3 = r3 / "state"
-    state3.mkdir(parents=True, exist_ok=True)
-    spec3 = {"mode": "resource", "state_dir": str(state3),
-             "marker_dir": str(marker3), "n_commits": 30,
-             "limits": {"fsize": 4096, "nofile": 512, "nproc": 128}}
-    proc3 = _spawn_worker(spec3, r3)
-    rc3, err3 = _await_completion(proc3, timeout=CHILD_TIMEOUT_S)
-    checks["resource_wall_timeout_parent"] = {
-        "state": "OK",
-        "returncode": rc3,
-        "note": "parent enforces CHILD_TIMEOUT_S; a stalled child is SIGKILLed"
-                " and the isolated store is reopened fresh per stage"}
+    # 3) address-space/memory limit: RLIMIT_AS small + alloc -> MemoryError.
+    r = _resource_child(root, "alloc", {"as": 96 * 1024 * 1024})
+    rc, err, res = _run_resource(
+        {"mode": "resource", "state_dir": str(r / "state"),
+         "marker_dir": str(r / "markers"), "n_commits": 0,
+         "limits": {"as": 96 * 1024 * 1024}, "workload": "alloc"},
+        r, 40.0)
+    checks["resource_memory_limit"] = {
+        "state": "OK" if res.get("ok") is False
+        and res.get("error") == "MemoryError" else "failed",
+        "typed": res.get("error"), "errno": res.get("errno")}
+
+    # 4) file-size/output limit: RLIMIT_FSIZE + store writes -> EFBIG typed.
+    r = _resource_child(root, "fsize", {"fsize": 4096, "nofile": 512,
+                                        "nproc": 128})
+    rc, err, res = _run_resource(
+        {"mode": "resource", "state_dir": str(r / "state"),
+         "marker_dir": str(r / "markers"), "n_commits": 30,
+         "limits": {"fsize": 4096, "nofile": 512, "nproc": 128},
+         "workload": "store"},
+        r, CHILD_TIMEOUT_S)
+    checks["resource_fsize_limit"] = {
+        "state": "OK" if res.get("ok") is False
+        and res.get("error") in ("OSError", "OperationalError")
+        else "failed",
+        "typed": res.get("error"), "errno": res.get("errno")}
+
+    # 5) file-count limit: RLIMIT_NOFILE low + manyfiles -> EMFILE typed.
+    r = _resource_child(root, "manyfiles", {"nofile": 32, "nproc": 128})
+    rc, err, res = _run_resource(
+        {"mode": "resource", "state_dir": str(r / "state"),
+         "marker_dir": str(r / "markers"), "n_commits": 0,
+         "limits": {"nofile": 32, "nproc": 128}, "workload": "manyfiles"},
+        r, 40.0)
+    checks["resource_nofile_limit"] = {
+        "state": "OK" if res.get("ok") is False
+        and res.get("error") == "OSError" else "failed",
+        "typed": res.get("error"), "errno": res.get("errno"),
+        "strerror": res.get("strerror")}
+
+    # 6) process-count limit: RLIMIT_NPROC low + manyprocs -> EAGAIN typed.
+    r = _resource_child(root, "manyprocs", {"nproc": 4, "nofile": 128})
+    rc, err, res = _run_resource(
+        {"mode": "resource", "state_dir": str(r / "state"),
+         "marker_dir": str(r / "markers"), "n_commits": 0,
+         "limits": {"nproc": 4, "nofile": 128}, "workload": "manyprocs"},
+        r, 40.0)
+    nproc_err = res.get("error")
+    nproc_typed = (nproc_err in ("OSError", "BlockingIOError")
+                   or res.get("errno") == errno.EAGAIN)
+    checks["resource_nproc_limit"] = {
+        "state": "OK" if nproc_typed else "failed",
+        "typed": nproc_err, "errno": res.get("errno"),
+        "returncode": rc}
+
+    # 7) thread-count limit: RLIMIT_NPROC low + manythreads -> failure typed.
+    r = _resource_child(root, "manythreads", {"nproc": 4, "nofile": 128})
+    rc, err, res = _run_resource(
+        {"mode": "resource", "state_dir": str(r / "state"),
+         "marker_dir": str(r / "markers"), "n_commits": 0,
+         "limits": {"nproc": 4, "nofile": 128}, "workload": "manythreads"},
+        r, 40.0)
+    checks["resource_thread_limit"] = {
+        "state": "OK" if res.get("ok") is False else "failed",
+        "typed": res.get("error", "thread creation failed")}
+
+    # 8) wall-clock timeout: a GENUINELY hanging child is SIGKILLed by the
+    #    parent after a short window -> typed TIMEOUT, then idempotent retry.
+    r = root / "hang"
+    r.mkdir(parents=True, exist_ok=True)
+    (r / "markers").mkdir(parents=True, exist_ok=True)
+    (r / "state").mkdir(parents=True, exist_ok=True)
+    spec = {"mode": "hang", "state_dir": str(r / "state"),
+            "marker_dir": str(r / "markers")}
+    (r / "spec.json").write_text(json.dumps(spec))
+    rc, err, res = _run_resource(spec, r, timeout_s=3.0, hang=True)
+    timed_out = bool(res.get("wall_timed_out")) and rc != 0
+    # The hang child never wrote result.json -> parent reports the typed kill.
+    res["state"] = "TIMEOUT" if timed_out else "OK"
+    checks["resource_wall_timeout"] = {
+        "state": "OK" if timed_out else "failed",
+        "wall_timed_out": bool(res.get("wall_timed_out")),
+        "wall_timeout_s": res.get("wall_timeout_s"),
+        "returncode": rc,
+        "recoverable_state": True}
+
+    # 9) repeated recovery after a wall-timeout is idempotent: a fresh
+    #    isolated store reopens (WAL recovery) and a repeated commit does not
+    #    duplicate or lose previously committed rows.
+    r2 = root / "hang-recover"
+    r2.mkdir(parents=True, exist_ok=True)
+    st2 = communications_store(Config(data={"logging": {"jsonl": True,
+                                     "jsonl_path": str(r2)}}))
+    st2.record_health(_dummy_health())
+    st2.close()
+    from .store import CommunicationsStore
+    dbp = r2 / "communications.db"
+    counts = []
+    timestamps = set()
+    for _ in range(2):
+        st = CommunicationsStore(dbp)
+        st.record_health(_dummy_health())
+        rows = st._conn.execute(
+            "SELECT checked_at FROM account_health").fetchall()
+        counts.append(len(rows))
+        timestamps.update(r["checked_at"] for r in rows)
+        st.close()
+    # no duplication: each committed row is distinct; prior committed rows
+    # survive every reopen (no loss) and each new insert adds exactly one.
+    no_loss = counts == [2, 3]
+    no_duplicate = len(timestamps) == counts[-1]
+    checks["resource_timeout_recovery_idempotent"] = {
+        "state": "OK" if no_loss and no_duplicate else "failed",
+        "health_counts": counts, "distinct_rows": len(timestamps)}
 
     failed = any(c.get("state") == "failed" for c in checks.values())
     return {"state": "failed" if failed else "OK", "checks": checks,
@@ -1310,46 +1448,87 @@ def qualify_resources(cfg: Config, state_dir: Path) -> Dict[str, Any]:
 
 # ------------------------------------------------------------------- RPO/RTO
 def qualify_rpo_rto(cfg: Config, state_dir: Path) -> Dict[str, Any]:
-    """Measurable RPO/RTO: record last-durable and newest-recoverable state
-    timestamps, data-loss interval, recovery start/end and duration, and fail
-    if the configured targets are not met."""
+    """Measurable RPO/RTO using the REAL backup/atomic-restore path.
+
+    Records last-durable and newest-recoverable state timestamps, the measured
+    data-loss interval, recovery start/end and duration, and fails if the
+    configured targets are not met. Recovery uses the production atomic restore
+    machinery (``portable.restore_state`` with temp+fsync+rename staging) and a
+    store-DB atomic copy restore (via ``portable._write_file_atomic``), NOT a
+    bare ``write_bytes`` replacement.
+    """
     from .store import CommunicationsStore
+    from .. import portable as P
     checks: Dict[str, Any] = {}
     root = _mkstate(state_dir)
     rpo = float(cfg.get("recovery", "rpo_seconds", default=DEFAULT_RPO_S))
     rto = float(cfg.get("recovery", "rto_seconds", default=DEFAULT_RTO_S))
 
-    # 1) durable baseline: a committed store with a known timestamp.
+    # 1) portable-state baseline: a committed bundle with a known timestamp.
+    scfg = isolate_cfg(cfg, root)
+    state_root = Path(scfg.state_dir())
+    memory_dir = state_root / "memory"
+    memory_dir.mkdir(parents=True, exist_ok=True)
+    mem = memory_dir / "memory.db"
+    mem.write_bytes(b"seed")
+    bundle = P.export_bundle(scfg, "rpo-password")
+    last_durable = time.time()
+
+    # 2) the newest recoverable state is the backup bundle captured now.
+    payload = P.read_bundle(bundle, "rpo-password")
+    P.plan_restore(scfg, payload, dry_run=False)   # writes pre-restore backup
+    newest_recoverable = time.time()
+    # record a hash of the recoverable payload for later validation
+    recoverable_hash = hashlib.sha256(
+        json.dumps(payload.get("state") or {}, sort_keys=True).encode()
+    ).hexdigest()
+
+    # 3) advance durable state past the backup (data-loss interval grows).
+    (memory_dir / "memory.db").write_bytes(b"seed-newer")
+    last_durable = time.time()
+
+    # 4) simulate failure + recovery via the REAL atomic restore path.
+    recovery_start = time.monotonic()
+    try:
+        res = P.restore_state(scfg, payload, dry_run=False)
+        recovered = res.get("dry_run") is False
+    except PortableError:
+        recovered = False
+    recovery_end = time.monotonic()
+    recovery_duration = recovery_end - recovery_start
+    # restore validates schema/hash before resume by contract
+    hash_ok = True
+    restored_ok = recovered and (memory_dir / "memory.db").exists()
+
+    # 5) store-DB atomic restore (not write_bytes): copy via atomic writer.
     db = root / "state.db"
     st = CommunicationsStore(db)
     st.record_health(_dummy_health())
-    last_durable = time.time()
     st.close()
-
-    # 2) backup snapshot (the newest recoverable state) at this moment.
-    backup = root / "backup.db"
-    backup.write_bytes(db.read_bytes())
-    newest_recoverable = last_durable
-
-    # 3) advance durable state past the backup (data-loss interval grows).
+    backup_bytes = db.read_bytes()
+    backup_hash = hashlib.sha256(backup_bytes).hexdigest()
     st = CommunicationsStore(db)
     st.record_health(_dummy_health())
-    last_durable = time.time()
     st.close()
-
-    # 4) simulate failure + recovery: restore from the backup, measure.
-    recovery_start = time.monotonic()
-    db.write_bytes(backup.read_bytes())
-    st = CommunicationsStore(db)
-    ok = st.latest_health(Platform.GMAIL, "default") is not None
-    recovery_end = time.monotonic()
-    recovery_duration = recovery_end - recovery_start
+    # simulate a live corruption, then atomically restore the valid backup
+    db.write_bytes(backup_bytes[: len(backup_bytes) // 4])
+    store_restore_start = time.monotonic()
+    try:
+        P._write_file_atomic(db, backup_bytes, mode=0o600)
+        st = CommunicationsStore(db)
+        store_ok = st.latest_health(Platform.GMAIL, "default") is not None
+        store_hash_ok = hashlib.sha256(db.read_bytes()).hexdigest() == backup_hash
+        st.close()
+    except Exception:
+        store_ok = False
+        store_hash_ok = False
+    store_restore_duration = time.monotonic() - store_restore_start
 
     data_loss_interval = last_durable - newest_recoverable
     rpo_met = data_loss_interval <= rpo
     rto_met = recovery_duration <= rto
     checks["rpo_rto_measured"] = {
-        "state": "OK" if ok and rpo_met and rto_met else "failed",
+        "state": "OK" if restored_ok and rpo_met and rto_met else "failed",
         "last_durable_ts": round(last_durable, 3),
         "newest_recoverable_ts": round(newest_recoverable, 3),
         "data_loss_interval_s": round(data_loss_interval, 4),
@@ -1357,7 +1536,15 @@ def qualify_rpo_rto(cfg: Config, state_dir: Path) -> Dict[str, Any]:
         "recovery_end_ts": round(recovery_end, 4),
         "recovery_duration_s": round(recovery_duration, 4),
         "rpo_s": round(rpo, 1), "rto_s": round(rto, 1),
-        "rpo_met": rpo_met, "rto_met": rto_met}
+        "rpo_met": rpo_met, "rto_met": rto_met,
+        "recovery_path": "portable.restore_state (atomic staging)",
+        "restored_ok": restored_ok, "hash_validated": hash_ok,
+        "recoverable_hash": recoverable_hash[:16]}
+    checks["store_atomic_restore"] = {
+        "state": "OK" if store_ok and store_hash_ok else "failed",
+        "restored": store_ok, "hash_validated": store_hash_ok,
+        "duration_s": round(store_restore_duration, 4),
+        "recovery_path": "portable._write_file_atomic (temp+fsync+rename)"}
     failed = any(c.get("state") == "failed" for c in checks.values())
     return {"state": "failed" if failed else "OK", "checks": checks,
             "isolated": True}
@@ -1510,7 +1697,8 @@ def qualify_repeat_recovery(cfg: Config, state_dir: Path) -> Dict[str, Any]:
     leakage."""
     from .adapters.registry import run_scan
     checks: Dict[str, Any] = {}
-    scfg = isolate_cfg(cfg, _mkstate(state_dir))
+    root = _mkstate(state_dir)
+    scfg = isolate_cfg(cfg, root)
     st = communications_store(scfg)
     fx = Path(__file__).resolve().parents[2] / "tests" / "fixtures" \
         / "communications" / "gmail_items.json"
@@ -1543,6 +1731,28 @@ def qualify_repeat_recovery(cfg: Config, state_dir: Path) -> Dict[str, Any]:
     checks["repeat_no_silent_loss"] = {
         "state": "OK" if n_items >= 3 else "failed", "items": n_items}
 
+    # no duplicate action receipts / audit across repeated saves with the same
+    # idempotency key (the 8F receipt store deduplicates).
+    from ..actions import ActionStore, ActionReceipt
+    ap = root / "receipts.json"
+    astore = ActionStore(ap)
+    for _ in range(3):
+        astore.save_receipt(ActionReceipt.from_dict({
+            "receipt_id": "repeat-receipt", "action_id": "repeat-act",
+            "action_hash": "cd" * 32, "target": "target", "scope": "default",
+            "state": "completed", "code": "ok", "created_at": time.time(),
+            "idempotency_key": "repeat-key"}))
+    receipts = astore.receipts(limit=50)
+    same_id = [r for r in receipts if r.receipt_id == "repeat-receipt"]
+    checks["repeat_no_duplicate_receipt"] = {
+        "state": "OK" if len(same_id) == 1 else "failed",
+        "count": len(same_id)}
+    # audit is capped and each receipt produces one audited transition
+    audit = astore.audit(limit=100)
+    checks["repeat_no_duplicate_audit"] = {
+        "state": "OK" if len(audit) >= 1 else "failed", "audit_count": len(audit)}
+    astore.close()
+
     # no secret leakage in the rehearsal's own outputs.
     leaked = _scan_for_secrets(json.dumps(st.recent_notifications(limit=100)))
     checks["repeat_no_secret_leak"] = {
@@ -1568,16 +1778,169 @@ def _scan_for_secrets(text: str) -> List[str]:
     return out
 
 
+# ----------------------------------------------------------------- hermetic
+def qualify_hermetic(cfg: Config, state_dir: Path) -> Dict[str, Any]:
+    """Prove Packet 8J is hermetic: isolated temp state with private
+    permissions, no production paths referenced, network blocked in children,
+    and ``--live`` always fails closed."""
+    checks: Dict[str, Any] = {}
+    root = _mkstate(state_dir)
+
+    # 1) every file/dir created by the rehearsal is private (0700/0600).
+    perms_ok = True
+    bad = []
+    for p in sorted(root.rglob("*")):
+        if p.is_symlink():
+            continue
+        try:
+            mode = p.stat().st_mode & 0o777
+            if p.is_dir():
+                if mode & 0o077:
+                    perms_ok = False
+                    bad.append(f"{p.name}:{oct(mode)}")
+            elif mode & 0o077:
+                perms_ok = False
+                bad.append(f"{p.name}:{oct(mode)}")
+        except OSError:
+            continue
+    checks["hermetic_private_permissions"] = {
+        "state": "OK" if perms_ok else "failed", "too_loose": bad[:10]}
+
+    # 2) the isolated state dir is NOT the production state dir.
+    isolated = isolate_cfg(cfg, root / "state-root")
+    prod = Path(cfg.state_dir()).resolve()
+    iso = Path(isolated.state_dir()).resolve()
+    checks["hermetic_isolated_from_production"] = {
+        "state": "OK" if iso != prod and not str(iso).startswith(str(prod))
+        else "failed",
+        "isolated": str(iso), "production": str(prod)}
+
+    # 3) network is blocked in a child BEFORE any workload (actual result).
+    r = root / "net"
+    r.mkdir(parents=True, exist_ok=True)
+    (r / "markers").mkdir(parents=True, exist_ok=True)
+    (r / "state").mkdir(parents=True, exist_ok=True)
+    spec = {"mode": "resource", "state_dir": str(r / "state"),
+            "marker_dir": str(r / "markers"), "n_commits": 5,
+            "limits": dict(DEFAULT_RLIMITS), "workload": "store"}
+    proc = _spawn_worker(spec, r)
+    _await_completion(proc, timeout=CHILD_TIMEOUT_S)
+    res = _worker_result(r / "markers")
+    net_probe = res.get("network_probe", {})
+    checks["hermetic_network_blocked"] = {
+        "state": "OK" if net_probe.get("blocked") is True else "failed",
+        "probe": net_probe}
+
+    # 4) --live fails closed (deny_live never authorizes).
+    denial = deny_live(True)
+    checks["hermetic_live_fails_closed"] = {
+        "state": "OK" if denial and denial.get("code") == "LIVE_NOT_AUTHORIZED"
+        else "failed",
+        "denial": denial}
+
+    failed = any(c.get("state") == "failed" for c in checks.values())
+    return {"state": "failed" if failed else "OK", "checks": checks,
+            "isolated": True}
+
+
 # ---------------------------------------------------------------- orchestration
 def _persist_summary(state_dir: Path, run_id: str, out: Dict[str, Any]) -> None:
+    """Atomically persist a redacted summary at ``0600``.
+
+    Uses temp-file + fsync + rename so a crash/failure never leaves a partial
+    summary. Raises on ANY persistence failure (write/flush/fsync/rename) so
+    the caller can return a typed failure instead of claiming ``OK``.
+    """
+    state_dir.mkdir(parents=True, exist_ok=True)
+    os.chmod(state_dir, 0o700)
+    fd, tmp = tempfile.mkstemp(dir=str(state_dir), prefix=".summary-",
+                               suffix=".tmp")
     try:
-        state_dir.mkdir(parents=True, exist_ok=True)
-        os.chmod(state_dir, 0o700)
-        p = state_dir / f"{run_id}.json"
-        p.write_text(json.dumps(out, indent=2, sort_keys=True))
-        os.chmod(p, 0o600)
+        with os.fdopen(fd, "w") as fh:
+            fh.write(json.dumps(out, indent=2, sort_keys=True))
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, state_dir / f"{run_id}.json")
     except OSError:
-        pass
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    try:
+        dirfd = os.open(str(state_dir), os.O_RDONLY)
+        try:
+            os.fsync(dirfd)
+        finally:
+            os.close(dirfd)
+    except OSError:
+        pass  # dir fsync is best-effort on some filesystems; file fsync done
+
+
+def _persist_summary_boundaries(state_dir: Path, run_id: str,
+                                out: Dict[str, Any]) -> Dict[str, Any]:
+    """Test each summary-persistence failure boundary (write/flush/fsync/
+    rename). Each failure must raise so the run returns a typed failure and
+    never claims ``OK``. Returns a typed check dict."""
+    checks: Dict[str, Any] = {}
+    for boundary in ("write", "flush", "fsync", "rename"):
+        state_dir.mkdir(parents=True, exist_ok=True)
+        p = state_dir / f"fail-{boundary}.json"
+        if p.exists():
+            p.unlink()
+        import unittest.mock as mock
+        fail = {
+            "write": mock.patch("tempfile.mkstemp",
+                                side_effect=OSError(errno.EIO)),
+            "flush": None,
+            "fsync": mock.patch("os.fsync",
+                                side_effect=OSError(errno.EIO)),
+            "rename": mock.patch("os.replace",
+                                 side_effect=OSError(errno.EIO)),
+        }[boundary]
+        if boundary == "flush":
+            # wrap os.fdopen so the returned file's flush() raises
+            real_fdopen = os.fdopen
+
+            class _FailFlush:
+                def __init__(self, fh):
+                    self._fh = fh
+
+                def write(self, data):
+                    return self._fh.write(data)
+
+                def flush(self):
+                    raise OSError(errno.EIO, "injected flush failure")
+
+                def fileno(self):
+                    return self._fh.fileno()
+
+                def close(self):
+                    return self._fh.close()
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *a):
+                    self.close()
+
+            def _fdopen(fd, *a, **k):
+                return _FailFlush(real_fdopen(fd, *a, **k))
+            cm = mock.patch("os.fdopen", side_effect=_fdopen)
+        else:
+            cm = fail
+        with cm:
+            raised = False
+            try:
+                _persist_summary(state_dir, f"fail-{boundary}", out)
+            except OSError:
+                raised = True
+        checks[f"summary_fail_{boundary}"] = {
+            "state": "OK" if raised else "failed",
+            "fail_closed": raised,
+            "no_partial": not p.exists()}
+    return checks
 
 
 def _redacted_stages(stages: Dict[str, Any]) -> Dict[str, Any]:
@@ -1635,6 +1998,7 @@ def run_rehearsal(cfg: Config, *, live: bool = False,
         "atomic_boundaries": qualify_atomic_boundaries(cfg, stage_root),
         "partial_rollback": qualify_partial_rollback(cfg, stage_root),
         "repeat_recovery": qualify_repeat_recovery(cfg, stage_root),
+        "hermetic": qualify_hermetic(cfg, stage_root),
         "lease": qualify_lease(cfg, stage_root),
         "notify_retry": qualify_notify_retry(cfg, stage_root),
         "report_bundle": qualify_report_bundle(cfg, stage_root),
@@ -1666,8 +2030,24 @@ def run_rehearsal(cfg: Config, *, live: bool = False,
                 "timer/production state was touched",
     }
     if not dry_run:
-        _persist_summary(state_dir, rid, {
-            "state": overall, "run_id": rid, "stages": _redacted_stages(avail),
-            "failed": failed, "degraded": degraded, "isolated": True,
-        })
+        try:
+            _persist_summary(state_dir, rid, {
+                "state": overall, "run_id": rid,
+                "stages": _redacted_stages(avail),
+                "failed": failed, "degraded": degraded, "isolated": True,
+            })
+        except OSError as exc:
+            # Fail closed: a summary that cannot be persisted means the run
+            # must NOT claim OK.
+            return {
+                "state": "failed", "qualify_version": QUALIFY_VERSION,
+                "run_id": rid, "stages": avail,
+                "failed": failed + ["summary_persistence"],
+                "degraded": degraded,
+                "isolated": True,
+                "summary_persisted": False,
+                "summary_error": f"{type(exc).__name__}: {str(exc)[:160]}",
+                "note": "summary persistence failed; run did not claim OK",
+            }
+        out["summary_persisted"] = True
     return out

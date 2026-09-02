@@ -30,11 +30,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from voicebridge.communications.recovery_qualify import (  # noqa: E402
-    _guard_newer_schema, _run_sigkill_file, _run_sigkill_store,
-    _run_fault_file, _scan_for_secrets, _snapshot_state, deny_live,
-    qualify_action_receipts, qualify_atomic_boundaries, qualify_concurrent,
-    qualify_corrupt_sqlite, qualify_crash_commit, qualify_crash_kill,
-    qualify_disk_state, qualify_enospc, qualify_fsync_failure,
+    _guard_newer_schema, _persist_summary, _persist_summary_boundaries,
+    _run_sigkill_file, _run_sigkill_store, _run_fault_file, _scan_for_secrets,
+    _snapshot_state, deny_live, qualify_action_receipts,
+    qualify_atomic_boundaries, qualify_concurrent, qualify_corrupt_sqlite,
+    qualify_crash_commit, qualify_crash_kill, qualify_disk_state,
+    qualify_enospc, qualify_fsync_failure, qualify_hermetic,
     qualify_idempotent_recovery, qualify_journal, qualify_lease,
     qualify_newer_schema, qualify_notify_retry, qualify_partial_rollback,
     qualify_portable_restore, qualify_preflight, qualify_rename_failure,
@@ -393,13 +394,21 @@ def test_resources_measured_and_enforced(tmp_path):
     assert m["cpu_s"] >= 0
     assert m["bytes_written"] > 0
     assert m["file_count"] >= 1
-    assert m["network_used"] is False
+    assert m["process_count"] >= 1
+    assert c["network_probe"]["blocked"] is True
+    assert c["network_blocked_before_workload"] is True
     assert c["elapsed_s"] > 0
-    assert out["checks"]["resource_exceed_typed_failure"]["state"] == "OK"
+    # every enforced limit must be a typed failure
+    for name in ("cpu", "memory", "fsize", "nofile", "nproc", "thread"):
+        assert out["checks"][f"resource_{name}_limit"]["state"] == "OK", name
+    # genuine wall-timeout on a hanging child
+    assert out["checks"]["resource_wall_timeout"]["state"] == "OK"
+    assert out["checks"]["resource_wall_timeout"]["wall_timed_out"] is True
+    assert out["checks"]["resource_timeout_recovery_idempotent"]["state"] == "OK"
 
 
 # ------------------------------------------------------------------- RPO/RTO
-def test_rpo_rto_measured(tmp_path):
+def test_rpo_rto_measured_real_restore_path(tmp_path):
     cfg = _cfg(tmp_path)
     out = qualify_rpo_rto(cfg, _stage_root(tmp_path))
     assert out["state"] == "OK"
@@ -409,6 +418,62 @@ def test_rpo_rto_measured(tmp_path):
     assert c["rpo_met"] is True
     assert c["rto_met"] is True
     assert c["last_durable_ts"] >= c["newest_recoverable_ts"]
+    # recovery must go through the real atomic restore path, not write_bytes
+    assert "restore_state" in c["recovery_path"]
+    assert out["checks"]["store_atomic_restore"]["state"] == "OK"
+    assert out["checks"]["store_atomic_restore"]["hash_validated"] is True
+
+
+# ----------------------------------------------------------------- hermetic
+def test_hermetic_stage(tmp_path):
+    cfg = _cfg(tmp_path)
+    out = qualify_hermetic(cfg, _stage_root(tmp_path))
+    assert out["state"] == "OK"
+    checks = out["checks"]
+    assert checks["hermetic_private_permissions"]["state"] == "OK"
+    assert checks["hermetic_isolated_from_production"]["state"] == "OK"
+    assert checks["hermetic_network_blocked"]["state"] == "OK"
+    assert checks["hermetic_network_blocked"]["probe"]["blocked"] is True
+    assert checks["hermetic_live_fails_closed"]["state"] == "OK"
+
+
+# -------------------------------------------------- summary persistence
+def test_summary_persist_fails_closed_at_every_boundary(tmp_path):
+    state_dir = tmp_path / "sum"
+    sb = _persist_summary_boundaries(
+        state_dir, "rc-test", {"state": "OK", "run_id": "rc-test"})
+    for k, v in sb.items():
+        assert v["state"] == "OK", f"{k}: {v}"
+        assert v["fail_closed"] is True
+        assert v["no_partial"] is True
+
+
+def test_summary_persist_atomic_rename_private(tmp_path):
+    state_dir = tmp_path / "sum2"
+    _persist_summary(state_dir, "rc-test", {"state": "OK", "run_id": "rc-test"})
+    p = state_dir / "rc-test.json"
+    assert p.exists()
+    assert oct(p.stat().st_mode) in ("0o100600", "0o600")
+    import json as _json
+    assert _json.loads(p.read_text())["state"] == "OK"
+    # no leftover temp files after a successful persist
+    temps = [f for f in state_dir.iterdir() if f.name.startswith(".summary-")]
+    assert temps == []
+
+
+def test_run_rehearsal_summary_failure_returns_typed_failure(tmp_path):
+    from unittest import mock
+    cfg = _cfg(tmp_path)
+    state_dir = tmp_path / "qual-fail"
+    # run only the fast preflight stage; a persisted summary is still written
+    with mock.patch(
+            "voicebridge.communications.recovery_qualify._persist_summary",
+            side_effect=OSError(5, "injected persist failure")):
+        out = run_rehearsal(cfg, state_dir=state_dir, stages=["preflight"])
+    # the run must NOT claim OK when the summary cannot be persisted
+    assert out["state"] == "failed"
+    assert out.get("summary_persisted") is False
+    assert "summary_persistence" in out.get("failed", [])
 
 
 # --------------------------------------------------------- atomic boundaries
@@ -470,6 +535,35 @@ def test_all_new_stages_pass_individually(tmp_path):
     cfg = _cfg(tmp_path)
     for name in ("crash_kill", "fsync_failure", "rename_failure", "enospc",
                  "corrupt_sqlite", "newer_schema", "resources", "rpo_rto",
-                 "atomic_boundaries", "partial_rollback", "repeat_recovery"):
+                 "atomic_boundaries", "partial_rollback", "repeat_recovery",
+                 "hermetic"):
         out = run_rehearsal(cfg, state_dir=tmp_path / name, stages=[name])
         assert out["state"] == "OK", f"{name}: {out['failed']}"
+
+
+# ------------------------------------------------------ network isolation
+def test_network_probe_blocked_before_workload(tmp_path):
+    cfg = _cfg(tmp_path)
+    out = qualify_resources(cfg, _stage_root(tmp_path))
+    probe = out["checks"]["resource_ok_and_measured"]["network_probe"]
+    assert probe["attempted"] is True
+    assert probe["blocked"] is True
+
+
+def test_process_count_measured_not_hardcoded(tmp_path):
+    from voicebridge.communications.recovery_crash import _process_count
+    assert _process_count() >= 1
+
+
+# ------------------------------------------------------- ENOSPC honesty
+def test_enospc_efbig_labeled_quota(tmp_path):
+    cfg = _cfg(tmp_path)
+    out = qualify_enospc(cfg, _stage_root(tmp_path))
+    checks = out["checks"]
+    assert checks["enospc_real_kernel_enforced"]["state"] == "OK"
+    assert checks["enospc_real_kernel_enforced"]["errno"] == 27  # EFBIG
+    assert "quota/file-size" in \
+        checks["enospc_real_kernel_enforced"]["failure_class"]
+    assert checks["enospc_deterministic"]["state"] == "OK"
+    assert checks["enospc_deterministic"]["errno"] == 28  # ENOSPC
+    assert checks["enospc_reopen_recovers"]["state"] == "OK"

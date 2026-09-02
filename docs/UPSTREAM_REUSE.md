@@ -1009,10 +1009,14 @@ LOCAL REQUIREMENT: an isolated staging/recovery rehearsal that exercises crash,
   and must block resume — never swallowed or reported as success). Includes
   deterministic child-process SIGKILL at every file/store crash boundary, real
   fsync/os.replace/write failure injection, kernel-enforced RLIMIT_FSIZE
-  disk-full, corrupt-SQLite and newer-schema fail-closed, resource enforcement
-  with actual measurements, measurable RPO/RTO, and repeated-recovery dedupe /
-  no-loss / no-leak. Hermetic only: no live service, account, browser, timer,
-  or production state touched.
+  file-size/quota (EFBIG, labeled distinct from ENOSPC) plus deterministic
+  ENOSPC, corrupt-SQLite and newer-schema fail-closed, resource enforcement
+  (CPU/AS/fsize/nofile/nproc/threads/wall) with actual measurements incl. a
+  measured process count and a pre-workload network probe, measurable RPO/RTO
+  via the real atomic-restore path, fail-closed summary persistence with
+  atomic rename, a genuine stalled-child wall-timeout, and repeated-recovery
+  dedupe / no-loss / no-leak / hermetic guarantees. Hermetic only: no live
+  service, account, browser, timer, or production state touched.
 UPSTREAM REPOSITORY + COMMIT: none copied/adapted. Reused verified local units:
   CommunicationsStore atomic commit/rollback_cursor/lease/retention (Packet 8A/
   8D), ReportStore atomic publish + integrity (Packet 8C), portable export/
@@ -1020,16 +1024,19 @@ UPSTREAM REPOSITORY + COMMIT: none copied/adapted. Reused verified local units:
   monitor run_hourly/notification retry (Packet 8D/8I), and the operator-gated
   qualification harness pattern of Packet 8I (timer_qualify) / 8G (browser_qualify).
 SOURCE FILES + SYMBOLS: voicebridge/communications/recovery_qualify.py
-  (qualify_* stages, run_rehearsal, deny_live, isolate_cfg, _guard_newer_schema),
-  voicebridge/communications/recovery_crash.py (child-process worker: sigkill_file/
-  sigkill_store/fsync_fail/rename_fail/enospc/enospc_real/resource modes),
+  (qualify_* stages incl. hermetic, run_rehearsal, deny_live, isolate_cfg,
+  _guard_newer_schema, _persist_summary + _persist_summary_boundaries),
+  voicebridge/communications/recovery_crash.py (child-process worker:
+  sigkill_file/sigkill_store/fsync_fail/rename_fail/enospc/enospc_real/
+  resource(store|busy|alloc|manyfiles|manyprocs|manythreads)/hang modes,
+  _probe_network_blocked, _process_count),
   scripts/recovery_qualify.py, tests/test_recovery_qualify.py; repair:
   voicebridge/portable.py restore_state (PartialRollbackError.failed_paths).
 UPSTREAM TESTS/FIXTURES: synthetic communications fixtures reused as-is
   (tests/fixtures/communications/gmail_items.json, qualify_external_item.json);
   failure injection is local (child subprocess + sqlite3 execute hooks + os-layer
-  fault injection + RLIMIT_FSIZE) and the PartialRollbackError contract is
-  tested directly.
+  fault injection + RLIMIT_* + network socket probe) and the PartialRollbackError
+  contract is tested directly.
 LICENSE: N/A (no upstream code copied; all reused units already carry their
   recorded provenance R1–R21).
 DECISION: WRAP (compose verified recovery surfaces into an isolated rehearsal)

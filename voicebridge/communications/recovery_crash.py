@@ -312,14 +312,77 @@ def _run_file_op(target: Path, data: bytes, marker_dir: Path,
 
 
 # ------------------------------------------------------------------ resource op
-def _resource_workload(state_dir: Path, n_commits: int = 60) -> Dict[str, Any]:
-    """Bounded store workload used by the resource stage. Writes health rows so
-    bytes/files/procs are actually produced; never touches live state."""
+def _resource_workload(state_dir: Path, n_commits: int = 60,
+                       workload: str = "store") -> Dict[str, Any]:
+    """Bounded workload used by the resource stage.
+
+    - ``store``: writes health rows (produces bytes/files/procs);
+    - ``busy``: burns CPU until RLIMIT_CPU kills it (SIGXCPU);
+    - ``alloc``: allocates a large buffer until RLIMIT_AS raises MemoryError;
+    - ``manyfiles``: opens files until RLIMIT_NOFILE raises EMFILE;
+    - ``manyprocs``: forks until RLIMIT_NPROC raises EAGAIN;
+    - ``manythreads``: spawns threads until creation fails.
+    Never touches live state.
+    """
     from ..config import Config  # noqa: PLC0415
     from ..communications.adapters.registry import communications_store  # noqa: PLC0415
     from ..communications.contracts import (  # noqa: PLC0415
         AccountHealthRecord, AccountHealthStatus, Platform,
     )
+
+    if workload == "busy":
+        t_end = time.monotonic() + 300.0   # long enough for the CPU limit
+        while time.monotonic() < t_end:
+            _ = 1 + 1
+        return {"elapsed_s": None}
+
+    if workload == "alloc":
+        chunks = []
+        while True:
+            chunks.append(bytearray(16 * 1024 * 1024))
+        return {"elapsed_s": None}
+
+    if workload == "manyfiles":
+        handles = []
+        try:
+            while True:
+                handles.append(open(os.devnull, "r"))
+        finally:
+            for h in handles:
+                try:
+                    h.close()
+                except OSError:
+                    pass
+        return {"elapsed_s": None}
+
+    if workload == "manyprocs":
+        children = []
+        try:
+            while True:
+                pid = os.fork()
+                if pid == 0:
+                    os._exit(0)
+                children.append(pid)
+        finally:
+            for c in children:
+                try:
+                    os.waitpid(c, 0)
+                except ChildProcessError:
+                    pass
+        return {"elapsed_s": None}
+
+    if workload == "manythreads":
+        threads = []
+        try:
+            while True:
+                t = threading.Thread(target=lambda: time.sleep(3600))
+                t.start()
+                threads.append(t)
+        finally:
+            for t in threads:
+                t.daemon = True
+        return {"elapsed_s": None}
+
     cfg = Config(data={"logging": {"jsonl": True,
                                    "jsonl_path": str(state_dir)}})
     st = communications_store(cfg)
@@ -366,9 +429,64 @@ def _measure(state_dir: Path) -> Dict[str, Any]:
         "bytes_written": by,
         "file_count": files,
         "thread_count": threads,
-        "process_count": 1,
+        "process_count": _process_count(),
         "network_used": False,
     }
+
+
+def _process_count() -> int:
+    """Count live processes belonging to this process's real UID (bounded)."""
+    me = os.getuid()
+    count = 0
+    try:
+        for entry in Path("/proc").iterdir():
+            if not entry.name.isdigit():
+                continue
+            try:
+                st = entry / "status"
+                if not st.exists():
+                    continue
+                uid_line = ""
+                for line in st.read_text().splitlines():
+                    if line.startswith("Uid:"):
+                        uid_line = line
+                        break
+                if uid_line and str(me) in uid_line.split()[1:]:
+                    count += 1
+            except OSError:
+                continue
+            if count > 4096:
+                break
+    except OSError:
+        pass
+    return count
+
+
+def _probe_network_blocked() -> Dict[str, Any]:
+    """Attempt a real socket connection BEFORE any workload; must be blocked.
+
+    ``_block_sockets()`` replaces ``socket.socket`` so a genuine connect() must
+    fail with the typed RuntimeError. Returns the ACTUAL observed result.
+    """
+    import socket as _socket
+    probe: Dict[str, Any] = {"attempted": True}
+    try:
+        s = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+        s.settimeout(1.0)
+        try:
+            s.connect(("127.0.0.1", 1))
+            probe["blocked"] = False
+            probe["detail"] = "socket connect unexpectedly succeeded"
+        finally:
+            s.close()
+    except RuntimeError as exc:
+        probe["blocked"] = True
+        probe["detail"] = str(exc)[:120]
+    except OSError as exc:
+        # a real OS refusal (ECONNREFUSED) means sockets still reach the stack
+        probe["blocked"] = False
+        probe["detail"] = f"OSError {exc.errno}: {exc.strerror}"
+    return probe
 
 
 # ------------------------------------------------------------------ entry point
@@ -427,22 +545,44 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if mode == "resource":
         applied = _apply_rlimits(spec.get("limits", {}))
+        # Pre-import the communications stack BEFORE blocking sockets so the
+        # stdlib ssl/urllib imports (needed by adapters.base) are not broken
+        # by the socket block. This is the only import order dependency.
+        try:
+            import voicebridge.communications.adapters.registry as _reg  # noqa: PLC0415
+            _ = _reg.PLATFORM_NAMES  # ensure the module is actually loaded
+        except Exception:  # noqa: BLE001 - typed; the workload itself re-raises
+            pass
+        # Prove network isolation BEFORE any workload begins: attempt a real
+        # socket connection and verify it is blocked.
+        _block_sockets()
+        net_probe = _probe_network_blocked()
         try:
             _resource_workload(Path(spec["state_dir"]),
-                               int(spec.get("n_commits", 60)))
+                               int(spec.get("n_commits", 60)),
+                               workload=str(spec.get("workload", "store")))
         except Exception as exc:  # noqa: BLE001 - typed
             _write_json(result_path, {"mode": mode, "applied": applied,
                                       "ok": False,
                                       "error": type(exc).__name__,
                                       "errno": getattr(exc, "errno", None),
-                                      "strerror": str(exc)})
+                                      "strerror": str(exc),
+                                      "network_probe": net_probe,
+                                      "workload": spec.get("workload",
+                                                           "store")})
             return 0
-        # prove network unused: after imports are loaded, any socket creation
-        # must fail typed
-        _block_sockets()
         meas = _measure(Path(spec["state_dir"]))
         _write_json(result_path, {"mode": mode, "applied": applied,
-                                  "ok": True, **meas})
+                                  "ok": True, **meas,
+                                  "network_probe": net_probe,
+                                  "workload": spec.get("workload", "store")})
+        return 0
+
+    if mode == "hang":
+        # A GENUINELY stalled child: it never completes. The parent must
+        # SIGKILL it after a wall-clock timeout and report a typed TIMEOUT.
+        time.sleep(3600.0)
+        _write_json(result_path, {"ok": True, "mode": "hang"})
         return 0
 
     _write_json(result_path, {"ok": False, "error": f"unknown mode {mode}"})
