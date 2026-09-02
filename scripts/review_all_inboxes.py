@@ -1,11 +1,11 @@
-#!/home/trick/Projects/Repos/openclaw-voice-bridge/.venv/bin/python
+#!/usr/bin/env python3
 """Review all inboxes — aggregates gmail/messenger/instagram/tiktok in parallel. <2s when cached."""
 from __future__ import annotations
 import subprocess, sys, time, concurrent.futures
 from pathlib import Path
 
-VENV_PY = Path.home() / "Projects/Repos/openclaw-voice-bridge/.venv/bin/python"
-SCRIPTS_DIR = Path.home() / "Projects/Repos/openclaw-voice-bridge/scripts"
+VENV_PY = sys.executable  # portable: the bridge venv python invokes this script
+SCRIPTS_DIR = Path(__file__).resolve().parent
 
 SCRIPTS = [
     ("gmail", SCRIPTS_DIR / "review_gmail.py"),

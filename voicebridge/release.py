@@ -1,0 +1,1016 @@
+"""Packet 8K: release certification — portability, packaging, security.
+
+This module is the *hermetic, read-only* certification surface. It never
+builds, installs, enables, restarts, mutates config/state, or touches live
+services. The orchestrator ``scripts/release_qualify.py`` drives the opt-in
+build/install steps (network) and collects the typed results here.
+
+Checks provided (each returns a typed record list; ``certify`` assembles the
+release report):
+
+- provenance: version, git commit, dirty/untracked files, toolchain;
+- dependency contract: declared constraints, dependency scan of installed code;
+- licenses/notices: project license status + THIRD_PARTY_NOTICES presence;
+- SBOM: declared deps + installed versions;
+- secret scan and machine-specific-path scan over shipped code;
+- artifact inspection: wheel/sdist members, forbidden/dirty members, content
+  secret/machine-path scan, hashes;
+- filesystem modes: portable templates carry no secrets/machine values, scripts
+  are executable, restrictive 0600 state-write contract present;
+- resource ceilings: recorded guardrails (disk/RAM/VRAM, oneshot runtime);
+- backup/migration: MIGRATIONS present, newer-schema refusal, atomic restore;
+- operator runbooks: required documentation present and non-empty;
+- unit verification: ``systemd-analyze verify`` on rendered units + a
+  repository-level security review;
+- upgrade/rollback/uninstall contract reuse (distribution.py), including
+  state-preserving uninstall by default with separate confirmation for data
+  deletion;
+- reproducibility: deterministic artifact hash helper + comparison record.
+
+Everything here is bounded: subprocesses carry timeouts, file reads are capped,
+and results are redacted (never include secret values).
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import platform
+import re
+import subprocess
+import sys
+import tarfile
+import tempfile
+import zipfile
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+REPO = Path(__file__).resolve().parents[1]
+
+# ---------------------------------------------------------------------------
+# Provenance
+# ---------------------------------------------------------------------------
+def git_provenance(repo: Optional[Path] = None) -> Dict[str, Any]:
+    """Version + commit + dirty/untracked-file record (bounded lists)."""
+    root = Path(repo) if repo else REPO
+    rec: Dict[str, Any] = {
+        "version": _package_version(),
+        "python": f"{platform.python_version()} ({platform.python_implementation()})",
+        "platform": f"{platform.system()} {platform.machine()}",
+    }
+    commit = _git(root, ["rev-parse", "HEAD"])
+    rec["commit"] = commit
+    rec["branch"] = _git(root, ["rev-parse", "--abbrev-ref", "HEAD"]) or None
+    dirty = _git(root, ["status", "--porcelain"])
+    if dirty is None:
+        rec["git_repo"] = False
+        rec["dirty"] = False
+        rec["dirty_files"] = []
+        rec["untracked_files"] = []
+        return rec
+    lines = [ln for ln in dirty.splitlines() if ln.strip()]
+    modified = []
+    untracked = []
+    for ln in lines:
+        code = ln[:2]
+        name = ln[3:]
+        if code == "??":
+            untracked.append(name)
+        else:
+            modified.append(name)
+    rec["git_repo"] = True
+    rec["dirty"] = bool(modified or untracked)
+    rec["dirty_files"] = modified[:200]
+    rec["untracked_files"] = untracked[:200]
+    return rec
+
+
+def _package_version() -> str:
+    try:
+        import tomllib
+        data = tomllib.loads((REPO / "pyproject.toml").read_text())
+        return str(data.get("project", {}).get("version", "unknown"))
+    except Exception:
+        return "unknown"
+
+
+def _git(repo: Path, args: List[str]) -> Optional[str]:
+    try:
+        out = subprocess.run(["git", "-C", str(repo)] + args,
+                             capture_output=True, text=True, timeout=10)
+        if out.returncode != 0:
+            return None
+        return (out.stdout or "").strip()
+    except Exception:
+        return None
+
+
+def toolchain() -> Dict[str, str]:
+    """Build/install toolchain identities for reproducibility notes."""
+    out: Dict[str, str] = {}
+    probes = [
+        ([sys.executable, "--version"], "python"),
+        ([sys.executable, "-m", "pip", "--version"], "pip"),
+        (["systemd-analyze", "--version"], "systemd-analyze"),
+        (["openssl", "version"], "openssl"),
+    ]
+    for cmd, key in probes:
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            out[key] = (r.stdout or r.stderr or "").strip().splitlines()[0][:160]
+        except Exception:
+            out[key] = ""
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Secret + machine-path scans
+# ---------------------------------------------------------------------------
+# Real secret VALUES — flagged in every file type.
+SECRET_SHAPES = (
+    ("openai_key", re.compile(r"\bsk-[A-Za-z0-9]{20,}\b")),
+    ("github_token", re.compile(r"\bghp_[A-Za-z0-9]{30,}\b")),
+    ("aws_key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
+    ("private_key", re.compile(r"-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----")),
+    ("jwt", re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")),
+)
+
+# The generic ``key|token|secret|password = <value>`` assign pattern applies
+# only to config/envelope files (yaml/env/json/systemd/toml/shell), where a
+# value is present. Python variables named ``token``, and prose/templates in
+# HTML/JS/markdown that say ``token=``, are NOT secrets.
+SECRET_SHAPES_ALL = SECRET_SHAPES + (
+    ("assign_secret", re.compile(
+        r"(?i)\b(api[_-]?key|token|secret|password|passwd|bearer)\s*[=:]\s*\S+")),
+)
+
+_CONFIG_EXT = {".yaml", ".yml", ".env", ".service", ".timer", ".json",
+               ".toml", ".sh", ".cfg", ".conf", ".ini"}
+
+# Machine-specific PATH tokens in shipped code. Device-name tokens
+# (Scarlett/HyperX/AT2020) are NOT here: they are the documented stable
+# device-name matching feature (docs/AUDIO_SETUP.md), not path dependencies —
+# the portable-CONFIG leak check for those tokens lives in
+# filesystem_modes_check, mirroring the config doctor.
+MACHINE_PATH_SHAPES = (
+    re.compile(r"/home/[A-Za-z0-9_.-]+"),
+    # a concrete project path (segments may contain spaces) — prose like
+    # "under ~/Projects/Repos and report" is NOT a path (no slash after
+    # Repos) and is not flagged.
+    re.compile(r"~/Projects/Repos/[A-Za-z0-9_.&'()~-]+(?: [A-Za-z0-9_.&'()~-]+)*"),
+    re.compile(r"/home/[A-Za-z0-9_.-]+/\.hermes"),
+)
+
+# Device-name tokens that must never leak into PORTABLE config examples or
+# systemd templates (config-doctor convention).
+DEVICE_TOKEN_SHAPES = (re.compile(r"\bScarlett\b|\bHyperX\b|\bAT2020\b"),)
+
+# Documented, opt-in user-personalization surfaces (PACKET_0A PATH-04; the
+# developer's personal task-template default). Values here are operator-editable
+# personalization, not core portable dependencies; the certification records
+# them as a separate typed category. `voicebridge/local/actions.py` is NOT on
+# this list since Packet 8K removed personal launcher targets from it — they
+# moved to the operator-local override ~/.config/openclaw-voice-bridge/
+# local-actions.yaml, outside the repository.
+PERSONALIZATION_FILES = (
+    "config/task-templates.yaml",
+)
+
+
+def scan_text_secrets(text: str, *, is_python: bool = False,
+                      is_config: bool = False) -> List[str]:
+    """Shape names found in ``text`` (never the values). In Python source and
+    in non-config prose/templates (HTML/JS/MD/README), the generic
+    ``token = …`` assign pattern is NOT flagged: those are variable names and
+    prose. Real secret VALUES (sk-, ghp_, AKIA, JWT, private keys) are flagged
+    everywhere. The assign pattern is only meaningful in config/envelope
+    files where a value is actually assigned."""
+    if is_python or not is_config:
+        shapes = SECRET_SHAPES
+    else:
+        shapes = SECRET_SHAPES_ALL
+    return [name for name, rx in shapes if rx.search(text)]
+
+
+def scan_text_machine_paths(text: str) -> List[str]:
+    """Machine-specific path tokens found in ``text`` (redacted to the
+    machine/user component)."""
+    hits = set()
+    for rx in MACHINE_PATH_SHAPES:
+        for m in rx.finditer(text):
+            v = m.group(0)
+            if v.startswith("/home/"):
+                hits.add(f"/home/{v.split('/')[2]}")
+            elif v.startswith("~/"):
+                hits.add(v.split("/", 2)[1])  # e.g. "Projects"
+            else:
+                hits.add(v[:40])
+    return sorted(hits)
+
+
+def _walk_py_files(root: Path) -> List[Path]:
+    if not root.exists():
+        return []
+    files = sorted(root.rglob("*.py")) if root.is_dir() else [root]
+    return [p for p in files if p.is_file()]
+
+
+def _read_capped(path: Path, max_bytes: int = 1 << 20) -> str:
+    try:
+        if path.stat().st_size > max_bytes:
+            return ""
+        return path.read_text(errors="replace")
+    except OSError:
+        return ""
+
+
+def secret_scan(root: Path, *, include_py: bool = True,
+                include_yaml: bool = True, include_docs: bool = False,
+                exclude_tests: bool = True
+                ) -> Dict[str, List[str]]:
+    """Scan a tree for secret-shaped values. Returns
+    {path: [shape names]}. Skips the developer's live config, private
+    browser state, and (by default) test fixtures, which intentionally carry
+    FAKE secrets. Reads are size-capped."""
+    results: Dict[str, List[str]] = {}
+    skip = _private_paths()
+    if exclude_tests:
+        skip.add("tests")
+    # voicebridge/evaluation/ is the documented private eval corpus (plan
+    # 4A/6B): sample utterances intentionally carry FAKE credential-shaped
+    # strings. Recorded separately, never treated as live secrets.
+    skip.add("voicebridge/evaluation")
+    patterns = ["*.py"] if include_py else []
+    if include_yaml:
+        patterns += ["*.yaml", "*.yml", "*.service", "*.timer", "*.json",
+                     "*.toml", "*.sh", "*.env", ".env*"]
+    for pattern in patterns:
+        for p in sorted(root.rglob(pattern)):
+            rel = p.relative_to(root).as_posix()
+            if not p.is_file() or rel in skip or any(
+                    rel.startswith(s) for s in skip):
+                continue
+            is_py = rel.endswith(".py")
+            is_cfg = Path(p).suffix.lower() in _CONFIG_EXT
+            hits = scan_text_secrets(_read_capped(p), is_python=is_py,
+                                     is_config=is_cfg)
+            if hits:
+                results[rel] = hits
+    return results
+
+
+def machine_path_scan(root: Path) -> Dict[str, List[str]]:
+    """Machine-specific path tokens in shipped code. Returns
+    {relpath: [tokens]}. Personalization surfaces are returned separately in
+    ``personalization`` so the gate is not weakened while the audit trail stays
+    complete."""
+    core: Dict[str, List[str]] = {}
+    personal: Dict[str, List[str]] = {}
+    skip = _private_paths() | {"frontend/", "docs/", "benchmarks/", "tests/"}
+    for pattern in ("*.py", "*.sh", "*.service", "*.timer", "*.yaml"):
+        for p in sorted(root.rglob(pattern)):
+            if not p.is_file():
+                continue
+            rel = p.relative_to(root).as_posix()
+            if rel in skip or any(rel.startswith(s) for s in skip):
+                continue
+            hits = scan_text_machine_paths(_read_capped(p))
+            if not hits:
+                continue
+            if rel in PERSONALIZATION_FILES:
+                personal[rel] = hits
+            else:
+                core[rel] = hits
+    return {"core": core, "personalization": personal}
+
+
+def _private_paths() -> set[str]:
+    """Paths that must never be scanned as shipped code or shipped at all."""
+    return {
+        "scripts/browser_profiles", "scripts/browser_auto_state",
+        ".git", ".venv", "__pycache__", ".pytest_cache", "graft", "dist",
+        ".claude", ".cursor", ".gemini", ".github", ".kiro", ".vscode",
+        ".windsurf", ".adal", "node_modules", ".mcp.json", "opencode.json",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Dependency contract + SBOM
+# ---------------------------------------------------------------------------
+def declared_dependencies(pyproject: Optional[Path] = None
+                          ) -> Dict[str, List[Dict[str, str]]]:
+    """Parse pyproject dependency constraints (main + optional extras). An
+    absent pyproject yields empty records (caller decides how to degrade)."""
+    pp = Path(pyproject) if pyproject else (REPO / "pyproject.toml")
+    if not pp.exists():
+        return {"main": [], "extras": {}}
+    data = json.loads(pp.read_text()) if pp.suffix == ".json" else _toml(pp)
+    project = data.get("project", {})
+    main = [_req(r) for r in project.get("dependencies", [])]
+    extras = {
+        name: [_req(r) for r in reqs]
+        for name, reqs in (project.get("optional-dependencies") or {}).items()
+    }
+    return {"main": main, "extras": extras}
+
+
+def _req(r: str) -> Dict[str, str]:
+    name = re.split(r"[<>=!\[;\s]", r.strip(), maxsplit=1)[0]
+    return {"name": name, "spec": r.strip()}
+
+
+def _toml(path: Path) -> Dict[str, Any]:
+    import tomllib
+    with open(path, "rb") as fh:
+        return tomllib.load(fh)
+
+
+def sbom(repo: Optional[Path] = None) -> Dict[str, Any]:
+    """Declared dependency record. Installed versions are resolved only when
+    the distributions are present (importlib.metadata); otherwise recorded as
+    ``unknown`` — never fabricated."""
+    root = Path(repo) if repo else REPO
+    deps = declared_dependencies(root / "pyproject.toml")
+    installed = _installed_versions()
+    recs = []
+    for d in deps["main"]:
+        recs.append({"name": d["name"], "constraint": d["spec"],
+                     "installed": installed.get(d["name"], "unknown")})
+    return {
+        "package": "qubit-voice-agent",
+        "version": _package_version(),
+        "python": platform.python_version(),
+        "main": recs,
+        "optional": deps["extras"],
+        "notices": "THIRD_PARTY_NOTICES.md + docs/UPSTREAM_REUSE.md",
+        "project_license": "UNDECLARED (no LICENSE file; upstream-derived "
+                           "material per THIRD_PARTY_NOTICES.md)",
+    }
+
+
+def _installed_versions() -> Dict[str, str]:
+    try:
+        from importlib import metadata
+    except ImportError:  # pragma: no cover
+        return {}
+    out: Dict[str, str] = {}
+    for d in metadata.distributions():
+        try:
+            name = (d.metadata.get("Name") or "").lower()
+        except Exception:
+            continue
+        if name:
+            out[name] = d.version
+    return out
+
+
+def import_scan_installed(base: Path, declared: set[str],
+                          stdlib: Optional[set[str]] = None,
+                          guarded: Optional[set[str]] = None) -> List[str]:
+    """AST-scan ``base`` (e.g. the installed ``voicebridge`` package) for
+    third-party imports not in ``declared`` or the stdlib. Returns
+    ``"module at relpath:line"`` records. This is the exact scan the clean-venv
+    check runs against the INSTALLED package so a missing wheel member cannot
+    be masked by a source checkout on ``sys.path``. Guarded optional imports
+    (``OPTIONAL_GUARDED``) are tolerated — they degrade at runtime."""
+    stdlib = stdlib if stdlib is not None else set(sys.stdlib_module_names)
+    guarded = guarded if guarded is not None else OPTIONAL_GUARDED
+    declared = {_normalize_import(d) for d in declared}
+    import ast
+    local = {"voicebridge", "scripts", "browser_auto"}
+    failures: List[str] = []
+    for py in _walk_py_files(base):
+        rel = py.relative_to(base).as_posix()
+        try:
+            tree = ast.parse(_read_capped(py))
+        except SyntaxError as exc:
+            failures.append(f"<syntax> at {rel}:{exc.lineno}")
+            continue
+        for node in ast.walk(tree):
+            mods: List[str] = []
+            if isinstance(node, ast.Import):
+                mods = [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                mods = [node.module]
+            for m in mods:
+                top = m.split(".")[0]
+                if top in stdlib | declared | local | guarded:
+                    continue
+                failures.append(f"{top} at {rel}:{node.lineno}")
+    return failures
+
+
+def declared_module_names(pyproject: Optional[Path] = None) -> set[str]:
+    """Import names allowed by pyproject (used by clean-venv + certifier)."""
+    data = declared_dependencies(pyproject)
+    names = {d["name"] for d in data["main"]}
+    for reqs in data["extras"].values():
+        names |= {d["name"] for d in reqs}
+    names |= _DIST_ALIASES.keys() | set(_DIST_ALIASES.values())
+    return {_normalize_import(n) for n in names}
+
+
+_DIST_ALIASES = {"pyyaml": "yaml", "piper_tts": "piper"}
+
+# Modules imported through guarded optional paths (try/except ImportError) as
+# inventoried in docs/PACKET_0A_MISMATCH_REPORT.md section D. They degrade
+# gracefully, so their absence is a warning, not a fresh-install failure
+# (mirrors scripts/config_doctor.OPTIONAL_GUARDED).
+OPTIONAL_GUARDED = {"psutil", "onnx", "prompt_toolkit", "websocket"}
+
+
+def _normalize_import(name: str) -> str:
+    return name.replace("-", "_").split(".")[0].lower()
+
+
+def declared_module_names_from_metadata(dist_name: str = "qubit-voice-agent"
+                                        ) -> set[str]:
+    """Import names allowed by the INSTALLED package metadata (Requires-Dist
+    including extras with markers). Used by the in-venv clean checks so a
+    missing dependency cannot be masked by a source checkout."""
+    from importlib import metadata
+    names = set()
+    for req in metadata.requires(dist_name) or []:
+        base = re.split(r"[<>=!\[;\s]", req.strip(), maxsplit=1)[0]
+        base = base.split("/")[-1] if "/" in base else base
+        if base:
+            names.add(base)
+    names |= _DIST_ALIASES.keys() | set(_DIST_ALIASES.values())
+    return {_normalize_import(n) for n in names}
+
+
+# ---------------------------------------------------------------------------
+# Artifact inspection
+# ---------------------------------------------------------------------------
+ARTIFACT_FORBIDDEN = (
+    "browser_profiles", "browser_auto_state", ".env", ".venv",
+    "__pycache__", ".pyc", "106", "DESIGN.md", "PRODUCT.md",
+    ".claude", ".cursor", ".gemini", ".github", ".kiro", ".vscode",
+    ".windsurf", ".adal", "config/voice.yaml", "config/voice.local.yaml",
+)
+
+
+def artifact_members(artifact: Path) -> List[str]:
+    """Member names inside a wheel (.whl zip) or sdist (.tar.gz)."""
+    if str(artifact).endswith(".whl") or str(artifact).endswith(".zip"):
+        with zipfile.ZipFile(artifact) as z:
+            return z.namelist()
+    if str(artifact).endswith((".tar.gz", ".tgz")):
+        with tarfile.open(artifact, "r:gz") as t:
+            return t.getnames()
+    raise ValueError(f"unsupported artifact: {artifact}")
+
+
+def artifact_member_hits(artifact: Path, forbidden: Tuple[str, ...] = ARTIFACT_FORBIDDEN
+                         ) -> List[str]:
+    """Members that match a forbidden private/dirty-file pattern."""
+    hits = []
+    for name in artifact_members(artifact):
+        low = name.lstrip("./").lower()
+        if low.endswith(("/", "")) and not low.rstrip("/"):
+            continue
+        for pat in forbidden:
+            pl = pat.lower()
+            if pl in low.split("/") or low.endswith(pl):
+                hits.append(name)
+                break
+    return hits
+
+
+def artifact_member_class(name: str) -> str:
+    """Classify an artifact member for gating:
+    ``fixture`` — tests/ and the eval corpus (intentionally fake secrets);
+    ``personalization`` — the documented operator personalization module;
+    ``core`` — shipped runtime code that must be clean;
+    ``noncore`` — docs, frontend UI, templates, metadata, model files."""
+    low = name.lstrip("./")
+    parts = low.split("/")
+    if len(parts) > 1 and parts[0].startswith("qubit_voice_agent-"):
+        # sdist members carry the source-root directory prefix.
+        low = "/".join(parts[1:])
+    if "/tests/" in low or low.split("/")[0] == "tests" \
+            or low.startswith("voicebridge/evaluation/"):
+        return "fixture"
+    if "config/task-templates.yaml" in low:
+        return "personalization"
+    if low.startswith("voicebridge/"):
+        return "core"
+    return "noncore"
+
+
+def artifact_content_scan(artifact: Path) -> Dict[str, Dict[str, List[str]]]:
+    """Scan artifact member contents for secret shapes and machine-specific
+    paths, classified for the gate (see :func:`artifact_member_class`).
+    Returns ``{"secrets", "fixture_secrets", "machine_paths",
+    "machine_paths_noncore"}``; values are shape names / redacted tokens,
+    never secret values. Reads are size-capped."""
+    secrets: Dict[str, List[str]] = {}
+    fixture_secrets: Dict[str, List[str]] = {}
+    machine: Dict[str, List[str]] = {}
+    machine_noncore: Dict[str, List[str]] = {}
+
+    def _handle(name: str, text: str) -> None:
+        is_py = name.endswith(".py")
+        is_cfg = Path(name).suffix.lower() in _CONFIG_EXT
+        sh = scan_text_secrets(text, is_python=is_py, is_config=is_cfg)
+        mh = scan_text_machine_paths(text)
+        cls = artifact_member_class(name)
+        if sh:
+            (fixture_secrets if cls == "fixture" else secrets)[name] = sh
+        if mh:
+            (machine if cls == "core" else machine_noncore)[name] = mh
+
+    if str(artifact).endswith((".whl", ".zip")):
+        with zipfile.ZipFile(artifact) as z:
+            for info in z.infolist():
+                if info.is_dir() or info.file_size > (1 << 20):
+                    continue
+                try:
+                    data = z.read(info).decode("utf-8", "replace")
+                except Exception:
+                    continue
+                _handle(info.filename, data)
+    elif str(artifact).endswith((".tar.gz", ".tgz")):
+        with tarfile.open(artifact, "r:gz") as t:
+            for member in t.getmembers():
+                if not member.isfile() or member.size > (1 << 20):
+                    continue
+                try:
+                    f = t.extractfile(member)
+                    if f is None:
+                        continue
+                    data = f.read().decode("utf-8", "replace")
+                except Exception:
+                    continue
+                _handle(member.name, data)
+    return {"secrets": secrets, "fixture_secrets": fixture_secrets,
+            "machine_paths": machine, "machine_paths_noncore": machine_noncore}
+
+
+def sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 16), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# Filesystem modes + resource ceilings + runbooks + migration
+# ---------------------------------------------------------------------------
+def filesystem_modes_check(root: Optional[Path] = None) -> List[Dict[str, str]]:
+    """Portable templates carry no secrets/machine values; launchers are
+    executable; the restrictive 0600 state-write contract is present in code."""
+    root = Path(root) if root else REPO
+    results: List[Dict[str, str]] = []
+
+    for rel in ("scripts/install.sh", "scripts/run.sh",
+                "scripts/install_systemd_unit.sh"):
+        p = root / rel
+        exe = os.access(p, os.X_OK) if p.exists() else False
+        results.append({
+            "name": f"mode.executable.{rel}",
+            "state": "OK" if exe else ("MISSING" if not p.exists() else "FAIL"),
+            "detail": f"executable={exe}",
+        })
+
+    example = root / "config/voice.example.yaml"
+    if example.exists():
+        tokens = scan_text_machine_paths(_read_capped(example))
+        device = []
+        for rx in DEVICE_TOKEN_SHAPES:
+            device += rx.findall(_read_capped(example))
+        results.append({
+            "name": "mode.portable_config",
+            "state": "OK" if not tokens and not device else "FAIL",
+            "detail": ("no machine tokens" if not tokens and not device else
+                       f"machine tokens: {tokens + sorted(set(device))}"),
+        })
+    else:
+        results.append({"name": "mode.portable_config", "state": "MISSING",
+                        "detail": "config/voice.example.yaml absent"})
+
+    # Packet 8K: the shipped operator-local override EXAMPLE must be portable
+    # (no absolute home-directory paths, no device tokens), so a fresh install
+    # never copies the developer's personal launcher targets.
+    la_example = root / "config/local-actions.example.yaml"
+    if la_example.exists():
+        la_tokens = scan_text_machine_paths(_read_capped(la_example))
+        la_device = []
+        for rx in DEVICE_TOKEN_SHAPES:
+            la_device += rx.findall(_read_capped(la_example))
+        results.append({
+            "name": "mode.portable_local_actions",
+            "state": "OK" if not la_tokens and not la_device else "FAIL",
+            "detail": ("no machine tokens" if not la_tokens and not la_device else
+                       f"machine tokens: {la_tokens + sorted(set(la_device))}"),
+        })
+    else:
+        results.append({"name": "mode.portable_local_actions",
+                        "state": "MISSING",
+                        "detail": "config/local-actions.example.yaml absent"})
+
+    # systemd templates must not carry machine paths, secrets, or (for the
+    # portable voice-agent template) hardcoded resource directives (Packet 7A
+    # convention). The monitor oneshot documents its bounds as repository
+    # defaults, so the hardcoded-resource gate applies only to the agent unit.
+    for unit in sorted(root.glob("systemd/*.service")) + sorted(root.glob("systemd/*.timer")):
+        text = _read_capped(unit)
+        bad = []
+        if scan_text_machine_paths(text):
+            bad.append("machine path")
+        if scan_text_secrets(text):
+            bad.append("secret")
+        if unit.name == "qubit-voice-agent.service" and re.search(
+                r"^Memory(Max|High)|^Nice=|^CPUQuota=", text, re.M):
+            bad.append("hardcoded resource directive")
+        results.append({
+            "name": f"mode.unit.{unit.name}",
+            "state": "OK" if not bad else "FAIL",
+            "detail": "clean" if not bad else "; ".join(bad),
+        })
+
+    # restrictive state-write contract: private state must be written 0600.
+    mode_contract = False
+    for mod in ("voicebridge/device.py", "voicebridge/portable.py"):
+        text = _read_capped(root / mod)
+        if "0o600" in text or "0600" in text:
+            mode_contract = True
+    results.append({
+        "name": "mode.private_state_0600",
+        "state": "OK" if mode_contract else "FAIL",
+        "detail": "0600 state-write contract present in device.py/portable.py",
+    })
+    return results
+
+
+def resource_ceilings(root: Optional[Path] = None) -> Dict[str, Any]:
+    """Recorded guardrails: distribution constants + oneshot runtime ceiling."""
+    root = Path(root) if root else REPO
+    ceilings: Dict[str, Any] = {}
+    text = _read_capped(root / "voicebridge/distribution.py")
+    for name in ("MIN_DISK_FREE_GIB", "MIN_RAM_GIB", "VRAM_CEILING_MIB"):
+        m = re.search(rf"^{name}\s*=\s*([\d\.\s\*]+?)(?:\n|#)", text, re.M)
+        if m:
+            try:
+                value = 1.0
+                for tok in re.findall(r"[\d.]+", m.group(1)):
+                    value *= float(tok)
+                ceilings[name] = value
+            except Exception:
+                ceilings[name] = None
+        else:
+            ceilings[name] = None
+    svc = _read_capped(root / "systemd/openclaw-communications-monitor.service")
+    t = re.search(r"^TimeoutStartSec=(\d+)", svc, re.M)
+    ceilings["monitor_oneshot_timeout_s"] = int(t.group(1)) if t else None
+    mh = re.search(r"^MemoryMax=(\S+)", svc, re.M)
+    ceilings["monitor_memory_max"] = mh.group(1) if mh else None
+    return ceilings
+
+
+def operator_runbook_check(root: Optional[Path] = None) -> List[Dict[str, str]]:
+    """Required operator documentation present and non-empty."""
+    root = Path(root) if root else REPO
+    required = [
+        "README.md",
+        "docs/VOICE_BRIDGE_SYSTEM.md",
+        "docs/AUDIO_SETUP.md",
+        "docs/VOICE_BRIDGE_TROUBLESHOOTING.md",
+        "docs/OPERATIONS_8J.md",
+        "docs/OPERATIONS_8K.md",
+        "docs/MIGRATIONS.md",
+        "docs/UPSTREAM_REUSE.md",
+        "THIRD_PARTY_NOTICES.md",
+    ]
+    results: List[Dict[str, str]] = []
+    for rel in required:
+        p = root / rel
+        if not p.exists():
+            results.append({"name": f"docs.{rel}", "state": "MISSING",
+                            "detail": "absent"})
+            continue
+        size = p.stat().st_size
+        results.append({"name": f"docs.{rel}", "state": "OK" if size > 200 else "FAIL",
+                        "detail": f"{size} bytes"})
+    return results
+
+
+def backup_migration_check(root: Optional[Path] = None) -> List[Dict[str, str]]:
+    """Migration history + newer-schema refusal + atomic restore contract."""
+    root = Path(root) if root else REPO
+    results: List[Dict[str, str]] = []
+    mig = root / "docs/MIGRATIONS.md"
+    results.append({
+        "name": "migration.history",
+        "state": "OK" if mig.exists() else "MISSING",
+        "detail": "docs/MIGRATIONS.md" if mig.exists() else "absent",
+    })
+    portable_text = _read_capped(root / "voicebridge/portable.py")
+    recov_text = _read_capped(root / "voicebridge/communications/recovery_qualify.py")
+    has_newer_schema = ("UnsupportedSchemaError" in portable_text) and (
+        "_guard_newer_schema" in recov_text or "newer" in recov_text.lower())
+    results.append({
+        "name": "migration.newer_schema_refusal",
+        "state": "OK" if has_newer_schema else "FAIL",
+        "detail": ("portable.py + recovery_qualify refuse newer schema"
+                   if has_newer_schema else "no newer-schema refusal found"),
+    })
+    has_atomic_restore = ("os.replace" in portable_text
+                          and "fsync" in portable_text)
+    results.append({
+        "name": "migration.atomic_restore",
+        "state": "OK" if has_atomic_restore else "FAIL",
+        "detail": "atomic temp+fsync+rename restore present" if has_atomic_restore
+                  else "atomic restore not found",
+    })
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Unit verification (systemd-analyze verify + security review)
+# ---------------------------------------------------------------------------
+def unit_verify(root: Optional[Path] = None, workdir: Optional[Path] = None,
+                stub_venv_python: bool = True) -> Dict[str, Any]:
+    """Render repository units (resolve __PROJECT_DIR__), stub the ExecStart
+    python so `systemd-analyze verify` can resolve it, run the verifier, and
+    return per-unit results. Units resolve from the checkout ``systemd/`` or,
+    in an installed package, from the packaged ``_data/systemd`` (Packet 8K
+    resource contract). Falls back to a repository security review when
+    systemd-analyze is unavailable (typed DEGRADED, never a silent pass)."""
+    root = Path(root) if root else REPO
+    unit_dirs = []
+    if (root / "systemd").exists():
+        unit_dirs.append(root / "systemd")
+    try:
+        from .resources import resource_path
+        packaged = resource_path("systemd")
+        if packaged.is_dir() and packaged not in unit_dirs:
+            unit_dirs.append(packaged)
+    except Exception:
+        pass
+    units = []
+    for d in unit_dirs:
+        units += sorted(d.glob("*.service")) + sorted(d.glob("*.timer"))
+    units = sorted(set(units))
+    if not units:
+        return {"available": True, "systemd_analyze": False, "units": [],
+                "error": "no units found under systemd/ or packaged _data/systemd",
+                "all_ok": False}
+    tmp = Path(workdir) if workdir else Path(tempfile.mkdtemp(prefix="vb-unit-verify-"))
+    proj = tmp / "proj"
+    proj.mkdir(parents=True, exist_ok=True)
+    (proj / ".venv" / "bin").mkdir(parents=True, exist_ok=True)
+    (proj / "scripts").mkdir(parents=True, exist_ok=True)
+    if stub_venv_python:
+        stub = proj / ".venv" / "bin" / "python"
+        stub.write_text("#!/bin/sh\nexit 0\n")
+        stub.chmod(0o755)
+        mon = proj / "scripts" / "communications_monitor.py"
+        mon.write_text("#!/bin/sh\nexit 0\n")
+        mon.chmod(0o755)
+    rendered: List[Path] = []
+    for u in units:
+        dst = tmp / u.name
+        dst.write_text(u.read_text().replace("__PROJECT_DIR__", str(proj)))
+        rendered.append(dst)
+
+    per_unit: List[Dict[str, str]] = []
+    if _which("systemd-analyze"):
+        try:
+            r = subprocess.run(
+                ["systemd-analyze", "verify"] + [str(p) for p in rendered],
+                capture_output=True, text=True, timeout=60)
+            lines = [ln for ln in (r.stdout or "").splitlines()
+                     if ln.strip()] + [ln for ln in (r.stderr or "").splitlines()
+                                       if ln.strip()]
+            # map the raw output back to per-unit status
+            for u in units:
+                relevant = [ln for ln in lines if u.name in ln]
+                ok = not any("bad unit file" in ln or "fatal error" in ln
+                             for ln in relevant)
+                per_unit.append({
+                    "unit": u.name,
+                    "state": "OK" if ok else "FAIL",
+                    "detail": " ".join(relevant)[:300] or "clean",
+                })
+            all_ok = all(x["state"] == "OK" for x in per_unit)
+            return {"available": True, "systemd_analyze": True,
+                    "units": per_unit, "all_ok": all_ok,
+                    "toolchain": toolchain()["systemd-analyze"]}
+        except subprocess.TimeoutExpired:
+            return {"available": True, "systemd_analyze": True,
+                    "units": [], "error": "systemd-analyze verify timed out",
+                    "all_ok": False}
+    # fallback security review (no systemd-analyze)
+    return {"available": True, "systemd_analyze": False, "all_ok": False,
+            "units": [_unit_security_review(u) for u in units],
+            "error": "systemd-analyze unavailable; repository security review "
+                     "used (DEGRADED)"}
+
+
+def _unit_security_review(unit: Path) -> Dict[str, str]:
+    text = _read_capped(unit)
+    bad = []
+    # __PROJECT_DIR__ is the documented render placeholder, not a security issue
+    if scan_text_secrets(text):
+        bad.append("secret-shaped value")
+    if re.search(r"/home/[A-Za-z0-9_.-]+", text):
+        bad.append("machine home path")
+    if re.search(r"^\s*Environment=.*(sk-[A-Za-z0-9]{20,}|ghp_|AKIA)", text, re.M):
+        bad.append("Environment carries a credential value")
+    return {"unit": unit.name, "state": "OK" if not bad else "FAIL",
+            "detail": "; ".join(bad) if bad else "clean (security review)"}
+
+
+def _which(name: str) -> Optional[str]:
+    import shutil
+    return shutil.which(name)
+
+
+# ---------------------------------------------------------------------------
+# Upgrade / rollback / uninstall contract (reuse, never weaken)
+# ---------------------------------------------------------------------------
+def upgrade_uninstall_contract(cfg: Any) -> Dict[str, Any]:
+    """Reuse distribution upgrade/uninstall contracts and assert the 8K
+    invariants: uninstall preserves user state by default and requires a
+    separate explicit confirmation for data deletion; upgrade preserves state,
+    config, flags, and never silently restarts/enables."""
+    from . import distribution as D
+    up = D.upgrade_plan(cfg)
+    un = D.uninstall_plan(cfg)
+    joined_up = " ".join(str(x) for x in up.get("does_not", [])).lower()
+    joined_un = " ".join(str(x) for x in un.get("preserves_by_default", [])).lower()
+    checks = {
+        "upgrade.action": up.get("action") == "upgrade",
+        # the plan must DOCUMENT that it does not delete state
+        "upgrade.preserves_state": "delete state" in joined_up,
+        "upgrade.rollback": bool(up.get("rollback")),
+        "uninstall.requires_confirmation": un.get("requires_confirmation") is True,
+        "uninstall.preserves_state_by_default": "state dir" in joined_un,
+        "uninstall.data_deletion_separate": bool(un.get("steps_if_confirmed")),
+    }
+    return {
+        "plan": {"upgrade": up, "uninstall": un},
+        "checks": checks,
+        "pass": all(checks.values()),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Reproducibility
+# ---------------------------------------------------------------------------
+def reproducibility_record(artifact_a: Path, artifact_b: Optional[Path] = None
+                           ) -> Dict[str, Any]:
+    """Artifact hash record + (optional) reproducibility comparison. A
+    mismatch is reported truthfully with both hashes, never hidden."""
+    rec: Dict[str, Any] = {
+        "artifact": artifact_a.name,
+        "size_bytes": artifact_a.stat().st_size if artifact_a.exists() else None,
+        "sha256": sha256(artifact_a) if artifact_a.exists() else None,
+    }
+    if artifact_b is not None:
+        if not artifact_b.exists():
+            rec["reproducible"] = False
+            rec["comparison"] = "second build missing"
+        else:
+            rec["second_sha256"] = sha256(artifact_b)
+            rec["reproducible"] = rec["sha256"] == rec["second_sha256"]
+    return rec
+
+
+# ---------------------------------------------------------------------------
+# Certification report
+# ---------------------------------------------------------------------------
+def support_matrix_check(root: Optional[Path] = None) -> List[Dict[str, str]]:
+    """Verify the RUNTIME platform/python against the documented support
+    matrix (distribution.SUPPORTED_TARGET), and that display/audio support is
+    documented (AUDIO_SETUP / VOICE_BRIDGE_SYSTEM). A runtime outside the
+    matrix is a typed NOT_SUPPORTED — never a silent pass."""
+    root = Path(root) if root else REPO
+    try:
+        from .distribution import SUPPORTED_TARGET
+        target = dict(SUPPORTED_TARGET)
+    except Exception:
+        target = {}
+    results: List[Dict[str, str]] = []
+    os_ok = platform.system() == "Linux"
+    arch_ok = platform.machine() in tuple(target.get("arches", []) or [])
+    results.append({
+        "name": "support.os",
+        "state": "OK" if os_ok else "NOT_SUPPORTED",
+        "detail": f"{platform.system()} (documented: "
+                  f"{target.get('os', 'linux')})",
+    })
+    results.append({
+        "name": "support.arch",
+        "state": "OK" if arch_ok else "NOT_SUPPORTED",
+        "detail": platform.machine(),
+    })
+    py_ok = sys.version_info >= (3, 11)
+    results.append({
+        "name": "support.python",
+        "state": "OK" if py_ok else "NOT_SUPPORTED",
+        "detail": f"{platform.python_version()} (documented: >= "
+                  f"{target.get('python_min', '3.11')})",
+    })
+    for doc in ("docs/AUDIO_SETUP.md", "docs/VOICE_BRIDGE_SYSTEM.md",
+                "docs/VOICE_BRIDGE_TROUBLESHOOTING.md"):
+        p = root / doc
+        results.append({
+            "name": f"support.documented.{Path(doc).stem}",
+            "state": "OK" if p.exists() and p.stat().st_size > 200 else "MISSING",
+            "detail": doc,
+        })
+    return results
+
+
+def bounded_logs_check(root: Optional[Path] = None) -> List[Dict[str, str]]:
+    """Bounded-logs contract (Packet 8K): the structured JSONL journal must be
+    valid-by-construction, bounded/recoverable, and covered by a no-secret-leak
+    contract. Reads are size-capped."""
+    root = Path(root) if root else REPO
+    results: List[Dict[str, str]] = []
+    logging_text = _read_capped(root / "voicebridge/logging_setup.py")
+    has_coercion = "_json_safe" in logging_text
+    results.append({
+        "name": "logs.journal_valid_coercion",
+        "state": "OK" if has_coercion else "FAIL",
+        "detail": ("_json_safe typed coercion keeps the JSONL journal valid"
+                   if has_coercion else "no journal coercion found"),
+    })
+    recov_text = _read_capped(root / "voicebridge/communications/recovery_qualify.py")
+    recov_crash = _read_capped(root / "voicebridge/communications/recovery_crash.py")
+    bounded = "jsonl_bounded" in recov_text and "truncated" in recov_text.lower()
+    results.append({
+        "name": "logs.journal_bounded_recovery",
+        "state": "OK" if bounded else "FAIL",
+        "detail": ("8J recovery qualifies journal boundedness + truncated-line "
+                   "tolerance" if bounded else "no bounded-journal qualification"),
+    })
+    no_secret = ("no_secret_in_journal" in recov_text
+                 or "secret" in recov_crash.lower())
+    results.append({
+        "name": "logs.journal_no_secret_leak",
+        "state": "OK" if no_secret else "FAIL",
+        "detail": "journal no-secret-leak contract present" if no_secret
+                  else "no journal no-secret contract found",
+    })
+    return results
+
+
+def certify(repo: Optional[Path] = None) -> Dict[str, Any]:
+    """Hermetic static certification: provenance, scans, contracts, docs,
+    units, ceilings. Does NOT build/install (that is the orchestrator's opt-in
+    step). Returns the typed report."""
+    root = Path(repo) if repo else REPO
+    provenance = git_provenance(root)
+    mpaths = machine_path_scan(root)
+    secrets = secret_scan(root)
+    report: Dict[str, Any] = {
+        "packet": "8K",
+        "provenance": provenance,
+        "toolchain": toolchain(),
+        "dependency": sbom(root),
+        "machine_paths": {
+            "core": mpaths["core"],
+            "personalization": mpaths["personalization"],
+        },
+        "secrets": secrets,
+        "filesystem_modes": filesystem_modes_check(root),
+        "resource_ceilings": resource_ceilings(root),
+        "operator_runbooks": operator_runbook_check(root),
+        "backup_migration": backup_migration_check(root),
+        "bounded_logs": bounded_logs_check(root),
+        "units": unit_verify(root),
+        "support_matrix": support_matrix_check(root),
+    }
+    return report
+
+
+def report_pass(report: Dict[str, Any]) -> bool:
+    """True when every required gate is OK (core machine paths, secrets,
+    filesystem modes, runbooks, migration, units). Personalization machine
+    values are recorded but not a gate failure."""
+    if report["machine_paths"]["core"]:
+        return False
+    if report["secrets"]:
+        return False
+    for check in report["filesystem_modes"]:
+        if check["state"] in ("FAIL", "MISSING"):
+            return False
+    for check in report["operator_runbooks"]:
+        if check["state"] in ("FAIL", "MISSING"):
+            return False
+    for check in report["backup_migration"]:
+        if check["state"] in ("FAIL", "MISSING"):
+            return False
+    for check in report["bounded_logs"]:
+        if check["state"] in ("FAIL", "MISSING"):
+            return False
+    for check in report["support_matrix"]:
+        if check["state"] in ("FAIL", "MISSING", "NOT_SUPPORTED"):
+            return False
+    if not report["units"].get("all_ok", False):
+        return False
+    return True

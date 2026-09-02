@@ -2,6 +2,11 @@
 name = "qubit-voice-agent"
 version = "1.0.0"
 description = "Qubit Voice Agent — local push-to-talk voice agent: Moonshine ASR, Silero VAD, voice-ID, local LLM, piper TTS — 5 GB VRAM budget."
+readme = "README.md"
+# The project's own LICENSE is intentionally UNDECLARED (no LICENSE file yet);
+# third-party/upstream-derived material is recorded in THIRD_PARTY_NOTICES.md
+# and docs/UPSTREAM_REUSE.md (Packet 8K provenance record).
+license = { text = "SEE THIRD_PARTY_NOTICES.md — upstream-derived material is MIT/Apache-2.0/BSD-3-Clause per record; project license is pending declaration" }
 requires-python = ">=3.11"
 dependencies = [
     "sherpa-onnx>=1.13",      # Moonshine ASR + Silero VAD + eres2net voice-ID + Kokoro
@@ -34,3 +39,53 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["voicebridge"]
+
+# Ship the runtime resources inside the wheel so a clean install (no checkout)
+# can resolve the dashboard frontend, config examples, prompt dialogs, task
+# templates, report templates, and systemd units (Packet 8K). voicebridge/
+# resources.py resolves package data first, then the checkout path when run
+# from a repository. No files are duplicated in the repo.
+[tool.hatch.build.targets.wheel.force-include]
+"frontend" = "voicebridge/_data/frontend"
+"templates" = "voicebridge/_data/templates"
+"config/dialogs.md" = "voicebridge/_data/config/dialogs.md"
+# ship the PORTABLE example as the installed default; the developer's personal
+# task-templates.yaml is never shipped (Packet 8K private-state rule).
+"config/task-templates.example.yaml" = "voicebridge/_data/config/task-templates.yaml"
+"config/local-actions.example.yaml" = "voicebridge/_data/config/local-actions.example.yaml"
+"config/voice.example.yaml" = "voicebridge/_data/config/voice.example.yaml"
+"systemd" = "voicebridge/_data/systemd"
+
+[tool.hatch.build.targets.sdist]
+# NEVER ship the developer's live config, private browser state, or accidental
+# dirty/untracked files (Packet 8K "no private developer state in the release").
+# The sdist carries the portable example config only.
+exclude = [
+  "config/voice.yaml",
+  "config/voice.local.yaml",
+  # the developer's personal template set stays out of the release
+  "config/task-templates.yaml",
+  # developer's personal knowledge + model file stay out of the release
+  "config/personal-knowledge.md",
+  "Modelfile.qubit",
+  # internal dev change reports carry machine-specific history; not needed to
+  # build, run, or test the release
+  "docs/CHANGE_REPORTS",
+  "scripts/browser_profiles",
+  "scripts/browser_auto_state",
+  "106",
+  "DESIGN.md",
+  "PRODUCT.md",
+  ".claude",
+  ".cursor",
+  ".gemini",
+  ".github",
+  ".kiro",
+  ".vscode",
+  ".windsurf",
+  ".adal",
+  ".pytest_cache",
+  "graft",
+  ".mcp.json",
+  "opencode.json",
+]

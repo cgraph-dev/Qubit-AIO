@@ -1,7 +1,7 @@
-#!/home/trick/Projects/Repos/openclaw-voice-bridge/.venv/bin/python
+#!/usr/bin/env python3
 """Fast TikTok review — CDP (if available) -> cache -> graceful."""
 from __future__ import annotations
-import json, sys, subprocess, time, urllib.request
+import json, sys, time, urllib.request
 from pathlib import Path
 
 CACHE_DIR = Path.home() / ".cache" / "openclaw-voice-bridge" / "inboxes"
@@ -142,7 +142,7 @@ def main():
     print("")
     print("No TikTok access found. To enable:")
     print("  1) Launch Chromium with CDP and log into TikTok:")
-    print("     DISPLAY=:0 /snap/bin/chromium --user-data-dir=/home/trick/snap/chromium/common/chromium --profile-directory=Default --remote-debugging-port=9222 --remote-allow-origins=* https://www.tiktok.com/messages")
+    print("     DISPLAY=:0 /snap/bin/chromium --user-data-dir=<your-chromium-profile> --profile-directory=Default --remote-debugging-port=9222 --remote-allow-origins=* https://www.tiktok.com/messages")
     print("  2) Verify: curl -s http://127.0.0.1:9222/json | grep tiktok.com")
     print("  3) Then say 'check tiktok' again.")
     print("  (TikTok inbox is limited — browser login is the only supported method)")

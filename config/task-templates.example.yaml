@@ -1,0 +1,24 @@
+# Portable daily-task templates — machine-agnostic EXAMPLE (Packet 8K).
+#
+# This example is shipped inside the wheel so a clean install has a portable
+# default. Operators replace it with their own templates at
+# ~/.config/openclaw-voice-bridge/task-templates.yaml (intent.templates_path)
+# or edit this file for their machine. The repository file
+# config/task-templates.yaml holds the developer's PERSONAL template set and is
+# intentionally NOT shipped (no machine-specific paths in the release).
+#
+# Format:
+#   templates:
+#     - name: <id>
+#       match: [regex, ...]   # case-insensitive; any() wins
+#       kind: coding | hermes | conversation | local-script
+#       task: "<agent task text>"          # kind coding/hermes/conversation
+#       script: "<shell command>"          # kind local-script; may embed {question}
+#       ack: "<spoken acknowledgement>"
+templates:
+- name: example-status
+  match:
+  - status of (my )?(projects|tasks)
+  kind: coding
+  task: "List the user's main projects and report their git status, current branch, and any uncommitted changes. Keep it to a concise summary."
+  ack: "Checking."

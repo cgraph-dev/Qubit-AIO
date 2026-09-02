@@ -9,6 +9,7 @@ Each action returns a short spoken status string.
 """
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from dataclasses import dataclass, field
@@ -18,6 +19,70 @@ from typing import Any, Callable, Dict, List, Optional
 from ..logging_setup import get_logger, log_event
 
 log = get_logger()
+
+
+# ---------------------------------------------------------------------------
+# Operator-local overrides (Packet 8K portability).
+#
+# Personal launcher targets and project roots are machine-specific and MUST
+# NOT ship in distributable runtime code. They live in an operator-local YAML
+# at ~/.config/openclaw-voice-bridge/local-actions.yaml (honours
+# $XDG_CONFIG_HOME). The installed package works on any machine with portable
+# generic defaults (launchers by name, home-directory file/screenshot dirs);
+# the operator override only customises that operator's machine.
+# ---------------------------------------------------------------------------
+def _operator_config_path() -> Path:
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    base = Path(xdg) if xdg else Path.home() / ".config"
+    return base / "openclaw-voice-bridge" / "local-actions.yaml"
+
+
+def _load_operator_overrides() -> Dict[str, Any]:
+    path = _operator_config_path()
+    data: Dict[str, Any] = {}
+    try:
+        if path.is_file():
+            import yaml
+            raw = yaml.safe_load(path.read_text())
+            if isinstance(raw, dict):
+                data = raw
+    except Exception as exc:
+        log_event("local.actions.config_error", error=str(exc)[:160])
+    return data
+
+
+_OPERATOR = _load_operator_overrides()
+
+
+def _expanded(args: List[str]) -> List[str]:
+    return [os.path.expanduser(a) for a in args]
+
+
+def _app_targets() -> Dict[str, List[str]]:
+    home = str(Path.home())
+    targets: Dict[str, List[str]] = {
+        "browser": ["xdg-open", "https://duckduckgo.com"],
+        "terminal": ["gnome-terminal"],
+        "discord": ["discord"],
+        "telegram": ["telegram-desktop"],
+        "spotify": ["spotify"],
+    }
+    targets.update(_OPERATOR.get("app_targets") or {})
+    targets.setdefault("editor", ["xdg-open", home])
+    targets.setdefault("vscode", ["code", home])
+    targets.setdefault("files", ["xdg-open", home])
+    return targets
+
+
+def _project_roots() -> Dict[str, str]:
+    return {k: str(v) for k, v in (_OPERATOR.get("project_roots") or {}).items()}
+
+
+def _screenshot_dir() -> Path:
+    over = _OPERATOR.get("screenshot_dir")
+    if over:
+        return Path(os.path.expanduser(str(over)))
+    return Path.home() / "Pictures"
 
 
 @dataclass
@@ -67,64 +132,49 @@ def _a_mic_mute(_: Dict[str, Any]) -> str:
 
 def _a_open_app(params: Dict[str, Any]) -> str:
     app = params.get("app", "")
-    targets = {
-        "browser": ["xdg-open", "https://duckduckgo.com"],
-        "editor": ["xdg-open", "/home/trick/Projects/Repos"],
-        "vscode": ["code", "/home/trick/Projects/Repos"],
-        "terminal": ["gnome-terminal"],
-        "discord": ["discord"],
-        "telegram": ["telegram-desktop"],
-        "files": ["xdg-open", "/home/trick"],
-        "fl studio": ["wine", "/home/trick/.wine/drive_c/Program Files/Image-Line/FL Studio 21/FL64.exe"],
-        "spotify": ["spotify"],
-    }
+    targets = _app_targets()
     argv = targets.get(app)
     if not argv:
         return f"I don't have a launcher for {app or 'that'}."
     try:
-        subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.Popen(_expanded(argv), stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL)
         return f"Opening {app}."
     except Exception as exc:
         return f"Could not open {app}: {exc}"
 
 
-# Known project roots for "open X in VS Code" — add more as needed.
-PROJECT_ROOTS = {
-    "cgraph": "/home/trick/Projects/Repos/CGraph Umbrella",
-    "cgraph umbrella": "/home/trick/Projects/Repos/CGraph Umbrella",
-    "rankvalut": "/home/trick/Projects/Repos/RankValut",
-    "qubit": "/home/trick/Projects/Repos/Qubit (2)",
-    "voice bridge": "/home/trick/Projects/Repos/openclaw-voice-bridge",
-    "voicebridge": "/home/trick/Projects/Repos/openclaw-voice-bridge",
-    "repos": "/home/trick/Projects/Repos",
-    "projects": "/home/trick/Projects/Repos",
-}
-
-
 def _a_open_project(params: Dict[str, Any]) -> str:
     """'open the CGraph project in vscode' -> launch VS Code on that repo."""
+    roots = _project_roots()
     name = (params.get("project", "") or "").strip().lower()
-    root = PROJECT_ROOTS.get(name)
+    root = roots.get(name)
     if not root:
         # fuzzy: pick the first root whose name appears in what was said
         said = (params.get("project", "") or "").lower()
-        for key, path in PROJECT_ROOTS.items():
+        for key, path in roots.items():
             if key in said and len(key) > 2:
                 root = path
                 break
     if not root:
-        return ("I know these projects: CGraph, RankValut, Qubit, voice bridge. "
+        known = ", ".join(sorted(set(roots))) or "none configured"
+        return (f"I know these projects: {known}. "
                 "Which one should I open?")
     try:
-        subprocess.Popen(["code", root], stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL)
+        subprocess.Popen(["code", os.path.expanduser(str(root))],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return f"Opening {name or 'project'} in VS Code."
     except Exception as exc:
         return f"Could not open VS Code: {exc}"
 
 
 def _a_screenshot(_: Dict[str, Any]) -> str:
-    out = "/home/trick/Pictures/screenshot-%s.png" % __import__("time").strftime("%Y%m%d-%H%M%S")
+    d = _screenshot_dir()
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return "Screenshot folder unavailable."
+    out = str(d / ("screenshot-%s.png" % __import__("time").strftime("%Y%m%d-%H%M%S")))
     if shutil.which("gnome-screenshot"):
         _run(["gnome-screenshot", "-f", out])
     elif shutil.which("scrot"):
@@ -605,7 +655,7 @@ def match(text: str) -> Optional[ActionMatch]:
                             params["app"] = canon
                             break
                 elif name == "open_project":
-                    for word in PROJECT_ROOTS:
+                    for word in _project_roots():
                         if word in low:
                             params["project"] = word
                             break

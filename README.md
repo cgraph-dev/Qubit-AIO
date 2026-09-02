@@ -289,6 +289,21 @@ Watch for `mic.utterance`, `asr.transcribe`, `routing.decision`,
    PersonaPlex-ready and the adapter point is preserved; on a 12 GB+ GPU or
    rented box you can re-add the duplex lane without touching the local stack.
 
+## Release certification (Packet 8K)
+
+`docs/OPERATIONS_8K.md` is the release-certification runbook: build the wheel
+and sdist, inspect and install them into a clean HOME outside the checkout,
+run import / entry-point / resource / unit / smoke checks with no
+`PYTHONPATH` or source-tree `sys.path` insertion, and record provenance,
+dependency constraints, licenses, SBOM, secret/machine-path scans, hashes, and
+a reproducibility comparison. Quick hermetic smoke:
+
+```bash
+python scripts/release_qualify.py --static --json   # no network
+voicebridge package certify                          # same, via the CLI
+python scripts/clean_venv_check.py --install         # opt-in clean-venv install
+```
+
 ## License / scope
 
 Personal tool. No telemetry, no cloud dependency for the core loop.

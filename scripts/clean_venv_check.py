@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
-"""Packet 7A: clean-venv installation + dependency contract check (opt-in).
+"""Packet 7A (+ 8K repair): clean-venv installation + dependency contract check.
 
 Two modes:
   --check        (default, fast, hermetic) parse pyproject.toml, AST-scan every
                  production module for undeclared third-party imports, and
                  bytecode-compile voicebridge/ + scripts/. Proves the source's
                  dependency contract without network or a new venv.
-  --install      (opt-in, slow, network) create a throwaway venv, pip-install
-                 the package with its declared dependencies, then run the same
-                 scan inside it so installed-but-undeclared packages cannot
-                 hide a missing dependency.
+  --install      (opt-in, slow, network) BUILD the wheel, install it into a
+                 throwaway venv, then run the dependency-contract scan inside
+                 that venv against the INSTALLED package files. The scan runs
+                 with no PYTHONPATH, no source-tree sys.path insertion, and a
+                 mask guard that fails if the installed ``voicebridge``
+                 resolves inside the checkout (Packet 8K finding #7 repair: a
+                 missing wheel member can no longer be hidden by the source
+                 tree).
 
 Typed exit: 0 ok, 2 undeclared import FAIL, 4 degraded (venv/pip/network
 unavailable for --install). A skipped --install is DEGRADED, never a pass.
@@ -17,6 +21,7 @@ unavailable for --install). A skipped --install is DEGRADED, never a pass.
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 import tempfile
@@ -65,16 +70,65 @@ def _check() -> int:
     return EXIT_OK
 
 
+def _run(cmd: list[str], timeout: int, cwd: str | None = None,
+         env: dict | None = None) -> subprocess.CompletedProcess:
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
+                          cwd=cwd, env=env)
+
+
+def _build_wheel(dist_dir: Path, env: dict | None = None) -> bool:
+    """Build the wheel with pip (build isolation fetches hatchling). Returns
+    True on success; prints a typed degraded message on failure/timeout."""
+    print("[clean-venv] building wheel (network: build backend)...")
+    try:
+        _run([sys.executable, "-m", "pip", "wheel", "--no-deps",
+              "-w", str(dist_dir), str(REPO)], timeout=600, env=env)
+    except subprocess.TimeoutExpired:
+        print("[clean-venv] DEGRADED: wheel build timed out (network/slow).")
+        return False
+    except subprocess.CalledProcessError as exc:
+        print(f"[clean-venv] DEGRADED: wheel build failed: "
+              f"{(exc.stderr or b'').decode(errors='replace')[-200:]} "
+              f"(network or build backend unavailable).")
+        return False
+    return True
+
+
 def _install() -> int:
-    venv_dir = Path(tempfile.mkdtemp(prefix="vb-cleanvenv-"))
+    base = Path(tempfile.mkdtemp(prefix="vb-cleanvenv-"))
+    venv_dir = base / "venv"
+    dist_dir = base / "dist"
+    home_dir = base / "home"
+    dist_dir.mkdir()
+    home_dir.mkdir()
     py = venv_dir / "bin" / "python"
+    # A genuinely separate HOME outside the checkout (Packet 8K): venv creation,
+    # pip install, and the in-venv scan must not read the operator's real
+    # ~/.config/pip, ~/.local, or user-site. XDG dirs follow HOME.
+    clean_env = dict(os.environ)
+    clean_env.pop("PYTHONPATH", None)
+    clean_env["HOME"] = str(home_dir)
+    clean_env["XDG_CONFIG_HOME"] = str(home_dir / ".config")
+    clean_env["XDG_DATA_HOME"] = str(home_dir / ".local" / "share")
+    clean_env["XDG_STATE_HOME"] = str(home_dir / ".local" / "state")
+    clean_env["XDG_CACHE_HOME"] = str(home_dir / ".cache")
     try:
         subprocess.run([sys.executable, "-m", "venv", str(venv_dir)],
-                       check=True, capture_output=True, timeout=300)
-        pip = venv_dir / "bin" / "pip"
-        print("[clean-venv] installing package + declared deps (network)...")
-        subprocess.run([str(pip), "install", str(REPO)],
-                       check=True, capture_output=True, timeout=1200)
+                       check=True, capture_output=True, timeout=300, env=clean_env)
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as exc:
+        print(f"[clean-venv] DEGRADED: venv creation failed: {exc}")
+        return EXIT_DEGRADED
+    if not _build_wheel(dist_dir, env=clean_env):
+        return EXIT_DEGRADED
+    wheels = list(dist_dir.glob("*.whl"))
+    if len(wheels) != 1:
+        print(f"[clean-venv] DEGRADED: expected one wheel, found {len(wheels)}")
+        return EXIT_DEGRADED
+    pip = venv_dir / "bin" / "pip"
+    print("[clean-venv] installing wheel + declared deps (network)...")
+    try:
+        subprocess.run([str(pip), "install", str(wheels[0])],
+                       check=True, capture_output=True, timeout=1800, env=clean_env)
     except subprocess.TimeoutExpired:
         print("[clean-venv] DEGRADED: install timed out (network/slow).")
         return EXIT_DEGRADED
@@ -83,31 +137,72 @@ def _install() -> int:
               f"{(exc.stderr or b'').decode(errors='replace')[-200:]} "
               f"(network or build backend unavailable).")
         return EXIT_DEGRADED
-    # Run the scan inside the clean venv so transitive site-packages cannot
-    # hide a missing declared dependency.
+    # Run the scan inside the clean venv with ISOLATED mode (-I: no PYTHONPATH,
+    # no CWD, no user site) against the INSTALLED package files. The source
+    # checkout is never placed on sys.path, and a mask guard FAILS if the
+    # installed package resolves inside the checkout.
     code = (
-        "import sys; sys.path.insert(0, %r);\n"
-        "from scripts.config_doctor import _import_scan;\n"
-        "f, w = _import_scan();\n"
-        "print('CLEAN-VENV-FAILS=' + str([f'{m} at {l}' for m, l in f]));\n"
-        "print('CLEAN-VENV-WARNS=' + str([f'{m} at {l}' for m, l in w]));\n"
-    ) % str(REPO)
+        "import sys, pathlib, os, importlib.util;\n"
+        "repo = os.environ.get('VB_CLEAN_VENV_REPO', '');\n"
+        "spec = importlib.util.find_spec('voicebridge');\n"
+        "assert spec is not None and spec.origin, 'voicebridge not importable';\n"
+        "base = pathlib.Path(spec.origin).resolve().parent;\n"
+        "assert not str(base).startswith(os.path.abspath(repo)), "
+        "'MASK-GUARD FAIL: installed voicebridge resolves inside the checkout';\n"
+        "from voicebridge.release import import_scan_installed, "
+        "declared_module_names_from_metadata;\n"
+        "declared = declared_module_names_from_metadata();\n"
+        "fails = import_scan_installed(base, declared);\n"
+        "print('CLEAN-VENV-FAILS=' + str(fails));\n"
+        "print('CLEAN-VENV-BASE=' + str(base));\n"
+        "print('CLEAN-VENV-ENTRY=' + str(len(list(importlib.metadata.entry_points("
+        "group='console_scripts')))));\n"
+        "import voicebridge, voicebridge.release;\n"
+        "from voicebridge import resources;\n"
+        "print('CLEAN-VENV-RESOURCE-FRONTEND=' + str("
+        "resources.resource_path('frontend').is_dir()));\n"
+        "print('CLEAN-VENV-RESOURCE-CONFIG=' + str("
+        "resources.resource_path('config/voice.example.yaml').is_file()));\n"
+        "print('CLEAN-VENV-OK');\n"
+    )
+    env = dict(clean_env)
+    env["VB_CLEAN_VENV_REPO"] = str(REPO)
     try:
-        out = subprocess.run([str(py), "-c", code],
-                             capture_output=True, text=True, timeout=300)
+        out = subprocess.run([str(py), "-I", "-c", code], capture_output=True,
+                             text=True, timeout=300, env=env, cwd=tempfile.gettempdir())
     except Exception as exc:
         print(f"[clean-venv] DEGRADED: in-venv scan failed: {exc}")
         return EXIT_DEGRADED
     fails: list[str] = []
+    mask_fail = False
     for line in out.stdout.splitlines():
         if line.startswith("CLEAN-VENV-FAILS="):
             import ast as _ast
             fails = _ast.literal_eval(line.split("=", 1)[1])
+        elif "MASK-GUARD FAIL" in line:
+            mask_fail = True
+        elif line.startswith("CLEAN-VENV-BASE="):
+            print(f"[clean-venv] installed base: {line.split('=', 1)[1]}")
+        elif line.startswith("CLEAN-VENV-RESOURCE-"):
+            print(f"[clean-venv] resource {line.split('=', 1)[0][12:]} = "
+                  f"{line.split('=', 1)[1]}")
+    if out.returncode != 0:
+        print(f"[clean-venv] DEGRADED: in-venv scan exited {out.returncode}: "
+              f"{(out.stderr or '')[-300:]}")
+        return EXIT_DEGRADED
+    if mask_fail:
+        print("[clean-venv] FAIL mask guard: installed package resolves inside "
+              "the source checkout (packaging is hiding missing contents).")
+        return EXIT_FAIL
     if fails:
         for f in fails:
-            print(f"[clean-venv] FAIL undeclared import (clean venv): {f}")
+            print(f"[clean-venv] FAIL undeclared import (installed wheel): {f}")
         return EXIT_FAIL
-    print("[clean-venv] PASS: clean-venv install has no undeclared imports.")
+    if "CLEAN-VENV-OK" not in out.stdout:
+        print("[clean-venv] DEGRADED: in-venv scan did not complete cleanly.")
+        return EXIT_DEGRADED
+    print("[clean-venv] PASS: clean-venv wheel install has no undeclared "
+          "imports; resources resolve; package does not mask the checkout.")
     return EXIT_OK
 
 
@@ -116,7 +211,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--check", action="store_true", default=False,
                     help="fast hermetic contract scan (default if no --install)")
     ap.add_argument("--install", action="store_true",
-                    help="opt-in: real clean-venv install (slow, network)")
+                    help="opt-in: build wheel + real clean-venv install (slow, network)")
     args = ap.parse_args(argv)
     if args.install:
         rc = _install()

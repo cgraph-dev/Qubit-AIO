@@ -96,6 +96,12 @@ def build_parser() -> argparse.ArgumentParser:
                                    help="model artifact metadata + digest (fail closed)")
     pkg_dist = pkg_sub.add_parser("distributable", parents=[common],
                                   help="distributable artifact completeness check")
+    pkg_cert = pkg_sub.add_parser("certify", parents=[common],
+                                  help="Packet 8K hermetic release certification "
+                                       "(provenance, secret/machine-path scan, "
+                                       "units, runbooks, upgrade/uninstall contract)")
+    pkg_cert.add_argument("--json", action="store_true",
+                          help="machine-readable certification report")
     aud = add("audio", help="user-facing audio settings contract (list/select/reset/status)")
     aud_sub = aud.add_subparsers(dest="audio_command")
     aud_list = aud_sub.add_parser("list", parents=[common], help="list audio devices")
@@ -864,7 +870,8 @@ def _cmd_flag_drill(cfg) -> int:
 
 
 def _cmd_package(cfg, args) -> int:
-    """voicebridge package manifest|doctor|launch|upgrade|uninstall."""
+    """voicebridge package manifest|doctor|launch|upgrade|uninstall|
+    model|distributable|certify."""
     import json as _json
     from . import distribution as D
     cmd = getattr(args, "package_command", None) or "manifest"
@@ -900,8 +907,44 @@ def _cmd_package(cfg, args) -> int:
         m = D.distributable_manifest()
         print(_json.dumps(m, indent=2, sort_keys=True))
         return 0 if m["complete"] else 1
+    if cmd == "certify":
+        from . import release as R
+        report = R.certify()
+        if getattr(args, "json", False):
+            print(_json.dumps(report, indent=2, sort_keys=True))
+        else:
+            _print_certify_human(report)
+        return 0 if R.report_pass(report) else 2
     print(f"ERROR: unknown package command {cmd!r}")
     return 2
+
+
+def _print_certify_human(report) -> None:
+    """Human-readable certification summary (never prints secret values)."""
+    p = report["provenance"]
+    print(f"version {p['version']} commit {p['commit'] or '?'} "
+          f"dirty={p.get('dirty')}")
+    core = report["machine_paths"]["core"]
+    pers = report["machine_paths"]["personalization"]
+    print(f"machine paths: core={len(core)} personalization={len(pers)}")
+    for rel, hits in core.items():
+        print(f"  FAIL core machine path {rel}: {hits}")
+    for rel, hits in pers.items():
+        print(f"  (personalization) {rel}: {hits}")
+    print(f"secret hits: {len(report['secrets'])}")
+    for rel, shapes in report["secrets"].items():
+        print(f"  FAIL secret-shaped {rel}: {shapes}")
+    fm = " ".join(f"{c['name']}={c['state']}" for c in report["filesystem_modes"])
+    print(f"filesystem modes: {fm}")
+    runbooks = " ".join(f"{c['name']}={c['state']}"
+                        for c in report["operator_runbooks"] if c["state"] != "OK")
+    print(f"runbooks missing/failed: {runbooks or 'none'}")
+    mig = " ".join(f"{c['name']}={c['state']}"
+                   for c in report["backup_migration"] if c["state"] != "OK")
+    print(f"migration: {mig or 'ok'}")
+    units = report["units"]
+    print(f"units: systemd_analyze={units.get('systemd_analyze')} "
+          f"all_ok={units.get('all_ok')}")
 
 
 def _bridge_service_active() -> bool:

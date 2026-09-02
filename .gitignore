@@ -15,3 +15,6 @@ browser_auto_state
 # PII bake artifact: composed from live personal files by scripts/bake_brain.py.
 # NEVER commit (plan rule 29). Superseded by the Packet 4B context compiler.
 Modelfile.qubit4
+
+# Packet 8K release certification output (wheel/sdist + clean-HOME installs).
+/dist/

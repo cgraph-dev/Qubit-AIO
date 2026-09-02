@@ -11,17 +11,19 @@ Exit 0 with the answer text on stdout. Exit 2 = no answer anywhere.
 """
 from __future__ import annotations
 
-import json
-import shlex
 import subprocess
 import re
 import sys
 import time
+from pathlib import Path
 
 DDG_MIN_RESULTS = 2   # fewer than this -> fall back to Perplexity
-PERPLEXITY_SCRIPT = ("/home/trick/.hermes/skills/research/perplexity-web-search/"
-                     "scripts/perplexity_search.py")
-BRIDGE_PYTHON = "/home/trick/Projects/Repos/openclaw-voice-bridge/.venv/bin/python"
+# Portable resolution: the bridge venv python runs this script, so the current
+# interpreter is the launcher; the Perplexity skill lives under the operator's
+# $HOME (documented skill path), never a machine-specific absolute path.
+BRIDGE_PYTHON = sys.executable
+PERPLEXITY_SCRIPT = (Path.home() / ".hermes/skills/research/perplexity-web-search"
+                     / "scripts" / "perplexity_search.py")
 
 
 def ddg_search(query: str, max_results: int = 5) -> list:
@@ -46,7 +48,6 @@ def ddg_answer(query: str) -> str:
     for r in rs[:4]:
         title = (r.get("title") or "").strip()
         body = (r.get("body") or "").strip()
-        href = (r.get("href") or "").strip()
         if title:
             lines.append(f"{title}: {body}" if body else title)
     if not lines:
@@ -79,10 +80,10 @@ def main() -> int:
     # Weather: Bucharest (and mangled 'Corest') must return real temps, not DDG titles.
     if re.search(r"weather|temperature|forecast", query, re.I):
         try:
-            import subprocess, pathlib
-            venv = pathlib.Path.home() / "Projects/Repos/openclaw-voice-bridge/.venv/bin/python"
-            weather = pathlib.Path.home() / "Projects/Repos/openclaw-voice-bridge/scripts/weather.py"
-            r = subprocess.run([str(venv), str(weather), query], capture_output=True, text=True, timeout=12)
+            import pathlib
+            weather = pathlib.Path(__file__).resolve().parent / "weather.py"
+            r = subprocess.run([sys.executable, str(weather), query],
+                               capture_output=True, text=True, timeout=12)
             if r.returncode == 0 and r.stdout.strip():
                 print(r.stdout.strip())
                 return 0

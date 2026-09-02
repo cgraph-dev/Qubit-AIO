@@ -40,6 +40,7 @@ from typing import Any, Deque, Dict, List, Optional
 
 from .logging_setup import log_event, get_logger
 from .redaction import redact_obj
+from . import resources
 
 log = get_logger()
 
@@ -1947,7 +1948,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
             self._send(404, b"not found")
 
 
-REPO_FRONTEND = Path(__file__).resolve().parents[1] / "frontend"
+REPO_FRONTEND = resources.resource_path("frontend")
 
 
 def _frontend_version(frontend_dir: Path) -> str:

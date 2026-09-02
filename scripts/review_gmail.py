@@ -1,4 +1,4 @@
-#!/home/trick/Projects/Repos/openclaw-voice-bridge/.venv/bin/python
+#!/usr/bin/env python3
 """Fast Gmail review — himalaya -> CDP -> cache -> graceful message. <2s when cached."""
 from __future__ import annotations
 import json, os, sys, subprocess, time
@@ -8,7 +8,7 @@ CACHE_DIR = Path.home() / ".cache" / "openclaw-voice-bridge" / "inboxes"
 CACHE_FILE = CACHE_DIR / "gmail.json"
 CACHE_TTL_S = 300  # 5 min fresh
 HIMALAYA = os.path.expanduser("~/.local/bin/himalaya")
-VENV_PY = os.path.expanduser("~/Projects/Repos/openclaw-voice-bridge/.venv/bin/python")
+VENV_PY = sys.executable  # portable: the bridge venv python invokes this script
 CDP_SCRIPT = Path.home() / ".hermes" / "skills" / "communication" / "social-inbox-check" / "scripts" / "read_gmail.py"
 
 def cache_load(max_age_s: int = 3600):
@@ -170,8 +170,6 @@ def categorize(items):
             # CDP path sets seen=False for all, so skip unread there
             pass
     # For himalaya we have accurate seen; for CDP we treat all as unknown
-    # Count unread from himalaya only
-    unread = sum(1 for it in items if it.get("seen") is False and it.get("flagged") is not None)  # placeholder
     # simpler: count where seen==False and we have real flag
     # Actually just use seen field when available
     real_unread = sum(1 for it in items if it.get("seen") is False)
@@ -272,7 +270,7 @@ def main():
     print("    (needs App Password if 2FA is on — https://myaccount.google.com/apppasswords)")
     print("    Config file: ~/.config/himalaya/config.toml — see ~/.hermes/skills/email/himalaya/references/configuration.md")
     print("  • Option B (browser): launch Chromium with CDP and log into Gmail:")
-    print("    DISPLAY=:0 /snap/bin/chromium --user-data-dir=/home/trick/snap/chromium/common/chromium --profile-directory=Default --remote-debugging-port=9222 --remote-allow-origins=* https://mail.google.com")
+    print("    DISPLAY=:0 /snap/bin/chromium --user-data-dir=<your-chromium-profile> --profile-directory=Default --remote-debugging-port=9222 --remote-allow-origins=* https://mail.google.com")
     print("    Then `curl -s http://127.0.0.1:9222/json | grep mail.google.com` should list the tab.")
     if q:
         print(f"  (query was: {q[:80]})")

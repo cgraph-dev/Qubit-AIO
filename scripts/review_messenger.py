@@ -1,4 +1,4 @@
-#!/home/trick/Projects/Repos/openclaw-voice-bridge/.venv/bin/python
+#!/usr/bin/env python3
 """Fast Messenger review — CDP (social-inbox-check) -> cache -> graceful."""
 from __future__ import annotations
 import json, sys, subprocess, time
@@ -7,7 +7,7 @@ from pathlib import Path
 CACHE_DIR = Path.home() / ".cache" / "openclaw-voice-bridge" / "inboxes"
 CACHE_FILE = CACHE_DIR / "messenger.json"
 CACHE_TTL_S = 300
-VENV_PY = Path.home() / "Projects/Repos/openclaw-voice-bridge/.venv/bin/python"
+VENV_PY = sys.executable  # portable: the bridge venv python invokes this script
 CDP_SCRIPT = Path.home() / ".hermes/skills/communication/social-inbox-check/scripts/read_messenger.py"
 
 def cache_load(max_age_s=3600):
@@ -113,7 +113,7 @@ def main():
     print("")
     print("No Messenger access found. To enable:")
     print("  1) Launch Chromium with CDP and log into Messenger:")
-    print("     DISPLAY=:0 /snap/bin/chromium --user-data-dir=/home/trick/snap/chromium/common/chromium --profile-directory=Default --remote-debugging-port=9222 --remote-allow-origins=* https://www.messenger.com/")
+    print("     DISPLAY=:0 /snap/bin/chromium --user-data-dir=<your-chromium-profile> --profile-directory=Default --remote-debugging-port=9222 --remote-allow-origins=* https://www.messenger.com/")
     print("  2) Verify: curl -s http://127.0.0.1:9222/json | grep messenger.com")
     print("  3) Then say 'check messenger' again.")
     if q:

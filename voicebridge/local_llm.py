@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .logging_setup import log_event
+from . import resources
 
 SYSTEM_PROMPT = (
     "You are Qubit, Tricky (cgraph-dev)'s warm voice assistant. Answer briefly in 1-3 short "
@@ -31,7 +32,7 @@ SYSTEM_PROMPT = (
 def _load_dialogs() -> str:
     candidates = [
         Path(os.path.expanduser("~/.config/openclaw-voice-bridge/dialogs.md")),
-        Path(__file__).resolve().parent.parent / "config" / "dialogs.md",
+        resources.resource_path("config/dialogs.md"),
     ]
     for p in candidates:
         if p.exists():

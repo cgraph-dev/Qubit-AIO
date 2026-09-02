@@ -36,6 +36,7 @@ from .audio.mic import (MicCapture, pin_pulse_default_source,
 from .audio.playback import Playback
 from .audio.vad import BargeInDetector, Endpointer, FrameSplitter
 from .config import Config
+from . import resources
 from .hermes import HermesBackend
 from .hotkeys import HotkeyListener
 from .intent.classifier import Classifier, Intent
@@ -619,9 +620,8 @@ class VoiceOrchestrator:
         self._templates = TaskTemplates.load(
             path=self.cfg.get("intent", "templates_path",
                               default="~/.config/openclaw-voice-bridge/task-templates.yaml"),
-            defaults_path=os.path.expanduser(
-                "~/Projects/Repos/openclaw-voice-bridge/config/task-templates.yaml")
-            if Path("~/Projects/Repos/openclaw-voice-bridge/config/task-templates.yaml").expanduser().exists()
+            defaults_path=resources.resource_path("config/task-templates.yaml")
+            if resources.resource_path("config/task-templates.yaml").exists()
             else None)
         if self._templates.items:
             log_event("task_templates.loaded", count=len(self._templates.items))
