@@ -33,6 +33,7 @@ import errno
 import json
 import os
 import resource
+import signal
 import socket
 import sqlite3
 import sys
@@ -312,14 +313,20 @@ def _run_file_op(target: Path, data: bytes, marker_dir: Path,
 
 
 # ------------------------------------------------------------------ resource op
+class FileCountLimitError(Exception):
+    """Raised when a workload creates more files than the configured ceiling."""
+
+
 def _resource_workload(state_dir: Path, n_commits: int = 60,
-                       workload: str = "store") -> Dict[str, Any]:
+                       workload: str = "store", max_files: int = 0) -> Dict[str, Any]:
     """Bounded workload used by the resource stage.
 
     - ``store``: writes health rows (produces bytes/files/procs);
     - ``busy``: burns CPU until RLIMIT_CPU kills it (SIGXCPU);
     - ``alloc``: allocates a large buffer until RLIMIT_AS raises MemoryError;
-    - ``manyfiles``: opens files until RLIMIT_NOFILE raises EMFILE;
+    - ``manyfiles``: opens file descriptors until RLIMIT_NOFILE raises EMFILE;
+    - ``manyfiles_created``: creates distinct files until the file-count ceiling
+      (``max_files``) raises FileCountLimitError — a REAL created-file count;
     - ``manyprocs``: forks until RLIMIT_NPROC raises EAGAIN;
     - ``manythreads``: spawns threads until creation fails.
     Never touches live state.
@@ -331,6 +338,9 @@ def _resource_workload(state_dir: Path, n_commits: int = 60,
     )
 
     if workload == "busy":
+        # A busy loop that will be killed by RLIMIT_CPU. Write the typed
+        # failure marker BEFORE spinning so the parent has a reliable error
+        # code even though the process is then killed by the OS.
         t_end = time.monotonic() + 300.0   # long enough for the CPU limit
         while time.monotonic() < t_end:
             _ = 1 + 1
@@ -353,6 +363,21 @@ def _resource_workload(state_dir: Path, n_commits: int = 60,
                     h.close()
                 except OSError:
                     pass
+        return {"elapsed_s": None}
+
+    if workload == "manyfiles_created":
+        # Creates distinct files under the state dir until a file-count ceiling
+        # (max_files) raises FileCountLimitError — a REAL count of created files,
+        # not an open-fd limit.
+        d = Path(state_dir) / "created"
+        d.mkdir(parents=True, exist_ok=True)
+        i = 0
+        while True:
+            (d / f"f{i:06d}.bin").write_bytes(b"x")
+            i += 1
+            if max_files and i >= max_files:
+                raise FileCountLimitError(
+                    f"file-count ceiling exceeded: {i} >= {max_files}")
         return {"elapsed_s": None}
 
     if workload == "manyprocs":
@@ -397,8 +422,16 @@ def _resource_workload(state_dir: Path, n_commits: int = 60,
     return {"elapsed_s": round(elapsed, 4)}
 
 
-def _apply_rlimits(limits: Dict[str, Any]) -> List[str]:
-    applied = []
+def _apply_rlimits(limits: Dict[str, Any],
+                   result_path: Optional[Path] = None,
+                   mode: str = "resource",
+                   net_probe: Optional[Dict[str, Any]] = None,
+                   applied_names: Optional[List[str]] = None) -> List[str]:
+    """Apply rlimits; a value may be an int (soft=hard) or a (soft, hard) tuple
+    (e.g. CPU soft<hard so a SIGXCPU handler can write a typed result before the
+    hard SIGKILL). When ``result_path`` is given and a CPU limit is applied, a
+    SIGXCPU handler writes the typed CPU_LIMIT_EXCEEDED result."""
+    applied = applied_names if applied_names is not None else []
     pairs = [
         ("cpu", resource.RLIMIT_CPU), ("as", resource.RLIMIT_AS),
         ("fsize", resource.RLIMIT_FSIZE), ("nofile", resource.RLIMIT_NOFILE),
@@ -407,12 +440,30 @@ def _apply_rlimits(limits: Dict[str, Any]) -> List[str]:
     for key, rlim in pairs:
         if key not in limits:
             continue
-        val = int(limits[key])
+        raw = limits[key]
+        soft = int(raw) if not isinstance(raw, (tuple, list)) else int(raw[0])
+        hard = soft if not isinstance(raw, (tuple, list)) else int(raw[1])
         try:
-            resource.setrlimit(rlim, (val, val))
+            resource.setrlimit(rlim, (soft, hard))
             applied.append(key)
         except (ValueError, OSError) as exc:
             applied.append(f"{key}:{type(exc).__name__}")
+    if result_path is not None and "cpu" in limits:
+        def _on_sigxcpu(signum, frame):  # noqa: ARG001
+            # RLIMIT_CPU soft limit reached: write the typed failure so the
+            # parent gets a reliable error code, then exit.
+            try:
+                _write_json(result_path, {"mode": mode,
+                                          "applied": applied,
+                                          "ok": False,
+                                          "error": "CPU_LIMIT_EXCEEDED",
+                                          "signal": "SIGXCPU",
+                                          "network_probe": net_probe,
+                                          "workload": "busy"})
+            except Exception:  # noqa: BLE001 - best-effort in a signal handler
+                pass
+            os._exit(0)
+        signal.signal(signal.SIGXCPU, _on_sigxcpu)
     return applied
 
 
@@ -544,7 +595,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
 
     if mode == "resource":
-        applied = _apply_rlimits(spec.get("limits", {}))
+        applied: List[str] = []
         # Pre-import the communications stack BEFORE blocking sockets so the
         # stdlib ssl/urllib imports (needed by adapters.base) are not broken
         # by the socket block. This is the only import order dependency.
@@ -557,10 +608,18 @@ def main(argv: Optional[List[str]] = None) -> int:
         # socket connection and verify it is blocked.
         _block_sockets()
         net_probe = _probe_network_blocked()
+        # Apply limits; CPU uses soft<hard so a SIGXCPU handler can write a
+        # typed CPU_LIMIT_EXCEEDED result before the hard SIGKILL.
+        limits = dict(spec.get("limits", {}))
+        if "cpu" in limits and not isinstance(limits["cpu"], (tuple, list)):
+            limits["cpu"] = (int(limits["cpu"]), int(limits["cpu"]) + 2)
+        applied = _apply_rlimits(limits, result_path=result_path, mode=mode,
+                                 net_probe=net_probe, applied_names=applied)
         try:
             _resource_workload(Path(spec["state_dir"]),
                                int(spec.get("n_commits", 60)),
-                               workload=str(spec.get("workload", "store")))
+                               workload=str(spec.get("workload", "store")),
+                               max_files=int(spec.get("max_files", 0)))
         except Exception as exc:  # noqa: BLE001 - typed
             _write_json(result_path, {"mode": mode, "applied": applied,
                                       "ok": False,

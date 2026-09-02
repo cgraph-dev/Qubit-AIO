@@ -69,6 +69,10 @@ def test_preflight_rpo_rto_and_isolated(tmp_path):
     assert out["recovery"]["rpo_seconds"] > 0
     assert out["recovery"]["rto_seconds"] > 0
     assert out["resource_ceilings"]["stage_uses_isolated_temp_state"] is True
+    # default resource ceilings enforce CPU + memory by default
+    child_limits = out["resource_ceilings"]["child_limits"]
+    assert "cpu" in child_limits and "as" in child_limits
+    assert out["resource_ceilings"]["hard_enforced"] is True
 
 
 def test_deny_live_fails_closed(tmp_path):
@@ -399,8 +403,17 @@ def test_resources_measured_and_enforced(tmp_path):
     assert c["network_blocked_before_workload"] is True
     assert c["elapsed_s"] > 0
     # every enforced limit must be a typed failure
-    for name in ("cpu", "memory", "fsize", "nofile", "nproc", "thread"):
+    for name in ("cpu", "memory", "fsize", "fd", "file_count", "nproc",
+                 "thread"):
         assert out["checks"][f"resource_{name}_limit"]["state"] == "OK", name
+    # the CPU limit must be TYPED (SIGXCPU -> CPU_LIMIT_EXCEEDED), not just a
+    # nonzero return code
+    assert out["checks"]["resource_cpu_limit"]["typed"] == "CPU_LIMIT_EXCEEDED"
+    assert out["checks"]["resource_cpu_limit"]["signal"] == "SIGXCPU"
+    # the file-count ceiling is a REAL created-file count, distinct from the
+    # open-fd (RLIMIT_NOFILE) limit
+    assert out["checks"]["resource_file_count_limit"]["typed"] == \
+        "FileCountLimitError"
     # genuine wall-timeout on a hanging child
     assert out["checks"]["resource_wall_timeout"]["state"] == "OK"
     assert out["checks"]["resource_wall_timeout"]["wall_timed_out"] is True

@@ -71,7 +71,9 @@ DEFAULT_RPO_S = 3600.0
 DEFAULT_RTO_S = 300.0
 
 # Resource ceilings applied to every isolated stage by default.
-DEFAULT_RLIMITS: Dict[str, int] = {
+DEFAULT_RLIMITS: Dict[str, Any] = {
+    "cpu": (120, 300),         # 120 s CPU soft / 300 s hard
+    "as": 2 * 1024 * 1024 * 1024,   # 2 GiB address space
     "fsize": 8 * 1024 * 1024,   # 8 MiB of output per stage
     "nofile": 512,
     "nproc": 128,
@@ -1264,7 +1266,7 @@ def _run_resource(spec: Dict[str, Any], root: Path, timeout_s: float,
     return rc, err, res
 
 
-def _resource_child(root: Path, workload: str, limits: Dict[str, int],
+def _resource_child(root: Path, workload: str, limits: Dict[str, Any],
                     n_commits: int = 30) -> Path:
     r = root / f"{workload}"
     r.mkdir(parents=True, exist_ok=True)
@@ -1314,17 +1316,23 @@ def qualify_resources(cfg: Config, state_dir: Path) -> Dict[str, Any]:
         "network_blocked_before_workload": net_ok,
         "returncode": rc}
 
-    # 2) CPU limit: RLIMIT_CPU tiny + busy loop -> SIGXCPU (typed kill).
-    r = _resource_child(root, "busy", {"cpu": 1})
+    # 2) CPU limit: RLIMIT_CPU soft=1/hard=3 + busy loop -> the SIGXCPU handler
+    #    writes a typed CPU_LIMIT_EXCEEDED result; the hard SIGKILL is only the
+    #    backstop. The parent requires the TYPED error code, not any nonzero rc.
+    r = _resource_child(root, "busy", {"cpu": (1, 3)})
     rc, err, res = _run_resource(
         {"mode": "resource", "state_dir": str(r / "state"),
          "marker_dir": str(r / "markers"), "n_commits": 0,
-         "limits": {"cpu": 1}, "workload": "busy"},
+         "limits": {"cpu": (1, 3)}, "workload": "busy"},
         r, 40.0)
+    cpu_typed = (res.get("ok") is False
+                 and res.get("error") == "CPU_LIMIT_EXCEEDED")
     checks["resource_cpu_limit"] = {
-        "state": "OK" if rc != 0 or res.get("ok") is not True else "failed",
+        "state": "OK" if cpu_typed else "failed",
         "returncode": rc, "err": err[:120],
-        "typed": res.get("error", "SIGXCPU/OS-enforced kill")}
+        "typed": res.get("error"),
+        "signal": res.get("signal"),
+        "applied": res.get("applied")}
 
     # 3) address-space/memory limit: RLIMIT_AS small + alloc -> MemoryError.
     r = _resource_child(root, "alloc", {"as": 96 * 1024 * 1024})
@@ -1353,18 +1361,41 @@ def qualify_resources(cfg: Config, state_dir: Path) -> Dict[str, Any]:
         else "failed",
         "typed": res.get("error"), "errno": res.get("errno")}
 
-    # 5) file-count limit: RLIMIT_NOFILE low + manyfiles -> EMFILE typed.
+    # 5) open-file-DESCRIPTOR limit: RLIMIT_NOFILE low + manyfiles -> EMFILE typed.
     r = _resource_child(root, "manyfiles", {"nofile": 32, "nproc": 128})
     rc, err, res = _run_resource(
         {"mode": "resource", "state_dir": str(r / "state"),
          "marker_dir": str(r / "markers"), "n_commits": 0,
          "limits": {"nofile": 32, "nproc": 128}, "workload": "manyfiles"},
         r, 40.0)
-    checks["resource_nofile_limit"] = {
+    checks["resource_fd_limit"] = {
         "state": "OK" if res.get("ok") is False
         and res.get("error") == "OSError" else "failed",
         "typed": res.get("error"), "errno": res.get("errno"),
-        "strerror": res.get("strerror")}
+        "strerror": res.get("strerror"),
+        "limit": "RLIMIT_NOFILE (open file descriptors)"}
+
+    # 5b) created-FILE-COUNT ceiling: manyfiles_created raises a typed
+    #     FileCountLimitError at the configured max_files (a real count of
+    #     distinct files created, not an open-fd limit).
+    r = _resource_child(root, "manyfiles_created", {"nofile": 512, "nproc": 128})
+    (r / "spec.json").write_text(json.dumps(
+        {"mode": "resource", "state_dir": str(r / "state"),
+         "marker_dir": str(r / "markers"), "n_commits": 0,
+         "limits": {"nofile": 512, "nproc": 128},
+         "workload": "manyfiles_created", "max_files": 8}))
+    rc, err, res = _run_resource(
+        {"mode": "resource", "state_dir": str(r / "state"),
+         "marker_dir": str(r / "markers"), "n_commits": 0,
+         "limits": {"nofile": 512, "nproc": 128},
+         "workload": "manyfiles_created", "max_files": 8},
+        r, 40.0)
+    checks["resource_file_count_limit"] = {
+        "state": "OK" if res.get("ok") is False
+        and res.get("error") == "FileCountLimitError" else "failed",
+        "typed": res.get("error"),
+        "strerror": res.get("strerror"),
+        "limit": "created-file count ceiling (max_files=8)"}
 
     # 6) process-count limit: RLIMIT_NPROC low + manyprocs -> EAGAIN typed.
     r = _resource_child(root, "manyprocs", {"nproc": 4, "nofile": 128})
@@ -1464,13 +1495,17 @@ def qualify_rpo_rto(cfg: Config, state_dir: Path) -> Dict[str, Any]:
     rpo = float(cfg.get("recovery", "rpo_seconds", default=DEFAULT_RPO_S))
     rto = float(cfg.get("recovery", "rto_seconds", default=DEFAULT_RTO_S))
 
-    # 1) portable-state baseline: a committed bundle with a known timestamp.
+    # 1) portable-state baseline: a committed memory store with a known fact.
     scfg = isolate_cfg(cfg, root)
     state_root = Path(scfg.state_dir())
     memory_dir = state_root / "memory"
     memory_dir.mkdir(parents=True, exist_ok=True)
     mem = memory_dir / "memory.db"
-    mem.write_bytes(b"seed")
+    from ..memory import MemoryStore
+    mstore = MemoryStore(mem)
+    mstore.remember("durable-fact", tier="core", scope="default",
+                    source="rpo-baseline", kind="fact")
+    mstore.close()
     bundle = P.export_bundle(scfg, "rpo-password")
     last_durable = time.time()
 
@@ -1478,13 +1513,12 @@ def qualify_rpo_rto(cfg: Config, state_dir: Path) -> Dict[str, Any]:
     payload = P.read_bundle(bundle, "rpo-password")
     P.plan_restore(scfg, payload, dry_run=False)   # writes pre-restore backup
     newest_recoverable = time.time()
-    # record a hash of the recoverable payload for later validation
-    recoverable_hash = hashlib.sha256(
-        json.dumps(payload.get("state") or {}, sort_keys=True).encode()
-    ).hexdigest()
 
     # 3) advance durable state past the backup (data-loss interval grows).
-    (memory_dir / "memory.db").write_bytes(b"seed-newer")
+    mstore = MemoryStore(mem)
+    mstore.remember("newer-fact", tier="core", scope="default",
+                    source="rpo-advance", kind="fact")
+    mstore.close()
     last_durable = time.time()
 
     # 4) simulate failure + recovery via the REAL atomic restore path.
@@ -1496,9 +1530,29 @@ def qualify_rpo_rto(cfg: Config, state_dir: Path) -> Dict[str, Any]:
         recovered = False
     recovery_end = time.monotonic()
     recovery_duration = recovery_end - recovery_start
-    # restore validates schema/hash before resume by contract
-    hash_ok = True
-    restored_ok = recovered and (memory_dir / "memory.db").exists()
+    # Validate the restored portable bundle content against the recoverable
+    # snapshot: compare the STABLE durable identity of the memory facts
+    # (norm_hash / mkey), not volatile created_at timestamps.
+    def _memory_hashes(state: Dict[str, Any]) -> List[str]:
+        out = []
+        for rec in (state.get("memory") or []):
+            h = rec.get("norm_hash") or rec.get("mkey")
+            if h:
+                out.append(str(h))
+        return sorted(out)
+
+    restored_hashes = []
+    if recovered:
+        try:
+            restored_bundle = P.export_bundle(scfg, "rpo-password")
+            restored_payload = P.read_bundle(restored_bundle, "rpo-password")
+            restored_hashes = _memory_hashes(restored_payload.get("state") or {})
+        except Exception:
+            restored_hashes = []
+    recoverable_hashes = _memory_hashes(payload.get("state") or {})
+    hash_ok = bool(recoverable_hashes) and \
+        restored_hashes == recoverable_hashes
+    restored_ok = recovered and (memory_dir / "memory.db").exists() and hash_ok
 
     # 5) store-DB atomic restore (not write_bytes): copy via atomic writer.
     db = root / "state.db"
@@ -1539,7 +1593,8 @@ def qualify_rpo_rto(cfg: Config, state_dir: Path) -> Dict[str, Any]:
         "rpo_met": rpo_met, "rto_met": rto_met,
         "recovery_path": "portable.restore_state (atomic staging)",
         "restored_ok": restored_ok, "hash_validated": hash_ok,
-        "recoverable_hash": recoverable_hash[:16]}
+        "recoverable_hashes": recoverable_hashes,
+        "restored_hashes": restored_hashes}
     checks["store_atomic_restore"] = {
         "state": "OK" if store_ok and store_hash_ok else "failed",
         "restored": store_ok, "hash_validated": store_hash_ok,
@@ -1736,22 +1791,41 @@ def qualify_repeat_recovery(cfg: Config, state_dir: Path) -> Dict[str, Any]:
     from ..actions import ActionStore, ActionReceipt
     ap = root / "receipts.json"
     astore = ActionStore(ap)
-    for _ in range(3):
-        astore.save_receipt(ActionReceipt.from_dict({
-            "receipt_id": "repeat-receipt", "action_id": "repeat-act",
-            "action_hash": "cd" * 32, "target": "target", "scope": "default",
-            "state": "completed", "code": "ok", "created_at": time.time(),
-            "idempotency_key": "repeat-key"}))
-    receipts = astore.receipts(limit=50)
-    same_id = [r for r in receipts if r.receipt_id == "repeat-receipt"]
-    checks["repeat_no_duplicate_receipt"] = {
-        "state": "OK" if len(same_id) == 1 else "failed",
-        "count": len(same_id)}
-    # audit is capped and each receipt produces one audited transition
-    audit = astore.audit(limit=100)
-    checks["repeat_no_duplicate_audit"] = {
-        "state": "OK" if len(audit) >= 1 else "failed", "audit_count": len(audit)}
+    astore.save_receipt(ActionReceipt.from_dict({
+        "receipt_id": "repeat-receipt", "action_id": "repeat-act",
+        "action_hash": "cd" * 32, "target": "target", "scope": "default",
+        "state": "completed", "code": "ok", "created_at": time.time(),
+        "idempotency_key": "repeat-key"}))
+    # a second save_receipt persists the audit history (8F: _audit runs after
+    # _save, so a later _save flushes the accumulated audit).
+    astore.save_receipt(ActionReceipt.from_dict({
+        "receipt_id": "repeat-receipt", "action_id": "repeat-act",
+        "action_hash": "cd" * 32, "target": "target", "scope": "default",
+        "state": "completed", "code": "ok", "created_at": time.time(),
+        "idempotency_key": "repeat-key"}))
     astore.close()
+    # Simulate crash/reopen recovery twice: no duplicate receipt and the audit
+    # history is EXACTLY one entry per receipt id across recoveries (reopen
+    # never appends a duplicate audit record).
+    audit_counts = []
+    receipt_counts = []
+    for _ in range(2):
+        astore = ActionStore(ap)   # __init__ runs _recover_interrupted
+        audit = astore.audit(limit=100)
+        receipts = astore.receipts(limit=50)
+        same_id = [r for r in receipts if r.receipt_id == "repeat-receipt"]
+        audit_for = [e for e in audit if e.get("receipt_id") == "repeat-receipt"]
+        receipt_counts.append(len(same_id))
+        audit_counts.append(len(audit_for))
+        astore.close()
+    checks["repeat_no_duplicate_receipt"] = {
+        "state": "OK" if set(receipt_counts) == {1} else "failed",
+        "counts": receipt_counts}
+    # EXACTLY one audit record per receipt id across recoveries: the reopen/
+    # recovery path never adds a duplicate audit record.
+    checks["repeat_no_duplicate_audit"] = {
+        "state": "OK" if set(audit_counts) == {1} else "failed",
+        "audit_counts": audit_counts}
 
     # no secret leakage in the rehearsal's own outputs.
     leaked = _scan_for_secrets(json.dumps(st.recent_notifications(limit=100)))
@@ -1875,16 +1949,23 @@ def _persist_summary(state_dir: Path, run_id: str, out: Dict[str, Any]) -> None:
         finally:
             os.close(dirfd)
     except OSError:
-        pass  # dir fsync is best-effort on some filesystems; file fsync done
+        # Dir fsync failure is a persistence failure: fail closed so the run
+        # cannot claim OK after the rename unless the directory entry is
+        # durably fsynced.
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def _persist_summary_boundaries(state_dir: Path, run_id: str,
                                 out: Dict[str, Any]) -> Dict[str, Any]:
     """Test each summary-persistence failure boundary (write/flush/fsync/
-    rename). Each failure must raise so the run returns a typed failure and
-    never claims ``OK``. Returns a typed check dict."""
+    dir-fsync/rename). Each failure must raise so the run returns a typed
+    failure and never claims ``OK``. Returns a typed check dict."""
     checks: Dict[str, Any] = {}
-    for boundary in ("write", "flush", "fsync", "rename"):
+    for boundary in ("write", "flush", "fsync", "dir_fsync", "rename"):
         state_dir.mkdir(parents=True, exist_ok=True)
         p = state_dir / f"fail-{boundary}.json"
         if p.exists():
@@ -1896,6 +1977,7 @@ def _persist_summary_boundaries(state_dir: Path, run_id: str,
             "flush": None,
             "fsync": mock.patch("os.fsync",
                                 side_effect=OSError(errno.EIO)),
+            "dir_fsync": None,
             "rename": mock.patch("os.replace",
                                  side_effect=OSError(errno.EIO)),
         }[boundary]
@@ -1928,6 +2010,17 @@ def _persist_summary_boundaries(state_dir: Path, run_id: str,
             def _fdopen(fd, *a, **k):
                 return _FailFlush(real_fdopen(fd, *a, **k))
             cm = mock.patch("os.fdopen", side_effect=_fdopen)
+        elif boundary == "dir_fsync":
+            # fail the SECOND os.fsync call (the dir entry after the rename)
+            real_fsync = os.fsync
+            calls = {"n": 0}
+
+            def _fsync(fd):
+                calls["n"] += 1
+                if calls["n"] == 2:
+                    raise OSError(errno.EIO, "injected dir fsync failure")
+                return real_fsync(fd)
+            cm = mock.patch("os.fsync", side_effect=_fsync)
         else:
             cm = fail
         with cm:
@@ -1936,10 +2029,14 @@ def _persist_summary_boundaries(state_dir: Path, run_id: str,
                 _persist_summary(state_dir, f"fail-{boundary}", out)
             except OSError:
                 raised = True
+        # write/flush/fsync leave no final file (tmp unlinked or never created);
+        # dir_fsync fails AFTER rename so the final file exists but the run
+        # still fails closed (no durable directory entry), not a partial file.
+        no_partial = True if boundary == "dir_fsync" else (not p.exists())
         checks[f"summary_fail_{boundary}"] = {
             "state": "OK" if raised else "failed",
             "fail_closed": raised,
-            "no_partial": not p.exists()}
+            "no_partial": no_partial}
     return checks
 
 

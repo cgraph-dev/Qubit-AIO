@@ -160,10 +160,16 @@ Every child stage is bounded by the parent wall-clock timeout
 (`CHILD_TIMEOUT_S`). The `--resources` stage applies REAL rlimits and enforces
 each one as a typed failure:
 
-- **CPU**: `RLIMIT_CPU` + busy loop → SIGXCPU/SIGKILL (non-zero rc);
+- **CPU**: `RLIMIT_CPU` soft<hard + busy loop; the SIGXCPU handler writes a
+  typed `CPU_LIMIT_EXCEEDED` result before the hard SIGKILL backstop (the
+  parent requires that typed error code, not any nonzero return);
 - **address-space/memory**: `RLIMIT_AS` + large allocation → `MemoryError`;
 - **file-size/output**: `RLIMIT_FSIZE` + store writes → `EFBIG`/`OperationalError`;
-- **file-count**: `RLIMIT_NOFILE` + many open files → `EMFILE`;
+- **open-fd limit**: `RLIMIT_NOFILE` + many open descriptors → `EMFILE`
+  (labeled as the descriptor limit it is);
+- **created-file count**: `manyfiles_created` creates distinct files until the
+  configured ceiling raises a typed `FileCountLimitError` — a REAL count of
+  files created, distinct from the open-fd limit;
 - **process-count**: `RLIMIT_NPROC` + `fork` → `EAGAIN`;
 - **thread-count**: `RLIMIT_NPROC` + thread creation → failure;
 - **wall-clock**: a genuinely hanging child is SIGKILLed by the parent → typed
@@ -214,15 +220,20 @@ and that a later recovery can safely complete.
 - the stage records last-durable ts, newest-recoverable ts, measured
   data-loss interval, recovery start/end and duration, and FAILS if the
   configured RPO/RTO targets are not met;
-- the store restore validates the restored hash before reopening.
+- the restored portable bundle is re-exported and its stable memory-fact
+  hashes are compared against the recoverable snapshot (volatile
+  `created_at`/`updated_at` timestamps are excluded); the store restore also
+  validates the restored hash before reopening.
 
 ## 8b. Summary persistence fail-closed
 
 Every non-dry-run rehearsal persists a redacted summary at `0600` using
-temp-file + `fsync` + `os.replace` (atomic rename). If writing, flushing,
-fsyncing, or renaming the summary fails, the run returns a typed failure and
-never claims `OK`. `_persist_summary_boundaries` exercises each of the four
-failure boundaries and asserts fail-closed behavior with no partial file.
+temp-file + `fsync` + `os.replace` (atomic rename) **and** an `fsync` of the
+directory entry after the rename. If writing, flushing, fsyncing the file,
+fsyncing the directory, or renaming the summary fails, the run returns a typed
+failure and never claims `OK`. `_persist_summary_boundaries` exercises each of
+the five failure boundaries (write / flush / fsync / dir-fsync / rename) and
+asserts fail-closed behavior with no partial file.
 
 ## 9. What is never done
 

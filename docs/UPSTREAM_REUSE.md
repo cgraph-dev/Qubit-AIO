@@ -1011,8 +1011,10 @@ LOCAL REQUIREMENT: an isolated staging/recovery rehearsal that exercises crash,
   fsync/os.replace/write failure injection, kernel-enforced RLIMIT_FSIZE
   file-size/quota (EFBIG, labeled distinct from ENOSPC) plus deterministic
   ENOSPC, corrupt-SQLite and newer-schema fail-closed, resource enforcement
-  (CPU/AS/fsize/nofile/nproc/threads/wall) with actual measurements incl. a
-  measured process count and a pre-workload network probe, measurable RPO/RTO
+  (CPU/AS/fsize/fd/file-count/nproc/threads/wall) with typed per-limit failures
+  (SIGXCPU->CPU_LIMIT_EXCEEDED, MemoryError, EFBIG, EMFILE, FileCountLimitError,
+  EAGAIN) and actual measurements incl. a measured process count and a
+  pre-workload network probe, measurable RPO/RTO
   via the real atomic-restore path, fail-closed summary persistence with
   atomic rename, a genuine stalled-child wall-timeout, and repeated-recovery
   dedupe / no-loss / no-leak / hermetic guarantees. Hermetic only: no live
