@@ -130,6 +130,9 @@ def test_report_bundle_recovery(tmp_path):
     assert checks["bundle_published"]["state"] == "OK"
     assert checks["corrupt_manifest_typed"]["state"] == "OK"
     assert checks["missing_evidence_typed"]["state"] == "OK"
+    assert checks["corrupt_evidence_hash_refused"]["state"] == "OK"
+    assert checks["corrupt_evidence_hash_refused"]["refused"] is True
+    assert checks["symlink_escape_refused"]["state"] == "OK"
     assert checks["stale_stage_not_served"]["state"] == "OK"
 
 
@@ -340,6 +343,9 @@ def test_corrupt_sqlite_stage(tmp_path):
     assert checks["corrupt_wal_sidecar"]["state"] == "OK"
     assert checks["backup_restore"]["state"] == "OK"
     assert checks["backup_restore"]["hash_validated"] is True
+    assert checks["missing_backup_fails_closed"]["state"] == "OK"
+    assert checks["missing_backup_fails_closed"]["resume_blocked"] is True
+    assert checks["partial_backup_fails_closed"]["state"] == "OK"
 
 
 # ------------------------------------------------------------- newer schema

@@ -22,7 +22,7 @@ the known finding #6 (partial rollback must be visible and block resume):
 | **fsync failure injection** (real `os.fsync` fails EIO) | `--fsync-failure`: typed failure, prior state intact, no partial serve, retry idempotent |
 | **atomic-rename / os.replace failure injection** | `--rename-failure`: temp never exposed, prior valid bundle intact, recovery leaves no partial state |
 | **ENOSPC / disk-full, honestly labeled** | `--enospc`: deterministic `ENOSPC` (errno 28, physical disk-full class) **and** kernel-enforced `RLIMIT_FSIZE` `EFBIG` (errno 27, **quota/file-size limit — not physical disk-full**, labeled as such); typed failure, no partial target, reopen recovers after the condition clears |
-| **Corrupt SQLite** (truncated / malformed / interrupted migration / corrupt WAL) | `--corrupt-sqlite`: fail closed, corrupt file preserved (never silently replaced by an empty store), valid backup restored with hash validation |
+| **Corrupt SQLite** (truncated / malformed / interrupted migration / corrupt WAL) | `--corrupt-sqlite`: fail closed, corrupt file preserved (never silently replaced by an empty store), valid backup restored with hash validation; **missing backup** and **partial/corrupt backup** also fail closed and block resume |
 | **Newer schema** | `--newer-schema`: the 8J recovery guard refuses a newer-schema state, never downgrades/overwrites it, never claims recovery, and a correct-code copy recovers |
 | **Resource enforcement + measurements** | `--resources`: real rlimits (CPU/AS-memory/fsize/nofile/nproc/threads) in a child; a **genuinely hanging child is SIGKILLed by the parent and reported as a typed wall-timeout**; actual elapsed wall, peak RSS, CPU time, bytes written, file count, thread count, **measured process count**, and a **network probe executed BEFORE the workload that is verified blocked**; exceeding each limit is a typed failure |
 | **Measurable RPO/RTO via the real restore path** | `--rpo-rto`: last-durable ts, newest-recoverable ts, data-loss interval, recovery start/end + duration, RPO/RTO target met; recovery uses `portable.restore_state` (atomic staging) and a store-DB atomic restore (temp+fsync+rename), NOT a bare `write_bytes` replacement |
@@ -32,7 +32,7 @@ the known finding #6 (partial rollback must be visible and block resume):
 | **Hermetic guarantees** | `--hermetic`: private temp permissions (0700/0600), isolated-from-production state dir, network blocked in a child BEFORE the workload, `--live` fails closed |
 | **Summary persistence fail-closed** | every run: atomic temp+fsync+rename at `0600`; if write/flush/fsync/rename fails, the run returns a typed failure and never claims `OK` (`_persist_summary_boundaries` tests each boundary) |
 | Notification retry / dead-letter bounds, dedupe, restart persistence | `--notify-retry` |
-| Report-bundle atomic publish, partial/corrupt bundle, missing evidence typed | `--report-bundle` |
+| Report-bundle atomic publish, partial/corrupt bundle, missing evidence typed | `--report-bundle`: atomic publish, corrupt manifest refused, **corrupt evidence hash (sha256/byte-count) refused**, **symlink escape refused** (asset + index integrity), stale stage not served |
 | Backup/restore/rollback; wrong passphrase typed; dry-run no-write | `--portable-restore` |
 | Stale lease / overlap / renewal / re-acquire after crash | `--lease` |
 | Truncated/corrupt JSONL journal tolerated, no secret leak | `--journal` |

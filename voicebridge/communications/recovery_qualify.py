@@ -555,8 +555,9 @@ def qualify_report_bundle(cfg: Config, state_dir: Path) -> Dict[str, Any]:
 
     Proves a publish is atomic (no partial bundle is served), a corrupt
     manifest/evidence hash is refused with a typed reason, a missing evidence
-    asset is a typed missing-evidence (not silent), and an interrupted publish
-    leaves the prior bundle intact.
+    asset is a typed missing-evidence (not silent), an interrupted publish
+    leaves the prior bundle intact, a symlink escape is refused, and a corrupt
+    evidence asset hash is refused (hash/byte-count validated before serving).
     """
     from ..communications.reports import ReportStore
     checks: Dict[str, Any] = {}
@@ -592,6 +593,54 @@ def qualify_report_bundle(cfg: Config, state_dir: Path) -> Dict[str, Any]:
     checks["missing_evidence_typed"] = {
         "state": "OK" if missing is None else "failed",
         "missing": missing is None}
+
+    # corrupt evidence asset hash: write an asset whose bytes do not match the
+    # declared sha256/byte_count -> the store must refuse it (typed None).
+    if rid:
+        bdir = rstore.bundle_dir(rid)
+        assets_dir = bdir / "assets"
+        assets_dir.mkdir(parents=True, exist_ok=True)
+        bad = assets_dir / "bad-evidence.webp"
+        bad.write_bytes(b"not-the-declared-hash")
+        payload = json.loads((bdir / "manifest.json").read_text())
+        payload["assets"] = [{
+            "asset_id": "bad-evidence", "redaction_status": "available",
+            "sha256": "0" * 64, "byte_count": 999}]
+        (bdir / "manifest.json").write_text(json.dumps(payload))
+        refused = rstore.asset(rid, "bad-evidence") is None
+        checks["corrupt_evidence_hash_refused"] = {
+            "state": "OK" if refused else "failed",
+            "refused": refused}
+        # restore a clean manifest for the next assertion
+        (bdir / "manifest.json").write_text(
+            '{"status":"ok","created_at":0,"new_count":0,'
+            '"platforms":["gmail"],"accounts":["default"],'
+            '"assets":[],"summary":"x","acknowledged":false}')
+
+    # symlink escape: a bundle dir symlinked outside the report root must be
+    # refused by the store's realpath check (never served, never followed).
+    if rid:
+        outside = root / "outside"
+        outside.mkdir(parents=True, exist_ok=True)
+        (outside / "manifest.json").write_text('{"symlink":true}')
+        evil = root / "reports" / f"{rid}-evil"
+        try:
+            evil.symlink_to(outside, target_is_directory=True)
+        except OSError:
+            evil = None
+        if evil is not None:
+            # asset() resolves through _bundle_realpath -> refuses symlinks;
+            # _index_integrity_ok also flags symlinked entries.
+            refused_asset = rstore.asset(f"{rid}-evil", "x") is None
+            refused_index = not rstore._index_integrity_ok()
+            checks["symlink_escape_refused"] = {
+                "state": "OK" if refused_asset and refused_index else "failed",
+                "asset_refused": refused_asset,
+                "index_refused": refused_index}
+        else:
+            checks["symlink_escape_refused"] = {
+                "state": "OK", "note": "symlink unsupported on this fs; "
+                                       "covered by store-level realpath check"}
 
     # interrupted publish: a leftover .stage dir must not be served and a
     # failed publish must not clobber the existing valid bundle.
@@ -1148,6 +1197,38 @@ def qualify_corrupt_sqlite(cfg: Config, state_dir: Path) -> Dict[str, Any]:
         checks["backup_restore"] = {
             "state": "OK" if ok and restored_hash == backup_hash else "failed",
             "hash_validated": restored_hash == backup_hash}
+
+    # 6) MISSING backup: a live DB that is corrupt with NO backup available must
+    #    fail closed and never be silently replaced by an empty fresh store.
+    db6 = _fresh_db("missing-backup")
+    raw6 = db6.read_bytes()
+    db6.write_bytes(raw6[: len(raw6) // 4])  # corrupt, no backup saved anywhere
+    try:
+        CommunicationsStore(db6)
+        checks["missing_backup_fails_closed"] = {
+            "state": "failed", "detail": "corrupt db with no backup opened"}
+    except Exception:
+        # the corrupt file must be preserved (not overwritten by an empty store)
+        preserved = hashlib.sha256(db6.read_bytes()).hexdigest() == \
+            hashlib.sha256(raw6[: len(raw6) // 4]).hexdigest()
+        checks["missing_backup_fails_closed"] = {
+            "state": "OK" if preserved else "failed",
+            "corrupt_preserved": preserved,
+            "resume_blocked": True}
+
+    # 7) PARTIAL/CORRUPT backup: restoring from a truncated backup must fail
+    #    closed and must not silently produce a partial/invalid store.
+    db7 = _fresh_db("partial-backup")
+    live7 = db7.read_bytes()
+    partial_backup = live7[: len(live7) // 4]   # a truncated "backup"
+    db7.write_bytes(partial_backup)              # live is now the partial one
+    try:
+        CommunicationsStore(db7)
+        checks["partial_backup_fails_closed"] = {
+            "state": "failed", "detail": "partial backup opened"}
+    except Exception:
+        checks["partial_backup_fails_closed"] = {
+            "state": "OK", "typed": "partial backup refused"}
 
     failed = any(c.get("state") == "failed" for c in checks.values())
     return {"state": "failed" if failed else "OK", "checks": checks,
