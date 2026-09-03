@@ -994,6 +994,61 @@ def artifact_signature_status() -> Dict[str, Any]:
     }
 
 
+def verify_artifact_signature(artifact: Path, sig: Optional[Path] = None
+                              ) -> Dict[str, Any]:
+    """Verify an ACTUAL detached signature (Packet 8K closure).
+
+    Looks for a detached signature for ``artifact`` (``<artifact>.asc`` or
+    ``<artifact>.sig``, or the explicit ``sig`` path). If none exists the
+    result is ``NOT_SIGNED``. If gpg is available the signature is verified
+    with ``gpg --verify``; a verified signature returns ``SIGNED`` with the
+    signing key id. Any other outcome is ``INVALID``/``DEGRADED`` — never a
+    silent pass. Nothing is ever fabricated."""
+    import shutil
+    if sig is None:
+        for cand in (Path(str(artifact) + ".asc"), Path(str(artifact) + ".sig")):
+            if cand.is_file():
+                sig = cand
+                break
+    if sig is None or not sig.is_file():
+        return {
+            "artifact": artifact.name,
+            "state": "NOT_SIGNED",
+            "detail": "no detached signature file present "
+                      "(expected <artifact>.asc or <artifact>.sig)",
+        }
+    gpg = shutil.which("gpg")
+    if not gpg:
+        return {
+            "artifact": artifact.name,
+            "state": "DEGRADED",
+            "detail": f"signature present ({sig.name}) but gpg unavailable to verify",
+            "signature": sig.name,
+        }
+    try:
+        r = subprocess.run([gpg, "--verify", str(sig), str(artifact)],
+                           capture_output=True, text=True, timeout=60)
+    except Exception as exc:
+        return {"artifact": artifact.name, "state": "DEGRADED",
+                "detail": f"gpg verification failed to run: {exc}",
+                "signature": sig.name}
+    if r.returncode == 0:
+        import re
+        keyid = ""
+        m = re.search(r"using (?:DSA|RSA|ECC|Ed25519)?\s*key ([0-9A-F]+)", r.stderr)
+        if m:
+            keyid = m.group(1)
+        elif re.search(r"Good signature", r.stderr):
+            keyid = "verified"
+        return {"artifact": artifact.name, "state": "SIGNED",
+                "detail": f"good signature ({sig.name})", "signature": sig.name,
+                "keyid": keyid}
+    tail = " ".join((r.stderr or "").split())[:200]
+    return {"artifact": artifact.name, "state": "INVALID",
+            "detail": f"signature does not verify: {tail}",
+            "signature": sig.name}
+
+
 def certify(repo: Optional[Path] = None) -> Dict[str, Any]:
     """Hermetic static certification: provenance, scans, contracts, docs,
     units, ceilings. Does NOT build/install (that is the orchestrator's opt-in

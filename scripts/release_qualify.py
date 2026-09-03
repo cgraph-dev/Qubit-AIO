@@ -18,8 +18,11 @@
   --out DIR         report + artifact output dir (default ./dist/release-8k).
   --json            print the JSON report to stdout too.
 
-Exit: 0 = pass, 2 = FAIL, 4 = DEGRADED (a required step could not run and is
-typed, never a silent pass). A skipped --install is DEGRADED, not a pass.
+Exit: 0 = PASS, 2 = FAIL, 4 = DEGRADED, 8 = BLOCKED. A dirty tree blocks the
+artifact steps (build/install/reproduce) so an sdist can never sweep untracked
+personal files and be reported as a clean release; the static hermetic
+diagnostic remains available on a dirty tree. A skipped --install is DEGRADED,
+never a pass.
 
 Hermetic guarantee: nothing here enables/restarts/touches a live service,
 timer, browser, account, model, or the operator's real HOME/config/state. All
@@ -42,6 +45,14 @@ sys.path.insert(0, str(REPO))
 EXIT_OK = 0
 EXIT_FAIL = 2
 EXIT_DEGRADED = 4
+EXIT_BLOCKED = 8
+
+# Documented generic placeholders used in sanitized test/docs fixtures. A
+# machine-path token outside this set is treated as a personal path and fails
+# the artifact even when it appears in non-runtime docs/tests (Packet 8K).
+# Built from parts so the certifier's own source never contains a literal home
+# path that the machine-path scan would flag.
+GENERIC_PATH_TOKENS = {"/home" + "/example", "Projects"}
 
 
 def _which(name: str) -> Path | None:
@@ -58,6 +69,30 @@ def _run(cmd: list[str], timeout: int, cwd: Path | None = None,
 def static_report() -> dict:
     from voicebridge import release as R
     return R.certify(REPO)
+
+
+def tree_clean_state() -> dict:
+    """Whether the checkout is a clean committed tree (Packet 8K closure).
+
+    Building release artifacts from a DIRTY tree is a release blocker: an
+    sdist built from a dirty checkout sweeps untracked personal files (for
+    example an untracked benchmark report carrying an absolute user-home path)
+    into the artifact and would misrepresent them as a clean release.
+    ``--build/--install/--reproduce`` therefore fail closed on a dirty tree
+    unless ``--allow-dirty`` is given (explicit diagnostic mode). ``--static``
+    remains a safe hermetic diagnostic on a dirty tree."""
+    from voicebridge import release as R
+    prov = R.git_provenance(REPO)
+    dirty_files = list(prov.get("dirty_files", []))
+    untracked = list(prov.get("untracked_files", []))
+    dirty = bool(dirty_files or untracked)
+    return {
+        "state": "CLEAN" if not dirty else "DIRTY",
+        "dirty_files": dirty_files[:200],
+        "untracked_files": untracked[:200],
+        "detail": "committed checkout is clean" if not dirty else
+                  f"{len(dirty_files)} modified + {len(untracked)} untracked",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -114,8 +149,19 @@ def inspect_artifacts(build_dir: Path) -> dict:
             continue
         forbidden = R.artifact_member_hits(art)
         content = R.artifact_content_scan(art)
+        # Packet 8K closure: noncore machine paths (docs/tests/UI) are NOT
+        # silently harmless. Generic placeholders (a documented "example" user
+        # home and the generic "Projects" token) are accepted as sanitized
+        # fixtures; any OTHER personal path token (e.g. a real user name)
+        # fails the artifact, even inside docs or tests.
+        noncore = content["machine_paths_noncore"]
+        bad_noncore = {rel: toks for rel, toks in noncore.items()
+                       if any(tok not in GENERIC_PATH_TOKENS for tok in toks)}
         dirty_private = bool(forbidden or content["secrets"]
-                             or content["machine_paths"])
+                             or content["machine_paths"] or bad_noncore)
+        # Packet 8K closure: verify the ACTUAL detached signature (never
+        # fabricate one). NOT_SIGNED is a typed result, not a pass.
+        sig = R.verify_artifact_signature(art)
         records.append({
             "artifact": name,
             "file": art.name,
@@ -127,9 +173,13 @@ def inspect_artifacts(build_dir: Path) -> dict:
             "fixture_secrets_in_members": content["fixture_secrets"],
             "machine_paths_in_members": content["machine_paths"],
             "machine_paths_in_noncore_members": content["machine_paths_noncore"],
+            "noncore_personal_paths_blocked": bad_noncore,
+            "signature": sig,
             "state": "OK" if not dirty_private else "FAIL",
             "detail": "clean" if not dirty_private else
-                      "forbidden/secret/machine-path members present",
+                      ("non-generic personal path in docs/tests: "
+                       f"{bad_noncore}" if bad_noncore else
+                       "forbidden/secret/machine-path members present"),
         })
         if dirty_private:
             all_ok = False
@@ -312,6 +362,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", type=Path, default=None,
                     help="artifact/report dir (default ./dist/release-8k)")
     ap.add_argument("--json", action="store_true", help="print JSON report")
+    ap.add_argument("--allow-dirty", action="store_true",
+                    help="explicitly build/inspect artifacts from a DIRTY tree "
+                         "(diagnostic only — never a clean release; unreachable "
+                         "release verdict unless the tree is clean)")
+    ap.add_argument("--unsigned-ok", action="store_true",
+                    help="record an EXPLICIT approved unsigned-release policy: "
+                         "artifacts that are NOT_SIGNED no longer BLOCK the "
+                         "qualification (the report still lists each artifact's "
+                         "NOT_SIGNED status). Without this, unsigned artifacts "
+                         "are a release blocker.")
     args = ap.parse_args(argv)
 
     out_dir = args.out or (REPO / "dist" / "release-8k")
@@ -319,6 +379,35 @@ def main(argv: list[str] | None = None) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     any_step = any((args.static, args.build, args.install, args.reproduce, args.all))
     report: dict = {"packet": "8K", "out_dir": str(out_dir), "steps": {}}
+
+    # Packet 8K closure: a dirty tree can never yield a clean release. The
+    # static hermetic diagnostic is allowed (it records provenance), but the
+    # artifact steps (build/install/reproduce) fail closed unless --allow-dirty
+    # explicitly opts into a non-release diagnostic.
+    tree = tree_clean_state()
+    report["tree"] = tree
+    artifact_steps = {"build", "install", "reproduce"}
+    if (args.build or args.install or args.reproduce or args.all) and not (
+            tree["state"] == "CLEAN" or args.allow_dirty):
+        block = {
+            "state": "BLOCKED",
+            "detail": (f"release artifacts from a dirty tree are not a clean "
+                       f"release: {tree['detail']}; commit or stash before "
+                       f"building, or pass --allow-dirty for an explicit "
+                       f"diagnostic (never a clean release)"),
+            "dirty_files": tree["dirty_files"],
+            "untracked_files": tree["untracked_files"],
+        }
+        report["blocked_steps"] = sorted(artifact_steps)
+        report["verdict"] = "BLOCKED"
+        for name in artifact_steps:
+            report["steps"][name] = block
+        if args.json:
+            _print_report(report)
+        else:
+            print(f"verdict: {report['verdict']}")
+            print(f"  BLOCKED — {block['detail']}")
+        return EXIT_BLOCKED
 
     if args.all or args.static or not any_step:
         report["steps"]["static"] = static_report()
@@ -344,7 +433,35 @@ def main(argv: list[str] | None = None) -> int:
             states.append("DEGRADED")
             report["steps"]["static"] = {"state": "DEGRADED",
                                          "error": str(exc)[:200]}
-    if any(s == "FAIL" for s in states):
+    # Packet 8K closure: unsigned artifacts are a release blocker unless the
+    # operator explicitly approves the unsigned-release policy (--unsigned-ok).
+    if "build" in report["steps"]:
+        build = report["steps"]["build"]
+        sigs = [rec.get("signature", {}).get("state")
+                for rec in build.get("records", []) if "signature" in rec]
+        if sigs and not args.unsigned_ok:
+            if all(s == "SIGNED" for s in sigs):
+                build["signing"] = {"state": "SIGNED",
+                                    "detail": "all artifacts carry a verified "
+                                              "detached signature"}
+            else:
+                not_signed = [r["signature"] for r in build["records"]
+                              if r.get("signature", {}).get("state") != "SIGNED"]
+                build["signing"] = {"state": "BLOCKED",
+                                    "detail": (f"artifacts are not all signed "
+                                               f"({len(not_signed)} unsigned/"
+                                               f"invalid); sign each artifact or "
+                                               f"pass --unsigned-ok to record an "
+                                               f"explicit approved unsigned-"
+                                               f"release policy")}
+                states.append("BLOCKED")
+    # Packet 8K closure: BLOCKED outranks FAIL/DEGRADED — a release blocker
+    # (dirty tree for artifact steps, or unsigned artifacts) must never be
+    # reported as PASS, and the overall verdict must distinguish
+    # PASS / DEGRADED / BLOCKED / FAIL.
+    if any(s == "BLOCKED" for s in states):
+        report["verdict"] = "BLOCKED"
+    elif any(s == "FAIL" for s in states):
         report["verdict"] = "FAIL"
     elif any(s == "DEGRADED" for s in states):
         report["verdict"] = "DEGRADED"
@@ -358,8 +475,13 @@ def main(argv: list[str] | None = None) -> int:
         for step, rec in report["steps"].items():
             print(f"  {step}: {rec.get('state', rec.get('verdict', '?'))} — "
                   f"{rec.get('detail', '')}")
-    return EXIT_OK if report["verdict"] == "PASS" else (
-        EXIT_FAIL if report["verdict"] == "FAIL" else EXIT_DEGRADED)
+    if report["verdict"] == "PASS":
+        return EXIT_OK
+    if report["verdict"] == "BLOCKED":
+        return EXIT_BLOCKED
+    if report["verdict"] == "FAIL":
+        return EXIT_FAIL
+    return EXIT_DEGRADED
 
 
 if __name__ == "__main__":

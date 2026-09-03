@@ -22,7 +22,7 @@ on the developer's private state.
 | **Clean-venv check cannot mask missing package contents (finding #7)** | `scripts/clean_venv_check.py --install` now BUILDS the wheel, installs it, scans the INSTALLED package, and fails on a mask guard if `voicebridge` resolves inside the checkout |
 | **No private developer state / machine paths / dirty files shipped** | `voicebridge/release.py` machine-path + secret scans; sdist excludes (`pyproject.toml`); artifact member/content scan rejects `browser_profiles`, live configs, untracked dirty files, secret-shaped values, machine paths |
 | **Provenance, dependency constraints, licenses/notices, SBOM, hashes, reproducibility** | `release.certify` + `--build`/`--reproduce` records version/commit/dirty state, declared deps, THIRD_PARTY_NOTICES status, project license, artifact sha256, second-build comparison |
-| **Artifact signature status (honest, never fabricated)** | `release.artifact_signature_status` reports `SIGNED` only when a git signing key or gpg is present; otherwise `NOT_SIGNED` with the available tools, so a release without a signing key is an explicit limitation, never a silent pass |
+| **Artifact signature status (honest, never fabricated)** | `release.artifact_signature_status` + `release.verify_artifact_signature` report `SIGNED` only when a real detached signature verifies (`gpg --verify`); otherwise `NOT_SIGNED`/`INVALID`/`DEGRADED` with the available tools. Unsigned artifacts BLOCK qualification unless `--unsigned-ok` records an explicit approved unsigned-release policy |
 | **`systemd-analyze verify` + security review** | `release.unit_verify` renders `__PROJECT_DIR__`, stubs ExecStart, runs `systemd-analyze verify`, and reviews unit security |
 | **Python/platform/display/audio support documented** | `docs/AUDIO_SETUP.md`, `docs/VOICE_BRIDGE_SYSTEM.md`, `distribution.SUPPORTED_TARGET` (Ubuntu x86_64, Python ≥ 3.11), runbook check |
 | **Upgrade from previous release / interrupted migration / newer-schema refusal / downgrade/rollback** | `docs/MIGRATIONS.md` + `portable.UnsupportedSchemaError` + 8J `_guard_newer_schema` + atomic restore — asserted by `backup_migration_check` |
@@ -60,7 +60,29 @@ python scripts/release_qualify.py --all --out dist/release-8k --json
 ```
 
 Exit codes: `0` PASS, `2` FAIL (release blocker), `4` DEGRADED (a required step
-could not run and is typed — a skipped `--install` is DEGRADED, never a pass).
+could not run and is typed — a skipped `--install` is DEGRADED, never a pass),
+`8` BLOCKED (a release blocker that must be resolved first: a dirty tree for
+the artifact steps, or unsigned artifacts without an approved unsigned-release
+policy).
+
+Release-artifact boundary (Packet 8K closure):
+
+- `--build` / `--install` / `--reproduce` FAIL CLOSED on a dirty tree
+  (`git status` modified/untracked) because an sdist built from a dirty
+  checkout sweeps untracked personal files (for example a benchmark report
+  carrying an absolute user-home path) into the artifact and would misreport
+  them as a clean release. `--static` remains available on a dirty tree as a
+  hermetic diagnostic. `--allow-dirty` explicitly opts into a diagnostic-only
+  artifact build — it can never produce a clean-release PASS.
+- Artifact content scan treats non-generic personal paths in docs/tests/UI as
+  FAIL (only the documented generic placeholders such as the `example` user
+  home are accepted), so personal paths are never silently classified harmless
+  merely because they appear in non-runtime files.
+- Actual detached signatures are verified per artifact (`<artifact>.asc` /
+  `<artifact>.sig` via `gpg --verify`). No signature → `NOT_SIGNED`; a
+  fabricated or failing signature → `INVALID`/`DEGRADED`. Unsigned artifacts
+  BLOCK the qualification unless `--unsigned-ok` records an explicit approved
+  unsigned-release policy.
 A faster static smoke is available from the CLI:
 
 ```bash
@@ -105,6 +127,10 @@ the checkout, the check FAILS instead of hiding a missing wheel member.
   tool is configured the certification records `NOT_SIGNED` (an explicit
   limitation), and the project license is the operator-supplied proprietary
   declaration in the root `LICENSE` file.
+- The webui event stream is shut down cleanly: `WebUI.stop()` closes every
+  event-stream subscriber so in-flight SSE handler threads exit their drain
+  loop and `server_close()` never blocks on a leaked handler (a clean-clone
+  suite-stall cause in `selectors.py`).
 
 ## 6. Rollback of the certification itself
 

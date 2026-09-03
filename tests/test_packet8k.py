@@ -389,6 +389,35 @@ def test_artifact_signature_status_never_fabricates(monkeypatch):
         assert not rec["git_signing_key"]
 
 
+def test_verify_artifact_signature_not_signed_when_no_sig(tmp_path):
+    art = tmp_path / "pkg.whl"
+    art.write_bytes(b"x")
+    rec = R.verify_artifact_signature(art)
+    assert rec["state"] == "NOT_SIGNED"
+    assert "no detached signature" in rec["detail"]
+
+
+def test_verify_artifact_signature_invalid_when_sig_present_but_bad(tmp_path):
+    art = tmp_path / "pkg.whl"
+    art.write_bytes(b"payload")
+    sig = tmp_path / "pkg.whl.asc"
+    sig.write_text("not a real detached signature")
+    rec = R.verify_artifact_signature(art)
+    # either gpg rejects it (INVALID) or gpg is unavailable (DEGRADED) —
+    # it must NEVER report SIGNED for a fabricated signature
+    assert rec["state"] in ("INVALID", "DEGRADED")
+    assert rec["state"] != "SIGNED"
+
+
+def test_verify_artifact_signature_picks_asc_or_sig(tmp_path):
+    art = tmp_path / "pkg.whl"
+    art.write_bytes(b"payload")
+    sig = tmp_path / "pkg.whl.sig"
+    sig.write_text("x")
+    rec = R.verify_artifact_signature(art)
+    assert rec["signature"] == "pkg.whl.sig"
+
+
 def test_report_pass_fails_on_core_machine_path(tmp_path):
     report = R.certify(tmp_path)
     # tmp_path has no package files -> runbook/units will fail, so report_pass
@@ -558,3 +587,34 @@ def test_install_step_rejects_missing_wheel(tmp_path):
     rec = RQ.install_step(tmp_path)
     assert rec["state"] == "DEGRADED"
     assert "no wheel built" in rec["detail"]
+
+
+def test_release_qualify_tree_clean_state(tmp_path):
+    """Packet 8K closure: the tree gate distinguishes CLEAN vs DIRTY and the
+    artifact steps must BLOCK on a dirty tree (never a misleading PASS)."""
+    import subprocess
+    import scripts.release_qualify as RQ
+
+    # In a real git repo the tree state reflects git status; on a clean clone
+    # HEAD it must be CLEAN. We cannot make the working repo clean here (user
+    # files are dirty by design), so assert the gate contract via the function
+    # and via a BLOCKED run of the orchestrator against this dirty tree.
+    state = RQ.tree_clean_state()
+    assert state["state"] in ("CLEAN", "DIRTY")
+    if state["state"] == "DIRTY":
+        assert state["dirty_files"] or state["untracked_files"]
+
+    # A dirty tree must block the artifact steps with rc == EXIT_BLOCKED and a
+    # BLOCKED verdict, never PASS.
+    r = subprocess.run(
+        [sys.executable, str(REPO / "scripts/release_qualify.py"), "--build",
+         "--json", "--out", str(REPO / "dist" / "release-8k-test")],
+        capture_output=True, text=True, timeout=120)
+    report = json.loads(r.stdout)
+    if report.get("tree", {}).get("state") == "DIRTY":
+        assert report["verdict"] == "BLOCKED"
+        assert r.returncode == RQ.EXIT_BLOCKED
+        assert report["steps"]["build"]["state"] == "BLOCKED"
+    else:
+        # clean tree: build may be OK or DEGRADED (network), but never BLOCKED
+        assert report["verdict"] in ("PASS", "FAIL", "DEGRADED")

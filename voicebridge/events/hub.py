@@ -98,6 +98,19 @@ class EventHub:
             self._subs.pop(sub.id, None)
         sub.close()
 
+    def close_all(self) -> None:
+        """Wake and close every live subscriber (Packet 8K closure).
+
+        Called on server shutdown so in-flight SSE handler threads exit their
+        drain loop promptly instead of blocking ``server_close()`` (which joins
+        handler threads when ``block_on_close`` is set). Without this, an open
+        event-stream connection can stall the webui accept loop indefinitely."""
+        with self._lock:
+            subs = list(self._subs.values())
+            self._subs.clear()
+        for sub in subs:
+            sub.close()
+
     @property
     def subscriber_count(self) -> int:
         with self._lock:

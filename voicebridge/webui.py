@@ -2176,12 +2176,26 @@ class WebUI:
         log.info("voice dashboard listening on http://%s:%s", self.host, self.port)
 
     def stop(self) -> None:
+        # Packet 8K closure: wake and close every event-stream subscriber FIRST
+        # so in-flight SSE handler threads exit their drain loop instead of
+        # blocking server_close() (ThreadingHTTPServer joins handler threads
+        # when block_on_close is set; an open stream would otherwise stall the
+        # accept loop and the test suite in selectors.py).
+        hub = getattr(self, "_events_hub", None)
+        if hub is not None:
+            try:
+                hub.close_all()
+            except Exception:
+                log.exception("webui.stop: event hub close_all failed")
         if self._server is not None:
             self._server.shutdown()
             # server_close() is required to actually release the listening
             # socket; shutdown() alone leaves it open (ResourceWarning + a real
             # fd leak across start/stop cycles in a long-lived process).
             self._server.server_close()
+        th = getattr(self, "_thread", None)
+        if th is not None and th is not threading.current_thread():
+            th.join(timeout=2.0)
 
     # -- public API -------------------------------------------------------
     def status(self) -> Dict[str, Any]:
