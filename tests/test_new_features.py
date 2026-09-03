@@ -3,12 +3,12 @@
 Run: .venv/bin/python -m pytest tests/test_new_features.py -v
 No gateway/audio/GPU required.
 """
-import sys, json, pathlib, subprocess, tempfile, time
+import sys, json, subprocess, time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 ROOT = Path(__file__).resolve().parents[1]
-VENV = ROOT / ".venv" / "bin" / "python"
+VENV = sys.executable  # portable: the interpreter running the test suite invokes scripts
 
 # --- shared_memory ---
 def test_shared_memory_roundtrip(tmp_path):
