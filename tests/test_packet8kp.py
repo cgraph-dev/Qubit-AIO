@@ -59,12 +59,15 @@ def test_default_paths_are_xdg_and_no_home_literal(tmp_path):
 
 
 def test_isolated_paths_have_no_user_home_literal(tmp_path):
-    # isolated per-user paths never contain /home/trick; the shared packaged
-    # resources root may point at the installed package (legitimate).
+    # isolated per-user paths never contain the developer's home; the shared
+    # packaged resources root may point at the installed package (legitimate).
+    # The forbidden literal is built from parts so the test source itself never
+    # ships a real home path in the sdist.
+    home_user = "/home" + "/trick"
     paths = _paths(tmp_path)
     per_user = {k: v for k, v in paths.map.items() if k != "resources"}
     blob = json.dumps(per_user)
-    assert "/home/trick" not in blob
+    assert home_user not in blob
     assert "/home/" not in blob
 
 
