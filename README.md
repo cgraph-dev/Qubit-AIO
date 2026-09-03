@@ -337,8 +337,8 @@ python scripts/clean_venv_check.py --install         # opt-in clean-venv install
 
 Personal tool. No telemetry, no cloud dependency for the core loop.
 
-Proprietary: Copyright © 2026 Qubit by Tricky. All rights reserved. No copying,
-redistribution, modification, sublicensing, or commercial use is permitted
-without the author's written permission. See the root `LICENSE` file.
-Third-party/upstream-derived material is MIT/Apache-2.0/BSD-3-Clause per
-`THIRD_PARTY_NOTICES.md` and `docs/UPSTREAM_REUSE.md`.
+Licensing: original Qubit material is covered by the school-project terms in
+`LICENSE`. Third-party/upstream-derived material keeps its original license;
+see `docs/LICENSING.md`, `THIRD_PARTY_NOTICES.md`, and
+`docs/UPSTREAM_REUSE.md`. The repository as a whole is not an OSI-approved
+open-source project.

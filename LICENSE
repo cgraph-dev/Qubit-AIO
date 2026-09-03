@@ -1,6 +1,53 @@
-Qubit Voice Agent
-Copyright © 2026 Qubit by Tricky. All rights reserved.
+QUBIT VOICE AGENT EDUCATIONAL PROJECT LICENSE
+==============================================
 
-This is a proprietary educational project. No copying, redistribution,
-modification, sublicensing, or commercial use is permitted without the
-author's written permission.
+Copyright © 2026 Qubit by Tricky.
+All rights reserved.
+
+This license applies only to original software, documentation, artwork, and
+other original material created for Qubit Voice Agent by Qubit by Tricky
+(“Original Material”). It does not replace, restrict, or relicense any
+third-party or upstream material. Third-party material is identified in
+THIRD_PARTY_NOTICES.md and docs/UPSTREAM_REUSE.md and remains governed by its
+original license.
+
+1. Educational permission
+-------------------------
+
+You may view, study, run, and make local modifications to the Original
+Material solely for personal, non-commercial educational work, including a
+school assignment, classroom demonstration, or private evaluation.
+
+You may provide the project to an instructor or school evaluator only as
+reasonably necessary to assess that educational work. You must retain this
+license and all applicable third-party notices.
+
+2. Restrictions
+---------------
+
+Without prior written permission from Qubit by Tricky, you may not:
+
+* publish, redistribute, sublicense, or sell the Original Material;
+* use the Original Material in a commercial product or service;
+* offer hosted, paid, or customer-facing access to the Original Material;
+* remove copyright, attribution, license, or provenance notices; or
+* represent the Original Material as open-source software.
+
+These restrictions apply only to the Original Material. They do not restrict
+rights granted by an applicable third-party license for third-party material.
+
+3. No warranty
+-------------
+
+THE ORIGINAL MATERIAL IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN
+NO EVENT SHALL QUBIT BY TRICKY BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY ARISING FROM OR IN CONNECTION WITH THE ORIGINAL MATERIAL.
+
+4. License questions
+--------------------
+
+For permission beyond this educational license, contact the copyright holder.
+For third-party licensing questions, consult THIRD_PARTY_NOTICES.md and the
+corresponding upstream license before copying or distributing anything.

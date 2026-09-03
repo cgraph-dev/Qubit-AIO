@@ -46,3 +46,13 @@ no API key, $0).
 - `docs/STEAL_LIST.md` — what to implement next from CopilotKit/AirLLM/OpenSandbox
   (smarter 4B model tier, live streaming, tool schema, etc).
 - `docs/VOICE_BRIDGE_SYSTEM.md` — full pipeline + roadmap.
+
+## Licensing and upstream reuse
+- `LICENSE` applies only to original Qubit material; it does not relicense
+  third-party or upstream-derived code.
+- Read `docs/LICENSING.md`, `THIRD_PARTY_NOTICES.md`, and
+  `docs/UPSTREAM_REUSE.md` before copying or adapting external source.
+- Record the exact upstream repository, commit, source path, license, and
+  local changes before implementation. Preserve required copyright/license
+  notices and stop with `BLOCKED — LICENSE REVIEW REQUIRED` when provenance or
+  license compatibility is uncertain.
