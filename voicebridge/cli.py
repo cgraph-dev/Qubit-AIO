@@ -935,7 +935,7 @@ def _print_certify_human(report) -> None:
     for rel, shapes in report["secrets"].items():
         print(f"  FAIL secret-shaped {rel}: {shapes}")
     sig = report.get("signature", {})
-    print(f"artifact signature: {sig.get('state', 'NOT_SIGNED')} "
+    print(f"signing capability: {sig.get('state', 'NOT_CONFIGURED')} "
           f"({sig.get('detail', 'not recorded')[:80]})")
     fm = " ".join(f"{c['name']}={c['state']}" for c in report["filesystem_modes"])
     print(f"filesystem modes: {fm}")

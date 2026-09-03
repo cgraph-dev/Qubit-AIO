@@ -54,6 +54,7 @@ packages = ["voicebridge"]
 # task-templates.yaml is never shipped (Packet 8K private-state rule).
 "config/task-templates.example.yaml" = "voicebridge/_data/config/task-templates.yaml"
 "config/local-actions.example.yaml" = "voicebridge/_data/config/local-actions.example.yaml"
+"config/release-signer.example.fingerprint" = "voicebridge/_data/config/release-signer.example.fingerprint"
 "config/voice.example.yaml" = "voicebridge/_data/config/voice.example.yaml"
 "systemd" = "voicebridge/_data/systemd"
 

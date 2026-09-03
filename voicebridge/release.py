@@ -51,7 +51,12 @@ REPO = Path(__file__).resolve().parents[1]
 # Provenance
 # ---------------------------------------------------------------------------
 def git_provenance(repo: Optional[Path] = None) -> Dict[str, Any]:
-    """Version + commit + dirty/untracked-file record (bounded lists)."""
+    """Version + commit + dirty/untracked-file record (bounded lists).
+
+    The dirty/untracked lists are parsed from ``git status --porcelain=v1 -z``
+    so the first modified path is reported EXACTLY (a plain ``.strip()`` of the
+    porcelain text would remove the leading status byte and truncate the first
+    character of the first path)."""
     root = Path(repo) if repo else REPO
     rec: Dict[str, Any] = {
         "version": _package_version(),
@@ -61,23 +66,22 @@ def git_provenance(repo: Optional[Path] = None) -> Dict[str, Any]:
     commit = _git(root, ["rev-parse", "HEAD"])
     rec["commit"] = commit
     rec["branch"] = _git(root, ["rev-parse", "--abbrev-ref", "HEAD"]) or None
-    dirty = _git(root, ["status", "--porcelain"])
-    if dirty is None:
+    entries = _status_entries(root)
+    if commit is None and not entries:
         rec["git_repo"] = False
         rec["dirty"] = False
         rec["dirty_files"] = []
         rec["untracked_files"] = []
         return rec
-    lines = [ln for ln in dirty.splitlines() if ln.strip()]
     modified = []
     untracked = []
-    for ln in lines:
-        code = ln[:2]
-        name = ln[3:]
+    for e in entries:
+        code = e["code"]
+        path = e["path"]
         if code == "??":
-            untracked.append(name)
+            untracked.append(path)
         else:
-            modified.append(name)
+            modified.append(path)
     rec["git_repo"] = True
     rec["dirty"] = bool(modified or untracked)
     rec["dirty_files"] = modified[:200]
@@ -103,6 +107,52 @@ def _git(repo: Path, args: List[str]) -> Optional[str]:
         return (out.stdout or "").strip()
     except Exception:
         return None
+
+
+def _git_bytes(repo: Path, args: List[str]) -> Optional[bytes]:
+    """Run a git command and return raw stdout bytes (no text stripping).
+
+    Used by the ``--porcelain=v1 -z`` provenance parser so path names are
+    never corrupted by the leading status byte or by newline handling."""
+    try:
+        out = subprocess.run(["git", "-C", str(repo)] + args,
+                             capture_output=True, timeout=10)
+        if out.returncode != 0:
+            return None
+        return out.stdout
+    except Exception:
+        return None
+
+
+def _status_entries(repo: Path) -> List[Dict[str, str]]:
+    """Parse ``git status --porcelain=v1 -z`` exactly.
+
+    Returns one dict per entry with ``code`` (the two status bytes, first byte
+    possibly a space), and ``path`` (and ``dest`` for rename/copy). The NUL
+    terminator means paths with spaces, Unicode, or quotes are preserved and the
+    leading status byte of the FIRST entry is never stripped."""
+    out = _git_bytes(repo, ["status", "--porcelain=v1", "-z"])
+    if out is None:
+        return []
+    fields = out.split(b"\x00")
+    entries: List[Dict[str, str]] = []
+    i = 0
+    while i < len(fields):
+        f = fields[i]
+        if not f:
+            i += 1
+            continue
+        code = f[:2].decode("utf-8", "replace")
+        # porcelain v1 keeps the space separator: "XY PATH\0" (also under -z)
+        path = f[3:].decode("utf-8", "replace") if len(f) > 2 and f[2:3] == b" " \
+            else f[2:].decode("utf-8", "replace")
+        entry: Dict[str, str] = {"code": code, "path": path}
+        if code[0] in ("R", "C") and i + 1 < len(fields):
+            entry["dest"] = fields[i + 1].decode("utf-8", "replace")
+            i += 1
+        entries.append(entry)
+        i += 1
+    return entries
 
 
 def toolchain() -> Dict[str, str]:
@@ -961,50 +1011,91 @@ def bounded_logs_check(root: Optional[Path] = None) -> List[Dict[str, str]]:
     return results
 
 
-def artifact_signature_status() -> Dict[str, Any]:
-    """Honest artifact-signature status (Packet 8K release inspection).
+def approved_signer_fingerprint() -> str:
+    """The single approved release-signer fingerprint (Packet 8K closure).
 
-    A signature is NEVER fabricated. This reports whether a release-signing
-    capability is actually configured on the host: a git signing key (with an
-    existing gpg/twine/sigstore tool as supporting evidence). The presence of a
-    gpg binary alone is NOT treated as signed — an installed tool is not the
-    same as a configured key that signed the artifacts. When no signing key is
-    configured, ``state`` is ``NOT_SIGNED`` (an explicit limitation for the
-    operator/verifier, never a silent pass)."""
+    Read from ``$RELEASE_SIGNER_FINGERPRINT`` or from the repository
+    ``config/release-signer.fingerprint`` file (a single 40-hex-char line).
+    A full 40-character fingerprint is REQUIRED; short key IDs are never
+    trusted. Returns ``""`` when not configured."""
+    fp = os.environ.get("RELEASE_SIGNER_FINGERPRINT", "").strip()
+    if not fp:
+        try:
+            p = REPO / "config" / "release-signer.fingerprint"
+            if p.is_file():
+                fp = p.read_text(errors="replace").strip()
+        except OSError:
+            pass
+    fp = "".join(fp.split()).upper()
+    if not re.fullmatch(r"[0-9A-F]{40}", fp):
+        return ""
+    return fp
+
+
+def artifact_signature_status() -> Dict[str, Any]:
+    """Honest SIGNING-CAPABILITY status (Packet 8K closure).
+
+    This is STATIC capability detection only and must never claim that an
+    artifact is signed. It reports ``SIGNING_CAPABLE`` when a release-signing
+    mechanism is configured (gpg available AND an approved full signer
+    fingerprint is set), ``NOT_CONFIGURED`` otherwise. Only
+    :func:`verify_artifact_signature` — which verifies an ACTUAL detached
+    signature against the approved fingerprint — may report ``SIGNED``. The
+    presence of the gpg binary alone is NOT signing capability."""
     import shutil
-    key = None
-    try:
-        key = _git(REPO, ["config", "--get", "user.signingkey"])
-    except Exception:
-        pass
+    gpg = shutil.which("gpg")
+    fp = approved_signer_fingerprint()
     tools = {
-        "gpg": bool(shutil.which("gpg")),
+        "gpg": bool(gpg),
         "twine": bool(shutil.which("twine")),
         "sigstore": bool(shutil.which("sigstore")),
     }
-    capable = bool(key)
+    capable = bool(gpg) and bool(fp)
     return {
-        "state": "SIGNED" if capable else "NOT_SIGNED",
-        "detail": ("no release signing key configured on this host; "
-                   "artifacts ship with sha256 hashes only (gpg binary present "
-                   "does not mean the release is signed)" if not capable
-                   else "release signing key configured"),
-        "git_signing_key": bool(key),
+        "state": "SIGNING_CAPABLE" if capable else "NOT_CONFIGURED",
+        "detail": ("signing capability present (gpg + approved full signer "
+                   "fingerprint configured); artifacts are only SIGNED after "
+                   "detached-signature verification" if capable else
+                   "no approved release-signer fingerprint configured and/or "
+                   "gpg unavailable; artifacts remain NOT_SIGNED"),
+        "approved_fingerprint_set": bool(fp),
+        "gpg_available": bool(gpg),
         "tools": tools,
     }
 
 
-def verify_artifact_signature(artifact: Path, sig: Optional[Path] = None
+def verify_artifact_signature(artifact: Path, sig: Optional[Path] = None,
+                              expected_fp: Optional[str] = None,
+                              env: Optional[Dict[str, str]] = None
                               ) -> Dict[str, Any]:
-    """Verify an ACTUAL detached signature (Packet 8K closure).
+    """Verify an ACTUAL detached signature against the APPROVED signer.
 
-    Looks for a detached signature for ``artifact`` (``<artifact>.asc`` or
-    ``<artifact>.sig``, or the explicit ``sig`` path). If none exists the
-    result is ``NOT_SIGNED``. If gpg is available the signature is verified
-    with ``gpg --verify``; a verified signature returns ``SIGNED`` with the
-    signing key id. Any other outcome is ``INVALID``/``DEGRADED`` — never a
-    silent pass. Nothing is ever fabricated."""
+    The signature only counts as ``SIGNED`` when ALL of these hold:
+
+    - a detached signature exists for ``artifact`` (``<artifact>.asc`` /
+      ``<artifact>.sig``, or the explicit ``sig`` path);
+    - gpg is available and the signature cryptographically verifies;
+    - gpg status reports a ``VALIDSIG`` whose FULL 40-hex fingerprint equals
+      the approved signer fingerprint.
+
+    Typed results: ``SIGNED``, ``INVALID`` (crypto failure or changed
+    artifact), ``UNTRUSTED_SIGNER`` (valid signature from the wrong key),
+    ``NOT_SIGNED`` (no signature file), ``DEGRADED`` (gpg missing / cannot
+    run / no approved fingerprint). Nothing is ever fabricated and no secret
+    key material is exposed."""
     import shutil
+    if expected_fp is None:
+        expected_fp = approved_signer_fingerprint()
+    expected_fp = "".join((expected_fp or "").split()).upper()
+    if not expected_fp:
+        return {
+            "artifact": artifact.name,
+            "state": "DEGRADED",
+            "detail": "no approved full signer fingerprint configured; "
+                      "set RELEASE_SIGNER_FINGERPRINT (or "
+                      "config/release-signer.fingerprint) to a 40-hex "
+                      "fingerprint before verifying signatures",
+        }
     if sig is None:
         for cand in (Path(str(artifact) + ".asc"), Path(str(artifact) + ".sig")):
             if cand.is_file():
@@ -1026,27 +1117,43 @@ def verify_artifact_signature(artifact: Path, sig: Optional[Path] = None
             "signature": sig.name,
         }
     try:
-        r = subprocess.run([gpg, "--verify", str(sig), str(artifact)],
-                           capture_output=True, text=True, timeout=60)
+        r = subprocess.run(
+            [gpg, "--status-fd", "1", "--verify", str(sig), str(artifact)],
+            capture_output=True, text=True, timeout=60,
+            env=env if env is not None else os.environ.copy())
     except Exception as exc:
         return {"artifact": artifact.name, "state": "DEGRADED",
                 "detail": f"gpg verification failed to run: {exc}",
                 "signature": sig.name}
-    if r.returncode == 0:
-        import re
-        keyid = ""
-        m = re.search(r"using (?:DSA|RSA|ECC|Ed25519)?\s*key ([0-9A-F]+)", r.stderr)
-        if m:
-            keyid = m.group(1)
-        elif re.search(r"Good signature", r.stderr):
-            keyid = "verified"
-        return {"artifact": artifact.name, "state": "SIGNED",
-                "detail": f"good signature ({sig.name})", "signature": sig.name,
-                "keyid": keyid}
-    tail = " ".join((r.stderr or "").split())[:200]
-    return {"artifact": artifact.name, "state": "INVALID",
-            "detail": f"signature does not verify: {tail}",
-            "signature": sig.name}
+    status = r.stdout or ""
+    err = r.stderr or ""
+    # VALIDSIG <fingerprint> <date> <timestamp> <expire-timestamp> <version>
+    # <reserved> <pubkey-algo> <hash-algo> ...
+    validsigs = []
+    for line in status.splitlines():
+        if line.startswith("[GNUPG:] VALIDSIG "):
+            parts = line.split()
+            if len(parts) > 2:
+                validsigs.append(parts[2])
+    if r.returncode != 0 or not validsigs:
+        tail = " ".join((err + " " + status).split())[:200]
+        # a cryptographically bad signature must never be SIGNED
+        return {"artifact": artifact.name, "state": "INVALID",
+                "detail": f"signature does not verify: {tail}",
+                "signature": sig.name}
+    # cryptographically valid — now bind to the APPROVED signer
+    for fp in validsigs:
+        if fp == expected_fp:
+            return {"artifact": artifact.name, "state": "SIGNED",
+                    "detail": f"good signature from approved signer ({sig.name})",
+                    "signature": sig.name, "signer_fingerprint": fp,
+                    "approved": True}
+    return {"artifact": artifact.name, "state": "UNTRUSTED_SIGNER",
+            "detail": (f"valid signature but signer "
+                       f"{', '.join(validsigs[:3])} is NOT the approved "
+                       f"fingerprint"), "signature": sig.name,
+            "signer_fingerprint": validsigs[0],
+            "approved": False}
 
 
 def certify(repo: Optional[Path] = None) -> Dict[str, Any]:

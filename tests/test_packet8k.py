@@ -8,6 +8,8 @@ logic is unit-tested with fake artifacts and monkeypatched subprocesses.
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 import sys
 import tarfile
 import zipfile
@@ -38,6 +40,89 @@ def test_git_provenance_non_git_repo(tmp_path):
     rec = R.git_provenance(tmp_path)
     assert rec["git_repo"] is False
     assert rec["dirty"] is False
+
+
+def _make_git_repo(tmp_path):
+    import subprocess as sp
+    def run(*args):
+        sp.run(args, cwd=str(tmp_path), check=True, capture_output=True)
+    run("git", "init", "-q")
+    run("git", "config", "user.email", "t@t")
+    run("git", "config", "user.name", "t")
+    (tmp_path / "base.txt").write_text("x")
+    run("git", "add", ".")
+    run("git", "commit", "-qm", "init")
+    return run
+
+
+def test_git_provenance_first_modified_path_exact(tmp_path):
+    """Packet 8K closure: the first modified path must NOT be truncated by
+    stripping the leading porcelain status byte."""
+    _make_git_repo(tmp_path)
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "AGENT_PROMPT_PACK.md").write_text("x")
+    (tmp_path / "base.txt").write_text("y")
+    # must be an actual git repo so commit resolves
+    import subprocess as sp
+    sp.run(["git", "add", "-A"], cwd=str(tmp_path), check=True,
+           capture_output=True)
+    sp.run(["git", "commit", "-qm", "add docs"], cwd=str(tmp_path),
+           check=True, capture_output=True)
+    (tmp_path / "docs" / "AGENT_PROMPT_PACK.md").write_text("changed")
+    rec = R.git_provenance(tmp_path)
+    assert rec["dirty_files"] and rec["dirty_files"][0] == "docs/AGENT_PROMPT_PACK.md"
+    assert not rec["dirty_files"][0].startswith("ocs/AGENT_PROMPT_PACK.md")
+
+
+def test_git_provenance_first_untracked_path_exact(tmp_path):
+    _make_git_repo(tmp_path)
+    # a flat untracked file reports its exact path (no directory collapsing)
+    (tmp_path / "untracked-one.txt").write_text("x")
+    (tmp_path / "untracked-two.txt").write_text("y")
+    rec = R.git_provenance(tmp_path)
+    assert rec["untracked_files"] and rec["untracked_files"][0] == "untracked-one.txt"
+    assert rec["dirty"] is True
+    # a wholly-untracked directory is reported by git as "<dir>/"
+    (tmp_path / ".newdir").mkdir()
+    (tmp_path / ".newdir" / "a.json").write_text("x")
+    rec2 = R.git_provenance(tmp_path)
+    assert any(p in (".newdir/", ".newdir/a.json") for p in rec2["untracked_files"])
+
+
+def test_git_provenance_path_with_spaces_preserved(tmp_path):
+    _make_git_repo(tmp_path)
+    (tmp_path / "my file name.txt").write_text("x")
+    rec = R.git_provenance(tmp_path)
+    assert "my file name.txt" in rec["untracked_files"]
+
+
+def test_git_provenance_rename_handled_safely(tmp_path):
+    import subprocess as sp
+    _make_git_repo(tmp_path)
+    (tmp_path / "renamed.txt").write_text("y")
+    sp.run(["git", "add", "-A"], cwd=str(tmp_path), check=True,
+           capture_output=True)
+    sp.run(["git", "commit", "-qm", "renamed"], cwd=str(tmp_path),
+           check=True, capture_output=True)
+    # rename in the working tree (staged): porcelain v1 -z emits R old\0new\0
+    sp.run(["git", "mv", "renamed.txt", "newname.txt"], cwd=str(tmp_path),
+           check=True, capture_output=True)
+    rec = R.git_provenance(tmp_path)
+    # the rename is a staged modified entry; path must be the new name exactly
+    assert rec["dirty_files"]
+    assert any("newname.txt" == p or p.endswith("/newname.txt")
+               for p in rec["dirty_files"])
+
+
+def test_git_provenance_no_personal_paths_in_diagnostics(tmp_path):
+    """Packet 8K closure: provenance lists must carry no secrets or personal
+    home paths (they are path names, never token values)."""
+    _make_git_repo(tmp_path)
+    (tmp_path / "token-file").write_text("sk-abcdefghijklmnopqrstuvwxyz1234567890")
+    rec = R.git_provenance(tmp_path)
+    joined = " ".join(rec["dirty_files"] + rec["untracked_files"])
+    assert "sk-" not in joined
+    assert "/home/" not in joined
 
 
 # ========================================================================
@@ -373,23 +458,41 @@ def test_certify_passes_and_records_personalization():
     assert report["secrets"] == {}
     assert report["units"]["all_ok"] is True
     assert report["toolchain"]["python"]
-    # signature status is recorded honestly and is never fabricated
-    assert report["signature"]["state"] in ("SIGNED", "NOT_SIGNED")
-    assert "tools" in report["signature"] and "git_signing_key" in report["signature"]
+    # signature CAPABILITY is recorded honestly and is never fabricated; it is
+    # static capability detection and can never claim an artifact is SIGNED
+    assert report["signature"]["state"] in ("SIGNING_CAPABLE", "NOT_CONFIGURED")
+    assert "tools" in report["signature"]
+    assert "approved_fingerprint_set" in report["signature"]
 
 
-def test_artifact_signature_status_never_fabricates(monkeypatch):
+def test_artifact_signature_status_is_capability_not_signing(monkeypatch):
+    """Packet 8K closure: static capability detection must never claim SIGNED
+    merely because a signing mechanism exists. Only detached-signature
+    verification may report SIGNED."""
     rec = R.artifact_signature_status()
-    # NOT_SIGNED is reported explicitly when no capability exists; the record
-    # never claims SIGNED merely because sha256 hashes were computed.
+    assert rec["state"] in ("SIGNING_CAPABLE", "NOT_CONFIGURED")
     assert "tools" in rec
-    if rec["state"] == "SIGNED":
-        assert rec["git_signing_key"]
-    else:
-        assert not rec["git_signing_key"]
+    # never claims SIGNED at the capability level
+    assert "approved_fingerprint_set" in rec
 
 
-def test_verify_artifact_signature_not_signed_when_no_sig(tmp_path):
+def test_approved_signer_fingerprint_requires_full_40_hex(monkeypatch):
+    import os
+    # short key id must be rejected
+    monkeypatch.setenv("RELEASE_SIGNER_FINGERPRINT", "D7062848")
+    assert R.approved_signer_fingerprint() == ""
+    # invalid chars rejected
+    monkeypatch.setenv("RELEASE_SIGNER_FINGERPRINT", "X" * 40)
+    assert R.approved_signer_fingerprint() == ""
+    # full 40-hex accepted (uppercase normalized)
+    fp = "A1B2C3D4E5F60718293A4B5C6D7E8F9012345678"
+    monkeypatch.setenv("RELEASE_SIGNER_FINGERPRINT", fp.lower())
+    assert R.approved_signer_fingerprint() == fp
+
+
+def test_verify_artifact_signature_not_signed_when_no_sig(monkeypatch, tmp_path):
+    monkeypatch.setenv("RELEASE_SIGNER_FINGERPRINT",
+                       "A1B2C3D4E5F60718293A4B5C6D7E8F9012345678")
     art = tmp_path / "pkg.whl"
     art.write_bytes(b"x")
     rec = R.verify_artifact_signature(art)
@@ -397,7 +500,22 @@ def test_verify_artifact_signature_not_signed_when_no_sig(tmp_path):
     assert "no detached signature" in rec["detail"]
 
 
-def test_verify_artifact_signature_invalid_when_sig_present_but_bad(tmp_path):
+def test_verify_artifact_signature_degraded_when_no_approved_fp(tmp_path):
+    # ensure env is unset
+    import os
+    os.environ.pop("RELEASE_SIGNER_FINGERPRINT", None)
+    art = tmp_path / "pkg.whl"
+    art.write_bytes(b"payload")
+    sig = tmp_path / "pkg.whl.asc"
+    sig.write_text("garbage")
+    rec = R.verify_artifact_signature(art)
+    assert rec["state"] == "DEGRADED"
+    assert "fingerprint" in rec["detail"]
+
+
+def test_verify_artifact_signature_invalid_when_sig_present_but_bad(monkeypatch, tmp_path):
+    monkeypatch.setenv("RELEASE_SIGNER_FINGERPRINT",
+                       "A1B2C3D4E5F60718293A4B5C6D7E8F9012345678")
     art = tmp_path / "pkg.whl"
     art.write_bytes(b"payload")
     sig = tmp_path / "pkg.whl.asc"
@@ -409,13 +527,132 @@ def test_verify_artifact_signature_invalid_when_sig_present_but_bad(tmp_path):
     assert rec["state"] != "SIGNED"
 
 
-def test_verify_artifact_signature_picks_asc_or_sig(tmp_path):
+def test_verify_artifact_signature_picks_asc_or_sig(monkeypatch, tmp_path):
+    monkeypatch.setenv("RELEASE_SIGNER_FINGERPRINT",
+                       "A1B2C3D4E5F60718293A4B5C6D7E8F9012345678")
     art = tmp_path / "pkg.whl"
     art.write_bytes(b"payload")
     sig = tmp_path / "pkg.whl.sig"
     sig.write_text("x")
     rec = R.verify_artifact_signature(art)
     assert rec["signature"] == "pkg.whl.sig"
+
+
+# ---------------------------------------------------------------------------
+# Approved-signer detached-signature contract (Packet 8K closure)
+# Uses an ISOLATED temporary GNUPGHOME with throwaway test keys only. The
+# operator's real keyring is never touched.
+# ---------------------------------------------------------------------------
+def _sig_harness(tmp_path, monkeypatch, key_names=("alice", "bob")):
+    """Create two throwaway gpg keys in an isolated GNUPGHOME and return
+    {name: {"fpr":..., "gpg":..., "gnupghome":...}, ...}."""
+    import shutil
+    gpg = shutil.which("gpg")
+    if not gpg:
+        pytest.skip("gpg unavailable (DEGRADED path covered by unit tests)")
+    gnupghome = tmp_path / "gnupg"
+    gnupghome.mkdir(mode=0o700)
+    env = {"GNUPGHOME": str(gnupghome), "PATH": os.environ.get("PATH", "")}
+    keys = {}
+    for name in key_names:
+        batch = tmp_path / f"{name}-batch"
+        batch.write_text(
+            f"Key-Type: RSA\nKey-Length: 2048\nName-Real: {name}\n"
+            f"Name-Email: {name}@example.invalid\nExpire-Date: 2d\n"
+            "%no-protection\n%commit\n")
+        r = subprocess.run([gpg, "--batch", "--gen-key", str(batch)],
+                           capture_output=True, text=True, env=env, timeout=60)
+        assert r.returncode == 0, r.stderr
+        out = subprocess.run([gpg, "--with-colons", "--list-keys",
+                              f"{name}@example.invalid"],
+                             capture_output=True, text=True, env=env,
+                             timeout=30)
+        fpr = ""
+        for line in out.stdout.splitlines():
+            if line.startswith("fpr:"):
+                fpr = line.split(":")[9]
+                break
+        assert len(fpr) == 40
+        keys[name] = {"fpr": fpr, "gpg": gpg, "gnupghome": str(gnupghome),
+                      "env": env}
+    return keys
+
+
+def _sign(harness, key, artifact, sig_path):
+    subprocess.run([harness[key]["gpg"], "--batch", "--yes",
+                    "--detach-sign", "--armor",
+                    "-u", harness[key]["fpr"],
+                    "-o", str(sig_path), str(artifact)],
+                   capture_output=True, text=True,
+                   env=harness[key]["env"], timeout=60,
+                   check=True)
+
+
+def test_signed_correct_key_and_unchanged_artifact(tmp_path, monkeypatch):
+    keys = _sig_harness(tmp_path, monkeypatch)
+    art = tmp_path / "pkg.whl"
+    art.write_bytes(b"payload-1")
+    sig = tmp_path / "pkg.whl.asc"
+    _sign(keys, "alice", art, sig)
+    monkeypatch.setenv("RELEASE_SIGNER_FINGERPRINT", keys["alice"]["fpr"])
+    rec = R.verify_artifact_signature(art, sig, expected_fp=keys["alice"]["fpr"], env=keys["alice"]["env"])
+    assert rec["state"] == "SIGNED"
+    assert rec["signer_fingerprint"] == keys["alice"]["fpr"]
+    assert rec["approved"] is True
+
+
+def test_signed_wrong_valid_key_is_untrusted(tmp_path, monkeypatch):
+    keys = _sig_harness(tmp_path, monkeypatch)
+    art = tmp_path / "pkg.whl"
+    art.write_bytes(b"payload-2")
+    sig = tmp_path / "pkg.whl.asc"
+    _sign(keys, "bob", art, sig)  # signed by bob
+    # approved signer is ALICE — a valid signature from BOB must fail
+    monkeypatch.setenv("RELEASE_SIGNER_FINGERPRINT", keys["alice"]["fpr"])
+    rec = R.verify_artifact_signature(art, sig, expected_fp=keys["alice"]["fpr"], env=keys["alice"]["env"])
+    assert rec["state"] == "UNTRUSTED_SIGNER"
+    assert rec["signer_fingerprint"] == keys["bob"]["fpr"]
+    assert rec["approved"] is False
+
+
+def test_signed_modified_artifact_is_invalid(tmp_path, monkeypatch):
+    keys = _sig_harness(tmp_path, monkeypatch)
+    art = tmp_path / "pkg.whl"
+    art.write_bytes(b"payload-3")
+    sig = tmp_path / "pkg.whl.asc"
+    _sign(keys, "alice", art, sig)
+    # change the artifact AFTER signing — signature must no longer verify
+    art.write_bytes(b"payload-3-TAMPERED")
+    monkeypatch.setenv("RELEASE_SIGNER_FINGERPRINT", keys["alice"]["fpr"])
+    rec = R.verify_artifact_signature(art, sig, expected_fp=keys["alice"]["fpr"], env=keys["alice"]["env"])
+    assert rec["state"] == "INVALID"
+    assert rec["state"] != "SIGNED"
+
+
+def test_signed_malformed_signature_is_invalid(tmp_path, monkeypatch):
+    keys = _sig_harness(tmp_path, monkeypatch)
+    art = tmp_path / "pkg.whl"
+    art.write_bytes(b"payload-4")
+    sig = tmp_path / "pkg.whl.asc"
+    sig.write_text("-----BEGIN PGP SIGNATURE-----\\ngarbage\\n-----END PGP SIGNATURE-----")
+    monkeypatch.setenv("RELEASE_SIGNER_FINGERPRINT", keys["alice"]["fpr"])
+    rec = R.verify_artifact_signature(art, sig, expected_fp=keys["alice"]["fpr"], env=keys["alice"]["env"])
+    assert rec["state"] in ("INVALID", "DEGRADED")
+    assert rec["state"] != "SIGNED"
+
+
+def test_signed_no_secret_material_in_output(tmp_path, monkeypatch, capsys):
+    keys = _sig_harness(tmp_path, monkeypatch)
+    art = tmp_path / "pkg.whl"
+    art.write_bytes(b"payload-5")
+    sig = tmp_path / "pkg.whl.asc"
+    _sign(keys, "alice", art, sig)
+    monkeypatch.setenv("RELEASE_SIGNER_FINGERPRINT", keys["alice"]["fpr"])
+    rec = R.verify_artifact_signature(art, sig, expected_fp=keys["alice"]["fpr"], env=keys["alice"]["env"])
+    blob = str(rec) + capsys.readouterr().out + capsys.readouterr().err
+    # no private key material / passphrase fragments in output
+    assert "PRIVATE KEY" not in blob
+    assert "passphrase" not in blob.lower()
 
 
 def test_report_pass_fails_on_core_machine_path(tmp_path):

@@ -443,18 +443,38 @@ def main(argv: list[str] | None = None) -> int:
             if all(s == "SIGNED" for s in sigs):
                 build["signing"] = {"state": "SIGNED",
                                     "detail": "all artifacts carry a verified "
-                                              "detached signature"}
+                                              "detached signature from the "
+                                              "approved signer"}
             else:
                 not_signed = [r["signature"] for r in build["records"]
                               if r.get("signature", {}).get("state") != "SIGNED"]
+                states_detail = ", ".join(
+                    f"{r['artifact']}={r['signature']['state']}"
+                    for r in build["records"])
                 build["signing"] = {"state": "BLOCKED",
-                                    "detail": (f"artifacts are not all signed "
-                                               f"({len(not_signed)} unsigned/"
-                                               f"invalid); sign each artifact or "
-                                               f"pass --unsigned-ok to record an "
+                                    "detail": (f"artifacts are not all signed by "
+                                               f"the approved signer "
+                                               f"({len(not_signed)} not SIGNED: "
+                                               f"{states_detail}); sign each "
+                                               f"artifact with the approved "
+                                               f"fingerprint or pass "
+                                               f"--unsigned-ok to record an "
                                                f"explicit approved unsigned-"
                                                f"release policy")}
                 states.append("BLOCKED")
+        elif sigs and args.unsigned_ok:
+            # Explicitly approved exception: never claim cryptographic release
+            # readiness, but do not BLOCK on the missing signature.
+            states_detail = ", ".join(
+                f"{r['artifact']}={r['signature']['state']}"
+                for r in build["records"])
+            build["signing"] = {
+                "state": "UNSIGNED_POLICY_APPROVED",
+                "detail": (f"EXPLICIT approved unsigned-release policy "
+                           f"(--unsigned-ok): artifacts are NOT cryptographically "
+                           f"signed ({states_detail}). This is an exception, "
+                           f"not a verified-signature release."),
+            }
     # Packet 8K closure: BLOCKED outranks FAIL/DEGRADED — a release blocker
     # (dirty tree for artifact steps, or unsigned artifacts) must never be
     # reported as PASS, and the overall verdict must distinguish

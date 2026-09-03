@@ -1,0 +1,13 @@
+# Approved release-signer fingerprint (Packet 8K-P signing contract).
+#
+# Copy this file to config/release-signer.fingerprint and put the FULL
+# 40-hex-character GPG fingerprint of the operator's approved release key on
+# the single line, OR set the RELEASE_SIGNER_FINGERPRINT environment variable.
+#
+# The certification only treats a detached signature as SIGNED when gpg
+# reports a VALIDSIG whose fingerprint EXACTLY equals this value. Short key
+# IDs are never trusted. A valid signature from any other key is
+# UNTRUSTED_SIGNER and blocks the release.
+#
+# Example (REPLACE with the real fingerprint, never commit a real key):
+# A1B2C3D4E5F60718293A4B5C6D7E8F9012345678
