@@ -132,7 +132,7 @@ def test_no_hardcoded_home_in_touched_sources():
     for rel in ("voicebridge/webui.py", "voicebridge/config.py",
                 "scripts/config_doctor.py"):
         text = (REPO / rel).read_text(errors="replace")
-        assert "/home/trick" not in text, f"{rel} hardcodes a user home"
+        assert "/home/example" not in text, f"{rel} hardcodes a user home"
 
 
 # ------------------------------------------------------- portable config contract

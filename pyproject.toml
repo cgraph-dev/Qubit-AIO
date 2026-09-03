@@ -3,10 +3,11 @@ name = "qubit-voice-agent"
 version = "1.0.0"
 description = "Qubit Voice Agent — local push-to-talk voice agent: Moonshine ASR, Silero VAD, voice-ID, local LLM, piper TTS — 5 GB VRAM budget."
 readme = "README.md"
-# The project's own LICENSE is intentionally UNDECLARED (no LICENSE file yet);
-# third-party/upstream-derived material is recorded in THIRD_PARTY_NOTICES.md
-# and docs/UPSTREAM_REUSE.md (Packet 8K provenance record).
-license = { text = "SEE THIRD_PARTY_NOTICES.md — upstream-derived material is MIT/Apache-2.0/BSD-3-Clause per record; project license is pending declaration" }
+# The project's own LICENSE is proprietary: Copyright © 2026 Qubit by Tricky.
+# All rights reserved (see the root LICENSE file). Third-party/upstream-derived
+# material is recorded in THIRD_PARTY_NOTICES.md and docs/UPSTREAM_REUSE.md.
+license = { text = "Proprietary — Copyright © 2026 Qubit by Tricky. All rights reserved; no copying/redistribution/modification/sublicensing/commercial use without the author's written permission (see LICENSE). Upstream-derived material is MIT/Apache-2.0/BSD-3-Clause per THIRD_PARTY_NOTICES.md." }
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
     "sherpa-onnx>=1.13",      # Moonshine ASR + Silero VAD + eres2net voice-ID + Kokoro
@@ -71,6 +72,10 @@ exclude = [
   # internal dev change reports carry machine-specific history; not needed to
   # build, run, or test the release
   "docs/CHANGE_REPORTS",
+  # working-tree documents the developer edits in parallel with packaging; they
+  # carry machine-specific history and must not ship (Packet 8K sdist privacy)
+  "docs/UNIFIED_AGENT_PLAN.md",
+  "tests/test_new_features.py",
   "scripts/browser_profiles",
   "scripts/browser_auto_state",
   "106",

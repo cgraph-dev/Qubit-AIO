@@ -41,7 +41,7 @@ profile. Then run:
 
 ```bash
 DISPLAY=:0 /snap/bin/chromium \
-  --user-data-dir=/home/trick/snap/chromium/common/chromium \
+  --user-data-dir=$HOME/snap/chromium/common/chromium \
   --profile-directory=Default \
   --remote-debugging-address=127.0.0.1 \
   --remote-debugging-port=9222 \
@@ -52,7 +52,7 @@ DISPLAY=:0 /snap/bin/chromium \
 
 If Chromium is already running without CDP, do not start a second instance.
 Close it normally, then start it with the command above. If the old
-`/home/trick/.config/qubit-cdp-chromium-snap` directory reports `Permission
+`$HOME/.config/qubit-cdp-chromium-snap` directory reports `Permission
 denied`, do not use that directory; use the existing Snap profile above or
 repair ownership only after inspecting it.
 
@@ -94,7 +94,7 @@ These commands use synthetic repository fixtures. They do not touch Chromium,
 accounts, cursors, reports, or notifications.
 
 ```bash
-cd /home/trick/Projects/Repos/openclaw-voice-bridge
+cd ~/qubit-voice-agent
 
 .venv/bin/python scripts/communications_monitor.py \
   --once --dry-run \

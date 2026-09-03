@@ -23,7 +23,7 @@ website.
 Run these from the repository:
 
 ```bash
-cd /home/trick/Projects/Repos/openclaw-voice-bridge
+cd ~/qubit-voice-agent
 
 systemctl --user status openclaw-voice-bridge.service --no-pager -l
 .venv/bin/python scripts/communications_monitor.py --health
@@ -99,7 +99,7 @@ Check recent bridge events:
 
 ```bash
 rg -n 'hotkey|feedback\.beep|mic\.capture|playback\.' \
-  /home/trick/.local/state/openclaw-voice-bridge/events.jsonl | tail -50
+  $HOME/.local/state/openclaw-voice-bridge/events.jsonl | tail -50
 ```
 
 Interpretation:
@@ -202,7 +202,7 @@ If Chromium is already running without CDP:
 
 ```bash
 DISPLAY=:1 /snap/bin/chromium \
-  --user-data-dir=/home/trick/snap/chromium/common/chromium \
+  --user-data-dir=$HOME/snap/chromium/common/chromium \
   --profile-directory=Default \
   --remote-debugging-address=127.0.0.1 \
   --remote-debugging-port=9222 \

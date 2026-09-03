@@ -343,8 +343,9 @@ def sbom(repo: Optional[Path] = None) -> Dict[str, Any]:
         "main": recs,
         "optional": deps["extras"],
         "notices": "THIRD_PARTY_NOTICES.md + docs/UPSTREAM_REUSE.md",
-        "project_license": "UNDECLARED (no LICENSE file; upstream-derived "
-                           "material per THIRD_PARTY_NOTICES.md)",
+        "project_license": "Proprietary (see root LICENSE; Copyright © 2026 "
+                           "Qubit by Tricky, all rights reserved); "
+                           "upstream-derived material per THIRD_PARTY_NOTICES.md",
     }
 
 
@@ -674,6 +675,7 @@ def operator_runbook_check(root: Optional[Path] = None) -> List[Dict[str, str]]:
     root = Path(root) if root else REPO
     required = [
         "README.md",
+        "LICENSE",
         "docs/VOICE_BRIDGE_SYSTEM.md",
         "docs/AUDIO_SETUP.md",
         "docs/VOICE_BRIDGE_TROUBLESHOOTING.md",

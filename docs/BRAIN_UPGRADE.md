@@ -70,7 +70,7 @@ events.jsonl + shared_memory.jsonl
 
 ```bash
 # cron: 03:00 nightly
-0 3 * * * /home/trick/Projects/Repos/openclaw-voice-bridge/scripts/auto_improve.sh
+0 3 * * * ~/qubit-voice-agent/scripts/auto_improve.sh
 ```
 
 `auto_improve.sh` should: pull last 7 days logs → build DPO pairs (tasks where you said "good" vs re-prompted) → 30-min finetune → swap model if eval improves.

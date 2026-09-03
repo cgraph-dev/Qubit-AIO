@@ -153,7 +153,7 @@ quality to whatever sink is active (headphones, TV/HDMI, speakers):
   ```
 
 ## References
-- Repo: `~/Projects/Repos/openclaw-voice-bridge`
+- Repo: `~/qubit-voice-agent`
 - Playback + device resolution: `voicebridge/audio/playback.py`
 - Mic capture + normalize: `voicebridge/audio/mic.py`
 - Stable audio settings contract: `voicebridge/audio/settings.py`

@@ -2,7 +2,7 @@
 
 Status: **inventory baseline** — documentation-only packet; **no runtime behavior was changed**.
 Date: 2026-08-24
-Repo: `/home/trick/Projects/Repos/openclaw-voice-bridge` @ `86d1b4a` (+ unrelated uncommitted user work preserved)
+Repo: `~/qubit-voice-agent` @ `86d1b4a` (+ unrelated uncommitted user work preserved)
 Contract: `docs/UNIFIED_AGENT_PLAN.md` §2, §3 (P0-A…P0-Q), §5 Phase 0, packet table row 0A.
 Companion record: `docs/UPSTREAM_REUSE.md` (created in this packet).
 
@@ -117,7 +117,7 @@ DEP-03 is the fresh-install failure candidate alongside SYS-03's onnx.
 
 | ID | Finding | Evidence |
 |---|---|---|
-| PATH-01 | Hardcoded sibling dashboard dir `/home/trick/Projects/Repos/voice-dashboard/frontend` is the PRIMARY frontend source; repo-relative fallback exists and works (frontend/index.html present). Must become configured/repository-relative (0B task 8). Doctor must report which frontend is active. | voicebridge/webui.py:958-962 (hardcode at :960) |
+| PATH-01 | Hardcoded sibling dashboard dir `~/voice-dashboard/frontend` is the PRIMARY frontend source; repo-relative fallback exists and works (frontend/index.html present). Must become configured/repository-relative (0B task 8). Doctor must report which frontend is active. | voicebridge/webui.py:958-962 (hardcode at :960) |
 | PATH-02 | Tests read the sibling repo directly → suite fails on any other machine. | tests/test_steal_list_strict.py:411,:482 |
 | PATH-03 | Absolute Hermes-skill + venv-python paths in web_search script. | scripts/web_search.py:20-22 |
 | PATH-04 | Personal app/dir/screenshot paths hardcoded in local actions. | voicebridge/local/actions.py:72-100,:127 |

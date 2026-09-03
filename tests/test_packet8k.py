@@ -67,8 +67,8 @@ def test_scan_text_machine_paths_prose_not_path():
     ) == []
     # a real absolute home path is flagged (redacted to user component)
     hits = R.scan_text_machine_paths(
-        "launch /home/alice/Projects/Repos/demo-app")
-    assert "/home/alice" in hits
+        "launch /home/example/Projects/Repos/demo-app")
+    assert "/home/example" in hits
 
 
 def test_machine_path_scan_classifies_personalization():
@@ -170,7 +170,7 @@ def test_artifact_content_scan_classifies_fixture_and_personalization(tmp_path):
     art = _make_artifact(tmp_path, "wheel", {
         "voicebridge/core.py": "k = 'sk-abcdefghijklmnopqrstuvwxyz1234567890'",
         "voicebridge/evaluation/eval_set.py": "q = 'sk-AbCdEfGhIjKlMnOpQrStUvWxYz1234567890'",
-        "config/task-templates.yaml": "script: ~/Projects/Repos/openclaw-voice-bridge/.venv/bin/python",
+        "config/task-templates.yaml": "script: ~/Projects/Repos/example-app/.venv/bin/python",
         "voicebridge/resources.py": "x = 1",
     })
     res = R.artifact_content_scan(art)
@@ -420,7 +420,7 @@ def test_resource_path_prefers_package_data(monkeypatch, tmp_path):
 # ========================================================================
 def test_orchestrator_has_no_developer_home_path():
     text = (REPO / "voicebridge/orchestrator.py").read_text()
-    assert "/home/trick" not in text
+    assert "/home/" not in text
     assert "~/Projects/Repos" not in text
     assert "resources.resource_path" in text
 

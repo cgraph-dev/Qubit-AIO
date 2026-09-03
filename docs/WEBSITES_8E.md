@@ -441,7 +441,7 @@ graft build all green.
 Root cause: the checkpoint commit excluded two gitignored/machine-local files that
 tests required — `Modelfile.qubit4` (the generated bake artifact, intentionally
 never committed per plan P0-N / `scripts/bake_brain.py`) and
-`tests/test_steal_list_strict.py` (which hardcoded `/home/trick` sibling paths).
+`tests/test_steal_list_strict.py` (which hardcoded `/home/example` sibling paths).
 A fresh checkout therefore could not run `test_packet4b` (two `Modelfile.qubit4`
 reads + one read of `test_steal_list_strict.py`) or
 `test_steal_list_strict` itself (five `Modelfile.qubit4` reads).
@@ -473,7 +473,7 @@ Chosen fix (no assertions weakened, no tests deleted, no PII committed):
   tracked fixture instead of the gitignored `Modelfile.qubit4`; the sanitized +
   stability + doc-param assertions are unchanged.
 - `tests/test_steal_list_strict.py` is included in the baseline; its two
-  `/home/trick` sibling-dashboard reads now target the repository frontend
+  `/home/example` sibling-dashboard reads now target the repository frontend
   (inline editor) and the tracked polling-contract fixture; the private test
   handle `@tr.cky` is sanitized to `@demohandle`.
 - `voicebridge/benchmarking/harness.py` hashes the tracked fixture so a clean

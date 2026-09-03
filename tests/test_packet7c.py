@@ -179,7 +179,7 @@ class _FakeCfg:
         self._sd = state_dir
         self.data = {"audio": {"output_device": "", "output_device_name": ""},
                      "webui": {"token": "super-secret-live-token-xyz",
-                               "frontend_dir": "/home/me/custom"},
+                               "frontend_dir": "/home/example/custom"},
                      "intent": {"local_llm": {"model": "qubit-brain4",
                                               "url": "http://127.0.0.1:11434"}},
                      "safety": {"tool_broker": True},
@@ -236,7 +236,7 @@ def test_export_import_roundtrip_preserves_sanitized_state(tmp_path):
     joined = json.dumps(state)
     assert "super-secret-live-token-xyz" not in joined
     assert "~/.openclaw/.env" not in joined
-    assert "/home/me/custom" not in joined
+    assert "/home/example/custom" not in joined
 
 
 @pytest.mark.skipif(not D.openssl_ok(), reason="DEGRADED: system OpenSSL missing")
