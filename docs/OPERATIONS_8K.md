@@ -22,7 +22,7 @@ on the developer's private state.
 | **Clean-venv check cannot mask missing package contents (finding #7)** | `scripts/clean_venv_check.py --install` now BUILDS the wheel, installs it, scans the INSTALLED package, and fails on a mask guard if `voicebridge` resolves inside the checkout |
 | **No private developer state / machine paths / dirty files shipped** | `voicebridge/release.py` machine-path + secret scans; sdist excludes (`pyproject.toml`); artifact member/content scan rejects `browser_profiles`, live configs, untracked dirty files, secret-shaped values, machine paths |
 | **Provenance, dependency constraints, licenses/notices, SBOM, hashes, reproducibility** | `release.certify` + `--build`/`--reproduce` records version/commit/dirty state, declared deps, THIRD_PARTY_NOTICES status, project license, artifact sha256, second-build comparison |
-| **Artifact signature status (honest, never fabricated)** | `release.artifact_signature_status` + `release.verify_artifact_signature` report `SIGNED` only when a real detached signature verifies (`gpg --verify`); otherwise `NOT_SIGNED`/`INVALID`/`DEGRADED` with the available tools. Unsigned artifacts BLOCK qualification unless `--unsigned-ok` records an explicit approved unsigned-release policy |
+| **Artifact signature status (honest, never fabricated)** | `release.artifact_signature_status` reports STATIC capability only (`SIGNING_CAPABLE`/`NOT_CONFIGURED`); `release.verify_artifact_signature` verifies ACTUAL detached signatures against the approved full 40-hex fingerprint via gpg `VALIDSIG` and returns `SIGNED`/`INVALID`/`UNTRUSTED_SIGNER`/`NOT_SIGNED`/`DEGRADED`. Unsigned artifacts BLOCK qualification unless `--unsigned-ok` records an explicit approved unsigned-release policy |
 | **`systemd-analyze verify` + security review** | `release.unit_verify` renders `__PROJECT_DIR__`, stubs ExecStart, runs `systemd-analyze verify`, and reviews unit security |
 | **Python/platform/display/audio support documented** | `docs/AUDIO_SETUP.md`, `docs/VOICE_BRIDGE_SYSTEM.md`, `distribution.SUPPORTED_TARGET` (Ubuntu x86_64, Python ≥ 3.11), runbook check |
 | **Upgrade from previous release / interrupted migration / newer-schema refusal / downgrade/rollback** | `docs/MIGRATIONS.md` + `portable.UnsupportedSchemaError` + 8J `_guard_newer_schema` + atomic restore — asserted by `backup_migration_check` |
@@ -79,10 +79,21 @@ Release-artifact boundary (Packet 8K closure):
   home are accepted), so personal paths are never silently classified harmless
   merely because they appear in non-runtime files.
 - Actual detached signatures are verified per artifact (`<artifact>.asc` /
-  `<artifact>.sig` via `gpg --verify`). No signature → `NOT_SIGNED`; a
-  fabricated or failing signature → `INVALID`/`DEGRADED`. Unsigned artifacts
-  BLOCK the qualification unless `--unsigned-ok` records an explicit approved
-  unsigned-release policy.
+  `<artifact>.sig` via `gpg --status-fd` and `VALIDSIG`). A signature only
+  counts as `SIGNED` when it cryptographically verifies AND the signer's FULL
+  40-hex fingerprint exactly equals the approved signer fingerprint
+  (`RELEASE_SIGNER_FINGERPRINT` env or `config/release-signer.fingerprint`).
+  Short key IDs are never trusted. A valid signature from the wrong key →
+  `UNTRUSTED_SIGNER`; a tampered/changed artifact or malformed signature →
+  `INVALID`; no signature file → `NOT_SIGNED`; gpg or approved fingerprint
+  missing → `DEGRADED`. `artifact_signature_status` is STATIC capability
+  detection only (`SIGNING_CAPABLE` / `NOT_CONFIGURED`) and can never claim an
+  artifact is signed. Unsigned artifacts BLOCK the qualification unless
+  `--unsigned-ok` records an explicit approved unsigned-release policy
+  (reported as `UNSIGNED_POLICY_APPROVED`, never a cryptographic claim).
+- Provenance lists are parsed from `git status --porcelain=v1 -z` so the first
+  modified/untracked path is reported exactly (a plain `.strip()` truncated the
+  first path character). Paths with spaces, Unicode, and renames are preserved.
 A faster static smoke is available from the CLI:
 
 ```bash

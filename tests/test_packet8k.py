@@ -476,6 +476,31 @@ def test_artifact_signature_status_is_capability_not_signing(monkeypatch):
     assert "approved_fingerprint_set" in rec
 
 
+def test_static_certify_cannot_claim_signed_via_git_key(monkeypatch):
+    """Packet 8K closure: even with a git signing key configured, static
+    certify() reports capability only (SIGNING_CAPABLE/NOT_CONFIGURED), never
+    SIGNED. Only detached-signature verification reports SIGNED."""
+    import subprocess as sp
+    # set a git signing key in the REPO config (harmless, read-only)
+    try:
+        sp.run(["git", "config", "user.signingkey", "D7062848A1AB005C"],
+               cwd=str(REPO), check=True, capture_output=True)
+        have = True
+    except Exception:
+        have = False
+    try:
+        rec = R.artifact_signature_status()
+        assert rec["state"] in ("SIGNING_CAPABLE", "NOT_CONFIGURED")
+        assert rec["state"] != "SIGNED"
+        report = R.certify(REPO)
+        assert report["signature"]["state"] in ("SIGNING_CAPABLE",
+                                                "NOT_CONFIGURED")
+    finally:
+        if have:
+            sp.run(["git", "config", "--unset", "user.signingkey"],
+                   cwd=str(REPO), check=False, capture_output=True)
+
+
 def test_approved_signer_fingerprint_requires_full_40_hex(monkeypatch):
     import os
     # short key id must be rejected
