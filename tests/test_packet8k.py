@@ -616,5 +616,12 @@ def test_release_qualify_tree_clean_state(tmp_path):
         assert r.returncode == RQ.EXIT_BLOCKED
         assert report["steps"]["build"]["state"] == "BLOCKED"
     else:
-        # clean tree: build may be OK or DEGRADED (network), but never BLOCKED
-        assert report["verdict"] in ("PASS", "FAIL", "DEGRADED")
+        # clean tree: the build step may be OK or DEGRADED (network), but a
+        # BLOCKED verdict is also valid when artifacts are unsigned and no
+        # --unsigned-ok policy was recorded. It must NEVER be a silent PASS
+        # while artifacts are unsigned.
+        assert report["verdict"] in ("PASS", "FAIL", "DEGRADED", "BLOCKED")
+        if report["verdict"] == "BLOCKED":
+            assert r.returncode == RQ.EXIT_BLOCKED
+            assert "sign" in report["steps"]["build"].get(
+                "signing", {}).get("detail", "")
