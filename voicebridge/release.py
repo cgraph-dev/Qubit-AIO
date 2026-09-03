@@ -467,7 +467,8 @@ _DIST_ALIASES = {"pyyaml": "yaml", "piper_tts": "piper"}
 # inventoried in docs/PACKET_0A_MISMATCH_REPORT.md section D. They degrade
 # gracefully, so their absence is a warning, not a fresh-install failure
 # (mirrors scripts/config_doctor.OPTIONAL_GUARDED).
-OPTIONAL_GUARDED = {"psutil", "onnx", "prompt_toolkit", "websocket"}
+OPTIONAL_GUARDED = {"psutil", "onnx", "prompt_toolkit", "websocket",
+                    "pystray"}
 
 
 def _normalize_import(name: str) -> str:

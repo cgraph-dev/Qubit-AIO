@@ -40,7 +40,8 @@ MISSING, DEGRADED, WARN, FAIL = "MISSING", "DEGRADED", "WARN", "FAIL"
 # Modules imported through guarded optional paths (try/except ImportError) as
 # inventoried in docs/PACKET_0A_MISMATCH_REPORT.md section D. They degrade
 # gracefully, so their absence is a warning, not a fresh-install failure.
-OPTIONAL_GUARDED = {"psutil", "onnx", "prompt_toolkit", "websocket"}
+OPTIONAL_GUARDED = {"psutil", "onnx", "prompt_toolkit", "websocket",
+                    "pystray"}
 LOCAL_TOP = {"voicebridge", "scripts", "browser_auto"}
 
 

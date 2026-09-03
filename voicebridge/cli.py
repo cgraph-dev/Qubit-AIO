@@ -102,6 +102,49 @@ def build_parser() -> argparse.ArgumentParser:
                                        "units, runbooks, upgrade/uninstall contract)")
     pkg_cert.add_argument("--json", action="store_true",
                           help="machine-readable certification report")
+    prod = add("product", help="Packet 8K-P product surface "
+               "(paths/install/first-run/repair/migration/service/shortcut/"
+               "tray/capabilities/boundary/upgrade/rollback)")
+    prod_sub = prod.add_subparsers(dest="product_command")
+    prod_paths = prod_sub.add_parser("paths", parents=[common],
+                                     help="effective path map (diagnostic)")
+    prod_paths.add_argument("--json", action="store_true")
+    prod_inst = prod_sub.add_parser("install", parents=[common],
+                                    help="installer (prereq probe + apply; "
+                                         "never enables live services)")
+    prod_inst.add_argument("--apply", action="store_true",
+                           help="actually stage config/resources (default dry-run)")
+    prod_inst.add_argument("--service-owner", default=None,
+                           help="documented service owner (systemctl --user)")
+    prod_first = prod_sub.add_parser("first-run", parents=[common],
+                                     help="beginner first-run status flow")
+    prod_rep = prod_sub.add_parser("repair", parents=[common],
+                                   help="one diagnostic/repair command")
+    prod_caps = prod_sub.add_parser("capabilities", parents=[common],
+                                    help="typed capability states")
+    prod_caps.add_argument("--json", action="store_true")
+    prod_mig = prod_sub.add_parser("migration", parents=[common],
+                                   help="branding/migration status (read-only)")
+    prod_mig.add_argument("--json", action="store_true")
+    prod_svc = prod_sub.add_parser("service", parents=[common],
+                                   help="service ownership contract (read-only)")
+    prod_short = prod_sub.add_parser("shortcut", parents=[common],
+                                     help="desktop shortcut (dry-run unless --apply)")
+    prod_short.add_argument("--apply", action="store_true")
+    prod_short.add_argument("--json", action="store_true")
+    prod_tray = prod_sub.add_parser("tray", parents=[common],
+                                    help="optional tray status")
+    prod_tray.add_argument("--json", action="store_true")
+    prod_bound = prod_sub.add_parser("boundary", parents=[common],
+                                     help="packaging/private-source boundary")
+    prod_bound.add_argument("--json", action="store_true")
+    prod_up = prod_sub.add_parser("upgrade", parents=[common],
+                                  help="upgrade/uninstall/rollback contract")
+    prod_up.add_argument("--json", action="store_true")
+    prod_roll = prod_sub.add_parser("rollback", parents=[common],
+                                    help="rollback from a backup (dry-run unless --apply)")
+    prod_roll.add_argument("--apply", action="store_true")
+    prod_roll.add_argument("--backup-dir", type=Path, default=None)
     aud = add("audio", help="user-facing audio settings contract (list/select/reset/status)")
     aud_sub = aud.add_subparsers(dest="audio_command")
     aud_list = aud_sub.add_parser("list", parents=[common], help="list audio devices")
@@ -450,6 +493,8 @@ def main(argv=None) -> int:
         return _cmd_flag_drill(cfg)
     if command == "package":
         return _cmd_package(cfg, args)
+    if command == "product":
+        return _cmd_product(cfg, args)
     if command == "audio":
         return _cmd_audio(cfg, args)
     if command == "profile":
@@ -916,6 +961,95 @@ def _cmd_package(cfg, args) -> int:
             _print_certify_human(report)
         return 0 if R.report_pass(report) else 2
     print(f"ERROR: unknown package command {cmd!r}")
+    return 2
+
+
+def _cmd_product(cfg, args) -> int:
+    """voicebridge product paths|install|first-run|repair|capabilities|
+    migration|service|shortcut|tray|boundary|upgrade|rollback (Packet 8K-P)."""
+    import json as _json
+    from . import product as P
+    cmd = getattr(args, "product_command", None) or "paths"
+    if cmd == "paths":
+        diag = P.path_map_diagnostic()
+        if getattr(args, "json", False):
+            print(_json.dumps(diag, indent=2, sort_keys=True))
+        else:
+            print(f"product: {diag['product']} {diag['version']}")
+            for k, v in diag["paths"].items():
+                print(f"  {k:<10} {v}")
+            print(f"platform: {diag['platform']['state']} "
+                  f"({diag['platform']['detail']})")
+        return 0
+    if cmd == "install":
+        out = P.install(dry_run=not args.apply,
+                        service_owner=args.service_owner)
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] in ("READY", "DEGRADED") else 1
+    if cmd == "first-run":
+        out = P.first_run()
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    if cmd == "repair":
+        out = P.repair()
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] == "READY" else 1
+    if cmd == "capabilities":
+        out = P.capabilities()
+        if getattr(args, "json", False):
+            print(_json.dumps(out, indent=2, sort_keys=True))
+        else:
+            for c in out["capabilities"].values():
+                print(f"[{c['state']:>10}] {c['capability']:<10} {c['detail']}")
+            print(out["note"])
+        return 0
+    if cmd == "migration":
+        out = P.branding_status()
+        if getattr(args, "json", False):
+            print(_json.dumps(out, indent=2, sort_keys=True))
+        else:
+            print(f"migration: {out['state']} — {out['detail']}")
+        return 0
+    if cmd == "service":
+        out = P.service_owner()
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    if cmd == "shortcut":
+        out = P.desktop_shortcut(dry_run=not args.apply)
+        if getattr(args, "json", False):
+            print(_json.dumps(out, indent=2, sort_keys=True))
+        else:
+            print(f"shortcut: {out['state']} — {out['detail']}")
+        return 0
+    if cmd == "tray":
+        out = P.tray_status()
+        if getattr(args, "json", False):
+            print(_json.dumps(out, indent=2, sort_keys=True))
+        else:
+            print(f"tray: {out['state']} — {out['detail']}")
+        return 0
+    if cmd == "boundary":
+        out = P.package_boundary()
+        if getattr(args, "json", False):
+            print(_json.dumps(out, indent=2, sort_keys=True))
+        else:
+            print(f"private source solved: {out['private_source_solved']}")
+            print(out["release_blocker"])
+        return 0
+    if cmd == "upgrade":
+        out = P.upgrade_contract()
+        if getattr(args, "json", False):
+            print(_json.dumps(out, indent=2, sort_keys=True))
+        else:
+            print("upgrade/uninstall/rollback contract:")
+            print(f"  preserves: {', '.join(out['preserves'])}")
+            print(f"  does_not:  {', '.join(out['does_not'])}")
+        return 0
+    if cmd == "rollback":
+        out = P.rollback(dry_run=not args.apply, backup_dir=args.backup_dir)
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] in ("OK", "READY", "MISSING") else 1
+    print(f"ERROR: unknown product command {cmd!r}")
     return 2
 
 
