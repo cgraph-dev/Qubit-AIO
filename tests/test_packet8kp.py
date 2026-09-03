@@ -1002,12 +1002,12 @@ def test_first_run_pairing_never_token_in_url(tmp_path):
     assert "token=" not in json.dumps(out["pairing"])
 
 
-def test_capabilities_typed_and_no_reroute(tmp_path):
+def test_capabilities_typed_and_no_reroute(tmp_path, monkeypatch):
+    monkeypatch.setattr(P, "_require_audio",
+                        lambda: {"state": "OK", "detail": "2 audio devices"})
     out = P.capabilities(_paths(tmp_path))
-    assert out["capabilities"]["voice"]["state"] in (
-        "ENABLED", "UNAVAILABLE")
-    assert "never auto-selected" in str(out["capabilities"]["voice"].get(
-        "next", "")) or out["capabilities"]["voice"]["state"] == "ENABLED"
+    assert out["capabilities"]["voice"]["state"] == "ENABLED"
+    assert "detection is not permission" in out["note"]
 
 
 def test_cli_product_migrate_dry_run(tmp_path):
