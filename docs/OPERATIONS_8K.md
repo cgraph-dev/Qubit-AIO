@@ -21,7 +21,8 @@ on the developer's private state.
 | **Wheel + sdist build, inspect, clean-HOME install outside the checkout** | `scripts/release_qualify.py --build` / `--install` — imports, entry points, resources, packaged units, and smoke checks run with `-I` (no `PYTHONPATH`), a clean `HOME`, and no source-tree `sys.path` insertion |
 | **Clean-venv check cannot mask missing package contents (finding #7)** | `scripts/clean_venv_check.py --install` now BUILDS the wheel, installs it, scans the INSTALLED package, and fails on a mask guard if `voicebridge` resolves inside the checkout |
 | **No private developer state / machine paths / dirty files shipped** | `voicebridge/release.py` machine-path + secret scans; sdist excludes (`pyproject.toml`); artifact member/content scan rejects `browser_profiles`, live configs, untracked dirty files, secret-shaped values, machine paths |
-| **Provenance, dependency constraints, licenses/notices, SBOM, hashes, reproducibility** | `release.certify` + `--build`/`--reproduce` records version/commit/dirty state, declared deps, THIRD_PARTY_NOTICES status, artifact sha256, second-build comparison |
+| **Provenance, dependency constraints, licenses/notices, SBOM, hashes, reproducibility** | `release.certify` + `--build`/`--reproduce` records version/commit/dirty state, declared deps, THIRD_PARTY_NOTICES status, project license, artifact sha256, second-build comparison |
+| **Artifact signature status (honest, never fabricated)** | `release.artifact_signature_status` reports `SIGNED` only when a git signing key or gpg is present; otherwise `NOT_SIGNED` with the available tools, so a release without a signing key is an explicit limitation, never a silent pass |
 | **`systemd-analyze verify` + security review** | `release.unit_verify` renders `__PROJECT_DIR__`, stubs ExecStart, runs `systemd-analyze verify`, and reviews unit security |
 | **Python/platform/display/audio support documented** | `docs/AUDIO_SETUP.md`, `docs/VOICE_BRIDGE_SYSTEM.md`, `distribution.SUPPORTED_TARGET` (Ubuntu x86_64, Python ≥ 3.11), runbook check |
 | **Upgrade from previous release / interrupted migration / newer-schema refusal / downgrade/rollback** | `docs/MIGRATIONS.md` + `portable.UnsupportedSchemaError` + 8J `_guard_newer_schema` + atomic restore — asserted by `backup_migration_check` |
@@ -100,6 +101,10 @@ the checkout, the check FAILS instead of hiding a missing wheel member.
 - The gate is not weakened: core machine paths, shipped secrets, forbidden
   artifact members, broken units, missing runbooks, or missing migration
   guards all fail the certification.
+- Artifact signatures are never fabricated: when no release signing key or
+  tool is configured the certification records `NOT_SIGNED` (an explicit
+  limitation), and the project license is the operator-supplied proprietary
+  declaration in the root `LICENSE` file.
 
 ## 6. Rollback of the certification itself
 

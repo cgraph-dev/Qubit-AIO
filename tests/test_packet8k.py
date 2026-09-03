@@ -373,6 +373,20 @@ def test_certify_passes_and_records_personalization():
     assert report["secrets"] == {}
     assert report["units"]["all_ok"] is True
     assert report["toolchain"]["python"]
+    # signature status is recorded honestly and is never fabricated
+    assert report["signature"]["state"] in ("SIGNED", "NOT_SIGNED")
+    assert "tools" in report["signature"] and "git_signing_key" in report["signature"]
+
+
+def test_artifact_signature_status_never_fabricates(monkeypatch):
+    rec = R.artifact_signature_status()
+    # NOT_SIGNED is reported explicitly when no capability exists; the record
+    # never claims SIGNED merely because sha256 hashes were computed.
+    assert "tools" in rec
+    if rec["state"] == "SIGNED":
+        assert rec["git_signing_key"]
+    else:
+        assert not rec["git_signing_key"]
 
 
 def test_report_pass_fails_on_core_machine_path(tmp_path):
@@ -443,7 +457,8 @@ def test_pyproject_ships_portable_resources_and_excludes_private():
     # sdist excludes live config, personal templates, browser state, dirty files
     for private in ("config/voice.yaml", "config/voice.local.yaml",
                     "config/task-templates.yaml", "config/personal-knowledge.md",
-                    "browser_profiles", "DESIGN.md", "PRODUCT.md", "106"):
+                    "browser_profiles", "DESIGN.md", "PRODUCT.md", "106",
+                    "docs/UNIFIED_AGENT_PLAN.md", "tests/test_new_features.py"):
         assert private in text, f"{private} not excluded from sdist"
 
 

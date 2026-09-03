@@ -961,6 +961,39 @@ def bounded_logs_check(root: Optional[Path] = None) -> List[Dict[str, str]]:
     return results
 
 
+def artifact_signature_status() -> Dict[str, Any]:
+    """Honest artifact-signature status (Packet 8K release inspection).
+
+    A signature is NEVER fabricated. This reports whether a release-signing
+    capability is actually configured on the host: a git signing key (with an
+    existing gpg/twine/sigstore tool as supporting evidence). The presence of a
+    gpg binary alone is NOT treated as signed — an installed tool is not the
+    same as a configured key that signed the artifacts. When no signing key is
+    configured, ``state`` is ``NOT_SIGNED`` (an explicit limitation for the
+    operator/verifier, never a silent pass)."""
+    import shutil
+    key = None
+    try:
+        key = _git(REPO, ["config", "--get", "user.signingkey"])
+    except Exception:
+        pass
+    tools = {
+        "gpg": bool(shutil.which("gpg")),
+        "twine": bool(shutil.which("twine")),
+        "sigstore": bool(shutil.which("sigstore")),
+    }
+    capable = bool(key)
+    return {
+        "state": "SIGNED" if capable else "NOT_SIGNED",
+        "detail": ("no release signing key configured on this host; "
+                   "artifacts ship with sha256 hashes only (gpg binary present "
+                   "does not mean the release is signed)" if not capable
+                   else "release signing key configured"),
+        "git_signing_key": bool(key),
+        "tools": tools,
+    }
+
+
 def certify(repo: Optional[Path] = None) -> Dict[str, Any]:
     """Hermetic static certification: provenance, scans, contracts, docs,
     units, ceilings. Does NOT build/install (that is the orchestrator's opt-in
@@ -979,6 +1012,7 @@ def certify(repo: Optional[Path] = None) -> Dict[str, Any]:
             "personalization": mpaths["personalization"],
         },
         "secrets": secrets,
+        "signature": artifact_signature_status(),
         "filesystem_modes": filesystem_modes_check(root),
         "resource_ceilings": resource_ceilings(root),
         "operator_runbooks": operator_runbook_check(root),
