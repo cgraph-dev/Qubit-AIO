@@ -375,6 +375,27 @@ def _toml(path: Path) -> Dict[str, Any]:
         return tomllib.load(fh)
 
 
+def _project_license_text(repo: Optional[Path] = None) -> str:
+    """The canonical project-license declaration read from ``pyproject.toml``
+    (``[project].license``). Falls back to the root LICENSE summary when the
+    metadata is missing — never fabricated, and never a hardcoded claim that
+    can drift from the real license boundary."""
+    root = Path(repo) if repo else REPO
+    try:
+        data = _toml(root / "pyproject.toml")
+        lic = (data.get("project") or {}).get("license")
+        if isinstance(lic, dict) and lic.get("text"):
+            return lic["text"].strip()
+        if isinstance(lic, str) and lic.strip():
+            return lic.strip()
+    except OSError:
+        pass
+    return ("Qubit Voice Agent Educational Project License — see the root "
+            "LICENSE; applies only to original Qubit material. Third-party/"
+            "upstream-derived material remains under its original license per "
+            "THIRD_PARTY_NOTICES.md and docs/UPSTREAM_REUSE.md.")
+
+
 def sbom(repo: Optional[Path] = None) -> Dict[str, Any]:
     """Declared dependency record. Installed versions are resolved only when
     the distributions are present (importlib.metadata); otherwise recorded as
@@ -393,9 +414,7 @@ def sbom(repo: Optional[Path] = None) -> Dict[str, Any]:
         "main": recs,
         "optional": deps["extras"],
         "notices": "THIRD_PARTY_NOTICES.md + docs/UPSTREAM_REUSE.md",
-        "project_license": "Proprietary (see root LICENSE; Copyright © 2026 "
-                           "Qubit by Tricky, all rights reserved); "
-                           "upstream-derived material per THIRD_PARTY_NOTICES.md",
+        "project_license": _project_license_text(root),
     }
 
 

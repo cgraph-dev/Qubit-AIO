@@ -136,8 +136,10 @@ the checkout, the check FAILS instead of hiding a missing wheel member.
   guards all fail the certification.
 - Artifact signatures are never fabricated: when no release signing key or
   tool is configured the certification records `NOT_SIGNED` (an explicit
-  limitation), and the project license is the operator-supplied proprietary
-  declaration in the root `LICENSE` file.
+  limitation), and the project license is the educational-project declaration
+  in the root `LICENSE` file (applies only to original Qubit material;
+  third-party material keeps its original license per THIRD_PARTY_NOTICES.md
+  and docs/UPSTREAM_REUSE.md).
 - The webui event stream is shut down cleanly: `WebUI.stop()` closes every
   event-stream subscriber so in-flight SSE handler threads exit their drain
   loop and `server_close()` never blocks on a leaked handler (a clean-clone
