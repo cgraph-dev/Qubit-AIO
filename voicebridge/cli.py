@@ -477,6 +477,16 @@ def build_parser() -> argparse.ArgumentParser:
                        help="rollback: disable timer, keep cursors/reports/evidence")
     mon_sub.add_parser("launch", parents=[common],
                        help="optional approved Chromium launch (cdp_launch must be on)")
+    webui = add("webui", help="probe/open the local dashboard (never starts "
+                "a second bridge, listener, or server; never puts a token in "
+                "a URL or on the command line)")
+    webui.add_argument("--open", action="store_true",
+                       help="open the local dashboard in the default browser "
+                            "when it is already reachable")
+    webui.add_argument("--port", type=int, default=None,
+                       help="dashboard port (default: webui.port from config)")
+    webui.add_argument("--json", action="store_true",
+                       help="machine-readable typed result")
     return p
 
 
@@ -534,6 +544,8 @@ def main(argv=None) -> int:
         return _cmd_device(cfg, args)
     if command == "monitor":
         return _cmd_monitor(cfg, args)
+    if command == "webui":
+        return _cmd_webui(cfg, args)
 
     from .orchestrator import VoiceOrchestrator
     orch = VoiceOrchestrator(cfg, no_hotkey=args.no_hotkey, dry_run=args.dry_run)
@@ -2030,6 +2042,67 @@ def _cmd_monitor(cfg, args) -> int:
         return 0
     print(f"ERROR: unknown monitor command {cmd!r}")
     return 2
+
+
+def _cmd_webui(cfg, args) -> int:
+    """voicebridge webui [--open] — probe/open the real local dashboard.
+
+    Never starts a second bridge, hotkey listener, or dashboard instance; it
+    only probes the already-running bridge's dashboard and, with ``--open``,
+    opens it in the default browser. The token is never placed in a URL, on
+    the command line, or in any output."""
+    import json as _json
+    import urllib.request
+    import webbrowser
+    from . import product as P
+    host = cfg.get("webui", "host", default="127.0.0.1") or "127.0.0.1"
+    port = args.port or int(cfg.get("webui", "port", default=8890))
+    url = f"http://{host}:{port}/"
+    try:
+        with urllib.request.urlopen(url, timeout=1.5) as resp:
+            reachable = resp.status == 200
+    except Exception:
+        reachable = False
+    if not reachable:
+        if getattr(args, "json", False):
+            print(_json.dumps({
+                "state": "UNAVAILABLE",
+                "detail": f"no dashboard at {url}; start the bridge first "
+                          f"(`voicebridge run` or the "
+                          f"{P.PRODUCT_NAME}.service) — nothing was started",
+                "url": url,
+                "token_in_url": False,
+                "started_second_bridge": False,
+            }, indent=2, sort_keys=True))
+        else:
+            print(f"dashboard: UNAVAILABLE — no dashboard at {url}")
+            print(f"start the bridge first: voicebridge run  (or the "
+                  f"{P.PRODUCT_NAME} user service); the shortcut never starts "
+                  f"a second bridge")
+        return 1
+    opened = False
+    if args.open:
+        try:
+            opened = bool(webbrowser.open(url))
+        except Exception:
+            opened = False
+    if getattr(args, "json", False):
+        print(_json.dumps({
+            "state": "READY",
+            "detail": "local dashboard is reachable; token is never placed "
+                      "in the URL",
+            "url": url,
+            "token_in_url": False,
+            "opened": opened,
+            "started_second_bridge": False,
+        }, indent=2, sort_keys=True))
+    else:
+        print(f"dashboard: READY — {url} (authenticated in-browser; token "
+              f"never in the URL)")
+        if args.open and not opened:
+            print("note: could not open a default browser; open the URL "
+                  "manually")
+    return 0
 
 
 if __name__ == "__main__":

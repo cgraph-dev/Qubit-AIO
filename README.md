@@ -68,11 +68,17 @@ idempotent, and typed:
 
 ```bash
 pip install qubit-voice-agent        # from the release artifact
-voicebridge product install          # typed prerequisite probe (dry-run)
+voicebridge product install          # typed prerequisite probe (dry-run, zero writes)
 voicebridge product install --apply  # stage config/resources + compat aliases
-voicebridge product first-run        # beginner-friendly status wizard
-voicebridge product repair           # one diagnostic/repair command
+voicebridge product first-run        # beginner-friendly status wizard (read-only)
+voicebridge product repair           # one diagnostic/repair command (read-only)
 ```
+
+The desktop shortcut and `voicebridge webui --open` open the real local
+dashboard when the bridge is running — they never start a second bridge or
+listener, and a token is never placed in a URL, argument, or file. Dashboard
+pairing is reported truthfully (`REQUIRES_PAIRING` / `PAIRED`), never as a
+fabricated "token generated".
 
 Existing installations on the legacy OpenClaw Voice Bridge paths keep working
 and migrate with a reversible, backed-up flow:

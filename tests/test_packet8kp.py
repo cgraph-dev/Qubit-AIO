@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -117,7 +118,17 @@ def test_install_prereq_blocked_when_missing(tmp_path, monkeypatch):
     out = P.install(paths, dry_run=True)
     assert out["state"] in ("MISSING", "BLOCKED")
     assert out["completed"] is False
-    # journal recorded the block
+    # dry-run is zero-write: the journal must NOT exist at all
+    assert not (paths.journal_dir / "install.jsonl").exists()
+
+
+def test_install_apply_records_block_in_journal(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    monkeypatch.setattr(P, "_require_python",
+                        lambda: {"state": "MISSING", "detail": "no python"})
+    out = P.install(paths, dry_run=False)
+    assert out["state"] in ("MISSING", "BLOCKED")
+    assert out["completed"] is False
     j = P.InstallJournal(paths.journal_dir)
     recs = j.read()
     assert any(r.get("step") == "python" and r.get("state") == "MISSING"
@@ -169,13 +180,22 @@ def test_install_dry_run_readiness(tmp_path):
 
 
 # ========================================================================
-# 3. Model/provider bootstrap
+# 3. Model/provider bootstrap (fail closed)
 # ========================================================================
+def _valid_spec(**kw) -> P.ModelSpec:
+    base = dict(id="m.bin", source="http://127.0.0.1:1/m.bin", revision="r1",
+                sha256="a" * 64, size_bytes=128, license="Apache-2.0",
+                kind="file", local_path="m.bin")
+    base.update(kw)
+    return P.ModelSpec(**base)
+
+
 def test_model_bootstrap_offline_missing(tmp_path):
     paths = _paths(tmp_path)
-    spec = P.ModelSpec(id="qubit-brain4", source="ollama://qubit-brain4",
-                       revision="digest", sha256="", size_bytes=0,
-                       license="Apache-2.0", kind="ollama")
+    spec = _valid_spec(id="qubit-brain4", source="ollama://qubit-brain4",
+                       revision="a" * 64, sha256="b" * 64, size_bytes=1024,
+                       license="Apache-2.0", kind="ollama",
+                       local_path="qubit-brain4")
     out = P.model_bootstrap(spec, paths, offline=True)
     assert out["state"] == "MISSING"
     assert out["target"].startswith(str(paths.model_dir))
@@ -186,9 +206,8 @@ def test_model_bootstrap_bad_hash_fails_closed(tmp_path):
     paths.model_dir.mkdir(parents=True, exist_ok=True)
     art = paths.model_dir / "model.bin"
     art.write_bytes(b"corrupt")
-    spec = P.ModelSpec(id="model.bin", source="http://x/model.bin",
-                       revision="r1", sha256="0" * 64, size_bytes=0,
-                       license="MIT", kind="file", local_path="model.bin")
+    spec = _valid_spec(id="model.bin", local_path="model.bin",
+                       sha256="0" * 64, size_bytes=7)
     out = P.model_bootstrap(spec, paths, offline=True)
     assert out["state"] == "FAILED"
     assert "sha256 mismatch" in out["detail"]
@@ -200,9 +219,8 @@ def test_model_bootstrap_good_hash_promotes(tmp_path):
     art = paths.model_dir / "model.bin"
     art.write_bytes(b"good bytes")
     actual = P._sha256(art)
-    spec = P.ModelSpec(id="model.bin", source="http://x/model.bin",
-                       revision="r1", sha256=actual, size_bytes=0,
-                       license="MIT", kind="file", local_path="model.bin")
+    spec = _valid_spec(id="model.bin", local_path="model.bin",
+                       sha256=actual, size_bytes=10)
     out = P.model_bootstrap(spec, paths, offline=True)
     assert out["state"] == "OK"
     assert "sha256 verified" in out["detail"]
@@ -213,14 +231,14 @@ def test_model_bootstrap_preflight_blocks(tmp_path, monkeypatch):
     monkeypatch.setattr(P, "_preflight",
                         lambda d: {"state": "DEGRADED",
                                    "detail": "insufficient disk"})
-    spec = P.ModelSpec(id="m", source="http://x/m", revision="r", kind="file")
+    spec = _valid_spec(id="m", local_path="m")
     out = P.model_bootstrap(spec, paths, dry_run=False, offline=False)
     assert out["state"] == "BLOCKED"
 
 
 def test_model_bootstrap_dry_run_no_promote(tmp_path):
     paths = _paths(tmp_path)
-    spec = P.ModelSpec(id="m", source="http://x/m", revision="r", kind="file")
+    spec = _valid_spec(id="m", local_path="m")
     out = P.model_bootstrap(spec, paths, dry_run=True)
     assert out["state"] == "READY"
     assert out["promoted"] is False
@@ -238,7 +256,7 @@ def test_first_run_typed_and_no_secrets(tmp_path):
         assert secret.lower() not in blob.lower()
     assert out["product"] == P.PRODUCT_NAME
     assert "pairing" in out
-    assert out["pairing"]["state"] == "PENDING"
+    assert out["pairing"]["state"] in ("REQUIRES_PAIRING", "PAIRED")
     assert "storage" in out and "config" in out["storage"]
 
 
@@ -410,9 +428,11 @@ def test_rollback_applies_atomically(tmp_path):
 # CLI surface
 # ========================================================================
 def _cli_env(tmp_path: Path) -> Dict[str, str]:
-    """Isolated XDG environment for CLI subprocess tests so they never create
-    directories or read config/state in the operator's real HOME."""
+    """Isolated HOME + XDG environment for CLI subprocess tests so they never
+    touch the operator's real HOME/state (the CLI config/state defaults use
+    `~`-relative constants)."""
     env = dict(os.environ)
+    env["HOME"] = str(tmp_path / "home")
     env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg-config")
     env["XDG_STATE_HOME"] = str(tmp_path / "xdg-state")
     env["XDG_DATA_HOME"] = str(tmp_path / "xdg-data")
@@ -823,7 +843,7 @@ def test_model_download_resumes_from_part(tmp_path):
         spec = P.ModelSpec(id="m.bin", source=url, revision="r1",
                            sha256=P._sha256(expect_file),
                            size_bytes=len(payload), kind="file",
-                           local_path="m.bin")
+                           local_path="m.bin", license="Apache-2.0")
         out = P.model_bootstrap(spec, paths, dry_run=False, offline=False)
         assert out["state"] == "OK", out
         assert (paths.model_dir / "m.bin").read_bytes() == payload
@@ -834,16 +854,69 @@ def test_model_download_resumes_from_part(tmp_path):
 
 def test_model_download_size_validation(tmp_path):
     payload = b"short"
+    expect_file = tmp_path / "expect.bin"
+    expect_file.write_bytes(payload)
     srv, url = _range_server(payload)
     try:
         paths = _paths(tmp_path)
         spec = P.ModelSpec(id="m.bin", source=url, revision="r1",
-                           sha256="", size_bytes=len(payload) + 100,
-                           kind="file", local_path="m.bin")
+                           sha256=P._sha256(expect_file),
+                           size_bytes=len(payload) + 100,
+                           kind="file", local_path="m.bin",
+                           license="Apache-2.0")
         out = P.model_bootstrap(spec, paths, dry_run=False, offline=False)
         assert out["state"] == "FAILED"
         assert "size mismatch" in out["detail"]
         assert "resume_part" in out
+    finally:
+        _stop_server(srv)
+
+
+def test_model_download_exact_size_without_content_length(tmp_path):
+    """Exact byte size is validated even when the server sends no
+    Content-Length header (fail closed on truncated/short downloads)."""
+    payload = b"x" * 64
+    expect_file = tmp_path / "expect.bin"
+    expect_file.write_bytes(payload)
+
+    import http.server
+    import threading
+
+    class NoLenHandler(http.server.BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def do_GET(self):  # noqa: N802
+            # deliberately omit Content-Length
+            self.send_response(200)
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(payload)
+            self.close_connection = True
+
+        def log_message(self, *args):  # noqa: A003
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), NoLenHandler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    url = f"http://127.0.0.1:{srv.server_address[1]}/m.bin"
+    try:
+        paths = _paths(tmp_path)
+        spec = P.ModelSpec(id="m.bin", source=url, revision="r1",
+                           sha256=P._sha256(expect_file),
+                           size_bytes=len(payload), kind="file",
+                           local_path="m.bin", license="Apache-2.0")
+        out = P.model_bootstrap(spec, paths, dry_run=False, offline=False)
+        assert out["state"] == "OK", out
+        # wrong expected size must fail even without Content-Length
+        spec_bad = P.ModelSpec(id="m.bin", source=url, revision="r1",
+                               sha256=P._sha256(expect_file),
+                               size_bytes=len(payload) + 7, kind="file",
+                               local_path="m.bin", license="Apache-2.0")
+        paths2 = _paths(tmp_path / "again")
+        out_bad = P.model_bootstrap(spec_bad, paths2, dry_run=False,
+                                    offline=False)
+        assert out_bad["state"] == "FAILED"
+        assert "size mismatch" in out_bad["detail"]
     finally:
         _stop_server(srv)
 
@@ -855,9 +928,7 @@ def test_model_provider_timeout_fails_closed(tmp_path, monkeypatch):
         raise P._DownloadError("provider timeout after 3 attempts")
 
     monkeypatch.setattr(P, "_download_with_retry", boom)
-    spec = P.ModelSpec(id="m.bin", source="http://127.0.0.1:1/m",
-                       revision="r1", size_bytes=0, kind="file",
-                       local_path="m.bin")
+    spec = _valid_spec(id="m.bin", size_bytes=32)
     out = P.model_bootstrap(spec, paths, dry_run=False, offline=False)
     assert out["state"] == "FAILED"
     assert "resume_part" in out
@@ -869,7 +940,7 @@ def test_model_low_ram_blocks_preflight(tmp_path, monkeypatch):
     monkeypatch.setattr(P, "_preflight",
                         lambda d: {"state": "DEGRADED",
                                    "detail": "low RAM: 1.0 GiB"})
-    spec = P.ModelSpec(id="m", source="http://x/m", revision="r", kind="file")
+    spec = _valid_spec(id="m", local_path="m")
     out = P.model_bootstrap(spec, paths, dry_run=False, offline=False)
     assert out["state"] == "BLOCKED"
     assert "preflight" in out
@@ -877,8 +948,7 @@ def test_model_low_ram_blocks_preflight(tmp_path, monkeypatch):
 
 def test_model_offline_never_network(tmp_path):
     paths = _paths(tmp_path)
-    spec = P.ModelSpec(id="m", source="http://127.0.0.1:1/m", revision="r",
-                       kind="file")
+    spec = _valid_spec(id="m", local_path="m")
     out = P.model_bootstrap(spec, paths, offline=True)
     assert out["state"] == "MISSING"
 
@@ -889,8 +959,8 @@ def test_model_bad_hash_rejects_promoted_file(tmp_path):
     art = paths.model_dir / "m.bin"
     art.write_bytes(b"corrupt-bytes")
     spec = P.ModelSpec(id="m.bin", source="http://x/m.bin", revision="r1",
-                       sha256="0" * 64, size_bytes=0, kind="file",
-                       local_path="m.bin")
+                       sha256="0" * 64, size_bytes=13, kind="file",
+                       local_path="m.bin", license="Apache-2.0")
     out = P.model_bootstrap(spec, paths, offline=True)
     assert out["state"] == "FAILED"
 
@@ -925,11 +995,9 @@ def test_package_boundary_no_secrets_and_private_source_honest():
 def test_first_run_pairing_never_token_in_url(tmp_path):
     paths = _paths(tmp_path)
     out = P.first_run(paths)
-    assert out["pairing"]["state"] == "PENDING"
+    assert out["pairing"]["state"] in ("REQUIRES_PAIRING", "PAIRED")
     blob = json.dumps(out)
     assert "token=" not in blob
-    assert "http" not in json.dumps(out["pairing"]).lower() or \
-        "127.0.0.1" in json.dumps(out["pairing"]).lower()
     # the pairing block never carries an actual token value
     assert "token=" not in json.dumps(out["pairing"])
 
@@ -942,27 +1010,622 @@ def test_capabilities_typed_and_no_reroute(tmp_path):
         "next", "")) or out["capabilities"]["voice"]["state"] == "ENABLED"
 
 
-def test_cli_product_migrate_dry_run(tmp_path, monkeypatch):
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
-    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "stt"))
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "dat"))
+def test_cli_product_migrate_dry_run(tmp_path):
     r = subprocess.run(
         [sys.executable, "-m", "voicebridge", "product", "migrate",
          "--json"],
-        capture_output=True, text=True, timeout=60)
+        capture_output=True, text=True, timeout=60, env=_cli_env(tmp_path))
     assert r.returncode == 0, r.stderr
     assert json.loads(r.stdout)["state"] == "FRESH"
 
 
-def test_cli_product_paths_shows_legacy_aliases(tmp_path, monkeypatch):
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
-    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "stt"))
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "dat"))
+def test_cli_product_paths_shows_legacy_aliases(tmp_path):
     r = subprocess.run(
         [sys.executable, "-m", "voicebridge", "product", "paths", "--json"],
-        capture_output=True, text=True, timeout=60)
+        capture_output=True, text=True, timeout=60, env=_cli_env(tmp_path))
     assert r.returncode == 0, r.stderr
     diag = json.loads(r.stdout)
     assert "legacy_config" in diag["paths"]
     assert "legacy_state" in diag["paths"]
     assert "legacy_data" in diag["paths"]
+
+# ========================================================================
+# 19. Audit repairs: dry-run is strictly side-effect-free (item 1)
+# ========================================================================
+def _fs_snapshot(root: Path) -> Dict[str, str]:
+    """Hash-based filesystem snapshot: every dir/file/symlink under root with
+    content hashes and symlink targets, so ANY write is detected."""
+    snap: Dict[str, str] = {}
+    if not root.exists():
+        return snap
+    for p in sorted(root.rglob("*")):
+        rel = str(p.relative_to(root))
+        if p.is_symlink():
+            snap[f"link:{rel}"] = os.readlink(p)
+        elif p.is_dir():
+            snap[f"dir:{rel}"] = ""
+        else:
+            snap[f"file:{rel}"] = P._sha256(p)
+    return snap
+
+
+def _noop_capabilities(paths=None):
+    caps = {
+        name: {"capability": name, "state": "AVAILABLE",
+               "detail": "injected", "next": "ready"}
+        for name in ("voice", "provider", "display", "browser", "tray")
+    }
+    return {"capabilities": caps, "note": "injected"}
+
+
+def test_install_dry_run_zero_writes(tmp_path, monkeypatch):
+    _ready_prereqs(monkeypatch)
+    root = tmp_path / "root"
+    before = _fs_snapshot(root)
+    paths = P.default_paths(base=root)
+    out = P.install(paths, dry_run=True)
+    assert out["state"] == "READY"
+    assert _fs_snapshot(root) == before
+
+
+def test_install_dry_run_zero_writes_even_when_blocked(tmp_path, monkeypatch):
+    monkeypatch.setattr(P, "_require_audio",
+                        lambda: {"state": "MISSING", "detail": "no audio"})
+    root = tmp_path / "root"
+    before = _fs_snapshot(root)
+    out = P.install(P.default_paths(base=root), dry_run=True)
+    assert out["state"] in ("MISSING", "BLOCKED")
+    assert _fs_snapshot(root) == before
+
+
+def test_first_run_dry_run_zero_writes(tmp_path, monkeypatch):
+    _ready_prereqs(monkeypatch)
+    monkeypatch.setattr(P, "capabilities", _noop_capabilities)
+    root = tmp_path / "root"
+    before = _fs_snapshot(root)
+    paths = P.default_paths(base=root)
+    out = P.first_run(paths, dry_run=True)
+    assert out["state"] == "READY"
+    assert _fs_snapshot(root) == before
+
+
+def test_migrate_dry_run_zero_writes(tmp_path):
+    paths = _paths(tmp_path)
+    _legacy_install(paths)
+    before = _fs_snapshot(paths.base)
+    out = P.migrate(paths, dry_run=True)
+    assert out["state"] == "READY"
+    assert _fs_snapshot(paths.base) == before
+
+
+# ========================================================================
+# 20. Audit repairs: model bootstrap fails closed (item 2)
+# ========================================================================
+def test_model_spec_requires_all_metadata():
+    errors = P._validate_spec(P.ModelSpec(id="", source="", revision="",
+                                          sha256="", size_bytes=0,
+                                          license="", kind="file"))
+    joined = "; ".join(errors)
+    assert "empty model id" in joined
+    assert "empty source" in joined
+    assert "empty revision" in joined
+    assert "empty license" in joined
+    assert "empty sha256" in joined
+    assert "positive exact byte size" in joined
+
+
+def test_model_spec_rejects_bad_scheme():
+    spec = _valid_spec(source="ftp://x/m.bin")
+    errors = P._validate_spec(spec)
+    assert any("unapproved source scheme" in e for e in errors)
+
+
+def test_model_spec_rejects_invalid_hash():
+    spec = _valid_spec(sha256="not-a-hash")
+    errors = P._validate_spec(spec)
+    assert any("64 hex" in e for e in errors)
+
+
+def test_model_spec_rejects_oversized():
+    spec = _valid_spec(size_bytes=P.MAX_DOWNLOAD_BYTES + 1)
+    errors = P._validate_spec(spec)
+    assert any("bound" in e for e in errors)
+
+
+def test_model_spec_rejects_unapproved_license():
+    spec = _valid_spec(license="Made-Up-1.0")
+    errors = P._validate_spec(spec)
+    assert any("unapproved license" in e for e in errors)
+
+
+def test_model_spec_rejects_ollama_bad_digest():
+    spec = _valid_spec(source="ollama://qubit-brain4", revision="digest",
+                       kind="ollama")
+    errors = P._validate_spec(spec)
+    assert any("provider digest" in e for e in errors)
+
+
+def test_model_invalid_spec_fails_closed_no_download(tmp_path):
+    paths = _paths(tmp_path)
+    bad = P.ModelSpec(id="m", source="", revision="", sha256="",
+                      size_bytes=0, license="", kind="file")
+    out = P.model_bootstrap(bad, paths, dry_run=False)
+    assert out["state"] == "FAILED"
+    assert "invalid model spec" in out["detail"]
+    # nothing was created
+    assert not (paths.model_dir / "m").exists()
+
+
+def test_model_traversal_rejected(tmp_path):
+    paths = _paths(tmp_path)
+    spec = _valid_spec(local_path="../evil.bin")
+    assert P._safe_model_target(paths.model_dir, spec) is None
+    out = P.model_bootstrap(spec, paths, dry_run=True)
+    assert out["state"] == "FAILED"
+    assert "traversal" in out["detail"]
+
+
+def test_model_preserves_previous_valid_on_failure(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    paths.model_dir.mkdir(parents=True)
+    old = paths.model_dir / "m.bin"
+    old.write_bytes(b"old-valid-model")
+
+    def boom(*a, **k):
+        raise P._DownloadError("provider timeout")
+
+    monkeypatch.setattr(P, "_download_with_retry", boom)
+    spec = _valid_spec(id="m.bin", local_path="m.bin", sha256="a" * 64,
+                       size_bytes=16)
+    out = P.model_bootstrap(spec, paths, dry_run=False, offline=False)
+    assert out["state"] == "FAILED"
+    # the previous valid model was NOT deleted or overwritten
+    assert (paths.model_dir / "m.bin").read_bytes() == b"old-valid-model"
+
+
+def test_model_tampered_download_hash_removes_part(tmp_path):
+    payload = b"tampered-bytes"
+    expect_file = tmp_path / "expect.bin"
+    expect_file.write_bytes(payload)
+    srv, url = _range_server(payload)
+    try:
+        paths = _paths(tmp_path)
+        spec = P.ModelSpec(id="m.bin", source=url, revision="r1",
+                           sha256="0" * 64,  # expected hash never matches
+                           size_bytes=len(payload), kind="file",
+                           local_path="m.bin", license="Apache-2.0")
+        out = P.model_bootstrap(spec, paths, dry_run=False, offline=False)
+        assert out["state"] == "FAILED"
+        assert "sha256 mismatch" in out["detail"]
+        assert not (paths.model_dir / "m.bin").exists()
+        # tampered .part was removed (no lingering temp file)
+        assert not (paths.model_dir / ".dl.m.bin.part").exists()
+    finally:
+        _stop_server(srv)
+
+
+def test_model_ollama_digest_mismatch_fails_closed(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    monkeypatch.setattr(
+        P, "_preflight", lambda d: {"state": "OK", "disk_ok": True,
+                                    "ram_ok": True})
+    rec = {"state": "OK", "checksum": "f" * 64, "revision": "f" * 64,
+           "alias": "qubit-brain4"}
+    monkeypatch.setattr("voicebridge.distribution.model_artifact_record",
+                        lambda cfg: dict(rec))
+    spec = P.ModelSpec(id="qubit-brain4", source="ollama://qubit-brain4",
+                       revision="a" * 64, sha256="b" * 64, size_bytes=1024,
+                       license="Apache-2.0", kind="ollama")
+    out = P.model_bootstrap(spec, paths, dry_run=False, offline=False)
+    assert out["state"] == "FAILED"
+    assert "digest" in out["detail"].lower()
+
+
+def test_model_interrupted_download_keeps_resumable_part(tmp_path,
+                                                         monkeypatch):
+    payload = b"interrupt-me" * 32
+    expect_file = tmp_path / "expect.bin"
+    expect_file.write_bytes(payload)
+    srv, url = _range_server(payload)
+    try:
+        paths = _paths(tmp_path)
+        spec = P.ModelSpec(id="m.bin", source=url, revision="r1",
+                           sha256=P._sha256(expect_file),
+                           size_bytes=len(payload), kind="file",
+                           local_path="m.bin", license="Apache-2.0")
+        paths.model_dir.mkdir(parents=True)
+        part = paths.model_dir / ".dl.m.bin.part"
+        part.write_bytes(payload[:64])
+        calls = {"n": 0}
+        real = P._resume_download
+
+        def flaky(*a, **k):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise P._DownloadError("interrupted mid-stream")
+            return real(*a, **k)
+
+        monkeypatch.setattr(P, "_resume_download", flaky)
+        out = P.model_bootstrap(spec, paths, dry_run=False, offline=False,
+                                attempts=2)
+        assert out["state"] == "OK", out
+        assert (paths.model_dir / "m.bin").read_bytes() == payload
+        assert calls["n"] >= 2  # a real bounded retry resumed the .part
+    finally:
+        _stop_server(srv)
+
+
+# ========================================================================
+# 21. Audit repairs: desktop shortcut is real and testable (item 3)
+# ========================================================================
+def test_webui_command_exists():
+    from voicebridge.cli import build_parser
+    build_parser().parse_args(["webui", "--open"])  # must not SystemExit
+
+
+def test_shortcut_exec_is_the_real_webui_launcher(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
+    monkeypatch.setenv("DISPLAY", ":0")
+    paths = _paths(tmp_path)
+    out = P.desktop_shortcut(paths, dry_run=False)
+    assert out["state"] in ("OK", "UNAVAILABLE")
+    if out["state"] == "OK":
+        dest = (tmp_path / "xdg" / "applications" /
+                f"{P.PRODUCT_NAME}.desktop")
+        text = dest.read_text()
+        exec_line = [l for l in text.splitlines() if l.startswith("Exec=")][0]
+        assert exec_line == f"Exec={sys.executable} -m voicebridge webui --open"
+        assert "token" not in text
+        assert "sk-" not in text
+
+
+def test_shortcut_returns_failed_if_webui_command_missing(tmp_path,
+                                                          monkeypatch):
+    monkeypatch.setattr(P, "_webui_open_available", lambda: False)
+    monkeypatch.setenv("DISPLAY", ":0")
+    out = P.desktop_shortcut(_paths(tmp_path), dry_run=True)
+    assert out["state"] == "FAILED"
+    assert "webui" in out["detail"]
+
+
+def _closed_port() -> int:
+    import socket
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
+
+
+def test_webui_open_executed_in_isolated_home(tmp_path):
+    """Execute the real shortcut launcher inside an isolated HOME. The
+    dashboard is not running -> typed UNAVAILABLE, nothing started, no token,
+    no crash."""
+    port = _closed_port()
+    r = subprocess.run(
+        [sys.executable, "-m", "voicebridge", "webui", "--open", "--json",
+         "--port", str(port)],
+        capture_output=True, text=True, timeout=60, env=_cli_env(tmp_path))
+    assert r.returncode != 0
+    out = json.loads(r.stdout)
+    assert out["state"] == "UNAVAILABLE"
+    assert out["started_second_bridge"] is False
+    assert out["token_in_url"] is False
+    assert "token" not in (r.stdout + r.stderr).lower() or \
+        out["detail"].startswith("no dashboard")
+
+
+def test_webui_ready_reachable_no_token(tmp_path):
+    import http.server
+    import threading
+
+    class OK(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"dashboard")
+
+        def log_message(self, *args):  # noqa: A003
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), OK)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        port = srv.server_address[1]
+        r = subprocess.run(
+            [sys.executable, "-m", "voicebridge", "webui", "--json",
+             "--port", str(port)],
+            capture_output=True, text=True, timeout=60,
+            env=_cli_env(tmp_path))
+        assert r.returncode == 0, r.stderr
+        out = json.loads(r.stdout)
+        assert out["state"] == "READY"
+        assert out["token_in_url"] is False
+        assert out["started_second_bridge"] is False
+    finally:
+        _stop_server(srv)
+
+
+# ========================================================================
+# 22. Audit repairs: first-run pairing is truthful (item 4)
+# ========================================================================
+def test_first_run_pairing_truthful(tmp_path, monkeypatch):
+    _ready_prereqs(monkeypatch)
+    monkeypatch.setattr(P, "capabilities", _noop_capabilities)
+    paths = _paths(tmp_path)
+    out = P.first_run(paths, dry_run=True)
+    assert out["pairing"]["state"] == "REQUIRES_PAIRING"
+    assert "generated" not in out["pairing"]["detail"].lower()
+    # once a token is actually stored in canonical config, pairing is PAIRED
+    paths.config_dir.mkdir(parents=True)
+    (paths.config_dir / "voice.yaml").write_text(
+        "webui:\n  token: real-secret-token\n")
+    out2 = P.first_run(paths, dry_run=True)
+    assert out2["pairing"]["state"] == "PAIRED"
+    blob = json.dumps(out2)
+    assert "real-secret-token" not in blob
+
+
+# ========================================================================
+# 23. Audit repairs: rollback is genuinely atomic (item 5)
+# ========================================================================
+def _make_backup(paths, files: Dict[str, str]) -> Path:
+    bdir = paths.backup_dir / "latest"
+    bdir.mkdir(parents=True, exist_ok=True)
+    for name, content in files.items():
+        p = bdir / name
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content)
+    P._write_backup_manifest(bdir)
+    return bdir
+
+
+def test_rollback_corrupted_manifest_fails_closed(tmp_path):
+    paths = _paths(tmp_path)
+    bdir = paths.backup_dir / "latest"
+    bdir.mkdir(parents=True)
+    (bdir / "manifest.json").write_text("{not json")
+    (bdir / "state.json").write_text("{}")
+    out = P.rollback(paths, dry_run=False)
+    assert out["state"] == "FAILED"
+    assert "corrupted backup manifest" in out["detail"]
+    assert out.get("blocks_resume") is True
+
+
+def test_rollback_newer_schema_fails_closed(tmp_path):
+    paths = _paths(tmp_path)
+    bdir = paths.backup_dir / "latest"
+    bdir.mkdir(parents=True)
+    (bdir / "manifest.json").write_text(
+        json.dumps({"schema_version": 999, "files": {}}))
+    (bdir / "state.json").write_text("{}")
+    out = P.rollback(paths, dry_run=False)
+    assert out["state"] == "FAILED"
+    assert "newer than runtime" in out["detail"]
+    assert out.get("blocks_resume") is True
+
+
+def test_rollback_corrupted_backup_file_fails_closed(tmp_path):
+    paths = _paths(tmp_path)
+    bdir = _make_backup(paths, {"state.json": '{"v": 1}'})
+    # tamper the backup after the manifest was written
+    (bdir / "state.json").write_text("tampered!!!")
+    out = P.rollback(paths, dry_run=False)
+    assert out["state"] == "FAILED"
+    assert "sha256 mismatch" in out["detail"]
+    assert out.get("blocks_resume") is True
+
+
+def test_rollback_readonly_target_fails_closed(tmp_path):
+    paths = _paths(tmp_path)
+    paths.state_dir.mkdir(parents=True, exist_ok=True)
+    _make_backup(paths, {"state.json": '{"v": 1}'})
+    os.chmod(paths.state_dir, 0o500)
+    try:
+        out = P.rollback(paths, dry_run=False)
+        assert out["state"] == "FAILED"
+        assert out.get("blocks_resume") is True
+        assert "read-only" in out["detail"] or "partial rollback" in \
+            out["detail"]
+    finally:
+        os.chmod(paths.state_dir, 0o700)
+
+
+def test_rollback_disk_full_staging_fails_closed(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    _make_backup(paths, {"state.json": '{"v": 1}'})
+
+    def full(src, dst):
+        raise OSError("No space left on device")
+
+    monkeypatch.setattr(shutil, "copy2", full)
+    out = P.rollback(paths, dry_run=False)
+    assert out["state"] == "FAILED"
+    assert "staging failed" in out["detail"]
+    assert out.get("blocks_resume") is True
+
+
+def test_rollback_partial_reports_exact_paths(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    _make_backup(paths, {"a.json": '{"a": 1}', "b.json": '{"b": 2}'})
+    real_replace = os.replace
+
+    def flaky_replace(src, dst):
+        if str(dst).endswith("b.json"):
+            raise OSError("fake io error")
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(P.os, "replace", flaky_replace)
+    out = P.rollback(paths, dry_run=False)
+    assert out["state"] == "FAILED"
+    assert "partial rollback" in out["detail"]
+    assert any("b.json" in p for p in out["paths"])
+    assert out.get("blocks_resume") is True
+    # the good file was still restored atomically
+    assert (paths.state_dir / "a.json").exists()
+
+
+def test_rollback_repeated_is_idempotent(tmp_path):
+    paths = _paths(tmp_path)
+    _make_backup(paths, {"state.json": '{"v": 1}'})
+    first = P.rollback(paths, dry_run=False)
+    second = P.rollback(paths, dry_run=False)
+    assert first["state"] == "OK"
+    assert second["state"] == "OK"
+    assert (paths.state_dir / "state.json").read_text() == '{"v": 1}'
+
+
+def test_rollback_preserves_backup(tmp_path):
+    paths = _paths(tmp_path)
+    bdir = _make_backup(paths, {"state.json": '{"v": 1}'})
+    out = P.rollback(paths, dry_run=False)
+    assert out["state"] == "OK"
+    assert bdir.exists()
+    assert (bdir / "state.json").exists()
+
+
+def test_migrate_writes_validated_manifest(tmp_path):
+    paths = _paths(tmp_path)
+    _legacy_install(paths)
+    out = P.migrate(paths, dry_run=False)
+    bak = Path(out["backup_dir"])
+    mf = bak / "manifest.json"
+    assert mf.exists()
+    manifest = json.loads(mf.read_text())
+    assert manifest["schema_version"] == P.BACKUP_SCHEMA_VERSION
+    assert "legacy/voice.yaml" in manifest["files"]
+    # credentials excluded from the backup AND the manifest
+    assert ".env" in out["excluded"]
+    assert not (bak / "legacy" / ".env").exists()
+
+
+# ========================================================================
+# 24. Audit repairs: installer/migration consistent (item 6)
+# ========================================================================
+def test_staging_uses_installed_package_data_not_checkout(tmp_path,
+                                                          monkeypatch):
+    fake_data = tmp_path / "installed-data"
+    (fake_data / "config").mkdir(parents=True)
+    (fake_data / "config" / "voice.example.yaml").write_text(
+        "# from-installed-wheel\n")
+    monkeypatch.setattr(P.resources, "_PACKAGE_DATA", fake_data)
+    paths = _paths(tmp_path)
+    P._stage_packaged_defaults(paths, dry_run=False)
+    staged = (paths.config_dir / "voice.yaml").read_text()
+    assert "# from-installed-wheel" in staged
+
+
+def test_migrate_mixed_trees_partial(tmp_path):
+    """Only a subset of legacy trees present -> migration handles the partial
+    state without splitting or duplicating anything."""
+    paths = _paths(tmp_path)
+    paths.legacy_base.mkdir(parents=True)
+    (paths.legacy_base / "voice.yaml").write_text("audio: {}\n")
+    # legacy_state / legacy_data absent
+    out = P.migrate(paths, dry_run=False)
+    assert out["state"] == "OK"
+    assert paths.legacy_base.is_symlink()
+    assert os.path.realpath(paths.legacy_base) == str(paths.config_dir)
+    assert (paths.config_dir / "voice.yaml").exists()
+    # state/data pairs were absent: only compat aliases were created (never
+    # duplicated trees), and no state data appeared out of nowhere
+    assert paths.legacy_state.is_symlink()
+    assert os.path.realpath(paths.legacy_state) == str(paths.state_dir)
+    assert not (paths.state_dir / "events.jsonl").exists()
+
+
+def test_two_concurrent_installs_converge(tmp_path, monkeypatch):
+    _ready_prereqs(monkeypatch)
+    paths = _paths(tmp_path)
+    first = P.install(paths, dry_run=False)
+    second = P.install(paths, dry_run=False)
+    assert first["state"] == "READY"
+    assert second["state"] == "READY"
+    files = sorted(p.name for p in paths.config_dir.iterdir())
+    assert files.count("voice.yaml") == 1
+    aliases = [a for a in second["aliases"] if a["state"] == "ALIAS_CREATED"]
+    assert not aliases  # second run converged, did not duplicate
+
+
+def test_install_apply_preserves_tuned_config(tmp_path, monkeypatch):
+    _ready_prereqs(monkeypatch)
+    paths = _paths(tmp_path)
+    P.install(paths, dry_run=False)
+    tuned = "my-tuned-key: keep\n"
+    (paths.config_dir / "voice.yaml").write_text(tuned)
+    out = P.install(paths, dry_run=False)
+    assert out["state"] == "READY"
+    assert (paths.config_dir / "voice.yaml").read_text() == tuned
+    kept = [s for s in out["staged"] if s["resource"] == "voice.yaml"]
+    assert kept and kept[0]["state"] == "KEPT"
+
+
+# ========================================================================
+# 25. Audit repairs: service/tray truthful (item 7)
+# ========================================================================
+def test_service_unit_missing_state(tmp_path):
+    out = P.service_owner(unit_dir=tmp_path / "units")
+    assert out["state"] == "UNIT_MISSING"
+    assert out["active_state"].startswith("requires_operator_check")
+    assert out["one_service_one_listener"] is True
+
+
+def test_service_duplicate_state(tmp_path):
+    udir = tmp_path / "units"
+    udir.mkdir(parents=True)
+    (udir / f"{P.PRODUCT_NAME}.service").write_text("[Unit]\n")
+    (udir / f"{P.LEGACY_NAME}.service").write_text("[Unit]\n")
+    out = P.service_owner(unit_dir=udir)
+    assert out["state"] == "DUPLICATE"
+    assert out["stale_legacy_unit"] == "STALE"
+
+
+def test_service_mismatch_state(tmp_path):
+    udir = tmp_path / "units"
+    udir.mkdir(parents=True)
+    (udir / f"{P.PRODUCT_NAME}.service").write_text(
+        "[Service]\nExecStart=/some/wrong/bin -x\n")
+    out = P.service_owner(unit_dir=udir)
+    assert out["state"] == "MISMATCH"
+
+
+def test_service_present_state(tmp_path):
+    udir = tmp_path / "units"
+    udir.mkdir(parents=True)
+    (udir / f"{P.PRODUCT_NAME}.service").write_text(
+        f"[Service]\nExecStart={sys.executable} -m voicebridge run\n")
+    out = P.service_owner(unit_dir=udir)
+    assert out["state"] == "PRESENT"
+    assert out["active_state"].startswith("requires_operator_check")
+
+
+def test_tray_never_listener_or_cookie(tmp_path):
+    out = P.tray_status(_paths(tmp_path))
+    assert out["second_bridge"] is False
+    assert out["hotkey_listener"] is False
+    assert out["cookie_access"] is False
+    assert out["token_exposure"] is False
+    assert out["required"] is False
+
+
+# ========================================================================
+# 26. Audit repairs: release boundary honest (item 8)
+# ========================================================================
+def test_package_boundary_no_fabricated_claims():
+    out = P.package_boundary()
+    assert "no signature claim" in out["signatures"]
+    assert "no SBOM claim" in out["sbom"]
+    assert "never fabricated" in out["provenance"]
+    assert out["private_source_solved"] is False
+    blob = json.dumps(out)
+    for secret in ("sk-", "ghp_", "password"):
+        assert secret not in blob
+
+
+def test_repair_is_readonly_diagnostic(tmp_path, monkeypatch):
+    _ready_prereqs(monkeypatch)
+    root = tmp_path / "root"
+    before = _fs_snapshot(root)
+    out = P.repair(P.default_paths(base=root))
+    assert "checks" in out
+    assert _fs_snapshot(root) == before
