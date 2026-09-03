@@ -103,7 +103,7 @@ def build_parser() -> argparse.ArgumentParser:
     pkg_cert.add_argument("--json", action="store_true",
                           help="machine-readable certification report")
     prod = add("product", help="Packet 8K-P product surface "
-               "(paths/install/first-run/repair/migration/service/shortcut/"
+               "(paths/install/first-run/repair/migrate/service/shortcut/"
                "tray/capabilities/boundary/upgrade/rollback)")
     prod_sub = prod.add_subparsers(dest="product_command")
     prod_paths = prod_sub.add_parser("paths", parents=[common],
@@ -117,7 +117,11 @@ def build_parser() -> argparse.ArgumentParser:
     prod_inst.add_argument("--service-owner", default=None,
                            help="documented service owner (systemctl --user)")
     prod_first = prod_sub.add_parser("first-run", parents=[common],
-                                     help="beginner first-run status flow")
+                                     help="beginner first-run flow "
+                                          "(status by default)")
+    prod_first.add_argument("--apply", action="store_true",
+                            help="stage configured defaults + compat aliases "
+                                 "(merge only, never overwrite tuned settings)")
     prod_rep = prod_sub.add_parser("repair", parents=[common],
                                    help="one diagnostic/repair command")
     prod_caps = prod_sub.add_parser("capabilities", parents=[common],
@@ -126,6 +130,19 @@ def build_parser() -> argparse.ArgumentParser:
     prod_mig = prod_sub.add_parser("migration", parents=[common],
                                    help="branding/migration status (read-only)")
     prod_mig.add_argument("--json", action="store_true")
+    prod_migrate = prod_sub.add_parser("migrate", parents=[common],
+                                       help="reversible legacy -> canonical "
+                                            "migration (backed up, "
+                                            "resume-able)")
+    prod_migrate.add_argument("--apply", action="store_true",
+                              help="perform the migration (default dry-run)")
+    prod_migrate.add_argument("--backup-dir", type=Path, default=None)
+    prod_migrate.add_argument("--json", action="store_true")
+    prod_migroll = prod_sub.add_parser("migrate-rollback", parents=[common],
+                                       help="reverse a branding migration")
+    prod_migroll.add_argument("--apply", action="store_true",
+                              help="perform the rollback (default dry-run)")
+    prod_migroll.add_argument("--backup-dir", type=Path, default=None)
     prod_svc = prod_sub.add_parser("service", parents=[common],
                                    help="service ownership contract (read-only)")
     prod_short = prod_sub.add_parser("shortcut", parents=[common],
@@ -987,9 +1004,9 @@ def _cmd_product(cfg, args) -> int:
         print(_json.dumps(out, indent=2, sort_keys=True))
         return 0 if out["state"] in ("READY", "DEGRADED") else 1
     if cmd == "first-run":
-        out = P.first_run()
+        out = P.first_run(dry_run=not args.apply)
         print(_json.dumps(out, indent=2, sort_keys=True))
-        return 0
+        return 0 if out["state"] in ("READY", "DEGRADED", "BLOCKED") else 1
     if cmd == "repair":
         out = P.repair()
         print(_json.dumps(out, indent=2, sort_keys=True))
@@ -1010,6 +1027,20 @@ def _cmd_product(cfg, args) -> int:
         else:
             print(f"migration: {out['state']} — {out['detail']}")
         return 0
+    if cmd == "migrate":
+        out = P.migrate(dry_run=not args.apply, backup_dir=args.backup_dir)
+        if getattr(args, "json", False):
+            print(_json.dumps(out, indent=2, sort_keys=True))
+        else:
+            print(f"migrate: {out['state']} — {out['detail']}")
+            if out.get("backup_dir"):
+                print(f"  backup: {out['backup_dir']}")
+        return 0 if out["state"] in ("OK", "READY", "FRESH") else 1
+    if cmd == "migrate-rollback":
+        out = P.migrate_rollback(dry_run=not args.apply,
+                                 backup_dir=args.backup_dir)
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] in ("OK", "READY") else 1
     if cmd == "service":
         out = P.service_owner()
         print(_json.dumps(out, indent=2, sort_keys=True))

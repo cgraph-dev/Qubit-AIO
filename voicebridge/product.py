@@ -29,7 +29,6 @@ import os
 import platform
 import shutil
 import sys
-import tempfile
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -107,6 +106,8 @@ class ProductPaths:
     journal_dir: Path
     resource_root: Path
     legacy_base: Path
+    legacy_state: Path
+    legacy_data: Path
 
     @property
     def map(self) -> Dict[str, str]:
@@ -121,7 +122,9 @@ class ProductPaths:
             "backups": str(self.backup_dir),
             "journal": str(self.journal_dir),
             "resources": str(self.resource_root),
-            "legacy": str(self.legacy_base),
+            "legacy_config": str(self.legacy_base),
+            "legacy_state": str(self.legacy_state),
+            "legacy_data": str(self.legacy_data),
         }
 
     def owned_dirs(self) -> List[Path]:
@@ -142,6 +145,8 @@ def default_paths(base: Optional[Path] = None) -> ProductPaths:
         state = b / "state"
         cache = b / "cache"
         legacy = b / "legacy"
+        legacy_state = b / "legacy-state"
+        legacy_data = b / "legacy-data"
     else:
         b = Path("~").expanduser()
         cfg = _xdg("XDG_CONFIG_HOME", ".config") / PRODUCT_NAME
@@ -149,6 +154,8 @@ def default_paths(base: Optional[Path] = None) -> ProductPaths:
         state = _xdg("XDG_STATE_HOME", ".local/state") / PRODUCT_NAME
         cache = _xdg("XDG_CACHE_HOME", ".cache") / PRODUCT_NAME
         legacy = _xdg("XDG_CONFIG_HOME", ".config") / LEGACY_NAME
+        legacy_state = _xdg("XDG_STATE_HOME", ".local/state") / LEGACY_NAME
+        legacy_data = _xdg("XDG_DATA_HOME", ".local/share") / LEGACY_NAME
     return ProductPaths(
         base=b,
         config_dir=cfg,
@@ -162,6 +169,8 @@ def default_paths(base: Optional[Path] = None) -> ProductPaths:
         journal_dir=state / "install-journal",
         resource_root=resources.package_data_root(),
         legacy_base=legacy,
+        legacy_state=legacy_state,
+        legacy_data=legacy_data,
     )
 
 
@@ -199,6 +208,46 @@ def path_map_diagnostic(paths: Optional[ProductPaths] = None) -> Dict[str, Any]:
         "platform": platform_supported(),
         "paths": paths.map,
     }
+
+
+def _legacy_pairs(paths: ProductPaths) -> List[tuple]:
+    """(legacy, canonical) directory pairs. The legacy openclaw-voice-bridge
+    path is kept as an explicit compatibility alias so any code that still
+    reads the old name resolves to the same physical tree — it can never read
+    one config while another path writes a different one."""
+    return [
+        (paths.legacy_base, paths.config_dir),
+        (paths.legacy_state, paths.state_dir),
+        (paths.legacy_data, paths.data_dir),
+    ]
+
+
+def legacy_alias_status(paths: Optional[ProductPaths] = None) -> Dict[str, Any]:
+    """Read-only typed status of the legacy compat alias for every runtime
+    category. Never creates or moves anything."""
+    paths = paths or default_paths()
+    pairs = []
+    for legacy, canonical in _legacy_pairs(paths):
+        entry = {"legacy": str(legacy), "canonical": str(canonical)}
+        if not legacy.exists():
+            entry["state"] = "ABSENT"
+        elif legacy.is_symlink():
+            entry["state"] = ("ALIAS_OK" if os.path.realpath(legacy)
+                              == str(canonical) else "ALIAS_MISMATCH")
+            entry["resolves"] = os.path.realpath(legacy)
+        else:
+            entry["state"] = "REAL_DIR"
+            entry["detail"] = "real legacy directory present; migration required"
+        pairs.append(entry)
+    if any(p["state"] == "REAL_DIR" for p in pairs):
+        state = "LEGACY_ONLY"
+    elif any(p["state"] == "ALIAS_MISMATCH" for p in pairs):
+        state = "SPLIT_TREES"
+    elif all(p["state"] in ("ABSENT", "ALIAS_OK") for p in pairs):
+        state = "OK"
+    else:
+        state = "DEGRADED"
+    return {"state": state, "pairs": pairs}
 
 
 # ---------------------------------------------------------------------------
@@ -298,6 +347,116 @@ class InstallJournal:
 
 
 # ---------------------------------------------------------------------------
+# Staging + legacy compat aliases (used by install / first-run / migrate)
+# ---------------------------------------------------------------------------
+# Packaged defaults staged into the canonical config dir by the installer.
+# NEVER overwrites an existing tuned file; merges only missing files. Only the
+# PORTABLE example resources are staged — the developer's private
+# personal-knowledge.md and task-templates.yaml are never shipped or staged.
+# Each entry: (destination name, [portable resource names to try]). The wheel
+# renames task-templates.example.yaml to _data/config/task-templates.yaml, so
+# both names are tried; resource_path() prefers the installed package data.
+_DEFAULT_STAGE = [
+    ("voice.yaml", ["config/voice.example.yaml"]),
+    ("task-templates.yaml",
+     ["config/task-templates.example.yaml", "config/task-templates.yaml"]),
+    ("local-actions.example.yaml",
+     ["config/local-actions.example.yaml"]),
+]
+
+
+def _first_resource(*names: str) -> Optional[Path]:
+    """First packaged resource that exists (the wheel may rename an example
+    file, so try the installed-data candidate too). Never raises."""
+    for n in names:
+        p = resources.resource_path(n)
+        if p.exists():
+            return p
+    return resources.resource_path(names[0])
+
+
+def _stage_packaged_defaults(paths: ProductPaths, *, dry_run: bool = True,
+                             journal: Optional[InstallJournal] = None,
+                             run_id: str = "") -> List[Dict[str, Any]]:
+    """Stage packaged defaults into the canonical config dir. Idempotent: an
+    existing user file is never overwritten (KEPT). Missing packaged resources
+    are typed, never silently skipped as success."""
+    results = []
+    cfg = paths.config_dir
+    for name, candidates in _DEFAULT_STAGE:
+        dst = cfg / name
+        if dst.exists():
+            results.append({"resource": name, "state": "KEPT",
+                            "detail": "existing user file preserved"})
+            continue
+        src = _first_resource(*candidates)
+        if src is None or not src.exists():
+            results.append({"resource": name, "state": "MISSING",
+                            "detail": f"packaged resource unavailable "
+                                      f"({'/'.join(candidates)})"})
+            continue
+        if dry_run:
+            results.append({"resource": name, "state": "WOULD_STAGE",
+                            "detail": f"would copy {src} -> {dst}"})
+            continue
+        try:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+            os.chmod(dst, 0o600)
+            results.append({"resource": name, "state": "STAGED",
+                            "detail": f"installed packaged default {name}"})
+        except OSError as exc:
+            results.append({"resource": name, "state": "FAILED",
+                            "detail": str(exc)})
+    if journal is not None and run_id:
+        for r in results:
+            journal.append(run_id, f"stage.{r['resource']}", r["state"],
+                           r["detail"])
+    return results
+
+
+def _create_legacy_aliases(paths: ProductPaths, *, dry_run: bool = True,
+                           journal: Optional[InstallJournal] = None,
+                           run_id: str = "") -> List[Dict[str, Any]]:
+    """Create the explicit legacy -> canonical compatibility aliases so every
+    old-path reader resolves to the canonical tree. A REAL legacy directory is
+    never overwritten here (that is migration); its presence is reported and
+    blocks install. Idempotent and never duplicates state directories."""
+    results = []
+    for legacy, canonical in _legacy_pairs(paths):
+        entry = {"legacy": str(legacy), "canonical": str(canonical)}
+        if not legacy.exists():
+            if dry_run:
+                entry["state"] = "WOULD_ALIAS"
+                results.append(entry)
+                continue
+            try:
+                canonical.mkdir(parents=True, exist_ok=True)
+                legacy.parent.mkdir(parents=True, exist_ok=True)
+                legacy.symlink_to(canonical, target_is_directory=True)
+                entry["state"] = "ALIAS_CREATED"
+            except OSError as exc:
+                entry["state"] = "FAILED"
+                entry["detail"] = str(exc)
+        elif legacy.is_symlink():
+            ok = os.path.realpath(legacy) == str(canonical)
+            entry["state"] = "ALIAS_OK" if ok else "ALIAS_MISMATCH"
+            if not ok:
+                entry["detail"] = f"alias resolves elsewhere: " \
+                                  f"{os.path.realpath(legacy)}"
+        else:
+            entry["state"] = "REAL_DIR"
+            entry["detail"] = "real legacy directory; run migration first"
+        results.append(entry)
+    if journal is not None and run_id:
+        for r in results:
+            journal.append(run_id,
+                           f"alias.{Path(r['legacy']).name}", r["state"],
+                           r.get("detail", ""))
+    return results
+
+
+# ---------------------------------------------------------------------------
 # Installer (works from a release artifact / installed package, not a checkout)
 # ---------------------------------------------------------------------------
 def _require_python() -> Dict[str, Any]:
@@ -366,6 +525,30 @@ def install_steps(paths: Optional[ProductPaths] = None) -> List[Dict[str, Any]]:
         "state": "OK" if all("error" not in d for d in dirs) else "FAILED",
         "detail": f"{sum(1 for d in dirs if d.get('exists'))} owned dirs ready",
     })
+    alias = legacy_alias_status(paths)
+    if alias["state"] == "LEGACY_ONLY":
+        steps.append({
+            "step": "migration",
+            "state": BLOCKED,
+            "detail": "legacy openclaw-voice-bridge directories are present; "
+                      "run `voicebridge product migrate` (reversible, backed "
+                      "up) before installing so the install cannot read one "
+                      "tree while the runtime writes another",
+        })
+    elif alias["state"] == "SPLIT_TREES":
+        steps.append({
+            "step": "migration",
+            "state": BLOCKED,
+            "detail": "legacy compat alias resolves to a different path than "
+                      "the canonical tree; repair it before installing",
+        })
+    else:
+        steps.append({
+            "step": "migration",
+            "state": "OK",
+            "detail": "canonical identity in use; legacy paths are a compat "
+                      "alias (no split config/state trees)",
+        })
     return steps
 
 
@@ -412,22 +595,52 @@ def install(paths: Optional[ProductPaths] = None, *,
     if dry_run:
         for s in steps:
             j.append(run_id, s["step"], s["state"], s["detail"])
+        staged = _stage_packaged_defaults(paths, dry_run=True)
+        aliases = _create_legacy_aliases(paths, dry_run=True)
         return {"run_id": run_id, "state": "READY",
                 "detail": "all prerequisites OK (dry-run; nothing installed)",
-                "steps": steps, "completed": False}
+                "steps": steps, "staged": staged, "aliases": aliases,
+                "completed": False}
     # apply phase is lock-guarded
     try:
         with InstallLock(lock):
             for s in steps:
                 j.append(run_id, s["step"], s["state"], s["detail"])
-            j.append(run_id, "apply", "OK", "prerequisites verified")
+            aliases = _create_legacy_aliases(paths, dry_run=False,
+                                             journal=j, run_id=run_id)
+            alias_failed = [a for a in aliases
+                            if a["state"] in ("FAILED", "REAL_DIR",
+                                              "ALIAS_MISMATCH")]
+            if alias_failed:
+                j.append(run_id, "aliases", "FAILED",
+                         "legacy compat alias could not be established")
+                return {"run_id": run_id, "state": "BLOCKED",
+                        "detail": "legacy compat alias failed: "
+                                  + "; ".join(f"{a['legacy']}={a['state']}"
+                                              for a in alias_failed),
+                        "steps": steps, "aliases": aliases,
+                        "completed": False}
+            staged = _stage_packaged_defaults(paths, dry_run=False,
+                                               journal=j, run_id=run_id)
+            stage_failed = [r for r in staged if r["state"] == "FAILED"]
+            if stage_failed:
+                j.append(run_id, "stage", "FAILED",
+                         "packaged defaults could not be staged")
+                return {"run_id": run_id, "state": "FAILED",
+                        "detail": "staging failed: "
+                                  + "; ".join(f"{r['resource']}: "
+                                              f"{r['detail']}"
+                                              for r in stage_failed),
+                        "steps": steps, "staged": staged,
+                        "aliases": aliases, "completed": False}
+            j.append(run_id, "apply", "OK", "config/resources staged")
             # service install happens through the documented owner only
             svc = service_owner
             if svc:
                 j.append(run_id, "service", "OK",
                          f"service owner {svc} (unit not enabled by install)")
             j.append(run_id, "install", "OK",
-                     "config/resources staged; dashboard pairing at first run")
+                     "install complete; dashboard pairing at first run")
     except ProductError as exc:
         j.append(run_id, "install", exc.state, str(exc))
         return {"run_id": run_id, "state": exc.state,
@@ -435,7 +648,8 @@ def install(paths: Optional[ProductPaths] = None, *,
     return {"run_id": run_id, "state": "READY",
             "detail": "install complete (dry_run=False); dashboard pairing "
                       "happens at first run",
-            "steps": steps, "completed": True}
+            "steps": steps, "staged": staged, "aliases": aliases,
+            "completed": True}
 
 
 # ---------------------------------------------------------------------------
@@ -488,11 +702,66 @@ def _preflight(model_dir: Path) -> Dict[str, Any]:
         return {"state": DEGRADED, "detail": f"preflight unavailable: {exc}"}
 
 
+class _DownloadError(Exception):
+    """A download that cannot be safely resumed or verified."""
+
+
+def _resume_download(url: str, dest: Path, expected_size: int,
+                     timeout: float) -> int:
+    """Download ``url`` into ``dest`` with HTTP Range resume. ``dest`` is a
+    ``.part`` file that survives failures so a later retry resumes, not
+    restarts. Validates size as it goes and on completion. Returns the final
+    byte count."""
+    import urllib.request
+    headers = {}
+    offset = dest.stat().st_size if dest.exists() else 0
+    if offset:
+        headers["Range"] = f"bytes={offset}-"
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        if resp.status == 200:
+            offset = 0  # server ignored Range; restart cleanly
+        total = int(resp.headers.get("Content-Length") or 0)
+        if expected_size and total and (offset + total) > expected_size:
+            raise _DownloadError(
+                f"size overflow: offset {offset} + content {total} > "
+                f"expected {expected_size}")
+        mode = "ab" if offset else "wb"
+        with open(dest, mode) as fh:
+            while True:
+                chunk = resp.read(1 << 16)
+                if not chunk:
+                    break
+                fh.write(chunk)
+    size = dest.stat().st_size
+    if expected_size and size != expected_size:
+        raise _DownloadError(
+            f"size mismatch: expected {expected_size} got {size}")
+    return size
+
+
+def _download_with_retry(url: str, dest: Path, expected_size: int,
+                         timeout: float, attempts: int = 3) -> int:
+    """Bounded safe retry with resume. Each failed attempt keeps the ``.part``
+    so the next attempt resumes; a corrupt final size is still an error."""
+    last: Optional[Exception] = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return _resume_download(url, dest, expected_size, timeout)
+        except Exception as exc:  # noqa: BLE001 — typed below
+            last = exc
+            if attempt < attempts:
+                time.sleep(min(attempt, 3) * 0.5)
+    raise _DownloadError(f"download failed after {attempts} attempts: {last}")
+
+
 def model_bootstrap(spec: ModelSpec, paths: Optional[ProductPaths] = None, *,
                     dry_run: bool = True, offline: bool = False,
-                    timeout_s: float = 120.0) -> Dict[str, Any]:
-    """Safe model acquisition: temp download, size validation, sha256 verify,
-    atomic promotion. Never trusts a downloaded file merely because it exists.
+                    timeout_s: float = 120.0,
+                    attempts: int = 3) -> Dict[str, Any]:
+    """Safe model acquisition: resumable temp download, size validation, sha256
+    verify, atomic promotion. Never trusts a downloaded file merely because it
+    exists.
 
     ``offline=True`` checks the pinned local artifact only (no network).
     Never trains or self-modifies a model, never switches the active provider,
@@ -520,12 +789,9 @@ def model_bootstrap(spec: ModelSpec, paths: Optional[ProductPaths] = None, *,
         return {"state": "READY", "detail": f"would download {spec.id} from "
                 f"{spec.source} (revision {spec.revision})",
                 "preflight": pf, "promoted": False}
-    # download to a temp file, verify, then promote atomically
+    # download to a resumable .part file, verify, then promote atomically
     model_dir.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=str(model_dir), prefix=".dl.",
-                               suffix=".part")
-    os.close(fd)
-    tmp_path = Path(tmp)
+    tmp_path = model_dir / f".dl.{spec.id}.part"
     try:
         if spec.kind == "ollama":
             # Ollama pull is handled by the provider contract; we only verify.
@@ -537,19 +803,8 @@ def model_bootstrap(spec: ModelSpec, paths: Optional[ProductPaths] = None, *,
                         "target": str(target)}
             return {"state": "OK", "detail": "ollama model verified via "
                     "provider digest (no file promotion)", "promoted": False}
-        import urllib.request
-        with urllib.request.urlopen(spec.source, timeout=timeout_s) as resp:
-            got = int(resp.headers.get("Content-Length") or 0)
-            if spec.size_bytes and got and got != spec.size_bytes:
-                return {"state": "FAILED",
-                        "detail": f"size mismatch: expected {spec.size_bytes} "
-                                  f"got {got}"}
-            with open(tmp_path, "wb") as fh:
-                while True:
-                    chunk = resp.read(1 << 16)
-                    if not chunk:
-                        break
-                    fh.write(chunk)
+        _download_with_retry(spec.source, tmp_path, spec.size_bytes,
+                             timeout_s, attempts=attempts)
         actual = _sha256(tmp_path)
         if spec.sha256 and actual.lower() != spec.sha256.lower():
             return {"state": "FAILED",
@@ -561,14 +816,12 @@ def model_bootstrap(spec: ModelSpec, paths: Optional[ProductPaths] = None, *,
                 "promoted atomically", "target": str(target), "promoted": True}
     except ProductError:
         raise
+    except _DownloadError as exc:
+        return {"state": "FAILED", "detail": str(exc), "target": str(target),
+                "resume_part": str(tmp_path)}
     except Exception as exc:
-        return {"state": "FAILED", "detail": f"download failed: {exc}"}
-    finally:
-        try:
-            if tmp_path.exists():
-                tmp_path.unlink()
-        except OSError:
-            pass
+        return {"state": "FAILED", "detail": f"download failed: {exc}",
+                "target": str(target), "resume_part": str(tmp_path)}
 
 
 # ---------------------------------------------------------------------------
@@ -646,7 +899,13 @@ def first_run(paths: Optional[ProductPaths] = None, *,
     """Beginner-friendly first-run flow. Transactional and resumable via the
     journal; explains runtime, provider/model, mic/output, display/session,
     storage/paths, pairing, service owner, permissions, migration, and optional
-    capabilities in plain language. Never prints a secret."""
+    capabilities in plain language. Never prints a secret.
+
+    With ``dry_run=False`` it performs the staged configuration write (merge
+    only — existing tuned settings are preserved, new defaults are added
+    explicitly), creates the legacy compat aliases, and records every step in
+    the journal. It never enables a live service, browser, timer, or account.
+    """
     paths = paths or default_paths()
     j = InstallJournal(paths.journal_dir)
     run_id = uuid.uuid4().hex[:12]
@@ -655,13 +914,60 @@ def first_run(paths: Optional[ProductPaths] = None, *,
     pairs = {c["capability"]: c["state"] for c in caps["capabilities"].values()}
     j.append(run_id, "first_run", "OK", "capabilities probed")
     missing = [s for s in steps if s["state"] != "OK"]
+    staged: List[Dict[str, Any]] = []
+    aliases: List[Dict[str, Any]] = []
+    if not missing and not dry_run:
+        j.append(run_id, "first_run", "OK", "staging configured defaults")
+        staged = _stage_packaged_defaults(paths, dry_run=False, journal=j,
+                                          run_id=run_id)
+        aliases = _create_legacy_aliases(paths, dry_run=False, journal=j,
+                                         run_id=run_id)
+        if any(a["state"] in ("FAILED", "REAL_DIR", "ALIAS_MISMATCH")
+               for a in aliases) or any(r["state"] == "FAILED" for r in staged):
+            state = "BLOCKED" if any(a["state"] in ("REAL_DIR", "ALIAS_MISMATCH")
+                                     for a in aliases) else "FAILED"
+            return {
+                "run_id": run_id,
+                "product": PRODUCT_NAME,
+                "version": PRODUCT_VERSION,
+                "state": state,
+                "detail": "first-run apply could not complete (see staged/"
+                          "aliases); nothing was promoted",
+                "runtime": {s["step"]: s for s in steps},
+                "provider_model": {
+                    "provider": caps["capabilities"]["provider"]["state"],
+                    "model": "qubit-brain4 (default; verified at runtime)",
+                },
+                "audio": {"mic": "configured name pin (never auto-selected)",
+                          "output": "configured name pin (never auto-selected)",
+                          "state": caps["capabilities"]["voice"]["state"]},
+                "display": caps["capabilities"]["display"],
+                "storage": paths.map,
+                "pairing": {"state": "PENDING",
+                            "detail": "dashboard pairing token generated at "
+                                      "first run; never placed in a URL"},
+                "service_owner": {"state": "PENDING",
+                                  "detail": "systemctl --user (documented "
+                                            "owner)"},
+                "permissions": {"state": "OK",
+                                "detail": "owned dirs created with documented "
+                                          "modes"},
+                "migration": branding_status(paths),
+                "capabilities": pairs,
+                "staged": staged,
+                "aliases": aliases,
+                "dry_run": dry_run,
+                "next": "run `voicebridge product repair` for the exact next "
+                        "action",
+            }
+    state = "READY" if not missing else \
+        ("DEGRADED" if all(s["state"] in ("DEGRADED", "MISSING")
+                          for s in missing) else "BLOCKED")
     return {
         "run_id": run_id,
         "product": PRODUCT_NAME,
         "version": PRODUCT_VERSION,
-        "state": "READY" if not missing else
-        ("DEGRADED" if all(s["state"] in ("DEGRADED", "MISSING")
-                          for s in missing) else "BLOCKED"),
+        "state": state,
         "runtime": {s["step"]: s for s in steps},
         "provider_model": {
             "provider": caps["capabilities"]["provider"]["state"],
@@ -681,6 +987,8 @@ def first_run(paths: Optional[ProductPaths] = None, *,
                         "detail": "owned dirs created with documented modes"},
         "migration": branding_status(paths),
         "capabilities": pairs,
+        "staged": staged,
+        "aliases": aliases,
         "dry_run": dry_run,
         "next": "run `voicebridge product repair` for the exact next action",
     }
@@ -749,20 +1057,209 @@ def branding_status(paths: Optional[ProductPaths] = None) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# 5b. Reversible branding migration (backed up, resume-able, rollback-able)
+# ---------------------------------------------------------------------------
+# Files whose content is a credential/secret shape and is NEVER copied into a
+# migration backup (the live migration preserves the bytes; only the safety
+# copy excludes them).
+_CREDENTIAL_GLOBS = ("*.env", "*.key", "*.pem", "*.crt", "*.p12",
+                     "*credentials*", "*secret*", "*token*", "*.asc")
+
+
+def _is_credential_path(p: Path) -> bool:
+    import fnmatch
+    n = p.name.lower()
+    return any(fnmatch.fnmatch(n, g) for g in _CREDENTIAL_GLOBS)
+
+
+def _backup_tree(src: Path, bdir: Path) -> List[str]:
+    """Copy a legacy tree into the backup dir, excluding credential files.
+    Returns the relative paths that were excluded."""
+    excluded = []
+
+    def _ignore(directory: str, names: list) -> list:
+        drop = []
+        for n in names:
+            p = Path(directory) / n
+            if _is_credential_path(p):
+                drop.append(n)
+                excluded.append(str(p.relative_to(src)))
+        return drop
+
+    dst = bdir / src.name
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if src.is_dir():
+        shutil.copytree(src, dst, dirs_exist_ok=True, ignore=_ignore)
+    else:
+        shutil.copy2(src, dst)
+    return excluded
+
+
+def _resume_missing_aliases(paths: ProductPaths, journal: InstallJournal,
+                            run_id: str) -> List[str]:
+    """Idempotent resume: an interruption between the move and the alias step
+    leaves a canonical tree without the compat alias. Complete those aliases.
+    Never duplicates a directory or a listener."""
+    moved = []
+    for legacy, canonical in _legacy_pairs(paths):
+        if not legacy.exists() and canonical.exists():
+            try:
+                legacy.symlink_to(canonical, target_is_directory=True)
+                moved.append(str(legacy))
+                journal.append(run_id, f"alias.{legacy.name}", "OK",
+                               "resumed compat alias")
+            except OSError as exc:
+                journal.append(run_id, f"alias.{legacy.name}", "FAILED",
+                               str(exc))
+    return moved
+
+
+def migrate(paths: Optional[ProductPaths] = None, *,
+            dry_run: bool = True, backup_dir: Optional[Path] = None,
+            journal: Optional[InstallJournal] = None) -> Dict[str, Any]:
+    """Reversible, backed-up legacy -> canonical migration (branding).
+
+    - Backs up every legacy config/state/data tree first (credential files are
+      NEVER copied into the backup; the live move preserves all bytes).
+    - Moves legacy state to the canonical paths and leaves a compat alias so
+      the old name keeps resolving to the same physical tree.
+    - Is journaled and idempotent: an interrupted migration resumes on re-run
+      (a canonical tree without an alias is completed, never duplicated).
+    - Never creates duplicate services, state directories, hotkey listeners,
+      or dashboard instances, and never touches live systemd units.
+    """
+    paths = paths or default_paths()
+    j = journal or InstallJournal(paths.journal_dir)
+    run_id = uuid.uuid4().hex[:12]
+    alias = legacy_alias_status(paths)
+    real = [p for p in alias["pairs"] if p["state"] == "REAL_DIR"]
+    if not real:
+        # resume safety: complete aliases interrupted between move and alias
+        resumed = _resume_missing_aliases(paths, j, run_id)
+        if resumed:
+            return {"state": "OK", "run_id": run_id, "moved": [],
+                    "resumed": resumed, "backup_dir": None,
+                    "detail": "migration resumed; compat aliases completed"}
+        return {"state": "FRESH", "run_id": run_id,
+                "detail": "no legacy openclaw-voice-bridge directories to "
+                          "migrate (all pairs are absent or already aliased)",
+                "pairs": alias["pairs"], "moved": [], "backup_dir": None}
+    bdir = Path(backup_dir) if backup_dir else \
+        (paths.backup_dir / f"migration-{run_id}")
+    if dry_run:
+        return {"state": "READY", "run_id": run_id,
+                "detail": f"would back up {len(real)} legacy directory(s) to "
+                          f"{bdir} (credentials excluded), move them to the "
+                          f"canonical paths, and create compat aliases",
+                "legacy": real, "backup_dir": str(bdir), "pairs": alias["pairs"]}
+    j.append(run_id, "migrate", "OK", "start")
+    moved = []
+    excluded = []
+    for pair in real:
+        legacy = Path(pair["legacy"])
+        canonical = Path(pair["canonical"])
+        name = legacy.name
+        try:
+            excluded += _backup_tree(legacy, bdir)
+            j.append(run_id, f"backup.{name}", "OK",
+                     f"backed up to {bdir / legacy.name}")
+            canonical.parent.mkdir(parents=True, exist_ok=True)
+            if canonical.exists():
+                # canonical already has content: copy legacy in, then drop the
+                # legacy real dir before aliasing (never two live trees)
+                shutil.copytree(legacy, canonical, dirs_exist_ok=True)
+                shutil.rmtree(legacy)
+            else:
+                legacy.rename(canonical)
+            legacy.symlink_to(canonical, target_is_directory=True)
+            moved.append(str(legacy))
+            j.append(run_id, f"migrate.{name}", "OK",
+                     "moved to canonical + compat alias created")
+        except OSError as exc:
+            j.append(run_id, f"migrate.{name}", "FAILED", str(exc))
+            return {"state": "FAILED", "run_id": run_id,
+                    "detail": f"migration interrupted at {legacy}: {exc}",
+                    "moved": moved, "backup_dir": str(bdir),
+                    "excluded": excluded,
+                    "next": f"re-run `voicebridge product migrate` to resume; "
+                            f"backup kept at {bdir}",
+                    "blocks_resume": True}
+    # resume safety: complete any alias left behind by an interruption between
+    # the move and the alias step (idempotent, never duplicates)
+    resumed = _resume_missing_aliases(paths, j, run_id)
+    j.append(run_id, "migrate", "OK", "complete")
+    return {"state": "OK", "run_id": run_id, "moved": moved,
+            "resumed": resumed, "backup_dir": str(bdir), "excluded": excluded,
+            "detail": "legacy state migrated to canonical paths; compat "
+                      "aliases created; backup kept for rollback"}
+
+
+def migrate_rollback(paths: Optional[ProductPaths] = None, *,
+                     backup_dir: Optional[Path] = None,
+                     dry_run: bool = True) -> Dict[str, Any]:
+    """Reverse a branding migration: remove the compat aliases, move the
+    canonical trees back to the legacy paths, and restore anything missing
+    from the backup. Bounded and auditable."""
+    paths = paths or default_paths()
+    bdir = Path(backup_dir) if backup_dir else None
+    if dry_run:
+        return {"state": "READY",
+                "detail": "would remove compat aliases and restore the legacy "
+                          f"paths (backup: {bdir or 'none supplied'})",
+                "aliases": [str(legacy) for legacy, _ in _legacy_pairs(paths)
+                            if legacy.is_symlink()]}
+    restored = []
+    for legacy, canonical in _legacy_pairs(paths):
+        name = legacy.name
+        if legacy.is_symlink():
+            legacy.unlink()
+            restored.append(f"alias-removed:{legacy}")
+        if canonical.exists() and not legacy.exists():
+            canonical.rename(legacy)
+            restored.append(f"moved-back:{legacy}")
+        if bdir is not None and bdir.exists():
+            bak = bdir / name
+            if bak.exists():
+                dst = legacy
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                if bak.is_dir():
+                    shutil.copytree(bak, dst, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(bak, dst)
+                restored.append(f"restored:{legacy}")
+    return {"state": "OK", "restored": restored,
+            "detail": "migration reversed; legacy paths restored"}
+
+
+# ---------------------------------------------------------------------------
 # 6. Service ownership
 # ---------------------------------------------------------------------------
 def service_owner(paths: Optional[ProductPaths] = None, *,
-                  dry_run: bool = True) -> Dict[str, Any]:
+                  dry_run: bool = True, unit_dir: Optional[Path] = None
+                  ) -> Dict[str, Any]:
     """One authoritative service owner. One service creates one listener; the
     tray and desktop shortcut never start a second bridge. Stale-service
-    detection is typed. Never enables or restarts a service."""
+    detection is typed. Never enables or restarts a service.
+
+    ``unit_dir`` is only used in hermetic tests to point at an isolated
+    systemd user-unit directory; production resolves the real user unit."""
     paths = paths or default_paths()
     if platform.system() != "Linux":
         return {"state": "UNAVAILABLE",
                 "detail": "systemd user units are Linux-only"}
+    udir = Path(unit_dir) if unit_dir else \
+        (Path("~").expanduser() / ".config/systemd/user")
     # authoritative owner: the single canonical user unit
-    unit = Path("~").expanduser() / ".config/systemd/user" / \
-        f"{PRODUCT_NAME}.service"
+    unit = udir / f"{PRODUCT_NAME}.service"
+    legacy_unit = udir / f"{LEGACY_NAME}.service"
+    stale = legacy_unit.exists()
+    stale_state = "STALE" if stale else "NONE"
+    if stale:
+        stale_detail = (f"legacy unit {legacy_unit.name} present; disable it "
+                        "explicitly before/after migration so exactly one "
+                        "service owns one listener")
+    else:
+        stale_detail = "no legacy unit; single canonical unit only"
     return {
         "state": "READY" if not dry_run else "PENDING",
         "owner": "systemctl --user",
@@ -771,10 +1268,15 @@ def service_owner(paths: Optional[ProductPaths] = None, *,
         "one_service_one_listener": True,
         "tray_starts_second_bridge": False,
         "shortcut_starts_second_bridge": False,
-        "stale_detection": "typed: `systemctl --user is-active "
+        "stale_detection": f"typed: `systemctl --user is-active "
                            f"{PRODUCT_NAME}.service` + pid check",
+        "stale_legacy_unit": stale_state,
+        "stale_legacy_unit_detail": stale_detail,
         "start_stop_restart": "authenticated via systemctl --user; bounded; "
                               "never automatic on upgrade",
+        "systemd_unit_has_hardcoded_home_or_display": False,
+        "x11_wayland": "resolved at runtime from the user session env; never "
+                       "a hardcoded DISPLAY",
         "headless": "possible via --no-hotkey (no DISPLAY required)",
     }
 
@@ -787,7 +1289,8 @@ def desktop_shortcut(paths: Optional[ProductPaths] = None, *,
                      ) -> Dict[str, Any]:
     """Create a .desktop shortcut that opens the local dashboard/pairing page.
     NEVER puts the token in the URL or secrets in the Exec arguments. Resolves
-    the installed executable. Reports unsupported desktop environments."""
+    the installed executable. Reports unsupported desktop environments
+    clearly; the shortcut is never required for CLI/headless use."""
     paths = paths or default_paths()
     if platform.system() != "Linux":
         return {"state": "UNAVAILABLE",
@@ -795,6 +1298,15 @@ def desktop_shortcut(paths: Optional[ProductPaths] = None, *,
     if webui_url and "token=" in webui_url:
         return {"state": "FAILED",
                 "detail": "refusing: token must never appear in the URL"}
+    session = _require_session()
+    desktop_env = "supported" if session["state"] == "OK" else \
+        ("degraded" if session["state"] == DEGRADED else "unsupported")
+    if session["state"] != "OK":
+        return {"state": "DEGRADED" if session["state"] == DEGRADED
+                else "UNAVAILABLE",
+                "detail": f"no graphical session ({session['detail']}); the "
+                          f"desktop shortcut is skipped — CLI/headless use "
+                          f"needs no shortcut"}
     python = sys.executable
     apps = _xdg("XDG_DATA_HOME", ".local/share") / "applications"
     dest = apps / f"{PRODUCT_NAME}.desktop"
@@ -802,10 +1314,10 @@ def desktop_shortcut(paths: Optional[ProductPaths] = None, *,
         return {"state": "READY", "detail": f"would write {dest}",
                 "exec": f"{python} -m voicebridge webui --open "
                         "(token via config, never URL)",
-                "token_in_url": False, "secrets_in_args": False}
+                "token_in_url": False, "secrets_in_args": False,
+                "desktop_env": desktop_env}
     try:
         apps.mkdir(parents=True, exist_ok=True)
-        url = webui_url or "http://127.0.0.1:0"  # real port resolved at runtime
         content = (
             "[Desktop Entry]\n"
             "Type=Application\n"
@@ -818,7 +1330,8 @@ def desktop_shortcut(paths: Optional[ProductPaths] = None, *,
         dest.write_text(content)
         os.chmod(dest, 0o755)
         return {"state": "OK", "detail": f"shortcut written to {dest}",
-                "token_in_url": False, "secrets_in_args": False}
+                "token_in_url": False, "secrets_in_args": False,
+                "desktop_env": desktop_env}
     except OSError as exc:
         return {"state": "FAILED", "detail": f"shortcut write failed: {exc}"}
 

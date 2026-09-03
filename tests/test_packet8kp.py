@@ -14,6 +14,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Dict
 
 import pytest
 
@@ -408,37 +409,560 @@ def test_rollback_applies_atomically(tmp_path):
 # ========================================================================
 # CLI surface
 # ========================================================================
-def test_cli_product_paths_json():
+def _cli_env(tmp_path: Path) -> Dict[str, str]:
+    """Isolated XDG environment for CLI subprocess tests so they never create
+    directories or read config/state in the operator's real HOME."""
+    env = dict(os.environ)
+    env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg-config")
+    env["XDG_STATE_HOME"] = str(tmp_path / "xdg-state")
+    env["XDG_DATA_HOME"] = str(tmp_path / "xdg-data")
+    env["XDG_CACHE_HOME"] = str(tmp_path / "xdg-cache")
+    return env
+
+
+def test_cli_product_paths_json(tmp_path):
     r = subprocess.run(
         [sys.executable, "-m", "voicebridge", "product", "paths", "--json"],
-        capture_output=True, text=True, timeout=60)
+        capture_output=True, text=True, timeout=60, env=_cli_env(tmp_path))
     assert r.returncode == 0, r.stderr
     diag = json.loads(r.stdout)
     assert diag["product"] == P.PRODUCT_NAME
 
 
-def test_cli_product_boundary():
+def test_cli_product_boundary(tmp_path):
     r = subprocess.run(
         [sys.executable, "-m", "voicebridge", "product", "boundary", "--json"],
-        capture_output=True, text=True, timeout=60)
+        capture_output=True, text=True, timeout=60, env=_cli_env(tmp_path))
     assert r.returncode == 0  # informational; private-source is NOT solved
     out = json.loads(r.stdout)
     assert out["private_source_solved"] is False
 
 
-def test_cli_product_shortcut_refuses_token_url():
+def test_cli_product_shortcut_refuses_token_url(tmp_path):
     r = subprocess.run(
         [sys.executable, "-m", "voicebridge", "product", "shortcut",
          "--json"],
-        capture_output=True, text=True, timeout=60)
+        capture_output=True, text=True, timeout=60, env=_cli_env(tmp_path))
     assert r.returncode == 0
     assert json.loads(r.stdout)["state"] in ("READY", "UNAVAILABLE")
 
 
-def test_cli_product_repair_no_secrets():
+def test_cli_product_repair_no_secrets(tmp_path):
     r = subprocess.run(
         [sys.executable, "-m", "voicebridge", "product", "repair"],
-        capture_output=True, text=True, timeout=60)
+        capture_output=True, text=True, timeout=60, env=_cli_env(tmp_path))
     out = r.stdout + r.stderr
     for secret in ("sk-", "ghp_", "password="):
         assert secret not in out
+
+
+# ========================================================================
+# 12. Installer apply: staging + compat aliases + idempotency
+# ========================================================================
+def _ready_prereqs(monkeypatch):
+    """Force every install prerequisite to OK so the apply path runs."""
+    monkeypatch.setattr(P, "_require_python",
+                        lambda: {"state": "OK", "detail": "ok"})
+    monkeypatch.setattr(P, "_require_audio",
+                        lambda: {"state": "OK", "detail": "ok"})
+    monkeypatch.setattr(P, "_require_ollama",
+                        lambda: {"state": "OK", "detail": "ok"})
+    monkeypatch.setattr(P, "_require_session",
+                        lambda: {"state": "OK", "detail": "ok"})
+
+
+def test_install_apply_stages_defaults_and_aliases(tmp_path, monkeypatch):
+    _ready_prereqs(monkeypatch)
+    paths = _paths(tmp_path)
+    out = P.install(paths, dry_run=False, service_owner="systemctl --user")
+    assert out["state"] == "READY"
+    assert out["completed"] is True
+    # packaged default staged
+    assert (paths.config_dir / "voice.yaml").exists()
+    # legacy compat aliases created for config/state/data
+    for legacy, canonical in P._legacy_pairs(paths):
+        assert legacy.is_symlink(), legacy
+        assert os.path.realpath(legacy) == str(canonical)
+    assert P.legacy_alias_status(paths)["state"] == "OK"
+
+
+def test_install_apply_idempotent(tmp_path, monkeypatch):
+    _ready_prereqs(monkeypatch)
+    paths = _paths(tmp_path)
+    first = P.install(paths, dry_run=False)
+    second = P.install(paths, dry_run=False)
+    assert first["state"] == "READY"
+    assert second["state"] == "READY"
+    # no duplicate staged files, no duplicate aliases
+    assert (paths.config_dir / "voice.yaml").exists()
+    for legacy, canonical in P._legacy_pairs(paths):
+        assert legacy.is_symlink()
+    files = sorted(p.name for p in (paths.config_dir).iterdir())
+    assert files.count("voice.yaml") == 1
+
+
+def test_install_apply_never_overwrites_tuned_config(tmp_path, monkeypatch):
+    _ready_prereqs(monkeypatch)
+    paths = _paths(tmp_path)
+    P.install(paths, dry_run=False)
+    tuned = "tuned-setting: keep-me\n"
+    (paths.config_dir / "voice.yaml").write_text(tuned)
+    out = P.install(paths, dry_run=False)
+    assert out["state"] == "READY"
+    staged = [s for s in out["staged"] if s["resource"] == "voice.yaml"]
+    assert staged and staged[0]["state"] == "KEPT"
+    assert (paths.config_dir / "voice.yaml").read_text() == tuned
+
+
+def test_install_blocked_on_legacy_real_dir(tmp_path, monkeypatch):
+    _ready_prereqs(monkeypatch)
+    paths = _paths(tmp_path)
+    paths.legacy_base.mkdir(parents=True)
+    (paths.legacy_base / "voice.yaml").write_text("audio: {}\n")
+    out = P.install(paths, dry_run=False)
+    assert out["state"] == "BLOCKED"
+    assert out["completed"] is False
+    assert any(s["step"] == "migration" and s["state"] == "BLOCKED"
+               for s in out["steps"])
+
+
+def test_install_apply_blocks_when_lock_held(tmp_path, monkeypatch):
+    _ready_prereqs(monkeypatch)
+    paths = _paths(tmp_path)
+    lock = paths.state_dir / "install.lock"
+    held = P.InstallLock(lock)
+    assert held.acquire() is True
+    out = P.install(paths, dry_run=False, lock_path=lock)
+    assert out["state"] == "BLOCKED"
+    assert out["completed"] is False
+    held.release()
+
+
+def test_install_never_reports_complete_when_migration_blocks(tmp_path,
+                                                              monkeypatch):
+    _ready_prereqs(monkeypatch)
+    paths = _paths(tmp_path)
+    paths.legacy_base.mkdir(parents=True)
+    out = P.install(paths, dry_run=False)
+    assert out["state"] == "BLOCKED"
+    assert out["completed"] is False
+
+
+def test_path_map_stable_across_restarts(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "stt"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "dat"))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cch"))
+    p1 = P.default_paths()
+    p2 = P.default_paths()
+    assert p1.map == p2.map
+    assert p1.config_dir == p2.config_dir
+    assert p1.state_dir == p2.state_dir
+
+
+# ========================================================================
+# 13. Reversible branding migration
+# ========================================================================
+def _legacy_install(paths: P.ProductPaths) -> None:
+    paths.legacy_base.mkdir(parents=True)
+    (paths.legacy_base / "voice.yaml").write_text("audio: {}\n")
+    (paths.legacy_base / ".env").write_text("KEY=sekrit\n")
+    paths.legacy_state.mkdir(parents=True)
+    (paths.legacy_state / "events.jsonl").write_text('{"a":1}\n')
+    paths.legacy_data.mkdir(parents=True)
+    (paths.legacy_data / "models").mkdir(parents=True)
+
+
+def test_migrate_dry_run_is_read_only(tmp_path):
+    paths = _paths(tmp_path)
+    _legacy_install(paths)
+    out = P.migrate(paths, dry_run=True)
+    assert out["state"] == "READY"
+    assert out["backup_dir"] is not None
+    # nothing moved or aliased in dry-run
+    assert paths.legacy_base.is_dir()
+    assert not paths.legacy_base.is_symlink()
+    assert not (paths.config_dir / "voice.yaml").exists()
+
+
+def test_migrate_apply_moves_and_aliases(tmp_path):
+    paths = _paths(tmp_path)
+    _legacy_install(paths)
+    out = P.migrate(paths, dry_run=False)
+    assert out["state"] == "OK"
+    assert len(out["moved"]) == 3
+    # legacy paths now resolve to canonical (no split trees)
+    assert paths.legacy_base.is_symlink()
+    assert os.path.realpath(paths.legacy_base) == str(paths.config_dir)
+    assert os.path.realpath(paths.legacy_state) == str(paths.state_dir)
+    assert (paths.config_dir / "voice.yaml").exists()
+    assert (paths.state_dir / "events.jsonl").exists()
+    # backup kept
+    bak = Path(out["backup_dir"])
+    assert (bak / "legacy" / "voice.yaml").exists()
+
+
+def test_migrate_rerun_is_fresh_no_duplicates(tmp_path):
+    paths = _paths(tmp_path)
+    _legacy_install(paths)
+    P.migrate(paths, dry_run=False)
+    second = P.migrate(paths, dry_run=False)
+    assert second["state"] == "FRESH"
+    # exactly one physical tree (no duplicate state dirs)
+    assert paths.legacy_base.is_symlink()
+    assert (paths.config_dir / "voice.yaml").exists()
+
+
+def test_migrate_credentials_not_copied_to_backup(tmp_path):
+    paths = _paths(tmp_path)
+    _legacy_install(paths)
+    out = P.migrate(paths, dry_run=False)
+    assert ".env" in out["excluded"]
+    bak = Path(out["backup_dir"])
+    assert not (bak / "legacy" / ".env").exists()
+    # the LIVE migrated tree keeps the credential bytes (no loss)
+    assert (paths.config_dir / ".env").read_text() == "KEY=sekrit\n"
+
+
+def test_migrate_rollback_restores(tmp_path):
+    paths = _paths(tmp_path)
+    _legacy_install(paths)
+    out = P.migrate(paths, dry_run=False)
+    rb = P.migrate_rollback(paths, backup_dir=out["backup_dir"], dry_run=False)
+    assert rb["state"] == "OK"
+    assert paths.legacy_base.is_dir()
+    assert not paths.legacy_base.is_symlink()
+    assert (paths.legacy_base / "voice.yaml").exists()
+    assert (paths.legacy_state / "events.jsonl").exists()
+    assert not paths.config_dir.exists()
+
+
+def test_migrate_interrupted_before_alias_resumes(tmp_path):
+    # simulate a crash after the move but before the alias step
+    paths = _paths(tmp_path)
+    _legacy_install(paths)
+    for legacy, canonical in P._legacy_pairs(paths):
+        canonical.parent.mkdir(parents=True, exist_ok=True)
+        legacy.rename(canonical)
+    out = P.migrate(paths, dry_run=False)
+    assert out["state"] == "OK"
+    # resume safety created the missing aliases (idempotent, no duplicates)
+    assert paths.legacy_base.is_symlink()
+    assert os.path.realpath(paths.legacy_base) == str(paths.config_dir)
+    assert (paths.config_dir / "voice.yaml").exists()
+
+
+def test_migrate_never_creates_services(tmp_path):
+    paths = _paths(tmp_path)
+    _legacy_install(paths)
+    out = P.migrate(paths, dry_run=False)
+    assert out["state"] == "OK"
+    # no unit files or service dirs were created anywhere under the root
+    for p in paths.base.rglob("*.service"):
+        raise AssertionError(f"migration created a service unit: {p}")
+    assert not (paths.base / "systemd").exists()
+
+
+def test_migrate_preserves_existing_state_bytes(tmp_path):
+    paths = _paths(tmp_path)
+    _legacy_install(paths)
+    before = (paths.legacy_state / "events.jsonl").read_bytes()
+    P.migrate(paths, dry_run=False)
+    assert (paths.state_dir / "events.jsonl").read_bytes() == before
+
+
+def test_branding_status_after_migration(tmp_path):
+    paths = _paths(tmp_path)
+    _legacy_install(paths)
+    assert P.branding_status(paths)["state"] == "LEGACY_ONLY"
+    P.migrate(paths, dry_run=False)
+    st = P.branding_status(paths)
+    assert st["state"] == "MIGRATED"
+    assert st["alias"] is True
+
+
+# ========================================================================
+# 14. First-run apply (explicit merge, never overwrite tuned settings)
+# ========================================================================
+def test_first_run_apply_stages_and_preserves_tuned(tmp_path, monkeypatch):
+    _ready_prereqs(monkeypatch)
+    paths = _paths(tmp_path)
+    first = P.first_run(paths, dry_run=False)
+    assert first["state"] == "READY"
+    assert (paths.config_dir / "voice.yaml").exists()
+    tuned = "webui:\n  token: local-tuned\n"
+    (paths.config_dir / "voice.yaml").write_text(tuned)
+    second = P.first_run(paths, dry_run=False)
+    assert second["state"] == "READY"
+    kept = [s for s in second["staged"] if s["resource"] == "voice.yaml"]
+    assert kept and kept[0]["state"] == "KEPT"
+    assert (paths.config_dir / "voice.yaml").read_text() == tuned
+
+
+def test_first_run_dry_run_does_not_write(tmp_path, monkeypatch):
+    _ready_prereqs(monkeypatch)
+    paths = _paths(tmp_path)
+    out = P.first_run(paths, dry_run=True)
+    assert out["dry_run"] is True
+    assert not (paths.config_dir / "voice.yaml").exists()
+    assert not paths.legacy_base.is_symlink()
+
+
+def test_repair_includes_migration_check(tmp_path, monkeypatch):
+    _ready_prereqs(monkeypatch)
+    paths = _paths(tmp_path)
+    paths.legacy_base.mkdir(parents=True)
+    out = P.repair(paths)
+    checks = {c["check"]: c for c in out["checks"]}
+    assert checks["migration"]["state"] == "BLOCKED"
+    assert "next" in checks["migration"]
+
+
+# ========================================================================
+# 15. Service ownership (one service one listener, typed stale detection)
+# ========================================================================
+def test_service_owner_stale_legacy_unit_typed(tmp_path):
+    udir = tmp_path / "systemd/user"
+    udir.mkdir(parents=True)
+    (udir / f"{P.LEGACY_NAME}.service").write_text("[Unit]\n")
+    out = P.service_owner(unit_dir=udir)
+    assert out["stale_legacy_unit"] == "STALE"
+    assert out["one_service_one_listener"] is True
+
+
+def test_service_owner_no_stale_unit(tmp_path):
+    udir = tmp_path / "systemd/user"
+    udir.mkdir(parents=True)
+    out = P.service_owner(unit_dir=udir)
+    assert out["stale_legacy_unit"] == "NONE"
+
+
+def test_service_owner_unit_no_hardcoded_home_or_display(tmp_path):
+    out = P.service_owner(unit_dir=tmp_path / "units")
+    assert out["systemd_unit_has_hardcoded_home_or_display"] is False
+    assert "x11_wayland" in out
+    assert "headless" in out
+
+
+# ========================================================================
+# 16. Desktop shortcut in isolated XDG
+# ========================================================================
+def test_shortcut_apply_writes_no_token_exec(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg-data"))
+    monkeypatch.setenv("DISPLAY", ":0")
+    paths = _paths(tmp_path)
+    out = P.desktop_shortcut(paths, dry_run=False)
+    assert out["state"] in ("OK", "UNAVAILABLE")
+    if out["state"] == "OK":
+        dest = (tmp_path / "xdg-data" / "applications" /
+                f"{P.PRODUCT_NAME}.desktop")
+        assert dest.exists()
+        text = dest.read_text()
+        assert "token" not in text.split("Exec=")[-1]
+        assert "sk-" not in text
+
+
+def test_shortcut_reports_no_session(tmp_path, monkeypatch):
+    monkeypatch.setenv("DISPLAY", "")
+    monkeypatch.setenv("WAYLAND_DISPLAY", "")
+    monkeypatch.setenv("XDG_RUNTIME_DIR", "")
+    paths = _paths(tmp_path)
+    out = P.desktop_shortcut(paths, dry_run=False)
+    assert out["state"] in ("DEGRADED", "UNAVAILABLE")
+    assert "CLI/headless" in out["detail"]
+
+
+# ========================================================================
+# 17. Model bootstrap: resume/retry, size validation, timeout, low disk
+# ========================================================================
+def _range_server(payload: bytes):
+    """A tiny HTTP server that honours Range requests (resume)."""
+    import http.server
+    import threading
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def do_GET(self):  # noqa: N802
+            body = payload
+            start = 0
+            rng = self.headers.get("Range")
+            if rng and rng.startswith("bytes="):
+                start = int(rng.split("=")[1].split("-")[0])
+            body = body[start:]
+            self.send_response(206 if start else 200)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(body)
+            self.close_connection = True
+
+        def log_message(self, *args):  # noqa: A003
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv, f"http://127.0.0.1:{srv.server_address[1]}/m.bin"
+
+
+def _stop_server(srv) -> None:
+    srv.shutdown()
+    srv.server_close()
+
+
+def test_model_download_resumes_from_part(tmp_path):
+    payload = b"model-bytes-" * 256
+    expect_file = tmp_path / "expect.bin"
+    expect_file.write_bytes(payload)
+    srv, url = _range_server(payload)
+    try:
+        paths = _paths(tmp_path)
+        paths.model_dir.mkdir(parents=True)
+        part = paths.model_dir / ".dl.m.bin.part"
+        part.write_bytes(payload[:128])
+        spec = P.ModelSpec(id="m.bin", source=url, revision="r1",
+                           sha256=P._sha256(expect_file),
+                           size_bytes=len(payload), kind="file",
+                           local_path="m.bin")
+        out = P.model_bootstrap(spec, paths, dry_run=False, offline=False)
+        assert out["state"] == "OK", out
+        assert (paths.model_dir / "m.bin").read_bytes() == payload
+        assert not (paths.model_dir / ".dl.m.bin.part").exists()
+    finally:
+        _stop_server(srv)
+
+
+def test_model_download_size_validation(tmp_path):
+    payload = b"short"
+    srv, url = _range_server(payload)
+    try:
+        paths = _paths(tmp_path)
+        spec = P.ModelSpec(id="m.bin", source=url, revision="r1",
+                           sha256="", size_bytes=len(payload) + 100,
+                           kind="file", local_path="m.bin")
+        out = P.model_bootstrap(spec, paths, dry_run=False, offline=False)
+        assert out["state"] == "FAILED"
+        assert "size mismatch" in out["detail"]
+        assert "resume_part" in out
+    finally:
+        _stop_server(srv)
+
+
+def test_model_provider_timeout_fails_closed(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+
+    def boom(*a, **k):
+        raise P._DownloadError("provider timeout after 3 attempts")
+
+    monkeypatch.setattr(P, "_download_with_retry", boom)
+    spec = P.ModelSpec(id="m.bin", source="http://127.0.0.1:1/m",
+                       revision="r1", size_bytes=0, kind="file",
+                       local_path="m.bin")
+    out = P.model_bootstrap(spec, paths, dry_run=False, offline=False)
+    assert out["state"] == "FAILED"
+    assert "resume_part" in out
+    assert not (paths.model_dir / "m.bin").exists()
+
+
+def test_model_low_ram_blocks_preflight(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    monkeypatch.setattr(P, "_preflight",
+                        lambda d: {"state": "DEGRADED",
+                                   "detail": "low RAM: 1.0 GiB"})
+    spec = P.ModelSpec(id="m", source="http://x/m", revision="r", kind="file")
+    out = P.model_bootstrap(spec, paths, dry_run=False, offline=False)
+    assert out["state"] == "BLOCKED"
+    assert "preflight" in out
+
+
+def test_model_offline_never_network(tmp_path):
+    paths = _paths(tmp_path)
+    spec = P.ModelSpec(id="m", source="http://127.0.0.1:1/m", revision="r",
+                       kind="file")
+    out = P.model_bootstrap(spec, paths, offline=True)
+    assert out["state"] == "MISSING"
+
+
+def test_model_bad_hash_rejects_promoted_file(tmp_path):
+    paths = _paths(tmp_path)
+    paths.model_dir.mkdir(parents=True)
+    art = paths.model_dir / "m.bin"
+    art.write_bytes(b"corrupt-bytes")
+    spec = P.ModelSpec(id="m.bin", source="http://x/m.bin", revision="r1",
+                       sha256="0" * 64, size_bytes=0, kind="file",
+                       local_path="m.bin")
+    out = P.model_bootstrap(spec, paths, offline=True)
+    assert out["state"] == "FAILED"
+
+
+# ========================================================================
+# 18. Upgrade/uninstall/rollback + path stability + boundary scans
+# ========================================================================
+def test_upgrade_never_restarts_services():
+    out = P.upgrade_contract()
+    joined = " ".join(out["does_not"])
+    assert "enable/restart services silently" in joined
+    assert out["newer_schema_fails_closed"] is True
+
+
+def test_rollback_missing_backup_typed(tmp_path):
+    paths = _paths(tmp_path)
+    out = P.rollback(paths, dry_run=False)
+    assert out["state"] == "MISSING"
+
+
+def test_package_boundary_no_secrets_and_private_source_honest():
+    out = P.package_boundary()
+    assert out["private_source_solved"] is False
+    assert out["wheel_has_python_source"] is True
+    for field in ("distributed", "excluded"):
+        assert isinstance(out[field], list)
+    blob = json.dumps(out)
+    for secret in ("sk-", "ghp_", "password"):
+        assert secret not in blob
+
+
+def test_first_run_pairing_never_token_in_url(tmp_path):
+    paths = _paths(tmp_path)
+    out = P.first_run(paths)
+    assert out["pairing"]["state"] == "PENDING"
+    blob = json.dumps(out)
+    assert "token=" not in blob
+    assert "http" not in json.dumps(out["pairing"]).lower() or \
+        "127.0.0.1" in json.dumps(out["pairing"]).lower()
+    # the pairing block never carries an actual token value
+    assert "token=" not in json.dumps(out["pairing"])
+
+
+def test_capabilities_typed_and_no_reroute(tmp_path):
+    out = P.capabilities(_paths(tmp_path))
+    assert out["capabilities"]["voice"]["state"] in (
+        "ENABLED", "UNAVAILABLE")
+    assert "never auto-selected" in str(out["capabilities"]["voice"].get(
+        "next", "")) or out["capabilities"]["voice"]["state"] == "ENABLED"
+
+
+def test_cli_product_migrate_dry_run(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "stt"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "dat"))
+    r = subprocess.run(
+        [sys.executable, "-m", "voicebridge", "product", "migrate",
+         "--json"],
+        capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    assert json.loads(r.stdout)["state"] == "FRESH"
+
+
+def test_cli_product_paths_shows_legacy_aliases(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "stt"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "dat"))
+    r = subprocess.run(
+        [sys.executable, "-m", "voicebridge", "product", "paths", "--json"],
+        capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    diag = json.loads(r.stdout)
+    assert "legacy_config" in diag["paths"]
+    assert "legacy_state" in diag["paths"]
+    assert "legacy_data" in diag["paths"]

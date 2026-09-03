@@ -61,6 +61,29 @@ OpenClaw task routing; only long/web conversational answers fall back.
 
 ## Install on a fresh PC
 
+The **one supported installer** is the packaged product surface
+(`docs/OPERATIONS_8KP.md`). It works from a release artifact — no source
+checkout or repository-local virtualenv — and is lock + journal guarded,
+idempotent, and typed:
+
+```bash
+pip install qubit-voice-agent        # from the release artifact
+voicebridge product install          # typed prerequisite probe (dry-run)
+voicebridge product install --apply  # stage config/resources + compat aliases
+voicebridge product first-run        # beginner-friendly status wizard
+voicebridge product repair           # one diagnostic/repair command
+```
+
+Existing installations on the legacy OpenClaw Voice Bridge paths keep working
+and migrate with a reversible, backed-up flow:
+
+```bash
+voicebridge product migration        # status (FRESH / LEGACY_ONLY / MIGRATED)
+voicebridge product migrate --apply  # backed-up migration + compat alias
+```
+
+For a developer checkout the classic scripted installer remains available:
+
 ```bash
 git clone https://github.com/cgraph-dev/qubit-voice-agent.git
 cd qubit-voice-agent
