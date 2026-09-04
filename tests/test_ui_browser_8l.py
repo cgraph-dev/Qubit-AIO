@@ -691,3 +691,96 @@ def test_pairing_invalid_network_preserve_previous_token(browser, ui_server):
             timeout=8000)
     finally:
         page.close()
+
+def test_reports_page_open_html_authenticated(browser, ui_server):
+    """Packet 8L standalone-Reports repair: clicking "Open report" fetches the
+    HTML through the authenticated binary helper — the request must carry the
+    X-Api-Token header, return non-401, and open via a blob object URL (the
+    token is never placed in the URL)."""
+    page, errors = _page(browser, ui_server, "/reports")
+    requests = []
+    page.on("request", lambda r: requests.append(r)
+            if "/api/reports/" in r.url and "/html" in r.url else None)
+    try:
+        _wait_status(page, "live", "conn")
+        page.wait_for_function(
+            "() => { const f = document.getElementById('feed'); "
+            "return f && f.textContent.indexOf('report_8l1') !== -1; }",
+            timeout=8000)
+        with page.expect_popup() as popup_info:
+            page.locator("#feed button:has-text('Open report (new tab)')").first.click()
+        popup = popup_info.value
+        popup.wait_for_load_state("domcontentloaded")
+        assert popup.url.startswith("blob:"), \
+            f"report HTML must open as a blob URL, got {popup.url[:60]}"
+        popup.close()
+        assert requests, "no authenticated /html request was issued"
+        for req in requests:
+            assert req.headers.get("x-api-token") == "test-token", \
+                "report HTML request must carry the X-Api-Token header"
+            assert "token=" not in req.url, "token must never appear in a URL"
+        assert page.locator("#pair-hint").count() == 0
+        assert not errors, errors
+    finally:
+        page.close()
+
+
+def test_reports_page_typed_401_when_unpaired(browser, ui_server):
+    """Packet 8L: a missing/wrong token must yield a typed 401 pairing message
+    (no popup, no crash), proving the shared helper's authRequired path."""
+    page, errors = _page(browser, ui_server, "/reports", authed=False)
+    try:
+        page.wait_for_selector("#pair-hint", timeout=8000)
+        # drive the authenticated open directly with no token
+        page.evaluate("window.openReportHtml('report_8l1')")
+        page.wait_for_function(
+            "() => { const el = document.getElementById('msg'); "
+            "return el && el.textContent.indexOf('Not paired') !== -1; }",
+            timeout=8000)
+        assert page.locator("#pair-hint").count() >= 1
+        assert not errors, errors
+    finally:
+        page.close()
+
+
+def test_reports_hostile_values_safe_and_ids_encoded(browser, ui_server):
+    """Packet 8L: hostile backend-rendered report values (report_id, status,
+    summary) stay literal text and never execute; hostile report ids are
+    percent-encoded in the authenticated request URL."""
+    page, errors = _page(browser, ui_server, "/reports")
+    seen = []
+    page.on("request", lambda r: seen.append(r.url)
+            if "/api/reports/" in r.url and "/html" in r.url else None)
+    try:
+        _wait_status(page, "live", "conn")
+        hostile_id = '<img src=x onerror="window.__xss=9">\\"backslash"'
+        page.evaluate(
+            "(p) => { document.getElementById('feed')"
+            ".appendChild(window.reportCard(p)); }",
+            {"report_id": hostile_id,
+             "status": '<script>window.__xss=10</script>',
+             "summary": 'Hostile <script>alert(1)</script> "quotes" \\ backslash',
+             "created_at": 1700000000.0, "new_count": 1,
+             "platforms": ["gmail"], "assets_available": 0, "assets_total": 0})
+        text = page.evaluate("document.getElementById('feed').innerText")
+        assert "Hostile" in text and "<script>" in text and '"quotes"' in text, \
+            "hostile report values must stay literal text"
+        assert page.evaluate("window.__xss") is None, "hostile JS executed!"
+        assert page.evaluate(
+            "document.querySelectorAll('#feed img, #feed script').length") == 0
+        # hostile report id must be percent-encoded, never raw, in the URL
+        page.evaluate("(id) => window.openReportHtml(id)", hostile_id)
+        page.wait_for_function(
+            "() => { const el = document.getElementById('msg'); "
+            "return el && el.textContent.length > 0; }", timeout=8000)
+        assert seen, "no authenticated /html request issued for hostile id"
+        url = seen[-1]
+        assert "<" not in url and ">" not in url and '"' not in url, \
+            f"hostile id must be percent-encoded in the URL: {url}"
+        assert "%3C" in url and "%3E" in url, \
+            f"hostile id must be percent-encoded in the URL: {url}"
+        assert "token=" not in url, f"token must never appear in a URL: {url}"
+        assert page.evaluate("window.__xss") is None
+        assert not errors, errors
+    finally:
+        page.close()

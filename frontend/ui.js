@@ -25,13 +25,17 @@
     return el;
   }
 
-  /* Append strings (as text nodes) and nodes to el. Never interpreted as HTML. */
+  /* Append strings (as text nodes) and nodes to el. Never interpreted as HTML.
+   * Nested arrays are flattened so callers may pass several children either as
+   * separate arguments or as one array. */
   function vbAppend(el, children) {
     var arr = Array.isArray(children) ? children : [children];
     for (var i = 0; i < arr.length; i++) {
       var c = arr[i];
       if (c == null) continue;
-      if (typeof c === 'string' || typeof c === 'number') {
+      if (Array.isArray(c)) {
+        vbAppend(el, c);
+      } else if (typeof c === 'string' || typeof c === 'number') {
         el.appendChild(document.createTextNode(String(c)));
       } else if (c && c.nodeType) {
         el.appendChild(c);
@@ -42,8 +46,9 @@
 
   /* Build a DOM element safely.
    * attrs: className/class, dataset, aria-*, role, boolean attrs (true -> '' ),
-   * and event listeners as onclick/onchange/onkeydown/... values. */
-  function vbBuild(tag, attrs, children) {
+   * and event listeners as onclick/onchange/onkeydown/... values.
+   * Any argument after attrs is appended as a child (string -> text node). */
+  function vbBuild(tag, attrs) {
     var el = document.createElement(tag);
     attrs = attrs || {};
     for (var k in attrs) {
@@ -64,7 +69,7 @@
         el.setAttribute(k, String(v));
       }
     }
-    return vbAppend(el, children);
+    return vbAppend(el, Array.prototype.slice.call(arguments, 2));
   }
 
   /* Typed status text + state class. state in {live, ready, offline, degraded}. */

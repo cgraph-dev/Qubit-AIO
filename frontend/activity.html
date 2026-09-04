@@ -62,8 +62,9 @@
 <script src="/static/ui.js"></script>
 <script>
 // Token comes ONLY from localStorage via the shared helper (frontend/vb.js).
-// vbResolveBase() persists a transient ?api= override so vbApi() and vbStream()
-// agree on the base for this session.
+// API base is same-origin by default; vbResolveBase() returns the explicitly
+// saved pairing base only — an attacker-controlled ?api= query string is never
+// honored or persisted.
 vbResolveBase();
 const feed = document.getElementById('feed');
 let paused=false;

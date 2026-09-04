@@ -62,7 +62,8 @@
     return h;
   }
 
-  /* Plain-language pairing hint with a link to /token-setup. */
+  /* Plain-language pairing hint with a link to /token-setup. Built with DOM
+   * nodes and textContent (Packet 8L); no token is placed in any URL. */
   function vbPairHint(containerId) {
     var el = containerId ? document.getElementById(containerId) : null;
     if (!el) el = document.getElementById('pair-hint');
@@ -75,10 +76,17 @@
       if (body && body.firstChild) body.insertBefore(el, body.firstChild);
       else if (body) body.appendChild(el);
     }
-    el.innerHTML = 'This dashboard is not paired with the bridge. '
-      + '<a href="/token-setup" style="color:#6db3ff;display:inline-flex;'
-      + 'align-items:center;min-height:44px;padding:0 8px;">Pair this dashboard</a> '
-      + 'to store the X-Api-Token header token in this browser.';
+    while (el.firstChild) el.removeChild(el.firstChild);
+    el.appendChild(document.createTextNode(
+      'This dashboard is not paired with the bridge. '));
+    var link = document.createElement('a');
+    link.href = '/token-setup';
+    link.style.cssText = 'color:#6db3ff;display:inline-flex;'
+      + 'align-items:center;min-height:44px;padding:0 8px;';
+    link.textContent = 'Pair this dashboard';
+    el.appendChild(link);
+    el.appendChild(document.createTextNode(
+      ' to store the X-Api-Token header token in this browser.'));
     return el;
   }
 

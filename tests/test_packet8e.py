@@ -1518,7 +1518,12 @@ const fs = require('fs');
 global.window = global;
 global.document = {
   getElementById: () => null,
-  createElement: () => ({ style: {}, innerHTML: '', id: '' }),
+  createElement: () => ({
+    style: {}, id: '', className: '', textContent: '',
+    firstChild: null,
+    appendChild(){}, removeChild(){}, setAttribute(){}, addEventListener(){},
+  }),
+  createTextNode: () => ({ nodeType: 3 }),
   body: { insertBefore(){}, appendChild(){}, firstChild: null },
 };
 global.localStorage = {

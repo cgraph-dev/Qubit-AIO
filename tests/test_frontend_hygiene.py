@@ -133,7 +133,8 @@ def test_no_query_string_api_override_anywhere() -> None:
 def test_shared_authenticated_binary_helper_contract() -> None:
     """Packet 8L report-operations repair: the shared helper exposes
     authenticated binary/download/open helpers using the same header token, and
-    pages never build unauthenticated report URLs."""
+    no page creates an unauthenticated report URL (index Inbox AND the
+    standalone /reports page)."""
     vb = (FRONTEND / "vb.js").read_text(encoding="utf-8")
     for name in ["vbFetchBinary", "vbDownload", "vbOpenBinary", "vbApiTest",
                  "vbValidateApiOrigin"]:
@@ -144,6 +145,23 @@ def test_shared_authenticated_binary_helper_contract() -> None:
         "index.html must fetch report assets/export/html via vbFetchBinary"
     assert "window.open(BASE" not in index and "BASE + '/api/reports" not in index, \
         "index.html must not open unauthenticated report URLs"
+    reports = _read("reports.html")
+    assert "openReportHtml" in reports and "vbOpenBinary" in reports, \
+        "reports.html must open report HTML through the authenticated Blob flow"
+    assert "vbFetchBinary('/api/reports/'" in reports
+    assert not re.search(r"href:\s*['\"]/api/reports", reports), \
+        "reports.html must not build an unauthenticated <a href> report URL"
+    assert not re.search(r"\.html['\"]\s*,\s*target", reports), \
+        "reports.html must not open the HTML endpoint as a target link"
+
+
+def test_pair_hint_built_with_dom_nodes() -> None:
+    """Packet 8L safety: vbPairHint() must build the pairing hint with DOM
+    nodes/textContent — no innerHTML anywhere in the shared auth helper."""
+    vb = (FRONTEND / "vb.js").read_text(encoding="utf-8")
+    assert "innerHTML" not in vb, "vb.js must not use innerHTML"
+    assert "createTextNode" in vb and "textContent" in vb
+    assert "vbPairHint" in vb
 
 
 def test_pairing_token_tested_before_save() -> None:

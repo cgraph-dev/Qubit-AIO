@@ -57,6 +57,9 @@
 <script src="/static/ui.js"></script>
 <script>
 // Token comes ONLY from localStorage via the shared helper (frontend/vb.js).
+// API base is same-origin by default; vbResolveBase() returns the explicitly
+// saved pairing base only — an attacker-controlled ?api= query string is never
+// honored. Report HTML is opened through the authenticated Blob flow below.
 vbResolveBase();
 const msg = document.getElementById('msg');
 function setMsg(text){ if (msg) msg.textContent = text || ''; }
@@ -79,8 +82,8 @@ function statusBadge(status){
   return vbBuild('span', {class:'badge', style:'background:'+c+'22;color:'+c+';border:1px solid '+c+'66'}, String(status||'unknown'));
 }
 // DOM-built report cards from the canonical bundle index (Packet 8C contract):
-// every value is rendered via textContent (no innerHTML); the only links are
-// safe generated report IDs opened in a new tab.
+// every backend value is rendered via textContent (no innerHTML); "Open
+// report" is an authenticated button that opens the HTML through a Blob URL.
 function reportCard(it){
   const head = vbBuild('div', {class:'k'});
   head.appendChild(vbBuild('span', null, fmt(it.created_at)));
@@ -93,9 +96,32 @@ function reportCard(it){
   const card = vbBuild('div', {class:'card'}, head, title);
   if (it.summary) card.appendChild(vbBuild('div', {class:'summary'}, String(it.summary)));
   card.appendChild(meta);
-  const open = vbBuild('a', {class:'tap-target', href: '/api/reports/'+encodeURIComponent(it.report_id)+'/html', target:'_blank', rel:'noopener'}, 'Open report (new tab)');
+  const open = vbBuild('button', {class:'tap-target', type:'button'}, 'Open report (new tab)');
+  open.addEventListener('click', () => openReportHtml(it.report_id));
   card.appendChild(vbBuild('div', {style:'margin-top:6px'}, open));
   return card;
+}
+// Authenticated report HTML: fetch with the shared X-Api-Token binary helper,
+// open through a temporary Blob object URL (revoked after the tab loads), and
+// show a typed message for 401 / offline / non-2xx. The token is never placed
+// in a URL and the report id stays an encoded path segment.
+function openReportHtml(id){
+  const encoded = encodeURIComponent(String(id == null ? '' : id));
+  vbFetchBinary('/api/reports/' + encoded + '/html').then(bin => {
+    if (bin.ok && bin.blob) {
+      vbOpenBinary(bin.blob);
+      setMsg('');
+    } else if (bin.authRequired) {
+      setMsg('Not paired — open Pair device and save your token.');
+      vbAnnounce('Report view needs pairing.');
+    } else if (bin.error === 'network' || bin.status === 0) {
+      setMsg('Bridge unreachable — start the bridge and try again.');
+      vbAnnounce('Bridge unreachable.');
+    } else {
+      setMsg('Could not open the report (HTTP ' + (bin.status || 0) + ').');
+      vbAnnounce('Report could not be opened.');
+    }
+  });
 }
 function emptyState(text){
   const feed=document.getElementById('feed');
