@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Dashboard pairing</title>
 <style>
  body{font:15px/1.6 system-ui,sans-serif;background:#0b0e14;color:#dbe2ef;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}
@@ -8,10 +8,13 @@
  input{width:100%;padding:10px;border-radius:8px;border:1px solid #33455f;background:#0b0e14;color:#dbe2ef;font-size:14px}
  button{margin-top:12px;width:100%;padding:10px;border:0;border-radius:8px;background:#1f5a7a;color:#fff;font-size:15px;cursor:pointer}
  .ok{color:#5ad19b}.err{color:#ff8080}.muted{color:#7f8ca3;font-size:13px}
-</style></head><body><div class="box">
-<h2>Pair this device</h2>
+</style><link rel="stylesheet" href="/static/app.css"></head><body><a class="skip-link" href="#main-content">Skip to main content</a><main class="box" id="main-content" tabindex="-1">
+<h1><span class="brand-mark" aria-hidden="true">Q</span> Pair this device</h1>
+<nav class="page-nav" aria-label="Primary"><a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit</a><span class="nav-separator" aria-hidden="true"></span><a href="/">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/settings">Settings</a><a href="/token-setup" aria-current="page">Pair device</a></nav>
 <p class="muted">Paste the dashboard token from the PC<br>(<code>~/.config/openclaw-voice-bridge/webui-token.txt</code>).<br>
 It is stored only in this browser's localStorage.</p>
+<details class="help-panel"><summary>Pairing steps</summary><div><ol><li>Copy the token on the Qubit PC.</li><li>Paste it below and choose Save &amp; test.</li><li>Return to the dashboard when pairing succeeds.</li></ol></div></details>
+<label class="sr-only" for="tok">Dashboard token</label>
 <input id="tok" type="password" placeholder="dashboard token" autocomplete="off">
 <button onclick="save()">Save &amp; test</button>
 <p id="msg"></p>
@@ -29,4 +32,4 @@ async function save(){
  else if(r.status===401){msg.className='err';msg.textContent='Token rejected (401) — check the token and try again.';}
  else{msg.className='err';msg.textContent='Bridge unavailable ('+r.status+') — start the bridge first.';}
 }
-</script></div></body></html>
+</script></main></body></html>

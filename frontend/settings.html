@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Settings — Qubit Voice Agent</title>
 <style>
  body{font:14px/1.5 system-ui,sans-serif;background:#0b0e14;color:#dbe2ef;margin:0;padding:24px;max-width:900px}
@@ -13,9 +13,20 @@
  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap} select{padding:6px;border-radius:6px;background:#0b0e14;color:#dbe2ef;border:1px solid #22304a}
  .advanced{display:none} .advanced.open{display:block} .hidden{display:none}
  a{color:#6db3ff} code{background:#0b0e14;padding:1px 4px;border-radius:4px}
-</style></head><body>
-<h1>Qubit Voice Agent</h1>
+</style><link rel="stylesheet" href="/static/app.css"></head><body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<main id="main-content" tabindex="-1">
+<h1><span class="brand-mark" aria-hidden="true">Q</span> Qubit Voice Agent</h1>
 <div class="muted">Settings · beginner mode by default; <button class="warn" onclick="toggleAdvanced()">Advanced</button></div>
+<nav class="page-nav" aria-label="Primary">
+ <a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit</a><span class="nav-separator" aria-hidden="true"></span>
+ <a href="/">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/settings" aria-current="page">Settings</a><a class="nav-utility" href="/token-setup">Pair device</a>
+</nav>
+
+<details class="help-panel">
+ <summary>How Qubit works</summary>
+ <div><ol><li>Talk or type a request.</li><li>Qubit chooses the safest available route and shows progress.</li><li>Read-only work can run automatically; sending, publishing, deleting, or account changes always ask first.</li></ol><p>Use Advanced when you want to change models, voices, permissions, integrations, or recovery settings.</p></div>
+</details>
 
 <div id="onboarding" class="card">
  <b>Welcome</b> — you're already set up with the safe, verified defaults:
@@ -28,14 +39,14 @@
 <h2 style="border:0;margin-top:14px">Websites</h2>
 <div class="card">
   <div class="row">
-    <input id="ws-url" placeholder="https://example.com" spellcheck="false"
+    <label class="sr-only" for="ws-url">Website address</label><input id="ws-url" placeholder="https://example.com" spellcheck="false"
       style="flex:1;min-width:220px;padding:6px;border-radius:6px;background:#0b0e14;color:#dbe2ef;border:1px solid #22304a">
     <button class="ok" onclick="wsAdd()">Add Website</button>
     <button onclick="wsList()">Refresh list</button>
   </div>
   <div class="muted" style="margin-top:6px">Adding a URL only creates a pending, disabled proposal. It never grants access, never runs page instructions, and is restricted by default. To use a site you must first link an approved skill.</div>
   <div class="row" style="margin-top:8px">
-    <select id="ws-skill-beginner" style="font-size:12px"></select>
+    <label class="sr-only" for="ws-skill-beginner">Skill to link</label><select id="ws-skill-beginner" style="font-size:12px"></select>
     <button class="ok" onclick="wsLinkBeginner()">Link skill</button>
     <span id="ws-beginner-state" class="muted"></span>
   </div>
@@ -57,7 +68,7 @@
 <div class="advanced">
  <h2>Reasoning model (brain)</h2>
  <div class="card row">
-   <select id="brain-sel"></select>
+   <label class="sr-only" for="brain-sel">Reasoning model</label><select id="brain-sel"></select>
    <button class="ok" onclick="applyProfile('brain')">Select</button>
    <button onclick="resetProfile('brain')">Reset</button>
    <button class="warn" onclick="checkProfile('brain')">Check</button>
@@ -66,7 +77,7 @@
 
  <h2>Speech-to-text</h2>
  <div class="card row">
-   <select id="stt-sel"></select>
+   <label class="sr-only" for="stt-sel">Speech-to-text model</label><select id="stt-sel"></select>
    <button class="ok" onclick="applyProfile('stt')">Select</button>
    <button onclick="resetProfile('stt')">Reset</button>
    <span id="stt-state" class="muted"></span>
@@ -74,7 +85,7 @@
 
  <h2>Text-to-speech provider</h2>
  <div class="card row">
-   <select id="tts-sel"></select>
+   <label class="sr-only" for="tts-sel">Text-to-speech provider</label><select id="tts-sel"></select>
    <button class="ok" onclick="applyProfile('tts')">Select</button>
    <button onclick="resetProfile('tts')">Reset</button>
    <span id="tts-state" class="muted"></span>
@@ -82,7 +93,7 @@
 
  <h2>Voice artifact</h2>
  <div class="card row">
-   <select id="voice-sel"></select>
+   <label class="sr-only" for="voice-sel">Voice artifact</label><select id="voice-sel"></select>
    <button class="ok" onclick="applyProfile('voice')">Select</button>
    <button onclick="resetProfile('voice')">Reset</button>
    <span id="voice-state" class="muted"></span>
@@ -114,10 +125,10 @@
       <button onclick="wsDisableSel()">Disable</button>
       <button onclick="wsRemoveSel()">Remove</button>
       <button onclick="wsRollbackSel()">Rollback</button>
-      <select id="ws-sel" style="font-size:12px"></select>
+      <label class="sr-only" for="ws-sel">Website integration</label><select id="ws-sel" style="font-size:12px"></select>
     </div>
     <div class="row" style="margin-top:8px">
-      <select id="ws-skill-adv" style="font-size:12px"></select>
+      <label class="sr-only" for="ws-skill-adv">Skill manifest</label><select id="ws-skill-adv" style="font-size:12px"></select>
       <button class="ok" onclick="wsLinkSel()">Link manifest</button>
       <span id="ws-link-state" class="muted"></span>
     </div>
@@ -141,7 +152,7 @@
   <div class="card">
     <p class="muted" style="margin:0 0 6px">Packet 8F typed actions. Preview always; execute only after reviewing the exact preview and confirming (sending/posting/purchasing/deleting/account/system always need confirmation). Every result is the real backend typed state.</p>
     <div class="row">
-      <select id="act-sel" style="font-size:12px"></select>
+      <label class="sr-only" for="act-sel">Action contract</label><select id="act-sel" style="font-size:12px"></select>
       <button onclick="actShow()">Show contract</button>
       <button onclick="actCheck()">Check</button>
       <button class="warn" onclick="actPreview()">Preview</button>
@@ -151,7 +162,7 @@
       <button onclick="actRetry()">Retry</button>
     </div>
     <div class="row" style="margin-top:6px">
-      <input id="act-args" placeholder='{"recipient":"you@example.com","subject":"…","body":"…"}' spellcheck="false"
+      <label class="sr-only" for="act-args">Action arguments (JSON)</label><input id="act-args" placeholder='{"recipient":"you@example.com","subject":"…","body":"…"}' spellcheck="false"
         style="flex:1;min-width:240px;padding:6px;border-radius:6px;background:#0b0e14;color:#dbe2ef;border:1px solid #22304a;font-size:12px">
     </div>
     <div class="muted" id="act-adv-state"></div>
@@ -178,19 +189,22 @@
     <div class="row">
       <button class="ok" onclick="exportState()">Export state</button>
       <input type="file" id="import-file" accept=".vbp" style="font-size:12px">
+      <label class="sr-only" for="import-file">Import state bundle</label>
       <button class="ok" onclick="importState()">Import state</button>
       <button onclick="upgradeAll()">Upgrade checks</button>
       <button onclick="upgradeProfile('brain')">Upgrade brain</button>
       <button onclick="upgradeProfile('tts')">Upgrade TTS</button>
       <button onclick="rollbackProfile('brain')">Rollback brain</button>
-      <select id="remove-kind" style="font-size:12px"></select>
+      <label class="sr-only" for="remove-kind">Profile kind to remove</label><select id="remove-kind" style="font-size:12px"></select>
       <button onclick="removeProfile()">Remove profile</button>
     </div>
     <div class="muted" id="state-out"></div>
   </div>
 </div>
 
+</main>
 <script src="/static/vb.js"></script>
+<script src="/static/ui.js"></script>
 <script>
 const API = vbApiBase();
 const hdrs = (extra) => vbHeaders(extra);

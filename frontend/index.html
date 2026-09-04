@@ -34,20 +34,34 @@
   a { color:#58a6ff; text-decoration:none; }
   .row { display:flex; gap:8px; align-items:center; }
 </style><link rel="stylesheet" href="/static/app.css"></head><body>
+<!--
+THESIS: A calm control surface for speaking to a local assistant.
+OWN-WORLD: Near-black surfaces, warm text, and a signal-lime action color make system state legible.
+STORY: Pair the device, choose Talk, speak or type, then inspect activity and reports when needed.
+FIRST VIEWPORT: The status, main talk control, text fallback, and plain-language tools are visible immediately.
+FORM: One primary action, quiet secondary controls, clear focus, and responsive rows keep the interface usable.
+FINISH: Every state explains what happened and what the operator can safely do next.
+-->
 <a class="skip-link" href="#main-content">Skip to main content</a>
-<div class="wrap" id="main-content">
+<main class="wrap" id="main-content" tabindex="-1">
   <header>
-    <h1><span class="brand-mark" aria-hidden="true">Q</span> Voice Dashboard</h1>
-    <div class="row">
-      <span class="status" id="st" aria-live="polite">connecting…</span>
-      <a href="/activity">activity</a> · <a href="/reports">reports</a> · <a href="/settings">settings</a> · <a href="#" id="lessonslink">learned</a> <a href="#" id="permslink" style="margin-left:8px">permissions</a> <a href="#" id="reportslink" style="margin-left:8px">inbox</a> <a href="#" id="gearlink" style="margin-left:8px" aria-label="Open talk settings">settings</a>
+    <div>
+      <h1><span class="brand-mark" aria-hidden="true">Q</span> Voice Dashboard</h1>
+      <p class="page-lead">Speak or type a task. Qubit keeps the route and progress visible while you stay in control.</p>
     </div>
+    <div class="status-cluster"><span class="status" id="st" aria-live="polite">connecting…</span></div>
   </header>
+  <nav class="page-nav" aria-label="Primary">
+    <a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit</a>
+    <span class="nav-separator" aria-hidden="true"></span>
+    <a href="/" aria-current="page">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/settings">Settings</a>
+    <a class="nav-utility" href="/token-setup">Pair device</a>
+  </nav>
 
   <button class="ptt" id="ptt">Hold to talk</button>
-  <div class="hint">tap = toggle · release = send · esc = stop · <a href="#" id="interruptBtn" style="color:#f85149;">⏹ interrupt</a></div>
+  <div class="hint">tap = toggle · release = send · esc = stop · <a href="#" class="tap-target" id="interruptBtn" style="color:#f85149;">⏹ interrupt</a></div>
 
-  <div class="row" style="margin-top:14px;">
+  <div class="row talk-input-row" style="margin-top:14px;">
     <label class="sr-only" for="textin">Type a task</label>
     <input id="textin" type="text" placeholder="…or type a task (Enter to send)"
            style="flex:1; padding:10px 12px; background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:8px; font-size:15px;">
@@ -55,7 +69,13 @@
   </div>
 
   <div id="transcript"></div>
-</div>
+  <div class="workspace-actions" aria-label="Talk tools">
+    <button type="button" class="quiet-action" id="lessonslink">Learned preferences</button>
+    <button type="button" class="quiet-action" id="permslink">Permissions</button>
+    <button type="button" class="quiet-action" id="reportslink">Inbox</button>
+    <button type="button" class="quiet-action" id="gearlink" aria-label="Open talk settings">Connection settings</button>
+  </div>
+</main>
 
 
 <div id="settings" style="display:none; border:1px solid #30363d; border-radius:10px; padding:10px; margin:10px 0; background:#161b22;">
@@ -83,6 +103,7 @@
   <div class="row" style="gap:6px;">
     <button id="perm-restricted" style="padding:6px 12px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#e6edf3;cursor:pointer;">Restricted</button>
     <button id="perm-unrestricted" style="padding:6px 12px;border:1px solid #f85149;border-radius:6px;background:#0d1117;color:#f85149;cursor:pointer;">Unrestricted</button>
+    <label class="sr-only" for="perm-scopes">Scopes for unrestricted mode</label>
     <input id="perm-scopes" type="text" placeholder="scopes for unrestricted (comma-separated)"
            style="flex:1;padding:6px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:6px;font-size:12px;">
   </div>
@@ -94,6 +115,7 @@
   <details style="margin-top:8px;">
     <summary style="font-size:12px;color:#8b949e;cursor:pointer;">advanced: effective check + audit</summary>
     <div class="row" style="margin:6px 0;">
+      <label class="sr-only" for="perm-check-cap">Capability to check</label>
       <input id="perm-check-cap" type="text" placeholder="capability, e.g. browser.snapshot" style="flex:1;padding:5px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:6px;font-size:12px;">
       <button id="perm-check-btn" style="padding:5px 10px;background:#1f6feb;border:none;color:#fff;border-radius:5px;cursor:pointer;font-size:11px;">check</button>
     </div>
@@ -107,6 +129,7 @@
     <span id="notif-badge" style="margin-left:10px;display:none;background:#1f6feb;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;"></span>
   </div>
   <div class="row" style="gap:6px; margin-bottom:6px;">
+    <label class="sr-only" for="reports-q">Search reports</label>
     <input id="reports-q" type="text" placeholder="search reports…"
            style="flex:1;padding:6px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:6px;font-size:12px;">
     <button data-p="" style="padding:5px 10px;background:#1f6feb;border:none;color:#fff;border-radius:5px;cursor:pointer;font-size:11px;">all</button>
@@ -118,14 +141,15 @@
 </div>
 
 <script src="/static/vb.js"></script>
+<script src="/static/ui.js"></script>
 <script>
 // API base: same-origin by default (localhost/LAN). Override with ?api=<url>
 // so the same page works from Vercel against your PC's tunnel.
+// vbResolveBase() also persists ?api= to vdb_api so vbApi() and vbStream() agree.
+vbResolveBase();
 let BASE = (new URLSearchParams(location.search).get('api') || localStorage.getItem('vdb_api') || '').replace(/\/$/, '');
 // Token comes ONLY from localStorage via the shared helper (frontend/vb.js).
 // Query-string tokens are never accepted or placed in URLs.
-let API_TOKEN = vbToken();
-function hdrs(extra) { return vbHeaders(extra); }
 
 const ptt = document.getElementById('ptt');
 const st = document.getElementById('st');
@@ -287,7 +311,7 @@ document.getElementById('set-save').addEventListener('click', () => {
   const a = document.getElementById('set-api').value.trim().replace(/\/$/, '');
   const t = document.getElementById('set-token').value.trim();
   localStorage.setItem('vdb_api', a); localStorage.setItem('vdb_token', t);
-  // reload so BASE/API_TOKEN pick up the saved values cleanly
+  // reload so BASE picks up the saved values cleanly
   location.reload();
 });
 
@@ -411,20 +435,19 @@ vbApi('/api/status').then(res => {
       try{
         // lastSeq === null -> deliberately NO last_seq param: server replays
         // the whole journal (safe cursor after resync / first connect).
-        const url = BASE + '/api/events/stream' +
-          (lastSeq != null ? ('?last_seq=' + lastSeq) : '');
-        const res = await fetch(url,
-          { headers: hdrs({ 'Accept': 'text/event-stream' }),
-            signal: ctrl.signal });
-        if (res.status === 401) {
+        // vbStream (frontend/ui.js) opens the stream with the shared header
+        // token and returns typed {ok, status, authRequired, reader, cancel}.
+        const res = await vbStream('/api/events/stream' +
+          (lastSeq != null ? ('?last_seq=' + lastSeq) : ''),
+          { accept: 'text/event-stream', signal: ctrl.signal });
+        if (res.authRequired) {
           // unpaired: stop retrying and show the pairing hint
-          vbPairHint();
           stopped = true;
           break;
         }
-        if(!res.ok || !res.body) throw new Error('stream http ' + res.status);
+        if(!res.ok || !res.reader) throw new Error('stream http ' + (res.status||0));
         backoff = 1000;
-        const reader = res.body.getReader(); const dec = new TextDecoder();
+        const reader = res.reader; const dec = new TextDecoder();
         let buf = '', needResync = false;
         for(;;){
           const {done, value} = await reader.read();
@@ -799,7 +822,9 @@ vbApi('/api/status').then(res => {
     if(!url) return null;
     const a = document.createElement('a');
     a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
-    a.textContent = label; a.style.cssText = 'color:#58a6ff;';
+    a.textContent = label;
+    a.className = 'tap-target';
+    a.style.cssText = 'color:#58a6ff;';
     return a;
   }
   async function fetchJson(path){

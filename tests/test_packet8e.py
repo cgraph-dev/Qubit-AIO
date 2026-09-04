@@ -1652,10 +1652,14 @@ def test_vb_api_network_timeout_is_typed():
 def test_index_html_has_no_direct_fetch_outside_sse_stream():
     src = (REPO_ROOT / "frontend" / "index.html").read_text()
     import re as _re
-    fetches = _re.findall(r"fetch\(", src)
-    assert len(fetches) == 1          # only the SSE stream consumer
+    # Packet 8L: every page routes JSON APIs through the shared vbApi helper
+    # and the SSE stream through the shared vbStream helper in ui.js; pages
+    # perform no direct fetch at all.
+    assert _re.findall(r"fetch\(", src) == []
+    ui = (REPO_ROOT / "frontend" / "ui.js").read_text()
+    assert "vbStream" in ui and "fetch(" in ui  # stream fetch centralized here
     # every page loads the shared helper
-    assert "/static/vb.js" in src
+    assert "/static/vb.js" in src and "/static/ui.js" in src
     # no query-string token read anywhere
     assert "get('token')" not in src and 'get("token")' not in src
 

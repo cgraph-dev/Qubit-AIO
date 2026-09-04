@@ -42,7 +42,8 @@
       else if (body) body.appendChild(el);
     }
     el.innerHTML = 'This dashboard is not paired with the bridge. '
-      + '<a href="/token-setup" style="color:#6db3ff">Pair this dashboard</a> '
+      + '<a href="/token-setup" style="color:#6db3ff;display:inline-flex;'
+      + 'align-items:center;min-height:44px;padding:0 8px;">Pair this dashboard</a> '
       + 'to store the X-Api-Token header token in this browser.';
     return el;
   }

@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Voice Dashboard — Activity</title>
 <style>
   :root { color-scheme: dark; }
@@ -35,14 +35,15 @@
   #empty { color:#8b949e; text-align:center; margin-top:40px; }
   body::before { content:""; position:fixed; inset:0; z-index:0; opacity:.07; pointer-events:none; background: radial-gradient(1200px 600px at 20% -10%, #58a6ff33, transparent 60%), radial-gradient(1000px 500px at 100% 0%, #bc8cff22, transparent 60%); animation: bg-drift 18s ease-in-out infinite; }
   @keyframes bg-drift { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-</style></head><body>
-<div class="wrap">
+</style><link rel="stylesheet" href="/static/app.css"></head><body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<main class="wrap" id="main-content" tabindex="-1">
   <header>
     <div>
-      <h1>📋 Activity</h1>
+      <h1><span class="brand-mark" aria-hidden="true">Q</span> Activity</h1>
       <div class="sub">Live timeline — what you said, how it was handled, and what was spoken back. Newest first.</div>
     </div>
-    <span><a href="/">talk</a> · <a href="/reports">reports</a> · <a href="/activity">activity</a></span>
+    <nav class="page-nav" aria-label="Primary"><a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit</a><span class="nav-separator" aria-hidden="true"></span><a href="/">Talk</a><a href="/activity" aria-current="page">Activity</a><a href="/reports">Reports</a><a href="/settings">Settings</a><a class="nav-utility" href="/token-setup">Pair device</a></nav>
   </header>
   <div class="legend">
     <b>Badges — what each means:</b><br>
@@ -54,19 +55,19 @@
     <span class="badge b-failed">Failed</span> — error or no speech detected<br>
     <span style="opacity:.85">Tip: filter to <i>You said</i> or <i>Answered</i> for a clean read.</span>
   </div>
-  <div id="bar"><span id="conn">connecting…</span> · <span id="count">—</span> · <label>show <select id="kindFilter"><option value="">all — everything</option><option value="asked">You said</option><option value="answered">Answered</option><option value="decided">Routed</option><option value="running">Working</option><option value="report">Reports</option><option value="failed">Failed</option></select></label> <input id="q" placeholder="search…" style="margin-left:8px;"> <button id="pauseBtn">pause</button></div>
+  <div id="bar"><span id="conn" aria-live="polite">connecting…</span> · <span id="count">—</span> · <label>show <select id="kindFilter"><option value="">all — everything</option><option value="asked">You said</option><option value="answered">Answered</option><option value="decided">Routed</option><option value="running">Working</option><option value="report">Reports</option><option value="failed">Failed</option></select></label> <label class="sr-only" for="q">Search activity</label><input id="q" placeholder="search…" style="margin-left:8px;"> <button id="pauseBtn" type="button">pause</button></div>
   <div id="feed"><div id="empty">waiting for activity…</div></div>
-</div>
+</main>
 <script src="/static/vb.js"></script>
+<script src="/static/ui.js"></script>
 <script>
-const BASE = (new URLSearchParams(location.search).get('api') || localStorage.getItem('vdb_api') || '').replace(/\/$/, '');
 // Token comes ONLY from localStorage via the shared helper (frontend/vb.js).
-const TOKEN = vbToken();
-function hdrs(extra) { return vbHeaders(extra); }
+// vbResolveBase() persists a transient ?api= override so vbApi() and vbStream()
+// agree on the base for this session.
+vbResolveBase();
 const feed = document.getElementById('feed');
 let paused=false;
 document.getElementById('pauseBtn').addEventListener('click', ()=>{ paused=!paused; document.getElementById('pauseBtn').textContent=paused?'resume':'pause'; });
-function esc(s){ return (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 function fmt(ts){ const d = new Date(ts*1000); return d.toLocaleTimeString(); }
 function humanBadge(it){
   const kind=(it.kind||'').toLowerCase();
@@ -74,7 +75,7 @@ function humanBadge(it){
   if (kind==='fail' || kind==='error' || route==='error') return ['failed','Failed'];
   if (kind==='user' || kind==='asked') return ['asked','You said'];
   if (kind==='raw_report' || kind==='report') return ['report','Report saved'];
-  if (kind==='routing' || kind==='decided') { const dest=(it.route||it.detail||'').toString().split(/\\s+/)[0]; if(dest) return ['decided','Routed to '+dest]; return ['decided','Routed']; }
+  if (kind==='routing' || kind==='decided') { const dest=(it.route||it.detail||'').toString().split(/\s+/)[0]; if(dest) return ['decided','Routed to '+dest]; return ['decided','Routed']; }
   if (kind==='summary' || kind==='done' || kind==='answered') return ['answered','Answered'];
   if (kind==='status' || kind==='running' || kind==='interrupt' || kind==='hotkey') return ['running','Working…'];
   if (kind==='system') return ['system','System'];
@@ -82,6 +83,31 @@ function humanBadge(it){
   return ['system','Event'];
 }
 function badgeClass(kind){ const m={asked:'asked',decided:'decided',answered:'answered',running:'running',report:'report',failed:'failed',system:'system'}; return m[kind]||'system'; }
+// DOM-built item cards: every value is rendered via textContent (no innerHTML).
+function itemCard(it){
+  const [hbKind, hbText] = humanBadge(it);
+  const head = vbBuild('span', null, fmt(it.ts));
+  head.appendChild(vbBuild('span', {class:'badge b-'+badgeClass(hbKind)}, hbText));
+  if (it.route) head.appendChild(vbBuild('span', {class:'route'}, '· '+it.route));
+  if (it.conf!=null && it.conf!=='') head.appendChild(vbBuild('span', {class:'detail'}, '· conf '+it.conf));
+  if (it.latency_s!=null) head.appendChild(vbBuild('span', {class:'detail'}, '· '+it.latency_s+'s'));
+  const t = vbBuild('div', {class:'t'}, head);
+  const body = vbBuild('div', {class:'item'}, t);
+  if (it.text) body.appendChild(vbBuild('div', {class:'text'}, String(it.text)));
+  if (it.summary) body.appendChild(vbBuild('div', {class:'summary'}, String(it.summary)));
+  if (it.detail) body.appendChild(vbBuild('div', {class:'detail', style:'margin-top:4px'}, String(it.detail)));
+  if (it.raw) {
+    const rawText = typeof it.raw === 'string' ? it.raw : JSON.stringify(it.raw, null, 2);
+    const pre = vbBuild('div', {class:'raw', style:'margin-top:4px'}, rawText);
+    body.appendChild(vbBuild('details', {style:'margin-top:6px'},
+      vbBuild('summary', {style:'font-size:11px;color:#8b949e;cursor:pointer'}, 'full report / raw'), pre));
+  }
+  return body;
+}
+function emptyState(text){
+  const el = vbBuild('div', {id:'empty'}, text);
+  vbClear(feed); feed.appendChild(el);
+}
 function render(items){
   const kindFilter=document.getElementById('kindFilter').value;
   const q=(document.getElementById('q').value||'').toLowerCase();
@@ -89,21 +115,26 @@ function render(items){
   if(kindFilter) filtered=filtered.filter(it=> humanBadge(it)[0]===kindFilter);
   if(q) filtered=filtered.filter(it=> JSON.stringify(it).toLowerCase().includes(q));
   document.getElementById('count').textContent = filtered.length + '/' + items.length + ' items';
-  if(!filtered.length){ feed.innerHTML='<div id="empty">'+(items.length?'no matches':'waiting for activity…')+'</div>'; return; }
-  feed.innerHTML = filtered.map(it => {
-    const [hbKind, hbText] = humanBadge(it);
-    const badge = `<span class="badge b-${badgeClass(hbKind)}">${esc(hbText)}</span>`;
-    const route = it.route ? ` <span class="route">· ${esc(it.route)}</span>` : '';
-    const conf = (it.conf!=null && it.conf!=='') ? ` <span class="detail">· conf ${esc(String(it.conf))}</span>` : '';
-    const lat = (it.latency_s!=null) ? ` <span class="detail">· ${esc(String(it.latency_s))}s</span>` : '';
-    const detail = it.detail ? `<div class="detail" style="margin-top:4px;">${esc(it.detail)}</div>` : '';
-    const summary = it.summary ? `<div class="summary">${esc(it.summary)}</div>` : '';
-    const raw = it.raw ? `<details style="margin-top:6px;"><summary style="font-size:11px;color:#8b949e;cursor:pointer;">full report / raw</summary><div style="background:#161b22;border-radius:6px;padding:6px 8px;margin-top:4px;white-space:pre-wrap;font-size:12px;max-height:240px;overflow:auto;">${esc(typeof it.raw==='string'?it.raw:JSON.stringify(it.raw,null,2))}</div></details>` : '';
-    return `<div class="item">\n      <div class="t"><span>${fmt(it.ts)}</span> ${badge}${route}${conf}${lat}</div>\n      ${it.text ? `<div class="text">${esc(it.text)}</div>` : ''}${summary}${detail}${raw}</div>`;
-  }).join('');
+  if(!filtered.length){ emptyState(items.length ? 'no matches' : 'waiting for activity…'); return; }
+  vbClear(feed);
+  filtered.forEach(it => feed.appendChild(itemCard(it)));
 }
-async function refreshStatus(){ try{ const r=await fetch(BASE+'/api/status', {headers:hdrs()}); if(r.ok){ const d=await r.json(); if(d.sticky_route) document.getElementById('conn').textContent += ' · sticky→'+d.sticky_route; }}catch(_){} }
-async function refresh(){ if(paused) return; try { const r = await fetch(BASE + '/api/activity?limit=200', { headers: hdrs() }); if(!r.ok) throw new Error(''+r.status); const d = await r.json(); document.getElementById('conn').textContent='live · '+(d.items||[]).length+' items'; document.getElementById('conn').style.color='#3fb950'; render(d.items || []); } catch(e){ document.getElementById('conn').textContent='offline'; document.getElementById('conn').style.color='#f85149'; } }
+async function refreshStatus(){
+  const res = await vbApi('/api/status');
+  if (res.ok && res.body && res.body.sticky_route) {
+    document.getElementById('conn').textContent += ' · sticky→'+res.body.sticky_route;
+  }
+}
+async function refresh(){
+  if(paused) return;
+  const res = await vbApi('/api/activity?limit=200');
+  if (res.authRequired) { vbStatus('conn', 'not paired — open /token-setup', 'degraded'); return; }
+  if (!res.ok || !res.body || !Array.isArray(res.body.items)) {
+    vbStatus('conn', 'offline', 'offline'); return;
+  }
+  vbStatus('conn', 'live · '+(res.body.items||[]).length+' items', 'live');
+  render(res.body.items || []);
+}
 document.getElementById('kindFilter').addEventListener('change', ()=>refresh());
 document.getElementById('q').addEventListener('input', ()=>refresh());
 setInterval(refresh, 2000); setInterval(refreshStatus, 5000); refresh(); refreshStatus();
