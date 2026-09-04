@@ -297,6 +297,95 @@ def test_canonical_frontend_index_html_is_rate_aware():
     assert "getUserMedia" in html
 
 
+VOICE_SELECTOR_FORBIDDEN = (
+    "voiceSel",              # the misleading provider <select>
+    "vdb_voice",             # the misleading localStorage voice state
+    "voice-provider",        # the sr-only label
+    "restart bridge to apply",
+    "restart to apply",
+    "localStorage.getItem('vdb_voice'",
+    "localStorage.setItem('vdb_voice'",
+)
+
+
+def test_frontend_has_no_voice_selector():
+    """The dashboard must NOT offer a voice-provider selector or persist a
+    voice in localStorage; it shows a read-only status label filled from the
+    backend's /api/status. Browser storage/query params can never select a
+    voice."""
+    html = _frontend_index_html()
+    for needle in VOICE_SELECTOR_FORBIDDEN:
+        assert needle not in html, f"frontend/index.html still has {needle!r}"
+    assert "?voice=" not in html
+    assert 'id="voice-info"' in html
+    assert "Voice is controlled by bridge settings." in html
+    assert "Effective voice:" in html      # read-only label set from d.tts
+
+
+def test_served_dashboard_has_no_voice_selector(tmp_path: Path) -> None:
+    """The SERVED / page (over HTTP) must not expose the voice selector."""
+    import urllib.request
+    from voicebridge.webui import WebUI
+    orch = _FakeOrch()
+    ui = WebUI(orch, host="127.0.0.1", port=0, state_dir=tmp_path)
+    ui.start()
+    try:
+        port = ui._server.server_address[1]
+        html = urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/", timeout=10).read().decode()
+    finally:
+        ui.stop()
+    for needle in VOICE_SELECTOR_FORBIDDEN:
+        assert needle not in html, f"served / page still has {needle!r}"
+    assert 'id="voice-info"' in html
+    assert "Voice is controlled by bridge settings." in html
+
+
+def test_status_tts_comes_from_single_backend_instance(tmp_path: Path) -> None:
+    """/api/status reports the SAME orchestrator TTS instance (orch._tts.name)
+    used by both Right Ctrl and web PTT — there is no selectable 'voice' field
+    in the status payload."""
+    from voicebridge.webui import WebUI
+    orch = _FakeOrch()
+    ui = WebUI(orch, host="127.0.0.1", port=0, state_dir=tmp_path)
+    st = ui.status()
+    assert st["tts"] == orch._tts.name
+    assert st["tts"] == "fake"
+    # status exposes a read-only tts name, never a voice-selection surface
+    assert "voice" not in st or st["voice"] == ""
+
+
+def test_web_ptt_keeps_same_backend_tts_contract(tmp_path: Path) -> None:
+    """Web PTT (submit_talk) and /api/status both use the orchestrator's single
+    TTS instance; the dashboard never selects a voice itself and browser audio
+    comes back from the backend (no physical Right Ctrl required)."""
+    from voicebridge.webui import WebUI
+    orch = _FakeOrch()
+    ui = WebUI(orch, host="127.0.0.1", port=0, state_dir=tmp_path)
+    assert ui.status()["tts"] == orch._tts.name == "fake"
+
+    class _FakeASR:
+        def load(self):
+            pass
+
+        def transcribe(self, wav_path: Path):
+            from voicebridge.asr.base import Transcript
+            return Transcript(text="hello there", confidence=0.95)
+
+    ui._asr_factory = lambda: _FakeASR()
+    rid = ui.submit_talk(_tone(1.0))
+    result = None
+    for _ in range(50):
+        r = ui.result(rid)
+        if r["status"] == "done":
+            result = r
+            break
+        time.sleep(0.02)
+    assert result is not None
+    assert result["audio_b64"] is not None   # browser plays backend audio
+    assert ui.status()["tts"] == orch._tts.name  # still the one TTS instance
+
+
 def test_served_dashboard_http_content_is_rate_aware(tmp_path: Path) -> None:
     """Verify the SERVED / page (over HTTP, not only the source file) contains
     the rate-aware audio contract."""

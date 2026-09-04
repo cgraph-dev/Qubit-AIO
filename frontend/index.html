@@ -66,9 +66,8 @@
   <input id="set-token" type="text" placeholder="token (optional)" style="width:100%; padding:6px; margin-bottom:6px; background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:6px;">
   <div class="row"><button id="set-save" style="padding:6px 14px; background:#1f6feb; border:none; color:#fff; border-radius:6px; cursor:pointer;">Save</button>
   <span id="set-status" style="font-size:12px; color:#8b949e; margin-left:10px;"></span></div>
-  <div style="font-size:13px; margin:6px 0 4px;">Voice (TTS provider) — pick higher quality (openai nova = premium, edge = free, piper = offline)</div>
-  <label class="sr-only" for="voiceSel">Voice provider</label><select id="voiceSel" style="width:100%; padding:6px; background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:6px; margin-bottom:6px;"><option value="piper">piper (offline, fast)</option><option value="openai">openai nova (highest quality, requires key)</option><option value="edge">edge JennyNeural (free, online)</option><option value="kokoro">kokoro (local quality)</option><option value="gateway">gateway</option></select>
-  <div style="font-size:11px;color:#8b949e;margin-bottom:6px;">Change persists to voice.yaml on this PC; openai needs OPENAI_API_KEY in ~/.hermes/.env</div>
+  <div style="font-size:13px; margin:6px 0 4px;">Voice (TTS)</div>
+  <div id="voice-info" style="font-size:12px; color:#8b949e;">Voice is controlled by bridge settings.</div>
 </div>
 
 <div id="lessonspanel" style="display:none; border:1px solid #30363d; border-radius:10px; padding:10px; margin:10px 0; background:#161b22;">
@@ -380,9 +379,6 @@ document.getElementById('textin').addEventListener('keydown', (e) => {
 });
 
 document.getElementById('interruptBtn').addEventListener('click', async (e)=>{ e.preventDefault(); try{ await vbApi('/api/interrupt', {method:'POST', body: JSON.stringify({mode:'interrupt'})}); addMsg('meta','· interrupt sent'); }catch(_){}});
-// voice selector: load + persist via /api/status + localStorage
-try{ const vs=document.getElementById('voiceSel'); if(vs){ const saved=localStorage.getItem('vdb_voice')||''; if(saved) vs.value=saved; vs.addEventListener('change', ()=>{ localStorage.setItem('vdb_voice', vs.value); document.getElementById('set-status').textContent='voice='+vs.value+' (restart bridge to apply)'; }); }}
-catch(_){}
 setStatus('ready');
 // /api/status now goes through the shared vbApi() helper: it sends the
 // X-Api-Token header, shows the "Dashboard not paired" hint on 401, and never
@@ -392,6 +388,11 @@ vbApi('/api/status').then(res => {
   if (res.authRequired) { setStatus('not paired — open /token-setup'); return; }
   if (res.ok && d.bridge === 'up') setStatus('bridge up · ' + d.route, true);
   else setStatus('bridge: ' + (d.bridge || res.error || 'offline'));
+  // Voice is read-only: show the effective provider the backend reports.
+  const vi = document.getElementById('voice-info');
+  if (vi) vi.textContent = (res.ok && d.tts)
+    ? 'Effective voice: ' + d.tts + ' (controlled by bridge settings)'
+    : 'Voice is controlled by bridge settings.';
 }).catch(() => setStatus('bridge offline'));
 </script>
 <script>
