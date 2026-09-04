@@ -34,8 +34,8 @@ Shared static assets:
 | Asset | Purpose |
 |---|---|
 | `frontend/app.css` | Design tokens, typography, spacing, color, motion, focus, reduced motion, forced colors, responsive/reflow, 44 px touch targets |
-| `frontend/vb.js` | Shared authenticated typed API helper (`vbToken`/`vbApiBase`/`vbHeaders`/`vbPairHint`/`vbApi`); token lives only in `localStorage`, never in a URL |
-| `frontend/ui.js` | Shared rendering primitives: `vbBuild`/`vbAppend`/`vbClear` (safe DOM, textContent-based), `vbStatus` (typed states), `vbApiMessage` (plain-language errors), `vbAnnounce` (live region), `vbStream` (SSE fetch helper), `vbResolveBase` (`?api=` override → `vdb_api`) |
+| `frontend/ui.js` | Shared rendering primitives: `vbBuild`/`vbAppend`/`vbClear` (safe DOM, textContent-based), `vbStatus` (typed states), `vbApiMessage` (plain-language errors), `vbAnnounce` (live region), `vbSafeHTML` (audited sanitizer stripping `on*` handlers / `javascript:` / script / iframe), `vbStream` (SSE fetch helper), `vbResolveBase` (same-origin only — an attacker-controlled `?api=` query string is NEVER honored) |
+| `frontend/vb.js` | Shared authenticated typed API helper (`vbToken`/`vbApiBase`/`vbHeaders`/`vbPairHint`/`vbApi`), plus authenticated binary/download/open helpers (`vbFetchBinary`/`vbDownload`/`vbOpenBinary`) and the explicit pairing helpers (`vbValidateApiOrigin`/`vbApiTest`). Token lives only in `localStorage`, never in a URL |
 
 ## 2. Design source of truth (shared primitives)
 
@@ -61,9 +61,21 @@ Shared static assets:
   safe action. Optimistic success is forbidden.
 - All backend/user/page text is untrusted: dynamic content is rendered with
   `textContent` through `vbBuild` (activity/approvals/reports, and index.html
-  already) or through the escaping choke-point `esc()`/`show()` in
-  settings.html where quote-escaping is applied. No page parses a non-JSON
-  body; `vbApi` checks `Content-Type` before `JSON.parse`.
+  already) or, in settings.html, through DOM construction (`vbBuild` /
+  `fillOptions`, data attributes, `addEventListener`) and the shared audited
+  sanitizer `vbSafeHTML`. No page parses a non-JSON body; `vbApi` checks
+  `Content-Type` before `JSON.parse`.
+- API origin is same-origin/loopback by default. An attacker-controlled `?api=`
+  query string is ignored (never persisted, never contacted). A remote bridge
+  is used only through the explicit Settings/Pairing action, which validates
+  the origin (`vbValidateApiOrigin`), asks for confirmation, tests the
+  candidate token with the `X-Api-Token` header before saving, and preserves
+  the previous working token on 401/network failure. The stored token is only
+  ever sent to the approved origin.
+- Report export/HTML/screenshot operations fetch through the shared
+  authenticated binary helper (`vbFetchBinary`) and are delivered via Blob
+  object URLs/downloads, never as unauthenticated `<a href>`/`<img src>`
+  URLs; object URLs are revoked after use where safe.
 
 ## 3. WCAG 2.2 AA release contract
 

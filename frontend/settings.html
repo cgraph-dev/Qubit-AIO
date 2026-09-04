@@ -206,10 +206,29 @@
 <script src="/static/vb.js"></script>
 <script src="/static/ui.js"></script>
 <script>
-const API = vbApiBase();
-const hdrs = (extra) => vbHeaders(extra);
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function show(id,html){const el=document.getElementById(id);if(el)el.innerHTML=html;}
+// Packet 8L XSS repair: dynamic Settings content is rendered through the
+// shared audited sanitizer (vbSafeHTML strips inline on* handlers, javascript:
+// URLs, and script/iframe/object/embed) or as real DOM nodes built with
+// textContent + data attributes + addEventListener. Backend-controlled IDs and
+// text are NEVER placed inside inline event attributes or JS strings.
+function show(id, html){
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (html && html.nodeType === 1) { vbClear(el); el.appendChild(html); return; }
+  vbSafeHTML(el, html);
+}
+function fillOptions(sel, items){
+  if (!sel) return;
+  sel.replaceChildren();
+  (items || []).forEach(it => {
+    const o = document.createElement('option');
+    o.value = String(it.value == null ? '' : it.value);
+    o.textContent = String(it.label == null ? '' : it.label);
+    if (it.selected) o.selected = true;
+    sel.appendChild(o);
+  });
+}
 function tag(state){return '<span class="tag '+esc(state)+'">'+esc(state)+'</span>';}
 // One shared authenticated helper (frontend/vb.js): sends X-Api-Token from the
 // browser-stored token on every request; a 401 shows the "Pair this dashboard"
@@ -255,22 +274,29 @@ async function loadAll(){
 async function loadProfiles(){
  const {body} = await api('/api/profiles');
  if(!body||!body.profiles){show('health',tag('UNAVAILABLE')+' profiles unavailable');return;}
- for(const kind of ['brain','stt','tts','voice']){
-  const sel = document.getElementById(kind+'-sel');
-  if(!sel)continue;
-  const list = body.profiles.filter(p=>p.kind===kind);
-  const active = body.active ? body.active[kind] : '';
-  sel.innerHTML = list.map(p=>`<option value="${esc(p.id)}"${p.id===active?' selected':''}>${esc(p.id)} (${esc(p.gate)})</option>`).join('');
-  show(kind+'-state', 'active: '+esc(active||'—'));
- }
- // populate the removable list (non-default only)
- const rem = document.getElementById('remove-kind');
- if(rem){
-  rem.innerHTML = ['brain','stt','tts','voice','audio']
-    .map(k=>{const opts=body.profiles.filter(p=>p.kind===k&&!p.default)
-      .map(p=>`<option value="${esc(k)}:${esc(p.id)}">${esc(k)} ${esc(p.id)}</option>`).join('');
-      return opts;}).join('');
- }
+for(const kind of ['brain','stt','tts','voice']){
+   const sel = document.getElementById(kind+'-sel');
+   if(!sel)continue;
+   const list = body.profiles.filter(p=>p.kind===kind);
+   const active = body.active ? body.active[kind] : '';
+   fillOptions(sel, list.map(p => ({
+     value: String(p.id || ''),
+     selected: String(p.id || '') === String(active || ''),
+     label: String(p.id || '') + ' (' + String(p.gate || '') + ')',
+   })));
+   show(kind+'-state', 'active: '+esc(active||'—'));
+  }
+  // populate the removable list (non-default only)
+  const rem = document.getElementById('remove-kind');
+  if(rem){
+   const opts = [];
+   ['brain','stt','tts','voice','audio'].forEach(k => {
+    (body.profiles||[]).filter(p=>p.kind===k && !p.default).forEach(p => {
+      opts.push({ value: k+':'+p.id, label: k+' '+p.id });
+    });
+   });
+   fillOptions(rem, opts);
+  }
 }
 async function applyProfile(kind){
  const profile = document.getElementById(kind+'-sel').value;
@@ -440,42 +466,51 @@ function wsSelectValue(){
 function wsPopulate(integrations){
   const el = document.getElementById('ws-sel');
   if(!el) return;
-  el.innerHTML = (integrations||[]).map(r=>{
-    const label = (r.display_name||r.origin)+' ['+esc(r.status)+']';
-    return '<option value="'+esc(r.integration_id)+'">'+label+'</option>';
-  }).join('');
+  fillOptions(el, (integrations||[]).map(r => ({
+    value: String(r.integration_id || ''),
+    label: (r.display_name || r.origin || '') + ' [' + String(r.status || '') + ']',
+  })));
 }
 async function wsList(){
   const {status,body} = await api('/api/websites');
   if(!body || !body.integrations){ show('ws-add-state', tag('UNAVAILABLE')); return; }
   wsPopulate(body.integrations);
   wsPopulateSkills(body.skills||[]);
-  const rows = body.integrations.map(r=>{
+  const list = vbBuild('div', null);
+  (body.integrations||[]).forEach(r => {
     const caps = (r.requested_capabilities||[]).length;
     const grants = (r.grant_ids||[]).length;
-    const link = r.manifest_link
-      ? ' <span class="tag OK">link:'+esc(r.manifest_link)+'</span>'
-      : ' <span class="tag UNAVAILABLE">unlinked</span>';
-    return '<div class="row" style="margin:6px 0">'+tag(r.status)
-      +' <b>'+esc(r.display_name||r.origin)+'</b>'
-      +' <span class="muted">'+esc(r.origin)+'</span>'
-      +' <span class="muted">caps:'+caps+' grants:'+grants+'</span>'
-      +link
-      +' <button onclick="wsDetail(\''+esc(r.integration_id)+'\')">Show</button>'
-      +' <button onclick="wsInspect(\''+esc(r.integration_id)+'\')">Inspect</button>'
-      +' <button onclick="wsLogs(\''+esc(r.integration_id)+'\')">Logs</button>'
-      +'</div>';
-  }).join('');
-  show('ws-list', rows || '<span class="muted">no integrations yet</span>');
-  show('ws-add-state', tag('OK')+' '+body.integrations.length+' record(s) · mode '+esc(body.mode||'restricted')+' · skills '+body.skills.length);
+    const row = vbBuild('div', {class:'row', style:'margin:6px 0'});
+    row.appendChild(vbBuild('span', {class:'tag '+String(r.status||'')}, String(r.status||'')));
+    row.appendChild(vbBuild('b', null, String(r.display_name||r.origin||'')));
+    row.appendChild(vbBuild('span', {class:'muted'}, String(r.origin||'')));
+    row.appendChild(vbBuild('span', {class:'muted'}, 'caps:'+caps+' grants:'+grants));
+    if (r.manifest_link) row.appendChild(vbBuild('span', {class:'tag OK'}, 'link:'+String(r.manifest_link)));
+    else row.appendChild(vbBuild('span', {class:'tag UNAVAILABLE'}, 'unlinked'));
+    const id = String(r.integration_id || '');
+    const actions = [['Show', wsDetail], ['Inspect', wsInspect], ['Logs', wsLogs]];
+    actions.forEach(([label, fn]) => {
+      const b = vbBuild('button', {type:'button'}, label);
+      b.addEventListener('click', () => fn(id));
+      row.appendChild(b);
+    });
+    list.appendChild(row);
+  });
+  const wrap = vbBuild('div', null);
+  if(!(body.integrations||[]).length) wrap.appendChild(vbBuild('span', {class:'muted'}, 'no integrations yet'));
+  else wrap.appendChild(list);
+  show('ws-list', wrap);
+  show('ws-add-state', tag('OK')+' '+body.integrations.length+' record(s) · mode '+esc(body.mode||'restricted')+' · skills '+(body.skills||[]).length);
 }
 function wsPopulateSkills(skills){
   const active = (skills||[]).filter(s=>s.status==='active');
-  const opts = active.map(s=>'<option value="'+esc(s.skill_id)+'">'+esc(s.skill_id)+' (v'+esc(s.version)+')</option>').join('')
-    || '<option value="">no active skills</option>';
+  const opts = active.map(s => ({
+    value: String(s.skill_id || ''),
+    label: String(s.skill_id || '') + ' (v' + String(s.version || '') + ')',
+  }));
+  if(!opts.length) opts.push({ value: '', label: 'no active skills' });
   ['ws-skill-beginner','ws-skill-adv'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el) el.innerHTML=opts;
+    fillOptions(document.getElementById(id), opts);
   });
 }
 async function wsLink(id, skillId){
@@ -659,17 +694,21 @@ async function actList(){
   const {status,body,authRequired} = await api('/api/actions');
   if(authRequired){ show('act-beginner-state', tag('UNAVAILABLE')+' pair this dashboard'); return; }
   const rows = (body&&body.actions||[]);
-  const html = rows.map(a=>{
+  const wrap = vbBuild('div', {style:'margin-top:6px'});
+  if(!rows.length) wrap.appendChild(vbBuild('span', {class:'muted'}, 'no actions'));
+  rows.forEach(a => {
     const eff = a.effective||{};
-    return '<div class="muted" style="margin:4px 0">'+esc(a.action_id)
-      +' <span class="tag '+esc(a.tier)+'">'+esc(a.tier)+'</span>'
-      +' <span class="tag '+esc(eff.code||'UNKNOWN')+'">'+esc(eff.code||'UNKNOWN')+'</span>'
-      +' · '+esc(a.executor||'disabled')+' · '+(a.confirmation_required?'confirm required':'')
-      +'<div style="margin-left:14px;color:#7f8ca3">'+esc((a.summary||'').slice(0,120))+'</div></div>';
-  }).join('')||'<span class="muted">no actions</span>';
-  show('act-beginner', '<div style="margin-top:6px">'+html+'</div>');
+    const line = vbBuild('div', {class:'muted', style:'margin:4px 0'});
+    line.appendChild(vbBuild('span', null, String(a.action_id||'')));
+    line.appendChild(vbBuild('span', {class:'tag '+String(a.tier||'')}, String(a.tier||'')));
+    line.appendChild(vbBuild('span', {class:'tag '+String(eff.code||'UNKNOWN')}, String(eff.code||'UNKNOWN')));
+    line.appendChild(vbBuild('span', null, ' · '+String(a.executor||'disabled')+' · '+(a.confirmation_required?'confirm required':'')));
+    line.appendChild(vbBuild('div', {style:'margin-left:14px;color:#7f8ca3'}, String((a.summary||'').slice(0,120))));
+    wrap.appendChild(line);
+  });
+  show('act-beginner', wrap);
   const sel = document.getElementById('act-sel');
-  if(sel) sel.innerHTML = rows.map(a=>'<option value="'+esc(a.action_id)+'">'+esc(a.action_id)+'</option>').join('');
+  if(sel) fillOptions(sel, rows.map(a => ({ value: String(a.action_id||''), label: String(a.action_id||'') })));
   show('act-beginner-state', ' '+rows.length+' action contract(s) · mode '+esc(body&&body.mode||'?'));
 }
 async function actReceipts(){

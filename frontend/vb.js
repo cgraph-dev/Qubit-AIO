@@ -5,6 +5,12 @@
  * never embedded in HTML, reports, logs, screenshots, or error messages.
  * A missing/wrong token yields a typed {status:401, authRequired:true} and a
  * plain-language "Pair this dashboard" hint linking to /token-setup.
+ *
+ * API base: same-origin by default. The ONLY way to point the dashboard at a
+ * remote bridge is the explicit Settings/Pairing action, which validates the
+ * origin, requires user confirmation, tests the candidate token BEFORE saving,
+ * and never follows a ?api= query string (an attacker-controlled URL is
+ * ignored so the stored token is never sent to an unapproved origin).
  */
 (function () {
   'use strict';
@@ -17,6 +23,34 @@
 
   function vbApiBase() {
     try { return (localStorage.getItem(API_KEY) || '').replace(/\/+$/, ''); } catch (e) { return ''; }
+  }
+
+  /* Strict origin validation for the explicit pairing/settings action.
+   * Accepts: empty (same-origin), loopback http, or https (confirmed by the
+   * caller). Rejects credentials, query strings, fragments, and non-http(s). */
+  function vbValidateApiOrigin(input) {
+    var v = String(input || '').trim().replace(/\/+$/, '');
+    if (!v) return { base: '', error: '' };
+    var u = null;
+    try { u = new URL(v); } catch (e) { u = null; }
+    if (!u) return { base: '', error: 'Enter a valid server address (https://…), or leave empty for this device.' };
+    var proto = String(u.protocol || '').toLowerCase();
+    if (proto !== 'http:' && proto !== 'https:') {
+      return { base: '', error: 'Only http(s) server addresses are allowed.' };
+    }
+    if (proto === 'http:') {
+      var host = String(u.hostname || '').toLowerCase();
+      if (!/^(127\.0\.0\.1|localhost|\[::1\])$/.test(host)) {
+        return { base: '', error: 'Plain HTTP is only allowed for loopback (127.0.0.1 / localhost).' };
+      }
+    }
+    if (u.username || u.password) {
+      return { base: '', error: 'Do not include credentials in the server address.' };
+    }
+    if (u.search || u.hash) {
+      return { base: '', error: 'Do not include query strings or fragments in the server address.' };
+    }
+    return { base: u.origin, error: '' };
   }
 
   /* Never accept ?token= — query-string tokens are rejected by the backend
@@ -86,9 +120,74 @@
              error: ok ? null : ('http-' + res.status) };
   }
 
+  /* Shared authenticated BINARY helper (Packet 8L): same X-Api-Token header
+   * contract as vbApi, but returns a Blob for downloads / Blob-object-URLs.
+   * Never parses binary as JSON and never places the token in a URL. */
+  async function vbFetchBinary(path) {
+    var base = vbApiBase();
+    try {
+      var res = await fetch(base + path, {
+        headers: vbHeaders({ 'Accept': 'application/octet-stream' })
+      });
+      if (res.status === 401) {
+        vbPairHint();
+        return { ok: false, status: 401, authRequired: true, blob: null };
+      }
+      if (!res.ok) {
+        return { ok: false, status: res.status, authRequired: false, blob: null };
+      }
+      var blob = await res.blob();
+      return { ok: true, status: res.status, authRequired: false, blob: blob };
+    } catch (e) {
+      return { ok: false, status: 0, authRequired: false, error: 'network', blob: null };
+    }
+  }
+
+  /* Download a Blob as a file; revoke the object URL after the click. */
+  function vbDownload(blob, filename) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename || 'download';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { try { URL.revokeObjectURL(url); } catch (e) {} }, 4000);
+  }
+
+  /* Open a Blob (authenticated HTML view) in a new tab via a temporary object
+   * URL; revoke it after the tab has had time to load. */
+  function vbOpenBinary(blob) {
+    var url = URL.createObjectURL(blob);
+    var w = window.open(url, '_blank');
+    setTimeout(function () { try { URL.revokeObjectURL(url); } catch (e) {} }, 60000);
+    return w;
+  }
+
+  /* Test a candidate pairing (api base + token) WITHOUT persisting it. Used by
+   * the Settings and token-setup flows so an invalid/expired token or an
+   * unreachable bridge never replaces the working stored token. */
+  async function vbApiTest(base, token) {
+    var b = String(base || '').replace(/\/+$/, '');
+    try {
+      var res = await fetch(b + '/api/status', {
+        headers: { 'X-Api-Token': String(token || '') },
+        cache: 'no-store'
+      });
+      return { status: res.status, ok: res.status >= 200 && res.status < 300 };
+    } catch (e) {
+      return { status: 0, ok: false, error: 'network' };
+    }
+  }
+
   window.vbToken = vbToken;
   window.vbApiBase = vbApiBase;
+  window.vbValidateApiOrigin = vbValidateApiOrigin;
   window.vbHeaders = vbHeaders;
   window.vbApi = vbApi;
+  window.vbFetchBinary = vbFetchBinary;
+  window.vbDownload = vbDownload;
+  window.vbOpenBinary = vbOpenBinary;
+  window.vbApiTest = vbApiTest;
   window.vbPairHint = vbPairHint;
 })();

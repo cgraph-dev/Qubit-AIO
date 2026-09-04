@@ -21,15 +21,24 @@ It is stored only in this browser's localStorage.</p>
 <script src="/static/vb.js"></script>
 <script>
 async function save(){
- const t=document.getElementById('tok').value.trim();
- // The token is stored ONLY in localStorage; it is never placed in a URL.
- localStorage.setItem('vdb_token',t);
- const msg=document.getElementById('msg');
- // Validate with the SHARED helper: X-Api-Token header, no query string.
- const r=await vbApi('/api/status');
- if(r.status===200){msg.className='ok';msg.textContent='Paired ✓ — you can now open /activity or /';
-  setTimeout(()=>location.href='/activity',800);}
- else if(r.status===401){msg.className='err';msg.textContent='Token rejected (401) — check the token and try again.';}
- else{msg.className='err';msg.textContent='Bridge unavailable ('+r.status+') — start the bridge first.';}
+  const t=document.getElementById('tok').value.trim();
+  const msg=document.getElementById('msg');
+  if(!t){ msg.className='err'; msg.textContent='Enter the dashboard token first.'; return; }
+  // Packet 8L: TEST the candidate token with the X-Api-Token request header
+  // BEFORE saving. The previous working token is preserved when the candidate
+  // is invalid, expired, or the bridge is unreachable. The token is never
+  // placed in a URL.
+  const r=await vbApiTest('', t);
+  if(r.status===200){
+    localStorage.setItem('vdb_token', t);
+    msg.className='ok'; msg.textContent='Paired ✓ — you can now open /activity or /';
+    setTimeout(()=>location.href='/activity',800);
+  }
+  else if(r.status===401){
+    msg.className='err'; msg.textContent='Token rejected (401) — your previous token was kept.';
+  }
+  else{
+    msg.className='err'; msg.textContent='Bridge unavailable (' + (r.status||0) + ') — your previous token was kept.';
+  }
 }
 </script></main></body></html>

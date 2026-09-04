@@ -141,15 +141,18 @@ def test_report_persist_and_verify_present():
     assert "40-word" in txt.lower() or "40-word max" in txt.lower()
 
 def test_no_frontend_touched():
-    # Frontend IS intentionally updated in this batch: activity.html bugfix + reports.html
-    # Verify the expected frontend files exist and the duplicate-TOKEN bug is fixed.
+    # Frontend IS intentionally updated in this batch: activity/reports moved to
+    # the SHARED authenticated helper. Verify the pages exist and use the
+    # current vb.js/vbApi contract (token comes from vbToken, never a local
+    # duplicate TOKEN const).
     assert (ROOT/"frontend/reports.html").exists(), "frontend/reports.html must exist"
     assert (ROOT/"frontend/activity.html").exists()
     t=(ROOT/"frontend/activity.html").read_text()
-    # no duplicate TOKEN const
-    assert t.count("const TOKEN")==1, f"activity.html still has duplicate TOKEN ({t.count('const TOKEN')})"
-    # /api/activity fetch must send token
-    assert "headers: hdrs()" in t or 'hdrs()' in t, "activity.html should send X-Api-Token"
+    # no duplicate TOKEN const (the shared vb.js owns the token)
+    assert "const TOKEN" not in t, "activity.html must not define its own TOKEN"
+    # shared authenticated helper loaded; API calls go through vbApi()
+    assert "/static/vb.js" in t and "/static/ui.js" in t
+    assert "vbApi('/api/activity" in t, "activity.html should use the shared vbApi helper"
 
 
 def test_moonshine_chunking_guard():
@@ -181,15 +184,15 @@ def test_moonshine_chunking_guard():
 def test_activity_html_js_is_valid():
     """activity.html had `const TOKEN=*** URLSearchParams(...)` — a JS syntax
     error that killed the ENTIRE activity page. It must now use the shared
-    authenticated helper (frontend/vb.js) and a valid `new URLSearchParams`
-    for the ?api= base — never a query-string token."""
+    authenticated helper (frontend/vb.js): the token comes from vbToken() only,
+    and an attacker-controlled ?api= query string is never honored."""
     import subprocess, tempfile, pathlib
     t = (ROOT / "frontend/activity.html").read_text()
-    # shared helper loaded; token comes from vbToken() (browser storage only)
-    assert "/static/vb.js" in t and "vbToken" in t, "activity.html must load the shared vb.js helper"
-    # URLSearchParams still used for the ?api= BASE (not for a token)
-    assert "new URLSearchParams" in t, "activity.html BASE init broken"
-    # query-string tokens are never accepted
+    # shared helpers loaded; token comes from vbToken() (browser storage only)
+    assert "/static/vb.js" in t and "/static/ui.js" in t
+    assert "vbApi(" in t, "activity.html must use the shared vbApi helper"
+    # no ?api= URLSearchParams override, no query-string token read
+    assert "new URLSearchParams" not in t, "activity.html must not honor ?api="
     assert "get('token')" not in t and 'get("token")' not in t, \
         "activity.html must not read a query-string token"
     assert t.count("***") == 0, f"activity.html still contains literal *** ({t.count('***')})"
@@ -207,10 +210,14 @@ def test_activity_html_js_is_valid():
 
 
 def test_reports_page_fetches_with_token():
-    """reports.html must declare a single TOKEN and use it in headers."""
+    """reports.html must NOT declare its own TOKEN const: it uses the shared
+    authenticated helper (frontend/vb.js) which sends X-Api-Token from
+    vbToken(), and never honors a ?api= override or query-string token."""
     t = (ROOT / "frontend/reports.html").read_text()
-    assert t.count("const TOKEN") == 1, "reports.html duplicate TOKEN"
-    assert "new URLSearchParams" in t and t.count("***") == 0
+    assert "const TOKEN" not in t, "reports.html must not define its own TOKEN"
+    assert "/static/vb.js" in t and "/static/ui.js" in t
+    assert "vbApi('/api/reports" in t
+    assert "new URLSearchParams" not in t and t.count("***") == 0
 
 
 def test_task_queue_fifo_and_capacity():

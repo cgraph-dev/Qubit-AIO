@@ -32,6 +32,7 @@ def ui_server(tmp_path_factory):
     from voicebridge.config import Config
     from voicebridge.webui import WebUI
     state = tmp_path_factory.mktemp("state")
+    _seed_8l_state(state)
     p = state / "voice.yaml"
     p.write_text(f"logging:\n  jsonl_path: '{state}'\nwebui:\n  token: test-token\n")
     cfg = Config.load(p)
@@ -59,6 +60,86 @@ def ui_server(tmp_path_factory):
     ui.stop()
 
 
+def _seed_8l_state(state) -> None:
+    """Seed backend state used by the Packet 8L browser tests: one canonical
+    report bundle (for authenticated export/html/asset flows) and hostile
+    backend-controlled values (integration_id, skill_id, profile_id) to prove
+    the Settings UI renders them as text and never executes them."""
+    import hashlib
+    import json
+    from voicebridge.communications.contracts import (  # noqa: E402
+        CommunicationItem, EvidenceAssetRecord, EvidenceStatus, Platform,
+        ReadState, ReportManifest, ReportStatus,
+    )
+    from voicebridge.communications.reports import ReportStore  # noqa: E402
+
+    store = ReportStore(state / "reports")
+    items = [CommunicationItem.create(
+        platform=Platform.GMAIL, account_scope="a",
+        sender="Synthetic Sender", subject="Synthetic subject",
+        preview="synthetic preview", is_new=True, read_state=ReadState.UNREAD,
+        safe_url="https://mail.google.com/mail/u/0/#inbox",
+        source_item_id="m1", adapter="gmail", adapter_version="8b-gmail-2")]
+    manifest = ReportManifest.create(
+        window_start=1_700_000_000.0, window_end=1_700_000_500.0,
+        status=ReportStatus.SUCCESS, new_count=1, platforms=("gmail",),
+        accounts=("a",), item_identities=tuple(i.identity for i in items),
+        summary="Synthetic report summary", report_id="report_8l1")
+    # a real 1x1 PNG so the authenticated blob renders as a decodable image
+    import base64
+    data = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+        "+A8AAQUBAScY42YAAAAASUVORK5CYII=")
+    asset = EvidenceAssetRecord.create(
+        report_id="report_8l1", item_identity=items[0].identity,
+        mime="image/png", byte_count=len(data),
+        sha256=hashlib.sha256(data).hexdigest(),
+        redaction_status=EvidenceStatus.AVAILABLE)
+    store.render(manifest, items, [asset], asset_bytes={asset.asset_id: data})
+
+    hostile = {
+        "integration_id": '<img src=x onerror="window.__xss=1">',
+        "origin": "https://example.com",
+        "url": "https://example.com/page",
+        "display_name": 'Hostile <script>alert(1)</script>',
+        "status": "READY",
+        "enabled": False,
+        "requested_capabilities": [], "requested_scopes": [], "grant_ids": [],
+        "sensitivity": "personal", "approval_policy": "auto",
+        "auth_required": False,
+        "manifest_link": "https://example.com/manifest",
+        "created_at": 1_700_000_000.0, "updated_at": 1_700_000_000.0,
+    }
+    (state / "websites.json").write_text(json.dumps({
+        "schema": 1, "integrations": {"hostile_ws": hostile},
+        "removed": {}, "audit": []}, indent=2))
+    (state / "permissions.json").write_text(json.dumps({
+        "mode": "restricted", "mode_scopes": [], "grants": [], "audit": [],
+        # skill_id is backend-validated (hostile ids are rejected by the store),
+        # so a VALID skill is seeded here; hostile skill_id RENDERING is tested
+        # separately by driving wsPopulateSkills directly in the browser test.
+        "skills": {"render-skill": {
+            "skill_id": "render-skill",
+            "manifest": {
+                "skill_id": "render-skill", "version": "1.0.0",
+                "name": "Render skill", "source": "https://example.com/skill",
+                "revision": "abc123", "license": "MIT",
+                "content_hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "capabilities": ["read.reports"], "scopes": ["https://example.com"],
+                "tier": "read_only", "sensitivity": "personal",
+                "approval_policy": "auto", "timeout_s": 30,
+                "resource_limits": {}, "audit_events": ["skill.used"],
+                "compatibility": "linux", "rollback": "disabled",
+            },
+            "status": "active", "installed_at": 0.0,
+        }}}, indent=2))
+    (state / "profiles.json").write_text(json.dumps({"profiles": [{
+        "id": '<img src=x onerror="window.__xss=3">', "kind": "brain",
+        "source": "https://example.com/s", "revision": "r1",
+        "license": "MIT", "hardware": "any",
+    }]}, indent=2))
+
+
 @pytest.fixture()
 def browser():
     try:
@@ -77,7 +158,10 @@ def browser():
 
 
 def _page(browser, base, path="/", viewport=None, authed=True):
-    page = browser.new_page(viewport=viewport or {"width": 1280, "height": 800})
+    ctx = browser.new_context(
+        viewport=viewport or {"width": 1280, "height": 800},
+        accept_downloads=True)
+    page = ctx.new_page()
     if authed:
         page.add_init_script("localStorage.setItem('vdb_token','test-token');")
     errors = []
@@ -419,5 +503,191 @@ def test_bounded_activity_dom(browser, ui_server):
         page.wait_for_timeout(4500)
         third = page.locator(".item").count()
         assert third == second <= 5, (second, third)
+    finally:
+        page.close()
+
+
+def test_settings_hostile_values_never_execute(browser, ui_server):
+    """Packet 8L XSS repair: hostile backend values (integration_id, origin,
+    display_name, manifest_link, status, skill_id, profile_id) are rendered as
+    literal text through DOM/textContent/safe-HTML — never as live HTML or
+    inline handlers."""
+    page, errors = _page(browser, ui_server, "/settings")
+    try:
+        page.wait_for_function(
+            "(o) => { const el = document.getElementById('health'); "
+            "return el && el.textContent.indexOf(o.needle) !== -1; }",
+            arg={"needle": "bridge up"}, timeout=8000)
+        # hostile profile_id must appear as literal option text in brain-sel
+        page.wait_for_function(
+            "() => { const s = document.getElementById('brain-sel'); "
+            "return s && s.options.length > 0; }", timeout=8000)
+        brain_text = page.evaluate(
+            "[...document.getElementById('brain-sel').options].map(o => o.textContent).join('|')")
+        assert "<img" in brain_text and "onerror" in brain_text, \
+            "hostile profile_id must render as literal text in the select"
+        # drive the skill/action option builders directly with hostile values
+        page.evaluate(
+            "(p) => { "
+            " window.fillOptions(document.getElementById('act-sel'), "
+            "   [{value: p.action_id, label: p.action_label}]);"
+            " window.wsPopulateSkills([{skill_id: p.skill_id,"
+            "   status:'active', version: p.version}]); }",
+            {"action_id": '<img src=x onerror=window.__xss=4>',
+             "action_label": 'hostile <script>action</script> "quotes" \\ backslash',
+             "skill_id": '<img src=x onerror=window.__xss=5>',
+             "version": '<script>1</script>'})
+        act_text = page.evaluate(
+            "[...document.getElementById('act-sel').options].map(o => o.value + '::' + o.textContent).join('|')")
+        assert "onerror=window.__xss=4" in act_text, "hostile action_id must stay literal text"
+        assert '"quotes"' in act_text and "backslash" in act_text, \
+            "hostile action label quotes/backslashes must stay literal text"
+        skill_text = page.evaluate(
+            "[...document.getElementById('ws-skill-beginner').options].map(o => o.textContent).join('|')")
+        assert "onerror=window.__xss=5" in skill_text, \
+            "hostile skill_id must stay literal text in the options"
+        # render the seeded hostile website integration via the real backend
+        page.locator("button:has-text('Refresh list')").first.click()
+        page.wait_for_function(
+            "() => { const el = document.getElementById('ws-list'); "
+            "return el && el.children.length > 0; }", timeout=8000)
+        ws_text = page.evaluate(
+            "document.getElementById('ws-list').innerText")
+        # the displayed hostile values (display_name/status/origin/manifest_link)
+        # render as literal text, never as live markup
+        assert "Hostile" in ws_text and "<script>" in ws_text
+        assert "onerror" not in ws_text
+        # no hostile payload may have executed
+        assert page.evaluate("window.__xss") is None, "hostile JS executed!"
+        # no live <img>/<script> may exist anywhere from the hostile data
+        assert page.evaluate(
+            "document.querySelectorAll('#ws-list img, #ws-list script, "
+            "#brain-sel img, #ws-skill-beginner img, #act-sel img').length") == 0
+        assert not errors, errors
+    finally:
+        page.close()
+
+
+def test_report_operations_authenticated(browser, ui_server):
+    """Packet 8L report-operations repair: Open report / Export / Print /
+    screenshot all fetch through the authenticated binary helper (header token),
+    never as plain <a href>/<img src>/window.open URLs that would 401."""
+    page, errors = _page(browser, ui_server, "/")
+    unauth = []
+    page.on("response", lambda r: unauth.append(r.url)
+            if r.status == 401 and "/api/reports/" in r.url else None)
+    try:
+        _wait_status(page, "bridge up")
+        page.click("#reportslink")
+        page.wait_for_function(
+            "() => { const el = document.getElementById('reports-list'); "
+            "return el && el.textContent.indexOf('report_8l1') !== -1; }",
+            timeout=8000)
+        # Export -> authenticated blob download
+        with page.expect_download() as dl:
+            page.locator("#reports-list button[title='Download bundle (.zip)']").first.click()
+        download = dl.value
+        assert download.suggested_filename == "report_8l1.zip"
+        assert download.path() is not None
+        assert download.path().stat().st_size > 0
+        # Open report detail -> authenticated blob asset thumbnail
+        page.locator("#reports-list button[title='Open report detail']").first.click()
+        page.wait_for_function(
+            "() => { const imgs = document.querySelectorAll('#reportspanel img'); "
+            "return imgs.length > 0; }", timeout=8000)
+        page.wait_for_function(
+            "() => { const imgs = document.querySelectorAll('#reportspanel img'); "
+            "return imgs.length > 0 && imgs[0].naturalWidth > 0; }", timeout=8000)
+        assert page.evaluate(
+            "document.querySelector('#reportspanel img').src.indexOf('blob:') === 0"), \
+            "screenshot asset must be an authenticated blob object URL"
+        # Print -> authenticated blob open in a new tab
+        with page.expect_popup() as popup_info:
+            page.locator("#reportspanel button[title='Open print view']").first.click()
+        popup = popup_info.value
+        popup.wait_for_load_state("domcontentloaded")
+        assert popup.url.startswith("blob:"), f"print view must be a blob URL, got {popup.url[:60]}"
+        popup.close()
+        assert not unauth, f"report operations hit 401: {unauth}"
+        assert page.locator("#pair-hint").count() == 0
+        assert not errors, errors
+    finally:
+        page.close()
+
+
+def test_api_origin_attacker_rejected(browser, ui_server):
+    """Packet 8L API-origin repair: ?api=https://attacker.example must be
+    ignored (never persisted), no X-Api-Token request may be sent there, and
+    the page keeps working against the same-origin bridge."""
+    page, errors = _page(browser, ui_server, "/?api=https://attacker.example")
+    attacker = []
+    page.on("request", lambda r: attacker.append(r.url)
+            if r.url.startswith("https://attacker.example") else None)
+    try:
+        _wait_status(page, "bridge up")
+        assert not attacker, f"requests sent to attacker origin: {attacker}"
+        assert page.evaluate("localStorage.getItem('vdb_api')") is None or \
+            page.evaluate("localStorage.getItem('vdb_api')") == "", \
+            "attacker ?api= must not be persisted to vdb_api"
+        # token is still present and header-only
+        assert page.evaluate("localStorage.getItem('vdb_token')") == "test-token"
+        assert not errors, errors
+    finally:
+        page.close()
+
+
+def test_pairing_success_saves_token(browser, ui_server):
+    """Packet 8L pairing repair: a valid candidate token is saved only after a
+    successful authenticated /api/status."""
+    page = browser.new_page(viewport={"width": 1280, "height": 800})
+    try:
+        page.goto(ui_server + "/", wait_until="domcontentloaded")
+        page.click("#gearlink")
+        page.fill("#set-token", "test-token")
+        page.click("#set-save")
+        page.wait_for_function(
+            "() => localStorage.getItem('vdb_token') === 'test-token'",
+            timeout=8000)
+    finally:
+        page.close()
+
+
+def test_pairing_invalid_network_preserve_previous_token(browser, ui_server):
+    """Packet 8L pairing repair: a 401 candidate and an unreachable bridge must
+    preserve the previous working token; a later valid retry succeeds."""
+    page = browser.new_page(viewport={"width": 1280, "height": 800})
+    dialogs = []
+    page.on("dialog", lambda d: (dialogs.append(d.message), d.accept()))
+    try:
+        page.add_init_script(
+            "localStorage.setItem('vdb_token','prev-valid');")
+        page.goto(ui_server + "/", wait_until="domcontentloaded")
+        page.click("#gearlink")
+        # 401: wrong token must NOT overwrite the stored token
+        page.fill("#set-token", "definitely-wrong")
+        page.click("#set-save")
+        page.wait_for_function(
+            "() => { const el = document.getElementById('set-status'); "
+            "return el && el.textContent.indexOf('rejected') !== -1; }",
+            timeout=8000)
+        assert page.evaluate("localStorage.getItem('vdb_token')") == "prev-valid"
+        # network failure: loopback http to a dead port, confirm() accepted
+        page.fill("#set-api", "http://127.0.0.1:1")
+        page.click("#set-save")
+        page.wait_for_function(
+            "() => { const el = document.getElementById('set-status'); "
+            "return el && el.textContent.indexOf('unavailable') !== -1; }",
+            timeout=8000)
+        assert dialogs, "remote-origin pairing must ask for confirmation"
+        assert page.evaluate("localStorage.getItem('vdb_token')") == "prev-valid"
+        assert page.evaluate("localStorage.getItem('vdb_api')") in (None, ""), \
+            "unreachable bridge must not persist a new API origin"
+        # retry with the correct token and same-origin -> saved
+        page.fill("#set-api", "")
+        page.fill("#set-token", "test-token")
+        page.click("#set-save")
+        page.wait_for_function(
+            "() => localStorage.getItem('vdb_token') === 'test-token'",
+            timeout=8000)
     finally:
         page.close()

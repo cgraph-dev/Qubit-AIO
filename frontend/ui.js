@@ -12,18 +12,11 @@
 
   function noop() {}
 
-  /* Effective API base. A transient ?api= override is persisted to the same
-   * localStorage key vbApiBase() reads, so vbApi() and vbStream() agree on the
-   * base for the whole session (matches the existing "set-api" save control). */
+  /* Effective API base: same-origin by default. A ?api= query string is
+   * NEVER honored (an attacker-controlled URL could otherwise redirect the
+   * stored token); the base is changed only through the explicit pairing /
+   * Settings action in vb.js (vbValidateApiOrigin + confirmation + test). */
   function vbResolveBase() {
-    try {
-      var q = new URLSearchParams(location.search).get('api');
-      if (q) {
-        var cur = (localStorage.getItem('vdb_api') || '').replace(/\/+$/, '');
-        var next = String(q).replace(/\/+$/, '');
-        if (next && next !== cur) localStorage.setItem('vdb_api', next);
-      }
-    } catch (e) { /* private mode: fall through to vbApiBase */ }
     return window.vbApiBase ? window.vbApiBase() : '';
   }
 
@@ -116,6 +109,42 @@
     el.textContent = String(text || '');
   }
 
+  /* Audited safe-HTML renderer (Packet 8L). Builds real nodes from a template
+   * and strips every inline on* event attribute, javascript: URLs, and
+   * script/style/iframe/object/embed elements. Settings' dynamic data is
+   * already escaped; this neutralizes any residual markup so hostile values
+   * can never execute. Falls back to clear-text rendering when a string is
+   * not parseable. */
+  function vbSafeHTML(el, html) {
+    if (typeof el === 'string') el = document.getElementById(el);
+    if (!el) return el;
+    var t = document.createElement('template');
+    var text = html == null ? '' : String(html);
+    try { t.innerHTML = text; }
+    catch (e) { vbClear(el); el.textContent = text; return el; }
+    function strip(node) {
+      if (!node || node.nodeType !== 1) return;
+      if (/^(script|style|iframe|object|embed)$/i.test(node.tagName)) {
+        if (node.parentNode) node.parentNode.removeChild(node);
+        return;
+      }
+      var attrs = Array.prototype.slice.call(node.attributes || []);
+      for (var i = 0; i < attrs.length; i++) {
+        var name = String(attrs[i].name || '').toLowerCase();
+        var value = String(attrs[i].value || '').trim().toLowerCase();
+        if (name.indexOf('on') === 0 || value.indexOf('javascript:') === 0) {
+          node.removeAttribute(attrs[i].name);
+        }
+      }
+      Array.prototype.forEach.call(node.childNodes, strip);
+    }
+    Array.prototype.forEach.call(
+      Array.prototype.slice.call(t.content.childNodes), strip);
+    vbClear(el);
+    el.appendChild(t.content);
+    return el;
+  }
+
   /* Open the SSE stream with the shared header token. Returns a Promise of a
    * typed object {ok, status, authRequired, reader, cancel} — never parsed
    * JSON. Callers own the frame parser and must never execute streamed data. */
@@ -154,5 +183,6 @@
   window.vbStatus = vbStatus;
   window.vbApiMessage = vbApiMessage;
   window.vbAnnounce = vbAnnounce;
+  window.vbSafeHTML = vbSafeHTML;
   window.vbStream = vbStream;
 })();

@@ -143,11 +143,10 @@ FINISH: Every state explains what happened and what the operator can safely do n
 <script src="/static/vb.js"></script>
 <script src="/static/ui.js"></script>
 <script>
-// API base: same-origin by default (localhost/LAN). Override with ?api=<url>
-// so the same page works from Vercel against your PC's tunnel.
-// vbResolveBase() also persists ?api= to vdb_api so vbApi() and vbStream() agree.
-vbResolveBase();
-let BASE = (new URLSearchParams(location.search).get('api') || localStorage.getItem('vdb_api') || '').replace(/\/$/, '');
+// API base is same-origin by default. An attacker-controlled ?api= query string
+// is NEVER honored (it could redirect the stored token); the base is changed
+// only through the explicit Settings/Pairing action below, which validates the
+// origin, requires confirmation, and tests the token before saving.
 // Token comes ONLY from localStorage via the shared helper (frontend/vb.js).
 // Query-string tokens are never accepted or placed in URLs.
 
@@ -307,12 +306,37 @@ const panel = document.getElementById('settings');
 gear.addEventListener('click', (e) => { e.preventDefault(); panel.style.display = panel.style.display === 'none' ? 'block' : 'none'; });
 document.getElementById('set-api').value = localStorage.getItem('vdb_api') || '';
 document.getElementById('set-token').value = localStorage.getItem('vdb_token') || '';
-document.getElementById('set-save').addEventListener('click', () => {
-  const a = document.getElementById('set-api').value.trim().replace(/\/$/, '');
-  const t = document.getElementById('set-token').value.trim();
-  localStorage.setItem('vdb_api', a); localStorage.setItem('vdb_token', t);
-  // reload so BASE picks up the saved values cleanly
-  location.reload();
+// Explicit pairing action (Packet 8L): validate the origin strictly, ask for
+// confirmation when switching servers, TEST the candidate token with the
+// request header BEFORE saving, and keep the previous working token whenever
+// the candidate is rejected, expired, or the bridge is unreachable. The
+// stored token is never sent to an unapproved origin.
+document.getElementById('set-save').addEventListener('click', async () => {
+  const statusEl = document.getElementById('set-status');
+  statusEl.style.color = '#8b949e';
+  const apiCheck = vbValidateApiOrigin(document.getElementById('set-api').value);
+  if (apiCheck.error) { statusEl.textContent = apiCheck.error; statusEl.style.color = '#f85149'; return; }
+  const tok = document.getElementById('set-token').value.trim();
+  const base = apiCheck.base;
+  const changed = base && base !== vbApiBase();
+  if (changed && !confirm('Pair this browser with ' + base + '?\n\nYour dashboard token will be sent ONLY to this address, using the X-Api-Token header. Only continue if you trust it.')) {
+    statusEl.textContent = 'Pairing cancelled — previous server kept.';
+    return;
+  }
+  const res = await vbApiTest(base, tok);
+  if (res.status === 200) {
+    localStorage.setItem('vdb_api', base);
+    localStorage.setItem('vdb_token', tok);
+    statusEl.textContent = 'Paired and saved. Reloading…';
+    statusEl.style.color = '#3fb950';
+    setTimeout(() => location.reload(), 400);
+  } else if (res.status === 401) {
+    statusEl.textContent = 'Token rejected (401) — previous pairing kept.';
+    statusEl.style.color = '#f85149';
+  } else {
+    statusEl.textContent = 'Bridge unavailable (' + (res.status || 0) + ') — previous pairing kept.';
+    statusEl.style.color = '#f85149';
+  }
 });
 
 async function playResult(data) {
@@ -864,11 +888,13 @@ vbApi('/api/status').then(res => {
         + ' · ' + new Date(r.created_at * 1000).toLocaleString();
       const foot = document.createElement('div');
       foot.appendChild(btn('view', 'Open report detail', () => openDetail(r.report_id)));
-      foot.appendChild(btn('export', 'Download bundle (.zip)', () => {
-        const a = document.createElement('a');
-        a.href = BASE + '/api/reports/export/' + encodeURIComponent(r.report_id);
-        a.download = r.report_id + '.zip';
-        document.body.appendChild(a); a.click(); a.remove();
+      foot.appendChild(btn('export', 'Download bundle (.zip)', async () => {
+        const bin = await vbFetchBinary('/api/reports/export/' + encodeURIComponent(r.report_id));
+        if (bin.ok && bin.blob) {
+          vbDownload(bin.blob, r.report_id + '.zip');
+        } else {
+          addMsg('meta', '· export ' + (bin.authRequired ? 'not paired' : 'failed (' + (bin.status || 0) + ')'));
+        }
       }));
       card.appendChild(head); card.appendChild(meta); card.appendChild(foot);
       listEl.appendChild(card);
@@ -910,9 +936,20 @@ vbApi('/api/status').then(res => {
         if(aid){
           const img = document.createElement('img');
           img.alt = 'scoped screenshot thumbnail';
-          img.src = BASE + '/api/reports/' + encodeURIComponent(rid) + '/assets/' + encodeURIComponent(aid);
           img.style.cssText = 'max-width:220px;border-radius:6px;margin-top:4px;display:block;';
           row.appendChild(img);
+          // Authenticated asset: fetch with the header token, display via a
+          // temporary blob object URL, and revoke it once decoded.
+          vbFetchBinary('/api/reports/' + encodeURIComponent(rid) + '/assets/' + encodeURIComponent(aid)).then(ar => {
+            if (ar.ok && ar.blob) {
+              const url = URL.createObjectURL(ar.blob);
+              img.onload = () => { try { URL.revokeObjectURL(url); } catch (e) {} };
+              img.onerror = () => { try { URL.revokeObjectURL(url); } catch (e) {} };
+              img.src = url;
+            } else {
+              img.alt = 'evidence unavailable';
+            }
+          });
         }
         listEl.appendChild(row);
       });
@@ -923,8 +960,13 @@ vbApi('/api/status').then(res => {
           { method: 'POST', body: '{}' });
         load();
       }));
-      actions.appendChild(btn('print', 'Open print view', () => {
-        window.open(BASE + '/api/reports/' + encodeURIComponent(rid) + '/html', '_blank');
+      actions.appendChild(btn('print', 'Open print view', async () => {
+        const r = await vbFetchBinary('/api/reports/' + encodeURIComponent(rid) + '/html');
+        if (r.ok && r.blob) {
+          vbOpenBinary(r.blob);
+        } else {
+          addMsg('meta', '· print view ' + (r.authRequired ? 'not paired' : 'failed (' + (r.status || 0) + ')'));
+        }
       }));
       listEl.appendChild(actions);
     }).catch(() => { listEl.textContent = 'report detail unavailable'; });

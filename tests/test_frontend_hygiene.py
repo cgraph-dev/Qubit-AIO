@@ -95,12 +95,65 @@ def test_index_renders_with_textcontent_only() -> None:
     assert 'vbStream(' in text
 
 
-def test_settings_uses_escaping_chokepoint() -> None:
+def test_settings_uses_audited_safe_renderer() -> None:
+    """Packet 8L XSS repair: Settings has NO innerHTML assignments and NO
+    inline event attribute carrying dynamic/backend data. All dynamic content
+    is rendered through the shared audited sanitizer (vbSafeHTML), DOM
+    construction (vbBuild/fillOptions), textContent, data attributes, and
+    addEventListener."""
     text = _read("settings.html")
-    assert 'function show(id,html)' in text and 'innerHTML' in text
-    assert 'esc(' in text
-    assert '&quot;' in text and '&#39;' in text, \
-        "settings esc() must escape quotes for attribute contexts"
+    assert "innerHTML" not in text, "settings.html must not use innerHTML"
+    assert "vbSafeHTML" in text and "fillOptions" in text and "vbBuild" in text
+    assert "addEventListener" in text
+    assert 'esc(' in text  # text-context escaping still used for status copy
+    # no backend-controlled value may reach an inline event attribute:
+    # no onclick/onchange whose value interpolates esc() or a template/JS concat
+    assert not re.search(r'on(click|change|keydown)="[^"]*esc\(', text), \
+        "settings inline handler interpolates escaped dynamic data"
+    assert not re.search(r'on(click|change|keydown)="[^"]*\$', text), \
+        "settings inline handler uses a template literal"
+    assert 'onclick="' + "'" not in text and "onclick=\"'" not in text, \
+        "settings builds inline handlers via string concatenation"
+    # no option-list / row HTML built by string interpolation
+    assert not re.search(r"<\s*option[^>]*>\s*['\"]\s*\+", text)
+
+
+def test_no_query_string_api_override_anywhere() -> None:
+    """Packet 8L API-origin repair: no page may honor an attacker-controlled
+    ?api= query string, and the shared helpers must not read it."""
+    for page in PAGES:
+        text = _read(page)
+        assert "get('api')" not in text and 'get("api")' not in text, page
+    ui = (FRONTEND / "ui.js").read_text(encoding="utf-8")
+    vb = (FRONTEND / "vb.js").read_text(encoding="utf-8")
+    assert "URLSearchParams" not in ui, "ui.js must not read ?api="
+    assert "location.search" not in ui and "location.search" not in vb
+
+
+def test_shared_authenticated_binary_helper_contract() -> None:
+    """Packet 8L report-operations repair: the shared helper exposes
+    authenticated binary/download/open helpers using the same header token, and
+    pages never build unauthenticated report URLs."""
+    vb = (FRONTEND / "vb.js").read_text(encoding="utf-8")
+    for name in ["vbFetchBinary", "vbDownload", "vbOpenBinary", "vbApiTest",
+                 "vbValidateApiOrigin"]:
+        assert name in vb, f"vb.js missing shared helper {name}"
+    assert "X-Api-Token" in vb and "vbHeaders" in vb
+    index = _read("index.html")
+    assert "vbFetchBinary('/api/reports/" in index, \
+        "index.html must fetch report assets/export/html via vbFetchBinary"
+    assert "window.open(BASE" not in index and "BASE + '/api/reports" not in index, \
+        "index.html must not open unauthenticated report URLs"
+
+
+def test_pairing_token_tested_before_save() -> None:
+    """Packet 8L pairing repair: token-setup tests the candidate token via the
+    request header BEFORE persisting it to localStorage."""
+    text = _read("token-setup.html")
+    assert "vbApiTest" in text
+    assert "localStorage.setItem('vdb_token'" in text
+    assert text.index("vbApiTest") < text.index("localStorage.setItem('vdb_token'"), \
+        "token must be tested before it is saved"
 
 
 def test_shared_helpers_never_parse_unchecked_json() -> None:
