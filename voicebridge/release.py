@@ -1031,14 +1031,15 @@ def bounded_logs_check(root: Optional[Path] = None) -> List[Dict[str, str]]:
     return results
 
 
-def approved_signer_fingerprint() -> str:
+def approved_signer_fingerprint(env: Optional[Dict[str, str]] = None) -> str:
     """The single approved release-signer fingerprint (Packet 8K closure).
 
-    Read from ``$RELEASE_SIGNER_FINGERPRINT`` or from the repository
-    ``config/release-signer.fingerprint`` file (a single 40-hex-char line).
-    A full 40-character fingerprint is REQUIRED; short key IDs are never
-    trusted. Returns ``""`` when not configured."""
-    fp = os.environ.get("RELEASE_SIGNER_FINGERPRINT", "").strip()
+    Read from ``$RELEASE_SIGNER_FINGERPRINT`` (or the explicit ``env`` dict)
+    or from the repository ``config/release-signer.fingerprint`` file (a
+    single 40-hex-char line). A full 40-character fingerprint is REQUIRED;
+    short key IDs are never trusted. Returns ``""`` when not configured."""
+    src = os.environ if env is None else env
+    fp = src.get("RELEASE_SIGNER_FINGERPRINT", "").strip()
     if not fp:
         try:
             p = REPO / "config" / "release-signer.fingerprint"
@@ -1174,6 +1175,253 @@ def verify_artifact_signature(artifact: Path, sig: Optional[Path] = None,
                        f"fingerprint"), "signature": sig.name,
             "signer_fingerprint": validsigs[0],
             "approved": False}
+
+
+# ---------------------------------------------------------------------------
+# Release signing + source-hygiene workflow (Packet 8K-P signing support)
+#
+# Signing is OPTIONAL and school-only compatible. This is the generation and
+# verification surface for the documented detached-signature workflow:
+#   - SHA256SUMS (SHA-256 checksums for every wheel/sdist);
+#   - a signed release manifest (release-manifest.json + .asc);
+#   - per-artifact detached ASCII-armored signatures (<artifact>.asc);
+#   - gpg --verify based verification bound to the APPROVED public
+#     fingerprint (RELEASE_SIGNER_FINGERPRINT / config/release-signer.fingerprint).
+# The PUBLIC signer fingerprint is recorded; the PRIVATE key is never
+# generated, committed, printed, uploaded, or exposed here.
+# ---------------------------------------------------------------------------
+SHA256SUMS_NAME = "SHA256SUMS"
+RELEASE_MANIFEST_NAME = "release-manifest.json"
+RELEASE_MANIFEST_SCHEMA = 1
+
+
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 16), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def collect_artifacts(artifact_dir: Path) -> List[Path]:
+    """Wheel + sdist artifacts in a directory (sorted, deterministic)."""
+    d = Path(artifact_dir)
+    if not d.is_dir():
+        return []
+    out: List[Path] = []
+    for suffix in (".whl", ".tar.gz"):
+        out.extend(sorted(d.glob(f"*{suffix}")))
+    return out
+
+
+def generate_checksums(artifact_dir: Path) -> Dict[str, Any]:
+    """Write ``SHA256SUMS`` (``<sha256>  <filename>``) for every wheel/sdist.
+    Always safe and unsigned. Typed: OK / MISSING / FAILED."""
+    arts = collect_artifacts(artifact_dir)
+    if not arts:
+        return {"state": "MISSING",
+                "detail": f"no wheel/sdist artifacts in {artifact_dir}",
+                "path": None, "files": []}
+    try:
+        lines = [f"{_sha256_file(a)}  {a.name}" for a in arts]
+        out = Path(artifact_dir) / SHA256SUMS_NAME
+        out.write_text("\n".join(lines) + "\n")
+        return {"state": "OK", "path": str(out),
+                "files": [a.name for a in arts]}
+    except OSError as exc:
+        return {"state": "FAILED", "detail": f"checksum write failed: {exc}"}
+
+
+def _read_checksums(artifact_dir: Path) -> Dict[str, str]:
+    p = Path(artifact_dir) / SHA256SUMS_NAME
+    if not p.is_file():
+        return {}
+    out: Dict[str, str] = {}
+    for line in p.read_text(errors="replace").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split(None, 1)
+        if len(parts) == 2:
+            out[parts[1]] = parts[0].lower()
+    return out
+
+
+def verify_checksums(artifact_dir: Path) -> Dict[str, Any]:
+    """Recompute artifact hashes and compare to ``SHA256SUMS``. Typed:
+    OK / MISSING / FAILED (exact mismatches and missing files listed)."""
+    expected = _read_checksums(artifact_dir)
+    if not expected:
+        return {"state": "MISSING",
+                "detail": f"{SHA256SUMS_NAME} not present in {artifact_dir}"}
+    mismatches: List[str] = []
+    missing: List[str] = []
+    for name, want in expected.items():
+        p = Path(artifact_dir) / name
+        if not p.exists():
+            missing.append(name)
+            continue
+        if _sha256_file(p) != want:
+            mismatches.append(name)
+    if mismatches or missing:
+        return {"state": "FAILED",
+                "detail": "checksum mismatch (artifact modified): "
+                          + ", ".join(mismatches + missing),
+                "mismatches": mismatches, "missing": missing}
+    return {"state": "OK",
+            "detail": f"{len(expected)} artifact SHA-256 hashes match "
+                      f"{SHA256SUMS_NAME}"}
+
+
+def _gpg_env(homedir: Optional[Path] = None,
+             env: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+    out = os.environ.copy() if env is None else dict(env)
+    if homedir is not None:
+        out["GNUPGHOME"] = str(homedir)
+    return out
+
+
+def sign_detached(artifact: Path, *, homedir: Optional[Path] = None,
+                  env: Optional[Dict[str, str]] = None,
+                  key: Optional[str] = None) -> Dict[str, Any]:
+    """Create a detached ASCII-armored signature ``<artifact>.asc`` with gpg
+    (``gpg --detach-sign --armor``). Never exposes key material. Typed:
+    SIGNED / FAILED / DEGRADED."""
+    import shutil
+    gpg = shutil.which("gpg")
+    if not gpg:
+        return {"artifact": artifact.name, "state": "DEGRADED",
+                "detail": "gpg unavailable; cannot create a detached signature"}
+    sig = Path(str(artifact) + ".asc")
+    cmd = [gpg, "--batch", "--yes", "--armor", "--detach-sign"]
+    if key:
+        cmd += ["--local-user", str(key)]
+    cmd += ["--output", str(sig), str(artifact)]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=120,
+                           env=_gpg_env(homedir, env))
+    except Exception as exc:
+        return {"artifact": artifact.name, "state": "DEGRADED",
+                "detail": f"gpg failed to run: {exc}"}
+    if r.returncode != 0 or not sig.is_file():
+        return {"artifact": artifact.name, "state": "FAILED",
+                "detail": ("gpg detached-sign failed: "
+                           + " ".join((r.stderr or r.stdout or "").split())[:200])}
+    return {"artifact": artifact.name, "state": "SIGNED",
+            "signature": sig.name, "detail": "detached signature written"}
+
+
+def release_manifest(artifact_dir: Path,
+                     env: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    """The signed release-manifest payload (public data only: names, hashes,
+    sizes, public signer fingerprint). Never contains secret key material."""
+    return {
+        "schema_version": RELEASE_MANIFEST_SCHEMA,
+        "project": "qubit-voice-agent",
+        "checksums": SHA256SUMS_NAME,
+        "signer_fingerprint": approved_signer_fingerprint(env),
+        "artifacts": [
+            {"name": a.name, "sha256": _sha256_file(a),
+             "size_bytes": a.stat().st_size}
+            for a in collect_artifacts(artifact_dir)
+        ],
+    }
+
+
+def generate_signed_manifest(artifact_dir: Path, *, homedir: Optional[Path] = None,
+                             env: Optional[Dict[str, str]] = None,
+                             key: Optional[str] = None) -> Dict[str, Any]:
+    """Write ``release-manifest.json`` and its detached signature
+    ``release-manifest.json.asc``. The manifest itself is always written; only
+    the detached signature needs gpg. Typed: SIGNED / DEGRADED / FAILED /
+    MISSING."""
+    if not collect_artifacts(artifact_dir):
+        return {"state": "MISSING", "detail": "no artifacts",
+                "path": None, "signature": None}
+    mf = Path(artifact_dir) / RELEASE_MANIFEST_NAME
+    try:
+        mf.write_text(json.dumps(release_manifest(artifact_dir, env=env),
+                                 indent=2, sort_keys=True) + "\n")
+    except OSError as exc:
+        return {"state": "FAILED", "detail": f"manifest write failed: {exc}",
+                "path": str(mf), "signature": None}
+    sig = sign_detached(mf, homedir=homedir, env=env, key=key)
+    return {"state": sig["state"], "path": str(mf),
+            "signature": sig.get("signature") or None,
+            "detail": sig["detail"],
+            "signer_fingerprint": approved_signer_fingerprint(env)}
+
+
+def sign_artifacts(artifact_dir: Path, *, homedir: Optional[Path] = None,
+                   env: Optional[Dict[str, str]] = None,
+                   key: Optional[str] = None) -> Dict[str, Any]:
+    """Generate SHA-256 checksums, per-artifact detached signatures, and the
+    signed release manifest for every wheel/sdist in ``artifact_dir``.
+    Signing is OPTIONAL and never claims a result without verification —
+    if any signature step fails the aggregate is DEGRADED, never SIGNED."""
+    ck = generate_checksums(artifact_dir)
+    if ck["state"] != "OK":
+        return ck
+    arts = collect_artifacts(artifact_dir)
+    sig_results = [sign_detached(a, homedir=homedir, env=env, key=key)
+                   for a in arts]
+    mf = generate_signed_manifest(artifact_dir, homedir=homedir, env=env,
+                                  key=key)
+    all_signed = all(r["state"] == "SIGNED" for r in sig_results) and \
+        mf["state"] == "SIGNED"
+    return {"state": "SIGNED" if all_signed else "DEGRADED",
+            "detail": ("all artifacts + manifest carry detached signatures"
+                       if all_signed else
+                       "checksums written; some detached signatures are "
+                       "missing/failed (see per-artifact records)"),
+            "checksums": ck, "signatures": sig_results, "manifest": mf}
+
+
+def verify_release_signing(artifact_dir: Path, *,
+                           expected_fp: Optional[str] = None,
+                           homedir: Optional[Path] = None,
+                           env: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    """Verify checksums and every detached signature against the approved
+    signer (``gpg --verify`` + VALIDSIG fingerprint binding). Never claims
+    SIGNED unless ALL present artifacts verify against the approved
+    fingerprint AND the checksums match.
+
+    Typed aggregate: SIGNED / NOT_SIGNED / INVALID / UNTRUSTED_SIGNER /
+    DEGRADED / FAILED / MISSING."""
+    arts = collect_artifacts(artifact_dir)
+    if not arts:
+        return {"state": "MISSING",
+                "detail": f"no wheel/sdist artifacts in {artifact_dir}"}
+    ck = verify_checksums(artifact_dir)
+    if ck["state"] != "OK":
+        return {"state": "FAILED" if ck["state"] == "FAILED" else "MISSING",
+                "detail": ck["detail"], "checksums": ck}
+    v_env = _gpg_env(homedir, env)
+    results = [verify_artifact_signature(a, expected_fp=expected_fp,
+                                         env=v_env) for a in arts]
+    states = [r["state"] for r in results]
+    if "INVALID" in states or "UNTRUSTED_SIGNER" in states:
+        return {"state": "INVALID" if "INVALID" in states
+                else "UNTRUSTED_SIGNER",
+                "detail": "; ".join(f"{r['artifact']}={r['state']}"
+                                    for r in results),
+                "artifacts": results, "checksums": ck}
+    if all(s == "NOT_SIGNED" for s in states):
+        return {"state": "NOT_SIGNED",
+                "detail": "no detached signatures present; artifacts are "
+                          "NOT_SIGNED", "artifacts": results, "checksums": ck}
+    if "DEGRADED" in states or "FAILED" in states:
+        return {"state": "DEGRADED",
+                "detail": "; ".join(f"{r['artifact']}={r['state']}: "
+                                    f"{r['detail']}" for r in results),
+                "artifacts": results, "checksums": ck}
+    if all(s == "SIGNED" for s in states):
+        return {"state": "SIGNED",
+                "detail": f"all {len(arts)} artifacts verify against the "
+                          "approved signer (gpg --verify + VALIDSIG)",
+                "artifacts": results, "checksums": ck}
+    return {"state": "DEGRADED", "detail": "mixed signature states",
+            "artifacts": results, "checksums": ck}
 
 
 def certify(repo: Optional[Path] = None) -> Dict[str, Any]:

@@ -14,15 +14,34 @@
                     source-tree sys.path insertion, no editable install, no
                     repo-local venv (network: deps).
   --reproduce       build twice and compare artifact hashes.
-  --all             static + build + install + reproduce.
+  --sign            generate SHA256SUMS, per-artifact detached signatures and
+                    a signed release manifest (release-manifest.json + .asc)
+                    in the build dir. Requires gpg + the approved signer
+                    fingerprint (--signer-fingerprint / RELEASE_SIGNER_...
+                    / config/release-signer.fingerprint) and that the signer's
+                    SECRET key is available in the gpg keyring. OPTIONAL and
+                    school-only compatible.
+  --verify-signatures  verify SHA256SUMS and every detached signature with
+                    gpg --verify against the approved fingerprint; reports
+                    SIGNED / NOT_SIGNED / INVALID / UNTRUSTED_SIGNER /
+                    DEGRADED.
+  --signer-fingerprint FP   public 40-hex signer fingerprint (never a private
+                    key) to bind verification/signing to.
+  --gpg-homedir DIR  gpg home for signing/verification (hermetic tests /
+                    non-default keyrings).
+  --all             static + build + install + reproduce + sign +
+                    verify-signatures.
   --out DIR         report + artifact output dir (default ./dist/release-8k).
   --json            print the JSON report to stdout too.
 
 Exit: 0 = PASS, 2 = FAIL, 4 = DEGRADED, 8 = BLOCKED. A dirty tree blocks the
-artifact steps (build/install/reproduce) so an sdist can never sweep untracked
-personal files and be reported as a clean release; the static hermetic
-diagnostic remains available on a dirty tree. A skipped --install is DEGRADED,
-never a pass.
+artifact steps (build/install/reproduce/sign) so an sdist can never sweep
+untracked personal files and be reported as a clean release; the static
+hermetic diagnostic remains available on a dirty tree. A skipped --install is
+DEGRADED, never a pass. Artifacts are never claimed SIGNED unless a detached
+signature verifies (gpg VALIDSIG) against the approved fingerprint; unsigned
+artifacts are reported NOT_SIGNED and BLOCK the qualification unless
+--unsigned-ok records an explicit approved unsigned-release policy.
 
 Hermetic guarantee: nothing here enables/restarts/touches a live service,
 timer, browser, account, model, or the operator's real HOME/config/state. All
@@ -344,6 +363,37 @@ def reproduce_step(out_dir: Path) -> dict:
         return {"state": "DEGRADED", "detail": "rebuild timed out", "records": []}
 
 
+def _sign_env(fp: Optional[str]) -> dict:
+    env = dict(os.environ)
+    if fp:
+        env["RELEASE_SIGNER_FINGERPRINT"] = fp
+    return env
+
+
+def sign_step(out_dir: Path, fp: Optional[str], homedir: Optional[Path]) -> dict:
+    """Generate SHA256SUMS, per-artifact detached signatures, and the signed
+    release manifest in the build dir. Optional and school-only compatible:
+    never claims SIGNED unless every detached signature was created."""
+    from voicebridge import release as R
+    build_dir = out_dir / "build1"
+    if not R.collect_artifacts(build_dir):
+        return {"state": "DEGRADED", "detail": "no artifacts; run --build first"}
+    return R.sign_artifacts(build_dir, homedir=homedir,
+                            env=_sign_env(fp), key=fp or None)
+
+
+def verify_signatures_step(out_dir: Path, fp: Optional[str],
+                           homedir: Optional[Path]) -> dict:
+    """Verify SHA256SUMS and every detached signature with gpg --verify against
+    the approved fingerprint (never claims SIGNED without verification)."""
+    from voicebridge import release as R
+    build_dir = out_dir / "build1"
+    if not R.collect_artifacts(build_dir):
+        return {"state": "DEGRADED", "detail": "no artifacts; run --build first"}
+    return R.verify_release_signing(build_dir, expected_fp=fp,
+                                    homedir=homedir)
+
+
 # ---------------------------------------------------------------------------
 # Orchestration
 # ---------------------------------------------------------------------------
@@ -358,7 +408,18 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--build", action="store_true", help="build + inspect artifacts")
     ap.add_argument("--install", action="store_true", help="clean-HOME install + smoke")
     ap.add_argument("--reproduce", action="store_true", help="rebuild reproducibility")
-    ap.add_argument("--all", action="store_true", help="static+build+install+reproduce")
+    ap.add_argument("--sign", action="store_true",
+                    help="generate SHA256SUMS + detached signatures + signed "
+                         "manifest (requires gpg + approved fingerprint + the "
+                         "signer's secret key in the gpg keyring)")
+    ap.add_argument("--verify-signatures", action="store_true",
+                    help="verify SHA256SUMS and detached signatures with "
+                         "gpg --verify against the approved fingerprint")
+    ap.add_argument("--signer-fingerprint", default=None,
+                    help="public 40-hex signer fingerprint (never a private key)")
+    ap.add_argument("--gpg-homedir", type=Path, default=None,
+                    help="gpg home for signing/verification (tests/non-default keyrings)")
+    ap.add_argument("--all", action="store_true", help="static+build+install+reproduce+sign+verify")
     ap.add_argument("--out", type=Path, default=None,
                     help="artifact/report dir (default ./dist/release-8k)")
     ap.add_argument("--json", action="store_true", help="print JSON report")
@@ -377,7 +438,8 @@ def main(argv: list[str] | None = None) -> int:
     out_dir = args.out or (REPO / "dist" / "release-8k")
     out_dir = out_dir.resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
-    any_step = any((args.static, args.build, args.install, args.reproduce, args.all))
+    any_step = any((args.static, args.build, args.install, args.reproduce,
+                    args.sign, args.verify_signatures, args.all))
     report: dict = {"packet": "8K", "out_dir": str(out_dir), "steps": {}}
 
     # Packet 8K closure: a dirty tree can never yield a clean release. The
@@ -386,9 +448,9 @@ def main(argv: list[str] | None = None) -> int:
     # explicitly opts into a non-release diagnostic.
     tree = tree_clean_state()
     report["tree"] = tree
-    artifact_steps = {"build", "install", "reproduce"}
-    if (args.build or args.install or args.reproduce or args.all) and not (
-            tree["state"] == "CLEAN" or args.allow_dirty):
+    artifact_steps = {"build", "install", "reproduce", "sign"}
+    if (args.build or args.install or args.reproduce or args.sign or args.all) \
+            and not (tree["state"] == "CLEAN" or args.allow_dirty):
         block = {
             "state": "BLOCKED",
             "detail": (f"release artifacts from a dirty tree are not a clean "
@@ -417,6 +479,12 @@ def main(argv: list[str] | None = None) -> int:
         report["steps"]["install"] = install_step(out_dir)
     if args.all or args.reproduce:
         report["steps"]["reproduce"] = reproduce_step(out_dir)
+    if args.all or args.sign:
+        report["steps"]["sign"] = sign_step(
+            out_dir, args.signer_fingerprint, args.gpg_homedir)
+    if args.all or args.verify_signatures:
+        report["steps"]["verify-signatures"] = verify_signatures_step(
+            out_dir, args.signer_fingerprint, args.gpg_homedir)
 
     # gate: static must pass; build/install/reproduce FAIL is a release blocker;
     # DEGRADED is typed (never a silent pass).
@@ -478,7 +546,20 @@ def main(argv: list[str] | None = None) -> int:
     # Packet 8K closure: BLOCKED outranks FAIL/DEGRADED — a release blocker
     # (dirty tree for artifact steps, or unsigned artifacts) must never be
     # reported as PASS, and the overall verdict must distinguish
-    # PASS / DEGRADED / BLOCKED / FAIL.
+    # PASS / DEGRADED / BLOCKED / FAIL. Signing verification states are
+    # normalized into that vocabulary: a cryptographically invalid or
+    # wrong-signer signature is a FAIL; a missing signature set stays
+    # NOT_SIGNED (reported, and only a blocker via the build signing gate);
+    # a missing gpg/artifact dir is DEGRADED.
+    norm = []
+    for s in states:
+        if s in ("INVALID", "UNTRUSTED_SIGNER", "FAILED"):
+            norm.append("FAIL")
+        elif s == "MISSING":
+            norm.append("DEGRADED")
+        else:
+            norm.append(s)
+    states = norm
     if any(s == "BLOCKED" for s in states):
         report["verdict"] = "BLOCKED"
     elif any(s == "FAIL" for s in states):

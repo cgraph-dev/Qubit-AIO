@@ -233,11 +233,21 @@ resume. Repeated rollback is idempotent. Uninstall preserves state by default
 and requires separate confirmation for data deletion (existing
 `distribution.uninstall_plan` contract).
 
-## 11. Packaging and the private-source boundary
+## 11. Packaging, signing, and the private-source boundary
 
 `voicebridge product boundary` defines exactly what is distributed: the Python
 package `voicebridge` (implementation source), the static dashboard frontend,
 config examples, systemd templates, report templates, and operator docs.
+
+**Release signing (optional):** `docs/RELEASE_SIGNING.md` documents the
+detached-signature workflow — `SHA256SUMS`, per-artifact
+`gpg --detach-sign --armor` signatures, and a signed release manifest
+(`release-manifest.json` + `.asc`), verified with `gpg --verify` against the
+approved **public** 40-hex fingerprint. The private key is never generated,
+committed, printed, or exposed. `scripts/release_qualify.py --sign` and
+`--verify-signatures` drive the workflow; `release.verify_release_signing`
+never claims `SIGNED` unless every detached signature verifies against the
+approved fingerprint.
 
 **School-only submission:** this project is a school project. Artifact signing
 and private-source distribution are **NOT required** and are reported honestly
@@ -247,7 +257,11 @@ still ships Python implementation source and is never claimed private
 `artifact_signing_requirement` / `private_source_requirement` =
 `NOT APPLICABLE (school-only submission)`). Obfuscation is not security and is
 never claimed. Browser profiles, live config/state, credentials, private
-models, user data, and personal paths are never bundled.
+models, user data, and personal paths are never bundled. Source-hygiene is
+verified by the artifact scans in `docs/OPERATIONS_8K.md` (no secrets, user
+paths, credentials, browser data, model files, or unrelated dirty files in
+wheel/sdist) and the sdist remains a clean, inspectable source distribution
+for teacher review.
 
 ## 12. What is never done
 
