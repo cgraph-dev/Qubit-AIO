@@ -110,3 +110,18 @@ def test_cli_certify_human_summary_no_proprietary(tmp_path):
     assert "Educational" in out or r.returncode in (0, 2)
     assert "Proprietary" not in out.split("project license:")[-1] if \
         "project license:" in out else True
+
+def test_package_boundary_school_only_not_applicable():
+    """School-only submission: signing and private-source are NOT APPLICABLE
+    and are reported honestly (never fabricated as signed/private)."""
+    from voicebridge import product as P
+    out = P.package_boundary()
+    assert out["school_only_submission"] is True
+    assert "NOT APPLICABLE" in out["private_source_requirement"]
+    assert "NOT APPLICABLE" in out["artifact_signing_requirement"]
+    # underlying facts stay truthful
+    assert out["private_source_solved"] is False
+    assert out["wheel_has_python_source"] is True
+    assert "no signature claim" in out["signatures"]
+    assert "no release-signing key is generated or claimed" in out[
+        "artifact_signing_requirement"]

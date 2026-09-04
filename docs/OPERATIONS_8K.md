@@ -140,6 +140,12 @@ the checkout, the check FAILS instead of hiding a missing wheel member.
   in the root `LICENSE` file (applies only to original Qubit material;
   third-party material keeps its original license per THIRD_PARTY_NOTICES.md
   and docs/UPSTREAM_REUSE.md).
+- **School-only submission**: this is a school project. Artifact signing and
+  private-source distribution are NOT required and are reported honestly as
+  NOT APPLICABLE — no signing key is generated or claimed
+  (`artifact_signature_status` still reports `NOT_CONFIGURED` because no key
+  is configured), and the wheel is never claimed private. See
+  `docs/OPERATIONS_8KP.md` §11 and `voicebridge product boundary`.
 - The webui event stream is shut down cleanly: `WebUI.stop()` closes every
   event-stream subscriber so in-flight SSE handler threads exit their drain
   loop and `server_close()` never blocks on a leaked handler (a clean-clone

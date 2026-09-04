@@ -1764,32 +1764,49 @@ def tray_status(paths: Optional[ProductPaths] = None) -> Dict[str, Any]:
 # 10. Packaging / private-source boundary
 # ---------------------------------------------------------------------------
 def package_boundary() -> Dict[str, Any]:
-    """Define exactly what is distributed and report the private-source
-    boundary honestly. The wheel still contains Python implementation source:
-    private-source distribution is NOT solved by this packet and remains a
-    release blocker for that goal. Obfuscation is not security. No signature,
-    SBOM, or provenance claim is fabricated here — those live in
-    ``voicebridge release certify``."""
+    """Define exactly what is distributed and report the private-source and
+    signing boundary honestly.
+
+    This is a school-only submission: private-source distribution and artifact
+    signing are NOT required and are reported as NOT APPLICABLE — no signing
+    key is generated or claimed, and the wheel still exposes Python
+    implementation source and is never claimed private. The underlying facts
+    (``wheel_has_python_source``, ``private_source_solved``) stay truthful.
+    No signature, SBOM, or provenance claim is fabricated here — those live in
+    ``voicebridge release certify``.
+    """
     wheel_data = resources.package_data_root()
     return {
         "product": PRODUCT_NAME,
+        "school_only_submission": True,
         "distributed": ["python package voicebridge (implementation source)",
                         "static dashboard frontend",
                         "config examples", "systemd templates",
                         "report templates", "operator docs"],
         "private_source_solved": False,
+        "private_source_requirement": ("NOT APPLICABLE (school-only "
+                                       "submission): no private-source "
+                                       "distribution is required or claimed; "
+                                       "the wheel still ships Python "
+                                       "implementation source"),
+        "artifact_signing_requirement": ("NOT APPLICABLE (school-only "
+                                         "submission): no release-signing key "
+                                         "is generated or claimed"),
         "release_blocker": ("private-source distribution is NOT solved by "
                             "Packet 8K-P: the wheel exposes Python "
                             "implementation source. This is a release blocker "
-                            "for the private-source goal. Obfuscation is not "
-                            "security and is not claimed."),
+                            "for the private-source goal. For a school-only "
+                            "submission that goal is NOT APPLICABLE. "
+                            "Obfuscation is not security and is not claimed."),
         "wheel_has_python_source": True,
         "resources_root": str(wheel_data),
         "excluded": ["browser profiles", "live config/state", "credentials",
                      "private models", "user data"],
         "signatures": "no signature claim is made by this packet; artifact "
-                      "signing requires an operator key and is reported by "
-                      "`voicebridge package certify`",
+                      "signing is NOT APPLICABLE for a school-only submission "
+                      "and is reported as NOT_CONFIGURED by `voicebridge "
+                      "package certify` unless a real detached signature "
+                      "exists",
         "sbom": "no SBOM claim is made by this packet; see `voicebridge "
                 "package certify` for the real dependency record",
         "provenance": "recorded from git by `voicebridge package certify`; "

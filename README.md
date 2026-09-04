@@ -342,3 +342,8 @@ Licensing: original Qubit material is covered by the school-project terms in
 see `docs/LICENSING.md`, `THIRD_PARTY_NOTICES.md`, and
 `docs/UPSTREAM_REUSE.md`. The repository as a whole is not an OSI-approved
 open-source project.
+
+This is a **school-only submission**: artifact signing and private-source
+distribution are NOT required and are reported honestly as NOT APPLICABLE — no
+signing key is generated or claimed, and the wheel is never claimed private
+(`voicebridge product boundary`).

@@ -237,12 +237,17 @@ and requires separate confirmation for data deletion (existing
 
 `voicebridge product boundary` defines exactly what is distributed: the Python
 package `voicebridge` (implementation source), the static dashboard frontend,
-config examples, systemd templates, report templates, and operator docs. It
-reports honestly that **private-source distribution is NOT solved by Packet
-8K-P**: the wheel still exposes Python implementation source, and obfuscation
-is not security. This is a release blocker for the private-source goal and is
-never claimed as solved. Browser profiles, live config/state, credentials,
-private models, user data, and personal paths are never bundled.
+config examples, systemd templates, report templates, and operator docs.
+
+**School-only submission:** this project is a school project. Artifact signing
+and private-source distribution are **NOT required** and are reported honestly
+as **NOT APPLICABLE** — no signing key is generated or claimed, and the wheel
+still ships Python implementation source and is never claimed private
+(`private_source_solved: False`, `wheel_has_python_source: True`,
+`artifact_signing_requirement` / `private_source_requirement` =
+`NOT APPLICABLE (school-only submission)`). Obfuscation is not security and is
+never claimed. Browser profiles, live config/state, credentials, private
+models, user data, and personal paths are never bundled.
 
 ## 12. What is never done
 
