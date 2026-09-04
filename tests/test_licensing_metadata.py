@@ -32,9 +32,23 @@ def test_pyproject_license_is_educational_boundary():
     # never the old proprietary claim, never a whole-repo open-source claim
     assert "Proprietary" not in text
     assert "open source" not in text.lower()
-    # license-files carries the root LICENSE
+    # license-files carries the root LICENSE AND the third-party notices so a
+    # built wheel ships both legal files (regression: notices must not be
+    # dropped from the wheel while still shipping in the sdist)
     pp = tomllib.loads((REPO / "pyproject.toml").read_text())
-    assert pp["project"]["license-files"] == ["LICENSE"]
+    assert pp["project"]["license-files"] == \
+        ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+
+
+def test_wheel_ships_license_and_notices_declared():
+    """The license-files manifest must reference BOTH the project LICENSE and
+    THIRD_PARTY_NOTICES.md, and both must exist at the repository root so a
+    wheel build carries them into ``.dist-info/licenses/``."""
+    pp = tomllib.loads((REPO / "pyproject.toml").read_text())
+    files = pp["project"]["license-files"]
+    assert set(files) == {"LICENSE", "THIRD_PARTY_NOTICES.md"}
+    for rel in files:
+        assert (REPO / rel).is_file(), f"license-files entry missing: {rel}"
 
 
 def test_root_license_boundary():

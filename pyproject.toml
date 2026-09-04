@@ -10,7 +10,7 @@ readme = "README.md"
 # docs/UPSTREAM_REUSE.md. The repository as a whole is not an OSI-approved
 # open-source project.
 license = { text = "Qubit Voice Agent Educational Project License — Copyright © 2026 Qubit by Tricky; applies only to original Qubit material. Third-party/upstream-derived material remains under its original license; see LICENSE, docs/LICENSING.md, and THIRD_PARTY_NOTICES.md." }
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
 requires-python = ">=3.11"
 dependencies = [
     "sherpa-onnx>=1.13",      # Moonshine ASR + Silero VAD + eres2net voice-ID + Kokoro
