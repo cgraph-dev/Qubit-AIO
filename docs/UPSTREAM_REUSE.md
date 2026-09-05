@@ -1057,11 +1057,111 @@ BEHAVIOR INTENTIONALLY OMITTED: no live stages (--live fails closed); no
   destructive account actions, real messages, or fake remote rollback; no
   parallel persistence; production state is never a fixture; no 8K packaging.
 WHY THIS IS THE SMALLEST FIT: the recovery primitives were already verified in
-  Packets 7C/8A–8I; 8J adds only a bounded isolated rehearsal plus the one
-  explicit repair (partial-rollback visibility) the plan assigns to 8J.
+   Packets 7C/8A–8I; 8J adds only a bounded isolated rehearsal plus the one
+   explicit repair (partial-rollback visibility) the plan assigns to 8J.
 COMPATIBILITY DRIFT: none — restore_state now raises PartialRollbackError (a
-  PortableError subclass) instead of silently swallowing rollback OSErrors;
-  all existing callers already treat PortableError as a typed failure.
+   PortableError subclass) instead of silently swallowing rollback OSErrors;
+   all existing callers already treat PortableError as a typed failure.
+```
+
+## R23 — GENOME semantic-memory contract (Packet 8M)
+
+```text
+LOCAL REQUIREMENT: an OPTIONAL semantic-memory adapter on the existing 5B
+   MemoryStore: local embedding/retrieval, source provenance and trust levels,
+   temporal (bi-temporal) facts with point-in-time recall, explainability,
+   deterministic journal/replay or hash checks, and scoped forget/export —
+   disabled by default, LLM-free ingest, no voice-hot-path or resident-model
+   change, no unauthenticated MCP bypass, no second store/server/listener.
+UPSTREAM REPOSITORY + COMMIT: https://github.com/NORTHTEKDevs/genome @
+   ea76cf924b2382499a158b8c7ad8a815913c962f (HEAD at review; recorded 2026-09-05).
+SOURCE FILES + SYMBOLS: genome/journal.py → Journal.append/read (_last_line,
+   torn-tail recovery), _line_hash (chained sha256), verify_chain /
+   verify_journal_integrity, replay_journal, snapshot_hash; genome/memory/
+   temporal.py → record_fact (valid_from inclusive / valid_until exclusive,
+   believer-aware invalidation, future-dated cap, low-trust refuse-close),
+   invalidate_fact, entity_timeline, current_facts, facts_valid_at;
+   genome/memory/conflict.py → belief_conflicts concept (coexisting beliefs);
+   genome/explain.py → stored-data-only recall explanation (no LLM invention);
+   genome/embeddings.py → optional embedding-provider abstraction.
+UPSTREAM TESTS/FIXTURES: tests/test_journal.py, tests/test_journal_durability.py
+   (append/replay/verify/torn-tail), tests/memory/test_temporal.py
+   (boundary semantics valid_from <= T < valid_until, future-dated cap),
+   tests/test_belief_attribution.py (believer-aware invalidation),
+   tests/test_conflict_resolution.py (coexisting facts).
+LICENSE: Apache-2.0 — Copyright 2026 Northtek (FrostByte Digital LLC); NOTICE
+   file preserved verbatim in THIRD_PARTY_NOTICES.md. Model weights/licenses
+   are NOT bundled; the default `hash` provider downloads nothing and the
+   optional `ollama` provider uses the ALREADY-installed nomic-embed-text via
+   the existing Ollama endpoint (no new model artifact, no new license).
+DECISION: ADAPT (public contract + tested semantics) + WRAP (existing
+   MemoryStore). REJECT the heavy dependency stack (numpy, sentence-transformers,
+   scikit-learn, rank-bm25, PyTorch), the MCP/FastAPI servers, the graph/
+   entity/postgres layers, and whole-repo vendoring.
+LOCAL DESTINATION: voicebridge/memory/semantic.py (SemanticMemory: remember/
+   stage_inferred/correct/forget/purge/promote wrappers, record_belief,
+   invalidate_belief, facts_valid_at/current_facts/entity_timeline,
+   belief_conflicts, explain, recall with none|hash|ollama providers,
+   export/import_records, status/check_provider, journal_verify/journal_replay,
+   load_semantic_state/write_semantic_state),
+   voicebridge/memory/journal.py (Journal, verify_chain, snapshot_hash, replay,
+   apply_op, verify_journal), voicebridge/memory/store.py (additive migration 2:
+   valid_from/valid_until/believed_by columns; migration 3: scope-qualified
+   dedup identity mkey = scope\x00<content>; mkey override for distinct
+   temporal windows; finite/ordering validation; secret checks on correct;
+   defensive history redaction), voicebridge/memory/__init__.py,
+   voicebridge/config.py (memory.semantic defaults), voicebridge/cli.py (memory
+   command), tests/test_packet8m.py.
+DEPENDENCIES ADDED: none (stdlib-only; existing router/l1 embedding endpoint
+   reused for the opt-in ollama provider).
+BEHAVIOR KEPT: hash-chained append-only journal with monotonic seq, torn-tail
+   recovery, replay and chain verify; temporal boundary semantics
+   valid_from <= T < valid_until; believer-aware invalidation; origin-bound
+   authority (a lower-trust source cannot close a higher-trust fact — local
+   trust map user(3) > tool(2) > web/model/observed(1) in place of GENOME's
+   pluggable trust policy); stored-data-only explain; snapshot hash excludes
+   wall-clock fields (replay re-runs at a different time).
+BEHAVIOR INTENTIONALLY OMITTED: GENOME's numpy/PyTorch/sentence-transformers
+   embedding stack, MCP + FastAPI servers, entity/graph/postgres stores,
+   LLM conflict-resolution/extraction, LLM ingest, access-statistics tracking,
+   HMAC-keyed journals (sha256 chained is tamper-evident; keyed HMAC is a
+   future option), write-ahead-with-inverse-lines (local journal is written
+   AFTER a successful mutation; a lost final line is reported by verify rather
+   than trusted).
+WHY THIS IS THE SMALLEST FIT: the reusable units are the tested journal/temporal/
+   explain CONTRACTS, which fit the existing MemoryStore in < 300 production
+   lines with zero new dependencies; GENOME's own implementation is a full
+   framework (graph + entities + postgres + MCP + heavy ML deps) the plan
+   forbids adding.
+COMPATIBILITY DRIFT: GENOME is new and moves fast; the pin governs. Upstream
+   uses explicit MemoryRecord ids where the local store uses AUTOINCREMENT ids;
+   replay into an empty store reproduces ids because the same op sequence is
+   applied in the same order (verified by snapshot_hash).
+IMPLEMENTATION STATUS (Packet 8M repair, 2026-09-05, after the rejected
+   audit): the pin was re-verified — ea76cf924b2382499a158b8c7ad8a815913c962f
+   is still the remote HEAD and genome/journal.py, genome/memory/temporal.py,
+   genome/explain.py, genome/embeddings.py, genome/memory/conflict.py all exist
+   at it (Apache-2.0, NOTICE preserved). Repairs applied: (1) secret
+   validation/redaction at every mutation boundary (stage_inferred, correct,
+   import_records, record_belief) plus defensive redaction in the store history
+   trail and in recall/explain/conflict diagnostics (redact_secrets);
+   (2) provenance authority enforced — correct/forget/purge/promote/
+   invalidate_belief carry requested_by whose trust must be >= the target
+   record's trust, promote requires source='user', imported data can never
+   claim 'user', unknown/forged sources fail closed; (3) temporal validation —
+   finite confidence/timestamps, valid_until after valid_from, sane
+   invalidation times, already-closed refusal, finite query timestamps;
+   (4) scope isolation — the durable dedup identity is now (scope, content)
+   via mkey = scope\x00<content> with a safe one-to-one migration (migration 3)
+   for existing databases, plus IntegrityError-safe concurrent same-scope
+   writes; (5) corrupt/newer semantic state is a typed degraded/newer result
+   (load_semantic_state) and is never silently reset; state writes are atomic
+   (temp+fsync+rename+dir fsync, 0600); (6) replay re-runs validation and
+   authority checks (apply_op passes journaled requested_by) and write-after-
+   mutation divergence is surfaced by verify; (7) status() never contacts any
+   network service (embed_available stays None until the opt-in check_provider
+   probe); provider missing/unavailable/timeout are typed; (8) no MCP/FastAPI/
+   second store/model training/voice-hot-path/resident-model change.
 ```
 
 ---

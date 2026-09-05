@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import sqlite3
@@ -54,6 +55,43 @@ def normalize_text(text: str) -> str:
 
 def norm_hash(text: str) -> str:
     return hashlib.sha256(normalize_text(text).encode("utf-8")).hexdigest()
+
+
+# Separator between the scope and the content identity inside the durable
+# ``mkey``. The dedup identity is (scope, content), so the same fact stored in
+# two scopes never collides on the UNIQUE(mkey) column while identical facts in
+# the same scope still dedup (Mem0 contract).
+_SCOPE_SEP = "\x00"
+
+
+def scoped_key(scope: str, content_key: str) -> str:
+    return f"{scope}{_SCOPE_SEP}{content_key}"
+
+
+def redact_secrets(text: str) -> str:
+    """Replace every secret-shaped substring so raw secret-shaped content never
+    reaches logs, audit records, prompts, or diagnostic output."""
+    out = str(text or "")
+    for shape in _SECRET_SHAPES:
+        out = re.sub(shape, "[REDACTED]", out)
+    return out
+
+
+def _validate_numeric(name: str, value: Any) -> float:
+    """Reject NaN/Inf at the boundary (SQLite would store them silently and
+    break JSON/journal round-trips later)."""
+    try:
+        v = float(value)
+    except (TypeError, ValueError) as exc:
+        raise MemoryStoreError(f"{name} must be a finite number") from exc
+    if not math.isfinite(v):
+        raise MemoryStoreError(f"{name} must be a finite number")
+    return v
+
+
+def _validate_optional_ts(name: str, value: Optional[Any]) -> None:
+    if value is not None:
+        _validate_numeric(name, value)
 
 
 class MemoryStore:
@@ -126,6 +164,21 @@ class MemoryStore:
                  action TEXT NOT NULL,
                  payload TEXT,
                  ts REAL);""",
+            # Migration 2 (Packet 8M): optional GENOME temporal-fact validity
+            # window (valid_from INCLUSIVE / valid_until EXCLUSIVE, NULL = open
+            # window). Additive nullable columns; legacy rows are unaffected.
+            """ALTER TABLE memories ADD COLUMN valid_from REAL;
+               ALTER TABLE memories ADD COLUMN valid_until REAL;
+               ALTER TABLE memories ADD COLUMN believed_by TEXT;
+               CREATE INDEX IF NOT EXISTS idx_mem_valid ON memories(valid_until);""",
+            # Migration 3 (Packet 8M repair): scope-qualified dedup identity.
+            # The dedup key must be (scope, content), not content alone, so the
+            # identical fact can be stored independently in different scopes
+            # (repairs the global UNIQUE(mkey) collision). Existing rows are
+            # rewritten to scope\x00<content>; the rewrite is one-to-one so the
+            # UNIQUE constraint is preserved. Guarded against re-application.
+            """UPDATE memories SET mkey = scope || char(0) || mkey
+               WHERE instr(mkey, scope || char(0)) != 1;""",
         ]
         with self._conn:  # atomic migration transaction
             for i in range(version, len(migrations)):
@@ -136,18 +189,33 @@ class MemoryStore:
     def _insert(self, *, tier: str, scope: str, text: str, confidence: float,
                 source: str, provenance: List[str], kind: str,
                 expires_at: Optional[float], supersedes: Optional[int],
-                staged: bool) -> int:
+                staged: bool,
+                valid_from: Optional[float] = None,
+                valid_until: Optional[float] = None,
+                believed_by: Optional[str] = None,
+                mkey: Optional[str] = None) -> int:
         if tier not in TIERS:
             raise MemoryStoreError(f"unknown tier: {tier}")
-        mkey = norm_hash(text)
+        _validate_numeric("confidence", confidence)
+        _validate_optional_ts("expires_at", expires_at)
+        _validate_optional_ts("valid_from", valid_from)
+        _validate_optional_ts("valid_until", valid_until)
+        if (valid_from is not None and valid_until is not None
+                and valid_until <= valid_from):
+            raise MemoryStoreError(
+                "valid_until must be later than valid_from")
+        content_key = mkey or norm_hash(text)
+        key = scoped_key(scope, content_key)
         cur = self._conn.execute(
             "INSERT INTO memories(mkey, tier, scope, kind, text, norm_hash,"
             " confidence, source, provenance, created_at, updated_at,"
-            " expires_at, supersedes, tombstoned, staged)"
-            " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,0,?)",
-            (mkey, tier, scope, kind, text, mkey, float(confidence), source,
-             json.dumps(provenance), time.time(), time.time(), expires_at,
-             supersedes, 1 if staged else 0))
+            " expires_at, supersedes, tombstoned, staged, valid_from,"
+            " valid_until, believed_by)"
+            " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?)",
+            (key, tier, scope, kind, text, content_key, float(confidence),
+             source, json.dumps(provenance), time.time(), time.time(),
+             expires_at, supersedes, 1 if staged else 0, valid_from,
+             valid_until, believed_by))
         mid = cur.lastrowid
         self._index_fts(mid, tier, scope, text)
         self._history(mid, "remember" if not staged else "remember", None)
@@ -166,12 +234,15 @@ class MemoryStore:
                 "DELETE FROM memories_fts WHERE memory_id=?", (memory_id,))
 
     def _history(self, memory_id: int, action: str, payload: Any) -> None:
+        # Defensive redaction: secret-shaped content must never enter the
+        # append-only audit trail even if a future caller skips the write
+        # boundary checks.
+        raw = json.dumps(payload) if payload is not None else None
+        stored = redact_secrets(raw) if raw is not None else None
         self._conn.execute(
             "INSERT INTO history(memory_id, action, payload, ts)"
             " VALUES(?,?,?,?)",
-            (memory_id, action,
-             json.dumps(payload) if payload is not None else None,
-             time.time()))
+            (memory_id, action, stored, time.time()))
 
     def _row_to_dict(self, row: sqlite3.Row) -> Dict[str, Any]:
         d = {k: row[k] for k in row.keys()}
@@ -202,33 +273,72 @@ class MemoryStore:
                  scope: str = "default", confidence: float = 1.0,
                  source: str = "user", provenance: Optional[List[str]] = None,
                  kind: str = "fact",
-                 expires_at: Optional[float] = None) -> Dict[str, Any]:
+                 expires_at: Optional[float] = None,
+                 valid_from: Optional[float] = None,
+                 valid_until: Optional[float] = None,
+                 believed_by: Optional[str] = None,
+                 mkey: Optional[str] = None) -> Dict[str, Any]:
         """Explicit durable fact. Dedupes on normalized hash (Mem0 contract:
-        duplicate adds are skipped). Returns the record (existing or new)."""
+        duplicate adds are skipped). Returns the record (existing or new).
+
+        ``valid_from``/``valid_until`` (Packet 8M) carry the GENOME temporal
+        window: valid_from is INCLUSIVE, valid_until is EXCLUSIVE (NULL = open).
+        ``believed_by`` attributes the fact to a believer (multi-agent).
+        ``mkey`` overrides the dedup identity (used by the temporal adapter so
+        re-recorded belief facts are distinct windows, not skipped dups)."""
         if not (text or "").strip():
             raise MemoryStoreError("cannot remember empty text")
         for shape in _SECRET_SHAPES:
             if re.search(shape, text):
                 raise SecretRejectedError("secret-shaped content rejected")
+        _validate_optional_ts("expires_at", expires_at)
+        _validate_optional_ts("valid_from", valid_from)
+        _validate_optional_ts("valid_until", valid_until)
+        if (valid_from is not None and valid_until is not None
+                and valid_until <= valid_from):
+            raise MemoryStoreError(
+                "valid_until must be later than valid_from")
         with self._lock:
-            mkey = norm_hash(text)
+            content_key = mkey or norm_hash(text)
+            key = scoped_key(scope, content_key)
             existing = self._conn.execute(
                 "SELECT * FROM memories WHERE mkey=? AND scope=? "
                 "AND tombstoned=0 AND staged=0",
-                (mkey, scope)).fetchone()
+                (key, scope)).fetchone()
             if existing:
                 self._conn.execute(
                     "UPDATE memories SET updated_at=? WHERE id=?",
                     (time.time(), existing["id"]))
                 self._history(existing["id"], "dup_skip",
-                              {"hash": mkey})
+                              {"hash": content_key})
                 self._conn.commit()
                 return self._row_to_dict(existing)
-            mid = self._insert(tier=tier, scope=scope, text=text,
-                               confidence=confidence, source=source,
-                               provenance=list(provenance or []),
-                               kind=kind, expires_at=expires_at,
-                               supersedes=None, staged=False)
+            try:
+                mid = self._insert(tier=tier, scope=scope, text=text,
+                                   confidence=confidence, source=source,
+                                   provenance=list(provenance or []),
+                                   kind=kind, expires_at=expires_at,
+                                   supersedes=None, staged=False,
+                                   valid_from=valid_from,
+                                   valid_until=valid_until,
+                                   believed_by=believed_by,
+                                   mkey=content_key)
+            except sqlite3.IntegrityError:
+                # concurrent same-scope same-content write: another thread won
+                # the race; treat as the Mem0 duplicate-skip path
+                existing = self._conn.execute(
+                    "SELECT * FROM memories WHERE mkey=? AND scope=? "
+                    "AND tombstoned=0 AND staged=0",
+                    (key, scope)).fetchone()
+                if existing is None:
+                    raise
+                self._conn.execute(
+                    "UPDATE memories SET updated_at=? WHERE id=?",
+                    (time.time(), existing["id"]))
+                self._history(existing["id"], "dup_skip",
+                              {"hash": content_key})
+                self._conn.commit()
+                return self._row_to_dict(existing)
             self._conn.commit()
             return self.get(mid)
 
@@ -238,6 +348,16 @@ class MemoryStore:
         if row is None:
             raise MemoryStoreError(f"no memory id {memory_id}")
         return self._row_to_dict(row)
+
+    def find_by_content(self, text: str, *, scope: str = "default"
+                        ) -> Optional[Dict[str, Any]]:
+        """Active record whose content normalizes to ``text`` in ``scope``, or
+        None. Used for origin-bound authority checks before a mutation."""
+        row = self._conn.execute(
+            "SELECT * FROM memories WHERE mkey=? AND scope=? "
+            "AND tombstoned=0 AND staged=0",
+            (scoped_key(scope, norm_hash(text)), scope)).fetchone()
+        return self._row_to_dict(row) if row is not None else None
 
     def search(self, query: str, *, scope: Optional[str] = None,
                tier: Optional[str] = None, limit: int = 20,
@@ -284,11 +404,17 @@ class MemoryStore:
                 scope: str = "default", source: str = "user") -> Dict[str, Any]:
         """Correct a stale fact: new record supersedes old; old is
         tombstoned. Corrected facts then outrank stale ones in search."""
+        if not (new_text or "").strip():
+            raise MemoryStoreError("cannot correct to empty text")
+        for shape in _SECRET_SHAPES:
+            if re.search(shape, new_text):
+                raise SecretRejectedError("secret-shaped correction rejected")
         with self._lock:
+            key = scoped_key(scope, norm_hash(old_text))
             target = self._conn.execute(
                 "SELECT * FROM memories WHERE mkey=? AND scope=? "
                 "AND tombstoned=0 AND staged=0",
-                (norm_hash(old_text), scope)).fetchone()
+                (key, scope)).fetchone()
             if target is None:
                 raise MemoryStoreError(
                     f"no active memory matching: {old_text[:60]!r}")

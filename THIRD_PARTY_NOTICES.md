@@ -120,7 +120,51 @@ distributions (full text at https://www.apache.org/licenses/LICENSE-2.0):
 
 ---
 
-Entries for Semantic Router (MIT), Mem0 (Apache-2.0), devtools-protocol
-(BSD-3-Clause), and Himalaya (MIT) become required in the packet that performs
-each COPY/ADAPT listed in docs/UPSTREAM_REUSE.md §15. Wrap-only and REJECT
-decisions carry no notice obligation.
+## GENOME — semantic-memory contract (Packet 8M)
+
+The optional semantic-memory adapter `voicebridge/memory/semantic.py` +
+`voicebridge/memory/journal.py` ADAPT the tested journal/temporal/explain
+contracts from GENOME (Apache-2.0 © 2026 Northtek (FrostByte Digital LLC)),
+reviewed at pinned commit `ea76cf924b2382499a158b8c7ad8a815913c962f`:
+`genome/journal.py` (append/replay/verify), `genome/memory/temporal.py`
+(bi-temporal fact windows, believer-aware invalidation, origin-bound
+authority), and `genome/explain.py` (stored-data-only recall explanations).
+
+Adapted behavior: hash-chained append-only journal with monotonic seq and
+torn-tail recovery; replay + chain verification; `valid_from`-inclusive /
+`valid_until`-exclusive temporal windows with point-in-time recall; believer-
+aware invalidation; low-trust facts cannot close higher-trust facts.
+
+Local divergence (documented in docs/UPSTREAM_REUSE.md R23): stdlib-only; no
+numpy/sentence-transformers/scikit-learn/rank-bm25/PyTorch; no MCP or FastAPI
+server; no graph/entity/postgres layers; journal is written after a successful
+mutation (not write-ahead); snapshot hashing excludes wall-clock fields; the
+opt-in embedding provider reuses the existing Ollama `nomic-embed-text`
+endpoint (no new model artifact). Repair (2026-09-05): the durable dedup
+identity is scope-qualified (`mkey = scope\x00<content>`) so identical facts
+store independently per scope; mutation methods enforce origin-bound authority
+via a `requested_by` source-trust gate; secrets are rejected at every write
+boundary and redacted from history/recall/explain diagnostics; corrupt or
+newer runtime state is a typed degraded/newer result, never silently reset.
+
+The GENOME NOTICE file, preserved verbatim:
+
+> GENOME
+> Copyright 2026 Northtek (FrostByte Digital LLC)
+>
+> This product includes software developed by Northtek (FrostByte Digital LLC).
+>
+> Licensed under the Apache License, Version 2.0. See the LICENSE file for details.
+> Contact: info@northtek.io
+
+Apache License 2.0 requirement: include the license text and copyright notice
+in distributions (full text at https://www.apache.org/licenses/LICENSE-2.0):
+
+> Licensed under the Apache License, Version 2.0 (the "License"); you may not
+> use this file except in compliance with the License. You may obtain a copy of
+> the License at http://www.apache.org/licenses/LICENSE-2.0
+>
+> Unless required by applicable law or agreed to in writing, software distributed
+> under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+> CONDITIONS OF ANY KIND, either express or implied. See the License for the
+> specific language governing permissions and limitations under the License.

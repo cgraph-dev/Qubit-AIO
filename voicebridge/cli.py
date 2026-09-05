@@ -305,6 +305,53 @@ def build_parser() -> argparse.ArgumentParser:
     sk_roll.add_argument("skill_id")
     sk_roll.add_argument("--backup", type=Path, default=None)
     sk_roll.add_argument("--confirm", action="store_true")
+    mem = add("memory", help="Packet 8M semantic memory (GENOME contract; disabled by default)")
+    mem_sub = mem.add_subparsers(dest="memory_command")
+    mem_status = mem_sub.add_parser("status", parents=[common],
+                                    help="typed memory + optional semantic status")
+    mem_status.add_argument("--probe", action="store_true",
+                            help="opt-in live embedding-provider probe (may contact Ollama)")
+    sem_en = mem_sub.add_parser("enable", parents=[common],
+                                help="enable the optional semantic adapter (dry-run unless --confirm)")
+    sem_en.add_argument("--provider", choices=["none", "hash", "ollama"], default=None)
+    sem_en.add_argument("--confirm", action="store_true")
+    sem_dis = mem_sub.add_parser("disable", parents=[common],
+                                 help="disable the optional semantic adapter (dry-run unless --confirm)")
+    sem_dis.add_argument("--confirm", action="store_true")
+    sem_set = mem_sub.add_parser("set-provider", parents=[common],
+                                 help="set the embedding provider none|hash|ollama (dry-run unless --confirm)")
+    sem_set.add_argument("provider", choices=["none", "hash", "ollama"])
+    sem_set.add_argument("--confirm", action="store_true")
+    bel_rec = mem_sub.add_parser("belief-record", parents=[common],
+                                 help="record a belief fact over [from, until)")
+    bel_rec.add_argument("entity")
+    bel_rec.add_argument("fact_type")
+    bel_rec.add_argument("value")
+    bel_rec.add_argument("--scope", default="default")
+    bel_rec.add_argument("--from", dest="valid_from", type=float, default=None)
+    bel_rec.add_argument("--until", dest="valid_until", type=float, default=None)
+    bel_rec.add_argument("--source", choices=["user", "tool", "web", "model", "observed"],
+                         default="user")
+    bel_at = mem_sub.add_parser("belief-at", parents=[common],
+                                help="facts true at a time for an entity")
+    bel_at.add_argument("entity")
+    bel_at.add_argument("--time", type=float, default=None, help="unix ts (default now)")
+    bel_at.add_argument("--fact-type", default=None)
+    bel_at.add_argument("--scope", default="default")
+    mem_sub.add_parser("belief-conflicts", parents=[common],
+                       help="coexisting conflicting belief facts")
+    bel_ex = mem_sub.add_parser("explain", parents=[common],
+                                help="stored-data-only explanation of a memory id")
+    bel_ex.add_argument("memory_id", type=int)
+    mem_sub.add_parser("journal-verify", parents=[common],
+                       help="verify journal hash chain + replay reproduces live state")
+    mem_re = mem_sub.add_parser("journal-replay", parents=[common],
+                                help="preview replay snapshot hash into a temp store (never mutates live)")
+    mem_re.add_argument("--until", type=int, default=None)
+    mem_exp = mem_sub.add_parser("export", parents=[common],
+                                 help="export active memory records to private JSON")
+    mem_exp.add_argument("--out", type=Path, default=None)
+    mem_exp.add_argument("--scope", default=None)
     ws = add("websites", help="Packet 8E website-integration onboarding (proposal/observability, no live adapter)")
     ws_sub = ws.add_subparsers(dest="websites_command")
     ws_human = argparse.ArgumentParser(add_help=False)
@@ -532,6 +579,8 @@ def main(argv=None) -> int:
         return _cmd_permissions(cfg, args)
     if command == "skills":
         return _cmd_skills(cfg, args)
+    if command == "memory":
+        return _cmd_memory(cfg, args)
     if command == "websites":
         return _cmd_websites(cfg, args)
     if command == "actions":
@@ -1483,6 +1532,170 @@ def _cmd_skills(cfg, args) -> int:
     except (P.PermissionError, P.SkillValidationError) as exc:
         print(_json.dumps({"state": "failed", "detail": str(exc)}, indent=2))
         return 2
+
+
+def _cmd_memory(cfg, args) -> int:
+    """voicebridge memory status|enable|disable|set-provider|belief-record|
+    belief-at|belief-conflicts|explain|journal-verify|journal-replay|export.
+
+    Packet 8M semantic memory is DISABLED by default. Runtime selection
+    (enabled/provider) lives in <state_dir>/memory/semantic.json (state, not
+    live user config); mutations are dry-run unless --confirm. Corrupt or
+    newer-than-supported state is a typed degraded/newer result and is NEVER
+    silently reset to defaults.
+    """
+    import json as _json
+    import time as _time
+    from .memory import (SemanticMemory, SemanticMemoryError,
+                         load_semantic_state, write_semantic_state,
+                         redact_secrets)
+    from .memory.semantic import SEMANTIC_STATE_SCHEMA
+    cmd = getattr(args, "memory_command", None) or "status"
+    base = cfg.state_dir() / "memory"
+    base.mkdir(parents=True, exist_ok=True)
+    state_path = base / "semantic.json"
+    st, health = load_semantic_state(
+        state_path,
+        enabled_default=bool(cfg.get("memory", "semantic", "enabled",
+                                     default=False)),
+        provider_default=cfg.get("memory", "semantic", "provider",
+                                 default="none"),
+        embed_model_default=cfg.get("memory", "semantic", "embed_model",
+                                    default="nomic-embed-text"),
+        ollama_url_default=cfg.get("memory", "semantic", "ollama_url",
+                                   default="http://127.0.0.1:11434"),
+        timeout_s_default=float(cfg.get("memory", "semantic", "timeout_s",
+                                        default=10.0)),
+        top_k_default=int(cfg.get("memory", "semantic", "top_k", default=5)))
+    sm = SemanticMemory(
+        base / "memory.db", enabled=bool(st["enabled"]),
+        provider=st["provider"], embed_model=st["embed_model"],
+        ollama_url=st["ollama_url"], timeout_s=st["timeout_s"],
+        top_k=st["top_k"], journal_path=base / "memory.db.journal")
+    try:
+        if cmd == "status":
+            out = sm.status()
+            out["state_error"] = health["detail"] or None
+            if health["state"] in ("degraded", "newer"):
+                out["state"] = health["state"]
+            if getattr(args, "probe", False):
+                out["provider_probe"] = sm.check_provider()
+        elif cmd == "enable":
+            if health["state"] in ("degraded", "newer") and not args.confirm:
+                return _memory_state_blocked(health)
+            provider = args.provider or st["provider"]
+            merged = dict(st)
+            merged.update({"enabled": True, "provider": provider,
+                           "schema_version": SEMANTIC_STATE_SCHEMA})
+            out = _memory_write_state(cfg, state_path, merged,
+                                      confirm=args.confirm, health=health)
+        elif cmd == "disable":
+            if health["state"] in ("degraded", "newer") and not args.confirm:
+                return _memory_state_blocked(health)
+            merged = dict(st)
+            merged.update({"enabled": False,
+                           "schema_version": SEMANTIC_STATE_SCHEMA})
+            out = _memory_write_state(cfg, state_path, merged,
+                                      confirm=args.confirm, health=health)
+        elif cmd == "set-provider":
+            if health["state"] in ("degraded", "newer") and not args.confirm:
+                return _memory_state_blocked(health)
+            merged = dict(st)
+            merged.update({"provider": args.provider,
+                           "schema_version": SEMANTIC_STATE_SCHEMA})
+            out = _memory_write_state(cfg, state_path, merged,
+                                      confirm=args.confirm, health=health)
+        elif cmd == "belief-record":
+            rec = sm.record_belief(
+                args.entity, args.fact_type, args.value, scope=args.scope,
+                valid_from=args.valid_from, valid_until=args.valid_until,
+                source=args.source)
+            out = {"state": "ok", "id": rec["id"],
+                   "text": redact_secrets(rec["text"]),
+                   "valid_from": rec["valid_from"],
+                   "valid_until": rec["valid_until"], "scope": rec["scope"]}
+        elif cmd == "belief-at":
+            t = args.time if args.time is not None else _time.time()
+            facts = sm.facts_valid_at(args.entity, t, scope=args.scope,
+                                      fact_type=args.fact_type)
+            out = {"state": "ok", "entity": args.entity, "at": t,
+                   "facts": [{"id": r["id"],
+                              "text": redact_secrets(r["text"]),
+                              "source": r["source"],
+                              "valid_from": r["valid_from"],
+                              "valid_until": r["valid_until"]}
+                             for r in facts]}
+        elif cmd == "belief-conflicts":
+            out = {"state": "ok",
+                   "conflicts": [_redact_conflict(c.__dict__)
+                                 for c in sm.belief_conflicts()]}
+        elif cmd == "explain":
+            out = {"state": "ok", "explanation": sm.explain(args.memory_id)}
+        elif cmd == "journal-verify":
+            out = sm.journal_verify()
+        elif cmd == "journal-replay":
+            out = sm.journal_replay(until_seq=args.until)
+        elif cmd == "export":
+            out = {"state": "ok",
+                   "records": sm.export(scope=args.scope, path=args.out)}
+        else:
+            print(f"ERROR: unknown memory command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except (SemanticMemoryError, ValueError) as exc:
+        print(_json.dumps({"state": "failed", "detail": str(exc)}, indent=2))
+        return 2
+    finally:
+        try:
+            sm.close()
+        except Exception:
+            pass
+
+
+def _redact_conflict(c: dict) -> dict:
+    from .memory import redact_secrets
+    out = dict(c)
+    for k in ("entity", "fact_type", "value_a", "value_b"):
+        if out.get(k):
+            out[k] = redact_secrets(out[k])
+    return out
+
+
+def _memory_state_blocked(health: dict) -> int:
+    import json as _json
+    print(_json.dumps({"state": health["state"],
+                       "detail": health["detail"],
+                       "action": "refusing to mutate unless --confirm"},
+                      indent=2))
+    return 4
+
+
+def _memory_write_state(cfg, state_path, merged, *, confirm: bool,
+                        health: dict) -> dict:
+    """Atomic private state write (fsync+rename). A corrupt existing file is
+    backed up before an explicit confirmed overwrite; newer state is never
+    overwritten."""
+    import json as _json
+    import time as _time
+    from .memory import write_semantic_state
+    if not confirm:
+        return {"state": "preview", "would_set": merged,
+                "state_error": health["detail"] or None}
+    if health["state"] == "newer":
+        return {"state": "failed",
+                "detail": "refusing to overwrite newer semantic state"}
+    if health["state"] == "degraded" and state_path.exists():
+        bak = state_path.with_name(
+            f"semantic.json.corrupt-{int(_time.time())}")
+        bak.write_text(state_path.read_text(errors="replace"))
+        try:
+            import os as _os
+            _os.chmod(bak, 0o600)
+        except OSError:
+            pass
+    write_semantic_state(state_path, merged)
+    return {"state": "ok", "applied": merged}
 
 
 def _cmd_websites(cfg, args) -> int:

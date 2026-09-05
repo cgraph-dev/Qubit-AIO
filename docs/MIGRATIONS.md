@@ -1125,4 +1125,49 @@ Live: bridge restarted (PID 88914), `hotkey.active` + `mic.pin_source`
 (Scarlett) logged at startup; a fresh `xinput test-xi2 --root` child attached.
 
 Rollback: revert this commit; restore the blocking `_xinput_loop` if needed.
+
+## MIG-024 — Packet 8M: optional GENOME-compatible semantic memory (2026-09-05)
+
+Status: **IMPLEMENTED (hermetic)** — disabled by default; no live service,
+timer, model, audio, browser, or user-config change. Opening any existing
+`MemoryStore` (including the live `memory.db` during the CLI status probe)
+applies the additive store migration below.
+
+Decision:
+- **Store migration 2 (additive, nullable):** `memories` gains `valid_from
+  REAL`, `valid_until REAL`, and `believed_by TEXT` + `idx_mem_valid`. Existing
+  rows are untouched (NULL windows = always valid). Reversible by `git revert`;
+  the columns are unused unless the optional semantic adapter is enabled.
+- **Store migration 3 (Packet 8M repair):** scope-qualified dedup identity.
+  The durable dedup key becomes `mkey = scope\x00<content>` so the identical
+  fact stores independently in different scopes (repairs the global
+  `UNIQUE(mkey)` collision that previously made cross-scope storage of the
+  same text impossible). Existing rows are rewritten one-to-one
+  (`UPDATE memories SET mkey = scope || char(0) || mkey`), guarded against
+  re-application; `norm_hash` keeps the bare content hash; concurrent
+  same-scope inserts handle the `UNIQUE` race as a Mem0 duplicate-skip.
+- **New surface (all disabled/opt-in):** `voicebridge/memory/semantic.py`
+  (`SemanticMemory`), `voicebridge/memory/journal.py` (hash-chained journal +
+  replay/verify), `memory` CLI command, and `memory.semantic` config defaults
+  (`enabled: false`, `provider: none`). No new dependency, no MCP/HTTP server,
+  no second store; ingest is LLM-free by construction.
+- **Repairs from the rejected audit (2026-09-05):** secret validation/redaction
+  at every mutation boundary and in history/recall/explain diagnostics;
+  origin-bound authority (correct/forget/purge/promote/invalidate_belief carry
+  `requested_by` with trust >= the target's trust; import never claims
+  `source=user`; unknown sources fail closed); temporal validation (finite
+  confidence/timestamps, `valid_until` after `valid_from`, sane invalidation
+  times); corrupt/newer `semantic.json` is a typed DEGRADED/newer result and is
+  never silently reset (state writes are atomic temp+fsync+rename, 0600);
+  replay re-runs validation/authority; default status never contacts Ollama.
+- **Runtime selection** lives in `<state_dir>/memory/semantic.json` (state,
+  not the live `voice.yaml`); `memory enable|disable|set-provider` are dry-run
+  unless `--confirm`.
+- **Provenance:** GENOME pinned at `ea76cf924b2382499a158b8c7ad8a815913c962f`
+  (Apache-2.0) — see `docs/UPSTREAM_REUSE.md` R23 and
+  `THIRD_PARTY_NOTICES.md`.
+
+Tests: `tests/test_packet8m.py` (focused) + affected 5B/5C/portable regressions.
+Rollback: `git revert` of the 8M commit; `memory disable`; remove
+`semantic.json`/journal; the store remains fully functional without the columns.
 The hotkey fix is purely in-process and reversible by restarting the service.

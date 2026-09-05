@@ -112,6 +112,18 @@ DEFAULTS: Dict[str, Any] = {
         "workspace": "~/.openclaw/workspace",  # save session notes here
         "context_chars": 1500,          # max memory chars injected into text_prompt
         "save_notes": True,             # append session summary to memory/YYYY-MM-DD.md
+        # Packet 8M: optional GENOME-compatible semantic memory adapter.
+        # DISABLED BY DEFAULT. provider none|hash|ollama. Ingest is always
+        # LLM-free; embeddings are only contacted for recall and only when a
+        # provider is enabled and configured.
+        "semantic": {
+            "enabled": False,
+            "provider": "none",         # none | hash (offline approx) | ollama
+            "embed_model": "nomic-embed-text",
+            "ollama_url": "http://127.0.0.1:11434",
+            "timeout_s": 10.0,
+            "top_k": 5,
+        },
     },
     "tts": {
         "provider": "piper",        # piper (fast, cheap, local) | hybrid (piper short, openai nova long) | kokoro | edge | gateway | openai
