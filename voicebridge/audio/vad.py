@@ -14,6 +14,7 @@ short run of voiced frames, so the orchestrator can stop playback.
 from __future__ import annotations
 
 import threading
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -25,6 +26,42 @@ from ..logging_setup import log_event
 FRAME_MS = 30
 FRAME_RATE = 16000
 FRAME_SIZE = FRAME_RATE * FRAME_MS // 1000  # 480 samples
+
+# webrtcvad (2.0.10) imports pkg_resources at module import time; that
+# deprecated API emits a UserWarning on every Python >= 3.12 setuptools. There
+# is no webrtcvad API to disable it, so we scope a single warnings filter to
+# THIS known third-party warning only (exact message + UserWarning + the
+# webrtcvad/pkg_resources modules) and insert it at the front so it wins even
+# under ``-W error``. The filter is deliberately narrow — any other warning
+# still behaves normally (proven by tests/test_audio_qualify.py).
+_PKG_RESOURCES_WARN_FILTERED = False
+
+
+def _suppress_pkg_resources_deprecation_warning() -> None:
+    """Narrowly ignore webrtcvad's pkg_resources-deprecation UserWarning.
+
+    Idempotent: applies the filter at most once per process. Never touches any
+    other warning — the message, category, and module are all pinned to the
+    known third-party deprecation.
+    """
+    global _PKG_RESOURCES_WARN_FILTERED
+    if _PKG_RESOURCES_WARN_FILTERED:
+        return
+    warnings.filterwarnings(
+        "ignore",
+        message="pkg_resources is deprecated as an API",
+        category=UserWarning,
+        module="webrtcvad|pkg_resources",
+        append=False,
+    )
+    _PKG_RESOURCES_WARN_FILTERED = True
+
+
+def _import_webrtcvad():
+    """Import webrtcvad with its known import-time warning scoped away."""
+    _suppress_pkg_resources_deprecation_warning()
+    import webrtcvad
+    return webrtcvad
 
 
 class SileroVadGate:
@@ -102,7 +139,7 @@ def _make_vad_gate(backend: str, aggressiveness: int,
         except Exception as exc:
             log_event("vad.silero.unavailable", error=str(exc)[:160],
                       fallback="webrtc")
-    import webrtcvad
+    webrtcvad = _import_webrtcvad()
     vad = webrtcvad.Vad(aggressiveness)
     return lambda pcm: vad.is_speech(pcm, FRAME_RATE)
 

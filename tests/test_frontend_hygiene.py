@@ -234,3 +234,87 @@ def test_no_script_eval_or_dynamic_function() -> None:
         text = _read(page)
         assert 'eval(' not in text, f"{page}: eval()"
         assert 'new Function(' not in text, f"{page}: new Function"
+
+
+# ---------------------------------------------------------------------------
+# Packet 8L polish regression: consistent Qubit Voice Agent branding, the
+# Talk-page onboarding panel, canonical pairing guidance, and a single shared
+# visual palette (near-black + restrained lime). These are additive checks —
+# they never weaken the existing Packet 8L contract tests above.
+# ---------------------------------------------------------------------------
+
+def test_branding_title_on_every_page() -> None:
+    """Every dashboard page carries the product name in a consistent
+    ``<title>`` ("Qubit Voice Agent — <Section>")."""
+    for page in PAGES:
+        text = _read(page)
+        title = re.search(r"<title>(.*?)</title>", text, flags=re.S)
+        assert title, f"{page}: missing <title>"
+        assert title.group(1).strip().startswith("Qubit Voice Agent"), \
+            f"{page}: title must start with the product name, got {title.group(1)!r}"
+
+
+def test_talk_page_has_onboarding_help_panel() -> None:
+    """Packet 8L polish: the Talk page must include a first-run onboarding/help
+    panel that explains the safe workflow (pair -> talk -> activity -> reports)
+    and names the canonical token location. Links inside the panel are real
+    44px tap targets."""
+    text = _read("index.html")
+    assert 'class="help-panel"' in text, "Talk page missing onboarding help panel"
+    assert "How Qubit works" in text, "Talk help panel missing its heading"
+    for needle in ["Pair device", "Activity", "Reports", "Settings"]:
+        assert needle in text, f"Talk onboarding must mention the {needle} step"
+    assert '~/.config/qubit-voice-agent/voice.yaml' in text, \
+        "Talk onboarding must name the canonical token location"
+    assert "webui.token" in text
+    # every onboarding link (inside the help panel only) must be a >=44px
+    # tap target (WCAG 2.2 / 8L)
+    panel = re.search(
+        r'<details\b[^>]*class="help-panel"[^>]*>(.*?)</details>',
+        text, flags=re.S)
+    assert panel, "Talk page missing the help-panel details block"
+    panel_html = panel.group(1)
+    links = re.findall(r'<a\b[^>]*>', panel_html)
+    assert links, "Talk onboarding must link the workflow steps"
+    for tag in links:
+        assert 'tap-target' in tag, \
+            f"onboarding link {tag!r} must be a 44px tap target"
+
+
+def test_token_setup_uses_canonical_qubit_path() -> None:
+    """Packet 8L polish: the pairing page must reference the canonical
+    ``qubit-voice-agent`` config path (never the legacy
+    ``openclaw-voice-bridge`` name) and the real ``webui.token`` key."""
+    text = _read("token-setup.html")
+    assert "openclaw-voice-bridge" not in text, \
+        "token-setup must not name the legacy config path"
+    assert "webui.token" in text and "voice.yaml" in text, \
+        "token-setup must point at webui.token in voice.yaml"
+    assert "qubit-voice-agent" in text, "token-setup must use the canonical product path"
+    assert "vbApiTest" in text  # candidate token is tested before saving
+
+
+def test_no_legacy_blue_palette_in_page_styles() -> None:
+    """Packet 8L polish: every page's inline <style> block must use the shared
+    design tokens (near-black surfaces + lime accent). The legacy GitHub-blue
+    palette hexes are not allowed anywhere in the frontend — they would fight
+    the shared app.css foundation."""
+    legacy = re.compile(
+        r"#(?:0b0e14|dbe2ef|22304a|131a26|7f8ca3|6db3ff|1f7a4d|8a6d1f|7a1f2d|"
+        r"ff8080|58a6ff|1f6feb|30363d|0d1117|161b22|21262d|3fb950|d29922|f85149|"
+        r"238636|da3633|5ad19b|bc8cff|a371f7|8b949e|e6edf3|33455f|1f5a7a)\b",
+        re.IGNORECASE)
+    for page in PAGES + ["ui.js", "vb.js"]:
+        text = _read(page)
+        matches = legacy.findall(text)
+        assert not matches, f"{page}: legacy palette still present: {sorted(set(matches))}"
+
+
+def test_shared_tokens_defined_in_app_css() -> None:
+    """The design tokens the pages reference must be defined once in app.css."""
+    css = (FRONTEND / "app.css").read_text(encoding="utf-8")
+    for token in ["--bg", "--surface", "--surface-raised", "--surface-soft",
+                  "--text", "--muted", "--faint", "--line", "--line-strong",
+                  "--primary", "--primary-strong", "--success", "--warning",
+                  "--danger", "--focus", "--radius", "--shadow"]:
+        assert token in css, f"app.css missing token {token}"

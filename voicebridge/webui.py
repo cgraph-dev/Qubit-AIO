@@ -568,7 +568,11 @@ ACTIVITY_PAGE = r"""<!doctype html>
   <div id="feed"><div id="empty">waiting for activity…</div></div>
 </div>
 <script>
-const BASE = (new URLSearchParams(location.search).get('api') || localStorage.getItem('vdb_api') || '').replace(/\/$/, '');
+const BASE = (localStorage.getItem('vdb_api') || '').replace(/\/$/, '');
+// Packet 8L contract: an attacker-controlled ?api= query string is NEVER
+// honored (it could redirect the stored token); the base is changed only
+// through the explicit Settings/Pairing action, which validates the origin
+// and tests the token before saving.
 // Packet 1B: tokens come from localStorage only; ?token= URLs are rejected server-side.
 const TOKEN = localStorage.getItem('vdb_token') || '';
 function hdrs(extra) { const h = Object.assign({}, extra || {}); if (TOKEN) h['X-Api-Token'] = TOKEN; return h; }

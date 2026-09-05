@@ -2,36 +2,32 @@
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Voice Dashboard</title>
+<title>Qubit Voice Agent — Talk</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
   body { margin:0; font: 16px/1.5 system-ui, sans-serif;
-         background:#0d1117; color:#e6edf3; min-height:100vh; }
+         background:var(--bg); color:var(--text); min-height:100vh; }
   .wrap { max-width:720px; margin:0 auto; padding:16px; }
   header { display:flex; align-items:baseline; justify-content:space-between;
            gap:8px; margin-bottom:8px; }
   h1 { font-size:20px; margin:0; }
-  .status { font-size:13px; color:#8b949e; }
-  .status.live { color:#3fb950; }
-  #pulse { width:10px; height:10px; border-radius:50%; background:#f85149;
-           display:inline-block; vertical-align:middle; margin-right:6px; }
-  #pulse.on { background:#3fb950; animation: blink 1s infinite; }
-  @keyframes blink { 50% { opacity:.35; } }
+  .status { font-size:13px; color:var(--muted); }
+  .status.live { color:var(--success); }
   .ptt { width:100%; padding:36px 0; margin:24px 0; font-size:20px;
-         border:2px solid #30363d; border-radius:16px; background:#161b22;
-         color:#e6edf3; cursor:pointer; user-select:none; -webkit-user-select:none;
+         border:2px solid var(--line-strong); border-radius:16px; background:var(--surface);
+         color:var(--text); cursor:pointer; user-select:none; -webkit-user-select:none;
          touch-action:none; transition: background .08s; }
-  .ptt:active, .ptt.hold { background:#1f6feb; border-color:#1f6feb; color:#fff; }
+  .ptt:active, .ptt.hold { background:#1e2a11; border-color:var(--primary); color:var(--text); }
   .ptt[disabled] { opacity:.4; cursor:wait; }
-  .hint { text-align:center; color:#8b949e; font-size:13px; margin-top:-16px; }
+  .hint { text-align:center; color:var(--muted); font-size:13px; margin-top:-16px; }
   #transcript { margin-top:20px; }
   .msg { padding:10px 12px; border-radius:10px; margin:8px 0; white-space:pre-wrap; }
-  .msg.user { background:#1f6feb22; border:1px solid #1f6feb44; }
-  .msg.assistant { background:#161b22; border:1px solid #30363d; }
-  .msg.meta { background:#0d1117; color:#8b949e; font-size:13px; border:none; }
-  .err { color:#f85149; }
-  a { color:#58a6ff; text-decoration:none; }
+  .msg.user { background:rgb(216 243 106 / 8%); border:1px solid rgb(216 243 106 / 28%); }
+  .msg.assistant { background:var(--surface); border:1px solid var(--line); }
+  .msg.meta { background:transparent; color:var(--muted); font-size:13px; border:none; }
+  .err { color:var(--danger); }
+  a { color:var(--primary); text-decoration:none; }
   .row { display:flex; gap:8px; align-items:center; }
 </style><link rel="stylesheet" href="/static/app.css"></head><body>
 <!--
@@ -46,7 +42,7 @@ FINISH: Every state explains what happened and what the operator can safely do n
 <main class="wrap" id="main-content" tabindex="-1">
   <header>
     <div>
-      <h1><span class="brand-mark" aria-hidden="true">Q</span> Voice Dashboard</h1>
+      <h1><span class="brand-mark" aria-hidden="true">Q</span> Qubit Voice Agent</h1>
       <p class="page-lead">Speak or type a task. Qubit keeps the route and progress visible while you stay in control.</p>
     </div>
     <div class="status-cluster"><span class="status" id="st" aria-live="polite">connecting…</span></div>
@@ -58,14 +54,27 @@ FINISH: Every state explains what happened and what the operator can safely do n
     <a class="nav-utility" href="/token-setup">Pair device</a>
   </nav>
 
+  <details class="help-panel">
+    <summary>How Qubit works — first time here?</summary>
+    <div>
+      <ol>
+        <li><b>Pair this device</b> once: open <a class="tap-target" href="/token-setup">Pair device</a>, paste the <code>webui.token</code> from <code>~/.config/qubit-voice-agent/voice.yaml</code>, and choose Save &amp; test. Your token is stored only in this browser.</li>
+        <li><b>Talk or type</b> below. Hold the button and speak, or type a task and press Enter.</li>
+        <li><b>Watch progress</b> in the transcript and on <a class="tap-target" href="/activity">Activity</a>. Read-only work can run automatically; anything sensitive always asks first.</li>
+        <li><b>Review reports</b> and <a class="tap-target" href="/reports">Reports</a>. Use <a class="tap-target" href="/settings">Settings</a> only when you need to change models, voices, permissions, or pairing.</li>
+      </ol>
+      <p>Everything runs on your PC. No account is required, nothing is sent unless you act, and every change is backed up and reversible.</p>
+    </div>
+  </details>
+
   <button class="ptt" id="ptt">Hold to talk</button>
-  <div class="hint">tap = toggle · release = send · esc = stop · <a href="#" class="tap-target" id="interruptBtn" style="color:#f85149;">⏹ interrupt</a></div>
+  <div class="hint">tap = toggle · release = send · esc = stop · <a href="#" class="tap-target" id="interruptBtn" style="color:var(--danger);">⏹ interrupt</a></div>
 
   <div class="row talk-input-row" style="margin-top:14px;">
     <label class="sr-only" for="textin">Type a task</label>
     <input id="textin" type="text" placeholder="…or type a task (Enter to send)"
-           style="flex:1; padding:10px 12px; background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:8px; font-size:15px;">
-    <button id="textsend" style="padding:10px 16px; background:#238636; border:none; color:#fff; border-radius:8px; cursor:pointer;">Send</button>
+           style="flex:1; padding:10px 12px; background:var(--surface-soft); border:1px solid var(--line-strong); color:var(--text); border-radius:8px; font-size:15px;">
+    <button id="textsend" class="ok" type="button" style="padding:10px 16px; border-radius:8px;">Send</button>
   </div>
 
   <div id="transcript"></div>
@@ -78,64 +87,64 @@ FINISH: Every state explains what happened and what the operator can safely do n
 </main>
 
 
-<div id="settings" style="display:none; border:1px solid #30363d; border-radius:10px; padding:10px; margin:10px 0; background:#161b22;">
+<div id="settings" style="display:none; border:1px solid var(--line-strong); border-radius:10px; padding:10px; margin:10px 0; background:var(--surface);">
   <div style="font-size:13px; margin-bottom:6px;">API server (from Vercel, paste your PC's tunnel URL, e.g. https://xxx.run.pinggy-free.link)</div>
   <label class="sr-only" for="set-api">API server URL</label>
-  <input id="set-api" type="text" placeholder="https://your-pc-tunnel-url" style="width:100%; padding:6px; margin-bottom:6px; background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:6px;">
+  <input id="set-api" type="text" placeholder="https://your-pc-tunnel-url" style="width:100%; padding:6px; margin-bottom:6px; background:var(--surface-soft); border:1px solid var(--line-strong); color:var(--text); border-radius:6px;">
   <label class="sr-only" for="set-token">API token</label>
-  <input id="set-token" type="text" placeholder="token (optional)" style="width:100%; padding:6px; margin-bottom:6px; background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:6px;">
-  <div class="row"><button id="set-save" style="padding:6px 14px; background:#1f6feb; border:none; color:#fff; border-radius:6px; cursor:pointer;">Save</button>
-  <span id="set-status" style="font-size:12px; color:#8b949e; margin-left:10px;"></span></div>
+  <input id="set-token" type="text" placeholder="token (optional)" style="width:100%; padding:6px; margin-bottom:6px; background:var(--surface-soft); border:1px solid var(--line-strong); color:var(--text); border-radius:6px;">
+  <div class="row"><button id="set-save" class="ok" type="button" style="padding:6px 14px; border-radius:6px;">Save</button>
+  <span id="set-status" style="font-size:12px; color:var(--muted); margin-left:10px;"></span></div>
   <div style="font-size:13px; margin:6px 0 4px;">Voice (TTS)</div>
-  <div id="voice-info" style="font-size:12px; color:#8b949e;">Voice is controlled by bridge settings.</div>
+  <div id="voice-info" style="font-size:12px; color:var(--muted);">Voice is controlled by bridge settings.</div>
 </div>
 
-<div id="lessonspanel" style="display:none; border:1px solid #30363d; border-radius:10px; padding:10px; margin:10px 0; background:#161b22;">
-  <div style="font-size:13px; margin-bottom:6px; color:#e6edf3;">Learned preferences <span style="color:#8b949e;">— what I remember, why, and how to remove it</span></div>
+<div id="lessonspanel" style="display:none; border:1px solid var(--line-strong); border-radius:10px; padding:10px; margin:10px 0; background:var(--surface);">
+  <div style="font-size:13px; margin-bottom:6px; color:var(--text);">Learned preferences <span style="color:var(--muted);">— what I remember, why, and how to remove it</span></div>
   <div id="lessonslist" style="font-size:12px;"></div>
   <div id="lessonsreviews" style="font-size:12px; margin-top:8px;"></div>
 </div>
 
-<div id="permspanel" style="display:none; border:1px solid #30363d; border-radius:10px; padding:10px; margin:10px 0; background:#161b22;">
-  <div style="font-size:13px; margin-bottom:6px; color:#e6edf3;">Permissions &amp; skills <span style="color:#8b949e;">— restricted (default) / unrestricted (opt-in) · scoped grants · skill manifests</span></div>
-  <div id="perms-status" style="font-size:12px; color:#8b949e;"></div>
-  <div style="margin:8px 0 4px; font-size:13px; color:#e6edf3;">Mode</div>
+<div id="permspanel" style="display:none; border:1px solid var(--line-strong); border-radius:10px; padding:10px; margin:10px 0; background:var(--surface);">
+  <div style="font-size:13px; margin-bottom:6px; color:var(--text);">Permissions &amp; skills <span style="color:var(--muted);">— restricted (default) / unrestricted (opt-in) · scoped grants · skill manifests</span></div>
+  <div id="perms-status" style="font-size:12px; color:var(--muted);"></div>
+  <div style="margin:8px 0 4px; font-size:13px; color:var(--text);">Mode</div>
   <div class="row" style="gap:6px;">
-    <button id="perm-restricted" style="padding:6px 12px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#e6edf3;cursor:pointer;">Restricted</button>
-    <button id="perm-unrestricted" style="padding:6px 12px;border:1px solid #f85149;border-radius:6px;background:#0d1117;color:#f85149;cursor:pointer;">Unrestricted</button>
+    <button id="perm-restricted" style="padding:6px 12px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface-soft);color:var(--text);cursor:pointer;">Restricted</button>
+    <button id="perm-unrestricted" style="padding:6px 12px;border:1px solid var(--danger);border-radius:6px;background:var(--surface-soft);color:var(--danger);cursor:pointer;">Unrestricted</button>
     <label class="sr-only" for="perm-scopes">Scopes for unrestricted mode</label>
     <input id="perm-scopes" type="text" placeholder="scopes for unrestricted (comma-separated)"
-           style="flex:1;padding:6px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:6px;font-size:12px;">
+           style="flex:1;padding:6px;background:var(--surface-soft);border:1px solid var(--line-strong);color:var(--text);border-radius:6px;font-size:12px;">
   </div>
-  <div style="font-size:11px;color:#f85149;margin:4px 0 8px;">Unrestricted pre-authorizes routine non-destructive work only inside your selected scopes. It never bypasses hard-deny, audit, isolation, or confirmation for sending/publishing/purchasing/deleting/credentials/security/system changes.</div>
-  <div style="margin:8px 0 4px;font-size:13px;color:#e6edf3;">Current grants <button id="perm-reset" style="margin-left:8px;padding:3px 10px;background:#f85149;border:none;color:#fff;border-radius:5px;cursor:pointer;font-size:11px;">reset to restricted</button></div>
+  <div style="font-size:11px;color:var(--danger);margin:4px 0 8px;">Unrestricted pre-authorizes routine non-destructive work only inside your selected scopes. It never bypasses hard-deny, audit, isolation, or confirmation for sending/publishing/purchasing/deleting/credentials/security/system changes.</div>
+  <div style="margin:8px 0 4px;font-size:13px;color:var(--text);">Current grants <button id="perm-reset" style="margin-left:8px;padding:3px 10px;background:var(--danger);border:none;color:#201010;border-radius:5px;cursor:pointer;font-size:11px;">reset to restricted</button></div>
   <div id="perm-grants" style="font-size:12px;"></div>
-  <div style="margin:8px 0 4px;font-size:13px;color:#e6edf3;">Skills <span style="color:#8b949e;">(installs are staged disabled)</span></div>
+  <div style="margin:8px 0 4px;font-size:13px;color:var(--text);">Skills <span style="color:var(--muted);">(installs are staged disabled)</span></div>
   <div id="perm-skills" style="font-size:12px;"></div>
   <details style="margin-top:8px;">
-    <summary style="font-size:12px;color:#8b949e;cursor:pointer;">advanced: effective check + audit</summary>
+    <summary style="font-size:12px;color:var(--muted);cursor:pointer;">advanced: effective check + audit</summary>
     <div class="row" style="margin:6px 0;">
       <label class="sr-only" for="perm-check-cap">Capability to check</label>
-      <input id="perm-check-cap" type="text" placeholder="capability, e.g. browser.snapshot" style="flex:1;padding:5px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:6px;font-size:12px;">
-      <button id="perm-check-btn" style="padding:5px 10px;background:#1f6feb;border:none;color:#fff;border-radius:5px;cursor:pointer;font-size:11px;">check</button>
+      <input id="perm-check-cap" type="text" placeholder="capability, e.g. browser.snapshot" style="flex:1;padding:5px;background:var(--surface-soft);border:1px solid var(--line-strong);color:var(--text);border-radius:6px;font-size:12px;">
+      <button id="perm-check-btn" style="padding:5px 10px;background:var(--primary);border:none;color:#10120a;border-radius:5px;cursor:pointer;font-size:11px;">check</button>
     </div>
-    <div id="perm-effective" style="font-size:12px;color:#8b949e;"></div>
-    <div id="perm-audit" style="font-size:11px;color:#8b949e;margin-top:6px;"></div>
+    <div id="perm-effective" style="font-size:12px;color:var(--muted);"></div>
+    <div id="perm-audit" style="font-size:11px;color:var(--muted);margin-top:6px;"></div>
   </details>
 </div>
 
-<div id="reportspanel" style="display:none; border:1px solid #30363d; border-radius:10px; padding:10px; margin:10px 0; background:#161b22;">
-  <div style="font-size:13px; margin-bottom:6px; color:#e6edf3;">Reports <span style="color:#8b949e;">— canonical private bundles (JSON / Markdown / HTML)</span>
-    <span id="notif-badge" style="margin-left:10px;display:none;background:#1f6feb;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;"></span>
+<div id="reportspanel" style="display:none; border:1px solid var(--line-strong); border-radius:10px; padding:10px; margin:10px 0; background:var(--surface);">
+  <div style="font-size:13px; margin-bottom:6px; color:var(--text);">Reports <span style="color:var(--muted);">— canonical private bundles (JSON / Markdown / HTML)</span>
+    <span id="notif-badge" style="margin-left:10px;display:none;background:var(--primary);color:#10120a;border-radius:10px;padding:1px 8px;font-size:11px;"></span>
   </div>
   <div class="row" style="gap:6px; margin-bottom:6px;">
     <label class="sr-only" for="reports-q">Search reports</label>
     <input id="reports-q" type="text" placeholder="search reports…"
-           style="flex:1;padding:6px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:6px;font-size:12px;">
-    <button data-p="" style="padding:5px 10px;background:#1f6feb;border:none;color:#fff;border-radius:5px;cursor:pointer;font-size:11px;">all</button>
-    <button data-p="gmail" style="padding:5px 10px;background:#30363d;border:none;color:#e6edf3;border-radius:5px;cursor:pointer;font-size:11px;">gmail</button>
-    <button data-p="instagram" style="padding:5px 10px;background:#30363d;border:none;color:#e6edf3;border-radius:5px;cursor:pointer;font-size:11px;">instagram</button>
-    <button data-p="messenger" style="padding:5px 10px;background:#30363d;border:none;color:#e6edf3;border-radius:5px;cursor:pointer;font-size:11px;">messenger</button>
+           style="flex:1;padding:6px;background:var(--surface-soft);border:1px solid var(--line-strong);color:var(--text);border-radius:6px;font-size:12px;">
+    <button data-p="" style="padding:5px 10px;background:var(--primary);border:none;color:#10120a;border-radius:5px;cursor:pointer;font-size:11px;">all</button>
+    <button data-p="gmail" style="padding:5px 10px;background:var(--surface-soft);border:none;color:var(--text);border-radius:5px;cursor:pointer;font-size:11px;">gmail</button>
+    <button data-p="instagram" style="padding:5px 10px;background:var(--surface-soft);border:none;color:var(--text);border-radius:5px;cursor:pointer;font-size:11px;">instagram</button>
+    <button data-p="messenger" style="padding:5px 10px;background:var(--surface-soft);border:none;color:var(--text);border-radius:5px;cursor:pointer;font-size:11px;">messenger</button>
   </div>
   <div id="reports-list" style="font-size:12px;"></div>
 </div>
@@ -168,9 +177,6 @@ function addMsg(cls, text) {
 function setStatus(t, live=false) {
   st.textContent = t;
   st.className = 'status' + (live ? ' live' : '');
-}
-function setPulse(on) {
-  document.getElementById('pulse').style.display = 'none'; // unused fallback
 }
 
 function micError(err) {
@@ -313,9 +319,9 @@ document.getElementById('set-token').value = localStorage.getItem('vdb_token') |
 // stored token is never sent to an unapproved origin.
 document.getElementById('set-save').addEventListener('click', async () => {
   const statusEl = document.getElementById('set-status');
-  statusEl.style.color = '#8b949e';
+  statusEl.style.color = 'var(--muted)';
   const apiCheck = vbValidateApiOrigin(document.getElementById('set-api').value);
-  if (apiCheck.error) { statusEl.textContent = apiCheck.error; statusEl.style.color = '#f85149'; return; }
+  if (apiCheck.error) { statusEl.textContent = apiCheck.error; statusEl.style.color = 'var(--danger)'; return; }
   const tok = document.getElementById('set-token').value.trim();
   const base = apiCheck.base;
   const changed = base && base !== vbApiBase();
@@ -328,14 +334,14 @@ document.getElementById('set-save').addEventListener('click', async () => {
     localStorage.setItem('vdb_api', base);
     localStorage.setItem('vdb_token', tok);
     statusEl.textContent = 'Paired and saved. Reloading…';
-    statusEl.style.color = '#3fb950';
+    statusEl.style.color = 'var(--success)';
     setTimeout(() => location.reload(), 400);
   } else if (res.status === 401) {
     statusEl.textContent = 'Token rejected (401) — previous pairing kept.';
-    statusEl.style.color = '#f85149';
+    statusEl.style.color = 'var(--danger)';
   } else {
     statusEl.textContent = 'Bridge unavailable (' + (res.status || 0) + ') — previous pairing kept.';
-    statusEl.style.color = '#f85149';
+    statusEl.style.color = 'var(--danger)';
   }
 });
 
@@ -554,10 +560,11 @@ vbApi('/api/status').then(res => {
     const input = document.createElement('input');
     input.className = 'history-correction-input';
     input.placeholder = 'What should Qubit have said?';
-    input.style.cssText = 'flex:1;padding:4px 8px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:6px;font-size:12px;';
+    input.style.cssText = 'flex:1;padding:4px 8px;background:var(--surface-soft);border:1px solid var(--line-strong);color:var(--text);border-radius:6px;font-size:12px;';
     const send = document.createElement('button');
     send.textContent = 'Teach';
-    send.style.cssText = 'padding:4px 10px;background:#1f6feb;border:none;color:#fff;border-radius:6px;cursor:pointer;font-size:12px;';
+    send.className = 'ok';
+    send.style.cssText = 'padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;';
     send.addEventListener('click', async () => {
       const corrected = input.value.trim();
       const body = {
@@ -594,10 +601,10 @@ vbApi('/api/status').then(res => {
 
   function row(label, text){
     const el = document.createElement('div');
-    el.style.cssText = 'padding:6px 0;border-bottom:1px solid #21262d;';
+    el.style.cssText = 'padding:6px 0;border-bottom:1px solid var(--line);';
     const src = document.createElement('span');
     src.textContent = label;
-    src.style.cssText = 'color:#58a6ff;margin-right:6px;';
+    src.style.cssText = 'color:var(--primary);margin-right:6px;';
     const body = document.createElement('span');
     body.textContent = text;
     el.appendChild(src); el.appendChild(body);
@@ -607,8 +614,8 @@ vbApi('/api/status').then(res => {
     const b = document.createElement('button');
     b.textContent = label;
     b.title = title || '';
-    b.style.cssText = 'padding:2px 8px;background:#1f6feb;border:none;color:#fff;'
-      + 'border-radius:5px;cursor:pointer;font-size:11px;margin-left:8px;';
+    b.className = 'quiet-action';
+    b.style.cssText = 'padding:2px 8px;border-radius:5px;cursor:pointer;font-size:11px;margin-left:8px;';
     return b;
   }
   function explainLine(l){
@@ -699,8 +706,8 @@ vbApi('/api/status').then(res => {
   function btn(label, title, onClick){
     const b = document.createElement('button');
     b.textContent = label; b.title = title || '';
-    b.style.cssText = 'padding:2px 8px;background:#1f6feb;border:none;color:#fff;'
-      + 'border-radius:5px;cursor:pointer;font-size:11px;margin-left:8px;';
+    b.className = 'quiet-action';
+    b.style.cssText = 'padding:2px 8px;border-radius:5px;cursor:pointer;font-size:11px;margin-left:8px;';
     b.addEventListener('click', onClick);
     return b;
   }
@@ -712,7 +719,7 @@ vbApi('/api/status').then(res => {
   }
   function setStatus(t, kind){
     st.textContent = t;
-    st.style.color = kind === 'err' ? '#f85149' : (kind === 'ok' ? '#3fb950' : '#8b949e');
+    st.style.color = kind === 'err' ? 'var(--danger)' : (kind === 'ok' ? 'var(--success)' : 'var(--muted)');
   }
   async function post(body){
     const res = await vbApi('/api/permissions',
@@ -733,7 +740,7 @@ vbApi('/api/status').then(res => {
   function renderGrants(){
     grantsEl.replaceChildren();
     const gs = (data && data.grants) || [];
-    if(!gs.length){ grantsEl.appendChild(line('No grants — restricted mode denies everything not explicitly granted.', 'color:#8b949e;')); return; }
+    if(!gs.length){ grantsEl.appendChild(line('No grants — restricted mode denies everything not explicitly granted.', 'color:var(--muted);')); return; }
     gs.forEach(g => {
       const d = line('▸ ' + g.capability + ' · ' + (g.scopes||[]).join(', ') +
         (g.expires_at ? ' · expires ' + new Date(g.expires_at*1000).toLocaleString() : ' · no expiry'));
@@ -747,7 +754,7 @@ vbApi('/api/status').then(res => {
   function renderSkills(){
     skillsEl.replaceChildren();
     const ss = (data && data.skills) || [];
-    if(!ss.length){ skillsEl.appendChild(line('No skills installed. Use `voicebridge skills install <manifest.json>` or the CLI.', 'color:#8b949e;')); return; }
+    if(!ss.length){ skillsEl.appendChild(line('No skills installed. Use `voicebridge skills install <manifest.json>` or the CLI.', 'color:var(--muted);')); return; }
     ss.forEach(s => {
       const d = line('▸ ' + s.skill_id + ' v' + s.manifest.version + ' · ' + s.status +
         (s.manifest.license ? ' · ' + s.manifest.license : ''));
@@ -837,8 +844,8 @@ vbApi('/api/status').then(res => {
   function btn(label, title, onClick){
     const b = document.createElement('button');
     b.textContent = label; b.title = title || '';
-    b.style.cssText = 'padding:3px 10px;background:#1f6feb;border:none;color:#fff;'
-      + 'border-radius:5px;cursor:pointer;font-size:11px;margin-left:6px;';
+    b.className = 'quiet-action';
+    b.style.cssText = 'padding:3px 10px;border-radius:5px;cursor:pointer;font-size:11px;margin-left:6px;';
     b.addEventListener('click', onClick);
     return b;
   }
@@ -848,7 +855,7 @@ vbApi('/api/status').then(res => {
     a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
     a.textContent = label;
     a.className = 'tap-target';
-    a.style.cssText = 'color:#58a6ff;';
+    a.style.cssText = 'color:var(--primary);';
     return a;
   }
   async function fetchJson(path){
@@ -872,18 +879,18 @@ vbApi('/api/status').then(res => {
     }
     shown.forEach(r => {
       const card = document.createElement('div');
-      card.style.cssText = 'background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:8px;margin:6px 0;';
+      card.style.cssText = 'background:var(--surface-soft);border:1px solid var(--line);border-radius:8px;padding:8px;margin:6px 0;';
       const head = document.createElement('div');
       head.style.cssText = 'display:flex;justify-content:space-between;gap:8px;';
       const id = document.createElement('span');
       id.textContent = r.report_id + (r.acknowledged ? ' ✓' : '');
       const st = document.createElement('span');
       st.textContent = (r.status || '').toUpperCase();
-      st.style.cssText = 'color:' + (r.status === 'success' ? '#3fb950'
-        : (r.status === 'partial' ? '#d29922' : '#f85149'));
+      st.style.cssText = 'color:' + (r.status === 'success' ? 'var(--success)'
+        : (r.status === 'partial' ? 'var(--warning)' : 'var(--danger)'));
       head.appendChild(id); head.appendChild(st);
       const meta = document.createElement('div');
-      meta.style.cssText = 'color:#8b949e;font-size:11px;margin:2px 0;';
+      meta.style.cssText = 'color:var(--muted);font-size:11px;margin:2px 0;';
       meta.textContent = 'new ' + r.new_count + ' · ' + (r.platforms || []).join(', ')
         + ' · ' + new Date(r.created_at * 1000).toLocaleString();
       const foot = document.createElement('div');
@@ -910,7 +917,7 @@ vbApi('/api/status').then(res => {
       const head = document.createElement('h3'); head.textContent = 'Report ' + rid;
       listEl.appendChild(head);
       const meta = document.createElement('div');
-      meta.style.cssText = 'color:#8b949e;font-size:12px;';
+      meta.style.cssText = 'color:var(--muted);font-size:12px;';
       meta.textContent = (rep.status || '').toUpperCase() + ' · new ' + rep.new_count
         + ' · ' + new Date(rep.created_at * 1000).toLocaleString()
         + (rep.acknowledged ? ' · acknowledged' : '');
@@ -921,14 +928,14 @@ vbApi('/api/status').then(res => {
       listEl.appendChild(sum);
       (rep.items || []).forEach(it => {
         const row = document.createElement('div');
-        row.style.cssText = 'border-top:1px solid #21262d;padding:6px 0;';
+        row.style.cssText = 'border-top:1px solid var(--line);padding:6px 0;';
         const line = document.createElement('div');
         line.textContent = (it.sender || '') + ' — ' + (it.subject || it.preview || '')
           + ' [' + it.read_state + '] ' + (it.ts_raw || '');
         row.appendChild(line);
         const ev = document.createElement('div');
         ev.textContent = 'evidence: ' + it.evidence_status;
-        ev.style.cssText = 'color:#8b949e;font-size:11px;';
+        ev.style.cssText = 'color:var(--muted);font-size:11px;';
         row.appendChild(ev);
         const s = srcLink(it.safe_url, 'source');
         if(s) row.appendChild(s);

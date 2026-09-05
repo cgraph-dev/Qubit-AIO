@@ -1,18 +1,18 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Settings — Qubit Voice Agent</title>
+<title>Qubit Voice Agent — Settings</title>
 <style>
- body{font:14px/1.5 system-ui,sans-serif;background:#0b0e14;color:#dbe2ef;margin:0;padding:24px;max-width:900px}
- h1{font-size:20px;margin:0 0 4px} h2{font-size:15px;margin:18px 0 6px;border-bottom:1px solid #22304a;padding-bottom:4px}
- .card{background:#131a26;border:1px solid #22304a;border-radius:10px;padding:12px;margin-bottom:10px}
+ body{font:14px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--text);margin:0;padding:24px;max-width:900px}
+ h1{font-size:20px;margin:0 0 4px} h2{font-size:15px;margin:18px 0 6px;border-bottom:1px solid var(--line);padding-bottom:4px}
+ .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
  button{margin-right:8px;padding:6px 14px;border-radius:6px;border:0;cursor:pointer}
- .ok{background:#1f7a4d;color:#fff}.warn{background:#8a6d1f;color:#fff}.no{background:#7a1f2d;color:#fff}
- .muted{color:#7f8ca3}.err{color:#ff8080}.tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;margin-left:6px}
- .tag.OK{background:#1f7a4d}.tag.DENIED,.tag.FAILED{background:#7a1f2d}.tag.DEGRADED,.tag.PARTIAL{background:#8a6d1f}.tag.MISSING,.tag.UNAVAILABLE{background:#444}
- .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap} select{padding:6px;border-radius:6px;background:#0b0e14;color:#dbe2ef;border:1px solid #22304a}
+ .ok{background:var(--primary);color:#10120a}.warn{background:var(--warning);color:#201a0a}.no{background:var(--danger);color:#201010}
+ .muted{color:var(--muted)}.err{color:var(--danger)}.tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;margin-left:6px}
+ .tag.OK{background:var(--success)}.tag.DENIED,.tag.FAILED{background:var(--danger)}.tag.DEGRADED,.tag.PARTIAL{background:var(--warning)}.tag.MISSING,.tag.UNAVAILABLE{background:var(--faint)}
+ .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap} select{padding:6px;border-radius:6px;background:var(--surface-soft);color:var(--text);border:1px solid var(--line-strong)}
  .advanced{display:none} .advanced.open{display:block} .hidden{display:none}
- a{color:#6db3ff} code{background:#0b0e14;padding:1px 4px;border-radius:4px}
+ a{color:var(--primary)} code{background:var(--surface-soft);padding:1px 4px;border-radius:4px}
 </style><link rel="stylesheet" href="/static/app.css"></head><body>
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <main id="main-content" tabindex="-1">
@@ -40,7 +40,7 @@
 <div class="card">
   <div class="row">
     <label class="sr-only" for="ws-url">Website address</label><input id="ws-url" placeholder="https://example.com" spellcheck="false"
-      style="flex:1;min-width:220px;padding:6px;border-radius:6px;background:#0b0e14;color:#dbe2ef;border:1px solid #22304a">
+      style="flex:1;min-width:220px;padding:6px;border-radius:6px;background:var(--surface-soft);color:var(--text);border:1px solid var(--line-strong)">
     <button class="ok" onclick="wsAdd()">Add Website</button>
     <button onclick="wsList()">Refresh list</button>
   </div>
@@ -163,7 +163,7 @@
     </div>
     <div class="row" style="margin-top:6px">
       <label class="sr-only" for="act-args">Action arguments (JSON)</label><input id="act-args" placeholder='{"recipient":"you@example.com","subject":"…","body":"…"}' spellcheck="false"
-        style="flex:1;min-width:240px;padding:6px;border-radius:6px;background:#0b0e14;color:#dbe2ef;border:1px solid #22304a;font-size:12px">
+        style="flex:1;min-width:240px;padding:6px;border-radius:6px;background:var(--surface-soft);color:var(--text);border:1px solid var(--line-strong);font-size:12px">
     </div>
     <div class="muted" id="act-adv-state"></div>
     <div class="muted" id="act-detail"></div>
@@ -703,7 +703,7 @@ async function actList(){
     line.appendChild(vbBuild('span', {class:'tag '+String(a.tier||'')}, String(a.tier||'')));
     line.appendChild(vbBuild('span', {class:'tag '+String(eff.code||'UNKNOWN')}, String(eff.code||'UNKNOWN')));
     line.appendChild(vbBuild('span', null, ' · '+String(a.executor||'disabled')+' · '+(a.confirmation_required?'confirm required':'')));
-    line.appendChild(vbBuild('div', {style:'margin-left:14px;color:#7f8ca3'}, String((a.summary||'').slice(0,120))));
+    line.appendChild(vbBuild('div', {style:'margin-left:14px;color:var(--muted)'}, String((a.summary||'').slice(0,120))));
     wrap.appendChild(line);
   });
   show('act-beginner', wrap);

@@ -2,45 +2,43 @@
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Voice Dashboard — Activity</title>
+<title>Qubit Voice Agent — Activity</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
-  body { margin:0; font: 14px/1.5 system-ui, sans-serif; background:#0d1117; color:#e6edf3; min-height:100vh; }
+  body { margin:0; font: 14px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
   .wrap { max-width:820px; margin:0 auto; padding:16px; position:relative; z-index:1; }
   header { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px; }
   h1 { font-size:18px; margin:0; }
-  a { color:#58a6ff; text-decoration:none; }
-  .sub { font-size:12px; color:#8b949e; }
-  #bar { font-size:12px; color:#8b949e; margin-bottom:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; background:#161b22; border:1px solid #21262d; border-radius:8px; padding:8px 10px; }
-  #bar input, #bar select { padding:4px 6px; background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:6px; font-size:12px; }
-  #bar button { padding:4px 8px; background:#21262d; border:1px solid #30363d; color:#e6edf3; border-radius:6px; cursor:pointer; font-size:12px; }
-  .legend { font-size:11px; color:#8b949e; margin-bottom:10px; background:#161b22; border:1px solid #21262d; border-radius:8px; padding:8px 10px; }
-  .legend b { color:#e6edf3; }
-  .item { border:1px solid #21262d; border-radius:10px; padding:10px 12px; margin:8px 0; background:#0d1117; animation: badge-in .18s ease-out both; }
+  a { color:var(--primary); text-decoration:none; }
+  .sub { font-size:12px; color:var(--muted); }
+  #bar { font-size:12px; color:var(--muted); margin-bottom:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+  #bar input, #bar select { padding:4px 6px; background:var(--surface-soft); border:1px solid var(--line-strong); color:var(--text); border-radius:6px; font-size:12px; }
+  #bar button { padding:4px 8px; background:var(--surface-raised); border:1px solid var(--line-strong); color:var(--text); border-radius:6px; cursor:pointer; font-size:12px; }
+  .legend { font-size:11px; color:var(--muted); margin-bottom:10px; background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+  .legend b { color:var(--text); }
+  .item { border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin:8px 0; background:var(--surface); animation: badge-in .18s ease-out both; }
   @keyframes badge-in { from { opacity:0; transform: translateY(4px); } }
-  .item .t { font-size:11px; color:#8b949e; margin-bottom:4px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .item .t { font-size:11px; color:var(--muted); margin-bottom:4px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
   .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; border:1px solid transparent; }
-  .b-asked { background:#1f6feb22; color:#58a6ff; border-color:#1f6feb44; }
-  .b-decided { background:#d2992218; color:#d29922; border-color:#d2992244; }
-  .b-answered { background:#3fb95018; color:#3fb950; border-color:#3fb95044; }
-  .b-running { background:#8b949e18; color:#8b949e; border-color:#8b949e44; }
-  .b-failed { background:#f8514918; color:#f85149; border-color:#f8514944; }
-  .b-report { background:#a371f718; color:#bc8cff; border-color:#a371f744; }
-  .b-system { background:#21262d; color:#8b949e; border-color:#30363d; }
-  .route { color:#d29922; font-size:11px; }
-  .detail { font-size:11px; color:#8b949e; }
+  .b-asked { background:rgb(216 243 106 / 10%); color:var(--primary); border-color:rgb(216 243 106 / 35%); }
+  .b-decided { background:rgb(240 197 107 / 10%); color:var(--warning); border-color:rgb(240 197 107 / 35%); }
+  .b-answered { background:rgb(165 223 123 / 10%); color:var(--success); border-color:rgb(165 223 123 / 35%); }
+  .b-running { background:rgb(169 170 161 / 8%); color:var(--muted); border-color:rgb(169 170 161 / 25%); }
+  .b-failed { background:rgb(255 129 120 / 10%); color:var(--danger); border-color:rgb(255 129 120 / 35%); }
+  .b-report { background:rgb(216 243 106 / 14%); color:var(--primary-strong); border-color:rgb(216 243 106 / 40%); }
+  .b-system { background:var(--surface-soft); color:var(--muted); border-color:var(--line); }
+  .route { color:var(--warning); font-size:11px; }
+  .detail { font-size:11px; color:var(--muted); }
   .text { white-space:pre-wrap; margin-top:4px; }
-  .summary { color:#c9d1d9; background:#161b22; border-radius:6px; padding:6px 8px; margin-top:6px; white-space:pre-wrap; }
-  #empty { color:#8b949e; text-align:center; margin-top:40px; }
-  body::before { content:""; position:fixed; inset:0; z-index:0; opacity:.07; pointer-events:none; background: radial-gradient(1200px 600px at 20% -10%, #58a6ff33, transparent 60%), radial-gradient(1000px 500px at 100% 0%, #bc8cff22, transparent 60%); animation: bg-drift 18s ease-in-out infinite; }
-  @keyframes bg-drift { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+  .summary { color:var(--text); background:var(--surface); border-radius:6px; padding:6px 8px; margin-top:6px; white-space:pre-wrap; }
+  #empty { color:var(--faint); text-align:center; margin-top:40px; }
 </style><link rel="stylesheet" href="/static/app.css"></head><body>
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <main class="wrap" id="main-content" tabindex="-1">
   <header>
     <div>
-      <h1><span class="brand-mark" aria-hidden="true">Q</span> Activity</h1>
+      <h1><span class="brand-mark" aria-hidden="true">Q</span> Qubit Voice Agent — Activity</h1>
       <div class="sub">Live timeline — what you said, how it was handled, and what was spoken back. Newest first.</div>
     </div>
     <nav class="page-nav" aria-label="Primary"><a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit</a><span class="nav-separator" aria-hidden="true"></span><a href="/">Talk</a><a href="/activity" aria-current="page">Activity</a><a href="/reports">Reports</a><a href="/settings">Settings</a><a class="nav-utility" href="/token-setup">Pair device</a></nav>
@@ -101,7 +99,7 @@ function itemCard(it){
     const rawText = typeof it.raw === 'string' ? it.raw : JSON.stringify(it.raw, null, 2);
     const pre = vbBuild('div', {class:'raw', style:'margin-top:4px'}, rawText);
     body.appendChild(vbBuild('details', {style:'margin-top:6px'},
-      vbBuild('summary', {style:'font-size:11px;color:#8b949e;cursor:pointer'}, 'full report / raw'), pre));
+      vbBuild('summary', {style:'font-size:11px;color:var(--muted);cursor:pointer'}, 'full report / raw'), pre));
   }
   return body;
 }

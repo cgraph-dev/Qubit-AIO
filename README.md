@@ -213,19 +213,26 @@ what the agent is doing live.
 - **API** (for scripts): `POST /api/talk` with raw Int16 PCM @16k mono
   returns `{request_id}` instantly, then poll `GET /api/result/<id>` for
   `{text, route, summary, audio_b64}`. `GET /api/activity` = the feed.
-  `GET /api/status` = health. All API routes accept an optional
-  `X-Api-Token` header / `?token=` (config `webui.token`) for external use.
+  `GET /api/status` = health. Every API route is authenticated with the
+  `X-Api-Token` header (`webui.token` in `~/.config/qubit-voice-agent/voice.yaml`).
+  Query-string tokens are always rejected (Packet 1B) — the token never appears
+  in URLs, history, or logs.
 
 Find your PC's LAN IP with `ip -4 addr show | grep inet`. The dashboard
 binds `0.0.0.0:8890` by default (`webui.host` / `webui.port` in config).
 
-### Vercel-hosted frontend (when you're ready)
+### Hosted frontend (when you're ready)
 
 The `frontend/` dir is the deployable static app: `index.html` (chat) +
-`activity.html` (dashboard). It works from Vercel too — the ⚙ settings in
-the page let you paste your PC's current tunnel URL + token (saved in
-localStorage), or pass them as `?api=<url>&token=<secret>` query params.
-CORS is enabled on the bridge so the Vercel origin can call the PC API.
+`activity.html` (dashboard). It works from Vercel too — open **Pair device**
+(`/token-setup`) or the ⚙ connection settings and paste your PC's current
+tunnel URL + token. The URL is validated (loopback HTTP or HTTPS only, no
+credentials/query strings), the candidate token is tested with the
+`X-Api-Token` header **before** it is saved, and the previous working token
+is kept on any failure. An attacker-controlled `?api=`/`?token=` query string
+is never honored — the stored token is only ever sent to the approved origin
+as a request header. CORS is enabled on the bridge for exact configured
+origins so the hosted page can call the PC API.
 
 **Summarize-first workflow (why it feels smart):** recurring tool tasks are
 `local-script` templates — the bridge runs the tool itself (Perplexity

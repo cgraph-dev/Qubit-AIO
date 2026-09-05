@@ -1,23 +1,23 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Dashboard pairing</title>
+<title>Qubit Voice Agent — Pair device</title>
 <style>
- body{font:15px/1.6 system-ui,sans-serif;background:#0b0e14;color:#dbe2ef;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}
- .box{background:#131a26;border:1px solid #22304a;border-radius:12px;padding:28px;max-width:420px;width:90%}
- input{width:100%;padding:10px;border-radius:8px;border:1px solid #33455f;background:#0b0e14;color:#dbe2ef;font-size:14px}
- button{margin-top:12px;width:100%;padding:10px;border:0;border-radius:8px;background:#1f5a7a;color:#fff;font-size:15px;cursor:pointer}
- .ok{color:#5ad19b}.err{color:#ff8080}.muted{color:#7f8ca3;font-size:13px}
+ body{font:15px/1.6 system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}
+ .box{background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;padding:28px;max-width:420px;width:90%}
+ input{width:100%;padding:10px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface-soft);color:var(--text);font-size:14px}
+ button{margin-top:12px;width:100%;padding:10px;border:0;border-radius:8px;background:var(--primary);color:#10120a;font-size:15px;cursor:pointer}
+ .ok{color:var(--success)}.err{color:var(--danger)}.muted{color:var(--muted);font-size:13px}
 </style><link rel="stylesheet" href="/static/app.css"></head><body><a class="skip-link" href="#main-content">Skip to main content</a><main class="box" id="main-content" tabindex="-1">
 <h1><span class="brand-mark" aria-hidden="true">Q</span> Pair this device</h1>
 <nav class="page-nav" aria-label="Primary"><a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit</a><span class="nav-separator" aria-hidden="true"></span><a href="/">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/settings">Settings</a><a href="/token-setup" aria-current="page">Pair device</a></nav>
-<p class="muted">Paste the dashboard token from the PC<br>(<code>~/.config/openclaw-voice-bridge/webui-token.txt</code>).<br>
+<p class="muted">Copy the dashboard token from the Qubit PC<br>(the <code>webui.token</code> value in <code>~/.config/qubit-voice-agent/voice.yaml</code>).<br>
 It is stored only in this browser's localStorage.</p>
-<details class="help-panel"><summary>Pairing steps</summary><div><ol><li>Copy the token on the Qubit PC.</li><li>Paste it below and choose Save &amp; test.</li><li>Return to the dashboard when pairing succeeds.</li></ol></div></details>
+<details class="help-panel"><summary>Pairing steps</summary><div><ol><li>On the Qubit PC, open <code>~/.config/qubit-voice-agent/voice.yaml</code> and copy the <code>webui.token</code> value.</li><li>Paste it below and choose Save &amp; test. The bridge checks the token before it is saved.</li><li>If your previous token worked, it is kept until the new one is accepted.</li></ol></div></details>
 <label class="sr-only" for="tok">Dashboard token</label>
 <input id="tok" type="password" placeholder="dashboard token" autocomplete="off">
 <button onclick="save()">Save &amp; test</button>
-<p id="msg"></p>
+<p id="msg" role="status" aria-live="polite"></p>
 <script src="/static/vb.js"></script>
 <script>
 async function save(){

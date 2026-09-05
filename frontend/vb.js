@@ -70,8 +70,8 @@
     if (!el) {
       el = document.createElement('div');
       el.id = 'pair-hint';
-      el.style.cssText = 'padding:10px 12px;margin:8px 0;border:1px solid #7a5f1f;'
-        + 'border-radius:8px;background:#1a1f2e;color:#ffd27a;font-size:13px;';
+      el.style.cssText = 'padding:10px 12px;margin:8px 0;border:1px solid #7a652d;'
+        + 'border-radius:8px;background:#2f2817;color:#f5d982;font-size:13px;';
       var body = document.body;
       if (body && body.firstChild) body.insertBefore(el, body.firstChild);
       else if (body) body.appendChild(el);
@@ -81,7 +81,7 @@
       'This dashboard is not paired with the bridge. '));
     var link = document.createElement('a');
     link.href = '/token-setup';
-    link.style.cssText = 'color:#6db3ff;display:inline-flex;'
+    link.style.cssText = 'color:var(--primary);display:inline-flex;'
       + 'align-items:center;min-height:44px;padding:0 8px;';
     link.textContent = 'Pair this dashboard';
     el.appendChild(link);

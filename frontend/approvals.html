@@ -1,18 +1,18 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Approvals — Qubit</title>
+<title>Qubit Voice Agent — Approvals</title>
 <style>
- body{font:14px/1.5 system-ui,sans-serif;background:#0b0e14;color:#dbe2ef;margin:0;padding:24px}
+ body{font:14px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--text);margin:0;padding:24px}
  h1{font-size:18px;margin:0 0 16px}
- .card{background:#131a26;border:1px solid #22304a;border-radius:10px;padding:12px;margin-bottom:10px}
+ .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
  button{margin-right:8px;padding:6px 14px;border-radius:6px;border:0;cursor:pointer}
- .ok{background:#1f7a4d;color:#fff}.no{background:#7a1f2d;color:#fff}
- .muted{color:#7f8ca3}.err{color:#ff8080}
+ .ok{background:var(--primary);color:#10120a}.no{background:var(--danger);color:#201010}
+ .muted{color:var(--muted)}.err{color:var(--danger)}
 </style><link rel="stylesheet" href="/static/app.css"></head><body>
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <main id="main-content" tabindex="-1">
-<h1><span class="brand-mark" aria-hidden="true">Q</span> Pending approvals</h1>
+<h1><span class="brand-mark" aria-hidden="true">Q</span> Qubit Voice Agent — Approvals</h1>
 <nav class="page-nav" aria-label="Primary"><a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit</a><span class="nav-separator" aria-hidden="true"></span><a href="/">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/settings">Settings</a><a href="/approvals" aria-current="page">Approvals</a><a class="nav-utility" href="/token-setup">Pair device</a></nav>
 <p class="muted">Review actions that need your decision. Nothing is sent or changed until you approve it.</p>
 <div id="list" class="muted">loading…</div>
