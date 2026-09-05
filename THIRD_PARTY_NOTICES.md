@@ -140,12 +140,17 @@ numpy/sentence-transformers/scikit-learn/rank-bm25/PyTorch; no MCP or FastAPI
 server; no graph/entity/postgres layers; journal is written after a successful
 mutation (not write-ahead); snapshot hashing excludes wall-clock fields; the
 opt-in embedding provider reuses the existing Ollama `nomic-embed-text`
-endpoint (no new model artifact). Repair (2026-09-05): the durable dedup
+endpoint (no new model artifact). Repairs (2026-09-05): the durable dedup
 identity is scope-qualified (`mkey = scope\x00<content>`) so identical facts
 store independently per scope; mutation methods enforce origin-bound authority
 via a `requested_by` source-trust gate; secrets are rejected at every write
 boundary and redacted from history/recall/explain diagnostics; corrupt or
 newer runtime state is a typed degraded/newer result, never silently reset.
+Rejection #2 repairs (2026-09-05): raw external-origin (web/tool/model/
+observed) content is never stored or surfaced — it becomes a bounded
+non-recoverable reference; the persisted runtime-state configuration is fully
+validated on load and write; state writes surface file-fsync/rename/
+directory-fsync failures as typed errors instead of swallowing them.
 
 The GENOME NOTICE file, preserved verbatim:
 

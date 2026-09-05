@@ -1556,17 +1556,16 @@ def _cmd_memory(cfg, args) -> int:
     state_path = base / "semantic.json"
     st, health = load_semantic_state(
         state_path,
-        enabled_default=bool(cfg.get("memory", "semantic", "enabled",
-                                     default=False)),
+        enabled_default=cfg.get("memory", "semantic", "enabled", default=False),
         provider_default=cfg.get("memory", "semantic", "provider",
                                  default="none"),
         embed_model_default=cfg.get("memory", "semantic", "embed_model",
                                     default="nomic-embed-text"),
         ollama_url_default=cfg.get("memory", "semantic", "ollama_url",
                                    default="http://127.0.0.1:11434"),
-        timeout_s_default=float(cfg.get("memory", "semantic", "timeout_s",
-                                        default=10.0)),
-        top_k_default=int(cfg.get("memory", "semantic", "top_k", default=5)))
+        timeout_s_default=cfg.get("memory", "semantic", "timeout_s",
+                                  default=10.0),
+        top_k_default=cfg.get("memory", "semantic", "top_k", default=5))
     sm = SemanticMemory(
         base / "memory.db", enabled=bool(st["enabled"]),
         provider=st["provider"], embed_model=st["embed_model"],

@@ -22,15 +22,28 @@ cannot close a higher-trust user fact (origin-bound authority), and no
 low-trust actor can correct, forget, purge, promote, or invalidate a higher-
 trust user fact. Unknown or forged sources fail closed.
 
-Security/authority model (Packet 8M repair):
-- secrets are rejected at EVERY write boundary (remember, stage_inferred,
-  correct, record_belief, import_records) and defensively redacted from the
-  history/journal audit trail and from recall/explain diagnostics;
-- mutations that touch existing records (correct/forget/purge/promote/
-  invalidate_belief) carry a ``requested_by`` source whose trust must be >= the
-  target record's trust; imported data is never allowed to claim ``user``;
-- temporal values are validated (finite confidence/timestamps, ``valid_until``
-  after ``valid_from``, sane invalidation times).
+External-content boundary (Packet 8M repair, documented in R23):
+
+  Sources ``web``, ``tool``, ``model`` and ``observed`` are EXTERNAL-origin.
+  Their RAW text is NEVER stored, journaled, FTS-indexed, or returned. It is
+  replaced by a deterministic bounded reference ``[external:<source>:<sha256
+  of the normalized text, 20 hex>:<optional <=60-char caller label>]`` that
+  cannot expose the original private text. Every output surface (journal,
+  history, recall, explain, conflicts, CLI, export) therefore only ever carries
+  the reference for external-origin records, while legitimate user-owned
+  (source="user") memory is stored raw. This keeps deterministic replay honest:
+  replay reproduces the stored reference exactly, and integrity is never
+  claimed for raw content that was intentionally not stored.
+
+State-config boundary (Packet 8M repair): ``load_semantic_state`` /
+``write_semantic_state`` validate EVERY value (boolean ``enabled``, known
+provider, finite ``0 < timeout_s <= 60``, integer ``0 < top_k <= 50``, a valid
+non-empty model identifier, a valid http(s) ``ollama_url``, no unsupported
+fields, and a supported ``schema_version``). Malformed values return a typed
+``degraded``/``config-invalid`` health — they are NEVER silently coerced into
+valid-looking state. ``write_semantic_state`` validates before persisting and
+surfaces any write/flush/file-fsync/rename/directory-fsync/permission failure
+as a typed ``SemanticStateError`` (no swallowed directory-fsync).
 
 No MCP server, no second store/database/server/listener, no model downloads.
 """
@@ -45,6 +58,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 
 from .journal import (Journal, snapshot_hash, verify_chain, replay as _replay,
                       verify_journal as _verify_journal)
@@ -54,6 +68,7 @@ from .store import (MemoryStore, MemoryStoreError, SecretRejectedError,
 
 PROVIDERS = ("none", "hash", "ollama")
 SOURCES = ("user", "tool", "web", "model", "observed")
+EXTERNAL_SOURCES = ("tool", "web", "model", "observed")
 
 # Origin-bound authority: a lower-trust source may not close a higher-trust
 # fact. User-explicit facts (source="user") always outrank web/tool/model
@@ -63,6 +78,16 @@ _SOURCE_TRUST = {"user": 3, "tool": 2, "web": 1, "model": 1, "observed": 1}
 # State file schema version (memory/semantic.json). Bump on incompatible
 # change; a NEWER version is a typed DEGRADED state, never silently reset.
 SEMANTIC_STATE_SCHEMA = 1
+# Documented configuration bounds for the persisted runtime state.
+STATE_TIMEOUT_MAX = 60.0
+STATE_TOP_K_MAX = 50
+_MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/\-+]{0,127}$")
+_STATE_FIELDS = frozenset({"enabled", "provider", "embed_model", "ollama_url",
+                           "timeout_s", "top_k", "schema_version"})
+# A stored external-origin reference: [external:<source>:<20 hex>:<label?>]
+_EXTERNAL_REF_RE = re.compile(
+    r"^\[external:(tool|web|model|observed):[0-9a-f]{20}"
+    r"(:[^\]\n]{0,60})?\]$")
 
 
 class SemanticMemoryError(Exception):
@@ -78,7 +103,8 @@ class BeliefFormatError(SemanticMemoryError):
 
 
 class SemanticStateError(SemanticMemoryError):
-    """The persisted semantic-memory runtime state is corrupt or newer."""
+    """The persisted semantic-memory runtime state is corrupt, invalid, or
+    could not be written durably."""
 
 
 def _trust(source: Optional[str]) -> int:
@@ -103,31 +129,118 @@ def _validate_finite(name: str, value: Any) -> float:
     return v
 
 
-# ------------------------------------------------------ state persistence
-def load_semantic_state(path: Path | str, *,
-                        enabled_default: bool = False,
-                        provider_default: str = "none",
-                        embed_model_default: str = "nomic-embed-text",
-                        ollama_url_default: str = "http://127.0.0.1:11434",
-                        timeout_s_default: float = 10.0,
-                        top_k_default: int = 5,
-                        ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-    """Read the runtime semantic-memory state. Returns ``(state, health)``.
+# ---------------------------------------------- external-content boundary
+def external_ref(text: str, source: str, label: str = "") -> str:
+    """Deterministic, bounded, non-recoverable reference for external-origin
+    content. The raw text is reduced to a truncated SHA-256 digest of its
+    normalized form plus an optional caller-supplied short label; the original
+    private text cannot be recovered from it."""
+    digest = hashlib.sha256(normalize_text(text).encode("utf-8")).hexdigest()[:20]
+    label = re.sub(r"[\]\n]", "", (label or "").strip())[:60]
+    base = f"[external:{source}:{digest}"
+    return f"{base}:{label}]" if label else f"{base}]"
 
-    ``health["state"]`` is ``ok``, ``degraded`` (corrupt/unreadable), or
-    ``newer`` (schema_version the current build cannot safely apply). A
-    corrupt or newer file is NEVER silently reset to the defaults; callers
-    must surface the typed state and refuse unconfirmed mutations.
+
+def looks_like_external_ref(text: Optional[str]) -> bool:
+    return bool(text) and bool(_EXTERNAL_REF_RE.match((text or "").strip()))
+
+
+def _store_text(text: str, source: str, label: str = "") -> str:
+    """The text actually persisted for a source. User-owned content is kept raw
+    (legitimate private memory); external-origin content becomes the bounded
+    non-recoverable reference. Idempotent for already-stored references so
+    journal replay and import reproduce them exactly."""
+    if source == "user":
+        return text
+    if looks_like_external_ref(text):
+        return text
+    return external_ref(text, source, label)
+
+
+def _valid_url(url: str) -> bool:
+    try:
+        u = urlparse(url)
+    except ValueError:
+        return False
+    return (u.scheme in ("http", "https")
+            and bool(u.netloc) and bool(u.hostname))
+
+
+def _validate_state_values(state: Dict[str, Any]) -> Optional[str]:
+    """Return an error string for the first invalid field, or None."""
+    for k in state:
+        if k not in _STATE_FIELDS:
+            return f"unsupported state field {k!r}"
+    v = state.get("enabled")
+    if not isinstance(v, bool):
+        return f"enabled must be a boolean, got {v!r}"
+    provider = state.get("provider")
+    if provider not in PROVIDERS:
+        return f"invalid provider {provider!r}"
+    t = state.get("timeout_s")
+    if not isinstance(t, (int, float)) or isinstance(t, bool):
+        return f"timeout_s must be a number, got {t!r}"
+    tf = float(t)
+    if not math.isfinite(tf) or tf <= 0:
+        return f"timeout_s must be > 0, got {t!r}"
+    if tf > STATE_TIMEOUT_MAX:
+        return f"timeout_s above maximum {STATE_TIMEOUT_MAX}"
+    tk = state.get("top_k")
+    if not isinstance(tk, int) or isinstance(tk, bool):
+        return f"top_k must be an integer, got {tk!r}"
+    if tk <= 0:
+        return f"top_k must be > 0, got {tk!r}"
+    if tk > STATE_TOP_K_MAX:
+        return f"top_k above maximum {STATE_TOP_K_MAX}"
+    m = state.get("embed_model")
+    if not isinstance(m, str) or not _MODEL_RE.match(m):
+        return f"invalid embed_model {m!r}"
+    u = state.get("ollama_url")
+    if not isinstance(u, str) or not _valid_url(u):
+        return f"invalid ollama_url {u!r}"
+    ver = state.get("schema_version")
+    if not isinstance(ver, int) or isinstance(ver, bool) \
+            or ver > SEMANTIC_STATE_SCHEMA:
+        return f"unsupported schema_version {ver!r}"
+    return None
+
+
+# ------------------------------------------------------ state persistence
+def _default_state(enabled: Any = False, provider: Any = "none",
+                   embed_model: Any = "nomic-embed-text",
+                   ollama_url: Any = "http://127.0.0.1:11434",
+                   timeout_s: Any = 10.0, top_k: Any = 5) -> Dict[str, Any]:
+    return {"enabled": enabled, "provider": provider,
+            "embed_model": embed_model, "ollama_url": ollama_url,
+            "timeout_s": timeout_s, "top_k": top_k,
+            "schema_version": SEMANTIC_STATE_SCHEMA}
+
+
+def load_semantic_state(path: Path | str, *,
+                        enabled_default: Any = False,
+                        provider_default: Any = "none",
+                        embed_model_default: Any = "nomic-embed-text",
+                        ollama_url_default: Any = "http://127.0.0.1:11434",
+                        timeout_s_default: Any = 10.0,
+                        top_k_default: Any = 5,
+                        ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Read and VALIDATE the runtime semantic-memory state.
+
+    Returns ``(state, health)`` where ``health["state"]`` is ``ok``,
+    ``degraded`` (corrupt/unreadable/config-invalid), or ``newer`` (schema the
+    current build cannot safely apply). Every value is validated; malformed
+    values are NEVER silently coerced. The returned ``state`` is the validated
+    defaults when health is not ``ok``, so callers surface the typed state and
+    refuse unconfirmed mutations.
     """
-    defaults: Dict[str, Any] = {
-        "enabled": bool(enabled_default),
-        "provider": provider_default,
-        "embed_model": embed_model_default,
-        "ollama_url": ollama_url_default,
-        "timeout_s": float(timeout_s_default),
-        "top_k": int(top_k_default),
-        "schema_version": SEMANTIC_STATE_SCHEMA,
-    }
+    defaults = _default_state(enabled_default, provider_default,
+                              embed_model_default, ollama_url_default,
+                              timeout_s_default, top_k_default)
+    dflt_err = _validate_state_values(defaults)
+    if dflt_err is not None:
+        return dict(defaults), {"state": "degraded",
+                                "detail": f"invalid semantic config default: "
+                                          f"{dflt_err}"}
     p = Path(path)
     health: Dict[str, Any] = {"state": "ok", "detail": ""}
     if not p.exists():
@@ -145,59 +258,84 @@ def load_semantic_state(path: Path | str, *,
         return dict(defaults), {"state": "newer",
                                 "detail": f"semantic state schema {ver} is newer "
                                           f"than supported {SEMANTIC_STATE_SCHEMA}"}
-    state = dict(defaults)
-    state["schema_version"] = ver if isinstance(ver, int) else SEMANTIC_STATE_SCHEMA
-    for k in ("enabled", "provider", "embed_model", "ollama_url",
-              "timeout_s", "top_k"):
-        if k not in data:
-            continue
-        v = data[k]
-        if k == "enabled":
-            state[k] = bool(v)
-        elif k == "provider":
-            if v not in PROVIDERS:
-                return dict(defaults), {"state": "degraded",
-                                        "detail": f"invalid provider {v!r}"}
-            state[k] = v
-        elif k == "timeout_s":
-            try:
-                state[k] = float(v)
-            except (TypeError, ValueError):
-                return dict(defaults), {"state": "degraded",
-                                        "detail": f"invalid timeout_s {v!r}"}
-        elif k == "top_k":
-            try:
-                state[k] = int(v)
-            except (TypeError, ValueError):
-                return dict(defaults), {"state": "degraded",
-                                        "detail": f"invalid top_k {v!r}"}
-        else:
-            state[k] = str(v)
-    return state, health
+    unknown = [k for k in data if k not in _STATE_FIELDS]
+    if unknown:
+        return dict(defaults), {"state": "degraded",
+                                "detail": f"unsupported state field(s): {unknown}"}
+    candidate = dict(defaults)
+    for k in _STATE_FIELDS:
+        if k in data:
+            candidate[k] = data[k]
+    err = _validate_state_values(candidate)
+    if err is not None:
+        return dict(defaults), {"state": "degraded", "detail": err}
+    return candidate, health
 
 
-def write_semantic_state(path: Path | str, state: Dict[str, Any]) -> None:
-    """Atomic private state write: temp + fsync + rename + directory fsync."""
+def _cleanup_tmp(tmp: Path) -> None:
+    """Best-effort removal of our own temporary state file only. Never deletes
+    directories or unrelated files."""
+    try:
+        if tmp.exists():
+            tmp.unlink()
+    except OSError:
+        pass
+
+
+def write_semantic_state(path: Path | str, state: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate-then-write the runtime state atomically.
+
+    ANY failure — serialization, open, write, flush, file fsync, chmod, rename,
+    or directory fsync — raises a typed :class:`SemanticStateError`; success is
+    never reported when durability could not be guaranteed. On a failure before
+    the rename, the temporary file is removed (best-effort). Returns the
+    canonical validated state that was actually persisted.
+    """
+    if not isinstance(state, dict):
+        raise SemanticStateError("semantic state must be an object")
+    canonical = _default_state()
+    canonical.update({k: state[k] for k in state if k in _STATE_FIELDS})
+    err = _validate_state_values(canonical)
+    if err is not None:
+        raise SemanticStateError(f"refusing to write invalid semantic state: {err}")
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    payload = json.dumps(state, indent=2, sort_keys=True).encode("utf-8")
-    tmp = p.with_suffix(".json.tmp")
-    fd = os.open(str(tmp), os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
     try:
-        os.write(fd, payload)
-        os.fsync(fd)
-    finally:
-        os.close(fd)
-    os.chmod(tmp, 0o600)
-    os.replace(tmp, p)
+        payload = json.dumps(canonical, indent=2, sort_keys=True).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise SemanticStateError(
+            f"semantic state serialization failed: {exc}") from exc
+    tmp = p.with_suffix(".json.tmp")
+    try:
+        fd = os.open(str(tmp), os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(payload)
+            fh.flush()
+            os.fsync(fh.fileno())
+    except OSError as exc:
+        _cleanup_tmp(tmp)
+        raise SemanticStateError(f"semantic state write failed: {exc}") from exc
+    try:
+        os.chmod(tmp, 0o600)
+    except OSError as exc:
+        _cleanup_tmp(tmp)
+        raise SemanticStateError(
+            f"semantic state permission failed: {exc}") from exc
+    try:
+        os.replace(tmp, p)
+    except OSError as exc:
+        _cleanup_tmp(tmp)
+        raise SemanticStateError(f"semantic state rename failed: {exc}") from exc
     try:
         dir_fd = os.open(str(p.parent), os.O_RDONLY)
         try:
             os.fsync(dir_fd)
         finally:
             os.close(dir_fd)
-    except OSError:
-        pass
+    except OSError as exc:
+        raise SemanticStateError(
+            f"semantic state directory fsync failed: {exc}") from exc
+    return canonical
 
 
 # ------------------------------------------------------------ embeddings
@@ -298,21 +436,43 @@ class SemanticMemory:
             self.store = path_or_store
         else:
             self.store = MemoryStore(path_or_store)
-        self.enabled = bool(enabled)
-        self.top_k = int(top_k)
+        if not isinstance(enabled, bool):
+            raise SemanticMemoryError(f"enabled must be a boolean, got {enabled!r}")
+        self.enabled = enabled
         self._journal_path = Path(journal_path) if journal_path else None
         self._journal = Journal(self._journal_path) if self._journal_path else None
         self._journal_degraded = False
         self.set_provider(provider, embed_model=embed_model,
                           ollama_url=ollama_url, timeout_s=timeout_s)
+        self.set_top_k(top_k)
 
     # -------------------------------------------------------------- config
+    def set_top_k(self, top_k: Any) -> None:
+        if not isinstance(top_k, int) or isinstance(top_k, bool) \
+                or top_k <= 0 or top_k > STATE_TOP_K_MAX:
+            raise SemanticMemoryError(
+                f"top_k must be an integer in (0, {STATE_TOP_K_MAX}], "
+                f"got {top_k!r}")
+        self.top_k = int(top_k)
+
     def set_provider(self, provider: str, *, embed_model: str = "nomic-embed-text",
                      ollama_url: str = "http://127.0.0.1:11434",
                      timeout_s: float = 10.0) -> None:
         if provider not in PROVIDERS:
             raise SemanticMemoryError(
                 f"unknown provider {provider!r}; choose one of {PROVIDERS}")
+        if provider == "ollama":
+            if not isinstance(embed_model, str) or not _MODEL_RE.match(embed_model):
+                raise SemanticMemoryError(f"invalid embed_model {embed_model!r}")
+            if not isinstance(ollama_url, str) or not _valid_url(ollama_url):
+                raise SemanticMemoryError(f"invalid ollama_url {ollama_url!r}")
+            try:
+                tf = float(timeout_s)
+            except (TypeError, ValueError) as exc:
+                raise SemanticMemoryError("timeout_s must be a number") from exc
+            if not math.isfinite(tf) or tf <= 0 or tf > STATE_TIMEOUT_MAX:
+                raise SemanticMemoryError(
+                    f"timeout_s must be in (0, {STATE_TIMEOUT_MAX}], got {timeout_s!r}")
         self.provider = provider
         if provider == "hash":
             self._embed = HashProjection()
@@ -427,17 +587,26 @@ class SemanticMemory:
                  valid_from: Optional[float] = None,
                  valid_until: Optional[float] = None,
                  believed_by: Optional[str] = None,
-                 mkey: Optional[str] = None) -> Dict[str, Any]:
+                 mkey: Optional[str] = None,
+                 label: str = "") -> Dict[str, Any]:
+        """Store a fact. User-owned content is stored raw; external-origin
+        content (web/tool/model/observed) is stored ONLY as a bounded
+        non-recoverable reference, so raw private text never reaches the
+        journal, history, FTS index, recall/explain output, or exports."""
         src = _require_source(source)
-        rec = self.store.remember(text, tier=tier, scope=scope,
+        for shape in _SECRET_SHAPES:
+            if re.search(shape, text):
+                raise SecretRejectedError("secret-shaped content rejected")
+        stored = _store_text(text, src, label)
+        rec = self.store.remember(stored, tier=tier, scope=scope,
                                   confidence=confidence, source=src,
                                   provenance=provenance, kind=kind,
                                   expires_at=expires_at,
                                   valid_from=valid_from,
                                   valid_until=valid_until,
                                   believed_by=believed_by, mkey=mkey)
-        self._log({"op": "remember", "text": text, "tier": tier, "scope": scope,
-                   "confidence": confidence, "source": src,
+        self._log({"op": "remember", "text": rec["text"], "tier": tier,
+                   "scope": scope, "confidence": confidence, "source": src,
                    "provenance": list(provenance or []), "kind": kind,
                    "expires_at": expires_at, "valid_from": valid_from,
                    "valid_until": valid_until, "believed_by": believed_by,
@@ -447,7 +616,8 @@ class SemanticMemory:
     def stage_inferred(self, text: str, *, scope: str = "default",
                        confidence: float = 0.5, source: str = "model",
                        source_ids: Optional[List[str]] = None,
-                       tier: str = "recall") -> int:
+                       tier: str = "recall",
+                       label: str = "") -> int:
         if source not in SOURCES:
             raise SemanticMemoryError(
                 f"unknown/forged source {source!r} (fail closed)")
@@ -458,19 +628,23 @@ class SemanticMemory:
             if re.search(shape, text):
                 raise SecretRejectedError(
                     "secret-shaped inferred content rejected")
-        mid = self.store.stage_inferred(text, scope=scope, confidence=confidence,
-                                        source=source, source_ids=source_ids,
-                                        tier=tier)
-        self._log({"op": "stage_inferred", "text": text, "scope": scope,
+        stored = _store_text(text, source, label)
+        mid = self.store.stage_inferred(stored, scope=scope,
+                                        confidence=confidence, source=source,
+                                        source_ids=source_ids, tier=tier)
+        self._log({"op": "stage_inferred", "text": stored, "scope": scope,
                    "confidence": confidence, "source": source,
                    "source_ids": list(source_ids or []), "tier": tier, "id": mid})
         return mid
 
     def correct(self, old_text: str, new_text: str, *,
-                scope: str = "default", source: str = "user") -> Dict[str, Any]:
+                scope: str = "default", source: str = "user",
+                label: str = "") -> Dict[str, Any]:
         """Correct a fact. Origin-bound authority: the correcting source's trust
         must be >= the existing fact's trust, so a web/tool/model actor can
-        never replace a higher-trust user fact."""
+        never replace a higher-trust user fact. The new text follows the
+        external-content boundary (external-origin new text is stored as a
+        non-recoverable reference)."""
         src = _require_source(source)
         for shape in _SECRET_SHAPES:
             if re.search(shape, new_text):
@@ -480,9 +654,11 @@ class SemanticMemory:
             raise SemanticMemoryError(
                 f"refusing to correct a higher-trust {target.get('source')!r} "
                 f"fact from {source!r} (origin-bound authority)")
-        rec = self.store.correct(old_text, new_text, scope=scope, source=src)
-        self._log({"op": "correct", "old_text": old_text, "new_text": new_text,
-                   "scope": scope, "source": src, "id": rec["id"]})
+        stored_new = _store_text(new_text, src, label)
+        rec = self.store.correct(old_text, stored_new, scope=scope, source=src)
+        self._log({"op": "correct", "old_text": old_text,
+                   "new_text": rec["text"], "scope": scope, "source": src,
+                   "id": rec["id"]})
         return rec
 
     def forget(self, memory_id: int, *, reason: str = "user-forget",
@@ -558,13 +734,16 @@ class SemanticMemory:
                       confidence: float = 1.0, source: str = "user",
                       provenance: Optional[List[str]] = None,
                       believed_by: Optional[str] = None,
-                      invalidate_previous: bool = True) -> Dict[str, Any]:
+                      invalidate_previous: bool = True,
+                      label: str = "") -> Dict[str, Any]:
         """Record a fact believed true over [valid_from, valid_until) (NULL
         valid_until = open window). If ``invalidate_previous`` and an open
         fact of the same (entity, fact_type, believer) exists, close it at
         ``valid_from`` — unless the prior is higher-trust (origin-bound
         authority), in which case the two coexist as a conflict. A future-dated
-        open prior caps our own window instead of creating two open facts."""
+        open prior caps our own window instead of creating two open facts.
+        Entity/fact_type are schema identifiers and stay readable; an
+        external-origin VALUE is stored only as a non-recoverable reference."""
         entity = (entity or "").strip()
         fact_type = (fact_type or "").strip()
         value = (value or "").strip()
@@ -576,6 +755,12 @@ class SemanticMemory:
         if valid_until is not None:
             _validate_finite("valid_until", valid_until)
         src = _require_source(source)
+        raw_text = self._belief_text(entity, fact_type, value)
+        for shape in _SECRET_SHAPES:
+            if re.search(shape, raw_text):
+                raise SecretRejectedError(
+                    "secret-shaped belief content rejected")
+        value = _store_text(value, src, label)
         text = self._belief_text(entity, fact_type, value)
         now = valid_from if valid_from is not None else time.time()
         if valid_until is not None and valid_until <= now:
@@ -587,10 +772,6 @@ class SemanticMemory:
         # new window, not a Mem0 dedup skip.
         mkey = f"{norm_hash(text)}|{now!r}"
         with self.store._lock:
-            for shape in _SECRET_SHAPES:
-                if re.search(shape, text):
-                    raise SecretRejectedError(
-                        "secret-shaped belief content rejected")
             if invalidate_previous:
                 for prior in self._belief_records(entity, fact_type, scope):
                     if prior["valid_until"] is not None:
@@ -720,12 +901,17 @@ class SemanticMemory:
     def explain(self, memory_id: int) -> Dict[str, Any]:
         """Stored-data-only explanation: record, validity window, provenance,
         source trust, and the append-only history. Never invents text.
-        Secret-shaped content is redacted at this diagnostic boundary."""
+        Secret-shaped content is redacted, and external-origin records are
+        shown only as their bounded non-recoverable reference at this
+        diagnostic boundary."""
         rec = self.store.get(memory_id)
         valid = None
         if rec.get("kind") == "belief":
             valid = {"valid_from": rec.get("valid_from"),
                      "valid_until": rec.get("valid_until")}
+        src = rec.get("source")
+        text = _store_text(rec["text"], src) if src in EXTERNAL_SOURCES \
+            else rec["text"]
         history = []
         for h in self.store.history(memory_id):
             entry = dict(h)
@@ -734,11 +920,11 @@ class SemanticMemory:
                     json.dumps(entry["payload"]))
             history.append(entry)
         return {
-            "id": rec["id"], "text": redact_secrets(rec["text"]),
+            "id": rec["id"], "text": redact_secrets(text),
             "tier": rec["tier"], "scope": rec["scope"], "kind": rec["kind"],
             "confidence": rec.get("confidence"),
-            "source": rec.get("source"),
-            "source_trust": _trust(rec.get("source")),
+            "source": src,
+            "source_trust": _trust(src),
             "provenance": rec.get("provenance", []),
             "sensitivity": rec.get("sensitivity"),
             "believed_by": rec.get("believed_by"),
@@ -758,10 +944,13 @@ class SemanticMemory:
                                  limit=max(limit or self.top_k, self.top_k))
 
         def _out(r: Dict[str, Any], score: float) -> Dict[str, Any]:
-            return {"id": r["id"], "text": redact_secrets(r["text"]),
+            src = r.get("source", "")
+            text = _store_text(r["text"], src) if src in EXTERNAL_SOURCES \
+                else r["text"]
+            return {"id": r["id"], "text": redact_secrets(text),
                     "scope": r["scope"],
                     "confidence": r.get("confidence", 0.5),
-                    "source": r.get("source", ""),
+                    "source": src,
                     "provenance": r.get("provenance", []),
                     "valid_from": r.get("valid_from"),
                     "valid_until": r.get("valid_until"),
@@ -798,15 +987,23 @@ class SemanticMemory:
     # ------------------------------------------------------- export/import
     def export(self, *, scope: Optional[str] = None,
                path: Optional[Path | str] = None) -> List[Dict[str, Any]]:
-        """Scoped JSON export of active records (same private-file modes as the
-        store export; excludes tombstoned/staged by default)."""
-        records = self.store.export()
+        """Scoped JSON export of active records. External-origin records are
+        emitted ONLY as their bounded non-recoverable reference, so an exported
+        bundle or report can never expose raw web/tool/model/observed content.
+        User-owned records export raw (the 0600 file is the user's own data).
+        Excludes tombstoned/staged by default."""
+        records = []
+        for r in self.store.export():
+            d = dict(r)
+            if d.get("source") in EXTERNAL_SOURCES:
+                d["text"] = _store_text(d.get("text") or "",
+                                        d.get("source", "observed"))
+            records.append(d)
         if scope is not None:
             records = [r for r in records if r["scope"] == scope]
         if path is not None:
             out = Path(path)
             out.write_text(json.dumps(records, indent=2))
-            import os
             try:
                 os.chmod(out, 0o600)
             except OSError:
@@ -814,19 +1011,25 @@ class SemanticMemory:
         return records
 
     def import_records(self, records: List[Dict[str, Any]], *,
-                       default_scope: str = "default") -> Dict[str, Any]:
+                       default_scope: str = "default",
+                       trusted_user_import: bool = False) -> Dict[str, Any]:
         """Re-remember a sanitized export. Imported data can NEVER claim
-        source='user' (explicit trusted-user operations only); any record that
-        tries is downgraded to the low-trust 'observed' source. Secret-shaped,
-        malformed, or invalid records are rejected and counted. Returns typed
-        counts."""
+        source='user' UNLESS ``trusted_user_import=True`` is set by an explicit
+        trusted user restore operation (the documented boundary that keeps
+        user-owned private memory restorable). Records without that flag are
+        treated as external-origin: they are stored only as a bounded
+        non-recoverable reference. Secret-shaped, malformed, or invalid records
+        are rejected and counted. Returns typed counts."""
         stored = rejected = invalid = 0
         for r in records:
             if not isinstance(r, dict) or not r.get("text"):
                 invalid += 1
                 continue
-            source = r.get("source") if r.get("source") in (
-                "tool", "web", "model", "observed") else "observed"
+            raw_source = r.get("source")
+            if trusted_user_import and raw_source == "user":
+                source = "user"
+            else:
+                source = raw_source if raw_source in EXTERNAL_SOURCES else "observed"
             try:
                 self.remember(
                     r["text"], tier=r.get("tier", "recall"),

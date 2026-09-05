@@ -1160,6 +1160,23 @@ Decision:
   times); corrupt/newer `semantic.json` is a typed DEGRADED/newer result and is
   never silently reset (state writes are atomic temp+fsync+rename, 0600);
   replay re-runs validation/authority; default status never contacts Ollama.
+- **Rejection #2 repairs (2026-09-05):** (a) External-content boundary — raw
+  web/tool/model/observed text is never stored, journaled, FTS-indexed, or
+  returned; it is stored only as a bounded non-recoverable reference
+  `[external:<source>:<sha256[:20]>:<label?>]`, so private page/tool/model text
+  cannot appear in journals, logs, prompts, diagnostics, recall/explain/CLI
+  output, or exported reports. User-owned (source=user) memory stays raw;
+  import defaults to external-origin unless an explicit
+  `trusted_user_import=True` restore opts in. Replay reproduces the stored
+  reference exactly (integrity never claimed for content intentionally not
+  kept). (b) State-config validation — `load_semantic_state`/`write_semantic_state`
+  validate every value (boolean `enabled`, known provider, finite
+  `0 < timeout_s <= 60`, integer `0 < top_k <= 50`, valid model id, valid http(s)
+  url, no unsupported fields, supported schema); malformed values are a typed
+  DEGRADED/config-invalid result and are never coerced; CLI refuses mutation
+  without `--confirm`. (c) Durability — state writes surface file-fsync, rename,
+  and directory-fsync failures as typed `SemanticStateError` (directory fsync is
+  no longer swallowed), with the temp file cleaned up on pre-rename failure.
 - **Runtime selection** lives in `<state_dir>/memory/semantic.json` (state,
   not the live `voice.yaml`); `memory enable|disable|set-provider` are dry-run
   unless `--confirm`.

@@ -186,9 +186,14 @@ def test_origin_bound_authority(sm):
     sm.record_belief("alice", "lives_in", "Tokyo", source="user")
     sm.record_belief("alice", "lives_in", "Osaka", source="web")
     sm.record_belief("alice", "lives_in", "Kyoto", source="tool")
+    # external-origin belief VALUES are stored only as non-recoverable refs;
     # web/tool facts cannot close the user fact; tool outranks web and closes it
-    assert {r["text"] for r in sm.current_facts("alice")} == {
-        "alice: lives_in: Tokyo", "alice: lives_in: Kyoto"}
+    texts = {r["text"] for r in sm.current_facts("alice")}
+    assert "alice: lives_in: Tokyo" in texts                 # user fact raw
+    assert len(texts) == 2
+    assert all("lives_in: [external:" in t for t in texts
+               if "Tokyo" not in t)                          # external = ref
+    assert not any("Osaka" in t or "Kyoto" in t for t in texts)
     # all overlapping validity windows are surfaced (Tokyo coexisted with both)
     assert len(sm.belief_conflicts()) == 2
     # a second USER fact closes every lower-or-equal fact
@@ -845,4 +850,300 @@ def test_fresh_install_status_not_degraded(tmp_path):
     st = s.status()
     assert st["state"] == "ok"
     assert st["journal_degraded"] is False
+    s.close()
+
+
+# ============================================================== 8M REJECTION 2
+# Repairs: (1) private external-content leak, (2) invalid semantic state
+# configuration, (3) directory-fsync/write failure must never report success.
+
+from voicebridge.memory.semantic import (  # noqa: E402
+    external_ref, looks_like_external_ref, SemanticStateError,
+    STATE_TIMEOUT_MAX, STATE_TOP_K_MAX)
+
+_PRIVATE = ("the rust-colored umbrella on my porch is for "
+            "grandma's annual visit")
+
+
+def _all_surfaces(sm, store) -> str:
+    blob = []
+    if sm._journal_path is not None and Path(sm._journal_path).is_file():
+        blob.append(Path(sm._journal_path).read_text(errors="replace"))
+    for row in store._conn.execute("SELECT text FROM memories").fetchall():
+        blob.append(str(row["text"]))
+    for row in store._conn.execute("SELECT payload FROM history").fetchall():
+        blob.append(str(row["payload"] or ""))
+    blob.append(json.dumps(sm.recall(_PRIVATE[:20], limit=50)))
+    active = store._active_select(scope=None, staged=False)
+    if active:
+        blob.append(json.dumps([sm.explain(r["id"]) for r in active[:10]]))
+    blob.append(json.dumps(sm.export()))
+    return "\n".join(blob)
+
+
+def test_external_private_text_never_leaks(tmp_path):
+    for source in ("web", "tool", "model", "observed"):
+        db = tmp_path / f"{source}.db"
+        s = SemanticMemory(db, enabled=True, provider="hash",
+                           journal_path=tmp_path / f"{source}.journal")
+        rec = s.remember(_PRIVATE, source=source)
+        stored = rec["text"]
+        assert looks_like_external_ref(stored), source
+        assert _PRIVATE not in stored
+        blob = _all_surfaces(s, s.store)
+        assert _PRIVATE not in blob, f"{source} leaked into an output surface"
+        assert "external:" in blob
+        s.close()
+
+
+def test_external_private_text_never_leaks_via_belief_stage_import(tmp_path):
+    s = SemanticMemory(tmp_path / "m.db", enabled=True, provider="hash",
+                       journal_path=tmp_path / "mem.journal")
+    s.record_belief("alice", "note", _PRIVATE, source="web")
+    s.stage_inferred(_PRIVATE, source="model", confidence=0.5)
+    s.import_records([{"text": _PRIVATE, "source": "tool"}])
+    blob = _all_surfaces(s, s.store)
+    assert _PRIVATE not in blob
+    # user-origin private memory is preserved raw (legitimate boundary)
+    s.remember(_PRIVATE, source="user")
+    assert _PRIVATE in json.dumps(s.store.export())
+    s.close()
+
+
+def test_external_private_text_never_leaks_via_correct(tmp_path):
+    s = SemanticMemory(tmp_path / "m.db", journal_path=tmp_path / "j")
+    s.remember(_PRIVATE, source="tool")            # stored as a ref
+    stored = s.store._active_select(scope=None, staged=False)[0]["text"]
+    s.correct(stored, "replacement tool value", source="tool")
+    blob = _all_surfaces(s, s.store)
+    assert _PRIVATE not in blob
+    s.close()
+
+
+def test_external_private_text_absent_from_cli(tmp_path):
+    r = _cli(tmp_path, "belief-record", "alice", "note", _PRIVATE,
+             "--source", "web")
+    assert r.returncode == 0
+    out = json.loads(r.stdout)
+    assert _PRIVATE not in json.dumps(out)
+    assert "external:" in out["text"]
+
+
+def test_export_never_leaks_legacy_external_raw(tmp_path):
+    db = tmp_path / "m.db"
+    store = MemoryStore(db)
+    cur = store._conn.execute(
+        "INSERT INTO memories(mkey,tier,scope,text,norm_hash,source)"
+        " VALUES(?,?,?,?,?,?)",
+        (f"x\x00{hash('q')}", "recall", "default", _PRIVATE,
+         hash("q"), "web"))
+    store._index_fts(cur.lastrowid, "recall", "default", _PRIVATE)
+    store._conn.commit()
+    sm = SemanticMemory(store, enabled=True, provider="hash")
+    blob = json.dumps(sm.export())
+    assert _PRIVATE not in blob
+    blob2 = json.dumps(sm.recall(_PRIVATE[:20], limit=5))
+    assert _PRIVATE not in blob2
+    sm.close()
+
+
+# ------------------------------------------------------------ state config
+@pytest.mark.parametrize("bad", [
+    {"enabled": "yes"},
+    {"enabled": 1},
+    {"provider": "telepathy"},
+    {"timeout_s": "abc"},
+    {"timeout_s": 0},
+    {"timeout_s": -3},
+    {"timeout_s": float("inf")},
+    {"timeout_s": STATE_TIMEOUT_MAX + 1},
+    {"top_k": 5.5},
+    {"top_k": 0},
+    {"top_k": -2},
+    {"top_k": STATE_TOP_K_MAX + 1},
+    {"embed_model": ""},
+    {"embed_model": "bad model!"},
+    {"ollama_url": "not-a-url"},
+    {"ollama_url": "ftp://host/x"},
+    {"ollama_url": ""},
+    {"mystery_field": 1},
+])
+def test_load_state_rejects_invalid_values(tmp_path, bad):
+    p = tmp_path / "semantic.json"
+    p.write_text(json.dumps({"schema_version": 1, **bad}))
+    state, health = load_semantic_state(p)
+    assert health["state"] == "degraded", bad
+    assert health["detail"]
+    # defaults are returned but flagged; nothing silently coerced
+    assert state["enabled"] is False and state["provider"] == "none"
+
+
+def test_load_state_newer_schema(tmp_path):
+    p = tmp_path / "semantic.json"
+    p.write_text(json.dumps({"enabled": True, "provider": "hash",
+                             "schema_version": SEMANTIC_STATE_SCHEMA + 1}))
+    state, health = load_semantic_state(p)
+    assert health["state"] == "newer"
+    assert "newer" in health["detail"]
+
+
+def test_load_state_valid_values_ok(tmp_path):
+    p = tmp_path / "semantic.json"
+    p.write_text(json.dumps({"enabled": True, "provider": "hash",
+                             "timeout_s": 12.5, "top_k": 8,
+                             "embed_model": "nomic-embed-text",
+                             "ollama_url": "http://127.0.0.1:11434",
+                             "schema_version": 1}))
+    state, health = load_semantic_state(p)
+    assert health["state"] == "ok"
+    assert state["enabled"] is True and state["top_k"] == 8
+
+
+def test_write_state_validates_before_writing(tmp_path):
+    p = tmp_path / "semantic.json"
+    with pytest.raises(SemanticStateError, match="invalid"):
+        write_semantic_state(p, {"enabled": "yes", "provider": "hash",
+                                 "schema_version": 1})
+    assert not p.exists()
+    with pytest.raises(SemanticStateError, match="invalid"):
+        write_semantic_state(p, {"enabled": True, "provider": "hash",
+                                 "timeout_s": 0, "schema_version": 1})
+    assert not p.exists()
+    # a valid write succeeds and returns the canonical state
+    canonical = write_semantic_state(
+        p, {"enabled": True, "provider": "hash", "schema_version": 1})
+    assert canonical["top_k"] == 5  # unspecified keys default
+    assert (p.stat().st_mode & 0o777) == 0o600
+
+
+# ------------------------------------------------------ write failure paths
+def test_write_state_file_fsync_failure(tmp_path, monkeypatch):
+    p = tmp_path / "semantic.json"
+    real_fsync = os.fsync
+    calls = {"n": 0}
+
+    def boom(fd):
+        calls["n"] += 1
+        if calls["n"] == 1:     # file fsync fails
+            raise OSError(5, "I/O error")
+        return real_fsync(fd)
+
+    monkeypatch.setattr("voicebridge.memory.semantic.os.fsync", boom)
+    with pytest.raises(SemanticStateError, match="write failed"):
+        write_semantic_state(p, {"enabled": True, "provider": "hash"})
+    assert not p.exists()                       # not persisted
+    assert not p.with_suffix(".json.tmp").exists()   # temp cleaned up
+
+
+def test_write_state_rename_failure(tmp_path, monkeypatch):
+    p = tmp_path / "semantic.json"
+    real_replace = os.replace
+
+    def boom(a, b):
+        raise OSError(18, "invalid cross-device link")
+
+    monkeypatch.setattr("voicebridge.memory.semantic.os.replace", boom)
+    with pytest.raises(SemanticStateError, match="rename failed"):
+        write_semantic_state(p, {"enabled": True, "provider": "hash"})
+    assert not p.exists()
+    assert not p.with_suffix(".json.tmp").exists()
+
+
+def test_write_state_directory_fsync_failure(tmp_path, monkeypatch):
+    p = tmp_path / "semantic.json"
+    real_fsync = os.fsync
+    calls = {"n": 0}
+
+    def boom(fd):
+        calls["n"] += 1
+        if calls["n"] == 2:     # second fsync = directory fsync
+            raise OSError(5, "I/O error on dir")
+        return real_fsync(fd)
+
+    monkeypatch.setattr("voicebridge.memory.semantic.os.fsync", boom)
+    with pytest.raises(SemanticStateError, match="directory fsync failed"):
+        write_semantic_state(p, {"enabled": True, "provider": "hash"})
+    # the rename happened but the failure is SURFACED, never reported as success
+    assert not p.with_suffix(".json.tmp").exists()
+
+
+def test_interrupted_state_write_recovers(tmp_path):
+    # a leftover temp file from a crashed write does not corrupt the state
+    p = tmp_path / "semantic.json"
+    write_semantic_state(p, {"enabled": False, "provider": "none"})
+    p.with_suffix(".json.tmp").write_text("{partial garbage")
+    state, health = load_semantic_state(p)
+    assert health["state"] == "ok"
+    assert state["provider"] == "none"
+    # re-writing atomically clears the stale temp
+    write_semantic_state(p, {"enabled": True, "provider": "hash"})
+    assert not p.with_suffix(".json.tmp").exists()
+
+
+def test_cli_malformed_state_config_invalid(tmp_path):
+    state = tmp_path / "state"
+    mem = state / "memory"
+    mem.mkdir(parents=True, exist_ok=True)
+    (mem / "semantic.json").write_text(json.dumps(
+        {"enabled": "yes", "provider": "hash", "schema_version": 1}))
+    r = _cli(tmp_path, "status")
+    assert r.returncode == 0
+    out = json.loads(r.stdout)
+    assert out["state"] == "degraded" and "enabled" in out["state_error"]
+    # refused WITHOUT the explicit confirmation (never silent coercion)
+    r = _cli(tmp_path, "enable")
+    assert r.returncode == 4
+    # the documented explicit recovery contract (--confirm) backs up the
+    # malformed file and writes a validated replacement
+    r = _cli(tmp_path, "enable", "--confirm")
+    assert r.returncode == 0 and json.loads(r.stdout)["state"] == "ok"
+    assert len(list(mem.glob("semantic.json.corrupt-*"))) == 1
+
+
+# -------------------------------------------------- replay after redaction
+def test_replay_after_external_redaction_is_honest(tmp_path):
+    jp = tmp_path / "mem.journal"
+    s = SemanticMemory(tmp_path / "m.db", enabled=True, provider="hash",
+                       journal_path=jp)
+    s.remember(_PRIVATE, source="web")          # stored as ref
+    s.remember("user-owned sentence stays", source="user")
+    s.stage_inferred(_PRIVATE, source="model", confidence=0.6)
+    ok, reason = s.journal_verify()
+    assert ok, reason
+    # replay reproduces the refs and the user text; the raw private text is
+    # never required, so integrity is claimed honestly for what was stored
+    raw = jp.read_text()
+    assert _PRIVATE not in raw
+    out = s.journal_replay()
+    assert out["state"] == "ok"
+    s.close()
+
+
+def test_rejected_secret_leaves_no_journal_line(tmp_path):
+    jp = tmp_path / "mem.journal"
+    s = SemanticMemory(tmp_path / "m.db", journal_path=jp)
+    with pytest.raises(SecretRejectedError):
+        s.remember("password: hunter2!")
+    s.remember("clean fact after rejection")
+    raw = jp.read_text()
+    assert "hunter2" not in raw
+    ok, reason = s.journal_verify()
+    assert ok, reason
+    s.close()
+
+
+def test_adapter_rejects_bad_embed_config(tmp_path):
+    s = SemanticMemory(tmp_path / "m.db")
+    with pytest.raises(SemanticMemoryError, match="top_k"):
+        s.set_top_k(0)
+    with pytest.raises(SemanticMemoryError, match="top_k"):
+        s.set_top_k(STATE_TOP_K_MAX + 1)
+    with pytest.raises(SemanticMemoryError, match="timeout_s"):
+        s.set_provider("ollama", timeout_s=0)
+    with pytest.raises(SemanticMemoryError, match="timeout_s"):
+        s.set_provider("ollama", timeout_s=STATE_TIMEOUT_MAX + 1)
+    with pytest.raises(SemanticMemoryError, match="embed_model"):
+        s.set_provider("ollama", embed_model="bad model!")
+    with pytest.raises(SemanticMemoryError, match="ollama_url"):
+        s.set_provider("ollama", ollama_url="not a url")
     s.close()

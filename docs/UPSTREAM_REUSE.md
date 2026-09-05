@@ -1162,6 +1162,28 @@ IMPLEMENTATION STATUS (Packet 8M repair, 2026-09-05, after the rejected
    network service (embed_available stays None until the opt-in check_provider
    probe); provider missing/unavailable/timeout are typed; (8) no MCP/FastAPI/
    second store/model training/voice-hot-path/resident-model change.
+IMPLEMENTATION STATUS (Packet 8M rejection #2, 2026-09-05): (1) EXTERNAL-
+   CONTENT BOUNDARY — raw web/tool/model/observed text is NEVER stored,
+   journaled, FTS-indexed, or returned; it becomes a deterministic bounded
+   non-recoverable reference `[external:<source>:<sha256[:20]>:<label?>]`
+   (external_ref/_store_text), so private page/tool/model text cannot appear in
+   journals, history, logs, prompts, diagnostics, recall/explain output, CLI
+   output, or exported reports. User-owned (source="user") memory is stored raw
+   (documented boundary); imported data defaults to external-origin unless an
+   explicit trusted_user_import=True restore operation opts into user-owned
+   storage. Replay stays honest: it reproduces the stored reference exactly and
+   integrity is never claimed for raw content that was intentionally not kept.
+   (2) STATE-CONFIG VALIDATION — load/write_semantic_state validate every value
+   (boolean enabled; known provider; finite 0 < timeout_s <= 60; integer
+   0 < top_k <= 50; valid non-empty model identifier; valid http(s) url; no
+   unsupported fields; supported schema_version). Malformed values return a
+   typed degraded/config-invalid health and are NEVER silently coerced; the CLI
+   surfaces the typed failure and refuses mutation without the explicit
+   --confirm recovery contract. (3) DURABILITY — write_semantic_state validates
+   before persisting and raises a typed SemanticStateError on ANY write/flush/
+   file-fsync/rename/directory-fsync/permission/serialization failure (the
+   directory fsync is no longer swallowed); the temporary file is cleaned up
+   after a pre-rename failure and broad deletion is never used.
 ```
 
 ---
