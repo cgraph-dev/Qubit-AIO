@@ -64,9 +64,10 @@ ADAPTER_EDITOR = "editor"
 ADAPTER_DESKTOP = "desktop"
 ADAPTER_MAIL = "mail"
 ADAPTER_SOCIAL = "social"
+ADAPTER_GHOST = "ghost"
 
 ADAPTERS = (ADAPTER_BROWSER, ADAPTER_EDITOR, ADAPTER_DESKTOP,
-            ADAPTER_MAIL, ADAPTER_SOCIAL)
+            ADAPTER_MAIL, ADAPTER_SOCIAL, ADAPTER_GHOST)
 
 # Typed outcome states (receipts / CLI / dashboard / voice share these).
 ST_OK = "OK"
@@ -419,6 +420,25 @@ def action_spec(action_id: str) -> Optional[ActionSpec]:
     return _SPECS.get(action_id)
 
 
+def register_action_spec(spec: ActionSpec) -> None:
+    """Register one additional action contract (additive, idempotent).
+
+    Packet 8N adds its Ghost capabilities this way so they are resolvable by
+    ``action_spec()``/``validate_envelope`` (the same broker/gate/confirmation/
+    receipt machinery) WITHOUT extending the 8F ``action_specs()`` surface:
+    the 8F acceptance tests iterate that exact set, and Packet 8N must not
+    silently reclassify 8F capabilities. A duplicate id or an unknown adapter
+    fails closed.
+    """
+    if spec.action_id in _SPECS:
+        raise ActionError(f"{spec.action_id}: already registered")
+    if spec.adapter not in ADAPTERS:
+        raise ActionError(f"{spec.action_id}: unknown adapter {spec.adapter!r}")
+    if not re.match(r"^[a-z][a-z0-9_.-]{2,63}$", spec.action_id or ""):
+        raise ActionError(f"bad action_id: {spec.action_id!r}")
+    _SPECS[spec.action_id] = spec
+
+
 # ---------------------------------------------------------------------------
 # Exact argument schema validation (fail closed)
 # ---------------------------------------------------------------------------
@@ -556,6 +576,12 @@ def _validate_target(spec: ActionSpec, target: str) -> str:
         except Exception as exc:
             raise ActionValidationError(f"target URL rejected: {exc}") from None
         return origin
+    if spec.adapter == ADAPTER_GHOST:
+        # Ghost desktop/window targets are bounded app/window identifiers or a
+        # loopback host; browser-role ghost operations carry a URL origin and
+        # are validated by the ghost module's own target schema. Here we only
+        # enforce the shared bounds (no shell meta, bounded length).
+        return target
     if spec.adapter == ADAPTER_EDITOR:
         if not _FILEPATH_RE.match(target):
             raise ActionValidationError("editor target is not a bounded path")
@@ -1803,6 +1829,8 @@ class ActionRunner:
 def _sample_target(spec: ActionSpec) -> str:
     if spec.adapter in (ADAPTER_BROWSER, ADAPTER_MAIL, ADAPTER_SOCIAL):
         return "https://example.test"
+    if spec.adapter == ADAPTER_GHOST:
+        return "desktop"
     if spec.adapter == ADAPTER_EDITOR:
         return "workspace.example"
     return "desktop"

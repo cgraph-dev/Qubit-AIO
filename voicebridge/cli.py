@@ -487,6 +487,66 @@ def build_parser() -> argparse.ArgumentParser:
     act_recov.add_argument("--confirmation", default=None)
     act_recov.add_argument("--confirm", action="store_true")
     act_recov.add_argument("--fixture", type=Path, default=None)
+    ghost = add("ghost", help="Packet 8N Ghost desktop/browser capability adapter (optional, supervised; disabled by default)")
+    ghost_sub = ghost.add_subparsers(dest="ghost_command")
+    ghost_sub.add_parser("list", parents=[common],
+                         help="list Ghost capabilities + effective permissions")
+    ghost_sub.add_parser("status", parents=[common],
+                         help="typed adapter/browser-role/session-grant status")
+    ghost_show = ghost_sub.add_parser("show", parents=[common],
+                                      help="show one Ghost capability contract")
+    ghost_show.add_argument("action_id")
+    ghost_chk = ghost_sub.add_parser("check", parents=[common],
+                                     help="read-only effective permission decision")
+    ghost_chk.add_argument("action_id")
+    ghost_chk.add_argument("--scope", default="")
+    ghost_gr = ghost_sub.add_parser("grant", parents=[common],
+                                    help="issue a bounded user session grant for a read/reversible capability")
+    ghost_gr.add_argument("capability")
+    ghost_gr.add_argument("--scope", action="append", default=[],
+                          help="scope tag; repeatable")
+    ghost_gr.add_argument("--target", default="", help="origin or bounded target (default: contract first scope)")
+    ghost_gr.add_argument("--role", default="",
+                          choices=["", "chromium", "comet"],
+                          help="browser role binding (optional)")
+    ghost_gr.add_argument("--ttl", type=float, default=None,
+                          help="grant TTL seconds (default 600)")
+    ghost_rev = ghost_sub.add_parser("revoke", parents=[common],
+                                     help="revoke a session grant (and its mirrored 7E grant)")
+    ghost_rev.add_argument("grant_id")
+    ghost_prev = ghost_sub.add_parser("preview", parents=[common],
+                                      help="real no-side-effect preview + stable action hash")
+    ghost_prev.add_argument("action_id")
+    ghost_prev.add_argument("--args", default="{}", help="exact action args as JSON")
+    ghost_prev.add_argument("--target", default="")
+    ghost_prev.add_argument("--scope", default="")
+    ghost_prev.add_argument("--role", default="")
+    ghost_exec = ghost_sub.add_parser("execute", parents=[common],
+                                      help="gate+confirm+execute one Ghost capability (dry-run by default; --confirm = fresh confirmation)")
+    ghost_exec.add_argument("action_id")
+    ghost_exec.add_argument("--args", default="{}")
+    ghost_exec.add_argument("--target", default="")
+    ghost_exec.add_argument("--scope", default="")
+    ghost_exec.add_argument("--role", default="")
+    ghost_exec.add_argument("--confirmation", default=None)
+    ghost_exec.add_argument("--confirm", action="store_true")
+    ghost_exec.add_argument("--expected-hash", default="")
+    ghost_exec.add_argument("--fixture", type=Path, default=None,
+                            help="synthetic adapter outcomes JSON (explicit simulation; never live)")
+    ghost_can = ghost_sub.add_parser("cancel", parents=[common],
+                                     help="cancel an in-flight Ghost action (idempotent)")
+    ghost_can.add_argument("receipt_id")
+    ghost_recs = ghost_sub.add_parser("receipts", parents=[common],
+                                      help="list recent Ghost action receipts")
+    ghost_recs.add_argument("--limit", type=int, default=30)
+    ghost_en = ghost_sub.add_parser("enable", parents=[common],
+                                    help="enable the adapter health flag (capabilities still need an executor)")
+    ghost_dis = ghost_sub.add_parser("disable", parents=[common],
+                                     help="disable the adapter")
+    ghost_stop = ghost_sub.add_parser("emergency-stop", parents=[common],
+                                      help="global immediate stop (latched until reset)")
+    ghost_reset = ghost_sub.add_parser("reset", parents=[common],
+                                       help="reset the emergency-stop latch (returns to disabled)")
     export = add("export-state", help="encrypt + export portable state (memory/lessons/reports/config/model)")
     export.add_argument("--out", type=Path, default=None,
                         help="output file (default: <state_dir>/portable-<ts>.vbp)")
@@ -585,6 +645,8 @@ def main(argv=None) -> int:
         return _cmd_websites(cfg, args)
     if command == "actions":
         return _cmd_actions(cfg, args)
+    if command == "ghost":
+        return _cmd_ghost(cfg, args)
     if command == "export-state":
         return _cmd_export_state(cfg, args)
     if command == "import-state":
@@ -2102,6 +2164,122 @@ def _cmd_actions(cfg, args) -> int:
         return 0
     except (A.ActionError, A.ActionValidationError, A.ActionDeniedError) as exc:
         code = getattr(exc, "code", None) or "ACTION_ERROR"
+        print(_json.dumps({"state": "failed", "code": code,
+                           "detail": str(exc)}, indent=2))
+        return 2
+    except Exception as exc:
+        print(_json.dumps({"state": "failed", "detail": str(exc)[:200]},
+                          indent=2))
+        return 2
+
+
+def _cmd_ghost(cfg, args) -> int:
+    """voicebridge ghost list/status/show/check/grant/revoke/preview/execute/
+    cancel/receipts/enable/disable/emergency-stop/reset.
+
+    Packet 8N optional supervised Ghost adapter. All capabilities are disabled
+    by default; ``--fixture`` is the explicit synthetic-simulation path and
+    every other execute returns ADAPTER_DISABLED. ``GHOST_SHELL=off`` by
+    default. Session grants are human-issued, bounded, expiring, target-bound
+    and only cover read-only/reversible capabilities.
+    """
+    import json as _json
+    from . import ghost as G
+    G.register_ghost_specs()
+    cmd = getattr(args, "ghost_command", None) or "list"
+
+    executors: Dict[str, Any] = {}
+    fixture = getattr(args, "fixture", None)
+    if fixture:
+        fpath = Path(fixture)
+        if not fpath.is_file():
+            print(_json.dumps({"state": "failed",
+                               "detail": f"fixture not found: {fpath}"},
+                              indent=2))
+            return 2
+        try:
+            from . import actions as A
+            executors = A.make_fixture_executors(
+                A.load_fixture_outcomes(fpath))
+        except Exception as exc:
+            print(_json.dumps({"state": "failed", "detail": f"fixture "
+                               f"invalid: {exc}"}, indent=2))
+            return 2
+    runner = G.ghost_runner(cfg, executors=executors)
+
+    def _args_json(raw: str) -> Dict[str, Any]:
+        try:
+            return _json.loads(raw or "{}")
+        except Exception as exc:
+            raise G.ActionValidationError(f"args JSON invalid: {exc}") from None
+
+    try:
+        if cmd == "list":
+            out = {"state": "OK",
+                   "mode": runner.perms.mode()[0],
+                   "state_path": str(runner.store.path),
+                   "capabilities": runner.ghost_actions()}
+        elif cmd == "status":
+            out = runner.ghost_status()
+        elif cmd == "show":
+            spec = G.ghost_spec(args.action_id)
+            if spec is None:
+                raise G.ActionValidationError(f"unknown action {args.action_id!r}")
+            out = {"state": "OK", "action": spec.to_dict()}
+        elif cmd == "check":
+            out = runner.check(args.action_id,
+                               getattr(args, "scope", "") or "")
+        elif cmd == "grant":
+            scopes = tuple(args.scope) or (G.ghost_spec(args.capability)
+                                           .scopes[0],)
+            out = runner.grant(args.capability, scopes=scopes,
+                               target=getattr(args, "target", "") or "desktop",
+                               role=getattr(args, "role", "") or "",
+                               ttl_s=getattr(args, "ttl", None))
+        elif cmd == "revoke":
+            out = runner.revoke_grant(args.grant_id)
+        elif cmd == "preview":
+            out = runner.preview(args.action_id, _args_json(args.args),
+                                 target=getattr(args, "target", "") or "desktop",
+                                 scope=getattr(args, "scope", "") or "",
+                                 role=getattr(args, "role", "") or "")
+        elif cmd == "execute":
+            role = getattr(args, "role", "") or ""
+            if getattr(args, "dry_run", False):
+                out = runner.execute(args.action_id,
+                                     args=_args_json(args.args),
+                                     target=getattr(args, "target", "") or
+                                     "desktop",
+                                     scope=getattr(args, "scope", "") or "",
+                                     source="user", dry_run=True, role=role)
+            else:
+                out = runner.execute(
+                    args.action_id, args=_args_json(args.args),
+                    target=getattr(args, "target", "") or "desktop",
+                    scope=getattr(args, "scope", "") or "",
+                    source="user", confirmation_id=args.confirmation,
+                    confirmed=args.confirm,
+                    expected_hash=args.expected_hash or "", role=role)
+        elif cmd == "cancel":
+            out = runner.cancel(args.receipt_id)
+        elif cmd == "receipts":
+            out = runner.receipts(getattr(args, "limit", 30) or 30)
+        elif cmd == "enable":
+            out = runner.adapter.enable(requested_by="user")
+        elif cmd == "disable":
+            out = runner.adapter.disable(requested_by="user")
+        elif cmd == "emergency-stop":
+            out = runner.adapter.emergency_stop()
+        elif cmd == "reset":
+            out = runner.adapter.reset(requested_by="user")
+        else:
+            print(f"ERROR: unknown ghost command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except (G.ActionValidationError, G.ActionError,
+            G.SessionGrantError) as exc:
+        code = getattr(exc, "code", None) or "GHOST_ERROR"
         print(_json.dumps({"state": "failed", "code": code,
                            "detail": str(exc)}, indent=2))
         return 2

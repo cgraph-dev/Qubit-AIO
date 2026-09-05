@@ -186,3 +186,94 @@ in distributions (full text at https://www.apache.org/licenses/LICENSE-2.0):
 > under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
 > CONDITIONS OF ANY KIND, either express or implied. See the License for the
 > specific language governing permissions and limitations under the License.
+
+---
+
+## Ghost — computer-use capability contract (Packet 8N)
+
+`voicebridge/ghost.py` adapts the typed capability/HTTP contract and browser-
+role isolation idea from the Ghost computer-use layer for AI agents
+(MIT © 2026 Northtek), reviewed at pinned commit
+`00811dfb6fe62415c9dc7cc054a88c6fcf237288`
+(`crates/ghost-http/src/main.rs`, `crates/ghost-core/src/system/clipboard.rs`,
+`crates/ghost-core/src/capture/screen.rs`, `crates/ghost-browser/src/cdp.rs`,
+`crates/ghost-core/src/focus.rs`, `crates/ghost-core/src/input/*`).
+
+Adapted behavior: typed desktop-discovery / launch / window-anchoring /
+browser-tab-inspection / click / type / scroll / clipboard / screenshot
+capability surface; loopback-only CDP; typed outcome states; verify-then-report
+receipts; adapter health states; emergency stop.
+
+Local divergence (documented in UPSTREAM_REUSE.md R24): the adapter is Python
+over the existing 8F ActionBroker/ActionGate/ActionRunner; all capabilities are
+disabled by default; no Ghost subprocess/HTTP server is launched by this
+packet; coordinate-only scripts, foreground input, clipboard reads,
+browser/CDP control and account/credential operations are high-impact
+capabilities requiring fresh exact-hash confirmation; the shell capability is
+hard-disabled (`GHOST_SHELL=off`) by default.
+
+MIT License text requirement: include the copyright notice and this permission
+statement in distributions:
+
+> Copyright (c) 2026 Northtek
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy
+> of this software and associated documentation files (the "Software"), to deal
+> in the Software without restriction, including without limitation the rights
+> to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+> copies of the Software, and to permit persons to whom the Software is
+> furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all
+> copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+> IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+> FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+> AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+> LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+> OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+> SOFTWARE.
+
+---
+
+## mcp-comet — research-only adapter contract (Packet 8N)
+
+`voicebridge/ghost.py`'s `CometResearchAdapter` wraps the typed research-mode
+contract of the mcp-comet MCP server connecting to the Perplexity Comet
+browser (MIT © 2025), reviewed at pinned commit
+`6f10c86b0991ce95d9f41d972429888a111b86d5`
+(`src/comet-ai.ts`, `src/cdp-client.ts`, `src/types.ts`).
+
+Adapted behavior: research-mode-only selection; bounded query submission;
+source/page-content extraction bounded and redacted as untrusted evidence;
+typed unavailable/disabled states; provider disclosure.
+
+Local divergence (documented in UPSTREAM_REUSE.md R25): the local adapter is a
+Python contract boundary over the existing broker; it is disabled by default;
+`computer` mode and write-capable tools are disabled until Packet 8O; no Node/
+TypeScript runtime, no unauthenticated remote MCP mount, and no live connect
+happen in this packet.
+
+MIT License text requirement: include the copyright notice and this permission
+statement in distributions:
+
+> Copyright (c) 2025
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy
+> of this software and associated documentation files (the "Software"), to deal
+> in the Software without restriction, including without limitation the rights
+> to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+> copies of the Software, and to permit persons to whom the Software is
+> furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all
+> copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+> IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+> FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+> AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+> LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+> OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+> SOFTWARE.

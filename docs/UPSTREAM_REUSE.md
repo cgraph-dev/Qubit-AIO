@@ -1227,3 +1227,139 @@ IMPLEMENTATION STATUS (Packet 8M concurrency, 2026-09-05): write_semantic_state
 ```
 
 ---
+
+## R24 — Ghost computer-use capability contract (Packet 8N)
+
+```text
+LOCAL REQUIREMENT: an OPTIONAL, supervised Ghost desktop/browser capability
+    adapter through the existing CapabilityBroker/ActionBroker: typed
+    capabilities for desktop discovery, approved application launch, window
+    anchoring, browser-tab inspection, and explicitly permitted
+    click/type/scroll/clipboard/screenshot; two explicit browser roles
+    (Chromium account browser and Comet research browser) with distinct
+    loopback-only CDP ports/profiles/target registries; bounded session grants;
+    fresh exact-hash confirmation for high-impact actions; GHOST_SHELL=off
+    hard disable; disabled by default; no live launch in this packet.
+UPSTREAM REPOSITORY + COMMIT: https://github.com/NORTHTEKDevs/ghost @
+    00811dfb6fe62415c9dc7cc054a88c6fcf237288 (recorded 2026-09-05).
+SOURCE FILES + SYMBOLS: crates/ghost-http/src/main.rs → h_tools (declared
+    endpoint contract: /health, /click {name?,role?}, /click-at {x,y},
+    /type {name?,role?,text}, /press {key}, /hotkey {mods,key},
+    /screenshot, /launch {exe}, /list-windows, /focus-window {name},
+    /window-state {name,state}, /describe, /clipboard GET/POST {text},
+    /run intent); crates/ghost-core/src/system/clipboard.rs → clipboard
+    read/write semantics; crates/ghost-core/src/capture/screen.rs →
+    screenshot capture semantics; crates/ghost-browser/src/cdp.rs →
+    loopback browser/CDP target inspection semantics; crates/ghost-core/
+    src/focus.rs → focus preservation semantics; crates/ghost-core/src/
+    input/{mouse,keyboard,mod}.rs → input semantics. We reuse the CONTRACT
+    (names, arg shapes, typed outcomes) and the browser-role isolation idea;
+    we do NOT translate the Rust internals.
+UPSTREAM TESTS/FIXTURES: crates/ghost-http/tests (HTTP endpoint smoke,
+    tools listing), crates/ghost-core/src/capture/verify.rs (verify-then-
+    report), crates/ghost-core/src/input tests (bounded input), ghost-cli
+    `ghost doctor` health gate. Verified at the pinned commit.
+LICENSE: MIT — Copyright (c) 2026 Northtek. MIT notice requirement honored
+    in THIRD_PARTY_NOTICES.md. No model weights, no Rust crate, and no
+    compiled binary are bundled.
+DECISION: ADAPT (public HTTP/CLI contract + typed outcomes, in Python) +
+    WRAP (existing 8F ActionBroker/ActionGate/ActionRunner machinery). REJECT
+    vendoring the Rust project, its build system, `ghost-http` server, or any
+    Ghost subprocess in this packet (a live launch is a separately approved,
+    operator-gated rollout; every capability resolves to ADAPTER_DISABLED
+    without an injected executor).
+LOCAL DESTINATION: voicebridge/ghost.py (ghost_action_specs,
+    register_ghost_specs, ghost_spec, browser_roles, validate_role,
+    validate_cdp_endpoint, SessionGrant/SessionGrantStore, GhostAdapterState/
+    GhostAdapter (enable/disable/emergency_stop/reset/mark_failure/
+    mark_reconnect/track), GhostGate, ghost_actions_broker, GhostRunner,
+    ghost_runner, CometResearchAdapter, redact_evidence_bytes/json_evidence);
+    CLI `voicebridge ghost list|status|show|check|grant|revoke|preview|
+    execute|cancel|receipts|enable|disable|emergency-stop|reset`;
+    dashboard read-only `/api/ghost`; tests/test_packet8n.py.
+DEPENDENCIES ADDED: none (stdlib + existing voicebridge/actions machinery).
+BEHAVIOR KEPT: typed endpoint-style capabilities (discovery, launch, anchor,
+    browser-tab inspection, click/type/scroll/clipboard/screenshot); typed
+    outcome states; loopback-only CDP; focus preservation; verify-then-report
+    receipts; health states; emergency stop.
+BEHAVIOR INTENTIONALLY OMITTED: coordinate-only click-at; /run intent
+    interpreter; /press/hotkey global input; raw clipboard POST; screenshot
+    PNG bodies persisted raw; window-state maximize/minimize/close; any live
+    Ghost subprocess launch. Coordinate-only scripts, foreground input,
+    clipboard reads, browser/CDP control, and account/credential operations
+    are typed high-impact capabilities requiring fresh exact-hash
+    confirmation, and the shell capability is hard-disabled (GHOST_SHELL=off)
+    by default — the packet's fail-closed contract exceeds the upstream's
+    permissive surface.
+WHY THIS IS THE SMALLEST FIT: only the loopback HTTP contract and typed
+    capability names are needed; the existing 8F broker/gate/confirmation/
+    receipt/audit machinery already implements the authorization, hash
+    binding, cancellation, and redaction the packet requires.
+COMPATIBILITY DRIFT: upstream `main` (checked 2026-09-05) keeps the same
+    /tools endpoint shapes; additive. Pin remains authoritative; the local
+    adapter never calls a floating branch or an unauthenticated HTTP endpoint.
+IMPLEMENTATION STATUS: adapted into production as voicebridge/ghost.py
+    (Packet 8N, 2026-09-05) with hermetic tests tests/test_packet8n.py; MIT
+    notice added to THIRD_PARTY_NOTICES.md. All capabilities disabled by
+    default; live launch remains operator-gated and out of scope.
+REPAIR (Packet 8N, 2026-09-05): strict URL parsing and canonical-host
+    validation replace substring matching (evilgmail.com / gmail.com.evil.test /
+    notmail.google.com / user-info / non-default ports / non-https / IP
+    literals / query-fragment token-bearing / bare targets all fail closed);
+    browser ``role`` is merged into the validated envelope args so it is part
+    of the stable action hash and stays bound through preview/execute/retry/
+    recover/receipts/CLI/dashboard/fixtures; every Ghost execution is tracked
+    in the adapter with the real broker cancel callback so emergency stop
+    SIGKILLs active children and cooperatively cancels read-only inline runs;
+    comet operations execute only through the bound broker executor (direct
+    object calls are refused); persisted session grants fail closed on load
+    and save (cross-process lock, unique O_EXCL temp, file+dir fsync, chmod
+    0600, typed durability errors, no authority gain on load).
+```
+
+## R25 — mcp-comet research-only contract (Packet 8N)
+
+```text
+LOCAL REQUIREMENT: an OPTIONAL research-only adapter for the Comet research
+    browser (Perplexity, web research, forums, public browsing): connect,
+    select research mode, submit a bounded query, poll/wait, extract sources,
+    extract readable page content, and optionally capture bounded evidence
+    screenshots — disabled by default, `computer` mode and write-capable
+    tools disabled until Packet 8O, no second listener/policy path, no
+    unauthenticated remote MCP, no `npx -y`, no floating branch.
+UPSTREAM REPOSITORY + COMMIT: https://github.com/hanzili/comet-mcp @
+    6f10c86b0991ce95d9f41d972429888a111b86d5 (recorded 2026-09-05).
+SOURCE FILES + SYMBOLS: src/comet-ai.ts → research mode selection and
+    bounded-query submission/polling semantics; src/cdp-client.ts → loopback
+    CDP target discovery and page-content/source extraction semantics;
+    src/types.ts → typed mode/query/result shapes.
+UPSTREAM TESTS/FIXTURES: none packaged upstream (no test directory at the
+    pinned commit); the local adapter therefore ships its OWN hermetic
+    contract tests (connect/ask/select-mode/extract bounds, mode gate) and
+    documents that upstream tests are unavailable.
+LICENSE: MIT — Copyright (c) 2025. MIT notice requirement honored in
+    THIRD_PARTY_NOTICES.md. No Comet provider credentials, no browser
+    profile, and no remote MCP endpoint are bundled or contacted.
+DECISION: WRAP (typed research-only contract over the existing broker) +
+    REJECT (no Node/TypeScript runtime, no remote MCP mount, no `computer`
+    mode, no write tools, no second listener in this packet).
+LOCAL DESTINATION: voicebridge/ghost.py (CometResearchAdapter:
+    connect/disconnect/select_mode/ask/extract/status; CometResearchRequest)
+    + tests/test_packet8n.py.
+DEPENDENCIES ADDED: none (stdlib only; Node/TypeScript are NOT added).
+BEHAVIOR KEPT: research-mode only; bounded query submission; source/page
+    extraction bounded + redacted as untrusted evidence; typed unavailable /
+    disabled states; provider disclosure.
+BEHAVIOR INTENTIONALLY OMITTED: `computer` mode, any write-capable tool,
+    multi-tab management, credentials import, unauthenticated MCP mounting,
+    and any live connect in this packet.
+WHY THIS IS THE SMALLEST FIT: the packet requires only the typed research
+    contract and fail-closed gating; the existing broker provides the
+    authorization/audit boundary and the adapter stays disabled by default.
+COMPATIBILITY DRIFT: upstream is TypeScript/Node; the local adapter is a
+    Python contract boundary that never invokes it in this packet.
+IMPLEMENTATION STATUS: adapted into production as voicebridge/ghost.py
+    CometResearchAdapter (Packet 8N, 2026-09-05) with hermetic tests; MIT
+    notice added to THIRD_PARTY_NOTICES.md. Disabled by default; live use
+    remains a separately authorized, operator-gated rollout.
+```

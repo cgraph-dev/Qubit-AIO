@@ -302,6 +302,12 @@ class CapabilityBroker:
             out = binding.fn(dict(args))
         except BaseException as exc:
             return ExecResult(ok=False, error=str(exc)[:500], timed_out=False)
+        if active.cancel_event.is_set():
+            # Cooperative cancellation for the in-process read-only path: an
+            # emergency stop / cancel requested while the (side-effect-free)
+            # callable ran is reported as cancelled, never as success.
+            return ExecResult(ok=False, cancelled=True,
+                              error="cancelled during execution")
         return ExecResult(ok=True,
                           output=redact_text(str(out))[:_MAX_STR_ARG])
 
