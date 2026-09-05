@@ -55,6 +55,7 @@ import math
 import os
 import re
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -313,12 +314,51 @@ def load_semantic_state(path: Path | str, *,
 
 def _cleanup_tmp(tmp: Path) -> None:
     """Best-effort removal of our own temporary state file only. Never deletes
-    directories or unrelated files."""
+    directories or unrelated files (another process's temp is never touched)."""
     try:
         if tmp.exists():
             tmp.unlink()
     except OSError:
         pass
+
+
+class _StateWriteLock:
+    """Cross-process exclusive lock (fcntl.flock on a sidecar ``.lock`` file)
+    so concurrent write_semantic_state() calls are serialized: no interleaved,
+    partial, or duplicate state can reach the target, and each writer either
+    fully applies its state or raises a typed error. The sidecar is created
+    once and never unlinked (removing it would reintroduce a two-inode race)."""
+
+    def __init__(self, target: Path) -> None:
+        self._path = target.with_name(target.name + ".lock")
+        self._fd: Optional[int] = None
+
+    def __enter__(self) -> "_StateWriteLock":
+        import fcntl
+        self._fd = os.open(str(self._path), os.O_CREAT | os.O_RDWR, 0o600)
+        try:
+            fcntl.flock(self._fd, fcntl.LOCK_EX)
+        except BaseException:
+            try:
+                os.close(self._fd)
+            except OSError:
+                pass
+            self._fd = None
+            raise
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        import fcntl
+        fd, self._fd = self._fd, None
+        if fd is None:
+            return
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
 
 
 def write_semantic_state(path: Path | str, state: Dict[str, Any]) -> Dict[str, Any]:
@@ -361,44 +401,50 @@ def write_semantic_state(path: Path | str, state: Dict[str, Any]) -> Dict[str, A
     except (TypeError, ValueError) as exc:
         raise SemanticStateError(
             f"semantic state serialization failed: {exc}") from exc
-    tmp = p.with_suffix(".json.tmp")
-    try:
-        fd = os.open(str(tmp), os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
-        with os.fdopen(fd, "wb") as fh:
-            fh.write(payload)
-            fh.flush()
-            os.fsync(fh.fileno())
-    except OSError as exc:
-        _cleanup_tmp(tmp)
-        raise SemanticStateError(f"semantic state write failed: {exc}") from exc
-    try:
-        os.chmod(tmp, 0o600)
-    except OSError as exc:
-        _cleanup_tmp(tmp)
-        raise SemanticStateError(
-            f"semantic state permission failed: {exc}") from exc
-    try:
-        os.replace(tmp, p)
-    except OSError as exc:
-        _cleanup_tmp(tmp)
-        raise SemanticStateError(f"semantic state rename failed: {exc}") from exc
-    try:
-        dir_fd = os.open(str(p.parent), os.O_RDONLY)
+    # Per-process unique temp file: concurrent writers never share an inode,
+    # so a torn/interleaved temp can never be renamed into place. Combined
+    # with the cross-process flock below, the target always transitions
+    # atomically between complete states (no corruption, no partial file, no
+    # duplicate state, no false success).
+    tmp = p.with_name(f"{p.name}.tmp.{os.getpid()}.{uuid.uuid4().hex[:8]}")
+    with _StateWriteLock(p):
         try:
-            os.fsync(dir_fd)
-        finally:
-            os.close(dir_fd)
-    except OSError as exc:
-        # The rename already happened: the new file is in place but its
-        # durability across a crash is uncertain. Report a typed failure with
-        # the explicit recovery/rollback contract; never claim the previous
-        # state was preserved or that persistence is durable.
-        raise SemanticStateError(
-            "semantic state directory fsync failed after rename: "
-            f"{exc}; the new state file is in place but its durability is "
-            "UNCERTAIN - recovery: re-run the validated write, or inspect/"
-            "rollback via `voicebridge memory status`",
-            durability_uncertain=True, state_path=str(p)) from exc
+            fd = os.open(str(tmp), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(payload)
+                fh.flush()
+                os.fsync(fh.fileno())
+        except OSError as exc:
+            _cleanup_tmp(tmp)
+            raise SemanticStateError(f"semantic state write failed: {exc}") from exc
+        try:
+            os.chmod(tmp, 0o600)
+        except OSError as exc:
+            _cleanup_tmp(tmp)
+            raise SemanticStateError(
+                f"semantic state permission failed: {exc}") from exc
+        try:
+            os.replace(tmp, p)
+        except OSError as exc:
+            _cleanup_tmp(tmp)
+            raise SemanticStateError(f"semantic state rename failed: {exc}") from exc
+        try:
+            dir_fd = os.open(str(p.parent), os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        except OSError as exc:
+            # The rename already happened: the new file is in place but its
+            # durability across a crash is uncertain. Report a typed failure with
+            # the explicit recovery/rollback contract; never claim the previous
+            # state was preserved or that persistence is durable.
+            raise SemanticStateError(
+                "semantic state directory fsync failed after rename: "
+                f"{exc}; the new state file is in place but its durability is "
+                "UNCERTAIN - recovery: re-run the validated write, or inspect/"
+                "rollback via `voicebridge memory status`",
+                durability_uncertain=True, state_path=str(p)) from exc
     return canonical
 
 

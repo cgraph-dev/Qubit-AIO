@@ -708,7 +708,7 @@ def test_state_atomic_write_fsync_mode(tmp_path):
     write_semantic_state(p, {"enabled": True, "provider": "hash",
                              "schema_version": 1})
     assert (p.stat().st_mode & 0o777) == 0o600
-    assert not p.with_suffix(".json.tmp").exists()
+    assert list(tmp_path.glob("*.json.tmp.*")) == []
     state, health = load_semantic_state(p)
     assert health["state"] == "ok" and state["provider"] == "hash"
 
@@ -1032,7 +1032,7 @@ def test_write_state_file_fsync_failure(tmp_path, monkeypatch):
     with pytest.raises(SemanticStateError, match="write failed"):
         write_semantic_state(p, {"enabled": True, "provider": "hash"})
     assert not p.exists()                       # not persisted
-    assert not p.with_suffix(".json.tmp").exists()   # temp cleaned up
+    assert list(tmp_path.glob("*.json.tmp.*")) == []   # temp cleaned up
 
 
 def test_write_state_rename_failure(tmp_path, monkeypatch):
@@ -1046,7 +1046,7 @@ def test_write_state_rename_failure(tmp_path, monkeypatch):
     with pytest.raises(SemanticStateError, match="rename failed"):
         write_semantic_state(p, {"enabled": True, "provider": "hash"})
     assert not p.exists()
-    assert not p.with_suffix(".json.tmp").exists()
+    assert list(tmp_path.glob("*.json.tmp.*")) == []
 
 
 def test_write_state_directory_fsync_failure(tmp_path, monkeypatch):
@@ -1070,7 +1070,7 @@ def test_write_state_directory_fsync_failure(tmp_path, monkeypatch):
     # uncertain - the previous state is NOT claimed to be preserved
     assert p.exists()
     assert '"provider": "hash"' in p.read_text()
-    assert not p.with_suffix(".json.tmp").exists()
+    assert list(tmp_path.glob("*.json.tmp.*")) == []
     # rollback contract: a validated re-write succeeds normally afterwards
     write_semantic_state(p, {"enabled": False, "provider": "none"})
     assert '"provider": "none"' in p.read_text()
@@ -1116,16 +1116,23 @@ def test_load_state_rejects_unknown_fields(tmp_path):
 
 
 def test_interrupted_state_write_recovers(tmp_path):
-    # a leftover temp file from a crashed write does not corrupt the state
+    # a stale temp file from a crashed/concurrent process is inert and does
+    # not corrupt the persisted state
     p = tmp_path / "semantic.json"
     write_semantic_state(p, {"enabled": False, "provider": "none"})
-    p.with_suffix(".json.tmp").write_text("{partial garbage")
+    stale = p.with_name(f"{p.name}.tmp.99999.deadbeef")
+    stale.write_text("{partial garbage")
     state, health = load_semantic_state(p)
     assert health["state"] == "ok"
     assert state["provider"] == "none"
-    # re-writing atomically clears the stale temp
+    # recovery: a subsequent validated write succeeds and leaves no remnant
+    # of its OWN temp; the stale foreign temp is untouched
     write_semantic_state(p, {"enabled": True, "provider": "hash"})
-    assert not p.with_suffix(".json.tmp").exists()
+    assert '"provider": "hash"' in p.read_text()
+    assert stale.read_text() == "{partial garbage"
+    state2, health2 = load_semantic_state(p)
+    assert health2["state"] == "ok" and state2["provider"] == "hash"
+    stale.unlink()
 
 
 def test_cli_malformed_state_config_invalid(tmp_path):
@@ -1281,3 +1288,65 @@ def test_private_sentinel_absent_from_everywhere(tmp_path):
     r = _cli(tmp_path, "belief-record", "alice", "note", SENT, "--source", "web")
     assert SENT not in (r.stdout + r.stderr)
     assert "external:" in r.stdout
+
+
+def _mp_state_worker(path, idx, n_writes, q):
+    """Real subprocess writer: each process writes a DISTINCT complete state
+    (distinct top_k) repeatedly. Every write must fully succeed."""
+    from voicebridge.memory import write_semantic_state
+    try:
+        for _ in range(n_writes):
+            write_semantic_state(path, {"enabled": True, "provider": "hash",
+                                        "top_k": (idx % 20) + 1,
+                                        "schema_version": 1})
+        q.put((idx, "ok", None))
+    except Exception as exc:  # pragma: no cover
+        q.put((idx, "err", repr(exc)))
+
+
+def test_multiprocess_concurrent_state_writes(tmp_path):
+    """Real multi-process concurrent write_semantic_state: no corruption, no
+    partial file, no duplicate state, no lost (mixed) state, and no false
+    success; recovery afterward works."""
+    import multiprocessing as mp
+    ctx = mp.get_context("fork")
+    p = tmp_path / "semantic.json"
+    nprocs, n_writes = 12, 4
+    q = ctx.Queue()
+    procs = [ctx.Process(target=_mp_state_worker,
+                         args=(str(p), i, n_writes, q))
+             for i in range(nprocs)]
+    for pr in procs:
+        pr.start()
+    # concurrent reader: the target must ALWAYS be a complete, valid state
+    # (atomic rename) - never partial, corrupt, or mixed
+    samples = 0
+    deadline = time.time() + 20
+    while any(pr.is_alive() for pr in procs) and time.time() < deadline:
+        if p.exists():
+            data = json.loads(p.read_text())
+            assert data["provider"] == "hash" and 1 <= data["top_k"] <= 20
+            samples += 1
+        time.sleep(0.002)
+    for pr in procs:
+        pr.join(timeout=30)
+    results = []
+    for _ in procs:
+        try:
+            results.append(q.get(timeout=10))
+        except Exception:  # pragma: no cover
+            results.append((None, "err", "no result"))
+    assert all(r[1] == "ok" for r in results), results   # no false success
+    assert all(pr.exitcode == 0 for pr in procs), [pr.exitcode for pr in procs]
+    # the final state is complete and equals EXACTLY one writer's state
+    final = json.loads(p.read_text())
+    assert final["enabled"] is True and final["provider"] == "hash"
+    assert 1 <= final["top_k"] <= 20
+    assert (p.stat().st_mode & 0o777) == 0o600
+    # no leftover unique temp files and no partial/duplicate state anywhere
+    assert list(tmp_path.glob("*.json.tmp.*")) == []
+    # recovery afterward: a validated write + load succeed
+    write_semantic_state(p, {"enabled": False, "provider": "none"})
+    state, health = load_semantic_state(p)
+    assert health["state"] == "ok"
+    assert state["enabled"] is False and state["provider"] == "none"

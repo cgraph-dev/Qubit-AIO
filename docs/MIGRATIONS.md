@@ -1197,6 +1197,13 @@ Decision:
   `recovery` fields, exit 2) with a recovery/rollback contract and the previous
   state never claimed preserved in that case; unknown fields are rejected by
   `write_semantic_state()` (same policy as load).
+- **Concurrency (2026-09-05):** `write_semantic_state` is serialized across
+  processes by a sidecar `fcntl.flock` and writes through per-process unique
+  temp files (`semantic.json.tmp.<pid>.<uuid>`, `O_EXCL`), so concurrent
+  writers can never interleave into a shared temp inode or rename a
+  partial/corrupt file into place. A real multi-process test (12 processes x 4
+  writes on isolated temp state) proves no corruption, no partial file, no
+  duplicate/mixed state, no false success, and working recovery afterward.
 - **Runtime selection** lives in `<state_dir>/memory/semantic.json` (state,
   not the live `voice.yaml`); `memory enable|disable|set-provider` are dry-run
   unless `--confirm`.

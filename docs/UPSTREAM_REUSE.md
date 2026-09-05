@@ -1213,6 +1213,17 @@ IMPLEMENTATION STATUS (Packet 8M rejection #4, 2026-09-05): (1) parent-
     that case; a validated re-write restores durable persistence. (3) Unknown
     fields passed to write_semantic_state() are REJECTED with SemanticStateError
     (the same policy as load), never silently ignored.
+IMPLEMENTATION STATUS (Packet 8M concurrency, 2026-09-05): write_semantic_state
+    is now safe under genuine multi-process concurrency. Each writer uses a
+    per-process unique temp file (semantic.json.tmp.<pid>.<uuid>, opened
+    O_EXCL) so two processes can never interleave into a shared temp inode and
+    rename a partial/corrupt file into place, and a cross-process fcntl.flock
+    on a sidecar .lock file serializes writers. Combined with the atomic
+    os.replace, the target always transitions between complete states: a real
+    12-process x 4-write concurrent test (isolated temp state) proves no
+    corruption, no partial file, no duplicate/mixed state, no false success,
+    and working recovery afterward (the sidecar .lock is a coordination file,
+    not state; it is never deleted to avoid a two-inode race).
 ```
 
 ---

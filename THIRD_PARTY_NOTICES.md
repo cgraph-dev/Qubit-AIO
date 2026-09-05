@@ -160,6 +160,10 @@ Rejection #4 repairs (2026-09-05): parent-directory creation failures are typed
 SemanticStateError; directory-fsync failure after rename is reported as
 durability-UNCERTAIN with an explicit recovery/rollback contract (never
 claimed preserved or durable); unknown fields are rejected on write and load.
+Concurrency (2026-09-05): write_semantic_state is serialized across processes
+by a sidecar flock and writes through per-process unique temp files, so
+concurrent writers can never produce partial/corrupt/duplicate state (proved by
+a real multi-process test with recovery afterward).
 
 The GENOME NOTICE file, preserved verbatim:
 
