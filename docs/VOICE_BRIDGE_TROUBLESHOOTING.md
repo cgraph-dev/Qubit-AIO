@@ -1,8 +1,11 @@
-# Qubit Voice Bridge: Troubleshooting and Recovery
+# Qubit Voice Agent: Troubleshooting and Recovery
 
-This is the practical recovery guide for the current local voice bridge. The
-installed systemd unit still has the historical name
-`openclaw-voice-bridge.service`; do not rename it manually.
+This is the practical recovery guide for the current local voice agent. The
+systemd unit is installed as `qubit-voice-agent.service`. Existing machines
+migrated from the historical OpenClaw Voice Bridge name may keep a legacy
+`openclaw-voice-bridge.service` unit until you run the documented migration
+(`voicebridge product migrate --apply`); do not run both units at the same
+time.
 
 ## First: identify which part failed
 
@@ -25,7 +28,7 @@ Run these from the repository:
 ```bash
 cd ~/qubit-voice-agent
 
-systemctl --user status openclaw-voice-bridge.service --no-pager -l
+systemctl --user status qubit-voice-agent.service --no-pager -l
 .venv/bin/python scripts/communications_monitor.py --health
 ```
 
@@ -50,14 +53,14 @@ Use this after changing an audio device, after an audio backend failure, or
 when the bridge is genuinely stuck:
 
 ```bash
-systemctl --user restart openclaw-voice-bridge.service
-systemctl --user status openclaw-voice-bridge.service --no-pager -l
+systemctl --user restart qubit-voice-agent.service
+systemctl --user status qubit-voice-agent.service --no-pager -l
 ```
 
 To inspect the last messages:
 
 ```bash
-journalctl --user -u openclaw-voice-bridge.service -n 100 --no-pager -o short-precise
+journalctl --user -u qubit-voice-agent.service -n 100 --no-pager -o short-precise
 ```
 
 The unit uses `Restart=always` and `RestartSec=2s`. This means systemd
@@ -69,8 +72,8 @@ ALSA/PortAudio failure.
 If systemd has temporarily rate-limited starts:
 
 ```bash
-systemctl --user reset-failed openclaw-voice-bridge.service
-systemctl --user start openclaw-voice-bridge.service
+systemctl --user reset-failed qubit-voice-agent.service
+systemctl --user start qubit-voice-agent.service
 ```
 
 Do not use `kill -9`, delete the state directory, or remove databases as a
@@ -92,14 +95,14 @@ not inherited by the user systemd instance, import it once:
 
 ```bash
 systemctl --user import-environment DISPLAY XAUTHORITY
-systemctl --user restart openclaw-voice-bridge.service
+systemctl --user restart qubit-voice-agent.service
 ```
 
 Check recent bridge events:
 
 ```bash
 rg -n 'hotkey|feedback\.beep|mic\.capture|playback\.' \
-  $HOME/.local/state/openclaw-voice-bridge/events.jsonl | tail -50
+  $HOME/.local/state/qubit-voice-agent/events.jsonl | tail -50
 ```
 
 Interpretation:
@@ -107,7 +110,7 @@ Interpretation:
 - `hotkey` with `ptt_start` and `ptt_end` means Right-Ctrl is working; the
   failure is later in audio capture or playback.
 - `hotkey.xinput.dead` or no hotkey events means restart the bridge and check
-  the display resolution (`journalctl --user -u openclaw-voice-bridge | grep
+  the display resolution (`journalctl --user -u qubit-voice-agent | grep
   hotkey`) and that your session env is inherited
   (`systemctl --user import-environment DISPLAY XAUTHORITY`).
 - `feedback.beep` with `played=false` means the key was received but no output
@@ -158,13 +161,13 @@ pactl set-default-source <the-focusrite-source-name-from-the-command-above>
 Then restart the bridge:
 
 ```bash
-systemctl --user restart openclaw-voice-bridge.service
+systemctl --user restart qubit-voice-agent.service
 ```
 
 Check for recovery:
 
 ```bash
-journalctl --user -u openclaw-voice-bridge.service -n 80 --no-pager \
+journalctl --user -u qubit-voice-agent.service -n 80 --no-pager \
   | grep -E 'ALSA|PortAudio|playback\.failed|mic\.capture\.error|hotkey'
 ```
 
@@ -303,9 +306,9 @@ Collect status and redacted logs, but do not include tokens, cookies, message
 bodies, email addresses, or browser profile files:
 
 ```bash
-systemctl --user status openclaw-voice-bridge.service --no-pager -l
+systemctl --user status qubit-voice-agent.service --no-pager -l
 .venv/bin/python scripts/communications_monitor.py --health
-journalctl --user -u openclaw-voice-bridge.service -n 100 --no-pager \
+journalctl --user -u qubit-voice-agent.service -n 100 --no-pager \
   | tail -100
 ```
 

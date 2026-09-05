@@ -22,12 +22,12 @@ helper and `EventSource` cannot send the `X-Api-Token` header.
 
 | Route | Page | Components | API calls |
 |---|---|---|---|
-| `/` | `frontend/index.html` Talk | status (`#st`, aria-live), push-to-talk, typed input + send, transcript (textContent), interrupt, learned-preferences panel, permissions panel, inbox/report panel, SSE live stream (typed events → meta lines), connection settings drawer (`vdb_api`/`vdb_token`) | `/api/status`, `/api/type`, `/api/talk`, `/api/result/*`, `/api/interrupt`, `/api/feedback`, `/api/lessons`, `/api/lessons/remove`, `/api/lessons/promote`, `/api/permissions`, `/api/reports`, `/api/reports/*/ack`, `/api/reports/*/export`, `/api/reports/*/html`, `/api/reports/*/assets/*`, `/api/runs/*/cancel`, `/api/events/stream` (SSE) |
+| `/` | `frontend/index.html` Talk | status (`#st`, aria-live), **first-run onboarding help panel** (`details.help-panel` "How Qubit works" naming the safe workflow and the canonical `webui.token` location), push-to-talk, typed input + send, transcript (textContent), interrupt, learned-preferences panel, permissions panel, inbox/report panel, SSE live stream (typed events → meta lines), connection settings drawer (`vdb_api`/`vdb_token`) | `/api/status`, `/api/type`, `/api/talk`, `/api/result/*`, `/api/interrupt`, `/api/feedback`, `/api/lessons`, `/api/lessons/remove`, `/api/lessons/promote`, `/api/permissions`, `/api/reports`, `/api/reports/*/ack`, `/api/reports/*/export`, `/api/reports/*/html`, `/api/reports/*/assets/*`, `/api/runs/*/cancel`, `/api/events/stream` (SSE) |
 | `/activity` | `frontend/activity.html` Activity | status (`#conn`, aria-live), legend, kind filter, search, pause, item feed (DOM-built cards) | `/api/status`, `/api/activity` |
 | `/reports` | `frontend/reports.html` Reports | toolbar (search/category/days/refresh/prune), status (`#conn`, aria-live), meta, report feed (DOM-built cards), inline typed status message | `/api/status`, `/api/reports`, `/api/reports/prune` |
 | `/settings` | `frontend/settings.html` Settings | beginner/advanced toggle, health, model/STT/TTS/voice profiles, audio, permissions, permissions mode, websites, actions, device, export/import, upgrade, reset, branding | all via `api()` wrapper around `vbApi` (`/api/status`, `/api/profiles`, `/api/providers/*`, `/api/audio/*`, `/api/permissions*`, `/api/websites*`, `/api/actions*`, `/api/device*`, `/api/state/*`, `/api/upgrade*`, `/api/branding*`) |
 | `/approvals` | `frontend/approvals.html` Approvals | pending list (DOM-built cards), approve/deny buttons (addEventListener + `data-id`) | `/api/approvals`, `/api/approvals/respond` |
-| `/token-setup` | `frontend/token-setup.html` Pair device | token input (password), save & test (via `vbApi`), plain-language result | `/api/status` |
+| `/token-setup` | `frontend/token-setup.html` Pair device | token input (password), save & test (via `vbApiTest`), plain-language result; help copy points at the canonical `webui.token` value in `~/.config/qubit-voice-agent/voice.yaml` | `/api/status` |
 
 Shared static assets:
 
@@ -39,6 +39,13 @@ Shared static assets:
 
 ## 2. Design source of truth (shared primitives)
 
+- Every page is branded consistently: `<title>` is always
+  `Qubit Voice Agent — <Section>` (Talk / Activity / Reports / Settings /
+  Approvals / Pair device) and the `<h1>` heading carries the brand mark plus
+  the product name. The only page-specific inline `<style>` blocks use the
+  shared `app.css` design tokens (near-black surfaces, warm text, restrained
+  signal-lime accent) — the legacy GitHub-blue palette is gone from the
+  frontend (enforced by `tests/test_frontend_hygiene.py`).
 - Design tokens (color, spacing, radius, shadow, motion curves, focus color)
   live only in `frontend/app.css` `:root`. Pages must not hardcode new
   palette/motion values; they may keep their own layout classes but must not
