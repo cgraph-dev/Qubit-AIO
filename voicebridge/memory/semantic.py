@@ -104,7 +104,19 @@ class BeliefFormatError(SemanticMemoryError):
 
 class SemanticStateError(SemanticMemoryError):
     """The persisted semantic-memory runtime state is corrupt, invalid, or
-    could not be written durably."""
+    could not be written durably.
+
+    ``durability_uncertain`` is True when the rename already happened but the
+    directory fsync failed: the new file is in place but its durability across
+    a crash is not guaranteed. ``state_path`` carries the target path so
+    callers can run the documented recovery/rollback contract.
+    """
+
+    def __init__(self, message: str, *, durability_uncertain: bool = False,
+                 state_path: Optional[Path | str] = None) -> None:
+        super().__init__(message)
+        self.durability_uncertain = durability_uncertain
+        self.state_path = str(state_path) if state_path else None
 
 
 def _trust(source: Optional[str]) -> int:
@@ -312,21 +324,38 @@ def _cleanup_tmp(tmp: Path) -> None:
 def write_semantic_state(path: Path | str, state: Dict[str, Any]) -> Dict[str, Any]:
     """Validate-then-write the runtime state atomically.
 
-    ANY failure — serialization, open, write, flush, file fsync, chmod, rename,
-    or directory fsync — raises a typed :class:`SemanticStateError`; success is
-    never reported when durability could not be guaranteed. On a failure before
-    the rename, the temporary file is removed (best-effort). Returns the
-    canonical validated state that was actually persisted.
+    EVERY failure — parent-directory creation, serialization, open, write,
+    flush, file fsync, chmod, rename, directory fsync, permission, read-only
+    filesystem, disk-full, invalid path — raises a typed
+    :class:`SemanticStateError`; success is never reported when durability
+    could not be guaranteed. Unsupported fields are REJECTED (never silently
+    ignored). On a failure before the rename, the previous valid state (if any)
+    is preserved and the temporary file is removed (best-effort).
+
+    Directory-fsync failure AFTER the rename is handled explicitly: the new
+    file is in place, but durability across a crash is UNCERTAIN. The raised
+    :class:`SemanticStateError` sets ``durability_uncertain=True`` and carries
+    ``state_path`` so callers can run the documented recovery contract
+    (re-run the validated write, or inspect/rollback via ``voicebridge memory
+    status``). The previous state is NOT claimed to be preserved in that case.
     """
     if not isinstance(state, dict):
         raise SemanticStateError("semantic state must be an object")
+    unknown = [k for k in state if k not in _STATE_FIELDS]
+    if unknown:
+        raise SemanticStateError(
+            f"refusing to write unsupported state field(s): {unknown}")
     canonical = _default_state()
     canonical.update({k: state[k] for k in state if k in _STATE_FIELDS})
     err = _validate_state_values(canonical)
     if err is not None:
         raise SemanticStateError(f"refusing to write invalid semantic state: {err}")
     p = Path(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise SemanticStateError(
+            f"semantic state directory creation failed: {exc}") from exc
     try:
         payload = json.dumps(canonical, indent=2, sort_keys=True).encode("utf-8")
     except (TypeError, ValueError) as exc:
@@ -360,8 +389,16 @@ def write_semantic_state(path: Path | str, state: Dict[str, Any]) -> Dict[str, A
         finally:
             os.close(dir_fd)
     except OSError as exc:
+        # The rename already happened: the new file is in place but its
+        # durability across a crash is uncertain. Report a typed failure with
+        # the explicit recovery/rollback contract; never claim the previous
+        # state was preserved or that persistence is durable.
         raise SemanticStateError(
-            f"semantic state directory fsync failed: {exc}") from exc
+            "semantic state directory fsync failed after rename: "
+            f"{exc}; the new state file is in place but its durability is "
+            "UNCERTAIN - recovery: re-run the validated write, or inspect/"
+            "rollback via `voicebridge memory status`",
+            durability_uncertain=True, state_path=str(p)) from exc
     return canonical
 
 

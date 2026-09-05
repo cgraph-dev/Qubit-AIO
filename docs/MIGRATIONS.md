@@ -1189,6 +1189,14 @@ Decision:
   provider URL is loopback-only per the documented policy (plain http to
   `127.0.0.1`/`::1`/`localhost`); https and non-loopback hosts are rejected on
   both state load and adapter `set_provider`.
+- **Rejection #4 repairs (2026-09-05):** parent-directory creation failures
+  (mkdir PermissionError, read-only filesystem, invalid path, disk-full) are
+  typed `SemanticStateError`; directory-fsync failure after `os.replace()` is
+  reported explicitly as durability-UNCERTAIN (`SemanticStateError.
+  durability_uncertain=True` + `state_path`, CLI `durability_uncertain` +
+  `recovery` fields, exit 2) with a recovery/rollback contract and the previous
+  state never claimed preserved in that case; unknown fields are rejected by
+  `write_semantic_state()` (same policy as load).
 - **Runtime selection** lives in `<state_dir>/memory/semantic.json` (state,
   not the live `voice.yaml`); `memory enable|disable|set-provider` are dry-run
   unless `--confirm`.

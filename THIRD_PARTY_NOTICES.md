@@ -156,6 +156,10 @@ belief entity/fact_type are bounded single-token identifiers so prose cannot
 be smuggled through them; the embedding provider URL is loopback-only (plain
 http to 127.0.0.1/::1/localhost); durability failures at every persistence
 boundary surface as typed errors with the previous state preserved.
+Rejection #4 repairs (2026-09-05): parent-directory creation failures are typed
+SemanticStateError; directory-fsync failure after rename is reported as
+durability-UNCERTAIN with an explicit recovery/rollback contract (never
+claimed preserved or durable); unknown fields are rejected on write and load.
 
 The GENOME NOTICE file, preserved verbatim:
 

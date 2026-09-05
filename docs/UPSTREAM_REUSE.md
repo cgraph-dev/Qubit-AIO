@@ -1199,9 +1199,20 @@ IMPLEMENTATION STATUS (Packet 8M rejection #3, 2026-09-05): closed the three
    127.0.0.1 / ::1 / localhost / localhost.localdomain; https and any
    non-loopback host are rejected (state load and adapter set_provider), so an
    embedding call can never silently reach a remote host. (3) Durability
-   failures (write/flush/file-fsync/rename/directory-fsync/permission/disk-
-   full/read-only) all surface as typed SemanticStateError with the previous
-   valid state preserved and the temp file cleaned up on pre-rename failure.
+failures (write/flush/file-fsync/rename/directory-fsync/permission/disk-
+    full/read-only) all surface as typed SemanticStateError with the previous
+    valid state preserved and the temp file cleaned up on pre-rename failure.
+IMPLEMENTATION STATUS (Packet 8M rejection #4, 2026-09-05): (1) parent-
+    directory creation failures (mkdir PermissionError, read-only filesystem,
+    invalid path, disk-full) are typed SemanticStateError, never raw exceptions
+    or success. (2) Directory-fsync failure AFTER os.replace() is handled
+    explicitly: the new file is in place, durability is reported UNCERTAIN with
+    an explicit recovery/rollback contract (SemanticStateError.durability_
+    uncertain=True + state_path; CLI emits durability_uncertain + recovery
+    fields and exits 2), and the previous state is never claimed preserved in
+    that case; a validated re-write restores durable persistence. (3) Unknown
+    fields passed to write_semantic_state() are REJECTED with SemanticStateError
+    (the same policy as load), never silently ignored.
 ```
 
 ---

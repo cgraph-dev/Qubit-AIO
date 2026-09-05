@@ -1547,6 +1547,7 @@ def _cmd_memory(cfg, args) -> int:
     import json as _json
     import time as _time
     from .memory import (SemanticMemory, SemanticMemoryError,
+                         SemanticStateError,
                          load_semantic_state, write_semantic_state,
                          redact_secrets)
     from .memory.semantic import SEMANTIC_STATE_SCHEMA
@@ -1642,6 +1643,16 @@ def _cmd_memory(cfg, args) -> int:
             return 2
         print(_json.dumps(out, indent=2, sort_keys=True))
         return 0
+    except SemanticStateError as exc:
+        out = {"state": "failed", "detail": str(exc)}
+        if getattr(exc, "durability_uncertain", False):
+            out["durability_uncertain"] = True
+            out["recovery"] = ("re-run the validated write, or inspect/rollback "
+                               "via `voicebridge memory status`")
+        if getattr(exc, "state_path", None):
+            out["state_path"] = exc.state_path
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 2
     except (SemanticMemoryError, ValueError) as exc:
         print(_json.dumps({"state": "failed", "detail": str(exc)}, indent=2))
         return 2

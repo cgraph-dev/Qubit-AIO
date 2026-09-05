@@ -1061,10 +1061,58 @@ def test_write_state_directory_fsync_failure(tmp_path, monkeypatch):
         return real_fsync(fd)
 
     monkeypatch.setattr("voicebridge.memory.semantic.os.fsync", boom)
-    with pytest.raises(SemanticStateError, match="directory fsync failed"):
+    with pytest.raises(SemanticStateError) as exc:
         write_semantic_state(p, {"enabled": True, "provider": "hash"})
-    # the rename happened but the failure is SURFACED, never reported as success
+    assert exc.value.durability_uncertain is True
+    assert exc.value.state_path == str(p)
+    assert "UNCERTAIN" in str(exc.value) and "recovery" in str(exc.value)
+    # the rename already happened: the NEW state is in place, durability
+    # uncertain - the previous state is NOT claimed to be preserved
+    assert p.exists()
+    assert '"provider": "hash"' in p.read_text()
     assert not p.with_suffix(".json.tmp").exists()
+    # rollback contract: a validated re-write succeeds normally afterwards
+    write_semantic_state(p, {"enabled": False, "provider": "none"})
+    assert '"provider": "none"' in p.read_text()
+
+
+def test_write_state_mkdir_failure_is_typed(tmp_path):
+    base = tmp_path / "noperm"
+    base.mkdir()
+    try:
+        os.chmod(base, 0o500)
+        with pytest.raises(SemanticStateError, match="directory creation"):
+            write_semantic_state(base / "sub" / "semantic.json",
+                                 {"enabled": True, "provider": "hash"})
+    finally:
+        os.chmod(base, 0o700)
+
+
+def test_write_state_invalid_parent_path_is_typed(tmp_path):
+    # a regular file in place of the parent directory -> mkdir failure
+    blocker = tmp_path / "blocker"
+    blocker.write_text("not a directory")
+    with pytest.raises(SemanticStateError, match="directory creation"):
+        write_semantic_state(blocker / "semantic.json",
+                             {"enabled": True, "provider": "hash"})
+    assert not (blocker / "semantic.json").exists()
+
+
+def test_write_state_rejects_unknown_fields(tmp_path):
+    p = tmp_path / "semantic.json"
+    with pytest.raises(SemanticStateError, match="unsupported state field"):
+        write_semantic_state(p, {"enabled": True, "provider": "hash",
+                                 "sneaky_field": 1, "schema_version": 1})
+    assert not p.exists()
+
+
+def test_load_state_rejects_unknown_fields(tmp_path):
+    p = tmp_path / "semantic.json"
+    p.write_text(json.dumps({"enabled": True, "provider": "hash",
+                             "schema_version": 1, "sneaky_field": 1}))
+    state, health = load_semantic_state(p)
+    assert health["state"] == "degraded"
+    assert "unsupported state field" in health["detail"]
 
 
 def test_interrupted_state_write_recovers(tmp_path):
