@@ -117,8 +117,8 @@ DEFAULTS: Dict[str, Any] = {
         # LLM-free; embeddings are only contacted for recall and only when a
         # provider is enabled and configured. Bounds enforced by the adapter:
         # timeout_s in (0, 60], top_k integer in (0, 50], valid model id,
-        # valid http(s) ollama_url; malformed values are a typed DEGRADED
-        # state, never silently coerced.
+        # plain-http loopback-only ollama_url; malformed values are a typed
+        # DEGRADED state, never silently coerced.
         "semantic": {
             "enabled": False,
             "provider": "none",         # none | hash (offline approx) | ollama

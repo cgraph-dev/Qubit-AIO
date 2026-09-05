@@ -158,12 +158,39 @@ def _store_text(text: str, source: str, label: str = "") -> str:
 
 
 def _valid_url(url: str) -> bool:
+    """The optional embedding provider must use the documented loopback-only
+    policy: plain http to 127.0.0.1, ::1, localhost, or localhost.localdomain
+    (the existing nomic-embed-text endpoint is http://127.0.0.1:11434). HTTPS
+    and any non-loopback destination are rejected so an embedding call can
+    never be silently sent to a remote host or an unexpected TLS endpoint."""
     try:
         u = urlparse(url)
     except ValueError:
         return False
-    return (u.scheme in ("http", "https")
-            and bool(u.netloc) and bool(u.hostname))
+    if u.scheme != "http":
+        return False
+    if not u.netloc or not u.hostname:
+        return False
+    host = u.hostname.lower().rstrip(".")
+    return host in ("127.0.0.1", "::1", "localhost", "localhost.localdomain")
+
+
+def _validate_identifier(name: str, value: str) -> str:
+    """A belief entity/fact_type is a bounded single-token stable identifier:
+    1..32 characters of [A-Za-z0-9._-], no whitespace/colons/control chars.
+    This keeps identifiers safe as stable keys and blocks raw private prose
+    from being smuggled through the identifier fields of an external-origin
+    belief fact (multi-word sentences cannot be stored as an identifier)."""
+    v = (value or "").strip()
+    if not v:
+        raise SemanticMemoryError(f"{name} must be non-empty")
+    if len(v) > 32:
+        raise SemanticMemoryError(f"{name} must be at most 32 characters")
+    if re.fullmatch(r"[A-Za-z0-9._\-]+", v) is None:
+        raise SemanticMemoryError(
+            f"{name} must be a single token of [A-Za-z0-9._-] (no spaces, "
+            f"colons, or control characters)")
+    return v
 
 
 def _validate_state_values(state: Dict[str, Any]) -> Optional[str]:
@@ -650,7 +677,12 @@ class SemanticMemory:
             if re.search(shape, new_text):
                 raise SecretRejectedError("secret-shaped correction rejected")
         target = self.store.find_by_content(old_text, scope=scope)
-        if target is not None and _trust(src) < _trust(target.get("source")):
+        if target is None:
+            # Never echo caller-supplied text (which may be a raw private
+            # sentence) in a diagnostic; fail with a non-recovering message.
+            raise SemanticMemoryError(
+                "no active memory matching the requested content")
+        if _trust(src) < _trust(target.get("source")):
             raise SemanticMemoryError(
                 f"refusing to correct a higher-trust {target.get('source')!r} "
                 f"fact from {source!r} (origin-bound authority)")
@@ -744,10 +776,10 @@ class SemanticMemory:
         open prior caps our own window instead of creating two open facts.
         Entity/fact_type are schema identifiers and stay readable; an
         external-origin VALUE is stored only as a non-recoverable reference."""
-        entity = (entity or "").strip()
-        fact_type = (fact_type or "").strip()
+        entity = _validate_identifier("entity", entity)
+        fact_type = _validate_identifier("fact_type", fact_type)
         value = (value or "").strip()
-        if not entity or not fact_type or not value:
+        if not value:
             raise SemanticMemoryError("entity/fact_type/value must be non-empty")
         _validate_finite("confidence", confidence)
         if valid_from is not None:

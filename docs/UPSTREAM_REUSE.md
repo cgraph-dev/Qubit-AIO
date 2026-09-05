@@ -1184,6 +1184,24 @@ IMPLEMENTATION STATUS (Packet 8M rejection #2, 2026-09-05): (1) EXTERNAL-
    file-fsync/rename/directory-fsync/permission/serialization failure (the
    directory fsync is no longer swallowed); the temporary file is cleaned up
    after a pre-rename failure and broad deletion is never used.
+IMPLEMENTATION STATUS (Packet 8M rejection #3, 2026-09-05): closed the three
+   residual gaps from the independent audit. (1) No remaining leak path — a
+   failed correct() no longer echoes caller text (SemanticMemory raises a
+   non-recovering message when the target is absent; store.correct's message no
+   longer includes old_text), belief entity/fact_type are validated as bounded
+   single-token identifiers ([A-Za-z0-9._-], 1..32) so raw prose cannot be
+   smuggled through identifier fields, and sentinel tests scan every persisted
+   file and printed/CLI output in the state directory for external private
+   text. There is no MemoryStore-to-semantic migration that copies records;
+   SemanticMemory wraps the same authoritative store and external-origin text
+   is only ever stored as the bounded reference. (2) The embedding provider URL
+   is now validated against the documented loopback-only policy: plain http to
+   127.0.0.1 / ::1 / localhost / localhost.localdomain; https and any
+   non-loopback host are rejected (state load and adapter set_provider), so an
+   embedding call can never silently reach a remote host. (3) Durability
+   failures (write/flush/file-fsync/rename/directory-fsync/permission/disk-
+   full/read-only) all surface as typed SemanticStateError with the previous
+   valid state preserved and the temp file cleaned up on pre-rename failure.
 ```
 
 ---

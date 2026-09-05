@@ -1177,6 +1177,18 @@ Decision:
   without `--confirm`. (c) Durability — state writes surface file-fsync, rename,
   and directory-fsync failures as typed `SemanticStateError` (directory fsync is
   no longer swallowed), with the temp file cleaned up on pre-rename failure.
+- **Rejection #3 repairs (2026-09-05):** (a) no remaining leak path — `correct()`
+  errors never echo caller-supplied text (store.correct no longer includes the
+  old text and the adapter raises a non-recovering message when a target is
+  absent); belief `entity`/`fact_type` are validated as bounded single-token
+  identifiers (`[A-Za-z0-9._-]`, <= 32 chars) so raw prose cannot be smuggled
+  through them; sentinel tests scan every persisted file and CLI/printed output
+  in the state directory. There is no MemoryStore-to-semantic record-copy
+  migration; SemanticMemory wraps the same authoritative store and
+  external-origin text is only ever a bounded reference. (b) The embedding
+  provider URL is loopback-only per the documented policy (plain http to
+  `127.0.0.1`/`::1`/`localhost`); https and non-loopback hosts are rejected on
+  both state load and adapter `set_provider`.
 - **Runtime selection** lives in `<state_dir>/memory/semantic.json` (state,
   not the live `voice.yaml`); `memory enable|disable|set-provider` are dry-run
   unless `--confirm`.

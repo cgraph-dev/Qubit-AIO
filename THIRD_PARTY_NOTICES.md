@@ -151,6 +151,11 @@ observed) content is never stored or surfaced — it becomes a bounded
 non-recoverable reference; the persisted runtime-state configuration is fully
 validated on load and write; state writes surface file-fsync/rename/
 directory-fsync failures as typed errors instead of swallowing them.
+Rejection #3 repairs (2026-09-05): correct() errors never echo caller text;
+belief entity/fact_type are bounded single-token identifiers so prose cannot
+be smuggled through them; the embedding provider URL is loopback-only (plain
+http to 127.0.0.1/::1/localhost); durability failures at every persistence
+boundary surface as typed errors with the previous state preserved.
 
 The GENOME NOTICE file, preserved verbatim:
 

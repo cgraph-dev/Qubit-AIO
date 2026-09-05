@@ -1147,3 +1147,89 @@ def test_adapter_rejects_bad_embed_config(tmp_path):
     with pytest.raises(SemanticMemoryError, match="ollama_url"):
         s.set_provider("ollama", ollama_url="not a url")
     s.close()
+
+
+def test_correct_error_never_echoes_private_text(tmp_path):
+    s = SemanticMemory(tmp_path / "m.db", journal_path=tmp_path / "j")
+    SHORT = "rust umbrella on the porch for grandma"
+    with pytest.raises((SemanticMemoryError, MemoryStoreError)) as exc:
+        s.correct(SHORT, "x", source="web")
+    assert SHORT not in str(exc.value)
+    # the store-level message no longer echoes caller content either
+    store = MemoryStore(tmp_path / "m2.db")
+    with pytest.raises(MemoryStoreError) as exc2:
+        store.correct(SHORT, "x")
+    assert SHORT not in str(exc2.value)
+    s.close()
+
+
+def test_belief_identifier_cannot_smuggle_prose(tmp_path):
+    s = SemanticMemory(tmp_path / "m.db", journal_path=tmp_path / "j")
+    SENT = "the rust colored umbrella on my porch is for grandmas annual visit"
+    for name, val in (("entity", SENT), ("fact_type", SENT)):
+        with pytest.raises(SemanticMemoryError, match="must be"):
+            s.record_belief(name == "entity" and val or "alice",
+                            name == "fact_type" and val or "note",
+                            "v", source="web")
+    # nothing about the prose appears anywhere persisted
+    blob = "".join(
+        Path(p).read_text(errors="replace")
+        for p in tmp_path.iterdir() if p.is_file())
+    assert SENT not in blob
+    assert "umbrella" not in blob
+    s.close()
+
+
+def test_ollama_url_loopback_policy(tmp_path):
+    for u in ("http://127.0.0.1:11434", "http://localhost:11434",
+              "http://[::1]:11434"):
+        p = tmp_path / "s.json"
+        p.write_text(json.dumps({"enabled": True, "provider": "ollama",
+                                 "ollama_url": u, "schema_version": 1}))
+        _, health = load_semantic_state(p)
+        assert health["state"] == "ok", u
+    for u in ("http://192.168.1.10:11434", "http://ollama.example.com",
+              "https://127.0.0.1:11434", "ftp://127.0.0.1/x"):
+        p = tmp_path / "s2.json"
+        p.write_text(json.dumps({"enabled": True, "provider": "ollama",
+                                 "ollama_url": u, "schema_version": 1}))
+        _, health = load_semantic_state(p)
+        assert health["state"] == "degraded", u
+    # the adapter rejects non-loopback too
+    s = SemanticMemory(tmp_path / "m.db")
+    with pytest.raises(SemanticMemoryError, match="ollama_url"):
+        s.set_provider("ollama", ollama_url="http://10.0.0.9:11434")
+    s.close()
+
+
+def test_private_sentinel_absent_from_everywhere(tmp_path):
+    """Sentinel proof: a unique private sentence supplied through every
+    external-origin path must not appear in ANY persisted file or printed
+    output in the state directory."""
+    SENT = "the violet clock on my desk reads three seventeen precisely"
+    state = tmp_path / "state"
+    mem = state / "memory"
+    mem.mkdir(parents=True, exist_ok=True)
+    s = SemanticMemory(mem / "memory.db", enabled=True, provider="hash",
+                       journal_path=mem / "memory.db.journal")
+    s.remember(SENT, source="web")            # value path: stored as a ref
+    s.stage_inferred(SENT, source="model", confidence=0.5)
+    s.import_records([{"text": SENT, "source": "tool"}])
+    with pytest.raises((SemanticMemoryError, MemoryStoreError)):
+        s.correct(SENT, "x", source="web")        # error message must be clean
+    with pytest.raises(SemanticMemoryError, match="must be"):
+        s.record_belief(SENT, "note", "v", source="web")
+    s.record_belief("alice", "note", SENT, source="web")  # value -> ref
+    blob = []
+    for p in state.rglob("*"):
+        if p.is_file():
+            blob.append(p.read_text(errors="replace"))
+    blob.append(json.dumps(s.recall(SENT[:20], limit=50)))
+    blob.append(json.dumps(s.export()))
+    assert SENT not in "\n".join(blob)
+    assert "violet clock" not in "\n".join(blob)
+    s.close()
+    # CLI printed output is also clean
+    r = _cli(tmp_path, "belief-record", "alice", "note", SENT, "--source", "web")
+    assert SENT not in (r.stdout + r.stderr)
+    assert "external:" in r.stdout

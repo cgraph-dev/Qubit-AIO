@@ -417,7 +417,7 @@ class MemoryStore:
                 (key, scope)).fetchone()
             if target is None:
                 raise MemoryStoreError(
-                    f"no active memory matching: {old_text[:60]!r}")
+                    "no active memory matching the requested content")
             mid = self._insert(tier=target["tier"], scope=scope,
                                text=new_text,
                                confidence=1.0, source=source,
