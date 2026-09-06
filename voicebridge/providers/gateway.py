@@ -8,25 +8,41 @@ fail closed or use a clearly typed local fallback.
 from __future__ import annotations
 
 import time
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Optional
 
 from ..logging_setup import log_event
 from ..redaction import redact_text
 from . import frontier as _frontier
 from .catalog import ModelEntry, ProviderCatalog
 from .contracts import ProviderRequest, ProviderResult, UsageRecord
-from .credentials import looks_like_opencode_private_db, redact_ref, resolve_key
+from .credentials import (looks_like_browser_secret,
+                           looks_like_opencode_private_db, redact_ref,
+                           resolve_key)
 from .egress import classify_and_sanitize
 from .policy import FrontierPolicy, disclosure_block, get_governor
 
 
-def _estimate_cost(entry: Optional[ModelEntry], prompt_chars: int,
-                   max_tokens: int) -> float:
-    if entry is None:
+def _estimate_cost(entry: Optional[ModelEntry], pcfg: dict,
+                   prompt_chars: int, max_tokens: int) -> float:
+    """Cost estimate honoring catalog prices, else operator price overrides.
+
+    Operator ``price_in_per_1k``/``price_out_per_1k`` in the provider config
+    keep spend budgets enforceable for allowlist-catalog runs whose entries
+    carry no pricing. Unknown prices estimate 0.0 and are disclosed as such.
+    """
+    pin = entry.price_in_per_1k if entry is not None else 0.0
+    pout = entry.price_out_per_1k if entry is not None else 0.0
+    try:
+        if not pin:
+            pin = float((pcfg or {}).get("price_in_per_1k", 0.0) or 0.0)
+        if not pout:
+            pout = float((pcfg or {}).get("price_out_per_1k", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        pin, pout = 0.0, 0.0
+    if not pin and not pout:
         return 0.0
     pt_est = max(1, prompt_chars // 4)
-    return (pt_est / 1000.0) * entry.price_in_per_1k + \
-        (max_tokens / 1000.0) * entry.price_out_per_1k
+    return (pt_est / 1000.0) * pin + (max_tokens / 1000.0) * pout
 
 
 def _local_complete(prompt: str, cfg: Any, max_tokens: int) -> ProviderResult:
@@ -171,6 +187,13 @@ def run(req: ProviderRequest, cfg: Any,
                               message="undocumented OpenCode credential use refused",
                               provider=provider, model=model,
                               identity=f"{provider}/{model}")
+    ref_path = ref[len("file:"):] if ref.startswith("file:") else ""
+    if ref_path and looks_like_browser_secret(ref_path):
+        return ProviderResult(ok=False, code="AUTH_MISSING",
+                              message="browser cookie/session stores are never "
+                                      "valid credential references",
+                              provider=provider, model=model,
+                              identity=f"{provider}/{model}")
     key, kcode = resolve_key(provider, ref)
     if kcode:
         return ProviderResult(ok=False, code="AUTH_MISSING",
@@ -187,7 +210,7 @@ def run(req: ProviderRequest, cfg: Any,
                               identity=f"{provider}/{model}")
 
     max_tokens = min(int(req.max_tokens or policy.max_tokens), policy.max_tokens)
-    est = _estimate_cost(entry, len(eg.sanitized), max_tokens)
+    est = _estimate_cost(entry, pcfg, len(eg.sanitized), max_tokens)
 
     gov = get_governor()
     if req.idempotency_key and gov.replay_seen(req.idempotency_key):

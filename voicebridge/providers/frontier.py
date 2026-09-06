@@ -57,6 +57,22 @@ def urllib_transport(url: str, headers: Dict[str, str], payload: Dict[str, Any],
         return 0, {"__transport_error__": str(exc)[:300]}
 
 
+_REFUSAL_MARKERS = (
+    "content_filter", "content-filter", "content_policy", "content-policy",
+    "moderation", "refusal", "blocked_by_policy", "policy_violation",
+    "safety_system", "responsible_ai",
+)
+
+
+def _looks_like_refusal(body: Dict[str, Any]) -> bool:
+    """True when an error body signals a provider content-policy refusal."""
+    try:
+        hay = json.dumps(body)[:2000].lower()
+    except Exception:
+        return False
+    return any(m in hay for m in _REFUSAL_MARKERS)
+
+
 def _extract_text(body: Dict[str, Any]) -> tuple[str, int, int]:
     """Returns (text, prompt_tokens, completion_tokens) or raises ValueError."""
     choices = body.get("choices")
@@ -130,6 +146,17 @@ class FrontierClient:
                 log_event("frontier.attempt", provider=self.provider,
                           attempt=attempt, code=last_code)
                 continue  # retry (idempotent: no external tool action here)
+            if _looks_like_refusal(body):
+                return ProviderResult(ok=False, code="CONTENT_REFUSED",
+                                      message=json.dumps(body)[:300],
+                                      provider=self.provider, model=self.model,
+                                      identity=f"{self.provider}/{self.model}")
+            if status == 404:
+                return ProviderResult(ok=False, code="NOT_CONFIGURED",
+                                      message="endpoint or model not found "
+                                              f"(http 404 at {self.provider})",
+                                      provider=self.provider, model=self.model,
+                                      identity=f"{self.provider}/{self.model}")
             if status == 401 or status == 403:
                 return ProviderResult(ok=False, code="AUTH_INVALID",
                                       message=f"http {status}",

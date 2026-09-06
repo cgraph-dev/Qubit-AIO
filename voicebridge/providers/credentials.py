@@ -53,6 +53,35 @@ def redact_ref(ref: str) -> str:
     return "missing"
 
 
+_BROWSER_SECRET_BASENAMES = frozenset({
+    "cookies", "cookies.sqlite", "cookies.sqlite-wal", "login data",
+    "login data.sqlite", "logins.json", "key4.db", "key3.db", "cert9.db",
+    "local state", "secure preferences", "preferences", "history",
+    "history.sqlite", "web data", "web data.sqlite", "formhistory.sqlite",
+    "permissions.sqlite", "content-prefs.sqlite",
+})
+
+_BROWSER_PROFILE_MARKERS = ("chrome", "chromium", "firefox", "brave",
+                            "edge", "opera", "vivaldi", "comet")
+
+
+def looks_like_browser_secret(path: str) -> bool:
+    """True when ``path`` points at browser cookie/session/credential stores.
+
+    A ``file:`` credential reference must never resolve browser secrets as a
+    provider key: refuse first lines of Cookies/Login Data/Local State-style
+    stores and files inside browser profile trees.
+    """
+    low = (path or "").lower().replace("\\", "/")
+    base = low.rsplit("/", 1)[-1].strip()
+    if base in _BROWSER_SECRET_BASENAMES:
+        return True
+    if any(m in low for m in _BROWSER_PROFILE_MARKERS) and base not in (
+            "", "bookmarks", "bookmarks.bak"):
+        return "profile" in low or "default" in low or ".mozilla" in low
+    return False
+
+
 def looks_like_opencode_private_db(path: str) -> bool:
     p = (path or "").lower()
     return ("opencode" in p and ("auth" in p or "credentials" in p

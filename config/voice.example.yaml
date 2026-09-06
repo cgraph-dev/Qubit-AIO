@@ -142,7 +142,8 @@ intent:
     route: local               # local | frontier | auto (auto = opt-in escalation)
     privacy_tier: standard
     allowlist: []              # e.g. ["zen/zai-glio-..."] — owner-curated only
-    providers: {}              # e.g. zen: {base_url: ..., key_ref: "env:QUBIT_ZEN_KEY"}
+    providers: {}              # e.g. zen: {base_url: ..., key_ref: "env:QUBIT_ZEN_KEY",
+                             #   price_in_per_1k: 0.001, price_out_per_1k: 0.002}
     max_tokens: 512
     max_context_chars: 4000
     max_response_chars: 4000

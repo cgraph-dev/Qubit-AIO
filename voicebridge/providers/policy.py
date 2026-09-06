@@ -20,7 +20,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..logging_setup import log_event
-from .catalog import ProviderCatalog
 
 
 def _as_bool(v: Any) -> bool:

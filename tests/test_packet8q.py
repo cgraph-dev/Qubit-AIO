@@ -516,3 +516,132 @@ def test_spend_ledger_is_process_local_by_design():
     g2 = get_governor()
     assert g2 is not g1 and g2._spend_day == 0.0
     assert g2._seen_idempotency == {}
+
+# --- second close-out pass: HTTP fidelity, credential paths, budgets -------
+def test_content_refusal_is_typed_not_auth_error(monkeypatch):
+    _stub_local(monkeypatch)
+    cfg = Cfg(_base_frontier())
+    body = {"error": {"code": "content_filter",
+                      "message": "blocked by content policy"}}
+    res = G.run(ProviderRequest(prompt="hi", route="frontier",
+                                provider="zen", model="m1"),
+                cfg, catalog=_cat(), transport=lambda *a: (400, body))
+    assert res.code == "CONTENT_REFUSED" and not res.ok
+    assert res.identity == "zen/m1"
+
+
+def test_403_refusal_is_typed_not_auth_invalid(monkeypatch):
+    _stub_local(monkeypatch)
+    cfg = Cfg(_base_frontier())
+    body = {"error": {"message": "refused by moderation endpoint"}}
+    res = G.run(ProviderRequest(prompt="hi", route="frontier",
+                                provider="zen", model="m1"),
+                cfg, catalog=_cat(), transport=lambda *a: (403, body))
+    assert res.code == "CONTENT_REFUSED" and not res.ok
+
+
+def test_404_maps_to_not_configured(monkeypatch):
+    _stub_local(monkeypatch)
+    cfg = Cfg(_base_frontier())
+    res = G.run(ProviderRequest(prompt="hi", route="frontier",
+                                provider="zen", model="m1"),
+                cfg, catalog=_cat(), transport=lambda *a: (404, {}))
+    assert res.code == "NOT_CONFIGURED" and not res.ok
+
+
+def test_file_credential_ref_success(tmp_path, monkeypatch):
+    from voicebridge.providers.credentials import resolve_key
+    kf = tmp_path / "zen.key"
+    kf.write_text("live-key-abc\n")
+    key, code = resolve_key("zen", f"file:{kf}")
+    assert key == "live-key-abc" and code == ""
+
+
+def test_browser_secret_paths_refused_as_key_ref(monkeypatch):
+    from voicebridge.providers.credentials import looks_like_browser_secret
+    assert looks_like_browser_secret("~/.config/google-chrome/Default/Cookies")
+    assert looks_like_browser_secret("/home/u/.mozilla/firefox/x/Login Data")
+    assert looks_like_browser_secret("C:\\Users\\u\\Cookies")
+    assert not looks_like_browser_secret("/run/secrets/qubit-zen-key")
+    assert not looks_like_browser_secret("~/.config/qubit/zen.key")
+
+
+def test_gateway_refuses_browser_cookie_store(monkeypatch):
+    _stub_local(monkeypatch)
+    f = _base_frontier(providers={
+        "zen": {"base_url": "https://zen.example/v1",
+                "key_ref": "file:~/.config/google-chrome/Default/Cookies"}})
+    cfg = Cfg(f)
+    called = []
+    res = G.run(ProviderRequest(prompt="hi", route="frontier",
+                                provider="zen", model="m1"),
+                cfg, catalog=_cat(),
+                transport=lambda *a: (called.append(1), (200, _ok_body()))[1])
+    assert called == []
+    assert res.code == "AUTH_MISSING" and not res.ok
+
+
+def test_operator_price_override_enforces_budget(monkeypatch):
+    _stub_local(monkeypatch)
+    f = _base_frontier(
+        daily_usd=0.000001,
+        providers={"zen": {"base_url": "https://zen.example/v1",
+                           "key_ref": "env:QUBIT_TEST_ZEN_KEY",
+                           "price_in_per_1k": 1.0, "price_out_per_1k": 2.0}})
+    cfg = Cfg(f)
+    from voicebridge.providers.catalog import catalog_from_allowlist
+    from voicebridge.providers.policy import FrontierPolicy
+    cat = catalog_from_allowlist(FrontierPolicy.from_config(cfg).allowlist)
+    res = G.run(ProviderRequest(prompt="hi", route="frontier",
+                                provider="zen", model="m1"),
+                cfg, catalog=cat, transport=lambda *a: (200, _ok_body()))
+    assert res.code == "OVER_BUDGET" and not res.ok
+
+
+def test_rpm_limit_is_typed(monkeypatch):
+    _stub_local(monkeypatch)
+    cfg = Cfg(_base_frontier(rpm=1))
+    kw = dict(prompt="hi", route="frontier", provider="zen", model="m1")
+    r1 = G.run(ProviderRequest(**kw), cfg, catalog=_cat(),
+               transport=lambda *a: (200, _ok_body("one")))
+    assert r1.ok
+    r2 = G.run(ProviderRequest(**kw), cfg, catalog=_cat(),
+               transport=lambda *a: (200, _ok_body("two")))
+    assert r2.code == "RATE_LIMITED" and not r2.ok
+
+
+def test_concurrency_limit_is_typed(monkeypatch):
+    import threading
+    _stub_local(monkeypatch)
+    cfg = Cfg(_base_frontier(max_concurrency=1))
+    entered = threading.Event()
+    release = threading.Event()
+
+    def _blocking(*a):
+        entered.set()
+        assert release.wait(timeout=10)
+        return (200, _ok_body("slow"))
+
+    kw = dict(prompt="hi", route="frontier", provider="zen", model="m1")
+    t = threading.Thread(target=G.run,
+                         args=(ProviderRequest(**kw), cfg),
+                         kwargs={"catalog": _cat(), "transport": _blocking})
+    t.start()
+    assert entered.wait(timeout=10)
+    try:
+        r = G.run(ProviderRequest(**kw), cfg, catalog=_cat(),
+                  transport=lambda *a: (200, _ok_body("fast")))
+        assert r.code == "RATE_LIMITED" and not r.ok
+    finally:
+        release.set()
+        t.join(timeout=15)
+
+
+def test_gateway_creates_no_files(tmp_path, monkeypatch):
+    _stub_local(monkeypatch)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    cfg = Cfg(_base_frontier())
+    G.run(ProviderRequest(prompt="hi", route="frontier",
+                          provider="zen", model="m1"),
+          cfg, catalog=_cat(), transport=lambda *a: (200, _ok_body()))
+    assert list(tmp_path.iterdir()) == []
