@@ -611,6 +611,154 @@ def build_parser() -> argparse.ArgumentParser:
                                     help="clear the global disable latch (requires no emergency stop)")
     power_en.add_argument("--confirm", action="store_true",
                           help="explicitly confirm the enable")
+    vs = add("verified-skills", help="Packet 8P verified skill memory (disabled by default; owner-gated)")
+    vs_sub = vs.add_subparsers(dest="verified_skills_command")
+    vs_sub.add_parser("status", parents=[common],
+                      help="typed store status + journal verification")
+    vs_sub.add_parser("list", parents=[common],
+                      help="list skills (optionally by status/kind)")
+    vs_list_status = vs_sub.add_parser("list-status", parents=[common],
+                                       help="list skills by status (default verified)")
+    vs_list_status.add_argument("--status", default="verified",
+                                choices=["quarantined", "verified", "refuted",
+                                         "archived"])
+    vs_show = vs_sub.add_parser("show", parents=[common], help="show one skill")
+    vs_show.add_argument("id")
+    vs_submit = vs_sub.add_parser("submit", parents=[common],
+                                  help="stage a recipe candidate QUARANTINED (never auto-verified)")
+    vs_submit.add_argument("--name", required=True)
+    vs_submit.add_argument("--interface", default="")
+    vs_submit.add_argument("--implementation", required=True)
+    vs_submit.add_argument("--acceptance-test", required=True)
+    vs_submit.add_argument("--task", required=True)
+    vs_submit.add_argument("--capability", action="append", default=[])
+    vs_submit.add_argument("--cost", default="normal",
+                           choices=["cheap", "normal", "expensive"])
+    vs_submit.add_argument("--trust", type=int, default=1, choices=[1, 2, 3])
+    vs_submit.add_argument("--model", default="")
+    vs_submit.add_argument("--confirm", action="store_true",
+                           help="persist the candidate (dry-run unless --confirm)")
+    vs_verify = vs_sub.add_parser("verify", parents=[common],
+                                  help="OWNER verdict: verify a candidate (no self-verification)")
+    vs_verify.add_argument("id")
+    vs_verify.add_argument("--reason", default="")
+    vs_verify.add_argument("--confirm", action="store_true")
+    vs_refute = vs_sub.add_parser("refute", parents=[common],
+                                  help="OWNER verdict: refute a candidate (terminal)")
+    vs_refute.add_argument("id")
+    vs_refute.add_argument("--reason", default="")
+    vs_refute.add_argument("--confirm", action="store_true")
+    vs_fail = vs_sub.add_parser("record-failure", parents=[common],
+                                help="record an OBSERVED failure as a negative skill")
+    vs_fail.add_argument("--task", required=True)
+    vs_fail.add_argument("--approach", required=True)
+    vs_fail.add_argument("--reason", default="")
+    vs_fail.add_argument("--confirm", action="store_true")
+    vs_recall = vs_sub.add_parser("recall", parents=[common],
+                                  help="budgeted top-K recall + negatives slot")
+    vs_recall.add_argument("query")
+    vs_recall.add_argument("--top-k", type=int, default=5)
+    vs_recall.add_argument("--token-budget", type=int, default=6000)
+    vs_pin = vs_sub.add_parser("pin", parents=[common],
+                               help="pin a verified skill (always hot; OWNER)")
+    vs_pin.add_argument("id")
+    vs_pin.add_argument("--confirm", action="store_true")
+    vs_unpin = vs_sub.add_parser("unpin", parents=[common], help="unpin a skill")
+    vs_unpin.add_argument("id")
+    vs_unpin.add_argument("--confirm", action="store_true")
+    vs_reinf = vs_sub.add_parser("reinforce", parents=[common],
+                                 help="record a real outcome; failure re-checks then quarantines")
+    vs_reinf.add_argument("id")
+    vs_reinf.add_argument("--outcome", choices=["success", "failure"], required=True)
+    vs_reinf.add_argument("--confirm", action="store_true")
+    vs_quar = vs_sub.add_parser("quarantine-revoked", parents=[common],
+                                help="quarantine a skill whose 7E permission was revoked")
+    vs_quar.add_argument("id")
+    vs_quar.add_argument("--confirm", action="store_true")
+    vs_sweep = vs_sub.add_parser("sweep", parents=[common],
+                                 help="retention: archive cold low-utility; quarantine stale")
+    vs_sweep.add_argument("--confirm", action="store_true")
+    vs_remove = vs_sub.add_parser("remove", parents=[common],
+                                  help="remove a skill (OWNER; dry-run unless --confirm)")
+    vs_remove.add_argument("id")
+    vs_remove.add_argument("--confirm", action="store_true")
+    vs_retier = vs_sub.add_parser("retier", parents=[common],
+                                  help="recompute hot/warm/cold tiers by utility")
+    vs_snap = vs_sub.add_parser("snapshot", parents=[common],
+                                help="write a digest-verified backup snapshot")
+    vs_snap.add_argument("--out", type=Path, default=None)
+    vs_restore = vs_sub.add_parser("restore", parents=[common],
+                                   help="restore a snapshot (OWNER; dry-run unless --confirm)")
+    vs_restore.add_argument("snapshot", type=Path)
+    vs_restore.add_argument("--merge", action="store_true")
+    vs_restore.add_argument("--confirm", action="store_true")
+    vs_export = vs_sub.add_parser("export", parents=[common],
+                                  help="export a digest-verified snapshot to a file")
+    vs_export.add_argument("--out", type=Path, required=True)
+
+    exp = add("experiments", help="Packet 8P controlled offline evaluation (disabled by default)")
+    exp_sub = exp.add_subparsers(dest="experiments_command")
+    exp_sub.add_parser("status", parents=[common],
+                       help="typed store status + journal verification")
+    exp_sub.add_parser("candidates", parents=[common], help="list candidates")
+    exp_creg = exp_sub.add_parser("candidate", parents=[common],
+                                  help="register a typed prompt/model candidate")
+    exp_creg.add_argument("--role", choices=["champion", "challenger", "historical"],
+                          required=True)
+    exp_creg.add_argument("--label", required=True)
+    exp_creg.add_argument("--model", default="local")
+    exp_creg.add_argument("--description", default="")
+    exp_creg.add_argument("--confirm", action="store_true")
+    exp_start = exp_sub.add_parser("start", parents=[common],
+                                   help="open one running experiment for a pair")
+    exp_start.add_argument("--champion", required=True)
+    exp_start.add_argument("--challenger", required=True)
+    exp_start.add_argument("--confirm", action="store_true")
+    exp_list = exp_sub.add_parser("list", parents=[common],
+                                  help="list experiments")
+    exp_list.add_argument("--status", default=None,
+                          choices=["running", "promoted", "aborted", "held"])
+    exp_show = exp_sub.add_parser("show", parents=[common],
+                                  help="show one experiment + trials + signals")
+    exp_show.add_argument("id")
+    exp_trial = exp_sub.add_parser("trial", parents=[common],
+                                   help="start a trial for a running experiment")
+    exp_trial.add_argument("experiment_id")
+    exp_trial.add_argument("--variant", choices=["champion", "challenger"],
+                           required=True)
+    exp_trial.add_argument("--confirm", action="store_true")
+    exp_finish = exp_sub.add_parser("finish-trial", parents=[common],
+                                    help="finish a trial")
+    exp_finish.add_argument("trial_id")
+    exp_finish.add_argument("--outcome", choices=["completed", "failed", "cancelled"],
+                            required=True)
+    exp_finish.add_argument("--note", default="")
+    exp_finish.add_argument("--confirm", action="store_true")
+    exp_sig = exp_sub.add_parser("signal", parents=[common],
+                                 help="record an outcome signal (explicit/implicit, [0,1])")
+    exp_sig.add_argument("trial_id")
+    exp_sig.add_argument("--kind", choices=["explicit", "implicit"], required=True)
+    exp_sig.add_argument("--source", default="user_explicit_good")
+    exp_sig.add_argument("--value", type=float, required=True)
+    exp_sig.add_argument("--confirm", action="store_true")
+    exp_eval = exp_sub.add_parser("evaluate", parents=[common],
+                                  help="compute promotion decision (read-only, no state change)")
+    exp_eval.add_argument("id")
+    exp_eval.add_argument("--seed", type=int, default=None)
+    exp_prom = exp_sub.add_parser("promote", parents=[common],
+                                  help="record a promotion (OWNER + gate report required; never auto)")
+    exp_prom.add_argument("id")
+    exp_prom.add_argument("--gate-report", required=True,
+                          help="reference to a PASSING regression/security gate report")
+    exp_prom.add_argument("--confirm", action="store_true")
+    exp_abort = exp_sub.add_parser("abort", parents=[common],
+                                   help="abort a running experiment (OWNER)")
+    exp_abort.add_argument("id")
+    exp_abort.add_argument("--confirm", action="store_true")
+    exp_snap = exp_sub.add_parser("snapshot", parents=[common],
+                                  help="write a digest-verified backup snapshot")
+    exp_snap.add_argument("--out", type=Path, default=None)
+
     export = add("export-state", help="encrypt + export portable state (memory/lessons/reports/config/model)")
     export.add_argument("--out", type=Path, default=None,
                         help="output file (default: <state_dir>/portable-<ts>.vbp)")
@@ -713,6 +861,10 @@ def main(argv=None) -> int:
         return _cmd_ghost(cfg, args)
     if command == "power":
         return _cmd_power(cfg, args)
+    if command == "verified-skills":
+        return _cmd_verified_skills(cfg, args)
+    if command == "experiments":
+        return _cmd_experiments(cfg, args)
     if command == "export-state":
         return _cmd_export_state(cfg, args)
     if command == "import-state":
@@ -2502,6 +2654,260 @@ def _passphrase(args, env: str = "VOICE_BRIDGE_PASSPHRASE") -> str:
     if not pw:
         raise ValueError(f"passphrase required (--passphrase or {env})")
     return pw
+
+
+def _cmd_verified_skills(cfg, args) -> int:
+    """voicebridge verified-skills status|list|show|submit|verify|refute|
+    record-failure|recall|pin|unpin|reinforce|quarantine-revoked|sweep|remove|
+    retier|snapshot|restore|export.
+
+    Packet 8P verified skill memory is DISABLED by default and is advisory
+    recipe memory only. A candidate is staged QUARANTINED and only becomes
+    VERIFIED through an explicit OWNER verdict (there is no self-verification
+    path). Verified skills are never recalled as authority and never grant a
+    capability. All persistence is 0700/0600, audited, and hash-chain
+    journaled; secret-shaped text is rejected.
+    """
+    import json as _json
+    from .redaction import redact_text
+    from .verified_skills import (SkillProposal, VerifiedSkillError,
+                                  verified_skills_store)
+    cmd = getattr(args, "verified_skills_command", None) or "status"
+    store = verified_skills_store(cfg)
+    try:
+        if cmd == "status":
+            out = store.stats()
+            out["state"] = "OK" if out["journal"]["state"] == "OK" else "degraded"
+        elif cmd == "list":
+            out = {"skills": [r.to_dict() for r in store.list()]}
+        elif cmd == "list-status":
+            out = {"skills": [r.to_dict() for r in store.list(status=args.status)]}
+        elif cmd == "show":
+            rec = store.get(args.id)
+            if rec is None:
+                print(_json.dumps({"state": "MISSING", "id": args.id}))
+                return 1
+            out = {"state": "OK", "skill": rec.to_dict()}
+        elif cmd == "submit":
+            if not args.confirm:
+                print(_json.dumps({"state": "preview",
+                                   "detail": "dry-run; use --confirm to stage "
+                                             "the candidate as QUARANTINED"}))
+                return 0
+            prop = SkillProposal(
+                name=args.name, interface=args.interface,
+                implementation=args.implementation,
+                acceptance_test=args.acceptance_test, task=args.task,
+                capabilities=tuple(args.capability), cost=args.cost,
+                trust=args.trust, model=args.model)
+            rec = store.submit(prop)
+            out = {"state": "OK", "id": rec.id, "status": rec.status,
+                   "check_strength": rec.check_strength}
+        elif cmd == "verify":
+            if not args.confirm:
+                print(_json.dumps({"state": "preview",
+                                   "detail": "dry-run; use --confirm to issue "
+                                             "the OWNER verify verdict"}))
+                return 0
+            rec = store.apply_verdict(args.id, decision="verified",
+                                      requested_by="user", reason=args.reason)
+            out = {"state": "OK", "id": rec.id, "status": rec.status,
+                   "tier": rec.tier}
+        elif cmd == "refute":
+            if not args.confirm:
+                print(_json.dumps({"state": "preview",
+                                   "detail": "dry-run; use --confirm to refute"}))
+                return 0
+            rec = store.apply_verdict(args.id, decision="refuted",
+                                      requested_by="user", reason=args.reason)
+            out = {"state": "OK", "id": rec.id, "status": rec.status}
+        elif cmd == "record-failure":
+            if not args.confirm:
+                print(_json.dumps({"state": "preview",
+                                   "detail": "dry-run; use --confirm to record"}))
+                return 0
+            rec = store.record_failure(args.task, args.approach, args.reason)
+            out = {"state": "OK", "id": rec.id, "kind": rec.kind}
+        elif cmd == "recall":
+            out = store.recall(args.query, top_k=args.top_k,
+                               token_budget=args.token_budget)
+        elif cmd == "pin":
+            if not args.confirm:
+                print(_json.dumps({"state": "preview",
+                                   "detail": "dry-run; use --confirm to pin"}))
+                return 0
+            rec = store.pin(args.id, requested_by="user")
+            out = {"state": "OK", "id": rec.id, "pinned": rec.pinned}
+        elif cmd == "unpin":
+            if not args.confirm:
+                print(_json.dumps({"state": "preview",
+                                   "detail": "dry-run; use --confirm to unpin"}))
+                return 0
+            rec = store.unpin(args.id, requested_by="user")
+            out = {"state": "OK", "id": rec.id, "pinned": rec.pinned}
+        elif cmd == "reinforce":
+            if not args.confirm:
+                print(_json.dumps({"state": "preview",
+                                   "detail": "dry-run; use --confirm to "
+                                             "reinforce"}))
+                return 0
+            rec = store.reinforce(args.id, outcome=args.outcome,
+                                  requested_by="user")
+            out = {"state": "OK", "id": rec.id, "status": rec.status}
+        elif cmd == "quarantine-revoked":
+            if not args.confirm:
+                print(_json.dumps({"state": "preview",
+                                   "detail": "dry-run; use --confirm to "
+                                             "quarantine"}))
+                return 0
+            rec = store.quarantine_revoked(args.id)
+            out = {"state": "OK", "id": rec.id, "status": rec.status}
+        elif cmd == "sweep":
+            if not args.confirm:
+                print(_json.dumps({"state": "preview",
+                                   "detail": "dry-run; use --confirm to sweep"}))
+                return 0
+            out = store.sweep()
+        elif cmd == "remove":
+            if not args.confirm:
+                print(_json.dumps({"state": "preview",
+                                   "detail": "dry-run; use --confirm to remove"}))
+                return 0
+            rec = store.remove(args.id, requested_by="user")
+            out = {"state": "OK", "id": rec.id, "removed": True}
+        elif cmd == "retier":
+            out = store.retier()
+        elif cmd == "snapshot":
+            out = store.snapshot(path=args.out)
+        elif cmd == "export":
+            out = store.export(args.out)
+        elif cmd == "restore":
+            if not args.confirm:
+                print(_json.dumps({"state": "preview",
+                                   "detail": "dry-run; use --confirm to restore"}))
+                return 0
+            import json as _j
+            data = _j.loads(args.snapshot.read_text())
+            out = store.restore(data, requested_by="user", merge=args.merge)
+        else:
+            print(_json.dumps({"state": "failed", "detail": f"unknown "
+                                                            f"subcommand {cmd}"}))
+            return 2
+    except VerifiedSkillError as exc:
+        print(_json.dumps({"state": "failed", "detail": redact_text(str(exc))},
+                          indent=2))
+        return 2
+    finally:
+        store.close()
+    print(_json.dumps(out, indent=2, sort_keys=True))
+    return 0
+
+
+def _cmd_experiments(cfg, args) -> int:
+    """voicebridge experiments status|candidates|candidate|start|list|show|
+    trial|finish-trial|signal|evaluate|promote|abort|snapshot.
+
+    Packet 8P controlled evaluation is DISABLED by default and fully offline.
+    It never changes production model/router/permission configuration; a
+    promoted experiment is a stored decision record that requires an OWNER
+    approval AND a passing regression gate report, and applying it remains a
+    manual, separately authorized operation.
+    """
+    import json as _json
+    from .redaction import redact_text
+    from .experiments import (ExperimentError, experiments_store)
+    cmd = getattr(args, "experiments_command", None) or "status"
+    store = experiments_store(cfg)
+    try:
+        if cmd == "status":
+            out = store.journal_verify()
+            out["state"] = "OK" if out["state"] == "OK" else "degraded"
+            out["experiments"] = len(store.experiments())
+        elif cmd == "candidates":
+            out = {"candidates": [c.to_dict() for c in store.candidates()]}
+        elif cmd == "candidate":
+            if not args.confirm:
+                print(_json.dumps({"state": "preview",
+                                   "detail": "dry-run; use --confirm to "
+                                             "register"}))
+                return 0
+            c = store.register_candidate(role=args.role, label=args.label,
+                                         model=args.model,
+                                         description=args.description)
+            out = {"state": "OK", "id": c.id, "fingerprint": c.fingerprint}
+        elif cmd == "start":
+            if not args.confirm:
+                print(_json.dumps({"state": "preview",
+                                   "detail": "dry-run; use --confirm to start"}))
+                return 0
+            e = store.start_experiment(champion_config_id=args.champion,
+                                       challenger_config_id=args.challenger)
+            out = {"state": "OK", "id": e.id, "status": e.status}
+        elif cmd == "list":
+            out = {"experiments": [e.to_dict()
+                                   for e in store.experiments(status=args.status)]}
+        elif cmd == "show":
+            e = store.experiment(args.id)
+            if e is None:
+                print(_json.dumps({"state": "MISSING", "id": args.id}))
+                return 1
+            out = {"state": "OK", "experiment": e.to_dict(),
+                   "evaluate": store.evaluate(args.id)}
+        elif cmd == "trial":
+            if not args.confirm:
+                print(_json.dumps({"state": "preview",
+                                   "detail": "dry-run; use --confirm to start"}))
+                return 0
+            t = store.start_trial(args.experiment_id, variant=args.variant)
+            out = {"state": "OK", "id": t.id, "variant": t.variant}
+        elif cmd == "finish-trial":
+            if not args.confirm:
+                print(_json.dumps({"state": "preview",
+                                   "detail": "dry-run; use --confirm to "
+                                             "finish"}))
+                return 0
+            t = store.finish_trial(args.trial_id, outcome=args.outcome,
+                                   note=args.note)
+            out = {"state": "OK", "id": t.id, "outcome": t.outcome}
+        elif cmd == "signal":
+            if not args.confirm:
+                print(_json.dumps({"state": "preview",
+                                   "detail": "dry-run; use --confirm to record"}))
+                return 0
+            s = store.record_signal(args.trial_id, kind=args.kind,
+                                    source=args.source, value=args.value)
+            out = {"state": "OK", "id": s.id, "kind": s.kind, "value": s.value}
+        elif cmd == "evaluate":
+            out = store.evaluate(args.id, seed=args.seed)
+        elif cmd == "promote":
+            if not args.confirm:
+                print(_json.dumps({"state": "preview",
+                                   "detail": "dry-run; use --confirm to record "
+                                             "promotion"}))
+                return 0
+            out = store.record_promotion(args.id, owner_approved=True,
+                                         gate_report=args.gate_report,
+                                         requested_by="user")
+        elif cmd == "abort":
+            if not args.confirm:
+                print(_json.dumps({"state": "preview",
+                                   "detail": "dry-run; use --confirm to abort"}))
+                return 0
+            out = store.abort(args.id, requested_by="user")
+        elif cmd == "snapshot":
+            out = store.snapshot(path=args.out)
+        else:
+            print(_json.dumps({"state": "failed", "detail": f"unknown "
+                                                            f"subcommand {cmd}"}))
+            return 2
+    except ExperimentError as exc:
+        print(_json.dumps({"state": "failed", "detail": redact_text(str(exc))},
+                          indent=2))
+        return 2
+    finally:
+        store.close()
+    print(_json.dumps(out, indent=2, sort_keys=True))
+    return 0
 
 
 def _cmd_export_state(cfg, args) -> int:

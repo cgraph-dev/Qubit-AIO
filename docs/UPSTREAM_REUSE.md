@@ -1375,3 +1375,166 @@ IMPLEMENTATION STATUS: adapted into production as voicebridge/ghost.py
     notice added to THIRD_PARTY_NOTICES.md. Disabled by default; live use
     remains a separately authorized, operator-gated rollout.
 ```
+
+## R26 — Verified-before-remember skill memory (Packet 8P)
+
+```text
+LOCAL REQUIREMENT: an OPTIONAL verified-skill memory that only "remembers" a
+    task recipe after a real, owner-gated acceptance check passed it — plus
+    first-class negative ("known failure") records, budgeted top-K recall,
+    normalized-hash deduplication/reinforce, retention tiers, quarantine of
+    failed/expired/revoked/stale skills, and deterministic journal hashing.
+    Disabled by default; no new listener, store-of-facts authority, model
+    server, policy path, or MCP server; the existing MemoryStore stays
+    authoritative for facts.
+UPSTREAM REPOSITORY + COMMIT: https://github.com/NORTHTEKDevs/praxis @
+    a84d486c900aa1b438b75cc2e881bfc2013af84c (recorded 2026-09-06; default
+    branch master).
+SOURCE FILES + SYMBOLS: src/skill.ts → SkillStatus/SkillKind/SkillTier and the
+    Skill record shape (id, name, interface, implementation, acceptanceTest,
+    capabilities, cost, provenance{task,model,parents,createdAt,evidence},
+    embedding, embedderVersion, utilityScore, status, kind, tier, uses,
+    successRate, pinned, checkStrength); src/verify.ts → fail-closed verify
+    gate (no test -> quarantined; weak test -> quarantined; assertion failure
+    -> refuted; runtime/timeout/memory/async -> quarantined; verified only
+    when the real run passes AND a counter-example probe is cleanly rejected);
+    src/negative.ts → negative skill records (observed failure, kind=negative,
+    provenance.evidence); src/retrieve.ts → top-k + tokenBudget recall with a
+    separate always-included negatives slot and O(k)-bounded context cost;
+    src/dedup.ts → maybeMerge (verified near-duplicate reinforces; quarantined
+    near-duplicate suppresses but never inflates utility); src/utility.ts →
+    utilityScore + retier (hot/warm/cold, pinned always hot) + reinforce
+    re-run-then-quarantine; src/store.ts → SQLite schema, status/kind/tier
+    CHECKs, JSON-column defensive parsing; src/strength.ts → syntactic
+    acceptance-test strength. We adapt the CONTRACT and tested lifecycle, not a
+    TypeScript/Node port and not the worker_threads execution model.
+UPSTREAM TESTS/FIXTURES: src/praxis.test.ts, src/verify.test.ts,
+    src/verify-adversarial.test.ts (try/catch assert-swallowing, vacuous
+    passes, test tampering, memory bombs, probe-evasion), src/negative.test.ts,
+    src/retrieve.test.ts, src/dedup.test.ts, src/utility.test.ts,
+    src/store.test.ts. Verified at the pinned commit.
+LICENSE: MIT — Copyright (c) 2026 Kristian Baer / Northtek. MIT notice
+    requirement honored in THIRD_PARTY_NOTICES.md. No MCP SDK, no Node runtime,
+    no model weights, and no compiled artifact are bundled.
+DECISION: ADAPT the state machine (statuses, verify-before-remember,
+    refute/quarantine, negative skills, dedup/reinforce, budgeted top-K recall,
+    tiers) as a small stdlib-only Python store. REJECT copying the repository
+    wholesale, the MCP surface, `node:sqlite`/`worker_threads` sandbox, the
+    hashing-embedder internals, and any execution model that runs model-
+    proposed code on the host. In this local adaptation, executing an
+    acceptance check is OUT-OF-STORE and owner-gated (an "operator" verdict
+    path; there is no model/self-verification path — CONFIRMATION_SOURCE
+    semantics), and task text is stored as a bounded redacted label plus a
+    content hash, never raw model/page text.
+LOCAL DESTINATION: voicebridge/verified_skills/ (package of clearly owned
+     sub-components, each <300 lines: __init__.py public surface; _models.py
+     constants + dataclasses + pure helpers; _persist.py SQLite schema + CRUD;
+     _lifecycle.py verified-before-remember state transitions; _recall.py
+     budgeted top-K recall + tiers + retention; _transfer.py snapshot/restore/
+     export; store.py composed VerifiedSkillStore) + shared
+     voicebridge/state_journal.py (hash-chain journal) + tests/
+     test_packet8p.py + docs/VERIFIED_SKILLS_8P.md.
+DEPENDENCIES ADDED: none (Python stdlib sqlite3/json/hashlib + existing
+     voicebridge/redaction, voicebridge/logging_setup).
+BEHAVIOR KEPT: verified-before-remember; fail-closed verify transitions
+    (no/weak/vacuous test cannot verify); refuted on assertion failure;
+    quarantined on runtime/timeout/unknown; negative failure records with
+    evidence; recall returns verified positives AND a separate bounded
+    negatives slot under a token budget; verified near-duplicate reinforces
+    (bump) while a quarantined duplicate suppresses re-insertion without
+    inflating utility; utility-weighted hot/warm/cold tiers with pinned
+    exemption; reinforce(failure) re-checks then quarantines; expired/revoked
+    skills are quarantined/archived and never recalled as authority.
+BEHAVIOR INTENTIONALLY OMITTED: MCP server/tools; TypeScript worker sandbox
+    and arbitrary-code execution; the upstream hashing embedder internals
+    (local deterministic BLAKE2-based embedding instead); flywheel/usage-ledger
+    ingestion; automatic consolidation/eviction (replaced by explicit
+    retention/sweep); no second authority — verified skills are advisory
+    recipes gated to capabilities the owner already granted through 7E
+    permissions, and the existing MemoryStore remains the authoritative fact
+    store.
+WHY THIS IS THE SMALLEST FIT: the packet requires only the verified-before-
+    remember lifecycle, negative skills, bounded top-K retrieval, dedup, and
+    retention; the existing 7E permissions/broker/audit/redaction/rollback
+    machinery already owns authorization, resources, and emergency stop.
+COMPATIBILITY DRIFT: upstream is TypeScript/Node and moves fast; the pin is
+    authoritative. The local store never invokes upstream code or a floating
+    branch.
+IMPLEMENTATION STATUS: adapted into production as voicebridge/verified_skills/
+     (Packet 8P, 2026-09-06) with hermetic tests tests/test_packet8p.py; MIT
+     notice added to THIRD_PARTY_NOTICES.md. Feature disabled by default; no
+     live acceptance execution is performed in this packet.
+```
+
+## R27 — Bounded offline experiment comparison (Packet 8P)
+
+```text
+LOCAL REQUIREMENT: an OPTIONAL, offline "controlled evaluation" store for the
+    bounded statistical comparison of prompt/model/behavior candidates
+    (champion vs challenger), with explicit-feedback signals, seeded
+    deterministic posteriors, a no-promotion-until-evidence gate, and a
+    promotion record that requires explicit owner approval PLUS passing
+    regression/security/latency/resource/provenance/rollback gates. It must
+    never auto-change permissions, confirmation policy, scopes, safety rules,
+    production model selection, or external actions; external providers
+    receive nothing by default.
+UPSTREAM REPOSITORY + COMMIT: https://github.com/NORTHTEKDevs/evolve @
+    36404a7ac75080370b5157977e3bbe73979c9527 (recorded 2026-09-06; default
+    branch dev).
+SOURCE FILES + SYMBOLS: evolve-core/src/promotion.rs → aggregate (weighted
+    mean, explicit_weight=5.0 / implicit_weight=1.0, values clamped to [0,1],
+    empty -> neutral 0.5), wins_losses (binarize at 0.5), posterior_probability
+    (Beta(1+wins,1+losses) Monte Carlo, default samples=10_000),
+    promotion_decision (NeedMoreData when either arm < min_sessions_per_arm=20;
+    Promote when posterior >= promote_threshold=0.95; else Hold);
+    evolve-core/src/agent_config.rs → stable config fingerprint concept;
+    evolve-storage/migrations/0001_init.sql → experiment/session/signal
+    relational shape and the one-running-experiment-per-project invariant.
+    We adapt the pure statistics contract and the guardrails, not the Rust
+    adapter/CLI/HTTP-proxy surface.
+UPSTREAM TESTS/FIXTURES: evolve-core/src/promotion.rs unit tests
+    (default_weights_are_five_to_one, explicit_signal_weighs_five_times_
+    implicit, aggregate_* pins, posterior_* pins incl. determinism under seed,
+    decision_* guardrails, proptest invariants) and evolve-cli/tests/
+    end_to_end.rs (challenger_promotes_when_outperforming_champion, obvious_
+    loser_holds_at_low_posterior, promote_challenger_swaps_project_champion).
+    Verified at the pinned commit.
+LICENSE: Apache-2.0 — Copyright 2026 Kristian Baer / Northtek (Appendix
+    notice). The upstream repo ships no NOTICE file, so Apache-2.0 §4(d)
+    imposes no separate NOTICE carry-forward beyond this attribution record.
+    No Cargo/Rust artifact, model, or provider credential is bundled.
+DECISION: ADAPT the pure statistical comparison contract and its guardrails to
+    small stdlib-only Python (seeded `random.gammavariate` beta sampling). REJECT
+    the Rust CLI, Claude Code/Cursor/Aider adapters, the OpenAI-compat proxy, the
+    dashboard, challenger mutation from live transcripts, implicit-signal regex
+    harvesting, and any automatic promotion or production write.
+LOCAL DESTINATION: voicebridge/experiments/ (package of clearly owned
+     sub-components, each <300 lines: __init__.py public surface; _stats.py
+     pure aggregate/posterior/decision statistics; _models.py dataclasses +
+     bounds; _persist.py SQLite schema + row helpers; _run.py candidate/
+     experiment/trial/signal + score aggregation; _promote.py owner+gate-gated
+     promotion + abort/hold; _transfer.py snapshot/restore; store.py composed
+     ExperimentStore) + shared voicebridge/state_journal.py (hash-chain
+     journal) + tests/test_packet8p.py + docs/VERIFIED_SKILLS_8P.md.
+DEPENDENCIES ADDED: none (Python stdlib only; numpy is NOT used here).
+BEHAVIOR KEPT: signals clamped to [0,1] with explicit=5x weight; empty signal
+    set -> neutral 0.5; per-session aggregation then wins/losses at 0.5;
+    Beta(1+wins,1+losses) Monte Carlo posterior; NeedMoreData below 20 sessions
+    per arm; Promote only at posterior >= 0.95; Hold otherwise; deterministic
+    under a fixed seed; outcomes are stored without raw private prompts.
+BEHAVIOR INTENTIONALLY OMITTED: traffic-roll routing (champion/challenger
+    session steering), mutation from live sessions, implicit regex feedback,
+    provider proxy/dashboard, cost tracking, and any change to Qubit's
+    production model/router/permission configuration — a promoted experiment is
+    a stored decision record only and applying it stays a manual, separately
+    authorized operation.
+WHY THIS IS THE SMALLEST FIT: the packet requires only the offline statistical
+    comparison, explicit feedback, and a promotion gate; the existing 6B
+    PromotionGate/eval-set machinery owns regression/safety qualification.
+COMPATIBILITY DRIFT: upstream evolves quickly; the pin is authoritative. Local
+    code never invokes upstream Rust or a floating branch.
+IMPLEMENTATION STATUS: adapted into production as voicebridge/experiments/
+     (Packet 8P, 2026-09-06) with hermetic tests tests/test_packet8p.py; Apache-
+     2.0 attribution added to THIRD_PARTY_NOTICES.md. Feature disabled by
+     default and fully offline.
+```

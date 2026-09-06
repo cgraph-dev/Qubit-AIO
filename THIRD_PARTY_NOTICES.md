@@ -277,3 +277,94 @@ statement in distributions:
 > LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 > SOFTWARE.
+
+---
+
+## Praxis — verified skill memory contract (Packet 8P)
+
+The optional verified-skill-memory store package `voicebridge/verified_skills/`
+(`__init__`, `_models`, `_persist`, `_lifecycle`, `_recall`, `_transfer`,
+composed `store`; each file <300 lines; shared `voicebridge/state_journal.py`)
+ADAPTS the verified-before-remember lifecycle, negative ("known failure")
+records, budgeted top-K recall, deduplication/reinforce, and retention tiers
+from Praxis (MIT © 2026 Kristian Baer / Northtek), reviewed at pinned commit
+`a84d486c900aa1b438b75cc2e881bfc2013af84c`
+(`src/skill.ts`, `src/verify.ts`, `src/negative.ts`, `src/retrieve.ts`,
+`src/dedup.ts`, `src/utility.ts`, `src/store.ts`, and their tests).
+
+Adapted behavior: `quarantined → verified` only after an owner-gated
+acceptance check passes (fail-closed: no/weak/vacuous test → quarantined,
+assertion failure → refuted); first-class negative skills with evidence;
+top-K recall under a token budget with a separate negatives slot; verified
+near-duplicate reinforces while a quarantined duplicate suppresses without
+inflating utility; utility-weighted hot/warm/cold tiers; reinforce-failure
+re-checks then quarantines; deterministic hash-chain journal.
+
+Local divergence (documented in docs/UPSTREAM_REUSE.md R26): stdlib-only
+Python store; no MCP server, Node runtime, or worker_threads sandbox; no
+model-proposed code is ever executed (the acceptance verdict is an explicit
+operator/owner decision — there is no self-verification path); task text is
+stored as a bounded redacted label plus a content hash, never raw model/page
+text; verified skills are advisory recipes and the existing MemoryStore
+remains the authoritative fact store.
+
+MIT License text requirement: include the copyright notice and this permission
+statement in distributions:
+
+> Copyright (c) 2026 Kristian Baer / Northtek
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy
+> of this software and associated documentation files (the "Software"), to deal
+> in the Software without restriction, including without limitation the rights
+> to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+> copies of the Software, and to permit persons to whom the Software is
+> furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all
+> copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+> IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+> FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+> AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+> LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+> OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+> SOFTWARE.
+
+---
+
+## Evolve — offline experiment comparison contract (Packet 8P)
+
+The optional controlled-evaluation store package `voicebridge/experiments/`
+(`__init__`, `_stats`, `_models`, `_persist`, `_run`, `_promote`, `_transfer`,
+composed `store`; each file <300 lines; shared `voicebridge/state_journal.py`)
+ADAPTS the pure statistical comparison and promotion guardrails from Evolve
+(Apache-2.0 © 2026 Kristian Baer / Northtek), reviewed at pinned commit
+`36404a7ac75080370b5157977e3bbe73979c9527`
+(`evolve-core/src/promotion.rs`, `evolve-core/src/agent_config.rs`,
+`evolve-storage/migrations/0001_init.sql`, and their tests).
+
+Adapted behavior: per-session signals clamped to [0,1] with explicit=5x
+implicit weighting; empty → neutral 0.5; wins/losses binarized at 0.5;
+Beta(1+wins,1+losses) Monte Carlo posterior; NeedMoreData below 20 sessions
+per arm; Promote only at posterior ≥ 0.95, else Hold; deterministic under a
+fixed seed.
+
+Local divergence (documented in docs/UPSTREAM_REUSE.md R27): stdlib-only
+Python; no Rust CLI, adapter, HTTP proxy, dashboard, or traffic-roll routing;
+no mutation from live sessions; no implicit regex feedback; a promoted
+experiment is a stored decision record only and applying it remains a manual,
+separately authorized operation. The upstream repo ships no NOTICE file, so
+Apache-2.0 §4(d) imposes no separate NOTICE carry-forward beyond this record.
+
+Apache License 2.0 requirement: include the license text and copyright notice
+in distributions (full text at https://www.apache.org/licenses/LICENSE-2.0):
+
+> Licensed under the Apache License, Version 2.0 (the "License"); you may not
+> use this file except in compliance with the License. You may obtain a copy of
+> the License at http://www.apache.org/licenses/LICENSE-2.0
+>
+> Unless required by applicable law or agreed to in writing, software distributed
+> under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+> CONDITIONS OF ANY KIND, either express or implied. See the License for the
+> specific language governing permissions and limitations under the License.
