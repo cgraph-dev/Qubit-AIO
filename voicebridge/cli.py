@@ -8,6 +8,12 @@ from pathlib import Path
 from typing import Any, Dict
 
 
+def _shared_power(cfg):
+    """Return the shared 8O PowerPolicy for the config scope (one per process)."""
+    from . import power as PW
+    return PW.power_policy(cfg)
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="voicebridge",
@@ -547,6 +553,54 @@ def build_parser() -> argparse.ArgumentParser:
                                       help="global immediate stop (latched until reset)")
     ghost_reset = ghost_sub.add_parser("reset", parents=[common],
                                        help="reset the emergency-stop latch (returns to disabled)")
+    power = add("power", help="Packet 8O full-capability power profile: one policy path, capability inventory, owner power grant, global control")
+    power_sub = power.add_subparsers(dest="power_command")
+    power_sub.add_parser("profile", parents=[common],
+                         help="inventory every installed capability across all 11 domains (available != authorized)")
+    power_sub.add_parser("status", parents=[common],
+                         help="typed global power-control status (emergency stop, disable, circuits)")
+    power_sub.add_parser("circuits", parents=[common],
+                         help="per-adapter circuit-breaker states")
+    power_show = power_sub.add_parser("show", parents=[common],
+                                      help="show one capability's contract + effective state")
+    power_show.add_argument("capability")
+    power_chk = power_sub.add_parser("check", parents=[common],
+                                     help="read-only effective decision for one capability (one policy path)")
+    power_chk.add_argument("capability")
+    power_chk.add_argument("--scope", action="append", default=[])
+    power_chk.add_argument("--target", default="")
+    power_chk.add_argument("--role", default="", choices=["", "chromium", "comet"])
+    power_chk.add_argument("--account", default="")
+    power_gr = power_sub.add_parser("grant", parents=[common],
+                                    help="issue the ONE owner power grant (supersedes previous; dry-run unless --confirm)")
+    power_gr.add_argument("--browser", action="append", default=[], choices=["chromium", "comet"])
+    power_gr.add_argument("--app", action="append", default=[])
+    power_gr.add_argument("--account", action="append", default=[])
+    power_gr.add_argument("--origin", action="append", default=[])
+    power_gr.add_argument("--directory", action="append", default=[])
+    power_gr.add_argument("--scope", action="append", default=[])
+    power_gr.add_argument("--capability", action="append", default=[],
+                          help="exact capability ids covered by the grant "
+                               "(required)")
+    power_gr.add_argument("--ttl", type=float, default=None,
+                          help="grant duration seconds (default 7 days; max 90 days)")
+    power_gr.add_argument("--confirm", action="store_true",
+                          help="explicitly confirm the side effect")
+    power_gr.add_argument("--note", default="")
+    power_rev = power_sub.add_parser("revoke", parents=[common],
+                                     help="revoke the owner power grant (dry-run unless --confirm)")
+    power_rev.add_argument("grant_id")
+    power_rev.add_argument("--confirm", action="store_true")
+    power_sub.add_parser("reset-grant", parents=[common],
+                         help="remove the owner power grant entirely")
+    power_sub.add_parser("emergency-stop", parents=[common],
+                         help="global immediate stop: latches, cancels active runs; reset required")
+    power_sub.add_parser("reset", parents=[common],
+                         help="reset the emergency-stop/disable latches")
+    power_sub.add_parser("disable", parents=[common],
+                         help="global power disable (all capabilities denied)")
+    power_sub.add_parser("enable", parents=[common],
+                         help="clear the global disable latch (requires no emergency stop)")
     export = add("export-state", help="encrypt + export portable state (memory/lessons/reports/config/model)")
     export.add_argument("--out", type=Path, default=None,
                         help="output file (default: <state_dir>/portable-<ts>.vbp)")
@@ -647,6 +701,8 @@ def main(argv=None) -> int:
         return _cmd_actions(cfg, args)
     if command == "ghost":
         return _cmd_ghost(cfg, args)
+    if command == "power":
+        return _cmd_power(cfg, args)
     if command == "export-state":
         return _cmd_export_state(cfg, args)
     if command == "import-state":
@@ -2090,7 +2146,8 @@ def _cmd_actions(cfg, args) -> int:
             print(_json.dumps({"state": "failed", "detail": f"fixture "
                                f"invalid: {exc}"}, indent=2))
             return 2
-    runner = A.action_runner(cfg, executors=executors)
+    runner = A.action_runner(cfg, executors=executors,
+                             power=_shared_power(cfg))
 
     def _args_json(raw: str) -> Dict[str, Any]:
         try:
@@ -2205,7 +2262,8 @@ def _cmd_ghost(cfg, args) -> int:
             print(_json.dumps({"state": "failed", "detail": f"fixture "
                                f"invalid: {exc}"}, indent=2))
             return 2
-    runner = G.ghost_runner(cfg, executors=executors)
+    runner = G.ghost_runner(cfg, executors=executors,
+                            power=_shared_power(cfg))
 
     def _args_json(raw: str) -> Dict[str, Any]:
         try:
@@ -2282,6 +2340,120 @@ def _cmd_ghost(cfg, args) -> int:
         code = getattr(exc, "code", None) or "GHOST_ERROR"
         print(_json.dumps({"state": "failed", "code": code,
                            "detail": str(exc)}, indent=2))
+        return 2
+    except Exception as exc:
+        print(_json.dumps({"state": "failed", "detail": str(exc)[:200]},
+                          indent=2))
+        return 2
+
+
+def _cmd_power(cfg, args) -> int:
+    """voicebridge power profile/status/circuits/show/check/grant/revoke/
+    reset-grant/emergency-stop/reset/disable/enable.
+
+    Packet 8O: one policy path + capability inventory + owner power grant +
+    global power control. All of this is decision/inventory only — it never
+    launches, connects, or enables a live capability.
+    """
+    import json as _json
+    from . import power as PW
+    cmd = getattr(args, "power_command", None) or "profile"
+    control = PW.power_control(cfg)
+
+    def _store():
+        return PW.power_grant_store(cfg)
+
+    def _policy(store=None):
+        from .permissions import permissions_store
+        return PW.power_policy(cfg, store=store or _store(),
+                               control=control,
+                               perms=permissions_store(cfg))
+
+    def _shared_policy():
+        return PW.power_policy(cfg)
+
+    try:
+        if cmd == "profile":
+            out = PW.power_profile(cfg)
+        elif cmd == "status":
+            out = {"state": "OK", "control": control.status(),
+                   "grant": (_store().grant().to_dict()
+                             if _store().grant() else None),
+                   "grant_health": _store().health()}
+        elif cmd == "circuits":
+            out = {"state": "OK", "circuits": control.circuit_status()}
+        elif cmd == "show":
+            caps = PW.power_profile(cfg)["capabilities"]
+            row = next((c for c in caps
+                        if c["capability"] == args.capability), None)
+            if row is None:
+                print(_json.dumps({"state": "MISSING",
+                                   "detail": f"unknown capability "
+                                             f"{args.capability}"}, indent=2))
+                return 1
+            out = {"state": "OK", "capability": row}
+        elif cmd == "check":
+            out = _shared_policy().check(
+                args.capability, scopes=tuple(args.scope or ()),
+                target=args.target or "", role=args.role or "",
+                account_scope=args.account or "")
+            out["state"] = "OK" if out["allowed"] else "denied"
+        elif cmd == "grant":
+            store = _store()
+            if getattr(args, "dry_run", False):
+                out = {"state": "preview",
+                       "would_grant": {"browsers": list(args.browser or ()),
+                                       "apps": list(args.app or ()),
+                                       "accounts": list(args.account or ()),
+                                       "origins": list(args.origin or ()),
+                                       "directories": list(args.directory or ()),
+                                       "scopes": list(args.scope or ()),
+                                       "capabilities": list(args.capability or ()),
+                                       "ttl_s": args.ttl}}
+            else:
+                g = store.issue(
+                    browsers=tuple(args.browser or ()),
+                    apps=tuple(args.app or ()),
+                    accounts=tuple(args.account or ()),
+                    origins=tuple(args.origin or ()),
+                    directories=tuple(args.directory or ()),
+                    scopes=tuple(args.scope or ()),
+                    capabilities=tuple(args.capability or ()),
+                    ttl_s=args.ttl, note=args.note or "",
+                    issued_by="cli:user")
+                out = {"state": "OK", "grant": g.to_dict()}
+        elif cmd == "revoke":
+            store = _store()
+            if getattr(args, "dry_run", False):
+                out = {"state": "preview",
+                       "would_revoke": args.grant_id}
+            else:
+                g = store.revoke(args.grant_id, issued_by="cli:user")
+                out = {"state": "OK", "revoked": g.to_dict()}
+        elif cmd == "reset-grant":
+            g = _store().reset(issued_by="cli:user")
+            out = {"state": "OK", "grant": None}
+        elif cmd == "emergency-stop":
+            out = control.emergency_stop()
+        elif cmd == "reset":
+            out = control.reset()
+        elif cmd == "disable":
+            out = control.global_disable()
+        elif cmd == "enable":
+            out = control.global_enable()
+        else:
+            print(f"ERROR: unknown power command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except PW.PowerDenied as exc:
+        print(_json.dumps({"state": "denied", "code": exc.code,
+                           "detail": exc.detail}, indent=2))
+        return 3
+    except PW.PowerError as exc:
+        code = getattr(exc, "code", None) or "POWER_ERROR"
+        print(_json.dumps({"state": "failed", "code": code,
+                           "detail": str(exc)[:200]}, indent=2))
         return 2
     except Exception as exc:
         print(_json.dumps({"state": "failed", "detail": str(exc)[:200]},

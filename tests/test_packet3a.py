@@ -504,7 +504,11 @@ def test_orchestrator_wires_all_worker_sites_through_shared_engine():
     src = (REPO / "voicebridge/orchestrator.py").read_text(errors="replace")
     assert "WorkerGuard(self.cfg, engine=self._broker.engine)" in src
     assert "register_worker_caps(self._broker.registry)" in src
-    assert "build_host_broker()" in src
+    # Packet 8O: the orchestrator builds the host broker through the shared 8O
+    # power control so every worker site observes emergency stop / disable /
+    # circuit / cancellation state (the engine is still shared).
+    assert "build_host_broker(" in src
+    assert "power_control=self._power_policy.control" in src
 
 
 # --------------------------------------------------------------- benchmarks

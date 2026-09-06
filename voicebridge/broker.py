@@ -131,7 +131,8 @@ def _kill_tree(pid: Optional[int]) -> None:
 class CapabilityBroker:
     """Decides, then executes trusted host tools; never falls back to shell."""
 
-    def __init__(self, default_ttl_s: float = 120.0):
+    def __init__(self, default_ttl_s: float = 120.0,
+                 power_control: Optional[Any] = None):
         self.registry = CapabilityRegistry()
         self.engine = PolicyEngine(
             registry=self.registry,
@@ -139,6 +140,26 @@ class CapabilityBroker:
         self._bindings: Dict[str, ToolBinding] = {}
         self._active: Dict[str, _ActiveRun] = {}
         self._lock = threading.Lock()
+        # Packet 8O: optional shared PowerControl. When present, every execute
+        # checks emergency stop / global disable / per-adapter circuit breaker,
+        # registers the run for cancellation (track/untrack), and records
+        # failures so a circuit can trip. All channels that share this broker
+        # observe the same control state.
+        self._power = power_control
+
+    def _power_denied(self, capability: str, spec: Optional[CapabilitySpec]) \
+            -> Optional[str]:
+        """Return a denial code when the shared power control forbids the run."""
+        if self._power is None:
+            return None
+        if self._power.state.get("emergency_stop"):
+            return "EMERGENCY_STOP"
+        if self._power.state.get("global_disable"):
+            return "POWER_DISABLED"
+        adapter = str(getattr(spec, "adapter", "power") or "power")
+        if self._power.breaker_state(adapter) == "open":
+            return "CIRCUIT_OPEN"
+        return None
 
     # ------------------------------------------------------------ registration
     def register(self, binding: ToolBinding) -> CapabilitySpec:
@@ -198,6 +219,14 @@ class CapabilityBroker:
 
         binding = self._bindings.get(capability)
         spec = binding.spec if binding else None
+        # Packet 8O: the shared power control is checked BEFORE any decision or
+        # execution — emergency stop / global disable / circuit breaker deny the
+        # run across every channel that shares this broker.
+        power_denied = self._power_denied(capability, spec)
+        if power_denied is not None:
+            self._audit("denied", capability, spec, source, cid,
+                        Decision(False, power_denied, capability))
+            return _res(denied=power_denied)
         # Packet 4D destructive-intent tripwire (last-resort layer):
         # if the originating utterance or the capability/args combination
         # carries destruction intent while the tool is NOT a confirmed
@@ -245,6 +274,23 @@ class CapabilityBroker:
             return _res(ok=True, output=text[:2000], dry_run=True)
 
         self._audit("start", capability, spec, source, cid, d)
+        adapter = str(getattr(spec, "adapter", "power") or "power")
+        tracked = False
+        if self._power is not None:
+            # Register the real run for emergency-stop cancellation and bounded
+            # concurrency. The cancel callback SIGKILLs the child group through
+            # the broker's own cancel path. If no concurrency slot is available
+            # the run FAILS CLOSED (never executes outside the limit).
+            if not self._power.acquire(adapter):
+                self._audit("denied", capability, spec, source, cid,
+                            Decision(False, "CONCURRENCY_LIMIT", capability))
+                return _res(denied="CONCURRENCY_LIMIT")
+            try:
+                self._power.track(cid, lambda _cid=cid: self.cancel(_cid))
+                tracked = True
+            except Exception:
+                self._power.release(adapter)
+                raise
         try:
             if binding.fn is not None:
                 if spec.tier is Tier.READ_ONLY:
@@ -272,6 +318,18 @@ class CapabilityBroker:
             # EVERY path (normal, timeout, cancellation, exception) cleans up.
             with self._lock:
                 self._active.pop(cid, None)
+            if tracked:
+                try:
+                    self._power.untrack(cid)
+                finally:
+                    self._power.release(adapter)
+        if self._power is not None:
+            if res.cancelled:
+                pass  # cancellation is not a circuit failure
+            elif not res.ok or res.denied or res.error:
+                self._power.record_failure(adapter)
+            else:
+                self._power.record_success(adapter)
         res.correlation_id = cid
         res.duration_ms = round((time.perf_counter() - t0) * 1000, 3)
         self._audit("finish", capability, spec, source, cid, d,
@@ -467,11 +525,11 @@ _ACTION_EFFECTS = {
 }
 
 
-def build_host_broker() -> CapabilityBroker:
+def build_host_broker(power_control: Optional[Any] = None) -> CapabilityBroker:
     """Register every whitelisted local action behind the registry."""
     from .local.actions import ACTIONS
 
-    broker = CapabilityBroker()
+    broker = CapabilityBroker(power_control=power_control)
     for name, act in ACTIONS.items():
         if act is None or act.fn is None:
             continue

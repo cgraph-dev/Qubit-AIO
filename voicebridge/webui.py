@@ -227,6 +227,12 @@ def pcm_to_wav(pcm: bytes, rate: int = PCM_RATE) -> bytes:
     return bytes(buf)
 
 
+def _power_policy(cfg):
+    """Return the shared 8O PowerPolicy for the bridge config (one per process)."""
+    from . import power as PW
+    return PW.power_policy(cfg)
+
+
 def parse_audio_rate(raw: Any) -> int:
     """Parse the browser's ACTUAL AudioContext sample-rate header.
 
@@ -1193,7 +1199,9 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 return
             try:
                 from . import ghost as G
-                runner = G.ghost_runner(self.app.orch.cfg)
+                runner = G.ghost_runner(self.app.orch.cfg,
+                                        power=_power_policy(
+                                            self.app.orch.cfg))
                 qs = self.path.split("?", 1)[1] if "?" in self.path else ""
                 params = {}
                 for kv in qs.split("&"):
@@ -1217,6 +1225,49 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self._json(out)
             except G.ActionError as exc:
                 self._json({"state": "failed", "detail": str(exc)[:200]})
+            except Exception as exc:
+                self._json({"state": "degraded", "detail": str(exc)[:200]})
+        elif path == "/api/power":
+            # Packet 8O: one authenticated policy path. Read-only inventory +
+            # control/grant status here; mutations go through POST with explicit
+            # confirmation. Never executes or launches anything.
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            try:
+                from . import power as PW
+                qs = self.path.split("?", 1)[1] if "?" in self.path else ""
+                params = {}
+                for kv in qs.split("&"):
+                    if "=" in kv:
+                        k, v = kv.split("=", 1)
+                        params[k] = __import__(
+                            "urllib.parse").parse.unquote_plus(v)
+                if params.get("capability"):
+                    policy = PW.power_policy(self.app.orch.cfg)
+                    out = policy.check(
+                        params["capability"],
+                        scopes=tuple(params.get("scope", "").split(",")) if
+                        params.get("scope") else (),
+                        target=params.get("target", "") or "",
+                        role=params.get("role", "") or "",
+                        account_scope=params.get("account", "") or "")
+                    out["state"] = "OK" if out["allowed"] else "denied"
+                    self._json(out)
+                    return
+                store = PW.power_grant_store(self.app.orch.cfg)
+                self._json({
+                    "state": "OK",
+                    "profile": PW.power_profile(self.app.orch.cfg),
+                    "grant": store.grant().to_dict() if store.grant() else None,
+                    "grant_health": store.health(),
+                    "control": PW.power_control(self.app.orch.cfg).status(),
+                    "mcp": PW.mcp_status(self.app.orch.cfg),
+                })
+            except PW.PowerError as exc:
+                self._json({"state": "failed",
+                            "code": getattr(exc, "code", "POWER_ERROR"),
+                            "detail": str(exc)[:200]})
             except Exception as exc:
                 self._json({"state": "degraded", "detail": str(exc)[:200]})
         elif path == "/api/device/status":
@@ -1494,7 +1545,9 @@ class WebUIHandler(BaseHTTPRequestHandler):
                     executors = A.make_fixture_executors(
                         A.load_fixture_outcomes(fpath))
                 runner = A.action_runner(self.app.orch.cfg,
-                                         executors=executors)
+                                     executors=executors,
+                                     power=_power_policy(
+                                         self.app.orch.cfg))
                 if action == "preview":
                     out = runner.preview(
                         str(body.get("action_id", "")),
@@ -1729,6 +1782,72 @@ class WebUIHandler(BaseHTTPRequestHandler):
                             "backup": str(bak)})
             except Exception as exc:
                 self._json({"state": "FAILED", "detail": str(exc)[:160]}, 409)
+        elif path == "/api/power":
+            # Packet 8O: mutating power-control/grant actions (explicit confirm).
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            try:
+                from . import power as PW
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length).decode() or "{}")
+                action = str(body.get("action", ""))
+                confirmed = bool(body.get("confirmed", False))
+                store = PW.power_grant_store(self.app.orch.cfg)
+                control = PW.power_control(self.app.orch.cfg)
+                if action == "grant":
+                    if not confirmed:
+                        self._json({"state": "denied",
+                                    "code": "CONFIRMATION_REQUIRED",
+                                    "detail": "grant requires explicit "
+                                              "confirmation"})
+                        return
+                    g = store.issue(
+                        browsers=tuple(body.get("browsers") or ()),
+                        apps=tuple(body.get("apps") or ()),
+                        accounts=tuple(body.get("accounts") or ()),
+                        origins=tuple(body.get("origins") or ()),
+                        directories=tuple(body.get("directories") or ()),
+                        scopes=tuple(body.get("scopes") or ()),
+                        capabilities=tuple(body.get("capabilities") or ()),
+                        ttl_s=body.get("ttl"),
+                        note=str(body.get("note", ""))[:2000],
+                        issued_by="dashboard")
+                    self._json({"state": "OK", "grant": g.to_dict()})
+                elif action == "revoke":
+                    if not confirmed:
+                        self._json({"state": "denied",
+                                    "code": "CONFIRMATION_REQUIRED",
+                                    "detail": "revoke requires explicit "
+                                              "confirmation"})
+                        return
+                    g = store.revoke(str(body.get("grant_id", "")),
+                                     issued_by="dashboard")
+                    self._json({"state": "OK", "revoked": g.to_dict()})
+                elif action == "reset-grant":
+                    store.reset(issued_by="dashboard")
+                    self._json({"state": "OK", "grant": None})
+                elif action == "emergency-stop":
+                    self._json(control.emergency_stop())
+                elif action == "reset":
+                    self._json(control.reset())
+                elif action == "disable":
+                    self._json(control.global_disable())
+                elif action == "enable":
+                    self._json(control.global_enable())
+                else:
+                    self._json({"state": "failed",
+                                "detail": f"unknown action {action}"}, 400)
+            except PW.PowerDenied as exc:
+                self._json({"state": "denied", "code": exc.code,
+                            "detail": exc.detail})
+            except PW.PowerError as exc:
+                self._json({"state": "failed",
+                            "code": getattr(exc, "code", "POWER_ERROR"),
+                            "detail": str(exc)[:200]})
+            except Exception as exc:
+                self._json({"state": "failed", "detail": str(exc)[:200]})
+            return
         elif path == "/api/device/enroll":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")

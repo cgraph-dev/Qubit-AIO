@@ -1159,18 +1159,22 @@ def ghost_adapter(cfg=None, *, env: Optional[Dict[str, str]] = None) -> GhostAda
 # ---------------------------------------------------------------------------
 def ghost_actions_broker(cfg=None, *,
                          executors: Optional[Dict[str, Callable]] = None,
-                         enabled: bool = False) -> "CapabilityBroker":
+                         enabled: bool = False,
+                         power_control: Optional[Any] = None) -> "CapabilityBroker":
     """Build the SAME ActionBroker the 8F layer uses, plus Ghost capabilities.
 
     The host tools and 8F action bindings are registered exactly as
     ``actions.actions_broker`` does; Ghost bindings are added on top with the
     same envelope validator, preview, and disabled/fixture executor semantics.
     Without injected executors every Ghost capability resolves to the typed
-    ADAPTER_DISABLED result (never a live launch).
+    ADAPTER_DISABLED result (never a live launch). When ``power_control`` is
+    provided it is passed into the base broker so Ghost/Comet executions share
+    the 8O global control state.
     """
     from .actions import (_disabled_executor, _envelope_validator,
                           actions_broker, action_specs)
-    base = actions_broker(cfg, executors=executors, enabled=enabled)
+    base = actions_broker(cfg, executors=executors, enabled=enabled,
+                          power_control=power_control)
     register_ghost_specs()
     runner_executors = dict(executors or {})
     for spec in ghost_action_specs(shell=ghost_shell_enabled()):
@@ -1316,14 +1320,18 @@ class GhostRunner(ActionRunner):
                  session_grants: Optional[SessionGrantStore] = None,
                  adapter: Optional[GhostAdapter] = None,
                  comet: Optional[CometResearchAdapter] = None,
-                 max_preview_chars: int = 400):
+                 max_preview_chars: int = 400,
+                 power: Optional[Any] = None):
         register_ghost_specs()
         super().__init__(cfg=cfg, store=store, perms=perms,
                          broker=broker or ghost_actions_broker(
-                             cfg, executors=executors, enabled=enabled),
+                             cfg, executors=executors, enabled=enabled,
+                             power_control=(power.control if power is not None
+                                            else None)),
                          executors=executors, enabled=enabled, clock=clock,
                          confirmation_ttl_s=confirmation_ttl_s,
-                         max_preview_chars=max_preview_chars)
+                         max_preview_chars=max_preview_chars,
+                         power=power)
         self.ghost_grants = session_grants or (
             session_grants_store(cfg) if cfg is not None else None)
         self.adapter = adapter or ghost_adapter(cfg)
@@ -1332,8 +1340,17 @@ class GhostRunner(ActionRunner):
             self.comet.bind(self)
         # Session grants are the authoritative read/reversible authorization
         # for Ghost capabilities; GhostGate layers them on the shared 7E gate.
-        self.gate = GhostGate(self.perms)
-        self.gate.ghost_grants = self.ghost_grants
+        # Packet 8O: when a shared PowerPolicy is supplied, wrap the GhostGate
+        # in the power gate adapter so every Ghost/Comet path flows through the
+        # one policy path first.
+        if power is not None:
+            from .power import PowerGateAdapter
+            inner = GhostGate(self.perms)
+            inner.ghost_grants = self.ghost_grants
+            self.gate = PowerGateAdapter(power, inner_gate=inner)
+        else:
+            self.gate = GhostGate(self.perms)
+            self.gate.ghost_grants = self.ghost_grants
         self._install_broker_tracking()
         if self.comet is not None:
             self._bind_comet_executors()
@@ -1710,14 +1727,22 @@ def ghost_runner(cfg=None, *, executors: Optional[Dict[str, Callable]] = None,
                  enabled: bool = False,
                  session_grants: Optional[SessionGrantStore] = None,
                  adapter: Optional[GhostAdapter] = None,
-                 comet: Optional[CometResearchAdapter] = None) -> GhostRunner:
-    """Open (or create) the Ghost runner bound to the configured stores."""
+                 comet: Optional[CometResearchAdapter] = None,
+                 power: Optional[Any] = None) -> GhostRunner:
+    """Open (or create) the Ghost runner bound to the configured stores.
+
+    When ``power`` (a shared 8O PowerPolicy) is provided it is wired as the
+    runner gate and its PowerControl is passed to the underlying broker, so
+    Ghost/Comet requests flow through the one policy path and observe global
+    emergency stop / disable / circuit / cancellation state.
+    """
     from .actions import action_runner
-    base = action_runner(cfg, executors=executors, enabled=enabled)
+    base = action_runner(cfg, executors=executors, enabled=enabled,
+                         power=power)
     runner = GhostRunner(cfg, store=base.store, perms=base.perms,
                          executors=executors, enabled=enabled,
                          session_grants=session_grants, adapter=adapter,
-                         comet=comet)
+                         comet=comet, power=power)
     return runner
 
 

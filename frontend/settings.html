@@ -110,7 +110,29 @@
 <h2>Permissions</h2>
   <div class="card"><button onclick="permissions()">Review permissions</button><span id="perm-state" class="muted"></span></div>
 
- <h2>Websites (advanced)</h2>
+  <h2>Power profile</h2>
+   <div class="card">
+     <p class="muted" style="margin:0 0 6px">One authenticated policy path. Available never means authorized: every capability has a typed state plus revoke/disable controls, and the owner power grant only auto-allows routine read/search/navigation/fill. Posting, sending, publishing, purchasing, deleting, and modifying project code always ask for fresh confirmation.</p>
+     <div class="row">
+       <button onclick="powerProfile()">Inventory</button>
+       <button onclick="powerStatus()">Control status</button>
+       <button onclick="powerCircuits()">Circuits</button>
+       <button onclick="powerCheck()">Check capability</button>
+       <button class="ok" onclick="powerGrant()">Owner grant</button>
+       <button onclick="powerRevoke()">Revoke grant</button>
+       <button class="warn" onclick="powerEmergencyStop()">Emergency stop</button>
+       <button onclick="powerReset()">Reset latches</button>
+       <span id="power-state" class="muted"></span>
+     </div>
+     <div class="row" style="margin-top:8px">
+       <label class="sr-only" for="power-cap">Capability</label><input id="power-cap" placeholder="ghost.comet.ask" style="font-size:12px;flex:1;min-width:140px">
+       <button onclick="powerCheck()">Check</button>
+       <span id="power-detail" class="muted"></span>
+     </div>
+     <div class="muted" id="power-list" style="margin-top:8px;font-size:12px"></div>
+   </div>
+
+  <h2>Websites (advanced)</h2>
   <div class="card">
     <p class="muted" style="margin:0 0 6px">Versioned integration records and redacted progress/error logs. Each control calls the real backend; enabling, grants, and manifest linking require confirmation.</p>
     <div class="row">
@@ -373,6 +395,71 @@ async function permissions(){
  const {status,body} = await api('/api/permissions');
  const st = body && body.items ? 'OK' : 'UNAVAILABLE';
  show('perm-state', tag(st)+' <span class="muted">'+esc((body&&body.items||[]).map(i=>i.capability||i.name||'').join(', '))+'</span>');
+}
+async function powerProfile(){
+ const {body} = await api('/api/power');
+ if(!body || !body.profile){ show('power-state', tag('UNAVAILABLE')); return; }
+ const p = body.profile;
+ show('power-state', tag('OK')+' total '+p.total+' · enabled '+p.enabled+' · authorized '+p.authorized);
+ show('power-list', '<div>Domains: '+esc(Object.keys(p.domains||{}).join(', '))+'</div>'
+   + (body.grant ? '<div>Owner grant: '+esc(body.grant.grant_id.slice(0,8))+'… expires '+esc(new Date(body.grant.expires_at*1000).toISOString())+'</div>' : '<div>No active owner grant</div>'));
+}
+async function powerStatus(){
+ const {body} = await api('/api/power');
+ if(!body || !body.control){ show('power-state', tag('UNAVAILABLE')); return; }
+ const c = body.control;
+ show('power-state', tag(c.emergency_stop ? 'EMERGENCY STOP' : (c.global_disable ? 'DISABLED' : 'OK'))
+   +' <span class="muted">active '+c.active+' / '+c.max_concurrency+' · '+esc(JSON.stringify(c.circuits||{}))+'</span>');
+}
+async function powerCircuits(){
+ const {body} = await api('/api/power');
+ show('power-state', tag('OK')+' <span class="muted">'+esc(JSON.stringify((body&&body.control&&body.control.circuits)||{}))+'</span>');
+}
+async function powerCheck(){
+ const cap = (document.getElementById('power-cap')&&document.getElementById('power-cap').value||'').trim();
+ if(!cap){ show('power-detail', tag('MISSING')+' enter a capability id'); return; }
+ const {body} = await api('/api/power?capability='+encodeURIComponent(cap));
+ show('power-detail', body ? tag(body.allowed ? 'ALLOWED' : 'DENIED')+' <span class="muted">'+esc(body.code||'')+' · '+esc(body.detail||'')+'</span>' : tag('UNAVAILABLE'));
+}
+async function powerGrant(){
+ const origin = window.prompt('Owner power grant — origin allowlist (e.g. https://perplexity.ai; comma separated):','https://perplexity.ai');
+ if(origin==null) return;
+ const scopes = window.prompt('Scopes (comma separated; e.g. research,web):','research');
+ if(scopes==null) return;
+ const ttl = parseFloat(window.prompt('Duration seconds (1–'+(90*86400)+'; default 7 days):',''+(7*86400)))||7*86400;
+ const caps = window.prompt('Exact capability ids (comma separated; e.g. ghost.comet.ask,ghost.browser.tabs):','ghost.comet.ask');
+ if(caps==null) return;
+ const doIt = async () => {
+   const {status,body} = await api('/api/power',{method:'POST',body:JSON.stringify({
+     action:'grant', confirmed:true,
+     origins: origin.split(',').map(s=>s.trim()).filter(Boolean),
+     scopes: scopes.split(',').map(s=>s.trim()).filter(Boolean),
+     capabilities: caps.split(',').map(s=>s.trim()).filter(Boolean),
+     ttl: ttl})});
+   show('power-state', renderResult(body));
+ };
+ confirmDialog('Issue the one owner power grant? (visible, expiring, revocable, target-bound, audited)', doIt);
+}
+async function powerRevoke(){
+ const doIt = async () => {
+   const {body} = await api('/api/power',{method:'POST',body:JSON.stringify({action:'reset-grant', confirmed:true})});
+   show('power-state', renderResult(body));
+ };
+ confirmDialog('Remove the owner power grant?', doIt);
+}
+async function powerEmergencyStop(){
+ const doIt = async () => {
+   const {body} = await api('/api/power',{method:'POST',body:JSON.stringify({action:'emergency-stop'})});
+   show('power-state', renderResult(body));
+ };
+ confirmDialog('Global emergency stop? This latches and cancels active runs until reset.', doIt);
+}
+async function powerReset(){
+ const doIt = async () => {
+   const {body} = await api('/api/power',{method:'POST',body:JSON.stringify({action:'reset'})});
+   show('power-state', renderResult(body));
+ };
+ confirmDialog('Reset emergency-stop / disable latches?', doIt);
 }
 async function deviceStatus(){
  const {status,body} = await api('/api/device/status');

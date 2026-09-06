@@ -334,9 +334,12 @@ class VoiceOrchestrator:
         # in the SAME registry/store so every execution carries a Decision.
         from .broker import CapabilityBroker, build_host_broker
         from .dispatch_guard import register_worker_caps
+        from . import power as PW
         self._broker: Optional[CapabilityBroker] = None
+        self._power_policy = PW.power_policy(cfg)
         try:
-            self._broker = build_host_broker()
+            self._broker = build_host_broker(
+                power_control=self._power_policy.control)
             register_worker_caps(self._broker.registry)
             self._worker_guard = WorkerGuard(self.cfg, engine=self._broker.engine)
         except Exception as exc:
@@ -2370,7 +2373,7 @@ class VoiceOrchestrator:
             # result and speaks it honestly.
             from . import actions as A
             try:
-                runner = A.action_runner(self.cfg)
+                runner = A.action_runner(self.cfg, power=self._power_policy)
                 out = runner.execute(
                     str(payload.get("action_id", "")),
                     args=dict(payload.get("args") or {}),

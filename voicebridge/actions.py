@@ -797,8 +797,10 @@ class ActionBroker(CapabilityBroker):
     """
 
     def __init__(self, confirm_required: Tuple[str, ...] = (),
-                 default_ttl_s: float = 300.0):
-        super().__init__(default_ttl_s=default_ttl_s)
+                 default_ttl_s: float = 300.0,
+                 power_control: Optional[Any] = None):
+        super().__init__(default_ttl_s=default_ttl_s,
+                         power_control=power_control)
         self._confirm_required = frozenset(confirm_required)
 
     def execute(self, capability: str, args: Dict[str, Any], *, source: str,
@@ -820,17 +822,22 @@ class ActionBroker(CapabilityBroker):
 
 
 def actions_broker(cfg=None, *, executors: Optional[Dict[str, Callable]] = None,
-                   enabled: bool = False) -> ActionBroker:
+                   enabled: bool = False,
+                   power_control: Optional[Any] = None) -> ActionBroker:
     """Build a broker with every action capability registered.
 
     Live adapters are DISABLED: without injected ``executors`` (synthetic
     fixtures) every action resolves to the typed ADAPTER_DISABLED result.
+    When ``power_control`` is provided, the shared 8O PowerControl is wired
+    in (emergency stop / disable / circuit / concurrency / cancellation) so
+    every action path observes the same global control state.
     """
     from .broker import build_host_broker
-    host = build_host_broker()
+    host = build_host_broker(power_control=power_control)
     confirm_required = tuple(s.action_id for s in action_specs()
                              if s.needs_confirmation)
-    broker = ActionBroker(confirm_required=confirm_required)
+    broker = ActionBroker(confirm_required=confirm_required,
+                          power_control=power_control)
     broker.registry = host.registry
     broker.engine = host.engine
     for name, binding in host._bindings.items():
@@ -1356,12 +1363,14 @@ class ActionRunner:
                  enabled: bool = False,
                  clock: Callable[[], float] = time.time,
                  confirmation_ttl_s: Optional[float] = None,
-                 max_preview_chars: int = MAX_PREVIEW_CHARS):
+                 max_preview_chars: int = MAX_PREVIEW_CHARS,
+                 power: Optional[Any] = None):
         self.cfg = cfg
         self.clock = clock
         self.max_preview_chars = int(max_preview_chars)
         self.enabled = bool(enabled)
         self.executors = dict(executors or {})
+        self.power = power
         self.store = store
         self.perms = perms
         if self.store is None:
@@ -1374,8 +1383,18 @@ class ActionRunner:
                 raise ActionError("a 7E permission store is required")
             self.perms = permissions_store(cfg)
         self.broker = broker or actions_broker(
-            cfg, executors=self.executors, enabled=self.enabled)
+            cfg, executors=self.executors, enabled=self.enabled,
+            power_control=(self.power.control if self.power is not None
+                           else None))
         self.gate = ActionGate(self.perms)
+        # Packet 8O: when a shared PowerPolicy is supplied, use it as the gate
+        # so EVERY runner path (preview/check/execute/retry/recover) flows
+        # through the one policy path (emergency stop -> disable -> circuit ->
+        # concurrency -> grant routine -> this ActionGate).
+        if self.power is not None:
+            from .power import PowerGateAdapter
+            self.gate = PowerGateAdapter(self.power,
+                                         inner_gate=ActionGate(self.perms))
         self.confirmation_ttl_s = float(
             confirmation_ttl_s if confirmation_ttl_s is not None else (
                 (cfg.get("actions", "confirmation_ttl_s", default=300.0)
@@ -1388,6 +1407,11 @@ class ActionRunner:
         self.broker.engine.confirmations = PersistentConfirmationStore(
             self.store, clock=self.clock,
             default_ttl_s=self.confirmation_ttl_s)
+        # Packet 8O: the policy must verify confirmations against the EXACT
+        # store the broker consumes from, so a `--confirm`/prepare flow across
+        # the same process observes the freshly issued id.
+        if self.power is not None:
+            self.power.confirmations = self.broker.engine.confirmations
 
     # ------------------------------------------------------------ read-only
     def actions(self) -> List[Dict[str, Any]]:
@@ -1538,7 +1562,8 @@ class ActionRunner:
                 gate = self.gate.decide(spec, env, source=source,
                                         confirmation_id=confirmation_id)
             if not gate["allowed"]:
-                return {"state": ST_DENIED, "code": gate["code"],
+                return {"state": self._gate_denial_state(gate["code"]),
+                        "code": gate["code"],
                         "action_id": action_id,
                         "action_hash": env["action_hash"],
                         "detail": gate.get("detail", "")}
@@ -1593,6 +1618,21 @@ class ActionRunner:
             created_at=self.clock(), finished_at=None, duration_ms=0.0)
         self.store.save_receipt(receipt)
         return receipt
+
+    def _gate_denial_state(self, code: str) -> str:
+        """Map a gate/policy denial code to the typed action state vocabulary
+        (kept in sync with ``_outcome_from_exec`` for confirmation codes)."""
+        if code == "EXPIRED_CONFIRMATION":
+            return ST_EXPIRED
+        if code in ("TARGET_MISMATCH", "ARGS_MISMATCH",
+                    "TARGET_SCOPE_MISMATCH"):
+            return ST_STALE_TARGET
+        if code == "REPLAYED_CONFIRMATION":
+            return ST_REPLAYED
+        if code in ("CONFIRMATION_REQUIRED", "CONFIRMATION_UNAVAILABLE",
+                    "CONFIRMATION_SOURCE_FORBIDDEN", "UNKNOWN_CONFIRMATION_ID"):
+            return ST_DENIED
+        return ST_DENIED
 
     def _outcome_from_exec(self, spec: ActionSpec, env: Dict[str, Any],
                            res: ExecResult) -> Dict[str, Any]:
@@ -1798,7 +1838,8 @@ class ActionRunner:
                 gate = self.gate.decide(spec, env, source=source,
                                         confirmation_id=confirmation_id)
             if not gate["allowed"]:
-                return {"state": ST_DENIED, "code": gate["code"],
+                return {"state": self._gate_denial_state(gate["code"]),
+                        "code": gate["code"],
                         "receipt_id": receipt_id,
                         "detail": gate.get("detail", "")}
         if gate.get("confirmation_id"):
@@ -1911,8 +1952,10 @@ def voice_action_request(text: str) -> Optional[Dict[str, Any]]:
 
 
 def action_runner(cfg, *, executors: Optional[Dict[str, Callable]] = None,
-                  enabled: bool = False) -> ActionRunner:
+                  enabled: bool = False,
+                  power: Optional[Any] = None) -> ActionRunner:
     """Open (or create) the action runner bound to the configured stores."""
     enabled = bool(enabled) or bool(
         cfg.get("actions", "enabled", default=False))
-    return ActionRunner(cfg, executors=executors, enabled=enabled)
+    return ActionRunner(cfg, executors=executors, enabled=enabled,
+                        power=power)

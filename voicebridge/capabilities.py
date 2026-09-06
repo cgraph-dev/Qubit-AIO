@@ -178,6 +178,30 @@ class ConfirmationStore:
             rec.consumed_at = now
             return rec
 
+    def verify(self, confirmation_id: str, capability: str,
+               args: Dict[str, Any]) -> ConfirmationRecord:
+        """Non-destructive validation used by policy pre-decision layers.
+
+        Identical checks to ``consume`` (existence, single-use, expiry,
+        capability match, exact argument digest) but does NOT mark the record
+        consumed, so the broker can still consume it once at execution time.
+        Every failure raises a typed :class:`ConfirmationDenied`.
+        """
+        now = self._clock()
+        with self._lock:
+            rec = self._records.get(confirmation_id)
+            if rec is None:
+                raise ConfirmationDenied("UNKNOWN_CONFIRMATION_ID")
+            if rec.consumed:
+                raise ConfirmationDenied("REPLAYED_CONFIRMATION")
+            if now >= rec.expires_at:
+                raise ConfirmationDenied("EXPIRED_CONFIRMATION")
+            if rec.capability != capability:
+                raise ConfirmationDenied("CAPABILITY_MISMATCH")
+            if rec.args_digest != _args_digest(dict(args)):
+                raise ConfirmationDenied("TARGET_MISMATCH")
+            return rec
+
 
 @dataclass(frozen=True)
 class ActionRequest:
