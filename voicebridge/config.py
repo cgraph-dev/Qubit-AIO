@@ -190,6 +190,26 @@ DEFAULTS: Dict[str, Any] = {
         # In duplex mode PersonaPlex answers conversation directly; this backend
         # is only used when the PersonaPlex lane is down.
         "duplex_conversation_fallback": True,
+        # Packet 8Q: optional frontier-provider gateway. DISABLED BY DEFAULT.
+        # Enable only with an explicit allowlist, privacy tier, budgets, and
+        # credential references (env:/file:). Never reads OpenCode's private
+        # auth store. Availability/price subject to provider account.
+        "frontier": {
+            "enabled": False,
+            "route": "local",  # local | frontier | auto (auto = opt-in escalation)
+            "privacy_tier": "standard",
+            "allowlist": [],
+            "providers": {},
+            "max_tokens": 512,
+            "max_context_chars": 4000,
+            "max_response_chars": 4000,
+            "timeout_s": 20.0,
+            "max_retries": 1,
+            "rpm": 10,
+            "max_concurrency": 2,
+            "daily_usd": 1.0,
+            "monthly_usd": 10.0,
+        },
     },
     "openclaw": {
         "gateway_url": None,     # auto-discovered: ws://127.0.0.1:18789

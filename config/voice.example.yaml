@@ -133,6 +133,25 @@ intent:
   perplexity_url: https://api.perplexity.ai/chat/completions
   perplexity_model: sonar-pro
   perplexity_env: ~/.hermes/.env
+  # Packet 8Q: optional frontier-provider gateway (DISABLED BY DEFAULT).
+  # Enable only with allowlist + budgets + credential refs (env:/file:).
+  # Never points at OpenCode's private auth store. Availability and price
+  # subject to provider account; never free/unlimited by default.
+  frontier:
+    enabled: false
+    route: local               # local | frontier | auto (auto = opt-in escalation)
+    privacy_tier: standard
+    allowlist: []              # e.g. ["zen/zai-glio-..."] — owner-curated only
+    providers: {}              # e.g. zen: {base_url: ..., key_ref: "env:QUBIT_ZEN_KEY"}
+    max_tokens: 512
+    max_context_chars: 4000
+    max_response_chars: 4000
+    timeout_s: 20.0
+    max_retries: 1
+    rpm: 10
+    max_concurrency: 2
+    daily_usd: 1.0
+    monthly_usd: 10.0
 
 # ---------------------------------------------------------------------------
 # OpenClaw gateway (auto-discovered from ~/.openclaw/; these are overrides)

@@ -1538,3 +1538,69 @@ IMPLEMENTATION STATUS: adapted into production as voicebridge/experiments/
      2.0 attribution added to THIRD_PARTY_NOTICES.md. Feature disabled by
      default and fully offline.
 ```
+
+## R8Q — Frontier-provider gateway contracts (Packet 8Q, docs-only pins)
+
+```text
+LOCAL REQUIREMENT: Packet 8Q optional provider-neutral gateway: local default
+    plus explicit local/frontier/auto routing to direct frontier APIs, OpenCode
+    Zen, and OpenRouter behind one normalized contract with typed failures,
+    budgets, redaction, and truthful provider/model identity. No new
+    dependency; stdlib urllib only. No upstream code is copied — the OpenAI
+    chat-completions wire shape is a documented public API contract used at
+    arm's length, and OpenCode Zen / OpenRouter endpoints are operator-
+    configured values, never hardcoded as permanent.
+UPSTREAM/DOC REFERENCES (reviewed 2026-09-06, no code copied):
+  - OpenAI chat-completions API contract (public HTTP API): POST
+    {base}/chat/completions with model/messages/max_tokens/stream fields and
+    {choices[0].message.content, usage{prompt_tokens, completion_tokens}}
+    response shape. Local decision: implement a minimal stdlib client against
+    this shape only; no SDK, no API key in repo.
+  - OpenCode Zen (hosted API provider/gateway; separate from the OpenCode
+    coding-agent application, which is NOT part of 8Q): operator-configured
+    base_url + owner-held credential; docs describe sign-in/billing and
+    per-request charges — product copy must never call it "free" and must
+    display "availability and price subject to provider account".
+  - OpenRouter (optional aggregator/fallback): operator-configured base_url
+    (https://openrouter.ai/api/v1); actual processor may vary by route, so
+    identity, terms visibility, and cost estimate are shown per request.
+SOURCE FILES + SYMBOLS: none copied. Local modules are original Qubit work:
+    voicebridge/providers/contracts.py (ProviderRequest/Result/UsageRecord),
+    catalog.py (versioned snapshot + UNKNOWN_MODEL/STALE_CATALOG),
+    credentials.py (env:/file: refs only), egress.py (minimum-necessary
+    classification), policy.py (allowlist/budgets/circuit-breaker/governor),
+    frontier.py (stdlib OpenAI-compat client, injectable transport),
+    gateway.py (local/frontier/auto routing with fail-closed semantics).
+UPSTREAM TESTS/FIXTURES: none copied; hermetic suite tests/test_packet8q.py
+    covers all provider states with fake transports (no network).
+LICENSE: no upstream code vendored, so no new license notice. Provider TERMS
+    (retention/training/regional-processing/acceptable-use) must be recorded
+    by the operator per enabled model before any live canary and are shown in
+    CLI status/disclosure output; OpenRouter route changes re-disclose the
+    actual processor.
+DECISION: DOCUMENT-ONLY reference (no COPY/ADAPT). The gateway speaks the
+    public chat-completions shape to operator-configured endpoints; catalog
+    snapshots carry source+timestamp and stale data fails closed; model IDs
+    are never hardcoded as permanent.
+LOCAL DESTINATION: voicebridge/providers/ + tests/test_packet8q.py +
+    `voicebridge frontier status|show|chat` CLI.
+DEPENDENCIES ADDED: none (stdlib urllib/json only).
+BEHAVIOR KEPT: local-first default with zero frontier network; explicit
+    frontier fails closed with typed codes; auto uses truthful local fallback;
+    env/file credential refs with redaction; spend/rate/concurrency/circuit
+    limits; idempotent retries; redacted usage records; provider disclosure.
+BEHAVIOR INTENTIONALLY OMITTED: any coding-agent subprocess (Packet 8R),
+    automatic escalation on untrusted text, credential storage in config/git/
+    frontend/logs, reading OpenCode's private auth store, unbounded retries,
+    streaming reconnect cost multiplication, and treating a catalog/plan as
+    permanent.
+WHY THIS IS THE SMALLEST FIT: the packet needs only a governed HTTP boundary
+    plus routing policy; an SDK or framework would add undeclared dependencies
+    and bypass the broker/audit/redaction contracts.
+COMPATIBILITY DRIFT: provider endpoints, model IDs, pricing, and terms change;
+    Qubit validates catalog freshness per request and fails closed on drift.
+IMPLEMENTATION STATUS: implemented as voicebridge/providers/ (Packet 8Q,
+    2026-09-06) with hermetic tests tests/test_packet8q.py. Cloud disabled by
+    default. Live provider canary requires separate operator authorization and
+    is NOT performed in this packet.
+```

@@ -806,6 +806,30 @@ def build_parser() -> argparse.ArgumentParser:
                        help="dashboard port (default: webui.port from config)")
     webui.add_argument("--json", action="store_true",
                        help="machine-readable typed result")
+    fr = add("frontier", help="Packet 8Q frontier-provider gateway "
+             "(local default; cloud disabled unless explicitly enabled)")
+    fr_sub = fr.add_subparsers(dest="frontier_command")
+    fr_sub.add_parser("status", parents=[common],
+                      help="typed gateway status (route, allowlist, budgets, disclosure)")
+    fr_show = fr_sub.add_parser("show", parents=[common],
+                                help="show one provider/model catalog entry")
+    fr_show.add_argument("id", help="provider/model, e.g. zen/my-model")
+    fr_chat = fr_sub.add_parser("chat", parents=[common],
+                                help="one bounded completion via the gateway "
+                                     "(dry-run by default; --confirm to send)")
+    fr_chat.add_argument("prompt", nargs="+", help="sanitized task text")
+    fr_chat.add_argument("--route", default="",
+                         choices=["", "local", "frontier", "auto"],
+                         help="route override (default: configured route)")
+    fr_chat.add_argument("--provider", default="")
+    fr_chat.add_argument("--model", default="")
+    fr_chat.add_argument("--max-tokens", type=int, default=None)
+    fr_chat.add_argument("--confirm", action="store_true",
+                         help="explicitly confirm a cloud send (required for frontier/auto)")
+    fr_chat.add_argument("--allow-private", action="store_true",
+                         help="explicit per-request approval to include private context")
+    fr_chat.add_argument("--json", action="store_true",
+                         help="machine-readable typed result")
     return p
 
 
@@ -873,6 +897,8 @@ def main(argv=None) -> int:
         return _cmd_device(cfg, args)
     if command == "monitor":
         return _cmd_monitor(cfg, args)
+    if command == "frontier":
+        return _cmd_frontier(cfg, args)
     if command == "webui":
         return _cmd_webui(cfg, args)
 
@@ -3043,6 +3069,109 @@ def _cmd_monitor(cfg, args) -> int:
         print(_json.dumps(M.optional_launch(cfg), indent=2, sort_keys=True))
         return 0
     print(f"ERROR: unknown monitor command {cmd!r}")
+    return 2
+
+
+def _cmd_frontier(cfg, args) -> int:
+    """Packet 8Q: frontier gateway status/show/chat (local default)."""
+    import json as _json
+    from .providers import gateway as G
+    from .providers.catalog import catalog_from_allowlist
+    from .providers.contracts import ProviderRequest
+    from .providers.credentials import redact_ref
+    from .providers.policy import FrontierPolicy, disclosure_block
+    cmd = getattr(args, "frontier_command", None) or "status"
+    policy = FrontierPolicy.from_config(cfg)
+    if cmd == "status":
+        out = {
+            "enabled": policy.enabled,
+            "route": policy.route,
+            "effective_default": policy.effective_route(""),
+            "allowlist": policy.allowlist,
+            "privacy_tier": policy.privacy_tier,
+            "limits": {
+                "max_tokens": policy.max_tokens,
+                "max_context_chars": policy.max_context_chars,
+                "max_response_chars": policy.max_response_chars,
+                "timeout_s": policy.timeout_s,
+                "max_retries": policy.max_retries,
+                "rpm": policy.rpm,
+                "max_concurrency": policy.max_concurrency,
+                "daily_usd": policy.daily_usd,
+                "monthly_usd": policy.monthly_usd,
+            },
+            "providers": {
+                k: {"base_url": (v or {}).get("base_url", ""),
+                    "key_ref": redact_ref(str((v or {}).get("key_ref", "")))}
+                for k, v in policy.providers.items()
+            },
+            "local_default": "local/qubit-brain4 (no network beyond Ollama)",
+            "spend_ledger": ("process-local (resets on restart; reported spend "
+                             "is a lower bound after any restart)"),
+            "terms": ("availability and price subject to provider account; "
+                      "never free/unlimited by default"),
+        }
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    if cmd == "show":
+        ident = (args.id or "").strip()
+        if "/" not in ident:
+            print(_json.dumps({"ok": False, "code": "UNKNOWN_MODEL",
+                               "message": "expected provider/model"}, indent=2))
+            return 1
+        prov, mod = ident.split("/", 1)
+        pcfg = policy.provider_cfg(prov)
+        allowed = policy.is_allowed(prov, mod)
+        print(_json.dumps({
+            "provider": prov, "model": mod, "allowed": allowed,
+            "enabled": policy.enabled,
+            "base_url": pcfg.get("base_url", ""),
+            "key_ref": redact_ref(str(pcfg.get("key_ref", ""))),
+            "disclosure": disclosure_block(policy, prov, mod, 0.0),
+        }, indent=2, sort_keys=True))
+        return 0 if allowed else 1
+    if cmd == "chat":
+        prompt = " ".join(args.prompt or []).strip()
+        if not prompt:
+            print("ERROR: empty prompt", file=sys.stderr)
+            return 2
+        route = (args.route or policy.route or "local").lower()
+        if route in ("frontier", "auto") and not args.confirm:
+            print(_json.dumps({
+                "ok": False, "code": "CONFIRM_REQUIRED",
+                "message": "cloud send requires --confirm (dry-run default)",
+                "route": route, "provider": args.provider,
+                "model": args.model,
+            }, indent=2, sort_keys=True))
+            print("\n# dry-run: nothing sent. Re-run with --confirm to send.",
+                  file=sys.stderr)
+            return 1
+        req = ProviderRequest(
+            prompt=prompt,
+            max_tokens=int(args.max_tokens or policy.max_tokens),
+            timeout_s=policy.timeout_s, route=route,
+            provider=args.provider or "", model=args.model or "")
+        res = G.run(req, cfg,
+                    catalog=catalog_from_allowlist(policy.allowlist),
+                    allow_private=bool(args.allow_private))
+        if getattr(args, "json", False):
+            print(_json.dumps(res.to_public_dict(), indent=2, sort_keys=True))
+        else:
+            d = res.to_public_dict()
+            print(f"ok={d['ok']} identity={d['identity']} code={d['code']}")
+            if d["message"]:
+                print(f"note: {d['message']}")
+            u = d["usage"]
+            print(f"usage: cost_usd~{u['cost_usd_est']} ms={u['latency_ms']} "
+                  f"fallback={u['fallback']}")
+            if res.details.get("disclosure"):
+                print(f"disclosure: {res.details['disclosure']}")
+            if res.ok and d["text"]:
+                # Redacted public text only — never the raw provider string.
+                print("---")
+                print(d["text"][:2000])
+        return 0 if res.ok else 1
+    print(f"ERROR: unknown frontier command {cmd!r}")
     return 2
 
 
