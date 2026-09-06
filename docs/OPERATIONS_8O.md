@@ -53,8 +53,11 @@ for every channel:
   a typed `AUDIT_PERSIST_FAILED` — never silently swallowed. Grant-store write
   failures already raise typed `PowerError`s.
 - **Truthful inventory.** Ghost capabilities are reported `DISABLED` (adapter is
-  disabled by default) instead of `AVAILABLE`; declared config rows report real
-  config state; `authorized` counts only rows covered by an active grant.
+  disabled by default) instead of `AVAILABLE`; 8F action adapters are
+  `DISABLED` unless `actions.enabled`; declared config rows report `AVAILABLE`
+  (configured + present) — never `ENABLED` (running) without a live probe;
+  `configured != running` and `authorized != available` are never conflated;
+  `authorized` counts only rows covered by an active grant.
 - **MCP/Comet typed.** There is no MCP server in this repository. `mcp_status()`
   reports a truthful `UNAVAILABLE`/`DISABLED` state and the Comet research path
   stays broker-bound (through `GhostRunner`) — no direct adapter calls and no
@@ -62,6 +65,40 @@ for every channel:
 - **Secret hygiene.** Grants persist redacted notes (`0600`); audit records and
   all power decision fields pass through `redact_text`; receipts already redact
   private args; no cookie/token/page-text/message-body is written by this packet.
+
+### Source identity is preserved through every layer
+
+`model`, `automation`, `page`, `tool`, `skill`, and arbitrary text are NEVER
+coerced to `user`. The gate adapter and policy route the ORIGINAL source into
+the decision:
+
+- an owner grant is auto-allowed only for an authenticated human (`user`) or the
+  read-only `check` probe — non-human sources can never consume a grant;
+- high-impact actions require `source == "user"` AND a fresh single-use
+  confirmation verified against the canonical envelope (capability, complete
+  arguments, target/origin, account, role, scope, action hash, expiry, human
+  issuer);
+- the shared 7E/8F/8N gate sees the original source, never a coerced `user`.
+
+### Canonical origins and the explicit subdomain policy
+
+- `http` allows only port 80; `https` allows only port 443.
+- Paths, queries, fragments, credentials, IP literals, wildcards, malformed
+  hosts, empty labels, and bare single-label hosts are rejected.
+- Subdomains ARE allowed by default, but only at a label boundary
+  (`target == allowed` or `target.endswith("." + allowed)`); lookalike hosts
+  (`notgmail.com`, `perplexity.ai.evil.com`) never match. Exact-host matching is
+  available via `allow_subdomains=False`. Every caller passes this explicitly;
+  subdomains are never silently treated as exact matches.
+
+### Lock, persistence, and audit durability
+
+- The grant store releases its cross-process flock with `try/finally` on every
+  path (success, read failure, mutate failure, write/rename/fsync failure, and
+  exception) — a failed issue/revoke/reset can never hang the next operation.
+- The durable power audit is a `0600` JSONL appended under a cross-process
+  flock with file + directory fsync and complete-write accounting; a persistence
+  failure raises a typed `AUDIT_PERSIST_FAILED` and no record is duplicated.
 
 ## 1. What the power profile does
 

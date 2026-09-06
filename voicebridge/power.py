@@ -126,13 +126,13 @@ def is_high_impact(action_id: str, spec: Optional[ActionSpec] = None) -> bool:
 def _valid_origin(url: str) -> bool:
     """Strict canonical-origin validation for grant ``origins`` entries.
 
-    Accepts only http/https with an explicit multi-label DNS host and default
-    port, no user-info, no path, no query, no fragment, and no IP literal. A
-    bare host (``https://perplexity``), an IP literal, a non-default port, a
-    credential-bearing URL, and any path/query/fragment (only the origin is
-    intended) are all rejected. Used for BOTH grant-bound origins and
-    browser-role target matching so a grant can never be replayed against an
-    out-of-origin target.
+    Accepts only http (port 80) or https (port 443) with an explicit
+    multi-label DNS host, no user-info, no path, no query, no fragment, and no
+    IP literal. A bare host, an IP literal, a non-default port, an explicit
+    default-port-only mismatch (http on 443 / https on 80), a credential-bearing
+    URL, and any path/query/fragment (only the origin is intended) are all
+    rejected. Used for BOTH grant-bound origins and browser-role target
+    matching so a grant can never be replayed against an out-of-origin target.
     """
     if not isinstance(url, str) or not url.strip():
         return False
@@ -140,7 +140,8 @@ def _valid_origin(url: str) -> bool:
         parts = urlsplit(url.strip())
     except ValueError:
         return False
-    if (parts.scheme or "").lower() not in ("http", "https"):
+    scheme = (parts.scheme or "").lower()
+    if scheme not in ("http", "https"):
         return False
     host = parts.hostname or ""
     if not host or any(ch in host for ch in ("@", "/", "\\")):
@@ -149,11 +150,13 @@ def _valid_origin(url: str) -> bool:
         return False
     if re.match(r"^\d{1,3}(\.\d{1,3}){3}$", host):
         return False  # IP literals are never an approved origin
-    labels = [lbl for lbl in host.split(".") if lbl]
+    labels = host.split(".")
     if len(labels) < 2 or any(len(lbl) < 1 for lbl in labels):
-        return False  # require a canonical multi-label host
-    if parts.port is not None and parts.port not in (80, 443):
-        return False
+        return False  # require a canonical multi-label host, no empty labels
+    if parts.port is not None:
+        expected = 443 if scheme == "https" else 80
+        if parts.port != expected:
+            return False  # http:80 / https:443 only
     if parts.username or parts.password:
         return False
     if parts.path:
@@ -192,14 +195,17 @@ def _canonical_host(url: str) -> str:
     return host.strip()
 
 
-def _host_matches(url: str, allowed: Tuple[str, ...]) -> bool:
+def _host_matches(url: str, allowed: Tuple[str, ...], *,
+                  allow_subdomains: bool = True) -> bool:
     """Canonical host allowlist match with exact subdomain boundaries.
 
-    Both the request target and every allowlist entry are reduced to a
-    canonical host. A match requires the target host to EQUAL the allowed host
-    or be a proper subdomain ending in ``.<allowed>``. Ambiguous matches
-    (``notgmail.com`` for ``gmail.com``, a bare TLD, an IP, or a host with a
-    wildcard in the middle) never match.
+    POLICY (explicit): subdomains ARE allowed by default, but ONLY as a proper
+    suffix at a label boundary (``target == allowed`` or ``target`` ends with
+    ``.<allowed>``). ``notgmail.com`` never matches ``gmail.com``; a bare TLD,
+    an IP, or a host with a wildcard in the middle never match. Pass
+    ``allow_subdomains=False`` to require an EXACT host match. The decision is
+    explicit in every caller and documented; subdomains are never silently
+    treated as exact matches or vice versa.
     """
     host = _origin_host(url)
     if not host or not allowed:
@@ -212,7 +218,9 @@ def _host_matches(url: str, allowed: Tuple[str, ...]) -> bool:
             continue
         if any(ch in a for ch in ("*", "@", "/", "\\", " ")):
             continue
-        if host == a or host.endswith("." + a):
+        if host == a:
+            return True
+        if allow_subdomains and host.endswith("." + a):
             return True
     return False
 
@@ -327,8 +335,13 @@ def _domain_for_action(action_id: str, adapter: str) -> str:
 
 def _declared_capabilities(cfg: Any) -> List[PowerCapability]:
     """Declared (non-action) capability rows for domains that are not action
-    adapters: memory, notifications, audio, model, file. These report typed
-    availability from the effective config — never a live probe."""
+    adapters: memory, notifications, audio, model, file.
+
+    Truthfulness rule: ``AVAILABLE`` means the adapter is present AND enabled
+    by config, but the row does NOT claim it is running — a live probe is the
+    only way to claim ``ENABLED``. A disabled/absent feature is ``DISABLED``.
+    ``configured != running`` is therefore never conflated.
+    """
     from .profiles import current_profiles  # local import (no hard dep)
 
     caps: List[PowerCapability] = []
@@ -338,14 +351,14 @@ def _declared_capabilities(cfg: Any) -> List[PowerCapability]:
         domain="memory", capability="memory.core", adapter="memory",
         adapter_version="1.0.0", scope="memory",
         risk_tier=Tier.READ_ONLY.value,
-        state=ST_ENABLED if mem_enabled else ST_DISABLED,
+        state=ST_AVAILABLE if mem_enabled else ST_DISABLED,
         revocable=False, disableable=True,
         audit_status="config_declared"))
     caps.append(PowerCapability(
         domain="memory", capability="memory.semantic", adapter="memory",
         adapter_version="1.0.0", scope="memory",
         risk_tier=Tier.READ_ONLY.value,
-        state=ST_ENABLED if mem_sem else ST_DISABLED,
+        state=ST_AVAILABLE if mem_sem else ST_DISABLED,
         revocable=False, disableable=True,
         audit_status="config_declared"))
     notif = cfg.get("communications", "notifications", default="desktop") or \
@@ -354,7 +367,7 @@ def _declared_capabilities(cfg: Any) -> List[PowerCapability]:
         domain="notifications", capability="notifications.desktop",
         adapter="notifications", adapter_version="1.0.0",
         scope="notifications", risk_tier=Tier.REVERSIBLE.value,
-        state=ST_ENABLED if notif else ST_DISABLED,
+        state=ST_AVAILABLE if notif else ST_DISABLED,
         revocable=False, disableable=True, audit_status="config_declared"))
     try:
         profs = current_profiles(cfg)
@@ -363,23 +376,24 @@ def _declared_capabilities(cfg: Any) -> List[PowerCapability]:
         tts = (profs.get("tts") or {}).get("selected") or "piper"
     except Exception:
         brain, stt, tts = "qubit-brain4", "sherpa", "piper"
+    # Model/STT/TTS: configured + present (AVAILABLE), never claimed running.
     caps.append(PowerCapability(
         domain="model", capability=f"model.brain:{brain}",
         adapter="profiles", adapter_version="1.0.0", scope="model",
         target_or_origin="local", risk_tier=Tier.REVERSIBLE.value,
-        state=ST_ENABLED, revocable=False, disableable=True,
+        state=ST_AVAILABLE, revocable=False, disableable=True,
         audit_status="config_declared"))
     caps.append(PowerCapability(
         domain="model", capability=f"model.stt:{stt}",
         adapter="profiles", adapter_version="1.0.0", scope="model",
         target_or_origin="local", risk_tier=Tier.READ_ONLY.value,
-        state=ST_ENABLED, revocable=False, disableable=True,
+        state=ST_AVAILABLE, revocable=False, disableable=True,
         audit_status="config_declared"))
     caps.append(PowerCapability(
         domain="model", capability=f"model.tts:{tts}",
         adapter="profiles", adapter_version="1.0.0", scope="model",
         target_or_origin="local", risk_tier=Tier.REVERSIBLE.value,
-        state=ST_ENABLED, revocable=False, disableable=True,
+        state=ST_AVAILABLE, revocable=False, disableable=True,
         audit_status="config_declared"))
     mic = cfg.get("audio", "mic_name", default="") or "system default"
     out = cfg.get("audio", "output_name", default="") or "system default"
@@ -387,13 +401,13 @@ def _declared_capabilities(cfg: Any) -> List[PowerCapability]:
         domain="audio", capability="audio.capture", adapter="audio",
         adapter_version="1.0.0", scope="audio",
         target_or_origin=redact_text(mic), risk_tier=Tier.READ_ONLY.value,
-        state=ST_ENABLED, revocable=False, disableable=True,
+        state=ST_AVAILABLE, revocable=False, disableable=True,
         audit_status="config_declared"))
     caps.append(PowerCapability(
         domain="audio", capability="audio.playback", adapter="audio",
         adapter_version="1.0.0", scope="audio",
         target_or_origin=redact_text(out), risk_tier=Tier.REVERSIBLE.value,
-        state=ST_ENABLED, revocable=False, disableable=True,
+        state=ST_AVAILABLE, revocable=False, disableable=True,
         audit_status="config_declared"))
     caps.append(PowerCapability(
         domain="file", capability="file.workspace", adapter="file",
@@ -425,11 +439,19 @@ def power_profile(cfg: Any = None) -> Dict[str, Any]:
     """
     register_ghost_specs_safe()
     caps: List[PowerCapability] = []
+    # 8F action capabilities: the CONTRACT is registered but the live execution
+    # adapter is DISABLED by default (Packet 8F). Truthfulness rule:
+    # "available" describes an actually-executable adapter, not a registered
+    # contract, so disabled/unavailable adapters report DISABLED. An operator
+    # that enables the action adapter makes these AVAILABLE.
     from .actions import action_specs as _action_specs
+    action_enabled = bool(cfg is not None and cfg.get(
+        "actions", "enabled", default=False))
     for spec in _action_specs():
         domain = _domain_for_action(spec.action_id, spec.adapter)
         caps.append(_from_action_spec(
-            spec, domain, state=ST_AVAILABLE,
+            spec, domain,
+            state=ST_AVAILABLE if action_enabled else ST_DISABLED,
             target=redact_text(getattr(spec, "target", "")),
             revocable=spec.tier in (Tier.READ_ONLY, Tier.REVERSIBLE),
             disableable=True))
@@ -784,7 +806,11 @@ class PowerGrantStore:
     def _lockfd(self):
         import fcntl
         lock_path = self._path + ".lock"
-        fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+        except OSError as exc:
+            raise PowerError(f"grant lock open failed: {exc}",
+                             "GRANT_LOCK_FAILED") from exc
         try:
             fcntl.flock(fd, fcntl.LOCK_EX)
         except OSError:
@@ -865,21 +891,30 @@ class PowerGrantStore:
 
     def _locked_update(self, mutate: Callable[
             [Optional[PowerGrant]], Optional[PowerGrant]]) -> Optional[PowerGrant]:
+        """Cross-process locked read-modify-write. The flock is ALWAYS released
+        (try/finally) on success, read failure, mutate failure, write failure,
+        and exception paths — a failed operation can never hang the next one."""
         fd = self._lockfd()
         try:
-            latest = self._read_latest_locked()
-        except (OSError, PowerError) as exc:
-            self._unlockfd(fd)
-            code = getattr(exc, "code", "GRANT_STATE_CORRUPT")
-            raise PowerError(f"cannot read latest grant state: {exc}", code) \
-                from exc
-        new = mutate(latest)
-        try:
+            try:
+                latest = self._read_latest_locked()
+            except (OSError, PowerError, ValueError) as exc:
+                code = getattr(exc, "code", "GRANT_STATE_CORRUPT")
+                raise PowerError(
+                    f"cannot read latest grant state: {exc}", code) from exc
+            new = mutate(latest)
             self._write_payload_locked(new)
-        except PowerError:
-            self._unlockfd(fd)
+        except PowerDenied:
+            # mutate() refused the change (e.g. UNKNOWN_GRANT): release the
+            # lock and re-raise without persisting anything.
             raise
-        self._unlockfd(fd)
+        except PowerError:
+            raise
+        except Exception as exc:
+            raise PowerError(f"grant update failed: {exc}",
+                             "GRANT_UPDATE_FAILED") from exc
+        finally:
+            self._unlockfd(fd)
         with self._lock:
             self._grant = new
         return new
@@ -1307,14 +1342,17 @@ class PowerPolicy:
             return self._deny(capability, "CONCURRENCY_LIMIT",
                               f"adapter {adapter} concurrency limit reached")
         try:
-            # 6. Owner power grant: routine auto-allow ONLY. The exact argument
-            #    hash (when the grant binds one) is derived from the request
-            #    args so a changed argument can never reuse a grant.
+            # 6. Owner power grant: routine auto-allow ONLY for an
+            #    authenticated human/owner source (or the read-only "check"
+            #    probe). model / automation / page / tool / skill / arbitrary
+            #    text can NEVER consume a grant — it never silently becomes a
+            #    human.
             grant = self.store.grant() if self.store else None
-            if grant is not None and grant.covers_action(
-                    capability, spec, scopes=scopes, target=target,
-                    role=role, account_scope=account_scope,
-                    args_hash=args_digest(args) if grant.arg_hashes else ""):
+            if grant is not None and source in ("user", "check") and \
+                    grant.covers_action(
+                        capability, spec, scopes=scopes, target=target,
+                        role=role, account_scope=account_scope,
+                        args_hash=args_digest(args) if grant.arg_hashes else ""):
                 self._audit(capability, "ALLOWED", source,
                             "owner power grant routine", scopes, target)
                 return self._allow(capability, "ALLOWED",
@@ -1361,9 +1399,16 @@ class PowerPolicy:
         execution)."""
         gate = self._ensure_gate()
         scope = scopes[0] if scopes else (spec.scopes[0] if spec.scopes else "")
-        env = {"action_id": spec.action_id, "scope": scope,
-               "target": target, "role": role,
-               "account_scope": account_scope, "args": dict(args or {})}
+        # When the caller passed the full validated envelope (the gate adapter
+        # does), use it VERBATIM so confirmation verification and the gate see
+        # the exact same envelope the broker will consume. Otherwise build the
+        # minimal envelope from the typed fields.
+        if isinstance(args, dict) and args.get("action_id"):
+            env = dict(args)
+        else:
+            env = {"action_id": spec.action_id, "scope": scope,
+                   "target": target, "role": role,
+                   "account_scope": account_scope, "args": dict(args or {})}
         if hasattr(gate, "ghost_grants") and self.session_grants is not None:
             gate.ghost_grants = self.session_grants
         if dry_run:
@@ -1385,11 +1430,14 @@ class PowerPolicy:
                                   "no confirmation store configured; high-impact "
                                   "actions fail closed")
             try:
-                # The broker binds confirmations to the full envelope, so
-                # verification uses the envelope the executor will consume
-                # (passed through as ``args`` by the gate adapter).
-                verify_target = args if isinstance(args, dict) and args else \
-                    env
+                # The broker binds confirmations to the FULL envelope. The
+                # adapter passes that exact envelope through as ``args``;
+                # verification uses it (never re-wrapped), so a changed
+                # target/origin/account/scope/args/action-hash can never reuse
+                # a confirmation. Nothing is consumed here (the broker
+                # consumes once at execution).
+                verify_target = args if isinstance(args, dict) and \
+                    args.get("action_id") else env
                 self.confirmations.verify(confirmation_id, spec.action_id,
                                           verify_target)
             except ConfirmationDenied as exc:
@@ -1398,6 +1446,10 @@ class PowerPolicy:
             return self._translate_gate(gate.decide(
                 spec, env, source=source, confirmation_id=confirmation_id,
                 confirmation_required=True))
+        # Non-high-impact: preserve the ORIGINAL source through to the gate.
+        # A non-human source reaches the underlying 7E/8F/8N gate as itself
+        # (never coerced to "user"), so model/automation/tool text can never
+        # reuse a human grant or bypass the confirmation rules.
         translated = self._translate_gate(gate.decide(spec, env, source=source))
         self._audit(capability, translated.get("code", "DENIED"), source,
                     translated.get("detail", "")[:200], scopes, target)
@@ -1424,26 +1476,53 @@ class PowerPolicy:
                scopes: Tuple[str, ...], target: str) -> None:
         """Durable, fail-closed audit for power decisions and grant state.
 
-        Writes one redacted JSONL record (0600 file, appended under a lock).
-        A persistence failure raises a typed :class:`PowerError` — audit
-        failures are NEVER silently swallowed (Packet 8O requirement).
+        Writes one redacted JSONL record to a ``0600`` file under a
+        cross-process flock with file + directory fsync and complete-write
+        accounting. A persistence failure raises a typed :class:`PowerError`
+        — audit failures are NEVER silently swallowed (Packet 8O requirement).
         """
         rec = {"ts": _now(), "capability": capability, "code": code,
                "source": source, "detail": redact_text(detail)[:200],
                "scopes": sorted(scopes), "target": redact_text(target)[:120]}
         log_event("power.decision", **rec)
-        if self._audit_path:
-            try:
-                with self._audit_lock:
+        if not self._audit_path:
+            return
+        import fcntl
+        payload = (json.dumps(rec) + "\n").encode("utf-8")
+        lock_path = self._audit_path + ".lock"
+        try:
+            os.makedirs(os.path.dirname(self._audit_path) or ".", exist_ok=True)
+        except OSError as exc:
+            raise PowerError(f"power audit dir failed: {exc}",
+                             "AUDIT_MKDIR_FAILED", degraded=True) from exc
+        try:
+            with self._audit_lock:
+                lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+                try:
+                    fcntl.flock(lock_fd, fcntl.LOCK_EX)
                     fd = os.open(self._audit_path, os.O_CREAT | os.O_WRONLY
                                  | os.O_APPEND, 0o600)
                     try:
-                        os.write(fd, (json.dumps(rec) + "\n").encode("utf-8"))
+                        written = os.write(fd, payload)
+                        if written != len(payload):
+                            raise OSError(
+                                f"short write {written}/{len(payload)}")
+                        os.fsync(fd)
                     finally:
                         os.close(fd)
-            except OSError as exc:
-                raise PowerError(f"power audit persistence failed: {exc}",
-                                 "AUDIT_PERSIST_FAILED", degraded=True) from exc
+                    dir_fd = os.open(
+                        os.path.dirname(self._audit_path) or ".",
+                        os.O_RDONLY)
+                    try:
+                        os.fsync(dir_fd)
+                    finally:
+                        os.close(dir_fd)
+                finally:
+                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                    os.close(lock_fd)
+        except OSError as exc:
+            raise PowerError(f"power audit persistence failed: {exc}",
+                             "AUDIT_PERSIST_FAILED", degraded=True) from exc
 
 
 def power_policy(cfg: Any = None, *,
@@ -1525,13 +1604,17 @@ class PowerGateAdapter:
             envelope, dict) else ""
         scopes = tuple(s.strip() for s in str(scope).split(",") if s.strip())
         dry = source == "check"
-        # The broker binds confirmations to the FULL envelope, so the policy
-        # verifies against the same envelope the executor will consume.
-        verify_args = dict(envelope) if isinstance(envelope, dict) else args
+        # Source identity is PRESERVED through the policy path. model /
+        # automation / page / tool / skill / arbitrary text must never be
+        # converted to "user": the policy and the underlying gate deny them
+        # (no grant auto-allow, no confirmation reuse, no high-impact
+        # approval). Only an authenticated human channel reaches the gate as
+        # "user"; "check" is the read-only probe source.
         d = self.policy.decide(
             spec.action_id, scopes=scopes, target=target, role=role,
-            account_scope=account, source="user" if not dry else "user",
-            args=verify_args, confirmation_id=confirmation_id, dry_run=dry)
+            account_scope=account, source=source,
+            args=dict(envelope) if isinstance(envelope, dict) else args,
+            confirmation_id=confirmation_id, dry_run=dry)
         if d.get("allowed") is False and dry and d.get("code") == \
                 "CONFIRMATION_REQUIRED":
             return {"allowed": False, "code": "CONFIRMATION_REQUIRED",
