@@ -183,15 +183,15 @@ DEFAULTS: Dict[str, Any] = {
         # Master switch (packaged default False) ANDs with the state-file user
         # enablement (`voicebridge opencode enable`) and the emergency-stop
         # latch. No upstream code vendored; the local pinned binary is invoked
-        # one-shot at arm's length. Never inherits provider keys, cookies, or
-        # session env (see voicebridge/opencode.py sanitized_env).
+        # one-shot at arm's length. The child inherits only the strict
+        # allowlist (PATH/LANG/LC_ALL/LC_MESSAGES/TZ) — there is no
+        # environment pass-through knob (see voicebridge/opencode.py).
         "opencode": {
             "enabled": False,
             "binary": "~/.opencode/bin/opencode",
             "pinned_version": "1.18.29",
             "timeout_s": 300.0,
             "max_timeout_s": 600.0,
-            "pass_env": [],
         },
         "deepseek_url": "https://api.deepseek.com/chat/completions",
         "deepseek_model": "deepseek-v4-flash",

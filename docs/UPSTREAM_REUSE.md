@@ -1666,4 +1666,17 @@ IMPLEMENTATION STATUS: implemented as voicebridge/opencode.py (Packet 8R,
     default (config master switch + state-file flag + emergency-stop latch).
     Live coding runs require separate operator authorization and a disposable
     worktree and are NOT performed in this packet.
+
+REPAIR 2026-09-07 (independent-verification findings, no new upstream
+    touchpoint, still DOCUMENT-ONLY + local WRAP):
+    status/version probe spawns only while effectively enabled with the
+    strict sanitized environment; disposable cleanup moved to guaranteed
+    finally + stale-orphan sweep; non-JSON output fails closed
+    (MALFORMED_OUTPUT, raw-text fallback removed); task_file confined inside
+    the approved root; pass_env knob REMOVED in favor of a fixed allowlist
+    (PATH/LANG/LC_ALL/LC_MESSAGES/TZ); child setrlimit ceilings + workdir
+    caps + symlink-escape refusal; pinned version enforced at run time
+    (VERSION_MISMATCH/VERSION_UNKNOWN); in-project writes mechanically
+    require a preview hash (PREVIEW_REQUIRED); voice/tray execution
+    explicitly documented as NOT wired (CLI full, dashboard read-only).
 ```

@@ -23,8 +23,10 @@ Invariants enforced here (each has a test in tests/test_packet8r.py):
   gate: authenticated owner request, approved project root bound into the
   action hash, allowlisted file scope (= the resolved project root), bounded
   task/output/context, timeout, resource caps, visible run ID, cancellation,
-  kill/reap, and redacted receipts. Voice, dashboard, CLI (and future tray)
-  share the same ``OpenCodeRunner``/broker entry — no second listener.
+  kill/reap, and redacted receipts. The authenticated CLI has full parity
+  and the authenticated dashboard has read-only parity on the same
+  runner/broker — voice and tray execution are intentionally NOT wired (see
+  ``request_coding_run``), and no second listener exists.
 - Minimal sanitized environment: only an allowlist (PATH/LANG/LC_ALL plus
   operator-configured ``pass_env``) reaches the child. Provider keys, browser
   cookies, desktop-session variables, and personal paths are never inherited;
@@ -97,8 +99,22 @@ MAX_TASK_CHARS = 4000
 MAX_PROMPT_FILE_BYTES = 16 * 1024
 MAX_OUTPUT_CHARS = 32_768
 MAX_DIFFSTAT_LINES = 40
+MAX_DIFF_FILES = 100
 DEFAULT_TIMEOUT_S = 300.0
 MAX_TIMEOUT_S = 600.0
+
+# Generated-worktree validation caps (fail closed when exceeded).
+MAX_WORKDIR_FILES = 1000
+MAX_WORKDIR_BYTES = 100 * 1024 * 1024
+
+# Child-process resource ceilings enforced with setrlimit in preexec.
+RLIMIT_AS_BYTES = 4 * 1024 * 1024 * 1024
+RLIMIT_FSIZE_BYTES = 512 * 1024 * 1024
+RLIMIT_NPROC = 128
+RLIMIT_NOFILE = 256
+
+# Orphaned disposable-worktree sweep age (bases older than this are reaped).
+ORPHAN_MAX_AGE_S = 7200.0
 
 # Directories that can never be a project root or workdir.
 _SECRET_DIR_NAMES = frozenset({
@@ -168,11 +184,27 @@ def _is_secret_file(path: Path) -> bool:
     return any(h in name for h in _SECRET_FILE_HINTS)
 
 
-def load_task_text(args: Dict[str, Any]) -> str:
+def _assert_within_root(resolved: Path, root: Path, what: str) -> Path:
+    """Fail closed unless `resolved` is the root or lives under it.
+
+    `resolved` must already be fully resolved (symlinks followed) so
+    symlink/rename escapes cannot slip past a lexical check.
+    """
+    try:
+        resolved.relative_to(root)
+    except ValueError:
+        raise ActionValidationError(
+            f"opencode: {what} escapes the approved root — refused") from None
+    return resolved
+
+
+def load_task_text(args: Dict[str, Any], root: Path) -> str:
     """Return the bounded task text from ``task`` or ``task_file``.
 
-    Exactly one of the two must be present. File content is bounded, treated
-    as untrusted, and never validated as shell (it is message data, not argv).
+    Exactly one of the two must be present. File content is bounded, must
+    resolve INSIDE the approved project `root` (symlink escapes refused),
+    must not be a secret-named file, and is treated as untrusted message
+    data — never shell, never authority.
     """
     inline = str(args.get("task", "") or "")
     fpath = str(args.get("task_file", "") or "")
@@ -190,6 +222,7 @@ def load_task_text(args: Dict[str, Any]) -> str:
                 f"opencode: task_file unresolvable: {exc}") from None
         if not resolved.is_file():
             raise ActionValidationError("opencode: task_file is not a file")
+        _assert_within_root(resolved, root, "task_file")
         if _is_secret_file(resolved):
             raise ActionValidationError(
                 "opencode: task_file looks like a secret file — refused")
@@ -223,41 +256,24 @@ def flag_untrusted(text: str) -> List[str]:
 # Sanitized environment + argv
 # ---------------------------------------------------------------------------
 
-_BASE_ENV_ALLOW = ("PATH", "LANG", "LC_ALL")
+# Strict explicit allowlist: these — and ONLY these — names are ever copied
+# from the parent environment into the OpenCode child. Everything else is
+# rejected by construction, including HOME, PYTHONPATH, LD_PRELOAD, BASH_ENV,
+# ENV, XDG_CONFIG_HOME, XDG_RUNTIME_DIR, DBUS_SESSION_BUS_ADDRESS, DISPLAY,
+# WAYLAND_DISPLAY, SSH_AUTH_SOCK, GIT_* overrides, *KEY*/*TOKEN*/*SECRET*/
+# *COOKIE*/*AUTH*/*PASSWORD*/*CREDENTIAL* names, and any shell, session,
+# desktop, or account variable. There is no operator pass-through knob.
+_SAFE_ENV_ALLOW = ("PATH", "LANG", "LC_ALL", "LC_MESSAGES", "TZ")
 
 
-def sanitized_env_names(extra: List[str]) -> Dict[str, str]:
-    """Build the minimal child environment from explicit extra names."""
+def sanitized_env() -> Dict[str, str]:
+    """Build the minimal child environment (never inherits secrets)."""
     env: Dict[str, str] = {}
-    for name in list(_BASE_ENV_ALLOW) + [str(x) for x in extra]:
-        low = name.lower()
-        if any(s in low for s in ("key", "token", "secret", "cookie", "auth",
-                                  "password", "credential", "session",
-                                  "display", "wayland", "xdg_runtime",
-                                  "dbus", "ssh")):
-            raise OpenCodeError(
-                f"refusing secret/session env passthrough: {name!r}")
+    for name in _SAFE_ENV_ALLOW:
         if name in os.environ:
             env[name] = os.environ[name]
     env.setdefault("PATH", "/usr/bin:/bin")
     return env
-
-
-def sanitized_env(cfg=None) -> Dict[str, str]:
-    """Build the minimal child environment (never inherits secrets).
-
-    Only PATH/LANG/LC_ALL plus operator-configured ``intent.opencode.pass_env``
-    names are copied. Anything secret-bearing in the extra list
-    (key/token/secret/cookie/auth) is refused at configuration time.
-    """
-    extra: Tuple[str, ...] = ()
-    if cfg is not None:
-        try:
-            extra = tuple(cfg.get("intent", "opencode", "pass_env",
-                                  default=()) or ())
-        except Exception:
-            extra = ()
-    return sanitized_env_names([str(x) for x in extra])
 
 
 def build_argv(binary: str, workdir: Path, task: str) -> List[str]:
@@ -284,20 +300,26 @@ RunOpencode = Callable[[List[str], Path, Dict[str, str], float],
 
 def real_run_opencode(argv: List[str], workdir: Path, env: Dict[str, str],
                       timeout_s: float) -> Dict[str, Any]:
-    """Run the pinned binary one-shot; kill/reap on timeout; never shell."""
+    """Run the pinned binary one-shot; kill/reap on timeout; never shell.
+
+    The child is confined with setrlimit CPU/AS/FSIZE/NPROC/NOFILE ceilings
+    in preexec (plus its own process group for kill/reap). No shell, no
+    server argv, bounded output.
+    """
     if _looks_like_server_argv(argv):
         raise OpenCodeError("refusing server/auto-approve opencode argv")
     try:
         proc = subprocess.Popen(
             argv, cwd=str(workdir), env=env, stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            start_new_session=True, text=True)
+            text=True, preexec_fn=lambda: _limited_preexec(timeout_s))
     except FileNotFoundError:
         return {"state": "failed", "code": "BINARY_MISSING",
                 "detail": "opencode executable not found"}
     except Exception as exc:
         return {"state": "failed", "code": "SPAWN_FAILED",
                 "detail": str(exc)[:200]}
+    t0 = time.monotonic()
     try:
         out, err = proc.communicate(timeout=timeout_s)
         code = proc.returncode
@@ -313,7 +335,8 @@ def real_run_opencode(argv: List[str], workdir: Path, env: Dict[str, str],
         return {"state": "failed", "code": "TIMEOUT",
                 "detail": f"exceeded {timeout_s}s; process group killed",
                 "stdout": (out or "")[:MAX_OUTPUT_CHARS],
-                "stderr": (err or "")[:2000]}
+                "stderr": (err or "")[:2000],
+                "elapsed_ms": int((time.monotonic() - t0) * 1000)}
     finally:
         try:
             proc.wait(timeout=0)
@@ -323,11 +346,31 @@ def real_run_opencode(argv: List[str], workdir: Path, env: Dict[str, str],
             "code": "OK" if code == 0 else f"EXIT_{code}",
             "stdout": (out or "")[:MAX_OUTPUT_CHARS],
             "truncated": len(out or "") > MAX_OUTPUT_CHARS,
-            "stderr": (err or "")[:2000]}
+            "stderr": (err or "")[:2000],
+            "elapsed_ms": int((time.monotonic() - t0) * 1000)}
+
+
+_AUTH_FAILURE_MARKERS = (
+    "unauthenticated", "unauthorized", "authentication required",
+    "login required", "please login", "please log in", "api key",
+    "invalid api key", "missing credentials", "no auth", "forbidden",
+    "http 401", "http 403", "status 401", "status 403",
+)
+
+
+def _looks_like_auth_failure(stderr: str, code: str) -> bool:
+    low = (stderr or "").lower()
+    return code in ("EXIT_1",) and any(m in low for m in _AUTH_FAILURE_MARKERS)
 
 
 def parse_run_output(stdout: str) -> Dict[str, Any]:
-    """Parse ``--format json`` event stream (bounded); malformed is typed."""
+    """Parse ``--format json`` event stream (bounded, fail closed).
+
+    Only JSON-object lines carrying a text/content/message string field count
+    as model output. Anything else — prose, HTML, tool dumps, partial JSON —
+    is a typed MALFORMED_OUTPUT failure, never success. A failed or partial
+    run must never be reported complete.
+    """
     if not stdout.strip():
         return {"state": "failed", "code": "EMPTY_OUTPUT",
                 "detail": "opencode produced no output"}
@@ -350,9 +393,10 @@ def parse_run_output(stdout: str) -> Dict[str, Any]:
     except Exception as exc:
         return {"state": "failed", "code": "PATCH_MALFORMED",
                 "detail": f"output parse failed: {exc}"[:200]}
-    if not texts and stdout.strip():
-        # Not JSON-events: treat as raw text (older format), still bounded.
-        texts = [stdout.strip()[:MAX_OUTPUT_CHARS]]
+    if not texts:
+        return {"state": "failed", "code": "MALFORMED_OUTPUT",
+                "detail": "opencode output carried no JSON text event; "
+                          "raw/nonconforming output is never success"}
     combined = "\n".join(texts)[:MAX_OUTPUT_CHARS]
     return {"state": "OK", "text": combined}
 
@@ -373,8 +417,153 @@ def worktree_diffstat(root: Path) -> Dict[str, Any]:
         return {"git": "failed", "detail": str(exc)[:150]}
     files = [ln for ln in (st.stdout or "").splitlines() if ln.strip()]
     stat_lines = (df.stdout or "").splitlines()
-    return {"git": "OK", "files": files[:50], "files_truncated": len(files) > 50,
+    return {"git": "OK", "files": files[:MAX_DIFF_FILES],
+            "files_truncated": len(files) > MAX_DIFF_FILES,
             "stat": "\n".join(stat_lines[:MAX_DIFFSTAT_LINES])}
+
+
+def _validate_workdir(root: Path, workdir: Path) -> Dict[str, Any]:
+    """Validate generated workdir contents before reporting success.
+
+    Walks without following symlinks; enforces file-count and byte caps;
+    any symlink resolving OUTSIDE the approved project `root` is a
+    SYMLINK_ESCAPE failure (rename/symlink escapes cannot smuggle paths in).
+    Returns counts for honest receipts.
+    """
+    nfiles = 0
+    nbytes = 0
+    outside: List[str] = []
+    try:
+        for dirpath, dirnames, filenames in os.walk(workdir,
+                                                    followlinks=False):
+            for name in filenames:
+                p = Path(dirpath) / name
+                nfiles += 1
+                if nfiles > MAX_WORKDIR_FILES:
+                    return {"ok": False, "code": "LIMIT_EXCEEDED",
+                            "detail": f"workdir exceeds {MAX_WORKDIR_FILES} "
+                                      "files",
+                            "files": nfiles, "bytes": nbytes,
+                            "outside_symlinks": []}
+                try:
+                    if os.path.islink(p):
+                        target = p.resolve(strict=False)
+                        try:
+                            target.relative_to(root)
+                        except ValueError:
+                            outside.append(
+                                str(p.relative_to(workdir))[:200])
+                    else:
+                        nbytes += p.stat(follow_symlinks=False).st_size
+                except OSError:
+                    continue
+                if nbytes > MAX_WORKDIR_BYTES:
+                    return {"ok": False, "code": "LIMIT_EXCEEDED",
+                            "detail": f"workdir exceeds "
+                                      f"{MAX_WORKDIR_BYTES} bytes",
+                            "files": nfiles, "bytes": nbytes,
+                            "outside_symlinks": []}
+    except Exception as exc:
+        return {"ok": False, "code": "VALIDATION_CRASH",
+                "detail": f"workdir validation failed: {exc}"[:200],
+                "files": nfiles, "bytes": nbytes, "outside_symlinks": []}
+    if outside:
+        return {"ok": False, "code": "SYMLINK_ESCAPE",
+                "detail": "symlinks resolve outside the approved root: "
+                          + ", ".join(outside[:8]),
+                "files": nfiles, "bytes": nbytes,
+                "outside_symlinks": outside[:8]}
+    return {"ok": True, "files": nfiles, "bytes": nbytes,
+            "outside_symlinks": []}
+
+
+def sweep_orphaned_workdirs(max_age_s: float = ORPHAN_MAX_AGE_S) -> Dict[str, Any]:
+    """Reap stale disposable-worktree bases (crash/cancel orphans).
+
+    Only bases older than `max_age_s` are touched, so live runs are never
+    disturbed. Best-effort: failures are reported, never raised. Called
+    automatically before each disposable run and safe to run standalone.
+    """
+    swept: List[str] = []
+    failed: List[str] = []
+    now = time.time()
+    try:
+        bases = sorted(Path(tempfile.gettempdir()).glob("vb-opencode-*"))
+    except Exception:
+        return {"swept": [], "failed": [], "detail": "tmpdir unreadable"}
+    for base in bases:
+        try:
+            if not base.is_dir() or base.is_symlink():
+                continue
+            if now - base.stat().st_mtime < max_age_s:
+                continue
+            wt = base / "wt"
+            removed = False
+            git = shutil.which("git")
+            if git is not None and wt.is_dir():
+                try:
+                    main = subprocess.run(
+                        [git, "-C", str(wt), "rev-parse",
+                         "--path-to-common"], capture_output=True, text=True,
+                        timeout=15)
+                    common = (main.stdout or "").strip()
+                    if common:
+                        mainroot = str(Path(common).parent)
+                        subprocess.run(
+                            [git, "-C", mainroot, "worktree", "remove",
+                             "--force", str(wt)], capture_output=True,
+                            text=True, timeout=60)
+                except Exception:
+                    pass
+            shutil.rmtree(base, ignore_errors=True)
+            removed = not base.exists()
+            (swept if removed else failed).append(base.name)
+        except Exception:
+            failed.append(base.name)
+    return {"swept": swept, "failed": failed,
+            "detail": f"swept {len(swept)}, failed {len(failed)}"}
+
+
+def _probe_version(binary: str) -> str:
+    """Report the configured binary's ``--version`` (never shell, gated).
+
+    The path must be absolute and point at an executable file; the probe runs
+    with the strict sanitized environment. Returns the stripped version line
+    or one of: invalid-path / unavailable.
+    """
+    try:
+        p = Path(os.path.expanduser(binary or ""))
+        if not p.is_absolute():
+            return "invalid-path"
+        if not (p.is_file() and os.access(p, os.X_OK)):
+            return "unavailable"
+        proc = subprocess.run(
+            [str(p), "--version"], capture_output=True, text=True,
+            timeout=10, env=sanitized_env())
+        return ((proc.stdout or proc.stderr or "").strip()[:64]
+                or "unavailable")
+    except Exception:
+        return "unavailable"
+
+
+def _limited_preexec(cpu_s: float) -> None:
+    """Child-side confinement: new session + CPU/AS/FSIZE/NPROC/NOFILE caps."""
+    try:
+        os.setsid()
+        try:
+            import resource as _res
+        except ImportError:
+            return
+        cpu = max(1, int(cpu_s) + 60)
+        _res.setrlimit(_res.RLIMIT_CPU, (cpu, cpu))
+        _res.setrlimit(_res.RLIMIT_AS,
+                       (RLIMIT_AS_BYTES, RLIMIT_AS_BYTES))
+        _res.setrlimit(_res.RLIMIT_FSIZE,
+                       (RLIMIT_FSIZE_BYTES, RLIMIT_FSIZE_BYTES))
+        _res.setrlimit(_res.RLIMIT_NPROC, (RLIMIT_NPROC, RLIMIT_NPROC))
+        _res.setrlimit(_res.RLIMIT_NOFILE, (RLIMIT_NOFILE, RLIMIT_NOFILE))
+    except Exception:
+        os._exit(127)
 
 
 # ---------------------------------------------------------------------------
@@ -452,6 +641,9 @@ def _effective_state(state_path: Path, master_enabled: bool) -> Tuple[bool, str]
     return True, "OK"
 
 
+VersionProbe = Callable[[str], str]
+
+
 @dataclass(frozen=True)
 class _ExecCtx:
     """Spawn-safe executor context (no locks, no Config, no runner).
@@ -464,7 +656,8 @@ class _ExecCtx:
     master_enabled: bool
     timeout_default: float
     state_path: str
-    pass_env: Tuple[str, ...]
+    pinned_version: str
+    version_probe: VersionProbe
     run_opencode: RunOpencode
 
 
@@ -479,7 +672,7 @@ def _plan_impl(ctx: _ExecCtx, envelope: Dict[str, Any]) -> str:
     try:
         args = (envelope.get("args") or {})
         root = resolve_project_root(str(args.get("project", "")))
-        task = load_task_text(args)
+        task = load_task_text(args, root)
         disposable = bool(args.get("disposable", True))
         argv = build_argv(ctx.binary, root, task[:64] + "…")
         return json.dumps(redact_obj({
@@ -506,25 +699,40 @@ def _run_impl(ctx: _ExecCtx, envelope: Dict[str, Any]) -> str:
                            "detail": f"adapter not live: {reason}",
                            "rollback": RB_IMPOSSIBLE})
     run_id = uuid.uuid4().hex[:12]
+    workdir: Optional[Path] = None
+    disposable = True
+    root = Path(".")
     try:
         args = (envelope.get("args") or {})
         root = resolve_project_root(str(args.get("project", "")))
-        task = load_task_text(args)
+        task = load_task_text(args, root)
         disposable = bool(args.get("disposable", True))
         timeout_s = args.get("timeout_s", None)
         budget = min(float(timeout_s) if timeout_s else ctx.timeout_default,
                      MAX_TIMEOUT_S)
-        try:
-            env = sanitized_env_names(list(ctx.pass_env))
-        except OpenCodeError as exc:
-            return json.dumps({"state": "failed",
-                               "code": "MISSING_CREDENTIALS",
-                               "detail": str(exc)[:200]})
+        env = sanitized_env()
         if not (Path(ctx.binary).is_file()
                 and os.access(ctx.binary, os.X_OK)):
             return json.dumps({"state": "failed", "code": "BINARY_MISSING",
                                "detail": "configured opencode binary "
                                          "is not executable"})
+        installed = ctx.version_probe(ctx.binary)
+        if installed != ctx.pinned_version:
+            code = ("VERSION_UNKNOWN" if installed in
+                    ("unavailable", "invalid-path", "") else
+                    "VERSION_MISMATCH")
+            return json.dumps({"state": "failed", "code": code,
+                               "run_id": run_id, "project": str(root),
+                               "detail": f"run_id={run_id}; opencode "
+                                         f"{installed!r} != pinned "
+                                         f"{ctx.pinned_version!r}; "
+                                         "re-qualify or update the pin "
+                                         "before any live run"[:300],
+                               "rollback": RB_IMPOSSIBLE})
+        try:
+            sweep_orphaned_workdirs()
+        except Exception:
+            pass
         workdir = _prepare_workdir(root, disposable, run_id)
         argv = build_argv(ctx.binary, workdir, task)
         log_event("opencode.run.start", run_id=run_id,
@@ -541,21 +749,34 @@ def _run_impl(ctx: _ExecCtx, envelope: Dict[str, Any]) -> str:
             stdout = stdout[:MAX_OUTPUT_CHARS]
             raw = dict(raw, stdout=stdout, truncated=True)
         parsed = parse_run_output(stdout)
+        validation = _validate_workdir(root, workdir)
         diff = worktree_diffstat(workdir)
-        if disposable:
-            _cleanup_workdir(root, workdir, run_id)
         flags = flag_untrusted(task)
-        if raw.get("state") != "OK" or parsed.get("state") != "OK":
-            code = (raw.get("code") if raw.get("state") != "OK"
-                    else parsed.get("code"))
+        if (raw.get("state") != "OK" or parsed.get("state") != "OK"
+                or not validation["ok"]):
+            if not validation["ok"]:
+                code = validation["code"]
+                fail_detail = validation["detail"]
+            elif (raw.get("state") != "OK" and _looks_like_auth_failure(
+                    str(raw.get("stderr", "")), str(raw.get("code", "")))):
+                code = "MISSING_CREDENTIALS"
+                fail_detail = ("opencode reports missing/invalid provider "
+                               "credentials; configure provider auth "
+                               "explicitly, never in repo files")
+            else:
+                code = (raw.get("code") if raw.get("state") != "OK"
+                        else parsed.get("code"))
+                fail_detail = str(raw.get("detail") or parsed.get("detail")
+                                  or "run failed")
             out = {"state": "failed", "code": code,
                    "run_id": run_id, "project": str(root),
-                   "detail": (f"run_id={run_id}; " + redact_text(str(
-                       raw.get("detail") or parsed.get("detail")
-                       or "run failed")))[:300],
+                   "detail": (f"run_id={run_id}; " +
+                              redact_text(fail_detail))[:300],
                    "stderr": redact_text(
                        str(raw.get("stderr", "")))[:500],
                    "untrusted_flags": flags,
+                   "workdir_files": validation["files"],
+                   "workdir_bytes": validation["bytes"],
                    "rollback": RB_IMPOSSIBLE,
                    "partial": True,
                    "note": "a failed or partial run is never "
@@ -567,6 +788,9 @@ def _run_impl(ctx: _ExecCtx, envelope: Dict[str, Any]) -> str:
                    "detail": (f"run_id={run_id}; files_changed={nfiles}; "
                               f"truncated={bool(raw.get('truncated'))}; "
                               f"workdir_kept={bool(not disposable)}; "
+                              f"gen_files={validation['files']}; "
+                              f"gen_bytes={validation['bytes']}; "
+                              f"elapsed_ms={raw.get('elapsed_ms', '?')}; "
                               + redact_text(
                                   str(parsed.get("text", "")))[:200]),
                    "text": redact_text(
@@ -576,6 +800,8 @@ def _run_impl(ctx: _ExecCtx, envelope: Dict[str, Any]) -> str:
                    "diff_stat": redact_text(
                        str(diff.get("stat", "")))[:2000],
                    "untrusted_flags": flags,
+                   "workdir_files": validation["files"],
+                   "workdir_bytes": validation["bytes"],
                    "rollback": RB_IMPOSSIBLE,
                    "note": "changes are uncommitted working-tree "
                            "edits only; commit/push/publish/install "
@@ -590,6 +816,17 @@ def _run_impl(ctx: _ExecCtx, envelope: Dict[str, Any]) -> str:
         return json.dumps({"state": "failed", "code": "RUN_CRASH",
                            "run_id": run_id,
                            "detail": str(exc)[:200]})
+    finally:
+        # Guaranteed cleanup: success, timeout, transport exception, worker
+        # crash, malformed output, and partial failure all converge here, so
+        # a disposable worktree can never be orphaned by this process.
+        # (Broker-cancel SIGKILLs mid-flight; those orphans are reaped by
+        # sweep_orphaned_workdirs on the next disposable run.)
+        try:
+            if disposable and workdir is not None and workdir != root:
+                _cleanup_workdir(root, workdir, run_id)
+        except Exception:
+            pass
 
 
 def _prepare_workdir(root: Path, disposable: bool, run_id: str) -> Path:
@@ -689,7 +926,7 @@ def _opencode_cfg(cfg) -> Dict[str, Any]:
     if cfg is None:
         return out
     for key in ("enabled", "binary", "pinned_version", "timeout_s",
-                "max_timeout_s", "pass_env"):
+                "max_timeout_s"):
         try:
             out[key] = cfg.get("intent", "opencode", key, default=None)
         except Exception:
@@ -720,6 +957,7 @@ class OpenCodeRunner(ActionRunner):
                  clock: Callable[[], float] = time.time,
                  confirmation_ttl_s: Optional[float] = None,
                  run_opencode: Optional[RunOpencode] = None,
+                 version_probe: Optional[VersionProbe] = None,
                  power: Optional[Any] = None):
         register_opencode_specs()
         ocfg = _opencode_cfg(cfg)
@@ -727,13 +965,14 @@ class OpenCodeRunner(ActionRunner):
         super().__init__(cfg=cfg, store=store, perms=perms, broker=broker,
                          executors=executors, enabled=True, clock=clock,
                          confirmation_ttl_s=confirmation_ttl_s, power=power)
-        pass_env = tuple(str(x) for x in (ocfg.get("pass_env") or ()))
         self._ctx = _ExecCtx(
             binary=_resolve_binary(ocfg),
             master_enabled=bool(ocfg.get("enabled", False)),
             timeout_default=float(timeout_default),
             state_path=str(_adapter_path(cfg)),
-            pass_env=pass_env,
+            pinned_version=str(ocfg.get("pinned_version")
+                               or PINNED_OPENCODE_VERSION),
+            version_probe=version_probe or _probe_version,
             run_opencode=run_opencode or real_run_opencode)
         # Bind the executors unless the caller injected a full broker.
         if broker is None:
@@ -746,13 +985,19 @@ class OpenCodeRunner(ActionRunner):
         master = bool(ocfg.get("enabled", False))
         binary = _resolve_binary(ocfg)
         pinned = str(ocfg.get("pinned_version") or PINNED_OPENCODE_VERSION)
-        installed = self._binary_version(binary)
         effective = bool(master and st.get("user_enabled")
                          and not st.get("emergency_stop"))
         reason = ("OK" if effective else
                   ("CONFIG_DISABLED" if not master else
                    ("NOT_ENABLED" if not st.get("user_enabled") else
                     "EMERGENCY_STOP")))
+        # The version probe executes the configured binary: it runs ONLY when
+        # the adapter is effectively enabled, with the strict sanitized
+        # environment, and never through a shell. Disabled state ⇒ no spawn.
+        if effective:
+            installed = self._ctx.version_probe(binary)
+        else:
+            installed = "not-probed (disabled)"
         return {"state": ST_OK, "adapter": ADAPTER_OPENCODE,
                 "effective_enabled": effective, "reason": reason,
                 "config_enabled": master, "user_enabled": bool(
@@ -765,15 +1010,6 @@ class OpenCodeRunner(ActionRunner):
                                  opencode_action_specs()],
                 "stores": {"adapter_state": str(_adapter_path(self.cfg)),
                            "receipts": str(self.store.path)}}
-
-    def _binary_version(self, binary: str) -> str:
-        try:
-            proc = subprocess.run(
-                [binary, "--version"], capture_output=True, text=True,
-                timeout=10)
-            return (proc.stdout or proc.stderr or "").strip()[:64]
-        except Exception:
-            return "unavailable"
 
     def enable(self, requested_by: str = "user") -> Dict[str, Any]:
         if requested_by != "user":
@@ -891,10 +1127,11 @@ class OpenCodeRunner(ActionRunner):
 def opencode_runner(cfg=None, *,
                     executors: Optional[Dict[str, Callable]] = None,
                     run_opencode: Optional[RunOpencode] = None,
+                    version_probe: Optional[VersionProbe] = None,
                     power: Optional[Any] = None) -> OpenCodeRunner:
     """Build the supervised OpenCode runner on the shared 8F machinery."""
     return OpenCodeRunner(cfg, executors=executors, run_opencode=run_opencode,
-                          power=power)
+                          version_probe=version_probe, power=power)
 
 
 def request_coding_run(runner: OpenCodeRunner, *, project: str,
@@ -905,14 +1142,29 @@ def request_coding_run(runner: OpenCodeRunner, *, project: str,
                        confirmed: bool = False,
                        dry_run: bool = False,
                        expected_hash: str = "") -> Dict[str, Any]:
-    """One broker entry shared by voice, dashboard, CLI, and tray.
+    """One broker entry shared by every channel that may invoke OpenCode.
 
-    ``source`` must be ``user``/``automation``/``model``; only the
-    authenticated human channel can mint confirmations, and the broker
-    refuses model-carried confirmation ids (CONFIRMATION_SOURCE_FORBIDDEN).
-    No caller can reach the subprocess except through this gate.
+    Wired today: the authenticated CLI (full parity: grant/preview/prepare/
+    execute/cancel/receipts) and the authenticated dashboard (read-only
+    status/list/check parity on the same runner/broker). Voice and tray
+    execution are INTENTIONALLY NOT WIRED: voice coding requests continue
+    through the existing OpenClaw/Hermes dispatch, and no tray execution
+    surface exists. Any future voice/tray wiring must call this entry with
+    the channel's source label — direct subprocess, shell, or MCP paths stay
+    forbidden, and model/page/skill/tool text can never mint or carry
+    confirmations (CONFIRMATION_SOURCE_FORBIDDEN).
+
+    Writes outside a disposable worktree additionally require the preview
+    hash: pass the `expected_hash` from a prior preview, or the run is
+    refused as STALE_TARGET before anything executes.
     """
     tgt = target or project
+    if task_args.get("disposable", True) is False and not expected_hash \
+            and not dry_run:
+        return {"state": "stale_target", "code": "PREVIEW_REQUIRED",
+                "action_id": ACT_RUN,
+                "detail": "in-project writes require a prior preview hash; "
+                          "run preview first and pass --expected-hash"}
     return runner.execute(ACT_RUN, args={"project": project, **task_args},
                           target=tgt, scope=scope, source=source,
                           confirmation_id=confirmation_id,

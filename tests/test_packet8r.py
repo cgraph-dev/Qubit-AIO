@@ -96,9 +96,16 @@ def _ok_run(capture=None):
 
 
 def _runner(tmp_path, *, cfg=None, grants=(("act.opencode.run", "code"),
-            ("act.opencode.plan", "code")), run_opencode=None):
-    cfg = cfg or _cfg(tmp_path)
-    runner = OC.opencode_runner(cfg, run_opencode=run_opencode or _ok_run())
+            ("act.opencode.plan", "code")), run_opencode=None,
+            version_probe=None):
+    # Default binary is /bin/true (exists everywhere): hermetic tests must
+    # not depend on a real OpenCode install. The version probe is faked to
+    # the pin for the same reason; dedicated tests cover mismatch/unknown.
+    cfg = cfg or _cfg(tmp_path, binary="/bin/true")
+    probe = (version_probe if version_probe is not None
+             else (lambda _b: OC.PINNED_OPENCODE_VERSION))
+    runner = OC.opencode_runner(cfg, run_opencode=run_opencode or _ok_run(),
+                                version_probe=probe)
     for cap, scope in grants:
         runner.perms.grant(cap, requested_by="user", confirmed=True,
                            scopes=(scope,))
@@ -120,6 +127,8 @@ def _full(runner, root, **kw):
     args = {"project": str(root), "task": "Add a hello function",
             "disposable": True}
     args.update(kw)
+    if "task_file" in kw and "task" not in kw:
+        del args["task"]
     env = A.build_envelope(OC.opencode_spec(OC.ACT_RUN), args=args,
                            target=str(root), scope="code")
     return json.loads(runner.executors[OC.ACT_RUN](env))
@@ -296,7 +305,7 @@ def test_symlinked_project_resolves(tmp_path):
 def test_task_file_secret_refused(tmp_path):
     runner = _runner(tmp_path)
     root = _project(tmp_path)
-    envf = tmp_path / ".env"
+    envf = root / ".env"
     envf.write_text("KEY=abc\n")
     out = OC.request_coding_run(
         runner, project=str(root),
@@ -307,7 +316,7 @@ def test_task_file_secret_refused(tmp_path):
 def test_task_file_ok(tmp_path):
     runner = _runner(tmp_path)
     root = _project(tmp_path)
-    tf = tmp_path / "task.txt"
+    tf = root / "task.txt"
     tf.write_text("Add a hello function")
     out = OC.request_coding_run(runner, project=str(root),
                                 task_args={"task_file": str(tf)},
@@ -315,9 +324,36 @@ def test_task_file_ok(tmp_path):
     assert out["state"] == "OK"
 
 
+def test_task_file_outside_root_refused(tmp_path):
+    runner = _runner(tmp_path)
+    root = _project(tmp_path)
+    outside = tmp_path / "outside.txt"
+    outside.write_text("Add a hello function")
+    full = _full(runner, root, task_file=str(outside))
+    assert full["state"] == "failed"
+    assert full["code"] == "RUN_REJECTED"
+    assert "approved root" in full["detail"]
+
+
+def test_task_file_symlink_escape_refused(tmp_path):
+    runner = _runner(tmp_path)
+    root = _project(tmp_path)
+    outside = tmp_path / "secret-task.txt"
+    outside.write_text("Add a hello function")
+    link = root / "link.txt"
+    try:
+        link.symlink_to(outside)
+    except OSError:
+        pytest.skip("symlinks unavailable")
+    full = _full(runner, root, task_file=str(link))
+    assert full["state"] == "failed"
+    assert full["code"] == "RUN_REJECTED"
+
+
 def test_task_and_file_both_rejected(tmp_path):
+    root = _project(tmp_path)
     with pytest.raises(A.ActionValidationError):
-        OC.load_task_text({"task": "a", "task_file": "/tmp/x"})
+        OC.load_task_text({"task": "a", "task_file": "/tmp/x"}, root)
 
 
 # ---------------------------------------------------------------------------
@@ -362,7 +398,9 @@ def test_empty_output_failed(tmp_path):
 
 
 def test_output_truncated_bounded(tmp_path):
-    big = "x" * (OC.MAX_OUTPUT_CHARS + 5000)
+    lines = [json.dumps({"text": "y" * 200}) for _ in range(300)]
+    big = "\n".join(lines)
+    assert len(big) > OC.MAX_OUTPUT_CHARS
     runner = _runner(tmp_path, run_opencode=lambda *a: {
         "state": "OK", "code": "OK", "stdout": big, "stderr": ""})
     root = _project(tmp_path)
@@ -370,6 +408,27 @@ def test_output_truncated_bounded(tmp_path):
     assert out["state"] == "OK"
     assert out["output_truncated"] is True
     assert len(out["text"]) <= OC.MAX_OUTPUT_CHARS
+
+
+def test_malformed_output_fails_closed(tmp_path):
+    runner = _runner(tmp_path, run_opencode=lambda *a: {
+        "state": "OK", "code": "OK",
+        "stdout": "all done, looks great, no json here", "stderr": ""})
+    root = _project(tmp_path)
+    out = _full(runner, root)
+    assert out["state"] == "failed"
+    assert out["code"] == "MALFORMED_OUTPUT"
+    assert out.get("partial") is True
+
+
+def test_json_without_text_events_fails_closed(tmp_path):
+    runner = _runner(tmp_path, run_opencode=lambda *a: {
+        "state": "OK", "code": "OK",
+        "stdout": json.dumps({"tool": "edit", "args": [1, 2]}), "stderr": ""})
+    root = _project(tmp_path)
+    out = _full(runner, root)
+    assert out["state"] == "failed"
+    assert out["code"] == "MALFORMED_OUTPUT"
 
 
 def test_provider_outage_never_complete(tmp_path):
@@ -403,8 +462,10 @@ def test_missing_binary_typed(tmp_path):
 
 
 def test_missing_credentials_fail_closed(tmp_path):
-    cfg = _cfg(tmp_path, pass_env=["SOME_API_KEY"])
-    runner = _runner(tmp_path, cfg=cfg)
+    def _noauth(argv, workdir, env, timeout_s):
+        return {"state": "failed", "code": "EXIT_1", "stdout": "",
+                "stderr": "error: not logged in, please login first"}
+    runner = _runner(tmp_path, run_opencode=_noauth)
     root = _project(tmp_path)
     out = _exec(runner, root)
     assert out["state"] == "failed"
@@ -412,22 +473,62 @@ def test_missing_credentials_fail_closed(tmp_path):
 
 
 def test_secret_env_names_refused():
-    class C:
-        def get(self, *p, default=None):
-            return ["MY_API_KEY"]
-    with pytest.raises(OC.OpenCodeError):
-        OC.sanitized_env(C())
+    # No pass-through knob exists: the allowlist is fixed and every
+    # session/secret/shell name is rejected by construction.
+    env = OC.sanitized_env()
+    assert set(env) <= set(OC._SAFE_ENV_ALLOW)
+    assert "PATH" in env
 
 
 def test_child_env_sanitized(tmp_path, monkeypatch):
-    monkeypatch.setenv("QUBIT_TEST_SECRET_XYZ", "hunter2")
+    # HOME points at a valid dir (expanduser semantics stay intact) and the
+    # binary is an explicit absolute path; everything sensitive must still be
+    # absent from the child environment. NOTE: LD_PRELOAD/GIT_DIR are covered
+    # by test_env_allowlist_forbids_dangerous_names — setting them here would
+    # break the harness's own helper spawns, not the adapter.
+    cfg = _cfg(tmp_path, binary="/bin/true")
     capture = []
-    runner = _runner(tmp_path, run_opencode=_ok_run(capture))
+    runner = _runner(tmp_path, cfg=cfg, run_opencode=_ok_run(capture))
     root = _project(tmp_path)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    for name in ("QUBIT_TEST_SECRET_XYZ", "PYTHONPATH",
+                 "BASH_ENV", "XDG_CONFIG_HOME", "XDG_RUNTIME_DIR",
+                 "DBUS_SESSION_BUS_ADDRESS", "DISPLAY", "WAYLAND_DISPLAY",
+                 "SSH_AUTH_SOCK", "MY_API_KEY", "MY_TOKEN", "MY_PASSWORD",
+                 "MY_CREDENTIALS", "MY_COOKIE", "MY_AUTH"):
+        monkeypatch.setenv(name, "sensitive-value")
     _full(runner, root)
     env = capture[0]["env"]
     assert "QUBIT_TEST_SECRET_XYZ" not in env
+    for name in ("HOME", "PYTHONPATH", "LD_PRELOAD", "BASH_ENV",
+                 "XDG_CONFIG_HOME", "XDG_RUNTIME_DIR",
+                 "DBUS_SESSION_BUS_ADDRESS", "DISPLAY", "WAYLAND_DISPLAY",
+                 "SSH_AUTH_SOCK", "GIT_DIR", "MY_API_KEY", "MY_TOKEN"):
+        assert name not in env, name
     assert "PATH" in env
+    assert set(env) <= set(OC._SAFE_ENV_ALLOW)
+
+
+def test_env_allowlist_forbids_dangerous_names():
+    # The allowlist is fixed: none of these may ever be copied, and there is
+    # no knob to add them. This pins the invariant even for names that cannot
+    # be safely set in a live test process (LD_PRELOAD, GIT_DIR, ...).
+    forbidden = ("HOME", "PYTHONPATH", "LD_PRELOAD", "BASH_ENV", "ENV",
+                 "XDG_CONFIG_HOME", "XDG_RUNTIME_DIR",
+                 "DBUS_SESSION_BUS_ADDRESS", "DISPLAY", "WAYLAND_DISPLAY",
+                 "SSH_AUTH_SOCK", "SSH_AGENT_PID", "TERM_PROGRAM",
+                 "GIT_DIR", "GIT_WORK_TREE", "GIT_NAMESPACE", "GIT_INDEX_FILE",
+                 "GIT_AUTHOR_NAME", "GIT_COMMITTER_NAME")
+    for name in forbidden:
+        assert name not in OC._SAFE_ENV_ALLOW, name
+    for name in OC._SAFE_ENV_ALLOW:
+        low = name.lower()
+        for marker in ("key", "token", "secret", "cookie", "auth",
+                       "password", "credential", "home", "python", "preload",
+                       "bash", "xdg", "display", "wayland", "dbus", "ssh",
+                       "git", "session"):
+            assert marker not in low, (name, marker)
+    assert set(OC.sanitized_env()) <= set(OC._SAFE_ENV_ALLOW)
 
 
 # ---------------------------------------------------------------------------
@@ -615,10 +716,60 @@ def test_unpicklable_transport_refused(tmp_path):
 
 
 def test_version_pin_reported(tmp_path):
-    runner = OC.opencode_runner(_cfg(tmp_path), run_opencode=_ok_run())
+    runner = OC.opencode_runner(_cfg(tmp_path), run_opencode=_ok_run(),
+                                version_probe=lambda _b: OC.PINNED_OPENCODE_VERSION)
     st = runner.status()
     assert st["pinned_version"] == OC.PINNED_OPENCODE_VERSION
     assert isinstance(st["installed_version"], str)
+
+
+def test_status_spawns_nothing_when_disabled(tmp_path, monkeypatch):
+    def _boom(*a, **k):
+        raise AssertionError("status must not spawn while disabled")
+    monkeypatch.setattr(OC.subprocess, "run", _boom)
+    runner = OC.opencode_runner(_cfg_disabled(tmp_path),
+                                run_opencode=_ok_run(),
+                                version_probe=lambda _b: "SHOULD-NOT-RUN")
+    st = runner.status()
+    assert st["effective_enabled"] is False
+    assert st["installed_version"] == "not-probed (disabled)"
+    assert st["version_match"] is False
+
+
+def test_status_probe_uses_sanitized_env(tmp_path, monkeypatch):
+    monkeypatch.setenv("QUBIT_PROBE_SECRET", "hunter2")
+    dump = tmp_path / "probe-env.txt"
+    script = tmp_path / "fake-opencode"
+    script.write_text('#!/bin/sh\nenv > "' + str(dump) + '"\necho '
+                      + OC.PINNED_OPENCODE_VERSION + '\n')
+    script.chmod(0o700)
+    cfg = _cfg(tmp_path, binary=str(script))
+    runner = OC.opencode_runner(cfg, run_opencode=_ok_run())
+    runner.enable(requested_by="user")
+    st = runner.status()
+    assert st["installed_version"] == OC.PINNED_OPENCODE_VERSION
+    assert st["version_match"] is True
+    dumped = dump.read_text()
+    assert "QUBIT_PROBE_SECRET" not in dumped
+    assert "HOME=" not in dumped
+    assert "PATH=" in dumped
+
+
+def test_version_mismatch_fails_closed(tmp_path):
+    runner = _runner(tmp_path, version_probe=lambda _b: "0.0.0")
+    root = _project(tmp_path)
+    out = _full(runner, root)
+    assert out["state"] == "failed"
+    assert out["code"] == "VERSION_MISMATCH"
+    assert OC.PINNED_OPENCODE_VERSION in out["detail"]
+
+
+def test_version_unknown_fails_closed(tmp_path):
+    runner = _runner(tmp_path, version_probe=lambda _b: "unavailable")
+    root = _project(tmp_path)
+    out = _full(runner, root)
+    assert out["state"] == "failed"
+    assert out["code"] == "VERSION_UNKNOWN"
 
 
 # ---------------------------------------------------------------------------
@@ -633,6 +784,8 @@ def test_cli_parser_has_opencode():
 
 
 def test_voice_dashboard_cli_same_entry(tmp_path):
+    # Honest parity matrix: CLI full + dashboard read-only share this entry;
+    # voice/tray execution is intentionally NOT wired (see below).
     runner = _runner(tmp_path)
     root = _project(tmp_path)
     voice = OC.request_coding_run(
@@ -645,8 +798,162 @@ def test_voice_dashboard_cli_same_entry(tmp_path):
                for c in st["capabilities"])
 
 
+def test_no_voice_tray_execution_wiring():
+    # Voice coding stays on the existing OpenClaw/Hermes dispatch and no tray
+    # execution surface exists: neither may reach the OpenCode subprocess
+    # except through request_coding_run (which they never call today).
+    for mod in ("voicebridge/orchestrator.py", "voicebridge/terminal.py"):
+        src = (REPO_ROOT / mod).read_text(encoding="utf-8")
+        assert "opencode_runner" not in src, mod
+        assert "request_coding_run" not in src, mod
+        assert "act.opencode" not in src, mod
+    webui_src = (REPO_ROOT / "voicebridge" / "webui.py").read_text(
+        encoding="utf-8")
+    assert "request_coding_run" not in webui_src
+    # The /api/opencode block itself must be read-only: no execute/prepare/
+    # grant and no subprocess spawn (the pre-existing /api/actions POST
+    # handler is separate 8F surface and out of scope here).
+    block = webui_src.split('elif path == "/api/opencode"')[1]
+    block = block.split('elif path == "/api/power"')[0]
+    assert "runner.execute" not in block
+    assert ".prepare(" not in block
+    assert "Popen(" not in block
+    assert "check_output(" not in block
+    assert "os.system(" not in block
+    assert "real_run_opencode" not in block
+
+
 def test_tray_has_no_execution_path():
     import inspect
     src = inspect.getsource(OC)
     assert "serve" in src  # only as a forbidden token
     assert "opencode web" not in src
+
+
+def test_import_hygiene_no_new_dependencies():
+    # voicebridge/opencode.py may import stdlib + voicebridge.* only: a new
+    # third-party runtime dependency would break clean installs.
+    import ast as _ast
+    tree = _ast.parse((REPO_ROOT / "voicebridge" / "opencode.py")
+                      .read_text(encoding="utf-8"))
+    stdlib = set(sys.stdlib_module_names)
+    for node in _ast.walk(tree):
+        if isinstance(node, _ast.Import):
+            for a in node.names:
+                top = a.name.split(".")[0]
+                assert top in stdlib or top == "voicebridge", a.name
+        elif isinstance(node, _ast.ImportFrom):
+            if node.level:
+                continue
+            top = (node.module or "").split(".")[0]
+            assert top in stdlib or top == "voicebridge", node.module
+
+
+def test_in_project_requires_preview_hash(tmp_path):
+    runner = _runner(tmp_path)
+    root = _project(tmp_path)
+    out = OC.request_coding_run(
+        runner, project=str(root),
+        task_args={"task": "Add a hello function", "disposable": False},
+        confirmed=True)
+    assert out["state"] == "stale_target"
+    assert out["code"] == "PREVIEW_REQUIRED"
+
+
+def test_cli_in_project_requires_preview_hash(tmp_path, capsys):
+    from voicebridge.cli import build_parser, _cmd_opencode
+    cfg = _cfg(tmp_path)
+    args = build_parser().parse_args(
+        ["opencode", "execute", "--project", str(tmp_path),
+         "--task", "Add a hello function", "--in-project", "--confirm"])
+    rc = _cmd_opencode(cfg, args)
+    assert rc == 0  # command ran; refusal is in the typed payload
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["code"] == "PREVIEW_REQUIRED"
+
+
+def test_finally_cleans_crash_worktree(tmp_path):
+    if _git() is None:
+        pytest.skip("git unavailable")
+
+    def _boom(*a):
+        raise RuntimeError("simulated transport crash")
+
+    import glob as _glob
+    import tempfile as _t
+    _gpat = str(Path(_t.gettempdir()) / "vb-opencode-*")
+    before = set(_glob.glob(_gpat))
+    runner = _runner(tmp_path, run_opencode=_boom)
+    root = _project(tmp_path)
+    out = _full(runner, root)
+    assert out["state"] == "failed"
+    assert out["code"] == "RUN_CRASH"
+    after = set(_glob.glob(_gpat))
+    assert after - before == set()
+    wt = subprocess.run([_git(), "worktree", "list", "--porcelain"],
+                        cwd=root, capture_output=True, text=True)
+    assert "vb-opencode-" not in wt.stdout
+
+
+def test_orphan_sweep_reaps_stale_only(tmp_path):
+    import tempfile as _t
+    base_tmp = Path(_t.gettempdir())
+    stale = base_tmp / "vb-opencode-staletest"
+    fresh = base_tmp / "vb-opencode-freshtest"
+    for d in (stale, fresh):
+        (d / "wt").mkdir(parents=True, exist_ok=True)
+    old = time.time() - (OC.ORPHAN_MAX_AGE_S + 60)
+    os.utime(stale, (old, old))
+    try:
+        res = OC.sweep_orphaned_workdirs()
+        assert "vb-opencode-staletest" in res["swept"]
+        assert fresh.exists()
+    finally:
+        import shutil as _sh
+        _sh.rmtree(stale, ignore_errors=True)
+        _sh.rmtree(fresh, ignore_errors=True)
+
+
+def test_generated_file_overflow_fails_closed(tmp_path):
+    if _git() is None:
+        pytest.skip("git unavailable")
+
+    def _spam(argv, workdir, env, timeout_s):
+        for i in range(OC.MAX_WORKDIR_FILES + 10):
+            (Path(workdir) / f"g{i}.txt").write_text("x\n")
+        return {"state": "OK", "code": "OK",
+                "stdout": json.dumps({"text": "spam"}), "stderr": ""}
+
+    runner = _runner(tmp_path, run_opencode=_spam)
+    root = _project(tmp_path)
+    out = _full(runner, root)
+    assert out["state"] == "failed"
+    assert out["code"] == "LIMIT_EXCEEDED"
+    assert out.get("partial") is True
+
+
+def test_symlink_escape_fails_closed(tmp_path):
+    if _git() is None:
+        pytest.skip("git unavailable")
+
+    def _evil(argv, workdir, env, timeout_s):
+        (Path(workdir) / "evil").symlink_to("/etc/hostname")
+        return {"state": "OK", "code": "OK",
+                "stdout": json.dumps({"text": "evil"}), "stderr": ""}
+
+    runner = _runner(tmp_path, run_opencode=_evil)
+    root = _project(tmp_path)
+    out = _full(runner, root)
+    assert out["state"] == "failed"
+    assert out["code"] == "SYMLINK_ESCAPE"
+    assert out.get("partial") is True
+
+
+def test_child_rlimits_applied(tmp_path):
+    script = tmp_path / "print-nofile.sh"
+    script.write_text("#!/bin/sh\nulimit -Hn\n")
+    script.chmod(0o700)
+    out = OC.real_run_opencode(
+        [str(script)], tmp_path, {"PATH": "/usr/bin:/bin"}, 20.0)
+    assert out["state"] == "OK", out
+    assert out["stdout"].strip() == str(OC.RLIMIT_NOFILE)

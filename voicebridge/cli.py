@@ -3349,6 +3349,13 @@ def _cmd_opencode(cfg, args) -> int:
                     OC.ACT_RUN, args=_task_args(),
                     target=getattr(args, "project", "") or ".",
                     scope="code", source="user", dry_run=True)
+            elif bool(getattr(args, "in_project", False)) and not \
+                    getattr(args, "expected_hash", ""):
+                out = {"state": "stale_target", "code": "PREVIEW_REQUIRED",
+                       "action_id": OC.ACT_RUN,
+                       "detail": "in-project writes require a prior preview "
+                                 "hash; run preview first and pass "
+                                 "--expected-hash"}
             else:
                 out = runner.execute(
                     OC.ACT_RUN, args=_task_args(),
