@@ -97,7 +97,7 @@ def _ok_run(capture=None):
 
 def _runner(tmp_path, *, cfg=None, grants=(("act.opencode.run", "code"),
             ("act.opencode.plan", "code")), run_opencode=None,
-            version_probe=None):
+            version_probe=None, executors=None):
     # Default binary is /bin/true (exists everywhere): hermetic tests must
     # not depend on a real OpenCode install. The version probe is faked to
     # the pin for the same reason; dedicated tests cover mismatch/unknown.
@@ -105,12 +105,19 @@ def _runner(tmp_path, *, cfg=None, grants=(("act.opencode.run", "code"),
     probe = (version_probe if version_probe is not None
              else (lambda _b: OC.PINNED_OPENCODE_VERSION))
     runner = OC.opencode_runner(cfg, run_opencode=run_opencode or _ok_run(),
-                                version_probe=probe)
+                                version_probe=probe, executors=executors)
     for cap, scope in grants:
         runner.perms.grant(cap, requested_by="user", confirmed=True,
                            scopes=(scope,))
     runner.enable(requested_by="user")
     return runner
+
+
+def _sleepy_fixture(envelope):
+    """Module-level slow transport stand-in (spawn-safe, picklable)."""
+    import time as _t
+    _t.sleep(30)
+    return json.dumps({"state": "OK", "action_id": "act.opencode.run"})
 
 
 def _exec(runner, root, **kw):
@@ -950,10 +957,217 @@ def test_symlink_escape_fails_closed(tmp_path):
 
 
 def test_child_rlimits_applied(tmp_path):
-    script = tmp_path / "print-nofile.sh"
-    script.write_text("#!/bin/sh\nulimit -Hn\n")
+    script = tmp_path / "print-limits.sh"
+    script.write_text("#!/bin/sh\nulimit -Hn\nulimit -Hf\nulimit -Ht\n")
     script.chmod(0o700)
     out = OC.real_run_opencode(
         [str(script)], tmp_path, {"PATH": "/usr/bin:/bin"}, 20.0)
     assert out["state"] == "OK", out
-    assert out["stdout"].strip() == str(OC.RLIMIT_NOFILE)
+    nofile, fsize, cputime = out["stdout"].strip().split()
+    assert nofile == str(OC.RLIMIT_NOFILE)
+    assert fsize == str(OC.RLIMIT_FSIZE_BYTES // 512)
+    assert cputime == str(20 + 60)
+    assert out["elapsed_ms"] >= 0
+
+
+def test_workdir_bytes_cap_fails_closed(tmp_path):
+    if _git() is None:
+        pytest.skip("git unavailable")
+
+    def _fat(argv, workdir, env, timeout_s):
+        (Path(workdir) / "big.bin").write_bytes(b"\0" * (OC.MAX_WORKDIR_BYTES + 1024))
+        return {"state": "OK", "code": "OK",
+                "stdout": json.dumps({"text": "fat"}), "stderr": ""}
+
+    runner = _runner(tmp_path, run_opencode=_fat)
+    root = _project(tmp_path)
+    out = _full(runner, root)
+    assert out["state"] == "failed"
+    assert out["code"] == "LIMIT_EXCEEDED"
+    assert out.get("partial") is True
+
+
+def test_inflight_cancel_via_broker(tmp_path):
+    runner = _runner(tmp_path,
+                     executors={OC.ACT_RUN: _sleepy_fixture})
+    root = _project(tmp_path)
+    holder: dict = {}
+    t = threading.Thread(
+        target=lambda: holder.update(res=runner.execute(
+            OC.ACT_RUN, args={"project": str(root),
+                              "task": "Add a hello function",
+                              "disposable": True},
+            target=str(root), scope="code", source="user", confirmed=True)),
+        daemon=True)
+    t.start()
+    rid = None
+    deadline = time.time() + 20
+    while time.time() < deadline:
+        recs = runner.receipts(10)["receipts"]
+        running = [r for r in recs if r["state"] == "running"
+                   and r["action_id"] == OC.ACT_RUN]
+        if running:
+            rid = running[0]["receipt_id"]
+            break
+        time.sleep(0.1)
+    assert rid, "run never reached running state"
+    out = runner.cancel(rid)
+    assert out["state"] == "cancelled"
+    t.join(timeout=30)
+    assert not t.is_alive()
+    final = runner.store.receipt(rid).to_dict()
+    assert final["state"] == "cancelled"
+
+
+def test_target_switch_refused_stale(tmp_path):
+    runner = _runner(tmp_path)
+    r1 = _project(tmp_path, "pa")
+    r2 = _project(tmp_path, "pb")
+    prev = runner.preview(OC.ACT_RUN, {"project": str(r1),
+                                       "task": "Add a hello function"},
+                          target=str(r1), scope="code")
+    out = runner.execute(OC.ACT_RUN, args={"project": str(r1),
+                                            "task": "Add a hello function"},
+                         target=str(r2), scope="code", source="user",
+                         confirmed=True, expected_hash=prev["action_hash"])
+    assert out["state"] == "stale_target"
+
+
+def test_audit_journal_redacted(tmp_path):
+    from voicebridge import logging_setup
+    journal = tmp_path / "events.jsonl"
+    logging_setup.setup(jsonl_path=journal)
+    try:
+        runner = _runner(tmp_path)
+        root = _project(tmp_path)
+        out = OC.request_coding_run(
+            runner, project=str(root),
+            task_args={"task": "Wire up api_key=SECRET123 hunter"},
+            confirmed=True)
+        assert out["state"] == "OK"
+    finally:
+        logging_setup.setup(jsonl_path=tmp_path / "discard.jsonl")
+    text = journal.read_text(encoding="utf-8")
+    assert "act.opencode.run" in text
+    assert "SECRET123" not in text
+
+
+def test_registered_orphan_sweep_prunes_worktree(tmp_path):
+    if _git() is None:
+        pytest.skip("git unavailable")
+    import tempfile as _t
+    root = _project(tmp_path)
+    run_id = "deadbeefcafe"
+    base = Path(_t.gettempdir()) / f"vb-opencode-{run_id}"
+    wt = base / "wt"
+    try:
+        subprocess.run([_git(), "worktree", "add", "--detach", str(wt)],
+                       cwd=root, check=True, capture_output=True, timeout=60)
+        old = time.time() - (OC.ORPHAN_MAX_AGE_S + 60)
+        os.utime(base, (old, old))
+        res = OC.sweep_orphaned_workdirs()
+        assert base.name in res["swept"]
+        assert not base.exists()
+        listed = subprocess.run(
+            [_git(), "worktree", "list", "--porcelain"], cwd=root,
+            capture_output=True, text=True, timeout=15).stdout
+        assert f"vb-opencode-{run_id}" not in listed
+    finally:
+        import shutil as _sh
+        subprocess.run([_git(), "worktree", "remove", "--force", str(wt)],
+                       cwd=root, capture_output=True, timeout=60)
+        _sh.rmtree(base, ignore_errors=True)
+        subprocess.run([_git(), "worktree", "prune"], cwd=root,
+                       capture_output=True, timeout=60)
+
+
+def test_dashboard_opencode_readonly_behavioral(tmp_path):
+    import urllib.request
+    import urllib.error
+    from voicebridge.webui import WebUI
+    cfg = _cfg(tmp_path)
+    orch = type("_Orch", (), {"cfg": cfg})()
+    app = WebUI(orch, host="127.0.0.1", port=0,
+                asr_factory=lambda *a, **k: None, tts=None,
+                state_dir=tmp_path)
+    app.start()
+    try:
+        port = app._server.server_address[1]
+        base = f"http://127.0.0.1:{port}"
+        with urllib.request.urlopen(base + "/api/opencode",
+                                    timeout=10) as resp:
+            body = json.loads(resp.read())
+        assert body["effective_enabled"] is False
+        assert body["reason"] in ("CONFIG_DISABLED", "NOT_ENABLED")
+        assert any(c["action_id"] == OC.ACT_RUN
+                   for c in body["capabilities"])
+        # POST has no route here: dashboard cannot mutate opencode state.
+        req = urllib.request.Request(
+            base + "/api/opencode",
+            data=json.dumps({"action": "execute"}).encode(),
+            headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            urllib.request.urlopen(req, timeout=10)
+            posted = True
+        except urllib.error.HTTPError as exc:
+            posted = False
+            assert exc.code == 404
+        assert posted is False
+        # Nothing executed: no receipts exist for this config scope.
+        recs = OC.opencode_runner(cfg).receipts(10)["receipts"]
+        assert recs == []
+    finally:
+        app.stop()
+
+
+def test_dashboard_generic_api_cannot_execute_opencode(tmp_path):
+    import urllib.request
+    from voicebridge.webui import WebUI
+    cfg = _cfg(tmp_path)
+    orch = type("_Orch", (), {"cfg": cfg})()
+    app = WebUI(orch, host="127.0.0.1", port=0,
+                asr_factory=lambda *a, **k: None, tts=None,
+                state_dir=tmp_path)
+    app.start()
+    try:
+        port = app._server.server_address[1]
+        base = f"http://127.0.0.1:{port}"
+
+        def _post(path, body):
+            req = urllib.request.Request(
+                base + path, data=json.dumps(body).encode(),
+                headers={"Content-Type": "application/json"}, method="POST")
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return resp.status, json.loads(resp.read())
+        _post("/api/permissions",
+              {"action": "grant", "capability": "act.opencode.run",
+               "scopes": ["code"], "confirmed": True})
+        status, out = _post("/api/actions",
+                            {"action": "execute",
+                             "action_id": "act.opencode.run",
+                             "args": {"project": str(tmp_path),
+                                      "task": "Do work", "disposable": True},
+                             "target": str(tmp_path), "scope": "code",
+                             "confirmed": True})
+        assert status == 200
+        # Fail-closed: the generic runner has no opencode binding, so even a
+        # granted + confirmed dashboard call cannot reach a subprocess.
+        assert out["state"] in ("failed", "denied")
+        assert out["code"] in ("ACTION_ERROR", "NOT_GRANTED",
+                               "CONFIRMATION_REQUIRED", "ADAPTER_DISABLED",
+                               "UNKNOWN_CAPABILITY")
+    finally:
+        app.stop()
+
+
+def test_voice_runtime_not_wired():
+    # Behavioral (fresh interpreter): importing the voice pipeline must never
+    # pull in the OpenCode adapter — voice coding stays on the existing
+    # OpenClaw/Hermes dispatch by construction, not by convention.
+    probe = ("import sys; "
+             "import voicebridge.orchestrator, voicebridge.terminal; "
+             "print('opencode' in ','.join(sys.modules))")
+    proc = subprocess.run([sys.executable, "-c", probe], cwd=str(REPO_ROOT),
+                          capture_output=True, text=True, timeout=120)
+    assert proc.returncode == 0, proc.stderr[:500]
+    assert proc.stdout.strip() == "False"

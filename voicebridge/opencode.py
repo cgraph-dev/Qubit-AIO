@@ -477,6 +477,42 @@ def _validate_workdir(root: Path, workdir: Path) -> Dict[str, Any]:
             "outside_symlinks": []}
 
 
+def _prune_registered_worktree(wt: Path) -> bool:
+    """Deregister `wt` from its owning main worktree (best-effort).
+
+    Reads the worktree's ``.git`` pointer file (``gitdir: <main>/.git/
+    worktrees/<name>``) to find the owning main root — no git-version-
+    dependent plumbing — then removes and prunes through it.
+    """
+    try:
+        git = shutil.which("git")
+        if git is None:
+            return False
+        gitfile = wt / ".git"
+        if not gitfile.is_file():
+            return False
+        content = gitfile.read_text(encoding="utf-8",
+                                    errors="replace").strip()
+        if not content.startswith("gitdir:"):
+            return False
+        admindir = Path(content.split(":", 1)[1].strip())
+        mainroot = admindir.parent.parent
+        if not mainroot.is_dir():
+            return False
+        rem = subprocess.run(
+            [git, "-C", str(mainroot), "worktree", "remove", "--force",
+             str(wt)], capture_output=True, text=True, timeout=60)
+        if rem.returncode == 0:
+            return True
+        # Fallback: the working tree may already be gone; prune then drops
+        # the stale admin entry.
+        subprocess.run([git, "-C", str(mainroot), "worktree", "prune"],
+                       capture_output=True, text=True, timeout=60)
+        return not wt.exists()
+    except Exception:
+        return False
+
+
 def sweep_orphaned_workdirs(max_age_s: float = ORPHAN_MAX_AGE_S) -> Dict[str, Any]:
     """Reap stale disposable-worktree bases (crash/cancel orphans).
 
@@ -499,22 +535,8 @@ def sweep_orphaned_workdirs(max_age_s: float = ORPHAN_MAX_AGE_S) -> Dict[str, An
                 continue
             wt = base / "wt"
             removed = False
-            git = shutil.which("git")
-            if git is not None and wt.is_dir():
-                try:
-                    main = subprocess.run(
-                        [git, "-C", str(wt), "rev-parse",
-                         "--path-to-common"], capture_output=True, text=True,
-                        timeout=15)
-                    common = (main.stdout or "").strip()
-                    if common:
-                        mainroot = str(Path(common).parent)
-                        subprocess.run(
-                            [git, "-C", mainroot, "worktree", "remove",
-                             "--force", str(wt)], capture_output=True,
-                            text=True, timeout=60)
-                except Exception:
-                    pass
+            if wt.is_dir() or (wt / ".git").is_file():
+                _prune_registered_worktree(wt)
             shutil.rmtree(base, ignore_errors=True)
             removed = not base.exists()
             (swept if removed else failed).append(base.name)
