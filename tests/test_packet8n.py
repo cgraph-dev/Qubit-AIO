@@ -161,6 +161,33 @@ def test_restricted_default_deny_without_any_grant(tmp_path):
     assert d["code"] == "NOT_GRANTED"
 
 
+def test_unrestricted_mode_cannot_bypass_ghost_denials(tmp_path):
+    # Unrestricted pre-auth never bypasses ghost high-impact confirmation or
+    # the session-grant default-deny boundary.
+    store, perms, sgs = _stores(tmp_path)
+    perms.set_mode("unrestricted", requested_by="user", confirmed=True,
+                   scopes=("desktop",))
+    execs = A.make_fixture_executors(_ghost_outcomes())
+    runner = G.GhostRunner(store=store, perms=perms, executors=execs,
+                           enabled=True, session_grants=sgs,
+                           adapter=G.GhostAdapter(shell=False))
+    # unrestricted + mode scope: a read-only desktop capability still needs a
+    # grant because the GhostGate requires an explicit session grant for ghost
+    # caps (unrestricted never widens a grant).
+    d = runner.execute("ghost.desktop.discover", args={}, target="desktop",
+                       scope="desktop")
+    assert d["state"] == "denied"
+    assert d["code"] in ("NOT_GRANTED", "CONFIRMATION_REQUIRED")
+    # high-impact still requires a fresh confirmation even in unrestricted
+    perms.grant("ghost.input.click", requested_by="user", confirmed=True,
+                scopes=("web",))
+    d2 = runner.execute("ghost.input.click",
+                        args={"role": "chromium", "target": "#btn"},
+                        target="https://mail.google.com", scope="web")
+    assert d2["state"] == "denied"
+    assert d2["code"] == "CONFIRMATION_REQUIRED"
+
+
 def test_session_grant_enables_readonly(tmp_path):
     runner = _runner(tmp_path)
     g = runner.grant("ghost.desktop.discover", scopes=("desktop",),
@@ -446,6 +473,39 @@ def test_emergency_stop_reset(tmp_path):
     assert d["state"] == "OK"
 
 
+def test_adapter_crash_and_reconnect_health(tmp_path):
+    adapter = G.GhostAdapter(shell=False)
+    adapter.enable(requested_by="user")
+    adapter.mark_failure("adapter crashed (cdp lost)")
+    assert adapter.state.health == G.HEALTH_FAILED
+    assert adapter.state.last_error
+    adapter.mark_reconnect()
+    assert adapter.state.health == G.HEALTH_ENABLED
+    assert adapter.state.last_error == ""
+
+
+def test_slow_fixture_timeout_returns_typed_result(tmp_path):
+    # A slow side-effect-capable fixture that exceeds the resource bound is
+    # killed and returns a typed timeout, never a late false success.
+    runner = _runner(tmp_path, name="ghost_slow.json",
+                     grants=(("ghost.input.click", "web"),))
+    import threading
+    result = {}
+    t = threading.Thread(
+        target=lambda: result.update(
+            runner.execute("ghost.input.click",
+                           args={"role": "chromium", "target": "#btn"},
+                           target="https://mail.google.com", scope="web",
+                           confirmed=True, timeout_s=0.05)), daemon=True)
+    t.start()
+    t.join(timeout=10)
+    assert not t.is_alive()
+    state = result.get("state")
+    assert state in ("timeout", "cancelled", "denied"), result
+    # never reports OK after the budget
+    assert state != "OK"
+
+
 def test_adapter_enable_disable_health(tmp_path):
     adapter = G.GhostAdapter(shell=False)
     assert adapter.state.health == G.HEALTH_DISABLED
@@ -593,10 +653,12 @@ def test_comet_direct_object_call_refused():
     comet.bind(object())  # bound but NOT via a real runner broker executor
     for call in (
         lambda: comet.connect(requested_by="user"),
+        lambda: comet.disconnect(requested_by="user"),
         lambda: comet.select_mode("research", requested_by="user"),
         lambda: comet.ask(G.CometResearchRequest(query="q"),
                           requested_by="user"),
         lambda: comet.wait("w", max_wait_s=1, requested_by="user"),
+        lambda: comet.cancel_wait("w", requested_by="user"),
         lambda: comet.extract("text", requested_by="user"),
         lambda: comet.evidence(b"x", requested_by="user"),
     ):
@@ -637,8 +699,12 @@ def test_comet_research_mode_only_through_broker(tmp_path):
     runner, comet = _comet_runner(tmp_path)
     assert runner.comet_connect()["state"] == "OK"
     # computer/labs/empty/unknown modes are refused by the capability schema
-    # AND the adapter.
-    for bad in ("computer", "labs", "research; evil"):
+    # AND the adapter. Every non-research mode word that would imply write,
+    # login, click, type, post, purchase, or account/navigation mutation must
+    # be a typed denial.
+    for bad in ("computer", "labs", "research; evil", "login", "click",
+                "type", "post", "send", "purchase", "buy", "account",
+                "settings", "browse", "navigate", "write", "delete"):
         try:
             m = runner.comet_mode(bad)
         except G.ActionValidationError:
@@ -650,6 +716,21 @@ def test_comet_research_mode_only_through_broker(tmp_path):
     with pytest.raises(G.ActionValidationError):
         runner.comet_mode("")
     assert runner.comet_mode("research")["state"] == "OK"
+
+
+def test_no_write_capable_comet_capability():
+    # There is no write-capable comet capability registered at all: the comet
+    # surface is research read-only (connect/mode/ask/wait/extract/evidence).
+    for cid in G.ghost_action_ids():
+        if cid.startswith("ghost.comet."):
+            spec = G.ghost_spec(cid)
+            assert spec.tier is Tier.READ_ONLY, cid
+            assert spec.rollback_kind in (A.RB_NONE, A.RB_REVERSIBLE), cid
+    # and the comet adapter exposes no write/send/post/click/type method
+    for attr in ("send", "post", "publish", "click", "type_text", "submit",
+                 "navigate", "login", "purchase", "delete", "mark_read",
+                 "reply", "react"):
+        assert not hasattr(G.CometResearchAdapter, attr), attr
 
 
 def test_comet_connect_human_only(tmp_path):
@@ -1232,6 +1313,231 @@ def test_grant_crash_boundary_recovery(tmp_path):
     assert len(reopened.grants()) == 1  # stale temp never read
 
 
+def _mp_worker_code():
+    return (
+        "import sys, os\n"
+        "from pathlib import Path\n"
+        "sys.path.insert(0, %r)\n"
+        "os.environ.setdefault('VOICE_BRIDGE_MEMORY_DB', %r)\n"
+        "from voicebridge import ghost as G\n"
+        "store = G.SessionGrantStore(Path(sys.argv[1]))\n"
+        "g = store.issue('ghost.desktop.discover', scopes=('desktop',), "
+        "target='desktop')\n"
+        "print(g.grant_id)\n"
+    ) % (str(REPO_ROOT), str(Path(os.environ.get("VOICE_BRIDGE_MEMORY_DB",
+                                                  "/tmp/vb-mem")) / "mem.db"))
+
+
+def test_grant_multi_process_no_lost_updates(tmp_path):
+    """12 independent OS processes issuing grants to the SAME file must all be
+    retained (cross-process read-merge-write under the flock). A concurrent
+    reader must never see corruption or a partial file."""
+    import subprocess
+    import sys as _sys
+    p = tmp_path / "grants.json"
+    code = _mp_worker_code()
+    procs = [subprocess.Popen([_sys.executable, "-c", code, str(p)],
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE)
+             for _ in range(12)]
+    ids = []
+    for pr in procs:
+        out, err = pr.communicate(timeout=60)
+        assert pr.returncode == 0, err.decode()[:300]
+        gid = out.decode().strip()
+        assert gid, "worker printed no grant id"
+        ids.append(gid)
+    assert len(ids) == 12
+    assert len(set(ids)) == 12  # no duplicate grant ids
+    # concurrent reader: reload a fresh store and verify all 12 retained
+    reopened = G.SessionGrantStore(p)
+    persisted = [x.grant_id for x in reopened.grants()]
+    assert set(persisted) == set(ids), \
+        f"lost updates: {set(ids) - set(persisted)}"
+    # file is valid JSON, no leftover temp files
+    import json as _json
+    data = _json.loads(p.read_text())
+    assert isinstance(data.get("grants"), list)
+    leftovers = [f for f in tmp_path.iterdir()
+                 if f.name.startswith(p.name + ".tmp")]
+    assert leftovers == []
+
+
+def test_grant_multi_process_plus_concurrent_reader(tmp_path):
+    """A reader opening a fresh store while workers write must always see a
+    complete valid file (atomic rename), never a partial/corrupt root."""
+    import subprocess
+    import sys as _sys
+    import threading
+    p = tmp_path / "grants.json"
+    code = _mp_worker_code()
+    procs = [subprocess.Popen([_sys.executable, "-c", code, str(p)],
+                              stdout=subprocess.DEVNULL,
+                              stderr=subprocess.PIPE)
+             for _ in range(12)]
+    observed = []
+    errors = []
+    def reader():
+        for _ in range(40):
+            try:
+                store = G.SessionGrantStore(p)
+                observed.append(len(store.grants()))
+            except Exception as exc:  # pragma: no cover
+                errors.append(exc)
+            time.sleep(0.01)
+    t = threading.Thread(target=reader, daemon=True)
+    t.start()
+    for pr in procs:
+        pr.communicate(timeout=60)
+        assert pr.returncode == 0
+    t.join(timeout=10)
+    assert errors == [], f"reader saw corruption: {errors[:3]}"
+    assert max(observed) >= 1
+    reopened = G.SessionGrantStore(p)
+    assert len(reopened.grants()) == 12
+
+
+def test_grant_persistence_rollback_preserves_previous(tmp_path):
+    """A failed persistence must not lose the previous in-memory state and
+    must never report the new grant as issued."""
+    p = tmp_path / "grants.json"
+    sgs = G.SessionGrantStore(p)
+    g1 = sgs.issue("ghost.desktop.discover", scopes=("desktop",),
+                   target="desktop")
+    assert len(sgs.grants()) == 1
+    # force write failure on a second issue
+    tmp_path.chmod(0o500)
+    try:
+        with pytest.raises(G.SessionGrantError):
+            sgs.issue("ghost.desktop.discover", scopes=("desktop",),
+                      target="desktop")
+    finally:
+        tmp_path.chmod(0o700)
+    # previous grant intact in-memory and on disk
+    assert [x.grant_id for x in sgs.grants()] == [g1.grant_id]
+    reopened = G.SessionGrantStore(p)
+    assert [x.grant_id for x in reopened.grants()] == [g1.grant_id]
+
+
+def test_grant_dir_fsync_failure_is_typed(tmp_path, monkeypatch):
+    """A directory-fsync failure after rename is a typed, durability-UNCERTAIN
+    error — never silently swallowed and never claimed as fully durable."""
+    import os as _os
+    p = tmp_path / "grants.json"
+    sgs = G.SessionGrantStore(p)
+    real_open = _os.open
+
+    def _boom_open(path, flags, *a, **kw):
+        if isinstance(path, str) and flags == _os.O_RDONLY and \
+                _os.path.abspath(path) == _os.path.abspath(str(tmp_path)):
+            raise OSError(5, "input/output error (simulated dir fsync)")
+        return real_open(path, flags, *a, **kw)
+
+    monkeypatch.setattr(_os, "open", _boom_open)
+    try:
+        sgs.issue("ghost.desktop.discover", scopes=("desktop",),
+                  target="desktop")
+        raise AssertionError("issue succeeded despite dir-fsync failure")
+    except G.SessionGrantError as exc:
+        assert exc.code == "GRANT_DIR_FSYNC_FAILED"
+        assert exc.degraded is True
+    finally:
+        monkeypatch.undo()
+    # The rename already happened: the grant is on disk but durability is
+    # uncertain; the store must report it honestly, never as full success.
+    assert p.exists()
+
+
+def test_grant_lock_failure_is_typed(tmp_path, monkeypatch):
+    """A flock acquisition failure is a typed error, not a raw exception."""
+    import fcntl
+    p = tmp_path / "grants.json"
+    sgs = G.SessionGrantStore(p)
+
+    def _boom_flock(fd, op):
+        raise OSError(11, "resource temporarily unavailable")
+
+    monkeypatch.setattr(fcntl, "flock", _boom_flock)
+    try:
+        with pytest.raises(G.SessionGrantError) as exc:
+            sgs.issue("ghost.desktop.discover", scopes=("desktop",),
+                      target="desktop")
+        assert exc.value.code == "GRANT_LOCK_FAILED"
+    finally:
+        monkeypatch.undo()
+    assert sgs.grants() == []  # nothing reported issued
+
+
+def test_grant_issue_load_consistency(tmp_path):
+    """Everything rejected on load must be rejected by issue(); everything
+    issue() accepts must reload with identical validated fields."""
+    p = tmp_path / "grants.json"
+    sgs = G.SessionGrantStore(p)
+    # values issue() rejects
+    cases = [
+        ({"scopes": (), "target": "desktop"}, "NO_SCOPE"),
+        ({"scopes": ("web",), "target": "desktop"}, "SCOPE_NOT_DECLARED"),
+        ({"scopes": ("desktop",), "target": "desktop",
+          "resource_budget": 0}, "BAD_RESOURCE_BUDGET"),
+        ({"scopes": ("desktop",), "target": "desktop",
+          "resource_budget": -1}, "BAD_RESOURCE_BUDGET"),
+        ({"scopes": ("desktop",), "target": "desktop",
+          "resource_budget": 3.7}, "BAD_RESOURCE_BUDGET"),
+        ({"scopes": ("desktop",), "target": "desktop",
+          "resource_budget": 10 ** 13}, "BAD_RESOURCE_BUDGET"),
+        ({"scopes": ("desktop",), "target": "*"}, "BAD_TARGET"),
+        ({"scopes": ("desktop",), "target": ""}, "BAD_TARGET"),
+        ({"scopes": ("desktop",), "target": "desktop", "ttl_s": 0.5},
+         "INVALID_TTL"),
+        ({"scopes": ("desktop",), "target": "desktop", "ttl_s": 90000},
+         "INVALID_TTL"),
+        ({"scopes": ("desktop",), "target": "desktop", "role": "netflix"},
+         "ROLE_TARGET_MISMATCH"),
+    ]
+    for kw, expect in cases:
+        with pytest.raises(G.SessionGrantError) as exc:
+            sgs.issue("ghost.desktop.discover", **kw)
+        assert exc.value.code == expect, (kw, exc.value.code)
+    # a valid issue reloads with identical validated fields
+    g = sgs.issue("ghost.desktop.discover", scopes=("desktop",),
+                  target="desktop", resource_budget=1234, ttl_s=300)
+    reopened = G.SessionGrantStore(p)
+    loaded = [x for x in reopened.grants() if x.grant_id == g.grant_id][0]
+    assert loaded.resource_budget == 1234
+    assert loaded.scopes == ("desktop",)
+    assert loaded.issued_by == "user"
+    assert loaded.target == "desktop"
+
+
+@pytest.mark.parametrize("root", [
+    None,
+    "hello",
+    42,
+    {"grants": None},
+    {"grants": "x"},
+    {"grants": 7},
+    {"grants": {"a": 1}},
+    {"grants": [], "hack": True},
+    {"schema_version": 99, "grants": []},
+    {"grants": ["not", "a", "dict"]},
+    {"grants": [{"grant_id": "g", "bad": True}]},
+    {"grants": [None]},
+])
+def test_grant_malformed_roots_fail_closed(tmp_path, root):
+    """Loading ANY malformed root must fail closed with a typed degraded
+    state, never a raw TypeError/AttributeError/ValueError."""
+    import json as _json
+    p = tmp_path / "grants.json"
+    if root is None:
+        p.write_text("null")
+    else:
+        p.write_text(_json.dumps(root))
+    sgs = G.SessionGrantStore(p)  # must not raise raw errors
+    assert sgs.grants() == []
+    assert sgs.health()["load_degraded"] is True
+    assert sgs.health()["load_warnings"]
+
+
 def test_grant_replayed_id_rejected(tmp_path):
     # a replayed (duplicate) grant id in the file is dropped
     p = tmp_path / "grants.json"
@@ -1272,6 +1578,37 @@ def test_fixture_only_authorization_is_never_live(tmp_path):
                          scope="desktop")
     assert d2["state"] == "denied"
     assert d2["code"] == A.ST_ADAPTER_DISABLED
+
+
+def test_broker_execution_retains_hash_and_receipt(tmp_path):
+    # A broker execution must produce a durable receipt carrying the exact
+    # action hash and a correlation id; preview hash == execution hash so a
+    # confirmation can be bound to it.
+    runner = _runner(tmp_path, name="ghost_outcomes.json",
+                     grants=(("ghost.desktop.discover", "desktop"),))
+    p = runner.preview("ghost.desktop.discover", args={}, target="desktop",
+                       scope="desktop")
+    d = runner.execute("ghost.desktop.discover", args={}, target="desktop",
+                       scope="desktop")
+    assert d["state"] == "OK"
+    assert d["action_hash"] == p["action_hash"]
+    rec = runner.receipt(d["receipt_id"])
+    assert rec["action_hash"] == d["action_hash"]
+    assert rec["action_id"] == "ghost.desktop.discover"
+    assert rec["correlation_id"]
+
+
+def test_broker_execution_audited(tmp_path):
+    # The gate/broker decision is audited for ghost executions (policy.decision
+    # and broker.exec.* events carry the capability + correlation id).
+    runner = _runner(tmp_path, name="ghost_outcomes.json",
+                     grants=(("ghost.desktop.discover", "desktop"),))
+    d = runner.execute("ghost.desktop.discover", args={}, target="desktop",
+                       scope="desktop")
+    assert d["state"] == "OK"
+    audit = runner.store.audit(limit=50)
+    hashes = [e.get("action_hash", "") for e in audit]
+    assert any(h == d["action_hash"][:16] for h in hashes)
 
 
 def test_voice_ghost_uses_same_runner_no_bypass(tmp_path):

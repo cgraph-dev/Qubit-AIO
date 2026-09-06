@@ -1314,7 +1314,19 @@ REPAIR (Packet 8N, 2026-09-05): strict URL parsing and canonical-host
     comet operations execute only through the bound broker executor (direct
     object calls are refused); persisted session grants fail closed on load
     and save (cross-process lock, unique O_EXCL temp, file+dir fsync, chmod
-    0600, typed durability errors, no authority gain on load).
+    0600, typed durability errors, no authority gain on load). A second
+    repair pass (2026-09-05) made grant persistence read-merge-write: a single
+    flock is held across re-reading the LATEST on-disk grants, validating them,
+    merging the new/revoked grant, and the atomic write, so 12+ independent
+    processes issuing to the same file never lose updates; a failed
+    persistence restores the in-memory map exactly and never reports a grant
+    as issued; issue()/reload validation are identical (empty/undeclared
+    scopes, non-integer/zero/negative/oversized budgets, invalid TTL, wildcard
+    targets all rejected at both boundaries); malformed roots (null/string/
+    number/object grants, unknown top-level, newer schema, corrupt JSON) fail
+    closed with typed degraded state; Ghost read/reversible capabilities are
+    never auto-authorized by unrestricted mode (explicit session grant or 7E
+    grant required, high-impact still needs a fresh confirmation).
 ```
 
 ## R25 — mcp-comet research-only contract (Packet 8N)

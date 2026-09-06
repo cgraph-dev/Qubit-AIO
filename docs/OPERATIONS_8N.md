@@ -102,9 +102,11 @@ VOICE_BRIDGE_GHOST_SHELL=on         # explicit operator enable only
 ```
 
 Session grants persist to `<state_dir>/ghost-grants.json` (private `0600`
-atomic JSON with a cross-process lock, unique exclusive temp files, file +
-directory fsync, and typed durability failures). Adapter health is in-memory
-and typed; the dashboard/CLI show it read-only.
+atomic JSON with a single cross-process flock held across read-merge-write,
+unique exclusive temp files, file + directory fsync, and typed durability
+failures). Every write re-reads and validates the LATEST on-disk grants under
+the lock before merging, so independent processes never lose updates. Adapter
+health is in-memory and typed; the dashboard/CLI show it read-only.
 
 ## 3. CLI
 
@@ -143,7 +145,14 @@ endpoint (read-only) reports the same typed status and capability list.
   unknown/high-impact capability, wildcard target, invalid role/scope,
   impossible timestamps/TTL/budget, malformed JSON, unknown fields, duplicate
   IDs), and never gain more authority than a fresh grant. Save failures are
-  typed and a grant is never reported issued when persistence failed.
+  typed and a grant is never reported issued when persistence failed. Each
+  write re-reads the latest on-disk state under a single flock and merges, so
+  independent processes never lose updates; a failed persistence restores the
+  in-memory map exactly (rollback).
+- `unrestricted` mode never auto-authorizes Ghost capabilities: read/reversible
+  Ghost ops require an explicit session grant or 7E grant, and high-impact ops
+  still require a fresh confirmation. Unrestricted pre-auth cannot widen a
+  grant or bypass Ghost default deny.
 - High-impact capabilities always require a fresh confirmation bound to the
   exact action hash (target, origin, scope, arguments, role).
 - Emergency stop is a global latch that **cancels real active runs** via the

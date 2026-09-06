@@ -577,6 +577,8 @@ def _validate_grant_record(raw: Dict[str, Any], *, clock: float,
     for s in scopes:
         if not isinstance(s, str) or not _SCOPE_RE.match(s):
             return "INVALID_SCOPE"
+        if s not in spec.scopes:
+            return "SCOPE_NOT_DECLARED"
     try:
         created_at = float(raw.get("created_at"))
         expires_at = float(raw.get("expires_at"))
@@ -591,9 +593,9 @@ def _validate_grant_record(raw: Dict[str, Any], *, clock: float,
     ttl = expires_at - created_at
     if not (1.0 <= ttl <= 86400):
         return "INVALID_TTL"
-    try:
-        budget = int(raw.get("resource_budget", 1_000_000))
-    except (TypeError, ValueError):
+    budget = raw.get("resource_budget", 1_000_000)
+    # Strict integer budget (bool is an int subclass but is not a budget).
+    if not isinstance(budget, int) or isinstance(budget, bool):
         return "BAD_RESOURCE_BUDGET"
     if not (1 <= budget <= 10 ** 12):
         return "BAD_RESOURCE_BUDGET"
@@ -635,6 +637,71 @@ class SessionGrantStore:
         self._load_degraded = False
         self._load()
 
+    # ------------------------------------------------------------ parse
+    def _parse_root(self, raw: Any) -> Tuple[Dict[str, SessionGrant],
+                                             List[str], bool]:
+        """Parse+validate a raw persisted grant root (fail closed).
+
+        Returns ``(grants, warnings, degraded)``. A malformed root — non-dict,
+        unknown top-level fields, a newer schema, or a ``grants`` value that is
+        not a list — raises a typed :class:`SessionGrantError` instead of a
+        raw ``TypeError``/``AttributeError``/``ValueError``. Invalid individual
+        records are skipped with warnings; the store is marked degraded but a
+        valid subset is still usable (never loads more authority than a fresh
+        grant).
+        """
+        warnings: List[str] = []
+        if not isinstance(raw, dict):
+            raise SessionGrantError(
+                "grant state is not an object", code="GRANT_STATE_NOT_OBJECT",
+                degraded=True, path=self._path)
+        unknown_top = set(raw) - _GRANT_FILE_FIELDS
+        if unknown_top:
+            raise SessionGrantError(
+                "GRANT_STATE_UNKNOWN_TOP_LEVEL: " + ", ".join(sorted(unknown_top)),
+                code="GRANT_STATE_UNKNOWN_TOP_LEVEL", degraded=True,
+                path=self._path)
+        try:
+            schema = int(raw.get("schema_version", _GRANT_SCHEMA_VERSION))
+        except (TypeError, ValueError):
+            schema = -1
+        if schema > _GRANT_SCHEMA_VERSION:
+            raise SessionGrantError(
+                f"GRANT_SCHEMA_NEWER: file schema {schema} > supported "
+                f"{_GRANT_SCHEMA_VERSION}", code="GRANT_SCHEMA_NEWER",
+                degraded=True, path=self._path)
+        grants_list = raw.get("grants")
+        if not isinstance(grants_list, list):
+            raise SessionGrantError(
+                "grant state 'grants' is not a list",
+                code="GRANT_STATE_BAD_GRANTS", degraded=True, path=self._path)
+        now = self._clock()
+        seen: Dict[str, bool] = {}
+        grants: Dict[str, SessionGrant] = {}
+        for record in grants_list:
+            reason = _validate_grant_record(record, clock=now)
+            if reason is not None:
+                warnings.append(
+                    f"grant {record.get('grant_id', '?') if isinstance(record, dict) else '?'} "
+                    f"rejected: {reason}")
+                continue
+            grant_id = record["grant_id"]
+            if grant_id in seen:
+                warnings.append(f"duplicate grant id {grant_id} rejected")
+                continue
+            seen[grant_id] = True
+            grants[grant_id] = SessionGrant(
+                grant_id=grant_id,
+                capability=record["capability"],
+                scopes=tuple(record["scopes"]),
+                target=record["target"],
+                role=record.get("role") or "",
+                issued_by="user",
+                created_at=float(record["created_at"]),
+                expires_at=float(record["expires_at"]),
+                resource_budget=int(record["resource_budget"]))
+        return grants, warnings, bool(warnings)
+
     # ------------------------------------------------------------ load
     def _load(self) -> None:
         import json
@@ -652,67 +719,46 @@ class SessionGrantStore:
             log_event("ghost.grant.load.failed", code="GRANT_STATE_CORRUPT",
                       path=self._path)
             return
-        if not isinstance(raw, dict):
-            self._grants = {}
-            self._load_degraded = True
-            self._load_warnings.append("GRANT_STATE_NOT_OBJECT")
-            return
-        unknown_top = set(raw) - _GRANT_FILE_FIELDS
-        if unknown_top:
-            self._grants = {}
-            self._load_degraded = True
-            self._load_warnings.append(
-                "GRANT_STATE_UNKNOWN_TOP_LEVEL: " + ", ".join(sorted(unknown_top)))
-            return
         try:
-            schema = int(raw.get("schema_version", _GRANT_SCHEMA_VERSION))
-        except (TypeError, ValueError):
-            schema = -1
-        if schema > _GRANT_SCHEMA_VERSION:
-            # A newer-schema file may use fields this build cannot interpret:
-            # never load grants from it (fail closed; never silently coerce).
+            grants, warnings, degraded = self._parse_root(raw)
+        except SessionGrantError as exc:
             self._grants = {}
             self._load_degraded = True
-            self._load_warnings.append(
-                f"GRANT_SCHEMA_NEWER: file schema {schema} > supported "
-                f"{_GRANT_SCHEMA_VERSION}")
-            log_event("ghost.grant.load.failed", code="GRANT_SCHEMA_NEWER",
-                      path=self._path, schema=schema)
+            self._load_warnings.append(f"{exc.code}: {redact_text(str(exc))[:200]}")
+            log_event("ghost.grant.load.failed", code=exc.code, path=self._path)
             return
-        now = self._clock()
-        seen: Dict[str, bool] = {}
-        for record in raw.get("grants", []):
-            reason = _validate_grant_record(record, clock=now)
-            if reason is not None:
-                self._load_degraded = True
-                self._load_warnings.append(
-                    f"grant {record.get('grant_id', '?')} rejected: {reason}")
-                continue
-            grant_id = record["grant_id"]
-            if grant_id in seen:
-                self._load_degraded = True
-                self._load_warnings.append(
-                    f"duplicate grant id {grant_id} rejected")
-                continue
-            seen[grant_id] = True
-            self._grants[grant_id] = SessionGrant(
-                grant_id=grant_id,
-                capability=record["capability"],
-                scopes=tuple(record["scopes"]),
-                target=record["target"],
-                role=record.get("role") or "",
-                issued_by="user",
-                created_at=float(record["created_at"]),
-                expires_at=float(record["expires_at"]),
-                resource_budget=int(record.get("resource_budget",
-                                                1_000_000)))
-        if self._load_warnings:
+        self._grants = grants
+        self._load_warnings = warnings
+        self._load_degraded = degraded
+        if warnings:
             log_event("ghost.grant.load.degraded",
-                      warnings=list(self._load_warnings),
-                      path=self._path)
+                      warnings=list(warnings), path=self._path)
 
-    # ------------------------------------------------------------ save
-    def _save(self) -> None:
+    # ------------------------------------------------------- cross-process
+    def _read_latest_locked(self) -> Dict[str, SessionGrant]:
+        """Read + validate the current on-disk state (assumes the caller holds
+        the cross-process lock). Returns the validated grants or ``{}`` when
+        the file does not exist yet. A malformed root raises a typed
+        :class:`SessionGrantError`."""
+        import json
+        import os as _os
+        if not _os.path.exists(self._path):
+            return {}
+        try:
+            with open(self._path, "r", encoding="utf-8") as fh:
+                raw = json.load(fh)
+        except (OSError, ValueError, TypeError) as exc:
+            raise SessionGrantError(
+                f"GRANT_STATE_CORRUPT: {redact_text(str(exc))[:200]}",
+                code="GRANT_STATE_CORRUPT", degraded=True, path=self._path) from exc
+        grants, _warnings, _degraded = self._parse_root(raw)
+        return grants
+
+    def _write_payload_locked(self, grants: Dict[str, SessionGrant]) -> None:
+        """Atomically persist ``grants`` (assumes the caller holds the flock).
+        Every failure is a typed :class:`SessionGrantError`; only the current
+        writer's unique temp file is cleaned; the previous valid state is
+        preserved on a pre-rename failure."""
         import fcntl
         import json
         import os as _os
@@ -727,14 +773,61 @@ class SessionGrantStore:
         try:
             payload = json.dumps(
                 {"schema_version": _GRANT_SCHEMA_VERSION,
-                 "grants": [g.to_dict() for g in self._grants.values()]},
+                 "grants": [g.to_dict() for g in grants.values()]},
                 indent=2, sort_keys=True).encode("utf-8")
         except (TypeError, ValueError) as exc:
             raise SessionGrantError(
                 f"grant serialization failed: {exc}",
                 code="GRANT_SERIALIZE_FAILED", path=p) from exc
         tmp = (p + f".tmp.{_os.getpid()}.{uuid.uuid4().hex[:8]}")
-        lock_path = p + ".lock"
+        try:
+            fd = _os.open(str(tmp), _os.O_CREAT | _os.O_EXCL
+                          | _os.O_WRONLY, 0o600)
+            with _os.fdopen(fd, "wb") as fh:
+                fh.write(payload)
+                fh.flush()
+                _os.fsync(fh.fileno())
+        except OSError as exc:
+            self._cleanup_tmp(tmp)
+            raise SessionGrantError(
+                f"grant write failed: {exc}", code="GRANT_WRITE_FAILED",
+                path=p) from exc
+        try:
+            _os.chmod(tmp, 0o600)
+        except OSError as exc:
+            self._cleanup_tmp(tmp)
+            raise SessionGrantError(
+                f"grant chmod failed: {exc}", code="GRANT_CHMOD_FAILED",
+                path=p) from exc
+        try:
+            _os.replace(tmp, p)
+        except OSError as exc:
+            self._cleanup_tmp(tmp)
+            raise SessionGrantError(
+                f"grant rename failed: {exc}", code="GRANT_RENAME_FAILED",
+                path=p) from exc
+        try:
+            dir_fd = _os.open(d, _os.O_RDONLY)
+            try:
+                _os.fsync(dir_fd)
+            finally:
+                _os.close(dir_fd)
+        except OSError as exc:
+            # Rename already happened: the new file is in place but its
+            # durability across a crash is uncertain. Report a typed
+            # failure; never claim the previous state was preserved.
+            raise SessionGrantError(
+                "grant directory fsync failed after rename: "
+                f"{exc}; the new file is in place but durability is "
+                "UNCERTAIN",
+                code="GRANT_DIR_FSYNC_FAILED", degraded=True, path=p) from exc
+
+    def _lockfd(self):
+        """Acquire the cross-process flock (returns an open fd; caller must
+        close it). Never reentrant — the caller must not already hold it."""
+        import fcntl
+        import os as _os
+        lock_path = self._path + ".lock"
         fd_lock = None
         try:
             fd_lock = _os.open(lock_path, _os.O_CREAT | _os.O_RDWR, 0o600)
@@ -747,58 +840,58 @@ class SessionGrantStore:
                     pass
             raise SessionGrantError(
                 f"grant lock failed: {exc}", code="GRANT_LOCK_FAILED",
-                path=p) from exc
+                path=self._path) from exc
+        return fd_lock
+
+    @staticmethod
+    def _unlockfd(fd_lock: int) -> None:
+        import fcntl
+        import os as _os
         try:
+            fcntl.flock(fd_lock, fcntl.LOCK_UN)
+        except OSError:
+            pass
+        try:
+            _os.close(fd_lock)
+        except OSError:
+            pass
+
+    def _locked_update(self, mutate: Callable[[Dict[str, SessionGrant]],
+                                             Dict[str, SessionGrant]]) -> Dict[str, SessionGrant]:
+        """Cross-process read-merge-write under a SINGLE flock acquisition.
+
+        The flock is held across the read of the LATEST on-disk grants, the
+        merge, and the atomic write — so two independent processes cannot
+        clobber each other's grants (no lost updates). On any failure the
+        in-memory map is restored exactly and the caller receives a typed
+        :class:`SessionGrantError`; a grant is never reported issued when
+        persistence failed.
+        """
+        with self._lock:  # process-local guard; the flock is the cross-proc lock
+            previous = dict(self._grants)
+            fd_lock = None
             try:
-                fd = _os.open(str(tmp), _os.O_CREAT | _os.O_EXCL
-                              | _os.O_WRONLY, 0o600)
-                with _os.fdopen(fd, "wb") as fh:
-                    fh.write(payload)
-                    fh.flush()
-                    _os.fsync(fh.fileno())
-            except OSError as exc:
-                self._cleanup_tmp(tmp)
+                fd_lock = self._lockfd()
+                latest = self._read_latest_locked()   # safe: flock held
+                merged = mutate(latest)
+                self._write_payload_locked(merged)    # safe: flock held
+            except SessionGrantError:
+                self._grants = previous  # rollback in-memory exactly
+                raise
+            except Exception as exc:
+                # Any unexpected failure must never leave a partial in-memory
+                # state or silently report a grant as issued.
+                self._grants = previous
+                if isinstance(exc, SessionGrantError):
+                    raise
                 raise SessionGrantError(
-                    f"grant write failed: {exc}", code="GRANT_WRITE_FAILED",
-                    path=p) from exc
-            try:
-                _os.chmod(tmp, 0o600)
-            except OSError as exc:
-                self._cleanup_tmp(tmp)
-                raise SessionGrantError(
-                    f"grant chmod failed: {exc}", code="GRANT_CHMOD_FAILED",
-                    path=p) from exc
-            try:
-                _os.replace(tmp, p)
-            except OSError as exc:
-                self._cleanup_tmp(tmp)
-                raise SessionGrantError(
-                    f"grant rename failed: {exc}", code="GRANT_RENAME_FAILED",
-                    path=p) from exc
-            try:
-                dir_fd = _os.open(d, _os.O_RDONLY)
-                try:
-                    _os.fsync(dir_fd)
-                finally:
-                    _os.close(dir_fd)
-            except OSError as exc:
-                # Rename already happened: the new file is in place but its
-                # durability across a crash is uncertain. Report a typed
-                # failure; never claim the previous state was preserved.
-                raise SessionGrantError(
-                    "grant directory fsync failed after rename: "
-                    f"{exc}; the new file is in place but durability is "
-                    "UNCERTAIN",
-                    code="GRANT_DIR_FSYNC_FAILED", degraded=True, path=p) from exc
-        finally:
-            try:
-                fcntl.flock(fd_lock, fcntl.LOCK_UN)
-            except OSError:
-                pass
-            try:
-                _os.close(fd_lock)
-            except OSError:
-                pass
+                    f"grant update failed: {exc}", code="GRANT_UPDATE_FAILED",
+                    path=self._path) from exc
+            finally:
+                if fd_lock is not None:
+                    self._unlockfd(fd_lock)
+            self._grants = merged
+            return merged
 
     @staticmethod
     def _cleanup_tmp(tmp: str) -> None:
@@ -823,6 +916,18 @@ class SessionGrantStore:
             raise SessionGrantError(
                 f"{capability}: session grants only cover read-only/reversible "
                 "Ghost capabilities", code="HIGH_IMPACT_CAPABILITY")
+        if not isinstance(scopes, (list, tuple)) or not scopes:
+            raise SessionGrantError(
+                "session grant requires at least one scope", code="NO_SCOPE")
+        scopes = tuple(scopes)
+        for s in scopes:
+            if not isinstance(s, str) or not _SCOPE_RE.match(s):
+                raise SessionGrantError(f"invalid scope {s!r}",
+                                        code="INVALID_SCOPE")
+            if s not in spec.scopes:
+                raise SessionGrantError(
+                    f"scope {s!r} is not declared by capability {capability!r}",
+                    code="SCOPE_NOT_DECLARED")
         if not target or target in _WILDCARD_TARGETS:
             raise SessionGrantError(
                 "session grant target must be explicit, never empty/wildcard",
@@ -835,10 +940,13 @@ class SessionGrantStore:
                 raise SessionGrantError(
                     f"invalid role/target binding: {exc}",
                     code="ROLE_TARGET_MISMATCH") from exc
-        for s in scopes:
-            if not isinstance(s, str) or not _SCOPE_RE.match(s):
-                raise SessionGrantError(
-                    f"invalid scope {s!r}", code="INVALID_SCOPE")
+        if not isinstance(resource_budget, int) or isinstance(resource_budget, bool):
+            raise SessionGrantError(
+                "resource_budget must be an integer", code="BAD_RESOURCE_BUDGET")
+        if not (1 <= resource_budget <= 10 ** 12):
+            raise SessionGrantError(
+                f"resource_budget {resource_budget} outside [1, 10^12]",
+                code="BAD_RESOURCE_BUDGET")
         ttl = float(ttl_s if ttl_s is not None else self._ttl)
         if not (1.0 <= ttl <= 86400):
             raise SessionGrantError("ttl_s outside [1, 86400]",
@@ -846,23 +954,30 @@ class SessionGrantStore:
         now = self._clock()
         grant = SessionGrant(
             grant_id=f"g_{uuid.uuid4().hex[:16]}", capability=capability,
-            scopes=tuple(scopes), target=target,
+            scopes=scopes, target=target,
             role=role, issued_by="user", created_at=now,
             expires_at=now + ttl,
-            resource_budget=max(1, int(resource_budget)))
-        with self._lock:
-            self._grants[grant.grant_id] = grant
-            self._save()  # raises typed error; grant is NOT reported issued
+            resource_budget=resource_budget)
+
+        def _mutate(latest: Dict[str, SessionGrant]) -> Dict[str, SessionGrant]:
+            merged = dict(latest)
+            merged[grant.grant_id] = grant
+            return merged
+
+        merged = self._locked_update(_mutate)  # raises typed error on failure
         log_event("ghost.grant.issued", grant_id=grant.grant_id,
                   capability=capability, scopes=list(scopes),
                   target=redact_text(target), role=role, ttl_s=ttl)
         return grant
 
     def revoke(self, grant_id: str) -> bool:
-        with self._lock:
-            removed = self._grants.pop(grant_id, None) is not None
-            if removed:
-                self._save()  # raises typed error on persistence failure
+        def _mutate(latest: Dict[str, SessionGrant]) -> Dict[str, SessionGrant]:
+            merged = dict(latest)
+            merged.pop(grant_id, None)
+            return merged
+        before = dict(self._grants)
+        merged = self._locked_update(_mutate)  # raises typed error on failure
+        removed = len(before) > len(merged)
         if removed:
             log_event("ghost.grant.revoked", grant_id=grant_id)
         return removed
@@ -894,9 +1009,9 @@ class SessionGrantStore:
             return any(g.capability == capability for g in self._grants.values())
 
     def reset(self) -> None:
-        with self._lock:
-            self._grants = {}
-            self._save()
+        def _mutate(latest: Dict[str, SessionGrant]) -> Dict[str, SessionGrant]:
+            return {}
+        self._locked_update(_mutate)
 
     def health(self) -> Dict[str, Any]:
         return {"state": "degraded" if (self._load_degraded
@@ -1135,6 +1250,35 @@ class GhostGate(ActionGate):
                     return {"allowed": True, "code": "ALLOWED",
                             "mode": MODE_RESTRICTED,
                             "detail": "matched bounded Ghost session grant"}
+            # A session grant for this capability exists but did not match the
+            # requested target/origin/role: deny (never a wrong-browser fallback
+            # and never a coarser 7E grant bypass).
+            if grants is not None and grants.has_for_capability(spec.action_id):
+                return {"allowed": False, "code": "NOT_GRANTED",
+                        "mode": MODE_RESTRICTED,
+                        "detail": "session grant exists but does not match "
+                                  "requested target/origin/role (default deny)"}
+        if spec.adapter == ADAPTER_GHOST:
+            # Ghost read/reversible capabilities are NEVER auto-authorized by
+            # unrestricted pre-auth: only a matching explicit grant (session
+            # grant first, then a 7E grant) may authorize them. Unrestricted
+            # mode must not widen a grant or bypass Ghost default deny, so we
+            # never call the base ActionGate's unrestricted pre-auth branch.
+            if spec.tier in (Tier.READ_ONLY, Tier.REVERSIBLE):
+                if source not in ("user", "check"):
+                    return {"allowed": False,
+                            "code": "CONFIRMATION_SOURCE_FORBIDDEN",
+                            "mode": MODE_RESTRICTED,
+                            "detail": f"source={source} cannot authorize "
+                                      "Ghost read/reversible actions"}
+                if self._matching_grant(spec.action_id,
+                                        str(envelope.get("scope", ""))):
+                    return {"allowed": True, "code": "ALLOWED",
+                            "mode": MODE_RESTRICTED,
+                            "detail": "matched explicit Ghost grant"}
+                return {"allowed": False, "code": "NOT_GRANTED",
+                        "mode": MODE_RESTRICTED,
+                        "detail": "no matching grant; Ghost default deny"}
         return super().decide(spec, envelope, source=source,
                               confirmation_id=confirmation_id,
                               confirmation_required=confirmation_required)
