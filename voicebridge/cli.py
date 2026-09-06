@@ -829,7 +829,71 @@ def build_parser() -> argparse.ArgumentParser:
     fr_chat.add_argument("--allow-private", action="store_true",
                          help="explicit per-request approval to include private context")
     fr_chat.add_argument("--json", action="store_true",
-                         help="machine-readable typed result")
+                           help="machine-readable typed result")
+    oc = add("opencode", help="Packet 8R supervised OpenCode coding adapter "
+             "(optional; disabled by default; same broker as dashboard/voice)")
+    oc_sub = oc.add_subparsers(dest="opencode_command")
+    oc_sub.add_parser("status", parents=[common],
+                      help="typed adapter status (enablement, binary pin, capabilities)")
+    oc_sub.add_parser("list", parents=[common],
+                      help="list opencode capabilities + effective gate state")
+    oc_show = oc_sub.add_parser("show", parents=[common],
+                                help="show one opencode capability contract")
+    oc_show.add_argument("action_id")
+    oc_chk = oc_sub.add_parser("check", parents=[common],
+                               help="read-only effective decision for one capability")
+    oc_chk.add_argument("action_id")
+    oc_chk.add_argument("--scope", default="code")
+    oc_gr = oc_sub.add_parser("grant", parents=[common],
+                              help="grant an opencode capability in the 7E store (dry-run unless --confirm)")
+    oc_gr.add_argument("capability")
+    oc_gr.add_argument("--scope", action="append", default=[])
+    oc_gr.add_argument("--ttl", type=float, default=None)
+    oc_gr.add_argument("--confirm", action="store_true")
+    oc_rev = oc_sub.add_parser("revoke", parents=[common],
+                               help="revoke an opencode grant")
+    oc_rev.add_argument("grant_id")
+    oc_prev = oc_sub.add_parser("preview", parents=[common],
+                                help="validated no-side-effect preview + action hash (spawns nothing)")
+    oc_prev.add_argument("--project", default=".")
+    oc_prev.add_argument("--task", default="")
+    oc_prev.add_argument("--task-file", type=Path, default=None)
+    oc_prev.add_argument("--disposable", action="store_true", default=True)
+    oc_prev.add_argument("--in-project", action="store_true",
+                         help="run in the project dir instead of a disposable worktree")
+    oc_prep = oc_sub.add_parser("prepare", parents=[common],
+                                help="issue a fresh hash-bound confirmation for an exact preview")
+    oc_prep.add_argument("--project", default=".")
+    oc_prep.add_argument("--task", default="")
+    oc_prep.add_argument("--task-file", type=Path, default=None)
+    oc_prep.add_argument("--in-project", action="store_true")
+    oc_prep.add_argument("--expected-hash", default="",
+                         help="bind to a prior preview hash (stale refused)")
+    oc_ex = oc_sub.add_parser("execute", parents=[common],
+                              help="execute one bounded opencode run (requires grant + --confirm)")
+    oc_ex.add_argument("--project", default=".")
+    oc_ex.add_argument("--task", default="")
+    oc_ex.add_argument("--task-file", type=Path, default=None)
+    oc_ex.add_argument("--in-project", action="store_true")
+    oc_ex.add_argument("--timeout", type=int, default=None)
+    oc_ex.add_argument("--confirmation", default=None)
+    oc_ex.add_argument("--confirm", action="store_true")
+    oc_ex.add_argument("--expected-hash", default="")
+    oc_ex.add_argument("--fixture", type=Path, default=None,
+                       help="synthetic outcomes JSON (explicit simulation; never live)")
+    oc_can = oc_sub.add_parser("cancel", parents=[common],
+                               help="cancel an in-flight opencode run (idempotent)")
+    oc_can.add_argument("receipt_id")
+    oc_recs = oc_sub.add_parser("receipts", parents=[common],
+                                help="list recent opencode receipts")
+    oc_recs.add_argument("--limit", type=int, default=30)
+    oc_sub.add_parser("enable", parents=[common],
+                      help="owner opt-in: set the user enablement flag (config master switch still applies)")
+    oc_sub.add_parser("disable", parents=[common], help="disable the adapter")
+    oc_sub.add_parser("emergency-stop", parents=[common],
+                      help="latch an immediate stop (reset required)")
+    oc_sub.add_parser("reset", parents=[common],
+                      help="clear enablement + emergency-stop latch (returns to disabled)")
     return p
 
 
@@ -899,6 +963,8 @@ def main(argv=None) -> int:
         return _cmd_monitor(cfg, args)
     if command == "frontier":
         return _cmd_frontier(cfg, args)
+    if command == "opencode":
+        return _cmd_opencode(cfg, args)
     if command == "webui":
         return _cmd_webui(cfg, args)
 
@@ -3173,6 +3239,150 @@ def _cmd_frontier(cfg, args) -> int:
         return 0 if res.ok else 1
     print(f"ERROR: unknown frontier command {cmd!r}")
     return 2
+
+
+def _cmd_opencode(cfg, args) -> int:
+    """voicebridge opencode status/list/show/check/grant/revoke/preview/
+    prepare/execute/cancel/receipts/enable/disable/emergency-stop/reset.
+
+    Packet 8R optional supervised OpenCode adapter. Disabled by default
+    (config master switch + state-file user flag + emergency-stop latch).
+    ``act.opencode.run`` is DESTRUCTIVE tier: it needs a 7E grant plus a fresh
+    hash-bound human confirmation. ``--fixture`` is the explicit synthetic
+    path; live runs spawn exactly one ``opencode run`` child (never serve,
+    never --auto). In-project (non-disposable) writes additionally require the
+    preview hash via --expected-hash.
+    """
+    import json as _json
+    from . import opencode as OC
+    OC.register_opencode_specs()
+    cmd = getattr(args, "opencode_command", None) or "status"
+
+    executors: Dict[str, Any] = {}
+    fixture = getattr(args, "fixture", None)
+    if fixture:
+        fpath = Path(fixture)
+        if not fpath.is_file():
+            print(_json.dumps({"state": "failed",
+                               "detail": f"fixture not found: {fpath}"},
+                              indent=2))
+            return 2
+        try:
+            from . import actions as A
+            executors = A.make_fixture_executors(
+                A.load_fixture_outcomes(fpath))
+        except Exception as exc:
+            print(_json.dumps({"state": "failed", "detail": f"fixture "
+                               f"invalid: {exc}"}, indent=2))
+            return 2
+    runner = OC.opencode_runner(cfg, executors=executors,
+                                power=_shared_power(cfg))
+
+    def _task_args() -> Dict[str, Any]:
+        out: Dict[str, Any] = {}
+        task = getattr(args, "task", "") or ""
+        tfile = getattr(args, "task_file", None)
+        if task:
+            out["task"] = task
+        if tfile is not None:
+            out["task_file"] = str(tfile)
+        disposable = not bool(getattr(args, "in_project", False))
+        out["disposable"] = disposable
+        timeout = getattr(args, "timeout", None)
+        if timeout is not None:
+            out["timeout_s"] = int(timeout)
+        return out
+
+    try:
+        if cmd == "status":
+            out = runner.status()
+        elif cmd == "list":
+            st = runner.status()
+            out = {"state": "OK",
+                   "effective_enabled": st["effective_enabled"],
+                   "reason": st["reason"],
+                   "capabilities": runner.opencode_actions()}
+        elif cmd == "show":
+            spec = OC.opencode_spec(args.action_id)
+            if spec is None:
+                raise OC.OpenCodeError(f"unknown action {args.action_id!r}")
+            out = {"state": "OK", "action": spec.to_dict()}
+        elif cmd == "check":
+            out = runner.check(args.action_id,
+                               getattr(args, "scope", "") or "code")
+        elif cmd == "grant":
+            if getattr(args, "dry_run", False) or not args.confirm:
+                out = {"state": "preview",
+                       "would_grant": args.capability,
+                       "scopes": list(args.scope or ["code"]),
+                       "ttl_s": args.ttl,
+                       "note": "dry-run: re-run with --confirm to persist"}
+            else:
+                out = runner.grant(args.capability,
+                                   scopes=tuple(args.scope or ["code"]),
+                                   ttl_s=args.ttl)
+        elif cmd == "revoke":
+            out = runner.revoke_grant(args.grant_id)
+        elif cmd == "preview":
+            out = runner.preview(OC.ACT_RUN, _task_args(),
+                                 target=getattr(args, "project", "") or ".",
+                                 scope="code")
+        elif cmd == "prepare":
+            prev = runner.preview(OC.ACT_RUN, _task_args(),
+                                  target=getattr(args, "project", "") or ".",
+                                  scope="code")
+            if getattr(args, "expected_hash", "") and \
+                    prev["action_hash"] != args.expected_hash:
+                out = {"state": "stale_target", "code": "STALE_TARGET",
+                       "detail": "preview hash changed; preview again"}
+            else:
+                from .actions import build_envelope
+                spec = OC.opencode_spec(OC.ACT_RUN)
+                env = build_envelope(
+                    spec, args=_task_args(),
+                    target=getattr(args, "project", "") or ".", scope="code")
+                out = runner.prepare(OC.ACT_RUN, env, issued_by="user")
+                out["action_hash"] = env["action_hash"]
+        elif cmd == "execute":
+            if getattr(args, "dry_run", False):
+                out = runner.execute(
+                    OC.ACT_RUN, args=_task_args(),
+                    target=getattr(args, "project", "") or ".",
+                    scope="code", source="user", dry_run=True)
+            else:
+                out = runner.execute(
+                    OC.ACT_RUN, args=_task_args(),
+                    target=getattr(args, "project", "") or ".",
+                    scope="code", source="user",
+                    confirmation_id=args.confirmation,
+                    confirmed=args.confirm,
+                    expected_hash=args.expected_hash or "")
+        elif cmd == "cancel":
+            out = runner.cancel(args.receipt_id)
+        elif cmd == "receipts":
+            out = runner.receipts(getattr(args, "limit", 30) or 30)
+        elif cmd == "enable":
+            out = runner.enable(requested_by="user")
+        elif cmd == "disable":
+            out = runner.disable(requested_by="user")
+        elif cmd == "emergency-stop":
+            out = runner.emergency_stop()
+        elif cmd == "reset":
+            out = runner.reset(requested_by="user")
+        else:
+            print(f"ERROR: unknown opencode command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except (OC.OpenCodeError, ValueError) as exc:
+        code = getattr(exc, "code", None) or "OPENCODE_ERROR"
+        print(_json.dumps({"state": "failed", "code": code,
+                           "detail": str(exc)[:300]}, indent=2))
+        return 2
+    except Exception as exc:
+        print(_json.dumps({"state": "failed", "detail": str(exc)[:200]},
+                          indent=2))
+        return 2
 
 
 def _cmd_webui(cfg, args) -> int:

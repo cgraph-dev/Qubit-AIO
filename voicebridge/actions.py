@@ -65,9 +65,10 @@ ADAPTER_DESKTOP = "desktop"
 ADAPTER_MAIL = "mail"
 ADAPTER_SOCIAL = "social"
 ADAPTER_GHOST = "ghost"
+ADAPTER_OPENCODE = "opencode"
 
 ADAPTERS = (ADAPTER_BROWSER, ADAPTER_EDITOR, ADAPTER_DESKTOP,
-            ADAPTER_MAIL, ADAPTER_SOCIAL, ADAPTER_GHOST)
+            ADAPTER_MAIL, ADAPTER_SOCIAL, ADAPTER_GHOST, ADAPTER_OPENCODE)
 
 # Typed outcome states (receipts / CLI / dashboard / voice share these).
 ST_OK = "OK"
@@ -585,6 +586,13 @@ def _validate_target(spec: ActionSpec, target: str) -> str:
     if spec.adapter == ADAPTER_EDITOR:
         if not _FILEPATH_RE.match(target):
             raise ActionValidationError("editor target is not a bounded path")
+        return target
+    if spec.adapter == ADAPTER_OPENCODE:
+        # Packet 8R: the target is the approved project root (bounded path).
+        # Deeper worktree/secret/symlink checks live in voicebridge/opencode.py;
+        # here we enforce only the shared bounds (no shell meta, bounded path).
+        if not _FILEPATH_RE.match(target):
+            raise ActionValidationError("opencode target is not a bounded path")
         return target
     if spec.adapter == ADAPTER_DESKTOP:
         return target

@@ -1229,6 +1229,45 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self._json({"state": "failed", "detail": str(exc)[:200]})
             except Exception as exc:
                 self._json({"state": "degraded", "detail": str(exc)[:200]})
+        elif path == "/api/opencode":
+            # Packet 8R: read-only OpenCode adapter status/parity (GET).
+            # Mutations (grant/prepare/execute/enable) are CLI-only behind the
+            # same runner/broker; nothing here ever spawns a subprocess.
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            try:
+                from . import opencode as OC
+                runner = OC.opencode_runner(
+                    self.app.orch.cfg,
+                    power=_power_policy(self.app.orch.cfg))
+                qs = self.path.split("?", 1)[1] if "?" in self.path else ""
+                params = {}
+                for kv in qs.split("&"):
+                    if "=" in kv:
+                        k, v = kv.split("=", 1)
+                        params[k] = __import__("urllib.parse").parse.unquote_plus(v)
+                if params.get("id"):
+                    spec = OC.opencode_spec(params["id"])
+                    if spec is None:
+                        self._json({"state": "MISSING",
+                                    "detail": "unknown OpenCode capability"},
+                                   404)
+                        return
+                    self._json({"state": "OK", "action": spec.to_dict()})
+                    return
+                if params.get("check"):
+                    self._json(runner.check(params["check"],
+                                            params.get("scope", "code") or
+                                            "code"))
+                    return
+                out = runner.status()
+                out["capabilities"] = runner.opencode_actions()
+                self._json(out)
+            except OC.OpenCodeError as exc:
+                self._json({"state": "failed", "detail": str(exc)[:200]})
+            except Exception as exc:
+                self._json({"state": "degraded", "detail": str(exc)[:200]})
         elif path == "/api/power":
             # Packet 8O: one authenticated policy path. Read-only inventory +
             # control/grant status here; mutations go through POST with explicit

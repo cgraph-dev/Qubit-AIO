@@ -179,6 +179,20 @@ DEFAULTS: Dict[str, Any] = {
             "timeout_s": 8.0,           # local model chat timeout (was 4s — real 4s timeouts in the journal)
             "max_tokens": 100,         # local reply cap (short answers only)
         },
+        # Packet 8R: supervised OpenCode coding adapter. DISABLED BY DEFAULT.
+        # Master switch (packaged default False) ANDs with the state-file user
+        # enablement (`voicebridge opencode enable`) and the emergency-stop
+        # latch. No upstream code vendored; the local pinned binary is invoked
+        # one-shot at arm's length. Never inherits provider keys, cookies, or
+        # session env (see voicebridge/opencode.py sanitized_env).
+        "opencode": {
+            "enabled": False,
+            "binary": "~/.opencode/bin/opencode",
+            "pinned_version": "1.18.29",
+            "timeout_s": 300.0,
+            "max_timeout_s": 600.0,
+            "pass_env": [],
+        },
         "deepseek_url": "https://api.deepseek.com/chat/completions",
         "deepseek_model": "deepseek-v4-flash",
         "deepseek_env": "~/.hermes/.env",    # DEEPSEEK_API_KEY lives here

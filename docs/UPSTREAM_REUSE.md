@@ -1604,3 +1604,66 @@ IMPLEMENTATION STATUS: implemented as voicebridge/providers/ (Packet 8Q,
     default. Live provider canary requires separate operator authorization and
     is NOT performed in this packet.
 ```
+
+## R8R — Supervised OpenCode coding workflow adapter (Packet 8R)
+
+```text
+LOCAL REQUIREMENT: Packet 8R optional supervised adapter for explicitly
+    requested OpenCode coding workflows: authenticated owner request, approved
+    project root / disposable worktree, allowlisted file scope, time/resource
+    budget, bounded task/output, visible run ID, cancellation, kill/reap,
+    redacted receipts, diff/plan preview before non-disposable writes, never
+    auto-commit/push/publish/install, project-code modification stays
+    high-impact. No new dependency, server, listener, database, or framework.
+UPSTREAM REPOSITORY + COMMIT: https://github.com/sst/opencode — local
+    executable under qualification: version 1.18.29 at
+    ~/.opencode/bin/opencode (recorded 2026-09-07 via `opencode --version`).
+    No source commit is pinned because no upstream source is read, copied, or
+    vendored: the binary is invoked at arm's length as
+    `opencode run --format json --dir <workdir> <task>` (one-shot, never
+    serve/web/attach/share, never --auto). Public CLI surface consulted:
+    `opencode run [message..]` with --format/--dir/--file/--title flags.
+SOURCE FILES + SYMBOLS: none copied. Local module is original Qubit work:
+    voicebridge/opencode.py (validation, sanitized env, argv builder,
+    worktree isolation, spawn-safe executors, OpenCodeRunner on the 8F
+    ActionRunner, `voicebridge opencode ...` CLI, GET /api/opencode).
+    WRAPs the existing verified 8F/7E contracts (ActionRunner, ActionGate,
+    broker, receipts, redaction, power gate) without changing them.
+UPSTREAM TESTS/FIXTURES: none copied; hermetic suite tests/test_packet8r.py
+    covers all packet states with an injected transport (no network, no live
+    spawn; one opt-in local `sleep`-timeout kill test exercises the real
+    kill/reap path with no account or model involved).
+LICENSE: MIT (Copyright (c) 2025 opencode) — no upstream code vendored, so no
+    new notice in THIRD_PARTY_NOTICES.md. The adapter never bundles, copies,
+    or redistributes OpenCode; the operator supplies the binary.
+DECISION: DOCUMENT-ONLY reference + WRAP of local 8F/7E machinery. The only
+    upstream touchpoint is the pinned executable's one-shot `run` argv shape;
+    version drift is reported (installed vs pinned) and never silently
+    accepted as the pin.
+LOCAL DESTINATION: voicebridge/opencode.py + tests/test_packet8r.py +
+    `voicebridge opencode ...` CLI + GET /api/opencode (read-only) +
+    docs/OPERATIONS_8R.md.
+DEPENDENCIES ADDED: none (stdlib subprocess/json/shutil/tempfile only;
+    cloudpickle/forkserver reuse comes from the existing broker).
+BEHAVIOR KEPT: one-shot `run --format json --dir` invocation; JSON-event
+    output parsing with raw-text fallback; non-zero exit / timeout / missing
+    binary as typed failures.
+BEHAVIOR INTENTIONALLY OMITTED: serve/web/attach/share/continue/session,
+    --auto auto-approve, MCP servers, plugin install, model/provider
+    selection passthrough, reading OpenCode's private auth store, full
+    environment inheritance, browser cookies, desktop-session variables,
+    auto-commit/push/publish/install-dependency/service/permission/account
+    actions, and any second listener or bypass of 7E/8F policy.
+WHY THIS IS THE SMALLEST FIT: the packet needs only a governed process
+    boundary plus worktree isolation on top of the already-verified action
+    layer; vendoring the TypeScript agent (or adding an SDK/server) would add
+    an undeclared runtime and bypass the broker/audit/redaction contracts.
+COMPATIBILITY DRIFT: OpenCode CLI flags/version evolve; status reports
+    installed vs pinned versions and a mismatch is visible (never a silent
+    accept). The pin is authoritative for qualification.
+IMPLEMENTATION STATUS: implemented as voicebridge/opencode.py (Packet 8R,
+    2026-09-07) with hermetic tests tests/test_packet8r.py. Disabled by
+    default (config master switch + state-file flag + emergency-stop latch).
+    Live coding runs require separate operator authorization and a disposable
+    worktree and are NOT performed in this packet.
+```
