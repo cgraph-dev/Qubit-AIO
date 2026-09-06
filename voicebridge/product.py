@@ -1742,7 +1742,17 @@ def desktop_shortcut(paths: Optional[ProductPaths] = None, *,
 def tray_status(paths: Optional[ProductPaths] = None) -> Dict[str, Any]:
     """Optional tray/status controller. Never required, never starts a second
     bridge, hotkey listener, or dashboard instance, never exposes tokens, and
-    never reads browser cookies."""
+    never reads browser cookies.
+
+    Truthful inventory (Packet 8O): this repository ships NO executing tray
+    controller — ``tray`` is an optional, status-only diagnostic (pystray
+    presence). It executes NOTHING itself. Any operator tray menu action must
+    route through the shared authenticated power control (``voicebridge power
+    emergency-stop/reset/disable/enable`` CLI or the authenticated
+    ``/api/power`` dashboard endpoint), i.e. the ONE policy path. The
+    ``executes_actions`` / ``policy_path`` fields below make that explicit so a
+    status row is never mistaken for an executing adapter.
+    """
     st = _capability_tray(paths or default_paths())
     base = {
         "required": False,
@@ -1750,14 +1760,15 @@ def tray_status(paths: Optional[ProductPaths] = None) -> Dict[str, Any]:
         "hotkey_listener": False,
         "token_exposure": False,
         "cookie_access": False,
+        "executes_actions": False,
+        "policy_path": "authenticated power CLI/API (one policy path)",
     }
     if st["state"] != "AVAILABLE":
         return {"state": "UNAVAILABLE", "detail": st["detail"], **base,
                 "next": "none — tray is optional; core CLI works without it"}
     return {"state": "AVAILABLE", "detail": st["detail"], **base,
-            "actions": ["show typed readiness", "open dashboard",
-                        "open diagnostics", "request authenticated "
-                        "start/stop/restart"]}
+            "next": "status-only diagnostic; any tray action must use the "
+                    "authenticated power CLI/API (one policy path)"}
 
 
 # ---------------------------------------------------------------------------

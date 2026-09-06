@@ -389,6 +389,40 @@ def run_hourly(cfg, *, platforms: Optional[List[str]] = None,
                                      default=["gmail"])
     accounts = accounts or cfg.get("communications", "monitor", "accounts",
                                    default=["default"])
+    # Packet 8O: automation is a first-class channel on the ONE policy path.
+    # Before any scan the monitor consults the shared DURABLE power-control
+    # latch (the same <state_dir>/power-control.json every channel reads): a
+    # latched emergency stop / global disable FAILS CLOSED with a typed denial
+    # and no browser read ever happens. The monitor runs as its own process, so
+    # it cannot rely on an in-memory singleton — it re-reads the durable latch.
+    # If the durable control cannot be consulted at all, the scan is refused
+    # (fail closed — never scan on unverifiable control state).
+    try:
+        from .. import power as PW
+        _ctl = PW.power_control(cfg)
+        _ctl.refresh()
+        _pctl = _ctl.state
+        if not _pctl.get("persisted"):
+            return {"state": "denied", "code": "POWER_DISABLED",
+                    "detail": "power-control state is not durable; monitor "
+                              "scan refused (fail closed)",
+                    "exit_code": 3}
+        if _pctl.get("emergency_stop"):
+            return {"state": "denied", "code": "EMERGENCY_STOP",
+                    "detail": "global emergency stop is latched; monitor scan "
+                              "refused (reset required)",
+                    "exit_code": 3}
+        if _pctl.get("global_disable"):
+            return {"state": "denied", "code": "POWER_DISABLED",
+                    "detail": "global power disable is set; monitor scan "
+                              "refused",
+                    "exit_code": 3}
+    except Exception as exc:  # noqa: BLE001 — fail closed on any control error
+        from ..logging_setup import log_event
+        log_event("monitor.power.refused", error=str(exc)[:200])
+        return {"state": "denied", "code": "POWER_DISABLED",
+                "detail": "power-control unavailable; monitor scan refused",
+                "exit_code": 3}
     # Packet 8I: the overlap lease MUST exceed the maximum oneshot runtime
     # (unit TimeoutStartSec) by a safety margin. A configured value below the
     # floor is clamped up and the effective value reported truthfully.

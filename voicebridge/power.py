@@ -1072,6 +1072,270 @@ def mcp_status(cfg: Any = None) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# PowerControlStore — durable, atomic, cross-process fail-closed control state
+# ---------------------------------------------------------------------------
+# The emergency-stop and global-disable latches MUST be observable across the
+# running bridge, CLI, dashboard, voice, tray, Ghost, Comet/MCP, and automation
+# processes, and MUST survive a restart of any one of them. A process-local
+# singleton alone is insufficient: if the CLI sets emergency stop while the
+# bridge is running in a separate process, the bridge must observe it. This
+# store persists the latched control state to ``<state_dir>/power-control.json``
+# under a single cross-process flock with unique exclusive temp files, file +
+# directory fsync, chmod 0600, typed durability failures, and a FAIL-CLOSED
+# load (corrupt / unknown-field / newer-schema / forged-author / stale records
+# never load as "cleared" — an unreadable control state denies, it never
+# silently un-latches an emergency stop). Circuit breakers and concurrency
+# slots remain process-local runtime state (they track live in-process runs);
+# the durable latches that must span processes and restarts are the emergency
+# stop and the global disable.
+POWER_CONTROL_SCHEMA_VERSION = 1
+_CONTROL_FIELDS = frozenset((
+    "schema_version", "emergency_stop", "global_disable",
+    "updated_at", "updated_by", "latched_at"))
+
+
+class PowerControlStore:
+    """Durable, atomic, cross-process-locked latched control-state store.
+
+    Persists ``emergency_stop`` / ``global_disable`` (the latches that must
+    span processes and survive restart). Writes are atomic (unique exclusive
+    temp + fsync + rename + dir fsync + 0600) under a cross-process flock that
+    is ALWAYS released via try/finally on every success/failure path. Loading a
+    corrupt / newer-schema / unknown-field / forged-author record NEVER clears
+    a latch: it fails closed (the caller treats unreadable state as emergency
+    stop). ``updated_by`` records the authenticated human principal; a
+    non-human author is refused before any state change.
+    """
+
+    def __init__(self, path: str | os.PathLike, *,
+                 clock: Callable[[], float] = time.time) -> None:
+        self._path = str(path)
+        self._clock = clock
+        self._lock = threading.RLock()
+        self._data: Dict[str, Any] = {
+            "emergency_stop": False, "global_disable": False}
+        self._warnings: List[str] = []
+        self._degraded = False
+
+    # ------------------------------------------------------------- parse/load
+    def _parse_root(self, raw: Any) -> Dict[str, Any]:
+        if not isinstance(raw, dict):
+            raise PowerError("control state is not an object",
+                             "CONTROL_STATE_NOT_OBJECT")
+        unknown = set(raw) - _CONTROL_FIELDS
+        if unknown:
+            raise PowerError(
+                "CONTROL_STATE_UNKNOWN_FIELD: " + ", ".join(sorted(unknown)),
+                "CONTROL_STATE_UNKNOWN_FIELD")
+        try:
+            schema = int(raw.get("schema_version",
+                                 POWER_CONTROL_SCHEMA_VERSION))
+        except (TypeError, ValueError):
+            schema = -1
+        if schema > POWER_CONTROL_SCHEMA_VERSION:
+            raise PowerError(
+                f"CONTROL_SCHEMA_NEWER: file schema {schema} > supported "
+                f"{POWER_CONTROL_SCHEMA_VERSION}", "CONTROL_SCHEMA_NEWER")
+        for key in ("emergency_stop", "global_disable"):
+            val = raw.get(key)
+            if not isinstance(val, bool):
+                raise PowerError(f"CONTROL_STATE_BAD_{key.upper()}",
+                                 f"CONTROL_STATE_BAD_{key.upper()}")
+        if "updated_by" in raw and raw.get("updated_by") != "user":
+            # Only the canonical authenticated human principal may have latched
+            # the durable control state; a forged author record is corrupt and
+            # fails closed.
+            raise PowerError("CONTROL_STATE_FORGED_AUTHOR",
+                             "CONTROL_STATE_FORGED_AUTHOR")
+        for key in ("updated_at", "latched_at"):
+            if key in raw:
+                try:
+                    ts = float(raw[key])
+                except (TypeError, ValueError):
+                    raise PowerError(f"CONTROL_STATE_BAD_{key.upper()}",
+                                     f"CONTROL_STATE_BAD_{key.upper()}") from None
+                if not (ts > 0 and ts == ts):  # reject NaN / non-positive
+                    raise PowerError(f"CONTROL_STATE_BAD_{key.upper()}",
+                                     f"CONTROL_STATE_BAD_{key.upper()}")
+        # A durable record that carries a schema version but NO write timestamp
+        # is incomplete/stale — never trust it as "cleared".
+        if "schema_version" in raw and "updated_at" not in raw:
+            raise PowerError("CONTROL_STATE_NO_TIMESTAMP",
+                             "CONTROL_STATE_NO_TIMESTAMP")
+        return {"emergency_stop": bool(raw.get("emergency_stop", False)),
+                "global_disable": bool(raw.get("global_disable", False))}
+
+    def load(self) -> Dict[str, Any]:
+        """Load the latest durable latch state, FAILING CLOSED.
+
+        Returns ``{"emergency_stop": True}`` (deny) when the file is corrupt,
+        has an unknown/newer schema, or is otherwise unreadable — an unreadable
+        control state must never silently clear an emergency stop. The durable
+        file itself is read under the cross-process lock so a concurrent writer
+        cannot tear a half-written record.
+        """
+        if not os.path.exists(self._path):
+            return {"emergency_stop": False, "global_disable": False}
+        fd = self._lockfd()
+        try:
+            try:
+                with open(self._path, "r", encoding="utf-8") as fh:
+                    raw = json.load(fh)
+                parsed = self._parse_root(raw)
+                self._data = parsed
+                self._degraded = False
+                return parsed
+            except (OSError, ValueError, TypeError, PowerError) as exc:
+                self._degraded = True
+                warn = f"{getattr(exc, 'code', 'CONTROL_STATE_CORRUPT')}: " \
+                       f"{redact_text(str(exc))[:200]}"
+                if warn not in self._warnings:
+                    self._warnings.append(warn)
+                log_event("power.control.load.failed",
+                          code=getattr(exc, "code", "CONTROL_STATE_CORRUPT"),
+                          path=self._path)
+                # Fail closed: treat unreadable/newer/corrupt state as an
+                # emergency stop so no execution is ever allowed on it.
+                return {"emergency_stop": True, "global_disable": True}
+        finally:
+            self._unlockfd(fd)
+
+    # ------------------------------------------------------------- locking
+    def _lockfd(self):
+        import fcntl
+        lock_path = self._path + ".lock"
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+        except OSError as exc:
+            raise PowerError(f"control lock open failed: {exc}",
+                             "CONTROL_LOCK_FAILED") from exc
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+        except OSError:
+            os.close(fd)
+            raise
+        return fd
+
+    @staticmethod
+    def _unlockfd(fd) -> None:
+        import fcntl
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
+
+    def _read_latest_locked(self) -> Dict[str, Any]:
+        if not os.path.exists(self._path):
+            return {"emergency_stop": False, "global_disable": False}
+        with open(self._path, "r", encoding="utf-8") as fh:
+            raw = json.load(fh)
+        return self._parse_root(raw)
+
+    # ------------------------------------------------------------- write
+    def set(self, *, emergency_stop: bool, global_disable: bool,
+            issued_by: str = "user") -> Dict[str, Any]:
+        """Durably persist the latched control state (atomic + cross-process).
+
+        ``issued_by`` must be an authenticated human principal; a model/page/
+        tool/skill/automation/arbitrary author is refused with
+        ``CONFIRMATION_SOURCE_FORBIDDEN`` before any write. The flock is always
+        released (try/finally) on success, read failure, write failure, and
+        exception paths.
+        """
+        from .actions import require_human_principal
+        try:
+            require_human_principal(issued_by)
+        except Exception as exc:
+            code = getattr(exc, "code", None) or "CONFIRMATION_SOURCE_FORBIDDEN"
+            raise PowerDenied(code, f"control author refused: {exc}") from exc
+        now = self._clock()
+        payload = {"schema_version": POWER_CONTROL_SCHEMA_VERSION,
+                   "emergency_stop": bool(emergency_stop),
+                   "global_disable": bool(global_disable),
+                   "updated_at": now, "updated_by": "user",
+                   "latched_at": now}
+        fd = self._lockfd()
+        try:
+            try:
+                self._read_latest_locked()  # validate/parse under the lock
+            except (OSError, ValueError, TypeError, PowerError) as exc:
+                # Underlying state is corrupt/newer — refuse to "clear" it by
+                # writing a fresh record: fail closed instead.
+                code = getattr(exc, "code", "CONTROL_STATE_CORRUPT")
+                raise PowerError(f"cannot write control over bad state: {exc}",
+                                 code) from exc
+            self._write_payload_locked(payload)
+        finally:
+            self._unlockfd(fd)
+        with self._lock:
+            self._data = {"emergency_stop": bool(emergency_stop),
+                          "global_disable": bool(global_disable)}
+            self._degraded = False
+        return dict(self._data)
+
+    def _write_payload_locked(self, payload: Dict[str, Any]) -> None:
+        d = self._path.rsplit("/", 1)[0] if "/" in self._path else "."
+        try:
+            os.makedirs(d, exist_ok=True)
+        except OSError as exc:
+            raise PowerError(f"control dir creation failed: {exc}",
+                             "CONTROL_MKDIR_FAILED") from exc
+        blob = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8")
+        tmp = (self._path + f".tmp.{os.getpid()}.{uuid.uuid4().hex[:8]}")
+        try:
+            fd = os.open(str(tmp), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(blob)
+                fh.flush()
+                os.fsync(fh.fileno())
+        except OSError as exc:
+            self._cleanup_tmp(tmp)
+            raise PowerError(f"control write failed: {exc}",
+                             "CONTROL_WRITE_FAILED") from exc
+        try:
+            os.chmod(tmp, 0o600)
+        except OSError as exc:
+            self._cleanup_tmp(tmp)
+            raise PowerError(f"control chmod failed: {exc}",
+                             "CONTROL_CHMOD_FAILED") from exc
+        try:
+            os.replace(tmp, self._path)
+        except OSError as exc:
+            self._cleanup_tmp(tmp)
+            raise PowerError(f"control rename failed: {exc}",
+                             "CONTROL_RENAME_FAILED") from exc
+        try:
+            dir_fd = os.open(d, os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        except OSError as exc:
+            raise PowerError(
+                "control directory fsync failed after rename: "
+                f"{exc}; durability UNCERTAIN", "CONTROL_DIR_FSYNC_FAILED",
+            ) from exc
+
+    @staticmethod
+    def _cleanup_tmp(tmp: str) -> None:
+        try:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+        except OSError:
+            pass
+
+    def health(self) -> Dict[str, Any]:
+        return {"degraded": self._degraded, "warnings": list(self._warnings),
+                "path": self._path}
+
+
+def power_control_store(cfg: Any) -> PowerControlStore:
+    path = cfg.get("power", "control_path", default="") or \
+        (cfg.state_dir() / "power-control.json")
+    return PowerControlStore(os.fspath(path))
+
+
+# ---------------------------------------------------------------------------
 # PowerControl — emergency stop, global disable, circuit breakers, concurrency
 # ---------------------------------------------------------------------------
 class _CircuitBreaker:
@@ -1125,31 +1389,133 @@ class PowerControl:
     ``untrack`` hold the cancel callbacks supplied by callers (the same broker
     cancel callback pattern Packet 8N uses), so emergency stop can cancel
     active runs through the caller's own machinery.
+
+    Cross-process durability: when ``state_store`` is supplied (the production
+    path via ``power_control(cfg)``), the emergency-stop and global-disable
+    latches are persisted to a shared atomic ``0600`` file under a cross-process
+    flock and re-loaded on construction, so a CLI/dashboard emergency stop is
+    observed by the running bridge / voice / tray / Ghost / Comet / automation
+    and survives a restart of any one of them. Mutations are authenticated:
+    ``emergency_stop`` / ``global_disable`` / ``global_enable`` / ``reset``
+    require an authenticated human principal (``user`` / ``cli:user`` /
+    ``dashboard``); a model / page / tool / skill / automation / arbitrary-text
+    author is refused with ``CONFIRMATION_SOURCE_FORBIDDEN``. Circuit breakers
+    and concurrency slots remain process-local runtime state (they track live
+    in-process runs); the durable latches that must span processes and restarts
+    are the emergency stop and the global disable.
     """
 
     def __init__(self, *, clock: Callable[[], float] = time.time,
-                 max_concurrency: int = DEFAULT_CONCURRENCY) -> None:
+                 max_concurrency: int = DEFAULT_CONCURRENCY,
+                 state_store: Optional[PowerControlStore] = None,
+                 fail_closed_on_load: bool = True) -> None:
         self._clock = clock
         self._max_concurrency = int(max_concurrency)
-        self._stopped = False            # emergency stop latch
-        self._disabled = False           # global disable
         self._lock = threading.RLock()
         self._breakers: Dict[str, _CircuitBreaker] = {}
         self._slots: Dict[str, int] = {}
         self._active: Dict[str, Callable[[], None]] = {}
+        self._state_store = state_store
         self._state = {"enabled": False, "health": "disabled",
                        "emergency_stop": False, "global_disable": False,
-                       "adapter": "power"}
+                       "adapter": "power", "persisted": bool(state_store)}
+        # Load any latched cross-process control state. FAIL CLOSED: an
+        # unreadable / corrupt / newer-schema / unknown-field durable state is
+        # treated as an emergency stop (never as "cleared"), so a restart can
+        # never silently drop a prior emergency stop.
+        if state_store is not None:
+            try:
+                persisted = state_store.load()
+            except PowerError as exc:
+                if fail_closed_on_load:
+                    self._stopped = True
+                    self._disabled = True
+                    self._state.update(emergency_stop=True,
+                                       global_disable=True, enabled=False,
+                                       health="degraded")
+                    log_event("power.control.load.failed.closed",
+                              code=exc.code, path=state_store._path)
+                    return
+                persisted = {"emergency_stop": False, "global_disable": False}
+            self._stopped = bool(persisted.get("emergency_stop", False))
+            self._disabled = bool(persisted.get("global_disable", False))
+            if self._stopped:
+                self._state["emergency_stop"] = True
+                self._state["health"] = "degraded"
+                self._state["enabled"] = False
+            if self._disabled:
+                self._state["global_disable"] = True
+                self._state["health"] = "disabled"
+        else:
+            self._stopped = False
+            self._disabled = False
 
     @property
     def state(self) -> Dict[str, Any]:
         with self._lock:
             return dict(self._state)
 
-    def emergency_stop(self) -> Dict[str, Any]:
+    def refresh(self, *, ttl_s: float = 0.25) -> None:
+        """Re-read the durable latch state so a latch set by ANOTHER process
+        (e.g. CLI emergency-stop while the bridge runs) is observed here. Fails
+        closed: unreadable/corrupt/newer durable state latches emergency stop.
+        A short TTL avoids flock contention on hot decision/execution paths
+        while keeping cross-process freshness within ~0.25s."""
+        if self._state_store is None:
+            return
+        import time as _time
+        now = _time.monotonic()
+        if getattr(self, "_refresh_at", 0.0) + ttl_s > now:
+            return
+        self._refresh_at = now
+        try:
+            persisted = self._state_store.load()
+        except PowerError as exc:
+            persisted = {"emergency_stop": True, "global_disable": True}
+            log_event("power.control.load.failed.closed",
+                      code=exc.code, path=self._state_store._path)
+        with self._lock:
+            self._stopped = bool(persisted.get("emergency_stop", False))
+            self._disabled = bool(persisted.get("global_disable", False))
+            self._state["emergency_stop"] = self._stopped
+            self._state["global_disable"] = self._disabled
+            if self._stopped:
+                self._state["health"] = "degraded"
+                self._state["enabled"] = False
+            elif self._disabled:
+                self._state["health"] = "disabled"
+            else:
+                self._state["health"] = "disabled"
+
+    def _require_human(self, issued_by: str) -> None:
+        from .actions import require_human_principal
+        try:
+            require_human_principal(issued_by)
+        except Exception as exc:
+            code = getattr(exc, "code", None) or "CONFIRMATION_SOURCE_FORBIDDEN"
+            raise PowerDenied(code, f"control issuer refused: {exc}") from exc
+
+    def _persist(self, *, emergency_stop: bool, global_disable: bool,
+                 issued_by: str) -> None:
+        """Write the latches to the durable store when one is configured.
+        A persistence failure is typed and surfaced — it is never silently
+        swallowed, so a control mutation can never claim success while the
+        durable latch was not recorded."""
+        if self._state_store is None:
+            return
+        self._state_store.set(emergency_stop=emergency_stop,
+                              global_disable=global_disable,
+                              issued_by=issued_by)
+
+    def emergency_stop(self, *, issued_by: str = "user") -> Dict[str, Any]:
+        self._require_human(issued_by)
+        self.refresh()
+        self._persist(emergency_stop=True, global_disable=False,
+                      issued_by=issued_by)
         with self._lock:
             self._stopped = True
             self._state["emergency_stop"] = True
+            self._state["global_disable"] = False
             self._state["health"] = "degraded"
             self._state["enabled"] = False
             cancels = list(self._active.values())
@@ -1159,40 +1525,57 @@ class PowerControl:
                 cancel()
             except Exception:
                 pass
-        log_event("power.emergency_stop")
+        log_event("power.emergency_stop", issued_by=issued_by)
         return {"state": "OK", "health": "degraded",
                 "detail": "global emergency stop latched; reset required"}
 
-    def reset(self) -> Dict[str, Any]:
+    def reset(self, *, issued_by: str = "user") -> Dict[str, Any]:
+        """Clear the latches. REQUIRES explicit human authorization: a model/
+        page/tool/skill/automation/arbitrary author is refused and the durable
+        latch is left untouched."""
+        self._require_human(issued_by)
+        self.refresh()
+        self._persist(emergency_stop=False, global_disable=False,
+                      issued_by=issued_by)
         with self._lock:
             self._stopped = False
             self._disabled = False
             self._state = {"enabled": False, "health": "disabled",
                            "emergency_stop": False, "global_disable": False,
-                           "adapter": "power"}
+                           "adapter": "power",
+                           "persisted": bool(self._state_store)}
             for b in self._breakers.values():
                 b.reset()
-        log_event("power.reset")
+        log_event("power.reset", issued_by=issued_by)
         return {"state": "OK", "health": "disabled"}
 
-    def global_disable(self) -> Dict[str, Any]:
+    def global_disable(self, *, issued_by: str = "user") -> Dict[str, Any]:
+        self._require_human(issued_by)
+        self.refresh()
+        self._persist(emergency_stop=False, global_disable=True,
+                      issued_by=issued_by)
         with self._lock:
             self._disabled = True
             self._state["global_disable"] = True
             self._state["health"] = "disabled"
-        log_event("power.global_disable")
+        log_event("power.global_disable", issued_by=issued_by)
         return {"state": "OK", "detail": "global disable latched"}
 
-    def global_enable(self) -> Dict[str, Any]:
+    def global_enable(self, *, issued_by: str = "user") -> Dict[str, Any]:
+        self._require_human(issued_by)
+        self.refresh()
         with self._lock:
             if self._stopped:
                 return {"state": "denied", "code": "EMERGENCY_STOP",
                         "detail": "emergency stop is set; reset required"}
+        self._persist(emergency_stop=False, global_disable=False,
+                      issued_by=issued_by)
+        with self._lock:
             self._disabled = False
             self._state["global_disable"] = False
             self._state["health"] = "enabled"
             self._state["enabled"] = True
-        log_event("power.global_enable")
+        log_event("power.global_enable", issued_by=issued_by)
         return {"state": "OK", "health": "enabled"}
 
     # ------------------------------------------------------ circuit breakers
@@ -1248,6 +1631,7 @@ class PowerControl:
     def status(self) -> Dict[str, Any]:
         return {"state": "OK", "emergency_stop": self._stopped,
                 "global_disable": self._disabled,
+                "persisted": bool(self._state_store),
                 "max_concurrency": self._max_concurrency,
                 "active": len(self._active),
                 "circuits": self.circuit_status()}
@@ -1255,7 +1639,13 @@ class PowerControl:
 
 def power_control(cfg: Any = None, *,
                   max_concurrency: int = DEFAULT_CONCURRENCY) -> PowerControl:
-    """Return the shared process-wide PowerControl for a config scope."""
+    """Return the shared process-wide PowerControl for a config scope.
+
+    The shared control is bound to the durable cross-process control state
+    (``<state_dir>/power-control.json``) so emergency stop / global disable set
+    from the CLI, dashboard, or any channel are observed by every other channel
+    and survive a restart of any one of them.
+    """
     return _shared_control(cfg, max_concurrency=max_concurrency)
 
 
@@ -1265,7 +1655,14 @@ def _shared_control(cfg: Any = None, *,
     with _SHARED_LOCK:
         ctl = _SHARED_CONTROL.get(key)
         if ctl is None:
-            ctl = PowerControl(max_concurrency=max_concurrency)
+            store = None
+            if cfg is not None:
+                try:
+                    store = power_control_store(cfg)
+                except Exception:
+                    store = None
+            ctl = PowerControl(max_concurrency=max_concurrency,
+                               state_store=store)
             _SHARED_CONTROL[key] = ctl
         return ctl
 
@@ -1319,6 +1716,11 @@ class PowerPolicy:
                confirmation_id: Optional[str] = None,
                dry_run: bool = False) -> Dict[str, Any]:
         """One policy path. Returns a typed decision dict; never executes."""
+        # 0. Refresh the cross-process latch (no-op when the control has no
+        #    durable store, e.g. hermetic bare PowerControl()). This lets an
+        #    emergency stop / disable set by ANOTHER process (CLI while the
+        #    bridge runs, dashboard while the CLI waits) be observed here.
+        self.control.refresh()
         spec = self._resolve_spec(capability)
         # 1. Global emergency stop (hard latch).
         if self.control.state.get("emergency_stop"):

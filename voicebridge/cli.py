@@ -591,16 +591,26 @@ def build_parser() -> argparse.ArgumentParser:
                                      help="revoke the owner power grant (dry-run unless --confirm)")
     power_rev.add_argument("grant_id")
     power_rev.add_argument("--confirm", action="store_true")
-    power_sub.add_parser("reset-grant", parents=[common],
-                         help="remove the owner power grant entirely")
-    power_sub.add_parser("emergency-stop", parents=[common],
-                         help="global immediate stop: latches, cancels active runs; reset required")
-    power_sub.add_parser("reset", parents=[common],
-                         help="reset the emergency-stop/disable latches")
-    power_sub.add_parser("disable", parents=[common],
-                         help="global power disable (all capabilities denied)")
-    power_sub.add_parser("enable", parents=[common],
-                         help="clear the global disable latch (requires no emergency stop)")
+    power_reset_grant = power_sub.add_parser("reset-grant", parents=[common],
+                                             help="remove the owner power grant entirely")
+    power_reset_grant.add_argument("--confirm", action="store_true",
+                                   help="explicitly confirm the grant reset")
+    power_es = power_sub.add_parser("emergency-stop", parents=[common],
+                                    help="global immediate stop: latches, cancels active runs; reset required")
+    power_es.add_argument("--confirm", action="store_true",
+                          help="explicitly confirm the emergency stop")
+    power_reset = power_sub.add_parser("reset", parents=[common],
+                                       help="reset the emergency-stop/disable latches (requires --confirm)")
+    power_reset.add_argument("--confirm", action="store_true",
+                             help="explicitly confirm the reset (human authorization)")
+    power_dis = power_sub.add_parser("disable", parents=[common],
+                                     help="global power disable (all capabilities denied)")
+    power_dis.add_argument("--confirm", action="store_true",
+                           help="explicitly confirm the global disable")
+    power_en = power_sub.add_parser("enable", parents=[common],
+                                    help="clear the global disable latch (requires no emergency stop)")
+    power_en.add_argument("--confirm", action="store_true",
+                          help="explicitly confirm the enable")
     export = add("export-state", help="encrypt + export portable state (memory/lessons/reports/config/model)")
     export.add_argument("--out", type=Path, default=None,
                         help="output file (default: <state_dir>/portable-<ts>.vbp)")
@@ -2431,16 +2441,29 @@ def _cmd_power(cfg, args) -> int:
                 g = store.revoke(args.grant_id, issued_by="cli:user")
                 out = {"state": "OK", "revoked": g.to_dict()}
         elif cmd == "reset-grant":
+            if not getattr(args, "confirm", False):
+                print(_json.dumps(
+                    {"state": "denied", "code": "CONFIRMATION_REQUIRED",
+                     "detail": "power reset-grant requires --confirm "
+                               "(explicit human authorization)"}, indent=2))
+                return 3
             g = _store().reset(issued_by="cli:user")
             out = {"state": "OK", "grant": None}
-        elif cmd == "emergency-stop":
-            out = control.emergency_stop()
-        elif cmd == "reset":
-            out = control.reset()
-        elif cmd == "disable":
-            out = control.global_disable()
-        elif cmd == "enable":
-            out = control.global_enable()
+        elif cmd in ("emergency-stop", "reset", "disable", "enable"):
+            if not getattr(args, "confirm", False):
+                print(_json.dumps(
+                    {"state": "denied", "code": "CONFIRMATION_REQUIRED",
+                     "detail": f"power {cmd} requires --confirm (explicit "
+                               f"human authorization)"}, indent=2))
+                return 3
+            if cmd == "emergency-stop":
+                out = control.emergency_stop(issued_by="cli:user")
+            elif cmd == "reset":
+                out = control.reset(issued_by="cli:user")
+            elif cmd == "disable":
+                out = control.global_disable(issued_by="cli:user")
+            else:
+                out = control.global_enable(issued_by="cli:user")
         else:
             print(f"ERROR: unknown power command {cmd!r}")
             return 2

@@ -406,12 +406,22 @@ def test_served_dashboard_http_content_is_rate_aware(tmp_path: Path) -> None:
 
 
 def test_local_script_dispatch_runs_script(tmp_path: Path) -> None:
-    """_dispatch_local_script runs the command and stores the summary."""
+    """_dispatch_local_script runs the command (through the broker) and stores
+    the summary."""
     import voicebridge.orchestrator as orch_mod  # noqa: F401  (import smoke)
 
     tt = TaskTemplates.load(path=_tmpl_yaml(tmp_path))
     tmpl = tt.match("search the web for the answer")
     assert tmpl is not None
+
+    # Packet 8O: the script path executes ONLY through the broker. Build a real
+    # broker with the template registered (mirroring the orchestrator's
+    # register_script_tool wiring) so the dispatch path is the production one.
+    from voicebridge.broker import build_host_broker, register_script_tool
+    broker = build_host_broker()
+    register_script_tool(broker, template_name="search-web",
+                         script="echo RESULT: {question} is 42",
+                         timeout_s=60)
 
     # drive through a minimal fake orchestrator subclass
     class _O:
@@ -423,6 +433,7 @@ def test_local_script_dispatch_runs_script(tmp_path: Path) -> None:
                 "get": lambda self, *p, **kw: kw.get("default"),
                 "section": lambda self, n: {"max_words": 20},
             })()
+            self._broker = broker
             self._webui = None
             self.spoken = []
 

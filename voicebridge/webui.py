@@ -1155,7 +1155,9 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 return
             try:
                 from . import actions as A
-                runner = A.action_runner(self.app.orch.cfg)
+                runner = A.action_runner(self.app.orch.cfg,
+                                         power=_power_policy(
+                                             self.app.orch.cfg))
                 qs = self.path.split("?", 1)[1] if "?" in self.path else ""
                 params = {}
                 for kv in qs.split("&"):
@@ -1825,16 +1827,46 @@ class WebUIHandler(BaseHTTPRequestHandler):
                                      issued_by="dashboard")
                     self._json({"state": "OK", "revoked": g.to_dict()})
                 elif action == "reset-grant":
+                    if not confirmed:
+                        self._json({"state": "denied",
+                                    "code": "CONFIRMATION_REQUIRED",
+                                    "detail": "reset-grant requires explicit "
+                                              "confirmation"})
+                        return
                     store.reset(issued_by="dashboard")
                     self._json({"state": "OK", "grant": None})
                 elif action == "emergency-stop":
-                    self._json(control.emergency_stop())
+                    if not confirmed:
+                        self._json({"state": "denied",
+                                    "code": "CONFIRMATION_REQUIRED",
+                                    "detail": "emergency stop requires explicit "
+                                              "confirmation"})
+                        return
+                    self._json(control.emergency_stop(issued_by="dashboard"))
                 elif action == "reset":
-                    self._json(control.reset())
+                    if not confirmed:
+                        self._json({"state": "denied",
+                                    "code": "CONFIRMATION_REQUIRED",
+                                    "detail": "reset requires explicit human "
+                                              "confirmation"})
+                        return
+                    self._json(control.reset(issued_by="dashboard"))
                 elif action == "disable":
-                    self._json(control.global_disable())
+                    if not confirmed:
+                        self._json({"state": "denied",
+                                    "code": "CONFIRMATION_REQUIRED",
+                                    "detail": "disable requires explicit "
+                                              "confirmation"})
+                        return
+                    self._json(control.global_disable(issued_by="dashboard"))
                 elif action == "enable":
-                    self._json(control.global_enable())
+                    if not confirmed:
+                        self._json({"state": "denied",
+                                    "code": "CONFIRMATION_REQUIRED",
+                                    "detail": "enable requires explicit "
+                                              "confirmation"})
+                        return
+                    self._json(control.global_enable(issued_by="dashboard"))
                 else:
                     self._json({"state": "failed",
                                 "detail": f"unknown action {action}"}, 400)

@@ -1155,3 +1155,609 @@ def test_changed_arguments_reject_confirmation(tmp_path):
                       confirmation_id=rec.id, args=env_pwned)
     assert d["allowed"] is False
     assert d["code"] == "TARGET_MISMATCH"
+
+
+# ---------------------------------------------------------------------------
+# Cross-process durable control state (Packet 8O repair: process-local
+# singleton is NOT enough — emergency stop / global disable must survive
+# restart and be observed across processes; stale/corrupt/newer state must
+# FAIL CLOSED; concurrent writers cannot corrupt; reset requires human auth).
+# ---------------------------------------------------------------------------
+def _ctl_store(tmp_path, name="power-control.json"):
+    return PW.PowerControlStore(tmp_path / name)
+
+
+def test_control_latch_persists_across_restart(tmp_path):
+    # Emergency stop set on one PowerControl is observed by a brand-new
+    # PowerControl (simulating a bridge restart) bound to the same durable
+    # store.
+    store = _ctl_store(tmp_path)
+    c1 = PW.PowerControl(state_store=store)
+    c1.emergency_stop(issued_by="user")
+    c2 = PW.PowerControl(state_store=store)
+    assert c2.state["emergency_stop"] is True
+    # A policy bound to the restarted control denies.
+    store2, perms, grant_store, _ = _stores(tmp_path)
+    _grant(grant_store, ttl_s=3600)
+    policy = PW.PowerPolicy(store=grant_store, control=c2, perms=perms)
+    assert policy.check(ASK, scopes=("research",),
+                        target=ORIGIN + "/q")["code"] == "EMERGENCY_STOP"
+
+
+def test_control_disable_persists_across_restart(tmp_path):
+    store = _ctl_store(tmp_path)
+    c1 = PW.PowerControl(state_store=store)
+    c1.global_disable(issued_by="user")
+    c2 = PW.PowerControl(state_store=store)
+    assert c2.state["global_disable"] is True
+    assert c2.state["emergency_stop"] is False
+
+
+def test_control_reset_clears_latch_and_persists(tmp_path):
+    store = _ctl_store(tmp_path)
+    c1 = PW.PowerControl(state_store=store)
+    c1.emergency_stop(issued_by="user")
+    c1.reset(issued_by="user")
+    assert c1.state["emergency_stop"] is False
+    c2 = PW.PowerControl(state_store=store)
+    assert c2.state["emergency_stop"] is False
+    assert c2.state["global_disable"] is False
+
+
+def test_control_mutations_require_human_issuer(tmp_path):
+    store = _ctl_store(tmp_path)
+    c = PW.PowerControl(state_store=store)
+    for bad in ("model", "page", "tool", "skill", "automation",
+                "arbitrary text", "gpt-4"):
+        with pytest.raises(PW.PowerDenied) as e:
+            c.emergency_stop(issued_by=bad)
+        assert e.value.code == "CONFIRMATION_SOURCE_FORBIDDEN"
+        with pytest.raises(PW.PowerDenied):
+            c.global_disable(issued_by=bad)
+        with pytest.raises(PW.PowerDenied):
+            c.reset(issued_by=bad)
+    # None of the rejected mutations changed the durable latch.
+    assert c.state["emergency_stop"] is False
+    assert c.state["global_disable"] is False
+    assert store.load()["emergency_stop"] is False
+
+
+def test_control_reset_requires_explicit_human_confirmation_cli():
+    # The CLI requires --confirm for reset/emergency-stop/disable/enable.
+    from voicebridge.cli import build_parser
+    p = build_parser()
+    args = p.parse_args(["power", "reset"])
+    assert getattr(args, "confirm", False) is False
+    args2 = p.parse_args(["power", "reset", "--confirm"])
+    assert args2.confirm is True
+    args3 = p.parse_args(["power", "emergency-stop", "--confirm"])
+    assert args3.confirm is True
+
+
+def test_control_stale_durable_state_fails_closed(tmp_path):
+    # A durable control file that is INCOMPLETE (has a schema version but no
+    # write timestamp) is never trusted as "cleared": it fails closed.
+    path = tmp_path / "power-control.json"
+    path.write_text(json.dumps(
+        {"schema_version": 1, "emergency_stop": False, "global_disable": False}))
+    c = PW.PowerControl(state_store=PW.PowerControlStore(path))
+    assert c.state["emergency_stop"] is True
+
+
+def test_control_wellformed_future_record_loads_literally(tmp_path):
+    # A well-formed record (valid schema, timestamps, human author) loads
+    # literally even if its updated_at is in the future — the fail-closed paths
+    # are for unreadable/incomplete/forged/newer records, not well-formed ones.
+    path = tmp_path / "power-control.json"
+    path.write_text(json.dumps(
+        {"schema_version": 1, "emergency_stop": False, "global_disable": False,
+         "updated_at": 99999999999.0, "updated_by": "user",
+         "latched_at": 1.0}))
+    c = PW.PowerControl(state_store=PW.PowerControlStore(path))
+    assert c.state["emergency_stop"] is False
+
+
+def test_control_corrupt_state_fails_closed(tmp_path):
+    path = tmp_path / "power-control.json"
+    path.write_text("{ not json")
+    c = PW.PowerControl(state_store=PW.PowerControlStore(path))
+    assert c.state["emergency_stop"] is True
+    assert c.state["global_disable"] is True
+
+
+def test_control_newer_schema_fails_closed(tmp_path):
+    path = tmp_path / "power-control.json"
+    path.write_text(json.dumps({"schema_version": 999,
+                                "emergency_stop": False,
+                                "global_disable": False}))
+    c = PW.PowerControl(state_store=PW.PowerControlStore(path))
+    assert c.state["emergency_stop"] is True
+
+
+def test_control_unknown_field_fails_closed(tmp_path):
+    path = tmp_path / "power-control.json"
+    path.write_text(json.dumps({"schema_version": 1,
+                                "emergency_stop": False,
+                                "global_disable": False,
+                                "surprise": True}))
+    c = PW.PowerControl(state_store=PW.PowerControlStore(path))
+    assert c.state["emergency_stop"] is True
+
+
+def test_control_forged_author_refused(tmp_path):
+    path = tmp_path / "power-control.json"
+    path.write_text(json.dumps({"schema_version": 1,
+                                "emergency_stop": False,
+                                "global_disable": False,
+                                "updated_at": 1.0, "updated_by": "model"}))
+    c = PW.PowerControl(state_store=PW.PowerControlStore(path))
+    assert c.state["emergency_stop"] is True
+
+
+def test_control_cannot_clear_corrupt_state(tmp_path):
+    # Writing over a corrupt underlying state is refused (fail closed): a
+    # "reset" cannot silently clear an unreadable emergency-stop latch.
+    path = tmp_path / "power-control.json"
+    path.write_text("{ not json")
+    store = PW.PowerControlStore(path)
+    c = PW.PowerControl(state_store=store)
+    assert c.state["emergency_stop"] is True
+    with pytest.raises(PW.PowerError):
+        store.set(emergency_stop=False, global_disable=False,
+                  issued_by="user")
+    assert c.state["emergency_stop"] is True
+
+
+def test_control_file_private_modes_and_no_secrets(tmp_path):
+    path = tmp_path / "power-control.json"
+    store = PW.PowerControlStore(path)
+    store.set(emergency_stop=True, global_disable=False, issued_by="user")
+    assert path.exists()
+    assert oct(path.stat().st_mode & 0o777) == "0o600"
+    raw = json.loads(path.read_text())
+    assert raw["emergency_stop"] is True
+    assert "token" not in json.dumps(raw)
+
+
+def test_control_cross_process_consistency(tmp_path):
+    # Two separate processes share the durable latch: process A latches
+    # emergency stop, process B observes it.
+    import subprocess, sys as _sys
+    path = tmp_path / "power-control.json"
+    stop_script = (
+        "import sys; sys.path.insert(0, %r); "
+        "from voicebridge import power as P; "
+        "P.PowerControl(state_store=P.PowerControlStore(%r)).emergency_stop("
+        "issued_by='user')" % (str(REPO_ROOT), str(path)))
+    read_script = (
+        "import sys; sys.path.insert(0, %r); "
+        "from voicebridge import power as P; "
+        "c = P.PowerControl(state_store=P.PowerControlStore(%r)); "
+        "print(c.state['emergency_stop'], c.state['global_disable'])"
+        % (str(REPO_ROOT), str(path)))
+    out = subprocess.run([_sys.executable, "-c", stop_script],
+                         capture_output=True, text=True, timeout=60)
+    assert out.returncode == 0, out.stderr
+    out2 = subprocess.run([_sys.executable, "-c", read_script],
+                          capture_output=True, text=True, timeout=60)
+    assert out2.returncode == 0, out2.stderr
+    assert out2.stdout.strip().split() == ["True", "False"]
+
+
+def test_control_concurrent_writers_no_corruption(tmp_path):
+    # Many processes racing to write the durable latch never corrupt the file:
+    # a fresh read sees a valid, complete record.
+    import subprocess, sys as _sys
+    path = tmp_path / "power-control.json"
+    script = (
+        "import sys; sys.path.insert(0, %r); "
+        "from voicebridge import power as P; "
+        "P.PowerControl(state_store=P.PowerControlStore(%r)).global_disable("
+        "issued_by='user')" % (str(REPO_ROOT), str(path)))
+    procs = [subprocess.Popen([_sys.executable, "-c", script],
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+             for _ in range(5)]
+    for pr in procs:
+        out, err = pr.communicate(timeout=60)
+        assert pr.returncode == 0, err.decode()
+    store = PW.PowerControlStore(path)
+    st = store.load()
+    assert st["global_disable"] is True
+    assert st["emergency_stop"] is False
+    assert store.health()["degraded"] is False
+
+
+def test_control_shared_control_bound_to_durable_store(tmp_path):
+    cfg = _cfg(tmp_path)
+    c1 = PW.power_control(cfg)
+    c2 = PW.power_control(cfg)
+    assert c1 is c2
+    # The shared control is bound to the durable store at the state dir.
+    path = cfg.state_dir() / "power-control.json"
+    c1.emergency_stop(issued_by="cli:user")
+    assert path.exists()
+    assert json.loads(path.read_text())["emergency_stop"] is True
+    # A policy resolved through the shared path observes the latch.
+    _grant(PW.power_grant_store(cfg), capabilities=(ASK,), ttl_s=3600)
+    policy = PW.power_policy(cfg)
+    d = policy.check(ASK, scopes=("research",), target=ORIGIN + "/q")
+    assert d["allowed"] is False and d["code"] == "EMERGENCY_STOP"
+    c1.reset(issued_by="cli:user")
+    d2 = policy.check(ASK, scopes=("research",), target=ORIGIN + "/q")
+    assert d2["allowed"] is True
+
+
+def test_control_failed_durability_never_silently_swallowed(tmp_path):
+    # A control mutation whose durable write fails must raise a typed
+    # PowerError, never report fake success.
+    d = tmp_path / "ro"
+    d.mkdir()
+    os.chmod(d, 0o500)
+    try:
+        store = PW.PowerControlStore(d / "control.json")
+        c = PW.PowerControl(state_store=store)
+        with pytest.raises(PW.PowerError):
+            c.emergency_stop(issued_by="user")
+    finally:
+        os.chmod(d, 0o700)
+
+
+# ---------------------------------------------------------------------------
+# Tray scope (Packet 8O repair): this repo ships NO executing tray controller.
+# ``tray`` is an optional, status-only diagnostic; any tray action must route
+# through the shared authenticated power CLI/API (one policy path). The status
+# row never claims an executing adapter, cookies, secrets, or a second bridge.
+# ---------------------------------------------------------------------------
+def test_tray_status_truthful_no_executing_adapter():
+    from voicebridge import product as P
+    out = P.tray_status()
+    assert out["executes_actions"] is False
+    assert out["second_bridge"] is False
+    assert out["hotkey_listener"] is False
+    assert out["cookie_access"] is False
+    assert out["token_exposure"] is False
+    assert out["required"] is False
+    # Any tray action must route through the authenticated power CLI/API.
+    assert "power" in out["policy_path"]
+
+
+def test_tray_state_is_typed_available_or_unavailable():
+    from voicebridge import product as P
+    out = P.tray_status()
+    assert out["state"] in ("AVAILABLE", "UNAVAILABLE")
+    assert out["executes_actions"] is False
+
+
+# ---------------------------------------------------------------------------
+# MCP/Comet scope (Packet 8O repair): no MCP server is intentionally shipped.
+# ``mcp_status()`` reports a truthful typed UNAVAILABLE/DISABLED state and the
+# Comet research path stays broker-bound (through GhostRunner) — never a fake
+# "connected" success and never a second policy path.
+# ---------------------------------------------------------------------------
+def test_mcp_status_typed_and_not_fake_connected(tmp_path):
+    cfg = _cfg(tmp_path)
+    st = PW.mcp_status(cfg)
+    assert st["state"] in ("UNAVAILABLE", "DISABLED")
+    assert st["server"] == "none"
+    assert st["state"] != "AVAILABLE"
+    assert "connected" not in json.dumps(st).lower() or \
+        '"connected": false' in json.dumps(st)
+
+
+def test_mcp_status_reports_no_second_policy_path(tmp_path):
+    cfg = _cfg(tmp_path)
+    st = PW.mcp_status(cfg)
+    # No MCP server is shipped: the only research route is the broker-bound
+    # Comet adapter (GhostRunner), which flows through the one policy path.
+    assert st.get("comet_bound", False) is False or st["state"] == "DISABLED"
+
+
+# ---------------------------------------------------------------------------
+# Real execution wiring (Packet 8O repair): every channel flows through
+# policy -> broker -> typed result. Hermetic end-to-end traces for the
+# automation, CLI, dashboard (authenticated HTTP), and voice runner paths.
+# ---------------------------------------------------------------------------
+def test_automation_request_policy_broker_typed_result(tmp_path):
+    # Automation source flows through the broker, which checks the shared
+    # power control BEFORE execution and returns a typed denial.
+    from voicebridge.broker import build_host_broker
+    control = PW.PowerControl()
+    broker = build_host_broker(power_control=control)
+    control.emergency_stop(issued_by="user")
+    res = broker.execute("local.volume_up", {}, source="automation")
+    assert res.denied == "EMERGENCY_STOP"
+    assert res.ok is False
+
+
+def test_cli_power_emergency_stop_blocks_cli_check(tmp_path):
+    # CLI emergency-stop (--confirm) latches the DURABLE control; a fresh
+    # policy/check path observes the latch (cross-process CLI -> bridge).
+    from voicebridge.cli import _cmd_power, build_parser
+    cfg = _cfg(tmp_path)
+    _grant(PW.power_grant_store(cfg), capabilities=(ASK,), ttl_s=3600)
+    p = build_parser()
+    args = p.parse_args(["power", "emergency-stop", "--confirm"])
+    assert _cmd_power(cfg, args) == 0
+    # A NEW policy instance (fresh process semantics) observes the latch.
+    policy = PW.power_policy(cfg, shared=False)
+    d = policy.check(ASK, scopes=("research",), target=ORIGIN + "/q")
+    assert d["allowed"] is False and d["code"] == "EMERGENCY_STOP"
+    # Reset without --confirm is refused; with --confirm it clears.
+    args_r = p.parse_args(["power", "reset"])
+    assert _cmd_power(cfg, args_r) == 3
+    args_r2 = p.parse_args(["power", "reset", "--confirm"])
+    assert _cmd_power(cfg, args_r2) == 0
+    d2 = PW.power_policy(cfg, shared=False).check(
+        ASK, scopes=("research",), target=ORIGIN + "/q")
+    assert d2["allowed"] is True
+
+
+def test_webui_http_power_policy_broker(tmp_path):
+    # Authenticated dashboard request -> shared policy -> typed decision.
+    from voicebridge.config import Config
+    from voicebridge.webui import WebUI
+
+    class StubOrch:
+        pass
+    orch = StubOrch()
+    orch.cfg = Config.load()
+    orch.cfg.data["logging"].update(jsonl_path=str(tmp_path / "state"),
+                                    jsonl=True)
+    orch.cfg.data["webui"].update(host="127.0.0.1", token="tok123",
+                                  allowed_origins=["http://localhost:8890"])
+    orch.cfg.data["power"] = {}
+    _grant(PW.power_grant_store(orch.cfg), capabilities=(ASK,), ttl_s=3600)
+    w = WebUI(orchestrator=orch, port=0, state_dir=tmp_path / "state")
+    w.start()
+    try:
+        port = w._server.server_address[1]
+        base = f"http://127.0.0.1:{port}"
+        import urllib.error
+        import urllib.request
+
+        def get(url, token=None, query=""):
+            req = urllib.request.Request(url + query)
+            if token:
+                req.add_header("X-Api-Token", token)
+            return urllib.request.urlopen(req, timeout=10)
+
+        # Unauthenticated dashboard request is refused.
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            get(f"{base}/api/power")
+        assert ei.value.code == 401
+        ei.value.close()
+        # Authenticated policy check: the owner grant auto-allows routine ask.
+        r = get(f"{base}/api/power?capability={ASK}&scope=research"
+                f"&target={ORIGIN}/q", token="tok123")
+        try:
+            body = json.loads(r.read())
+        finally:
+            r.close()
+        assert body["allowed"] is True
+        # Emergency stop from the dashboard latches; the same policy denies.
+        req = urllib.request.Request(f"{base}/api/power")
+        req.add_header("X-Api-Token", "tok123")
+        req.add_header("Content-Type", "application/json")
+        req.data = json.dumps({"action": "emergency-stop",
+                               "confirmed": True}).encode()
+        r2 = urllib.request.urlopen(req, timeout=10)
+        try:
+            body2 = json.loads(r2.read())
+        finally:
+            r2.close()
+        assert body2["state"] == "OK"
+        r3 = get(f"{base}/api/power?capability={ASK}&scope=research"
+                 f"&target={ORIGIN}/q", token="tok123")
+        try:
+            body3 = json.loads(r3.read())
+        finally:
+            r3.close()
+        assert body3["allowed"] is False
+        assert body3["code"] == "EMERGENCY_STOP"
+        # Reset without confirmed is refused.
+        req4 = urllib.request.Request(f"{base}/api/power")
+        req4.add_header("X-Api-Token", "tok123")
+        req4.add_header("Content-Type", "application/json")
+        req4.data = json.dumps({"action": "reset"}).encode()
+        r4 = urllib.request.urlopen(req4, timeout=10)
+        try:
+            body4 = json.loads(r4.read())
+        finally:
+            r4.close()
+        assert body4["state"] == "denied"
+        assert body4["code"] == "CONFIRMATION_REQUIRED"
+    finally:
+        w.stop()
+
+
+def test_voice_runner_policy_broker_typed_result(tmp_path):
+    # Voice runner path: action_runner(power=policy) -> PowerGateAdapter ->
+    # policy -> broker. Emergency stop returns a typed denial, not a run.
+    from voicebridge.actions import action_runner
+    cfg = _cfg(tmp_path)
+    policy = PW.power_policy(cfg)
+    policy.control.emergency_stop(issued_by="user")
+    runner = action_runner(cfg, power=policy)
+    out = runner.execute("act.browser.write",
+                         args={"selector": "#x", "value": "y"},
+                         target="https://x.test", scope="web",
+                         source="user")
+    assert out["state"] == "denied"
+    assert out["code"] == "EMERGENCY_STOP"
+
+
+def test_voice_high_impact_execution_requires_confirmation_via_policy(tmp_path):
+    # A voice high-impact action flows through policy -> broker and demands a
+    # fresh confirmation (never auto-executes) even when a grant exists.
+    from voicebridge.actions import action_runner
+    cfg = _cfg(tmp_path)
+    PW.power_grant_store(cfg).issue(
+        origins=(ORIGIN,), scopes=("social",),
+        capabilities=("act.social.post",), ttl_s=3600, issued_by="user")
+    policy = PW.power_policy(cfg)
+    runner = action_runner(cfg, power=policy)
+    out = runner.execute("act.social.post",
+                         args={"account": "me", "text": "Hello"},
+                         target=ORIGIN + "/q", scope="social", source="user")
+    assert out["state"] == "denied"
+    assert out["code"] == "CONFIRMATION_REQUIRED"
+
+
+# ---------------------------------------------------------------------------
+# No-bypass regression (Packet 8O repair): with safety.tool_broker=false (or no
+# broker) voice local actions and local-script templates FAIL CLOSED with a
+# typed BROKER_DISABLED denial — they NEVER call local_actions.execute or
+# run_tool(cmd) directly around the broker/policy.
+# ---------------------------------------------------------------------------
+def test_no_local_action_executes_when_broker_disabled(tmp_path):
+    from voicebridge.broker import CapabilityBroker, ToolBinding
+    from voicebridge.capabilities import CapabilitySpec, Tier
+    from voicebridge.intent.classifier import Intent
+    import voicebridge.orchestrator as O
+
+    called = []
+    broker = CapabilityBroker()
+    broker.register(ToolBinding(
+        spec=CapabilitySpec(name="local.spy_act", version="1.0.0",
+                            tier=Tier.READ_ONLY, summary="spy",
+                            scopes=("local",)),
+        side_effects="test",
+        fn=lambda _a: called.append(1) or "done"))
+
+    class _FakeCfg:
+        _enabled = False
+
+        def get(self, *path, default=None):
+            if path == ("safety", "tool_broker"):
+                return self._enabled
+            if path == ("local", "enabled"):
+                return True
+            return default
+
+        def section(self, n):
+            return {}
+
+    class _FakeOrch:
+        def __init__(self):
+            self.cfg = _FakeCfg()
+            self._broker = broker
+            self.spoken = []
+
+        def speak(self, text, **kw):
+            self.spoken.append(text)
+
+        def feed_push(self, item):
+            pass
+
+        def _cur_ctx(self):
+            return None
+
+    o = _FakeOrch()
+    bound = O.VoiceOrchestrator._handle_local.__get__(o, O.VoiceOrchestrator)
+    intent = Intent(kind="local",
+                    params={"action": "spy_act", "action_params": {}})
+    # Broker disabled -> typed denial, and the action function NEVER ran.
+    bound(intent, "run the spy")
+    assert called == []
+    assert any("broker is turned off" in s for s in o.spoken)
+    # Sanity: with the broker ENABLED the same action executes through it.
+    o.cfg._enabled = True
+    o.spoken.clear()
+    bound(intent, "run the spy")
+    assert called == [1]
+
+
+def test_no_local_script_runs_when_broker_disabled(tmp_path):
+    import voicebridge.orchestrator as O
+    from voicebridge.task_templates import TemplateMatch
+
+    ran = []
+    from voicebridge.broker import CapabilityBroker, ToolBinding
+    from voicebridge.capabilities import CapabilitySpec, Tier
+    broker = CapabilityBroker()
+    broker.register(ToolBinding(
+        spec=CapabilitySpec(name="script.spy", version="1.0.0",
+                            tier=Tier.MUTATING, summary="spy",
+                            scopes=("scripts",)),
+        side_effects="test",
+        argv_builder=lambda args: ran.append(args) or ["/bin/true"]))
+
+    class _FakeCfg:
+        _enabled = False
+
+        def get(self, *path, default=None):
+            if path == ("safety", "tool_broker"):
+                return self._enabled
+            if path == ("webui", "script_timeout_s"):
+                return 60
+            return default
+
+        def section(self, n):
+            return {"max_words": 20}
+
+    class _FakeOrch:
+        def __init__(self):
+            self._last_web_text = "search the web for the answer"
+            self._last_web_summary = ""
+            self._last_web_route = ""
+            self.cfg = _FakeCfg()
+            self._broker = broker
+            self.spoken = []
+
+        def speak(self, text, **kw):
+            self.spoken.append(text)
+
+        def feed_push(self, item):
+            pass
+
+        def _cur_ctx(self):
+            return None
+
+    o = _FakeOrch()
+    bound = O.VoiceOrchestrator._dispatch_local_script.__get__(
+        o, O.VoiceOrchestrator)
+    tm = TemplateMatch(name="spy", kind="local-script", task="", ack="",
+                       script="echo hi", summary_words=20)
+    # Broker disabled -> typed denial, script argv builder NEVER invoked.
+    assert bound(tm) == ""
+    assert ran == []
+    assert any("broker is turned off" in s for s in o.spoken)
+    assert o._last_web_summary == ""
+
+
+def test_automation_monitor_observes_durable_emergency_stop(tmp_path):
+    # The automation channel (hourly communications monitor) must respect the
+    # shared DURABLE emergency-stop / global-disable latch: when the CLI (or any
+    # process) latches it, run_hourly FAILS CLOSED with a typed denial and no
+    # scan (and no browser read) ever happens.
+    from voicebridge.config import Config
+    from voicebridge.communications.monitor import run_hourly
+    state = tmp_path / "state"
+    state.mkdir(exist_ok=True)
+    p = tmp_path / "voice.yaml"
+    p.write_text("logging:\n  jsonl_path: '" + str(state) + "'\n")
+    cfg = Config.load(p)
+    # No latch -> the monitor proceeds to its normal degraded/scan path.
+    out_ok = run_hourly(cfg, platforms=["gmail"], source="fixture",
+                        fixture=tmp_path / "f.json")
+    assert out_ok["state"] != "denied"
+    # Latch the durable emergency stop (as the CLI would) -> typed denial.
+    from voicebridge import power as PW
+    PW.power_control(cfg).emergency_stop(issued_by="cli:user")
+    out = run_hourly(cfg, platforms=["gmail"], source="fixture",
+                     fixture=tmp_path / "f.json")
+    assert out["state"] == "denied"
+    assert out["code"] == "EMERGENCY_STOP"
+    assert out.get("exit_code") == 3
+    # Global disable latches too.
+    PW.power_control(cfg).reset(issued_by="cli:user")
+    PW.power_control(cfg).global_disable(issued_by="cli:user")
+    out2 = run_hourly(cfg, platforms=["gmail"], source="fixture",
+                      fixture=tmp_path / "f.json")
+    assert out2["state"] == "denied"
+    assert out2["code"] == "POWER_DISABLED"
+    # Reset clears and the monitor runs again.
+    PW.power_control(cfg).reset(issued_by="cli:user")
+    out3 = run_hourly(cfg, platforms=["gmail"], source="fixture",
+                      fixture=tmp_path / "f.json")
+    assert out3["state"] != "denied"

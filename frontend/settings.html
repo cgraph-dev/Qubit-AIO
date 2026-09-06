@@ -449,14 +449,14 @@ async function powerRevoke(){
 }
 async function powerEmergencyStop(){
  const doIt = async () => {
-   const {body} = await api('/api/power',{method:'POST',body:JSON.stringify({action:'emergency-stop'})});
+   const {body} = await api('/api/power',{method:'POST',body:JSON.stringify({action:'emergency-stop', confirmed:true})});
    show('power-state', renderResult(body));
  };
  confirmDialog('Global emergency stop? This latches and cancels active runs until reset.', doIt);
 }
 async function powerReset(){
  const doIt = async () => {
-   const {body} = await api('/api/power',{method:'POST',body:JSON.stringify({action:'reset'})});
+   const {body} = await api('/api/power',{method:'POST',body:JSON.stringify({action:'reset', confirmed:true})});
    show('power-state', renderResult(body));
  };
  confirmDialog('Reset emergency-stop / disable latches?', doIt);

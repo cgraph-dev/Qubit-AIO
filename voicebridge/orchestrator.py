@@ -1079,58 +1079,47 @@ class VoiceOrchestrator:
         log_event("local_script.run", name=tmpl.name,
                   cmd=script[:300], correlation_id=correlation_id)
         broker = getattr(self, "_broker", None)
-        if broker is not None and self.cfg.get(
-                "safety", "tool_broker", default=True):
-            res = broker.execute(
-                script_capability_name(tmpl.name),
-                {"question": redact_text(question.replace("\n", " "))},
-                source="user", correlation_id=correlation_id)
-            raw = res.output
-            if res.denied:
-                log_event("local_script.denied", name=tmpl.name,
-                          code=res.denied, correlation_id=correlation_id)
-                self.speak("That tool was blocked by the safety policy.")
-                self._last_web_summary = ""
-                return ""
-            if not res.ok:
-                err = (res.error or "")[:300]
-                if res.cancelled:
-                    log_event("local_script.cancelled", name=tmpl.name)
-                    self.speak("That took too long and was cancelled.")
-                elif res.timed_out:
-                    log_event("local_script.timeout", name=tmpl.name)
-                    self.speak("That took too long and was cancelled.")
-                else:
-                    log_event("local_script.failed", name=tmpl.name,
-                              rc=res.rc, error=err,
-                              correlation_id=correlation_id)
-                    self.speak(f"The search failed. {err}" if err
-                               else "The search failed.")
-                self._last_web_summary = ""
-                return ""
-        else:
-            # Legacy rollback path (safety.tool_broker=false): bounded shell
-            # execution of the user-configured template line. UNSECURED —
-            # this mode carries NO policy decisions and must never be
-            # described as secured.
-            cmd = script.replace("{question}", question.replace("\n", " ")).replace("{text}", question.replace("\n", " "))
-            from .sandbox import run_tool
-            r = run_tool(cmd,
-                         timeout_s=float(self.cfg.get("webui",
-                                                      "script_timeout_s",
-                                                      default=60)))
-            res_ok, raw = r.ok, r.stdout
-            if not res_ok:
-                err = (r.stderr or "")[:300]
-                if r.timed_out:
-                    log_event("local_script.timeout", name=tmpl.name)
-                    self.speak("That took too long and was cancelled.")
-                else:
-                    log_event("local_script.failed", name=tmpl.name,
-                              rc=r.rc, error=err)
-                    self.speak(f"The search failed. {err}" if err else "The search failed.")
-                self._last_web_summary = ""
-                return ""
+        broker_enabled = broker is not None and self.cfg.get(
+            "safety", "tool_broker", default=True)
+        if not broker_enabled:
+            # Packet 8O: NO unsecured run_tool(shell) fallback. When the broker
+            # is unavailable or safety.tool_broker=false, the template FAILS
+            # CLOSED with a typed denial — a user-configured script line is
+            # never executed through a raw shell around the broker, grants,
+            # scopes, confirmation, audit, resource limits, or emergency stop.
+            log_event("local_script.denied", name=tmpl.name,
+                      code="BROKER_DISABLED", correlation_id=correlation_id)
+            self.speak("That tool is disabled: the action broker is turned "
+                       "off, so no script can run.")
+            self._last_web_summary = ""
+            return ""
+        res = broker.execute(
+            script_capability_name(tmpl.name),
+            {"question": redact_text(question.replace("\n", " "))},
+            source="user", correlation_id=correlation_id)
+        raw = res.output
+        if res.denied:
+            log_event("local_script.denied", name=tmpl.name,
+                      code=res.denied, correlation_id=correlation_id)
+            self.speak("That tool was blocked by the safety policy.")
+            self._last_web_summary = ""
+            return ""
+        if not res.ok:
+            err = (res.error or "")[:300]
+            if res.cancelled:
+                log_event("local_script.cancelled", name=tmpl.name)
+                self.speak("That took too long and was cancelled.")
+            elif res.timed_out:
+                log_event("local_script.timeout", name=tmpl.name)
+                self.speak("That took too long and was cancelled.")
+            else:
+                log_event("local_script.failed", name=tmpl.name,
+                          rc=res.rc, error=err,
+                          correlation_id=correlation_id)
+                self.speak(f"The search failed. {err}" if err
+                           else "The search failed.")
+            self._last_web_summary = ""
+            return ""
         if not raw:
             self.speak("I didn't get any result back.")
             self._last_web_summary = ""
@@ -2894,40 +2883,47 @@ class VoiceOrchestrator:
             self.speak("That sounds like a PC action. Try a direct command, "
                        "like: mute the microphone, or open the terminal.")
             return
-        m = local_actions.ActionMatch(name=name, params=params, text=text)
         log_event("local.action.exec", action=name, text=text[:160], params=params)
         broker = getattr(self, "_broker", None)
-        use_broker = broker is not None and self.cfg.get(
+        broker_enabled = broker is not None and self.cfg.get(
             "safety", "tool_broker", default=True)
-        if use_broker:
-            res = broker.execute(f"local.{name}", dict(params),
-                                 source="user")
-            if res.denied == "CONFIRMATION_REQUIRED":
-                # Destructive tier: spoken two-step. The broker only executes
-                # after an explicit user-issued, single-use confirmation id.
-                desc = local_actions.ACTIONS[name].desc if name in \
-                    local_actions.ACTIONS else name
-                self.confirmations.request(
-                    desc,
-                    {"kind": "local", "capability": f"local.{name}",
-                     "args": dict(params)},
-                    reason="destructive local action requires confirmation")
-                self.speak(f"Do you want me to {desc}? Say yes or no.")
-                c_ask = self._cur_ctx()
-                if c_ask is not None:
-                    c_ask.summary = f"confirm: {desc}"
-                    c_ask.route = "local"
-                    c_ask.done.set()
-                return
-            if res.denied:
-                log_event("local.action.denied", action=name, code=res.denied)
-                self.speak("That action was blocked by the safety policy.")
-                return
-            # parity with local_actions.execute: failures speak a typed message
-            msg = res.output if res.ok else (
-                f"Action failed: {res.error}" if res.error else "")
-        else:
-            msg = local_actions.execute(m)
+        if not broker_enabled:
+            # Packet 8O: NO direct local_actions.execute fallback. When the
+            # broker is unavailable or safety.tool_broker=false, local actions
+            # FAIL CLOSED with a typed denial — they never execute around the
+            # broker, grants, scopes, confirmation, audit, resource limits, or
+            # emergency stop. There is no unsecured legacy execution route.
+            log_event("local.action.denied", action=name,
+                      code="BROKER_DISABLED")
+            self.speak("That action is disabled: the action broker is turned "
+                       "off, so no local action can run.")
+            return
+        res = broker.execute(f"local.{name}", dict(params),
+                             source="user")
+        if res.denied == "CONFIRMATION_REQUIRED":
+            # Destructive tier: spoken two-step. The broker only executes
+            # after an explicit user-issued, single-use confirmation id.
+            desc = local_actions.ACTIONS[name].desc if name in \
+                local_actions.ACTIONS else name
+            self.confirmations.request(
+                desc,
+                {"kind": "local", "capability": f"local.{name}",
+                 "args": dict(params)},
+                reason="destructive local action requires confirmation")
+            self.speak(f"Do you want me to {desc}? Say yes or no.")
+            c_ask = self._cur_ctx()
+            if c_ask is not None:
+                c_ask.summary = f"confirm: {desc}"
+                c_ask.route = "local"
+                c_ask.done.set()
+            return
+        if res.denied:
+            log_event("local.action.denied", action=name, code=res.denied)
+            self.speak("That action was blocked by the safety policy.")
+            return
+        # parity with local_actions.execute: failures speak a typed message
+        msg = res.output if res.ok else (
+            f"Action failed: {res.error}" if res.error else "")
         log_event("local.action.result", action=name, result_len=len(msg), result=msg[:2000])
         # Mirror to per-request ctx so /api/result returns the summary (dashboard poll), not just activity feed
         c_local = self._cur_ctx()
@@ -2953,7 +2949,7 @@ class VoiceOrchestrator:
                   confidence=1.0, reason="exact voice action request",
                   source="mic")
         try:
-            runner = A.action_runner(self.cfg)
+            runner = A.action_runner(self.cfg, power=self._power_policy)
             prev = runner.preview(request["action_id"], request["args"],
                                   target=request["target"],
                                   account_scope=request.get("account_scope", ""),

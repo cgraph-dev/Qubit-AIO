@@ -754,7 +754,7 @@ Acceptance gate:
   narrow scopes, provenance/license, and staged verification rather than a
   prompt edit or a launcher-only claim.
 
-### Phase 8 — hourly communications monitor and professional evidence reports
+### Phase 8 — communications, evidence reports, and production qualification
 
 Dependency gate: Phase 8 may start only after Packets 1A–1B, 2A–2B, 3A, 5A, 5C, and 7A are independently verified. Packet 8A may inventory and define contracts earlier only if it changes no runtime behavior, reads no private message bodies into fixtures, and does not install or enable a service. Packet 8B and every later live website/app/editor integration additionally require Packet 7E permission/skill contracts to be independently verified. Packet 8E may be implemented as a non-live onboarding layer after 7E and 8A, but it must not grant browser access or claim site control by itself. Packet 8A remains valid because it is schema/store work only and does not grant capabilities.
 
@@ -979,6 +979,748 @@ receipts and unrelated memory/reports/cursors. Do not attempt to undo remote
 messages, purchases, deletions, or account changes unless the adapter documents
 and verifies a genuine compensating operation.
 
+### Phase 8 production qualification packets (8G–8L)
+
+Packets 8A–8F establish the contracts and hermetic behavior; they do not by
+themselves prove that the installed bridge works with this machine's real
+Chromium session, microphone, audio sink, desktop notification service, timer,
+or restart behavior. The following packets are the explicit qualification
+track. They are not permission to access an account or send anything: every
+live packet requires a separate operator authorization, uses a disposable or
+operator-controlled test item, and stops on any unexpected state.
+
+Dependency order:
+
+```text
+8B + 7E + 8E ──> 8G live browser/CDP
+audio/PTT foundations ──> 8H live audio and Right Ctrl
+8D + 8H ──> 8I timer, notifications, and quiet hours
+8G + 8H + 8I ──> 8J end-to-end recovery rehearsal
+8J ──> 8K packaging, portability, security, and release certification
+8K ──> 8K-P productized installation, model bootstrap, and desktop integration
+8C + 8E ──> 8L UX, accessibility, mobile, and supportability
+```
+
+No packet starts another packet automatically. A packet is independently
+verified only when its focused tests, affected tests, implementation diff, and
+the explicitly authorized live gates all agree. A full-production verdict is
+blocked until 8G–8K pass. A simple-install/private-source distribution also
+requires 8K-P. A public-release verdict requires 8K-P and 8L, or a documented
+product decision accepting the remaining limitations.
+
+#### Packet 8G — real Chromium/CDP qualification
+
+Qualify the existing user-launched Chromium through loopback CDP, including
+target discovery, profile-lock handling, manual login, Gmail/Instagram/
+Messenger read-only scans, bounded clipped screenshot bytes, auth/2FA/CAPTCHA,
+selector drift, hidden/unavailable targets, reconnects, and per-platform
+failure isolation. Prove that no target is focused, navigated, closed, or
+mutated and that no competing profile or Playwright personal profile is
+launched. Run a baseline, an operator-arranged external test item (never sent
+by Qubit), and a no-change rescan for each approved platform; preserve
+redacted evidence only.
+
+#### Packet 8H — real audio, PTT, and Right Ctrl qualification
+
+Qualify the documented microphone/source and HyperX output path, web push-to-
+talk, Right Ctrl event capture, configured ASR, reasoning model, Qubit response,
+Piper playback, cancel, latency, and recovery after a service/audio-device
+restart or hot-unplug. Record the actual configured provider/model identity and
+distinguish a real response from an unavailable-provider fallback. Verify the
+user-session environment used by the service (DISPLAY or Wayland,
+XDG_RUNTIME_DIR, and Pulse/PipeWire access) without hardcoding a machine-only
+value; missing session context must be a typed failure with a recovery message.
+Do not guess the highest X display in a multi-session environment. Resolve and
+report the effective source/sink by stable device identity; a missing named pin
+must be a visible `DEVICE_MISMATCH`/degraded state rather than silently passing
+through an aggregate default. Exercise sample-rate/channel conversion, silence,
+clipping, background noise, echo, VAD boundaries, actual audible playback, and
+privacy cleanup of temporary audio.
+
+Measure capture, ASR, reasoning, synthesis, playback, and end-to-end latency.
+Stress concurrent web PTT and Right Ctrl turns, cancellation/barge-in, and
+restart/hotplug races; prove there is no cross-turn answer, duplicate listener,
+stuck key, restart storm, audio leak, or dashboard regression. Any automated
+restart requires explicit authorization, bounded backoff, and a circuit breaker.
+This packet may verify the current Piper path and sentiment controls, but must
+not silently replace the working provider with Fish Audio or add a model/
+training loop.
+
+#### Packet 8I — real timer, notification, and quiet-hours qualification
+
+Qualify the user-systemd oneshot/timer, overlap lease, bounded runtime,
+no-change silence, one genuinely new-item notification, deduplication,
+desktop-popup delivery, optional voice delivery, acknowledgement, quiet hours,
+catch-up, timezone/DST behavior, and truthful typed failures. A temporary
+isolated accelerated test unit may exercise failure paths, but cannot substitute
+for observing the production-equivalent hourly schedule. Verify the correct
+unit name, enable/disable/rollback, journal evidence, and that a timer
+or notification never exposes report IDs, URLs, senders, subjects, bodies,
+tokens, cookies, or secrets. Timer enablement remains an explicit operator
+action.
+
+Strictly validate quiet-hours syntax and hour/minute ranges and require a valid
+IANA timezone. Invalid values must produce `CONFIG_INVALID` and suppress voice
+delivery until repaired; they must not silently use host-local time or disable
+quiet hours. Use monotonic elapsed time for deadlines and leases and wall time
+only for schedules. Prove DST folds/gaps, clock jumps, suspend/resume, persistent
+catch-up, notification retry/dead-letter bounds, and acknowledgement. The lease
+must be renewable or exceed the maximum service runtime plus a safety margin,
+and the aggregate state/exit code must become partial/degraded/failed whenever
+any account or required delivery does. Resolve the real X11/Wayland notification
+session at install/run time; do not ship a hardcoded `DISPLAY` value.
+
+#### Packet 8J — end-to-end production rehearsal and recovery
+
+Exercise an isolated staging state through bridge start, Chromium/CDP loss,
+audio/ASR/TTS/model unavailability, network failure, timer overlap, process
+crash, restart, stale lease, partial report, notification retry, state backup
+restore, malformed/corrupt state, and rollback. Verify bounded memory/CPU/disk,
+no duplicate reports or notifications, atomic cursors, retention, audit
+continuity, and honest degraded recovery. Do not use destructive account
+actions or claim remote rollback where none exists.
+
+Inject deterministic failures before and after write, flush, fsync, rename,
+lease acquisition, cursor commit, report commit, receipt commit, notification
+send, backup, restore, and migration. Include `SIGKILL`, disk-full, read-only
+state, truncated/malformed JSON/JSONL/SQLite, corrupt evidence bytes/hash,
+partial or missing backups, stale temporary files, symlinks, a schema newer than
+the runtime, and concurrent manual/timer/action access. A rollback that cannot
+fully restore every touched path must be reported as a typed failure with the
+exact bounded paths; it may never be swallowed or described as successful.
+Validate restored schema and hashes before resuming, define measurable RPO/RTO,
+and prove repeated recovery is idempotent.
+
+#### Packet 8K — portability, packaging, security, and release certification
+
+Prove a clean checkout can install, configure, upgrade, restart, and roll back
+with documented dependencies, service units, permissions, secret handling,
+state migration, uninstall behavior, and no hidden machine-specific paths. An
+uninstall must preserve user state by default and require a separate explicit
+confirmation for data deletion. Run dependency/license/provenance and secret
+scans, filesystem-mode checks, resource ceilings, clean-clone tests,
+release-artifact checks, and operator documentation checks. Confirm
+intentional dirty files are not accidentally shipped and that the release can
+be reproduced without the developer's private state.
+
+Build both wheel and sdist, inspect their contents, install each into a clean
+HOME outside the checkout, and run entry points/import/resource checks with no
+`PYTHONPATH`, source-tree insertion, editable install, or repo-local virtualenv.
+Record version/commit provenance, dependency constraints, licenses/notices,
+SBOM, vulnerability and secret-scan results, artifact hashes/signatures, and a
+reproducibility comparison. Test all documented Python/platform/display/audio
+combinations or mark them unsupported before install. Rehearse upgrade from the
+previous supported release, interrupted migration, newer-schema refusal,
+rollback/downgrade behavior, and uninstall with state preservation. Validate
+units with `systemd-analyze verify` and a security review, including exact unit
+names, user-session environment, no home-directory literals, and bounded logs.
+
+#### Packet 8K-P — productized installation and desktop integration
+
+Make the application feel like one installable product without merging the
+voice bridge and local SLM into one fragile process. A single supported
+installer must provision or clearly report the runtime, model provider, pinned
+model artifacts, configuration, permissions, service, dashboard pairing,
+desktop shortcut, and optional tray controller. The bridge and inference
+provider remain separate supervised components so either can restart or degrade
+without creating duplicate listeners or losing state.
+
+Resolve the current product identity split before adding convenience features:
+the installer and packaged service currently use `qubit-voice-agent`, while
+runtime defaults, existing user state, and several diagnostics use
+`openclaw-voice-bridge`. Choose one canonical public identity, preserve the old
+paths/unit through an explicit migration and compatibility alias, and prove
+that a fresh install, upgrade, rollback, and existing installation cannot read
+one config while writing another.
+
+The installer must work from a release artifact rather than requiring a source
+checkout or repository-local `.venv`. It must use atomic, resumable, hash-
+verified model downloads with disk/RAM/VRAM preflight, clear offline and
+missing-provider states, and no shell-piped remote code. Ollama may be managed
+or replaced by an embedded/local inference runtime, but the user must not be
+required to discover or manually install an undocumented dependency. Model
+weights and runtime licenses must be recorded separately from application
+code.
+
+Provide a first-run wizard and a single health/repair command that explain
+Python/runtime, GPU/CPU fallback, microphone/output, display/session,
+inference-provider/model, dashboard token pairing, service state, storage, and
+permissions in plain language. Do not silently select a different audio
+device, model, account, browser profile, display, or service. Optional
+Playwright/browser support must be explicitly marked optional and must not
+download or launch a personal browser profile as a side effect.
+
+Add a desktop shortcut that opens the authenticated local dashboard without a
+token in the URL. Add an optional tray/status-notifier controller that talks
+to the existing authenticated backend or user service; it must never start a
+second bridge, duplicate a hotkey listener, expose tokens, or become required
+on headless systems. Tray/shortcut absence must produce a typed unsupported or
+unavailable state, not a failed core install.
+
+Document and test supported Linux desktop/session combinations first. Keep all
+live accounts, browser actions, model training, audio recording, and service
+enablement opt-in. Treat this packet as required for a simple consumer
+installation and private-source distribution; it is separate from Packet 8L's
+visual/accessibility qualification.
+
+The product must also have a portable defaults contract. Use platform-aware
+per-user locations rather than repository paths, `/home/<user>` literals,
+device indexes, or guessed application folders. Keep these categories separate
+and discoverable in diagnostics: configuration, user data, runtime state,
+downloaded model/cache data, logs, exports/backups, and installed resources.
+On Linux use XDG locations; define equivalent adapters for macOS and Windows or
+report those platforms as unsupported before installation. The installer must
+create only the directories it owns, with documented permissions, and must
+never scan or rewrite arbitrary user folders. A fresh install, upgrade,
+multi-user install, interrupted install, uninstall, and rollback must resolve
+the same paths deterministically.
+
+Voice, apps, browser integrations, and optional tray features should be
+capability profiles, not hidden side effects. Safe defaults may detect hardware
+and installed applications, but must not silently select a microphone, speaker,
+display, browser profile, account, or app permission. Each detected capability
+needs a typed state and an explicit enable/repair action. An app adapter must be
+disabled unless its contract, permissions, origin/account scope, and rollback
+are known; adding a new app must not change the core voice path or create a
+second listener.
+
+The first-run flow must be transactional and resumable: acquire prerequisites,
+write staged configuration, validate resources, install the service/shortcut,
+pair the dashboard, and promote the installation only after every required
+step succeeds. Interrupted or concurrent installers must recover through a
+lock and journal, never leave a half-active service, and never report success
+when only part of the product is usable. Diagnostics must show the effective
+path map, provider/model, selected devices, session, service owner, enabled
+capabilities, and exact next action without revealing secrets.
+
+#### Packet 8L — public-release UX, accessibility, mobile, and supportability
+
+Polish and qualify the real dashboard and notifications on narrow mobile and
+desktop viewports: onboarding, settings, reports, activity, permissions,
+websites, actions, empty/loading/degraded/error states, keyboard-only use,
+screen-reader labels, reduced motion, contrast, focus order, touch targets,
+plain-language notification copy, timezone/localization, export/delete/retention
+controls, and a safe diagnostic bundle. Destructive delete/reset actions must
+remain separately authenticated, confirmed, audited, and non-default. Prove
+all controls use the shared authenticated backend and never expose secrets or
+private page content.
+
+Begin with a route/page/component inventory and a short product/design source
+of truth. Consolidate only proven duplicates; preserve distinct user tasks.
+Move navigation, buttons, fields, status badges, dialogs, authenticated API
+calls, error handling, tokens, spacing, typography, color, and motion into
+shared primitives. No page may bypass the shared authenticated API helper or
+parse an unchecked/non-JSON response. Treat all backend/user/page text as
+untrusted: render with safe DOM APIs or an audited sanitizer, never raw dynamic
+HTML.
+
+WCAG 2.2 AA is a release gate. Test automated accessibility plus manual
+keyboard and screen-reader flows; visible focus, focus restoration/traps,
+announced live states, 44-by-44 CSS-pixel touch targets, 320 CSS-pixel reflow,
+200% zoom, forced colors/high contrast, and meaningful reduced-motion
+alternatives. Test desktop and mobile browser matrices, session expiry/re-pair,
+offline/reconnect/stale data, slow/empty/partial/failed states, bounded DOM and
+history growth, and performance budgets. Add visual regressions for critical
+states and plain-language onboarding/recovery steps without exposing technical
+IDs in beginner mode.
+
+### Phase 8 capability-expansion packets (8M–8R)
+
+Packets 8M–8R are an optional capability expansion after the release and
+qualification track above. They make Qubit a more capable local application,
+but they do not erase the existing broker, provenance, isolation, audit, or
+operator-control contracts. “Full capability” means every supported capability
+has a typed adapter and can be explicitly enabled; it does not mean that
+untrusted model/page text becomes authority or that irreversible actions run
+without approval.
+
+Dependency order:
+
+```text
+8L + 0A licensing review ──> 8M semantic memory adapter
+8L + 7E + 8F ──> 8N Ghost desktop/browser adapter
+8M + 8N + 8K-P ──> 8O full-capability qualification and power profile
+8O ──> 8P verified skill memory and controlled evaluation
+8K-P + 8L + provider-governance review ──> 8Q frontier-provider gateway and routing
+8Q + 8F + 8K-P ──> 8R supervised OpenCode coding adapter
+```
+
+The core installation must remain usable without either optional integration.
+Each integration runs out-of-process or behind a clearly owned adapter, is
+disabled until explicitly enabled, has a health/permission state, and can be
+removed without deleting existing memory, reports, browser profiles, audio
+configuration, or user data. A new integration must not create a second
+listener, bypass the authenticated dashboard, or silently change the model,
+browser, audio, service, or account configuration.
+
+#### Packet 8M — GENOME-compatible semantic memory integration
+
+Evaluate and, if justified, add an optional semantic-memory provider using the
+GENOME contract: local embedding/retrieval, source provenance and trust levels,
+temporal facts, explainable recall, deterministic journal/replay, and scoped
+forget/export behavior. Prefer a narrow adapter to the existing MemoryStore;
+do not replace the current bounded store or add a second uncontrolled memory
+database. The default path remains local, bounded, auditable, and free of LLM
+calls during ingest. Optional extraction, reranking, or model downloads must
+be explicitly configured and reported.
+
+Use a pinned GENOME commit and record its repository, exact source paths,
+license, notices, dependency footprint, model license, and local divergence in
+docs/UPSTREAM_REUSE.md before copying or adapting anything. GENOME is Apache-2.0
+and its name/trademarks are separate from the code license. Do not copy the
+whole repository or install its MCP server as an unauthenticated bypass.
+
+Preserve current memory guarantees: tenant/scope isolation, secret-shaped
+content rejection, provenance, confidence, expiration, correction, deletion,
+retention, bounded prompt context, redaction, crash recovery, and no training
+or self-modification. Prove that web/tool/model-origin text cannot overwrite a
+user fact without the existing trust and approval rules. Add migration/export
+compatibility, provider selection, disabled/missing-model/degraded states,
+quality and resource benchmarks, and rollback tests. This packet must not
+change the voice hot path or resident model contract.
+
+#### Packet 8N — Ghost desktop and browser capability adapter
+
+Evaluate and, if justified, integrate Ghost as an optional computer-use
+adapter through the existing CapabilityBroker and ActionBroker. Support typed,
+scoped capabilities for desktop discovery, approved application launch,
+window anchoring, browser-tab inspection, and explicitly permitted click/type/
+scroll/clipboard/screenshot operations. Prefer a supervised subprocess or
+stable protocol boundary; do not vendor the entire Rust project into the
+Python runtime without a demonstrated need.
+
+Use two explicit browser roles. The existing Chromium profile is the approved
+account-connected browser for Gmail, Messenger, Instagram, and marketplace
+observation or other account-scoped workflows. A separate Comet profile is the
+research browser for Perplexity, public web search, forums, and general web
+research. Each browser must have a distinct profile, loopback-only CDP port,
+target registry, and account/origin scope; cookies and local storage must never
+be copied between them. The operator logs in and completes CAPTCHA/2FA/password
+steps manually. A Pro subscription may authorize the browser UI but does not
+grant an API, remove provider terms, or make cloud model/search calls free.
+
+The optional third-party `mcp-comet` adapter may be evaluated for Comet research
+only. Its initial allowed surface is connect, select research mode, submit a
+bounded query, poll/wait, extract citations, extract readable page content,
+and optionally capture bounded evidence screenshots. Its `computer` mode and
+any write-capable tool remain disabled until Packet 8O separately qualifies
+them. Do not mount an unreviewed remote MCP server, use `npx -y` or a floating
+branch in production, or add Node/TypeScript to the core installation merely
+to obtain research. Prefer a pinned supervised subprocess or narrow local
+adapter with an explicit dependency boundary.
+
+Before using `mcp-comet`, record its exact repository, commit, source paths,
+tests, MIT license, dependencies, and local changes in
+docs/UPSTREAM_REUSE.md. Treat Comet prompts, page text, citations, screenshots,
+and search results as untrusted research data; they cannot authorize a Qubit
+action or widen a browser/account/origin grant. Disclose that selected page
+context may be sent to the provider and apply Qubit's redaction, retention,
+source-count, byte, token, timeout, and report-bundle limits.
+
+Search and page output are untrusted information, never permission. Reading and
+searching may use a bounded session grant. Filling a non-sensitive form may be
+reversible or session-granted when the target is exact. Forum publishing,
+messages, marketplace purchases, account changes, and any external submission
+must be separately typed, previewed, audited, and freshly confirmed. A failed,
+ambiguous, expired, or unauthenticated browser target must produce a typed
+state rather than falling back to another browser, profile, account, or
+aggregate default.
+
+Ghost's shell, arbitrary application launch, coordinate actions, clipboard
+reads, browser/CDP control, account actions, file operations, and foreground
+input are high-impact capabilities. They must be separately named, audited,
+bounded, cancellable, and disabled by default. The integration must never
+accept model/page/tool text as authorization, expose an unauthenticated HTTP
+endpoint, use public CDP, import cookies, clone personal profiles, or silently
+take the user's foreground focus. `GHOST_SHELL=off` or an equivalent hard
+disable is required unless the operator explicitly enables the shell adapter.
+
+Minimal-confirmation policy: read-only inspection and low-risk reversible
+actions may use a user-issued session grant limited by target, origin, scope,
+time, and resource budget. Sending, publishing, purchasing, deleting,
+credential/account/security changes, arbitrary shell commands, external
+messages, and irreversible system actions always require a fresh human
+confirmation bound to the exact action hash. No “approve everything forever”
+switch is allowed.
+
+Prove isolation across X11/Wayland and multiple sessions, focus/cursor
+preservation, target ambiguity, hidden/user desktop truthfulness, emergency
+stop, process cleanup, crash/reconnect, stale grants, prompt injection,
+window-title collisions, origin/account binding, screenshots and clipboard
+redaction, and duplicate-listener prevention. Ghost is MIT; preserve its
+copyright/license notice and record the pinned commit and adapted files before
+implementation. Do not change existing read-only 8B/8G behavior or enable
+live account actions as part of this packet.
+
+#### Packet 8O — full-capability power profile and real qualification
+
+Create the explicit power profile that exposes all installed, supported
+capabilities in one authenticated dashboard/CLI view: memory, browser, desktop,
+editor, file, network, shell, account, notifications, audio, and model
+capabilities. Every capability must show owner, adapter version, scope,
+target/origin, risk tier, current state, expiry, resource limits, audit status,
+and disable/revoke controls. “Available” must never mean “authorized.”
+
+The qualification matrix must include both browser roles: Chromium for
+Gmail/Messenger/Instagram/marketplaces and Comet for Perplexity, web research,
+forums, and public browsing. Verify independent CDP ports and profiles,
+correct target discovery, account/origin binding, no cross-profile cookies,
+manual login/2FA/CAPTCHA handoff, reconnect, session expiry, browser restart,
+and no fallback to the wrong browser. Prove that a Comet search result or any
+page text cannot authorize an action. Test read, fill, draft, post/send, and
+purchase as separate capabilities. Reading, navigation, and exact-target
+non-sensitive filling may receive a bounded session grant. Drafting is local
+and non-external. Posting, sending, publishing, purchasing, and other external
+submissions always require fresh approval.
+
+If `mcp-comet` is used, qualify its research tools separately from Ghost and
+from Qubit's native Chromium adapter: connect, mode, ask, wait/poll, source
+extraction, page-content extraction, and bounded screenshot evidence. Prove
+that the adapter cannot expose a second policy path, leak Comet context beyond
+the configured provider, or turn research output into authorization.
+
+Implement one policy path for voice, dashboard, CLI, MCP, tray, and automation
+requests. If no executing tray controller or MCP server is shipped, the tray/
+MCP surfaces report typed UNAVAILABLE/DISABLED (status-only) and are never
+claimed to expose an execution path. Add session grants with narrow targets
+and expiry, exact action
+previews/hashes, emergency stop, global disable, per-adapter circuit breakers,
+bounded concurrency, kill/reap behavior, redacted receipts, and recovery after
+restart. Add an explicit owner-authorized power grant covering the operator's
+selected browsers, apps, accounts, origins, directories, and duration. Within
+that grant, routine browsing, searching, reading, navigation, and exact-target
+non-sensitive form filling do not ask for repeated confirmation. Drafting
+remains local and non-external. Posting, sending, publishing, purchasing,
+deleting, and modifying project code always ask for fresh confirmation. The
+grant must be visible, revocable, expiring, target-bound, and auditable; it may
+not silently widen to a different browser, account, origin, directory, or
+unbounded shell. The UI must make the owner grant and these confirmation
+exceptions obvious in beginner and advanced modes.
+
+Qualify the real supported hardware, desktop sessions, browser targets, model,
+memory provider, and optional accounts only with explicit operator authorization
+and disposable/controlled test data. Prove read, reversible, external-send,
+destructive, shell, and account actions separately. Measure latency, CPU, RAM,
+disk, network, model context, and screenshot/clipboard bounds. Test malformed
+tool output, prompt injection, confused deputy, stale grants, replay, target
+switching, process crash, adapter compromise, offline mode, rollback, and
+uninstall. A live pass may not be inferred from a hermetic pass.
+
+8O is not required to claim that the safe 8L release is complete. It is required
+before claiming that Qubit has broad computer-use or “full control” capability.
+If any adapter cannot meet the broker, audit, isolation, or emergency-stop
+contract, report it as unavailable and keep it disabled.
+
+#### Packet 8P — verified skill memory and controlled agent evaluation
+
+Evaluate and, if justified, adapt the smallest tested concepts from Praxis and
+Evolve. Praxis may contribute verified-before-remember skill records, negative
+failure records, bounded retrieval, deduplication, retention, and acceptance
+tests. Evolve may contribute offline experiment design, explicit feedback, and
+bounded statistical comparison of prompt or model candidates. Neither project
+may be copied wholesale or become a second authority, memory store, model
+server, policy path, or listener.
+
+Pin exact upstream commits and record repositories, source paths, tests,
+licenses, notices, dependencies, and local changes in docs/UPSTREAM_REUSE.md
+before production code. Preserve the upstream MIT or Apache-2.0 notices as
+applicable. Do not use floating branches, undocumented generated code, or
+unreviewed packages. If provenance, license compatibility, or a security
+boundary is uncertain, stop with `BLOCKED — LICENSE REVIEW REQUIRED`.
+
+Keep all changes optional and disabled by default. Verified skills must pass the
+existing 7E manifest, provenance, scope, broker, resource, audit, redaction,
+rollback, and emergency-stop contracts. Failed, expired, revoked, or stale
+skills must be quarantined and must never become authority merely because an
+LLM reports success. Retrieval must be top-K and context-budget bounded; it
+must not train or self-modify the model.
+
+Evolve-style evaluation must be offline or use explicitly configured local
+Ollama by default. It may propose prompt, model, or behavior candidates, but it
+must never automatically change permissions, confirmation policy, browser or
+account scopes, safety rules, production model selection, or external actions.
+Promotion requires explicit owner approval and passing regression, security,
+latency, resource, provenance, and rollback gates. Do not store raw private
+prompts, credentials, browser text, or source code in evaluation records, and
+do not send them to an external challenger provider by default.
+
+Add typed provider states, migration/export, deterministic replay or hashes,
+correction/forget behavior, crash recovery, concurrent-access handling,
+resource limits, redacted audit, clean-install checks, and rollback. Keep the
+existing MemoryStore authoritative unless an explicit reversible migration is
+verified. Do not change the voice hot path or resident-model runner contract.
+
+#### Packet 8Q — frontier-provider gateway and intelligent model routing
+
+Add an optional, provider-neutral gateway for difficult tasks that can route
+between the local Ollama model, direct frontier providers, OpenCode Zen, and
+OpenRouter. OpenCode Zen is an API provider/gateway, not the OpenCode coding
+agent itself. Use the provider's documented API contract and current model
+catalog; do not guess model names or depend on the OpenCode TUI. OpenRouter is
+an optional aggregator and fallback layer, not a promise of free inference.
+The current Zen documentation describes sign-in, billing details, and
+per-request charges; product copy and defaults must never call it “free” or
+assume a subscription includes unlimited API usage.
+
+Keep `local` as the default route. Support explicit `local` and `frontier`
+selection plus an opt-in `auto` route. Automatic escalation to a paid or
+external provider must be disabled unless the owner enables it and sets a
+provider, model allowlist, privacy tier, token limit, timeout, concurrency
+limit, and spending budget. A route decision must never be based solely on
+untrusted page/tool/model text, and uncertainty must fall back to local or a
+typed refusal rather than silently exporting data.
+
+Define one normalized provider contract for request, streaming, cancellation,
+structured output, tool-call capability declaration, usage, cost estimate,
+latency, retry policy, and typed failures. Provider capability differences
+must be explicit: a model that cannot support a required schema, tool call,
+context size, or streaming mode must not be selected as if it could. Catalog
+and pricing metadata must be versioned or time-stamped; stale or unavailable
+catalog data must be visible.
+
+Store credentials only through an environment/keyring/OS-secret reference;
+never in git, packaged config, the frontend, prompts, reports, telemetry, or
+logs. Qubit must not read OpenCode's private auth database as an undocumented
+integration. Use a separate Qubit credential reference or an explicit
+supervised OpenCode login flow. Keys must be redacted in errors and memory.
+
+Add a data-egress policy that classifies user, project, browser, account, and
+secret content before a cloud request. Default cloud requests may contain only
+the minimum sanitized task context. Private browser text, credentials,
+cookies, tokens, raw audio, source trees, and memory records require an
+explicit per-request or configured data policy. Show the selected provider,
+model, privacy tier, estimated cost, and external-data warning before the first
+frontier request. Never send a secret merely because a model asks for it.
+
+Add bounded budgets for tokens, context bytes, response bytes, requests per
+minute, concurrent requests, retries, wall time, and daily/monthly spend.
+Retries must not duplicate external tool actions. Cancellation must stop local
+work and make provider-side cancellation limitations visible. Circuit-break an
+unavailable or over-budget provider and preserve local fallback behavior.
+
+Do not change Piper, ASR, the voice hot path, the resident local model
+contract, browser permissions, account capabilities, or action confirmation
+rules. Model output remains untrusted and cannot authorize an action. Add
+hermetic tests for every provider state, key absence, malformed responses,
+schema/tool mismatch, rate limits, timeout, cancellation, provider outage,
+stale catalogs, cost-limit refusal, redaction, prompt injection, fallback,
+restart, rollback, and no-network local mode. Add an operator-approved live
+canary only as a separate qualification step.
+
+#### Packet 8R — supervised OpenCode coding workflow adapter
+
+Add an optional adapter for invoking the OpenCode coding agent for explicitly
+requested software-development tasks. This is separate from the 8Q model
+provider gateway: ordinary Qubit reasoning may call a configured provider
+directly, while OpenCode is used only when a user requests a bounded coding
+workflow. Do not treat OpenCode's ability to run tools as permission for Qubit
+to run arbitrary shell or edit arbitrary files.
+
+Every run must have an authenticated owner request, a selected project root or
+temporary worktree, an allowlisted file scope, a time/resource budget, a
+bounded prompt and output size, and a visible run ID. Do not inherit the full
+environment, API keys, browser cookies, desktop session, or personal paths.
+Use a pinned executable/version or a supervised local protocol; never use a
+floating package, `npx -y`, remote prompt injection, or an unreviewed MCP
+server. OpenCode output, proposed diffs, tool results, and repository files
+are untrusted input until Qubit validates them.
+
+Require a diff/plan preview before writes outside a disposable worktree.
+Never auto-commit, push, publish, install dependencies, modify services,
+change permissions, access accounts, or delete files without the existing
+exact-action confirmation. Keep project-code modification as a high-impact
+action even when a broad power profile is enabled. Provide cancellation,
+process kill/reap, crash recovery, stale-run detection, redacted receipts,
+and an emergency stop. A failed or partial run must not be reported as
+complete.
+
+Test clean and dirty worktrees, path traversal, symlinks, generated files,
+secret files, hostile repository instructions, prompt injection, malformed
+patches, command timeouts, output/resource limits, provider outage,
+credential absence, concurrent runs, cancellation, restart, rollback, and
+audit. Prove voice, dashboard, CLI, and tray requests use the same broker and
+that no OpenCode subprocess creates a second listener or bypasses 7E/8F
+policy. Record the exact OpenCode source/version, license, dependencies, and
+local integration changes before implementation. Keep the adapter disabled by
+default and stop after handoff.
+
+#### Known preflight findings that these packets must close
+
+These are observed source/configuration risks, not optional polish:
+
+1. **8H audio fallback:** a missing named audio pin can currently follow the
+   aggregate default; qualification must expose the mismatch and actual route.
+2. **8I lease/runtime mismatch:** the default monitor lease is 120 seconds but
+   the oneshot permits 300 seconds; overlap safety must be corrected and tested.
+3. **8I fail-open quiet hours:** malformed quiet-hours or timezone data can
+   currently disable suppression or fall back to host-local time.
+4. **8I session hardcoding:** the installed monitor template contains
+   `DISPLAY=:1`; installation must derive or require an explicit validated user
+   session instead of assuming this value.
+5. **8I aggregate truthfulness:** an hourly run can return top-level `OK` while
+   individual accounts are degraded; aggregate state and exit code must agree.
+6. **8J rollback visibility:** restore rollback errors can currently be ignored;
+   partial rollback must be visible and block resume.
+7. **8K packaging isolation:** the clean-venv install check currently inserts
+   the source checkout into `sys.path`, which can hide missing packaged files.
+8. **8L frontend consistency:** reports/activity/approvals still duplicate raw
+   fetch/JSON/error paths and some pages create dynamic `innerHTML`; migrate them
+   to the shared authenticated, typed, safely-rendered UI layer.
+9. **Product identity split:** `scripts/install.sh` and the packaged service use
+   `qubit-voice-agent`, while `voicebridge/config.py`, existing user state,
+   diagnostics, and older units use `openclaw-voice-bridge`; a fresh install can
+   write one tree while runtime reads another.
+10. **Installer dependency burden:** the current installer requires a source
+    checkout, `uv`, `curl`, Ollama, native audio support, and manual desktop
+    prerequisites; absent Ollama is warned about rather than provisioned, so a
+    nominally successful install may not provide local chat.
+11. **Model supply-chain gap:** model downloads use fixed temporary locations and
+    direct downloads without a complete manifest/hash/atomic-promotion contract;
+    interrupted or altered weights can become a confusing runtime failure.
+12. **Artifact/runtime boundary:** release artifacts, source-checkout launchers,
+    user-local overrides, personal knowledge, and packaged examples must have a
+    single tested boundary; otherwise a wheel install can omit files that the
+    repository installer expects or expose private Python implementation code.
+13. **Service/session ambiguity:** the source launcher assumes a repository
+    `.venv` and defaults a display, while user service names and X11/Wayland
+    sessions vary; this can create duplicate services/listeners or a silent
+    headless failure.
+14. **Optional browser lifecycle:** Playwright is a declared dependency, but the
+    supported read-only CDP flow uses an existing user browser; installation
+    must not imply a browser binary/profile is available or launch one silently.
+15. **Missing desktop control surface:** there is no supported first-run
+    wizard, desktop shortcut, or tray/status controller that reports readiness,
+    pairing, model, audio, and service failures in one place; users currently
+    assemble these steps from separate commands and documents.
+16. **Portable path contract:** configuration, state, data, models/cache, logs,
+    exports, backups, and resources are not yet guaranteed to use deterministic
+    per-user OS-aware locations across fresh install, upgrade, multi-user, and
+    rollback flows.
+17. **Capability-default ambiguity:** detecting an app or audio device can be
+    mistaken for permission to use it; every capability needs an explicit
+    disabled/available/enabled/blocked state and must not silently reroute or
+    launch an account, browser, display, or listener.
+18. **Installer transaction gap:** a failure halfway through dependency,
+    model, service, shortcut, or pairing setup can leave a partially active
+    installation; locking, journaling, resumability, and cleanup need a tested
+    contract.
+19. **Multi-user/session ambiguity:** per-user services, X11/Wayland sessions,
+    permissions, and desktop integration must not cross users or assume one
+    logged-in display.
+20. **App-adapter growth risk:** future app integrations can widen the attack
+    surface or introduce duplicate listeners unless adapters use a versioned,
+    permissioned, opt-in capability registry with isolated failures.
+21. **Frontier-provider absence:** the current local model path has no governed
+    direct-provider registry, OpenCode Zen adapter, or OpenRouter adapter;
+    adding ad-hoc HTTP calls would bypass routing, budgets, redaction, and
+    typed failures.
+22. **Cloud-egress ambiguity:** there is no single tested classification for
+    what user, browser, project, memory, or secret content may leave the
+    machine; a frontier route could otherwise export private context silently.
+23. **Credential-boundary risk:** provider keys must not enter `voice.yaml`,
+    frontend state, prompts, logs, artifacts, or OpenCode's private auth store
+    through undocumented reads; each provider needs an OS-secret reference and
+    redaction test.
+24. **Capability mismatch:** providers differ in structured output, tool
+    calling, context, streaming, cancellation, pricing, and retention; model
+    selection needs a current capability/catalog contract and must fail closed
+    when metadata is stale.
+25. **Budget/retry risk:** cloud retries, fallbacks, streaming reconnects, and
+    automatic escalation can multiply cost or duplicate work without token,
+    spend, concurrency, and idempotency limits.
+26. **Provider-outage ambiguity:** a failed frontier request must expose whether
+    it timed out, was rate-limited, rejected, unavailable, or fell back to the
+    local model; a local answer must never be presented as the selected cloud
+    model's answer.
+27. **OpenCode execution boundary:** invoking a coding agent with inherited
+    environment, repository instructions, or broad workspace access could
+    expose secrets or bypass the ActionBroker; it needs a supervised worktree,
+    diff preview, process limits, and high-impact confirmation.
+28. **Model-catalog drift:** hardcoded provider/model IDs, endpoints, pricing,
+    or feature assumptions will become stale; catalog snapshots need source,
+    timestamp, validation, and an unavailable state.
+29. **Data-retention/terms gap:** each external provider's retention, training,
+    regional-processing, and acceptable-use terms must be recorded and shown
+    before enabling a cloud route; OpenRouter fallback/provider selection can
+    change the actual processor.
+30. **Release reproducibility gap:** provider adapters, SDK versions, CA/TLS
+    behavior, and model metadata must be pinned or constrained and exercised
+    in clean installs without making cloud access required for local use.
+31. **Provider-claim drift:** Zen/OpenRouter pricing, model availability,
+    endpoint behavior, and terms can change; Qubit must display “availability
+    and price subject to provider account” and fail safely when metadata is
+    stale instead of promising free or unlimited access.
+
+#### Non-blocking nice-to-have backlog
+
+These may be implemented only after every required gate above is green. They
+must remain opt-in, bounded, private by default, and may not delay a safety fix:
+
+1. A guided microphone/speaker/VAD calibration wizard with a local-only meter.
+2. A compact PTT waveform/level indicator with reduced-motion alternative.
+3. A unified notification center with filter, acknowledge, and retry context.
+4. Exportable signed diagnostic bundles with a preview of every included field.
+5. Additional UI languages and locale-aware dates after English copy stabilizes.
+6. A high-contrast theme and system-theme synchronization.
+7. An installable PWA shell, but no offline execution of privileged actions.
+8. A staged update notifier showing version, provenance, rollback, and restart.
+9. Local performance/reliability trend charts with bounded retention.
+10. Optional voice-style presets using the existing provider and resource
+    envelope; no emotion inference, cloning, training, or self-modification.
+
+#### Ten additional release requirements
+
+The following are cross-cutting requirements, not excuses to widen scope:
+
+1. **Real-device matrix:** document supported Linux/display/audio/browser
+   combinations and a clear unsupported-state message.
+2. **Resource envelope:** record CPU, RAM, VRAM, disk, network, and latency
+   ceilings under idle, normal, and bounded-load conditions.
+3. **Crash/restart safety:** prove leases, cursors, confirmations, receipts,
+   notifications, and temporary files recover without duplication or loss.
+4. **Clock correctness:** test timezone, DST transitions, clock skew, missed
+   runs, catch-up, and quiet-hours boundaries.
+5. **Privacy lifecycle:** verify redaction at capture, storage, logs, export,
+   backup, retention expiry, deletion, and support diagnostics.
+6. **Upgrade/rollback:** test additive migrations, interrupted upgrades,
+   downgrade refusal or safety, backup restoration, and uninstall cleanup.
+7. **Observability:** provide operator-readable health, correlation IDs only in
+   technical views, actionable logs, bounded log rotation, and no secret leaks.
+8. **Accessibility and mobile:** treat keyboard, screen reader, reduced motion,
+   contrast, touch size, and narrow layout as release gates, not decoration.
+9. **Dependency and provenance:** pin or constrain dependencies, record source
+   revisions/licenses/hashes, and reproduce the release from a clean checkout.
+10. **Operational runbooks:** document install, login/authorization, normal
+    use, recovery, disable, rollback, data deletion, and escalation paths in
+    plain language.
+
+### Productization acceptance checklist after Packet 8K
+
+Before Packet 8L, the verifier must additionally prove:
+
+1. A clean artifact install creates the documented per-user directory tree and
+   no source-checkout or repository-local runtime dependency.
+2. The same effective path map is reported before and after restart, upgrade,
+   rollback, and uninstall; legacy paths are migrated or explicitly aliased.
+3. OS/session detection is read-only and typed; unsupported combinations stop
+   with guidance rather than guessing a device, display, account, or browser.
+4. Every app/voice/browser capability is disabled or explicitly enabled, with
+   its permissions, scope, owner, and rollback visible to the user.
+5. Two concurrent installers and an interrupted installer converge to one
+   valid installation without duplicate services, listeners, or downloads.
+6. A missing optional provider, model, app, tray, display, or audio device
+   cannot make the installer claim that the complete product is ready.
+7. Backup, restore, update, downgrade, and uninstall preserve user data by
+   default and never copy credentials, browser profiles, tokens, or raw audio.
+8. The installer, desktop file, service, logs, diagnostics, and support bundle
+   contain no secrets, transient tokens, private absolute paths, or shell-piped
+   remote execution.
+
+Packet 8G–8K implementation must remain additive and must not enable live
+services during coding or hermetic verification. The operator performs the
+machine-specific live steps after the implementation handoff; an independent
+verifier then repeats or audits those steps before the release verdict.
+
 ### 5.1 Phase packet and verification protocol
 
 Each lettered packet is independently implemented and verified. An implementation agent may work only on the current packet and may not begin the next packet or parent phase. The packet ends with a mandatory handoff and a hard stop. A parent phase passes only after every packet below is independently verified and the parent acceptance gate is rerun.
@@ -1013,6 +1755,19 @@ Each lettered packet is independently implemented and verified. An implementatio
 | 8D | Implement dashboard/desktop/optional-voice notification policy, repository user-systemd oneshot/timer, overlap/resource limits, retention, rollback, opt-in personal-browser canary, and explicitly authorized live enablement |
 | 8E | Add the non-live website/app/editor onboarding façade: URL validation, bounded discovery/proposal, versioned integration records, redacted typed logs, CLI/dashboard parity, 7E permission/manifest linkage, tests, and rollback; do not enable arbitrary site control |
 | 8F | Add typed, brokered, confirmation-gated browser/desktop/editor actions with previews, receipts, cancellation, recovery, CLI/dashboard/voice parity, and separate live canaries; do not add unrestricted automation |
+| 8G | Qualify the real user-launched Chromium/CDP read-only browser path and three approved platform canaries without mutating accounts or tabs |
+| 8H | Qualify the real microphone, ASR, Piper playback, push-to-talk, Right Ctrl, latency, hotplug, and audio/service recovery paths |
+| 8I | Qualify the real user timer, overlap protection, no-change silence, notifications, quiet hours, catch-up, timezone/DST, and rollback paths |
+| 8J | Rehearse isolated end-to-end failure, crash, restart, backup/restore, retention, deduplication, and degraded recovery behavior |
+| 8K | Certify clean-install portability, upgrade/rollback, packaging, provenance, privacy, permissions, resource ceilings, and release artifacts |
+| 8K-P | Productize installation, model/runtime bootstrap, identity/path migration, first-run health, desktop shortcut, optional tray control, and private-source distribution |
+| 8L | Qualify public-release UX, accessibility, responsive/mobile layouts, plain-language errors/notifications, data lifecycle, and support diagnostics |
+| 8M | Integrate optional GENOME-compatible semantic memory without replacing the authoritative MemoryStore |
+| 8N | Integrate optional supervised Ghost desktop/browser capabilities and research-only Comet access |
+| 8O | Qualify the explicit power profile and real cross-capability/browser/hardware behavior |
+| 8P | Add verified skill memory and controlled Praxis/Evolve-style evaluation |
+| 8Q | Add optional direct frontier-provider, OpenCode Zen, and OpenRouter routing with egress, cost, and capability controls |
+| 8R | Add an optional supervised OpenCode coding workflow with worktree, diff, process, and confirmation boundaries |
 
 If a packet still exceeds the 300-line/dependency review threshold, stop and ask the user to authorize a smaller packet split. An agent may not silently widen a packet.
 
@@ -1529,6 +2284,15 @@ The project is ready for broad PC control only when:
 - event streaming, approvals, cancellation, and restart recovery are durable;
 - browser, file, repo, inbox, and web information has provenance and permissions;
 - deterministic/semantic/generative routing stages have separate measured gates and uncertainty never becomes authority;
+- local, direct-frontier, OpenCode Zen, and OpenRouter routes use one typed
+  provider contract with explicit model capabilities, data-egress policy,
+  token/cost/concurrency limits, redacted credentials, and truthful fallback
+  states;
+- cloud routing is disabled by default, never sends private context silently,
+  and remains usable offline with the local model;
+- OpenCode coding runs are supervised, scoped to an approved worktree, produce
+  a reviewable diff, and cannot bypass the action broker or high-impact
+  confirmation rules;
 - the default model has measured per-class quality, schema/tool accuracy, first-audio/full-turn latency, transition-reload, and VRAM gates;
 - every resident-model caller uses one canonical runner contract and the normal request sequence does not reload the model;
 - personal context is scoped, retrievable, correctable, inspectable, exportable, removable, citation-backed, and bounded instead of baked into the model or injected wholesale;
@@ -1563,3 +2327,9 @@ The project is ready for broad PC control only when:
 - Gmail incremental history contract: https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.history/list
 - Playwright Python v1.62.0 source (Apache-2.0), reviewed only for local report-UI tests at `3b7c24c3e67dc84f7b0eddd0c5fd2ca685705021`: https://github.com/microsoft/playwright-python/tree/3b7c24c3e67dc84f7b0eddd0c5fd2ca685705021
 - Himalaya v2.1.0 source (MIT), installed revision/tag commit `ca88bee08ad2e92127b46dc6200d1e8201885156`; optional Gmail fallback only: https://github.com/pimalaya/himalaya/tree/ca88bee08ad2e92127b46dc6200d1e8201885156
+- OpenCode provider and model configuration: https://opencode.ai/docs/providers and https://opencode.ai/docs/models
+- OpenCode Zen API/provider contract: https://opencode.ai/docs/zen
+- OpenCode Zen billing and per-request usage note: https://dev.opencode.ai/docs/zen
+- OpenRouter API quickstart and OpenAI-compatible endpoint: https://openrouter.ai/docs/quickstart
+- OpenRouter provider selection, fallback, and data-policy controls: https://openrouter.ai/docs/guides/routing/provider-selection
+- OpenAI API-key handling guidance: https://platform.openai.com/docs/api-reference/authentication

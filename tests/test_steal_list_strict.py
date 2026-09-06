@@ -921,9 +921,13 @@ class TestItem7Sandbox:
             pytest.fail("grandchild processes survived the kill")
 
     def test_dispatch_local_script_uses_sandbox_shape(self):
-        """The template-script path must go through run_tool, not raw subprocess."""
+        """The template-script path must go through the broker (argv), not a
+        raw subprocess or a raw run_tool shell fallback."""
         src = (ROOT / "voicebridge" / "orchestrator.py").read_text()
         seg = src[src.index("def _dispatch_local_script"):
                   src.index("def ", src.index("def _dispatch_local_script") + 10)]
-        assert "run_tool(" in seg
+        # Packet 8O repair: the script path executes ONLY through the broker.
+        assert "broker.execute(" in seg
+        assert "BROKER_DISABLED" in seg               # fail-closed denial
         assert "subprocess.run(" not in seg
+        assert "run_tool(cmd," not in seg             # no unsecured shell path

@@ -24,13 +24,73 @@ for every channel:
   (`power_control(cfg)` / `power_policy(cfg)` return a cached singleton).
   Emergency stop, disable, circuit breakers, concurrency, and cancellation now
   affect every channel consistently.
+
+### Cross-process, restart-persistent emergency control (8O repair)
+
+A process-local Python singleton is **not** sufficient for the emergency-stop /
+global-disable latches: the CLI, dashboard, bridge, voice, tray, Ghost/Comet,
+and automation run as separate processes and must observe each other's control
+actions. Packet 8O now persists the latched control state durably:
+
+- **`PowerControlStore`** writes the emergency-stop / global-disable latches to
+  `<state_dir>/power-control.json` (private `0600`) under a single cross-process
+  flock with unique exclusive temp files, file + directory fsync, atomic rename,
+  typed durability failures, and try/finally lock release on every path.
+- **`power_control(cfg)`** binds the shared `PowerControl` to that durable store
+  and reloads it on construction, so a CLI/dashboard emergency stop is observed
+  by the running bridge / voice / tray / Ghost / Comet / automation and survives
+  a restart of any one of them. `PowerPolicy.decide` and `CapabilityBroker`
+  refresh the latch (short TTL) before every decision/execution.
+- **Fail-closed load and refresh.** A corrupt, unknown-field, newer-schema, or
+  forged-author durable control file NEVER loads as "cleared" — it latches
+  emergency stop + global disable (deny). Writing over a corrupt underlying
+  state is refused, so a reset can never silently clear an unreadable latch.
+- **Explicit human authorization.** `emergency_stop` / `global_disable` /
+  `global_enable` / `reset` require an authenticated human principal
+  (`user` / `cli:user` / `dashboard`); the CLI requires `--confirm` and the
+  dashboard POST requires `confirmed:true`. A model/page/tool/skill/automation
+  author is refused with `CONFIRMATION_SOURCE_FORBIDDEN`.
+- Circuit breakers and bounded-concurrency slots remain process-local runtime
+  state (they track live in-process runs); the durable latches that must span
+  processes and restarts are the emergency stop and the global disable.
+
+### Tray and MCP/Comet scope (explicit)
+
+- **Tray.** This repository ships **no executing tray controller** — `tray` is
+  an optional, status-only diagnostic (`pystray` presence). `tray_status()`
+  reports `executes_actions: False` truthfully; it never starts a second
+  bridge/listener/browser and never touches cookies, tokens, or private page
+  data. Any operator tray menu action must route through the shared
+  authenticated power CLI/API (one policy path). The verification contract
+  treats tray as a status-only diagnostic, not a policy path.
+- **MCP/Comet.** No MCP server is intentionally shipped. `mcp_status()` reports
+  a truthful typed `UNAVAILABLE`/`DISABLED` state (`server: "none"`); it never
+  claims a fake "connected" MCP policy path. The Comet research path is
+  broker-bound through `GhostRunner` (the one policy path) and disabled by
+  default. The verification contract states this explicitly.
 - **Real executors wired through the policy before execution.** `CapabilityBroker`
   (host tools + actions + Ghost/Comet) checks the shared control before every
   run (emergency stop -> disable -> circuit breaker), tracks each real run for
   cancellation (`track`/`untrack`), records circuit failures, and enforces
   bounded concurrency. `ActionRunner`/`GhostRunner` accept a `power` policy and
   route preview/check/execute/retry/recover through `PowerGateAdapter` — the
-  same typed decision the CLI/dashboard/voice return.
+  same typed decision the CLI/dashboard/voice return. The voice action preview
+  path and the dashboard `/api/actions` check path were repaired to use the
+  shared policy (they previously used a plain runner).
+- **No execution bypass (`safety.tool_broker=false`).** The voice local-action
+  and local-script paths NO LONGER have an unsecured `local_actions.execute` /
+  `run_tool(cmd)` shell fallback. When the broker is unavailable or
+  `safety.tool_broker=false`, they FAIL CLOSED with a typed `BROKER_DISABLED`
+  denial — a direct adapter or raw shell route can never execute around the
+  broker, grants, scopes, confirmation, audit, resource limits, or emergency
+  stop. Regression tests prove no action/script executes with the broker
+  disabled.
+- **Automation is on the one policy path.** The hourly communications monitor
+  (`run_hourly`, the automation channel) consults the shared DURABLE
+  power-control latch before any scan: a latched emergency stop / global
+  disable (or an unreadable/non-durable control state) fails closed with a
+  typed `EMERGENCY_STOP` / `POWER_DISABLED` denial and no browser read ever
+  happens.
 - **Owner-grant issuer is strictly human.** `PowerGrantStore.issue/revoke/reset`
   require an authenticated human principal via `actions.require_human_principal`
   (`user`, `cli:user`, `dashboard`). Model, page, tool, skill, automation, and
@@ -142,7 +202,11 @@ No live config is edited and no new service is created. The grant persists to
 cross-process flock, unique exclusive temp file, file + directory fsync, typed
 durability failures, fail-closed load). Grant default duration is 7 days
 (`power.grant_ttl_s`), hard ceiling 90 days. Global power-control state is
-in-memory and typed; the dashboard/CLI show it read-only.
+typed and **durable**: the emergency-stop / global-disable latches persist to
+`<state_dir>/power-control.json` (private `0600`, atomic, cross-process flock,
+fail-closed load) so they survive restart and are observed by every channel;
+circuit breakers and concurrency slots are process-local runtime state. The
+dashboard/CLI show both read-only.
 
 ## 3. CLI
 
@@ -156,8 +220,8 @@ voicebridge power grant [--browser chromium|comet] [--app APP] [--account A]
                         [--origin URL] [--directory DIR] [--scope S]
                         [--capability CAP] [--ttl SECONDS] [--confirm] [--note TEXT]
 voicebridge power revoke <grant_id> [--confirm]
-voicebridge power reset-grant
-voicebridge power emergency-stop | reset | disable | enable
+voicebridge power reset-grant [--confirm]
+voicebridge power emergency-stop --confirm | reset --confirm | disable --confirm | enable --confirm
 ```
 
 `grant`/`revoke` are dry-run by default and require `--confirm`. `--capability`
@@ -204,7 +268,21 @@ orchestrator).
   corrupt/unreadable grant file degrades the store and returns None.
 - Emergency stop is a global latch that cancels tracked real runs through the
   caller's own cancel callbacks (registered by the broker for every execution)
-  and persists until an explicit human reset.
+  and persists until an explicit human reset. The latch is DURABLE: it is
+  written to `power-control.json` under a cross-process flock and reloaded on
+  restart, so a CLI/dashboard emergency stop is observed by the running bridge,
+  voice, tray, Ghost/Comet, and automation and survives a restart of any one of
+  them. Corrupt / unknown-field / newer-schema / forged-author control state
+  fails closed (never silently clears the latch). Reset / disable / enable all
+  require explicit human confirmation (`--confirm` / `confirmed:true`).
+- Tray: no executing tray controller is shipped; `tray_status()` is a
+  status-only diagnostic (`executes_actions: False`), never starts a second
+  bridge/listener/browser, never touches cookies/tokens/private page data, and
+  any tray action must use the shared authenticated power CLI/API.
+- MCP/Comet: no MCP server is shipped; `mcp_status()` reports a truthful typed
+  `UNAVAILABLE`/`DISABLED` state (`server: "none"`) — no fake "connected"
+  policy path. The Comet research path is broker-bound through `GhostRunner`
+  (one policy path) and disabled by default.
 - Circuit breakers trip after repeated adapter failures and deny while open.
 - Bounded concurrency fails closed (no unbounded queuing).
 - Audit is durable and fail-closed: every power decision is appended to a `0600`
@@ -216,9 +294,12 @@ orchestrator).
 
 Revert the new file `voicebridge/power.py`, `tests/test_packet8o.py`, and the
 additive `cli.py`/`webui.py`/`actions.py`/`broker.py`/`ghost.py`/
-`capabilities.py`/`orchestrator.py`/`frontend/settings.html` hunks. There is no
-data migration; removing the packet leaves 8F/8N/7E behavior exactly as it was.
-`git diff --check`, `graft build`, and the hermetic suite
+`capabilities.py`/`orchestrator.py`/`product.py`/`communications/monitor.py`/
+`frontend/settings.html` hunks.
+There is no data migration; removing the packet leaves 8F/8N/7E behavior exactly
+as it was. A durable `power-control.json` file left in the state dir is simply
+ignored after rollback (the 8O control layer is the only reader). `git diff
+--check`, `graft build`, and the hermetic suite
 (`tests/test_packet8o.py` plus the 7E/8E/8F/8M/8N regressions) are the
 verification gates.
 
@@ -246,6 +327,17 @@ disposable/controlled environment with explicit operator authorization:
 4. **Signed packaging / upgrade / rollback / uninstall** on a clean machine.
 5. **Operator-controlled account canary** for Gmail/Instagram/Messenger new-item
    detection without reading message bodies.
+6. **Cross-process emergency control (operator).** With the bridge running,
+   issue `voicebridge power emergency-stop --confirm` from a separate CLI
+   process and confirm the running bridge/dashboard/voice deny new runs and
+   cancel active ones within the refresh window; restart the bridge and confirm
+   the latch is still observed; `voicebridge power reset --confirm` clears it.
+7. **Tray (operator).** Confirm the optional tray icon shows typed readiness
+   only and that any menu action delegates to the authenticated power CLI/API
+   (no second bridge/listener/browser, no cookie/token access).
+8. **MCP/Comet (operator).** Confirm `mcp_status()` reports `UNAVAILABLE`/
+   `DISABLED` (`server: "none"`) and that the only research route is the
+   broker-bound Comet adapter via `GhostRunner` — no second policy path.
 
 This packet implements the hermetic inventory, grant, control, policy, CLI,
 dashboard, tests, and rollback only — nothing here launches, connects, or

@@ -494,7 +494,12 @@ def test_worker_guard_exec_audit_redacted_and_correlated(monkeypatch):
 def test_legacy_rollback_paths_present_behind_flag():
     src = (REPO / "voicebridge/orchestrator.py").read_text(errors="replace")
     assert 'tool_broker' in src                       # flag consulted
-    assert "run_tool(cmd," in src                     # legacy path retained
+    # Packet 8O repair: there is NO unsecured direct-shell fallback. When the
+    # broker is unavailable or safety.tool_broker=false the local-script path
+    # FAILS CLOSED with the typed BROKER_DISABLED denial — a user-configured
+    # script line is never executed through a raw shell around the broker.
+    assert "BROKER_DISABLED" in src
+    assert "run_tool(cmd," not in src
     assert "CONFIRMATION_REQUIRED" in src             # destructive flow wired
     cfg_src = (REPO / "voicebridge/config.py").read_text(errors="replace")
     assert '"tool_broker": True' in cfg_src           # additive default

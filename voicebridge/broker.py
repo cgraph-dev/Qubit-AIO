@@ -152,6 +152,10 @@ class CapabilityBroker:
         """Return a denial code when the shared power control forbids the run."""
         if self._power is None:
             return None
+        # Refresh the cross-process latch (no-op when the control has no
+        # durable store) so an emergency stop / disable set by another process
+        # is observed before every real execution.
+        self._power.refresh()
         if self._power.state.get("emergency_stop"):
             return "EMERGENCY_STOP"
         if self._power.state.get("global_disable"):
