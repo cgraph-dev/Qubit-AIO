@@ -4,6 +4,10 @@ After=network.target
 # OpenClaw gateway + ollama (local LLM) should be up first if they exist as units:
 After=openclaw-gateway.service ollama.service
 Wants=ollama.service
+# Bounded restart storm guard: at most 5 restarts per 5 minutes; beyond that
+# the unit stays failed (visible, typed) until the operator restarts it.
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=simple

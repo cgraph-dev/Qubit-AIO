@@ -21,9 +21,9 @@ ExecStart=__PROJECT_DIR__/.venv/bin/python scripts/timer_qualify.py --accelerate
 MemoryHigh=300M
 MemoryMax=400M
 TimeoutStartSec=120
-Environment=VOICE_BRIDGE_CONFIG=%h/.config/openclaw-voice-bridge/voice.yaml
+Environment=VOICE_BRIDGE_CONFIG=%h/.config/qubit-voicebridge/voice.yaml
 # Isolated state root so the accelerated unit NEVER touches production state.
-Environment=VOICE_BRIDGE_QUALIFY_ACCEL_STATE=%h/.cache/openclaw-voice-bridge/timer-qualify-accel
+Environment=VOICE_BRIDGE_QUALIFY_ACCEL_STATE=%h/.cache/qubit-voicebridge/timer-qualify-accel
 
 [Install]
 WantedBy=default.target

@@ -336,7 +336,7 @@ class VoiceOrchestrator:
         from .dispatch_guard import register_worker_caps
         from . import power as PW
         self._broker: Optional[CapabilityBroker] = None
-        self._power_policy = PW.power_policy(cfg)
+        self._power_policy = PW.power_policy(self.cfg)
         try:
             self._broker = build_host_broker(
                 power_control=self._power_policy.control)

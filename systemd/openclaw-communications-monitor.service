@@ -28,7 +28,7 @@ TimeoutStartSec=300
 # then `systemctl --user restart` this unit. Never ship a machine-specific
 # DISPLAY value in the repository template.
 # Uses the SAME user config as the bridge (private state root is shared):
-Environment=VOICE_BRIDGE_CONFIG=%h/.config/openclaw-voice-bridge/voice.yaml
+Environment=VOICE_BRIDGE_CONFIG=%h/.config/qubit-voicebridge/voice.yaml
 
 [Install]
 WantedBy=default.target

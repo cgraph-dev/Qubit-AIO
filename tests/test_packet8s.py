@@ -697,3 +697,140 @@ def test_sherpa_paths_use_legacy_models_when_unmigrated(tmp_path, monkeypatch):
                     model_dir=tmp_path / "data" / "qubit-voicebridge" / "models")
     paths = asr._paths()
     assert paths["encoder"] == legacy_enc
+
+
+def test_migrate_conflict_stashes_canonical_fragment(tmp_path):
+    paths = _paths(tmp_path)
+    paths.legacy_base.mkdir(parents=True)
+    (paths.legacy_base / "voice.yaml").write_text("legacy: 1\n")
+    paths.config_dir.mkdir(parents=True)
+    (paths.config_dir / "voice.yaml").write_text("canonical-fragment: 1\n")
+    bdir = tmp_path / "bdir"
+    out = P.migrate(paths, dry_run=False, backup_dir=bdir)
+    assert out["state"] == "OK", out
+    assert (paths.config_dir / "voice.yaml").read_text() == "legacy: 1\n"
+    stashed = bdir / "canonical-conflicts" / "legacy" / "voice.yaml"
+    assert stashed.exists()
+    assert stashed.read_text() == "canonical-fragment: 1\n"
+
+
+def test_migrate_empty_canonical_uses_fast_rename(tmp_path):
+    paths = _paths(tmp_path)
+    paths.legacy_data.mkdir(parents=True)
+    (paths.legacy_data / "big.bin").write_text("x" * 1000)
+    paths.data_dir.mkdir(parents=True)  # empty canonical dir
+    out = P.migrate(paths, dry_run=False)
+    assert out["state"] == "OK", out
+    assert (paths.data_dir / "big.bin").exists()
+
+
+# ---------------------------------------------------------------------------
+# 12. Startup, service, shortcut, uninstall, installed-layout (repair round 3)
+# ---------------------------------------------------------------------------
+def test_startup_binds_power_policy_without_nameerror(tmp_path, monkeypatch):
+    """VoiceOrchestrator must construct with the instance config (the
+    PW.power_policy(cfg) NameError is the regression)."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "c"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "s"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "d"))
+    cfg = C.Config.load(tmp_path / "voice.yaml")
+    from voicebridge.orchestrator import VoiceOrchestrator
+    orch = VoiceOrchestrator(cfg, no_hotkey=True, dry_run=True)
+    assert orch._power_policy is not None
+    assert orch._broker is not None
+
+
+def test_canonical_service_template():
+    text = (REPO / "systemd" / "qubit-voicebridge.service").read_text()
+    assert "Description=Qubit VoiceBridge" in text
+    assert "__PROJECT_DIR__/.venv/bin/python -m voicebridge run" in text
+    assert "WorkingDirectory=__PROJECT_DIR__" in text
+    assert "%h/.config/qubit-voicebridge/voice.yaml" in text
+    assert "Restart=on-failure" in text or "Restart=always" in text
+    assert "StartLimitIntervalSec=" in text and "StartLimitBurst=" in text
+    assert "openclaw-voice-bridge" not in text
+    assert "qubit-voice-agent" not in text
+    assert "/home/" not in text
+
+
+def test_service_template_validates_with_systemd_analyze(tmp_path):
+    import shutil
+    import subprocess
+    if shutil.which("systemd-analyze") is None:
+        pytest.skip("systemd-analyze unavailable")
+    # the template carries a __PROJECT_DIR__ placeholder rendered at install;
+    # validate the rendered unit (same rendering the installer performs)
+    text = (REPO / "systemd" / "qubit-voicebridge.service").read_text()
+    rendered = tmp_path / "qubit-voicebridge.service"
+    rendered.write_text(text.replace("__PROJECT_DIR__", str(REPO)))
+    r = subprocess.run(["systemd-analyze", "verify", str(rendered)],
+                       capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr[-2000:]
+
+
+def test_desktop_shortcut_generation_canonical(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setattr(P, "_require_session",
+                        lambda: {"state": "OK", "detail": "test"})
+    monkeypatch.setattr(P, "_webui_open_available", lambda: True)
+    out = P.desktop_shortcut(P.default_paths(), dry_run=False)
+    assert out["state"] == "OK", out
+    dest = tmp_path / "data" / "applications" / "qubit-voicebridge.desktop"
+    assert dest.exists()
+    text = dest.read_text()
+    assert "Name=Qubit VoiceBridge" in text
+    assert "token=" not in text and "webui.token" not in text
+
+
+def test_uninstall_preserves_state_by_default():
+    from voicebridge import distribution as D
+    plan = D.uninstall_plan(None)
+    assert plan["requires_confirmation"] is True
+    joined = " ".join(plan["preserves_by_default"]).lower()
+    assert "state" in joined and "config" in joined
+
+
+def test_repo_folder_is_canonical():
+    assert REPO.name == "qubit-voicebridge"
+    assert (REPO / "systemd" / "qubit-voicebridge.service").exists()
+    assert (REPO / "voicebridge" / "__init__.py").exists()
+
+
+def test_installed_layout_resource_resolution(tmp_path, monkeypatch):
+    """An installed wheel resolves frontend/config/systemd from its own
+    _data tree (never the developer checkout)."""
+    from voicebridge import resources
+    fake_data = tmp_path / "_data"
+    (fake_data / "frontend").mkdir(parents=True)
+    (fake_data / "frontend" / "index.html").write_text("x")
+    monkeypatch.setattr(resources, "_PACKAGE_DATA", fake_data)
+    resolved = resources.resource_path("frontend")
+    assert str(resolved).startswith(str(fake_data))
+    assert (resolved / "index.html").exists()
+
+
+def test_live_canonical_unit_points_at_canonical_tree():
+    """Live installed unit (when present) must reference the canonical
+    folder, venv, and config — never the retired checkout."""
+    unit = Path.home() / ".config/systemd/user/qubit-voicebridge.service"
+    if not unit.exists():
+        pytest.skip("canonical unit not installed here")
+    text = unit.read_text()
+    assert "/qubit-voicebridge/.venv/bin/python -m voicebridge run" in text
+    assert "WorkingDirectory=/home/trick/Projects/Repos/qubit-voicebridge" \
+        in text or "WorkingDirectory=%h/Projects/Repos/qubit-voicebridge" \
+        in text
+    assert "qubit-voicebridge/voice.yaml" in text
+    assert "openclaw-voice-bridge" not in text.replace(
+        "openclaw-voice-bridge.service", "")
+
+
+def test_no_competing_legacy_unit_enabled():
+    import shutil
+    import subprocess
+    if shutil.which("systemctl") is None:
+        pytest.skip("systemctl unavailable")
+    for legacy in ("openclaw-voice-bridge.service", "qubit-voice-agent.service"):
+        r = subprocess.run(["systemctl", "--user", "is-enabled", legacy],
+                           capture_output=True, text=True, timeout=15)
+        assert r.stdout.strip() != "enabled", f"{legacy} must not stay enabled"

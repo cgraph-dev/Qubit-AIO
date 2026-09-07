@@ -1397,6 +1397,47 @@ def _backup_tree(src: Path, bdir: Path) -> List[str]:
     return excluded
 
 
+def _stash_canonical_conflicts(legacy: Path, canonical: Path,
+                               bdir: Path) -> List[str]:
+    """Copy every canonical file shadowed by the incoming legacy tree into
+    the backup (under ``canonical-conflicts/<legacy-name>/``) before the
+    merge overwrites it. Read-only toward canonical; returns the conflicting
+    relative paths. An empty canonical dir is removed so the move stays a
+    fast rename instead of a multi-GB copy."""
+    conflicts: List[str] = []
+    if canonical.is_symlink():
+        return conflicts
+    if canonical.is_dir():
+        try:
+            entries = list(canonical.iterdir())
+        except OSError:
+            return conflicts
+        if not entries:
+            try:
+                canonical.rmdir()
+            except OSError:
+                pass
+            return conflicts
+    stash = bdir / "canonical-conflicts" / legacy.name
+    for src in sorted(legacy.rglob("*")):
+        if src.is_dir() or src.is_symlink():
+            continue
+        try:
+            rel = src.relative_to(legacy)
+        except ValueError:
+            continue
+        target = canonical / rel
+        try:
+            if target.is_file() and not target.is_symlink():
+                dest = stash / rel
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(target, dest)
+                conflicts.append(str(rel))
+        except OSError:
+            continue
+    return conflicts
+
+
 def _resume_missing_aliases(paths: ProductPaths, journal: InstallJournal,
                             run_id: str) -> List[str]:
     """Idempotent resume: an interruption between the move and the alias step
@@ -1520,12 +1561,25 @@ def _migrate_apply(paths: ProductPaths, j: InstallJournal, run_id: str,
                      f"backed up to {bdir / legacy.name}")
             canonical.parent.mkdir(parents=True, exist_ok=True)
             if canonical.exists():
-                # canonical already has content: copy legacy in, then drop the
-                # legacy real dir before aliasing (never two live trees).
-                # Inner symlinks are preserved as links, never followed out.
-                shutil.copytree(legacy, canonical, symlinks=True,
-                                dirs_exist_ok=True)
-                shutil.rmtree(legacy)
+                # canonical already has content: preserve both sides (the
+                # canonical fragment is stashed in the backup first), then
+                # copy legacy in — the established live tree wins on conflict
+                # and every conflict is reported. Never two live trees.
+                # An empty canonical dir is removed so the move stays a fast
+                # rename instead of a multi-GB copy.
+                conflicts = _stash_canonical_conflicts(legacy, canonical, bdir)
+                if conflicts:
+                    j.append(run_id, f"conflicts.{name}", "OK",
+                             f"{len(conflicts)} canonical fragment(s) stashed "
+                             f"in backup; legacy wins: "
+                             + "; ".join(conflicts[:8]))
+                    excluded += [f"canonical-conflict:{c}" for c in conflicts]
+                if not canonical.exists():
+                    legacy.rename(canonical)
+                else:
+                    shutil.copytree(legacy, canonical, symlinks=True,
+                                    dirs_exist_ok=True)
+                    shutil.rmtree(legacy)
             else:
                 legacy.rename(canonical)
             legacy.symlink_to(canonical, target_is_directory=True)
