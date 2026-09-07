@@ -21,7 +21,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-DEFAULT_FLAG_STATE = Path("~/.local/state/openclaw-voice-bridge/flags.state.json").expanduser()
+from .config import canonical_state_dir
+
+DEFAULT_FLAG_STATE = canonical_state_dir() / "flags.state.json"
 
 
 @dataclass(frozen=True)

@@ -645,7 +645,7 @@ def rollback_profile(cfg: Any, kind: str, *, dry_run: bool = True,
                 "action": f"restore {kind} from backup {backup or 'default'}"}
     if backup is not None and Path(backup).exists():
         target = Path(getattr(cfg, "path", None) or Path(
-            "~/.config/openclaw-voice-bridge/voice.yaml").expanduser())
+            "~/.config/qubit-voicebridge/voice.yaml").expanduser())
         try:
             data = Path(backup).read_text()
             fd, tmp = tempfile.mkstemp(dir=str(target.parent),
@@ -1114,14 +1114,15 @@ def branding_rollback(cfg: Any, backup_dir: Path, repo: Optional[Path] = None) -
         # rename back when neither legacy filename was restored
         os.replace(new_unit, old_unit)
         restored.append("systemd/unit-renamed-back")
-    # 2) restore runtime config/state/data
+    # 2) restore runtime config/state/data to the canonical tree (Packet 8S;
+    # legacy trees are only compat aliases and are never written)
     for name in ("voice.yaml", "state", "data", "models", "memory",
                  "reports", "device.json", "profiles.json"):
         bak = bdir / "runtime" / name
         if bak.exists():
-            dst = Path("~/.config/openclaw-voice-bridge").expanduser() / name
+            dst = Path("~/.config/qubit-voicebridge").expanduser() / name
             if name in ("voice.yaml",):
-                dst = Path("~/.config/openclaw-voice-bridge").expanduser() / name
+                dst = Path("~/.config/qubit-voicebridge").expanduser() / name
             dst.parent.mkdir(parents=True, exist_ok=True)
             if bak.is_dir():
                 shutil.copytree(bak, dst, dirs_exist_ok=True)

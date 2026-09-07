@@ -40,28 +40,38 @@ writing another.
   unit exists it reports `STALE`. Migration never enables, restarts, or
   edits a live unit.
 
-## 3. Repository-folder rename rehearsal (never move the active checkout)
+## 3. Repository-folder migration (performed 2026-09-07)
 
-The physical rename `openclaw-voice-bridge` -> `qubit-voicebridge` is part of
-this packet but MUST NOT move the active dirty checkout under a running
-agent or service. Operator procedure:
+The canonical folder is `/home/trick/Projects/Repos/qubit-voicebridge`.
+The migration was performed WITHOUT `git reset --hard`, `git clean`, broad
+checkout, mass deletion, or destructive overwrite:
 
-1. From a clean clone or release directory (not the live checkout):
-   `cp -a openclaw-voice-bridge qubit-voicebridge` (or `git clone` into a
-   `qubit-voicebridge` directory).
-2. Inside `qubit-voicebridge`: build/install into a clean HOME, run
-   `voicebridge product install` (dry-run), the 8S hermetic suite, and one
-   launch (`voicebridge webui --open` resolves; no second listener).
-3. Prove packaging (`pyproject.toml` name `qubit-voicebridge`), scripts, the
-   `systemd/qubit-voicebridge.service` template, and docs resolve from the
-   new path, and upgrade/rollback work from it.
-4. Only then move the existing checkout manually with all services stopped:
-   `systemctl --user stop qubit-voicebridge.service`,
-   `mv openclaw-voice-bridge qubit-voicebridge`, re-run install + tests.
-5. An existing `openclaw-voice-bridge` checkout remains safely readable
-   during migration; nothing in the migration deletes user data.
+1. Recorded `git status` plus SHA-256 of every tracked-dirty and untracked
+   file (baseline kept outside the repo).
+2. Copied the tree with `rsync -a` (excluding only rebuildable `.venv/`,
+   `graft/`, `__pycache__/`, `.pytest_cache/`), then proved the copy
+   byte-identical (`diff -r`, per-file hashes).
+3. Recreated the venv in the new folder (`uv venv`, `uv pip install
+   -e ".[test]"`) — the editable install is now `qubit_voicebridge-1.0.0`.
+4. Renamed the old checkout aside to
+   `openclaw-voicebridge.legacy-backup-<date>` (recoverable, NOT a second
+   active checkout: no service, test, or runtime resolves it).
+5. All verification below ran from the canonical folder.
 
-## 4. What is never done
+## 4. Rollback procedures
+
+- Runtime migration rollback: `voicebridge product migrate-rollback --apply
+  --backup-dir <manifest-backup>` (locked, staged, fsynced, atomic;
+  corrupt/newer backups fail closed; partial restores report exact paths
+  and block resume).
+- Repository-folder rollback: stop services, `mv qubit-voicebridge
+  qubit-voicebridge.failed-8s`, `mv
+  openclaw-voicebridge.legacy-backup-<date> openclaw-voice-bridge`,
+  re-create or re-point the venv, re-run the hermetic suite. Keep the
+  backup until an independent verifier returns VERIFIED.
+- Code rollback: `git revert <8S-commit>` (never `reset --hard`).
+
+## 5. What is never done
 
 - Never renames the `voicebridge` import package.
 - Never changes capability policy, browser/account/audio/model/timer
@@ -73,7 +83,7 @@ agent or service. Operator procedure:
 - Never uses `git reset --hard`, `git clean`, or broad checkout; rollback
   uses `git revert` or reviewed file-specific patches.
 
-## 5. Verification matrix (hermetic + isolated)
+## 6. Verification matrix (hermetic + isolated)
 
 Fresh install, canonical-only, legacy-only (each legacy family), mixed/split
 trees, partial/interrupted migration + resume, repeated migration, upgrade,

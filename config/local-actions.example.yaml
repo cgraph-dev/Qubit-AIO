@@ -2,7 +2,7 @@
 #
 # This EXAMPLE is shipped in the wheel so a fresh install can discover the
 # mechanism. It contains NO machine-specific paths. Copy it to
-# ~/.config/openclaw-voice-bridge/local-actions.yaml (honouring
+# ~/.config/qubit-voicebridge/local-actions.yaml (honouring
 # $XDG_CONFIG_HOME) and set YOUR launcher targets / project roots / screenshot
 # directory. Without that file the installed package uses portable generic
 # defaults (launchers by name, home-directory file/screenshot dirs).

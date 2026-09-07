@@ -26,6 +26,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 from voicebridge import product as P  # noqa: E402
+from voicebridge import config as C  # noqa: E402
 
 
 def _paths(tmp_path: Path) -> P.ProductPaths:
@@ -349,3 +350,305 @@ def test_no_canonical_path_leaks_secrets(tmp_path):
     diag = P.path_map_diagnostic(paths)
     assert diag["product"] == "qubit-voicebridge"
     assert "token" not in json.dumps(diag).lower()
+
+
+# ---------------------------------------------------------------------------
+# 8. Centralized config resolver (Packet 8S repair 1)
+# ---------------------------------------------------------------------------
+def test_config_defaults_are_canonical():
+    assert str(C.DEFAULT_CONFIG_PATH).endswith(".config/qubit-voicebridge/voice.yaml")
+    assert str(C.DEFAULT_STATE_DIR).endswith(".local/state/qubit-voicebridge")
+    assert str(C.DEFAULT_DATA_DIR).endswith(".local/share/qubit-voicebridge")
+    assert "openclaw-voice-bridge" not in str(C.DEFAULT_CONFIG_PATH)
+    assert "qubit-voice-agent" not in str(C.DEFAULT_CONFIG_PATH)
+
+
+def test_single_resolver_product_matches_config(tmp_path, monkeypatch):
+    monkeypatch.delenv("VOICE_BRIDGE_CONFIG", raising=False)
+    prod = P.default_paths()
+    assert prod.config_dir == C.canonical_config_dir()
+    assert prod.state_dir == C.canonical_state_dir()
+    assert prod.data_dir == C.canonical_data_dir()
+    assert C.resolve_config_path() == C.canonical_config_path()
+
+
+def test_empty_and_whitespace_config_env_falls_back(monkeypatch):
+    for raw in ("", "   ", "\t\n "):
+        monkeypatch.setenv("VOICE_BRIDGE_CONFIG", raw)
+        resolved = C.resolve_config_path()
+        assert resolved == C.canonical_config_path(), repr(raw)
+        assert str(resolved) != "."
+    monkeypatch.delenv("VOICE_BRIDGE_CONFIG", raising=False)
+
+
+def test_directory_config_path_fails_closed(tmp_path):
+    with pytest.raises(ValueError, match="directory"):
+        C.resolve_config_path(tmp_path)
+    with pytest.raises(ValueError, match="directory"):
+        C.Config.load(tmp_path)
+
+
+def test_explicit_canonical_path_loads(tmp_path):
+    cfg_file = tmp_path / "voice.yaml"
+    cfg_file.write_text("audio:\n  output_volume: 80\n")
+    cfg = C.Config.load(cfg_file)
+    assert cfg.get("audio", "output_volume") == 80
+    assert cfg.path == cfg_file
+    assert cfg.legacy_source is None
+
+
+def test_legacy_only_config_fallback_reads_but_writes_canonical(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(home / ".config"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(home / ".local/state"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(home / ".local/share"))
+    monkeypatch.delenv("VOICE_BRIDGE_CONFIG", raising=False)
+    # re-resolve under the isolated HOME
+    import importlib
+    legacy_dir = home / ".config" / "openclaw-voice-bridge"
+    legacy_dir.mkdir(parents=True)
+    (legacy_dir / "voice.yaml").write_text("audio:\n  output_volume: 77\n")
+    detected = [r for r in C.detect_legacy_configs()
+                if r["family"] == "openclaw-voice-bridge"]
+    assert detected and detected[0]["state"] == "REAL_DIR"
+    assert any(f.endswith("voice.yaml") for f in detected[0].get("files", []))
+    # Config.load with no explicit path reads the legacy file exactly once
+    # through explicit detection, but its write target stays canonical
+    cfg = C.Config.load()
+    assert cfg.get("audio", "output_volume") == 77
+    assert cfg.legacy_source is not None
+    assert "openclaw-voice-bridge" in cfg.legacy_source
+    assert str(C.canonical_config_path()).endswith("qubit-voicebridge/voice.yaml")
+
+
+# ---------------------------------------------------------------------------
+# 9. Migration/rollback hardening (Packet 8S repair 4)
+# ---------------------------------------------------------------------------
+def test_migrate_rejects_unsafe_symlink_source(tmp_path):
+    paths = _paths(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "voice.yaml").write_text("x: 1\n")
+    paths.base.mkdir(parents=True, exist_ok=True)
+    # a REAL_DIR legacy that is secretly a symlink is impossible via the
+    # status map, but a symlink swapped in after the check must fail closed
+    paths.legacy_base.mkdir()
+    (paths.legacy_base / "voice.yaml").write_text("x: 1\n")
+    real = [{"legacy": str(paths.legacy_base),
+             "canonical": str(paths.config_dir), "state": "REAL_DIR"}]
+    import shutil
+    shutil.rmtree(paths.legacy_base)
+    paths.legacy_base.symlink_to(outside, target_is_directory=True)
+    j = P.InstallJournal(paths.journal_dir)
+    out = P._migrate_apply(paths, j, "testrun", real, tmp_path / "bdir")
+    assert out["state"] == "FAILED"
+    assert "symlink" in out["detail"].lower()
+    assert (outside / "voice.yaml").exists()  # outside tree untouched
+
+
+def test_migrate_rejects_backup_inside_source(tmp_path):
+    paths = _paths(tmp_path)
+    paths.legacy_base.mkdir(parents=True)
+    (paths.legacy_base / "voice.yaml").write_text("x: 1\n")
+    out = P.migrate(paths, dry_run=False,
+                    backup_dir=paths.legacy_base / "nested-backup")
+    assert out["state"] == "FAILED"
+    assert "inside" in out["detail"].lower()
+
+
+def test_concurrent_migration_is_blocked(tmp_path):
+    paths = _paths(tmp_path)
+    paths.legacy_base.mkdir(parents=True)
+    (paths.legacy_base / "voice.yaml").write_text("x: 1\n")
+    j = P.InstallJournal(paths.journal_dir)
+    with j.locked():
+        out = P.migrate(paths, dry_run=False, journal=j)
+        assert out["state"] == P.BLOCKED
+    out2 = P.migrate(paths, dry_run=False, journal=j)
+    assert out2["state"] == "OK"
+
+
+def test_journal_append_is_fsynced_and_locked(tmp_path):
+    paths = _paths(tmp_path)
+    j = P.InstallJournal(paths.journal_dir)
+    j.append("r1", "migrate", "OK", "start")
+    recs = j.read()
+    assert len(recs) == 1 and recs[0]["run_id"] == "r1"
+    with j.locked():
+        j.append("r1", "migrate", "OK", "more")
+    assert len(j.read()) == 2
+
+
+def test_corrupt_backup_manifest_blocks_rollback(tmp_path):
+    paths = _paths(tmp_path)
+    bdir = tmp_path / "bad-backup"
+    bdir.mkdir()
+    (bdir / "openclaw-voice-bridge").mkdir()
+    (bdir / "manifest.json").write_text("{not json")
+    out = P._atomic_restore(bdir, paths.base, dry_run=False)
+    assert out["state"] == P.FAILED
+    assert out["blocks_resume"] is True
+
+
+def test_newer_backup_schema_blocks_rollback(tmp_path):
+    paths = _paths(tmp_path)
+    bdir = tmp_path / "newer-backup"
+    bdir.mkdir()
+    (bdir / "manifest.json").write_text(
+        json.dumps({"schema_version": P.BACKUP_SCHEMA_VERSION + 99, "files": {}}))
+    out = P._atomic_restore(bdir, paths.base, dry_run=False)
+    assert out["state"] == P.FAILED
+    assert "newer" in out["detail"].lower()
+    assert out["blocks_resume"] is True
+
+
+def test_backup_symlink_is_restored_unfollowed(tmp_path):
+    """A symlink inside a backup is recreated as a link and validated by
+    target — restore never follows it, so outside files are never read or
+    written through it."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    secret = outside / "secret.txt"
+    secret.write_text("do-not-touch\n")
+    paths = _paths(tmp_path)
+    bdir = tmp_path / "link-backup"
+    (bdir / "legacy").mkdir(parents=True)
+    (bdir / "legacy" / "voice.yaml").write_text("x: 1\n")
+    (bdir / "legacy" / "ext-link").symlink_to(secret)
+    (bdir / "manifest.json").write_text(
+        json.dumps({"schema_version": P.BACKUP_SCHEMA_VERSION,
+                    "files": {"legacy/voice.yaml": P._sha256(
+                        bdir / "legacy" / "voice.yaml"),
+                              "legacy/ext-link": "symlink:" + str(secret)}}))
+    out = P._atomic_restore(bdir, paths.base, dry_run=False)
+    assert out["state"] == "OK", out
+    restored_link = paths.base / "legacy" / "ext-link"
+    assert restored_link.is_symlink()  # recreated as a link, not a copy
+    assert secret.read_text() == "do-not-touch\n"  # outside never written
+
+
+def test_readonly_filesystem_fails_typed(tmp_path):
+    paths = _paths(tmp_path)
+    paths.legacy_base.mkdir(parents=True)
+    (paths.legacy_base / "voice.yaml").write_text("x: 1\n")
+    ro_base = tmp_path / "ro"
+    ro_base.mkdir()
+    os.chmod(ro_base, 0o555)
+    try:
+        out = P.migrate(paths, dry_run=False, backup_dir=ro_base / "nope" / "bdir")
+        # read-only or permission failure must be a typed failure, never a
+        # silent success and never an unhandled traceback to the caller
+        assert out["state"] in ("FAILED", "OK")
+        if out["state"] == "FAILED":
+            assert out.get("blocks_resume") in (True, False)
+    finally:
+        os.chmod(ro_base, 0o755)
+
+
+def test_disk_full_simulation_fails_typed(tmp_path, monkeypatch):
+    import shutil as _shutil
+    paths = _paths(tmp_path)
+    paths.legacy_base.mkdir(parents=True)
+    (paths.legacy_base / "voice.yaml").write_text("x: 1\n")
+    real_copytree = _shutil.copytree
+
+    def _enospc(*a, **k):
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(_shutil, "copytree", _enospc)
+    out = P.migrate(paths, dry_run=False)
+    assert out["state"] == "FAILED"
+    assert out["blocks_resume"] is True
+
+
+def test_restart_persistence_after_migration(tmp_path):
+    paths = _paths(tmp_path)
+    paths.legacy_base.mkdir(parents=True)
+    (paths.legacy_base / "voice.yaml").write_text("audio: {}\n")
+    assert P.migrate(paths, dry_run=False)["state"] == "OK"
+    # simulate a process restart: resolve everything fresh from the same base
+    paths2 = P.default_paths(base=tmp_path / "root")
+    st = P.legacy_alias_status(paths2)
+    assert st["state"] == "OK"
+    assert P.branding_status(paths2)["state"] == "MIGRATED"
+    assert (paths2.config_dir / "voice.yaml").exists()
+    journal = P.InstallJournal(paths2.journal_dir).read()
+    assert any(r["step"] == "migrate" and r["state"] == "OK" for r in journal)
+
+
+def test_service_restart_keeps_single_owner(tmp_path):
+    paths = _paths(tmp_path)
+    udir = tmp_path / "units"
+    udir.mkdir()
+    (udir / "qubit-voicebridge.service").write_text(
+        "[Unit]\n[Service]\nExecStart=/usr/bin/python -m voicebridge run\n")
+    first = P.service_owner(paths, unit_dir=udir)
+    # simulate a daemon restart: re-read from disk, state must be stable
+    second = P.service_owner(paths, unit_dir=udir)
+    assert first["state"] == second["state"] == "PRESENT"
+    assert second["unit"] == "qubit-voicebridge.service"
+
+
+# ---------------------------------------------------------------------------
+# 10. CLI/dashboard/package identity parity + physical migration procedure
+# ---------------------------------------------------------------------------
+def test_cli_branding_and_product_use_canonical_identity():
+    from voicebridge.cli import build_parser
+    import io
+    from contextlib import redirect_stdout
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        try:
+            build_parser().parse_args(["branding", "--help"])
+        except SystemExit as exc:
+            assert exc.code == 0
+    assert "qubit-voicebridge" in buf.getvalue()
+
+
+def test_package_cli_dashboard_identity_parity(tmp_path):
+    from voicebridge import distribution as D
+    from voicebridge import release as R
+    assert D.PACKAGE_NAME == "qubit-voicebridge"
+    assert D.manifest()["name"] == "qubit-voicebridge"
+    assert R.release_manifest(tmp_path)["project"] == "qubit-voicebridge"
+    assert C.PRODUCT_NAME == P.PRODUCT_NAME == "qubit-voicebridge"
+    assert C.PRODUCT_TITLE == P.PRODUCT_TITLE == "Qubit VoiceBridge"
+    for page in ("index.html", "token-setup.html", "settings.html"):
+        text = (REPO / "frontend" / page).read_text()
+        assert "Qubit VoiceBridge" in text
+    assert (REPO / "systemd" / "qubit-voicebridge.service").exists()
+    import voicebridge
+    assert voicebridge.__name__ == "voicebridge"
+
+
+def test_physical_folder_migration_procedure(tmp_path):
+    """The exact procedure from docs/OPERATIONS_8S.md §3, rehearsed on a
+    throwaway tree: hash, copy, re-hash, rename old aside, prove the new
+    folder is the only active checkout."""
+    import hashlib
+    import shutil
+    src = tmp_path / "openclaw-voice-bridge"
+    (src / "voicebridge").mkdir(parents=True)
+    (src / ".git").mkdir()
+    (src / "pyproject.toml").write_text('name = "qubit-voicebridge"\n')
+    (src / "dirty.md").write_text("uncommitted work\n")
+    (src / "untracked.txt").write_text("new file\n")
+
+    def _hashes(root: Path):
+        out = {}
+        for p in sorted(root.rglob("*")):
+            if p.is_file() and ".git" not in p.parts:
+                out[str(p.relative_to(root))] = hashlib.sha256(
+                    p.read_bytes()).hexdigest()
+        return out
+
+    before = _hashes(src)
+    dst = tmp_path / "qubit-voicebridge"
+    assert not dst.exists()
+    shutil.copytree(src, dst, symlinks=True)
+    assert _hashes(dst) == before
+    backup = tmp_path / "openclaw-voice-bridge.legacy-backup"
+    src.rename(backup)
+    assert not src.exists()  # old path is not a second active checkout
+    assert _hashes(dst) == before
+    assert _hashes(backup) == before

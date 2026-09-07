@@ -258,7 +258,7 @@ def main():
     ap.add_argument("--elapsed", default="")
     ap.add_argument("--raw", default="", help="path to raw output file OR raw text")
     ap.add_argument("--out", default="", help="output path (default stdout + state/reports)")
-    ap.add_argument("--state-dir", default="~/.local/state/openclaw-voice-bridge")
+    ap.add_argument("--state-dir", default="~/.local/state/qubit-voicebridge")
     args=ap.parse_args()
 
     raw=""

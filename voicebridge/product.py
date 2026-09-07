@@ -39,6 +39,7 @@ Design rules (all hermetic by default):
 """
 from __future__ import annotations
 
+import contextlib
 import fcntl
 import hashlib
 import json
@@ -54,14 +55,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from . import resources
+from .config import (LEGACY_NAME, LEGACY_NAME_7D, LEGACY_NAMES, PRODUCT_NAME,
+                     PRODUCT_TITLE, _xdg_base)
 
-# Canonical public identity (Packet 8S).
-PRODUCT_NAME = "qubit-voicebridge"
-PRODUCT_TITLE = "Qubit VoiceBridge"
-LEGACY_NAME = "openclaw-voice-bridge"
-# 7D intermediate installed identity; existing 7D/8K-P installs use it.
-LEGACY_NAME_7D = "qubit-voice-agent"
-LEGACY_NAMES = (LEGACY_NAME, LEGACY_NAME_7D)
+# Canonical public identity (Packet 8S) — single-sourced from
+# voicebridge.config (the centralized XDG-aware path resolver).
 PRODUCT_VERSION = "1.0.0"
 
 # Typed result states.
@@ -145,10 +143,9 @@ def platform_supported() -> Dict[str, Any]:
 
 
 def _xdg(env: str, default: str) -> Path:
-    v = os.environ.get(env, "")
-    if v:
-        return Path(v)
-    return Path("~").expanduser() / default
+    # Centralized resolver lives in voicebridge.config; kept as a thin alias
+    # so every path map resolves identically.
+    return _xdg_base(env, default)
 
 
 @dataclass(frozen=True)
@@ -409,6 +406,44 @@ class InstallJournal:
             rec.update(extra)
         with open(self.path, "a") as fh:
             fh.write(json.dumps(rec, sort_keys=True) + "\n")
+            fh.flush()
+            try:
+                os.fsync(fh.fileno())
+            except OSError:
+                pass
+        _fsync_dir(self.journal_dir)
+
+    @contextlib.contextmanager
+    def locked(self):
+        """Exclusive inter-process migration/install lock (fail closed with a
+        typed BLOCKED error when another run holds it). The lock file lives
+        in the journal dir; it is never a state tree."""
+        self._ensure()
+        lock_path = self.journal_dir / "install.lock"
+        try:
+            fh = open(lock_path, "a+")
+        except OSError as exc:
+            raise ProductError(f"cannot create migration lock: {exc}",
+                               state=BLOCKED)
+        try:
+            try:
+                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except (OSError, BlockingIOError) as exc:
+                raise ProductError(
+                    "another install/migration run holds the lock; refusing "
+                    f"concurrent migration: {exc}", state=BLOCKED)
+            try:
+                yield
+            finally:
+                try:
+                    fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+                except OSError:
+                    pass
+        finally:
+            try:
+                fh.close()
+            except OSError:
+                pass
 
     def read(self) -> List[Dict[str, Any]]:
         if not self.path.exists():
@@ -1306,10 +1341,16 @@ def _is_credential_path(p: Path) -> bool:
 
 def _write_backup_manifest(bdir: Path) -> Dict[str, Any]:
     """Write a validated backup manifest (schema version + per-file SHA-256)
-    so rollback can detect corruption, a newer schema, and tampering."""
+    so rollback can detect corruption, a newer schema, and tampering.
+    Symlinks are recorded by link target (never followed)."""
     files: Dict[str, str] = {}
     for p in sorted(bdir.rglob("*")):
-        if p.is_file() and p.name != BACKUP_MANIFEST:
+        if p.is_symlink():
+            if p.name == BACKUP_MANIFEST:
+                continue
+            files[str(p.relative_to(bdir))] = \
+                "symlink:" + os.readlink(p)
+        elif p.is_file() and p.name != BACKUP_MANIFEST:
             files[str(p.relative_to(bdir))] = _sha256(p)
     manifest = {"schema_version": BACKUP_SCHEMA_VERSION, "files": files}
     (bdir / BACKUP_MANIFEST).write_text(json.dumps(manifest, sort_keys=True))
@@ -1333,6 +1374,7 @@ def _load_backup_manifest(bdir: Path) -> Dict[str, Any]:
 
 def _backup_tree(src: Path, bdir: Path) -> List[str]:
     """Copy a legacy tree into the backup dir, excluding credential files.
+    Inner symlinks are preserved as links (never followed out of the tree).
     Returns the relative paths that were excluded."""
     excluded = []
 
@@ -1347,10 +1389,11 @@ def _backup_tree(src: Path, bdir: Path) -> List[str]:
 
     dst = bdir / src.name
     dst.parent.mkdir(parents=True, exist_ok=True)
-    if src.is_dir():
-        shutil.copytree(src, dst, dirs_exist_ok=True, ignore=_ignore)
+    if src.is_dir() and not src.is_symlink():
+        shutil.copytree(src, dst, symlinks=True, dirs_exist_ok=True,
+                        ignore=_ignore)
     else:
-        shutil.copy2(src, dst)
+        shutil.copy2(src, dst, follow_symlinks=False)
     return excluded
 
 
@@ -1393,25 +1436,73 @@ def migrate(paths: Optional[ProductPaths] = None, *,
     run_id = uuid.uuid4().hex[:12]
     alias = legacy_alias_status(paths)
     real = [p for p in alias["pairs"] if p["state"] == "REAL_DIR"]
-    if not real:
-        resumed = _resume_missing_aliases(paths, j, run_id)
-        if resumed:
-            return {"state": "OK", "run_id": run_id, "moved": [],
-                    "resumed": resumed, "backup_dir": None,
-                    "detail": "migration resumed; compat aliases completed"}
-        return {"state": "FRESH", "run_id": run_id,
-                "detail": "no legacy openclaw-voice-bridge/qubit-voice-agent "
-                          "directories to migrate (all pairs are absent or "
-                          "already aliased)",
-                "pairs": alias["pairs"], "moved": [], "backup_dir": None}
     bdir = Path(backup_dir) if backup_dir else \
         (paths.backup_dir / f"migration-{run_id}")
     if dry_run:
+        if not real:
+            return {"state": "FRESH", "run_id": run_id,
+                    "detail": "no legacy openclaw-voice-bridge/qubit-voice-agent "
+                              "directories to migrate (all pairs are absent or "
+                              "already aliased)",
+                    "pairs": alias["pairs"], "moved": [], "backup_dir": None}
         return {"state": "READY", "run_id": run_id,
                 "detail": f"would back up {len(real)} legacy directory(s) to "
                           f"{bdir} (credentials excluded), move them to the "
-                          f"canonical paths, and create compat aliases",
+                          "canonical paths, and create compat aliases",
                 "legacy": real, "backup_dir": str(bdir), "pairs": alias["pairs"]}
+    with _migration_lock_ctx(j) as lock_err:
+        if lock_err is not None:
+            return {"state": BLOCKED, "run_id": run_id,
+                    "detail": str(lock_err),
+                    "moved": [], "backup_dir": None,
+                    "blocks_resume": False}
+        if not real:
+            resumed = _resume_missing_aliases(paths, j, run_id)
+            if resumed:
+                return {"state": "OK", "run_id": run_id, "moved": [],
+                        "resumed": resumed, "backup_dir": None,
+                        "detail": "migration resumed; compat aliases completed"}
+            return {"state": "FRESH", "run_id": run_id,
+                    "detail": "no legacy openclaw-voice-bridge/qubit-voice-agent "
+                              "directories to migrate (all pairs are absent or "
+                              "already aliased)",
+                    "pairs": alias["pairs"], "moved": [], "backup_dir": None}
+        return _migrate_apply(paths, j, run_id, real, bdir)
+
+
+@contextlib.contextmanager
+def _migration_lock_ctx(j: InstallJournal):
+    """Yield None while holding the journal lock; yield the ProductError when
+    the lock is held elsewhere (typed BLOCKED instead of an exception)."""
+    try:
+        with j.locked():
+            yield None
+    except ProductError as exc:
+        yield exc
+
+
+def _migrate_apply(paths: ProductPaths, j: InstallJournal, run_id: str,
+                   real: List[Dict[str, Any]], bdir: Path) -> Dict[str, Any]:
+    """Locked legacy -> canonical move (backup, merge-or-rename, alias).
+
+    Fail-closed: unsafe symlinks, path traversal, and a backup directory
+    inside a migration source are rejected before anything moves."""
+    try:
+        bdir_outside = bdir.resolve()
+    except OSError:
+        bdir_outside = bdir
+    for pair in real:
+        try:
+            if bdir_outside == Path(pair["legacy"]).resolve() or \
+                    bdir_outside.is_relative_to(Path(pair["legacy"]).resolve()):
+                return {"state": "FAILED", "run_id": run_id,
+                        "detail": f"backup directory {bdir} lives inside the "
+                                  f"migration source {pair['legacy']}; refusing "
+                                  f"to move a tree into itself",
+                        "moved": [], "backup_dir": str(bdir),
+                        "blocks_resume": False}
+        except OSError:
+            pass
     j.append(run_id, "migrate", "OK", "start")
     moved = []
     excluded = []
@@ -1420,14 +1511,20 @@ def migrate(paths: Optional[ProductPaths] = None, *,
         canonical = Path(pair["canonical"])
         name = legacy.name
         try:
+            if legacy.is_symlink():
+                raise OSError(f"unsafe symlink at migration source {legacy} "
+                              f"-> {os.readlink(legacy)}; refusing to follow "
+                              f"it (repair the alias first)")
             excluded += _backup_tree(legacy, bdir)
             j.append(run_id, f"backup.{name}", "OK",
                      f"backed up to {bdir / legacy.name}")
             canonical.parent.mkdir(parents=True, exist_ok=True)
             if canonical.exists():
                 # canonical already has content: copy legacy in, then drop the
-                # legacy real dir before aliasing (never two live trees)
-                shutil.copytree(legacy, canonical, dirs_exist_ok=True)
+                # legacy real dir before aliasing (never two live trees).
+                # Inner symlinks are preserved as links, never followed out.
+                shutil.copytree(legacy, canonical, symlinks=True,
+                                dirs_exist_ok=True)
                 shutil.rmtree(legacy)
             else:
                 legacy.rename(canonical)
@@ -1476,8 +1573,17 @@ def _atomic_restore(bdir: Path, root: Path, *,
                 "paths": [], "restored": [], "blocks_resume": True}
     entries = []
     for p in sorted(bdir.rglob("*")):
-        if p.is_file() and p.name != BACKUP_MANIFEST:
+        if p.name == BACKUP_MANIFEST:
+            continue
+        if p.is_symlink() or p.is_file():
             rel = p.relative_to(bdir)
+            # path-traversal guard: backup entries must stay inside the root
+            if ".." in rel.parts or rel.is_absolute():
+                return {"state": FAILED,
+                        "detail": f"backup entry escapes the restore root: "
+                                  f"{rel}; refusing to restore",
+                        "paths": [str(rel)], "restored": [],
+                        "blocks_resume": True}
             entries.append((p, root / rel, rel))
     if not entries:
         return {"state": MISSING,
@@ -1501,7 +1607,12 @@ def _atomic_restore(bdir: Path, root: Path, *,
             s = staging / rel
             try:
                 s.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, s)
+                if src.is_symlink():
+                    if s.exists() or s.is_symlink():
+                        s.unlink()
+                    s.symlink_to(os.readlink(src))
+                else:
+                    shutil.copy2(src, s)
             except OSError as exc:
                 return {"state": FAILED,
                         "detail": f"staging failed for {rel}: {exc} (read-only "
@@ -1509,12 +1620,15 @@ def _atomic_restore(bdir: Path, root: Path, *,
                         "paths": [str(target)], "restored": [],
                         "blocks_resume": True}
             exp = manifest.get("files", {}).get(str(rel))
-            if exp and _sha256(s).lower() != str(exp).lower():
-                return {"state": FAILED,
-                        "detail": f"corrupted backup file {rel}: sha256 "
-                                  f"mismatch",
-                        "paths": [str(target)], "restored": [],
-                        "blocks_resume": True}
+            if exp:
+                actual = ("symlink:" + os.readlink(s)) if s.is_symlink() \
+                    else _sha256(s)
+                if actual.lower() != str(exp).lower():
+                    return {"state": FAILED,
+                            "detail": f"corrupted backup file {rel}: sha256 "
+                                      f"mismatch",
+                            "paths": [str(target)], "restored": [],
+                            "blocks_resume": True}
             _fsync_file(s)
             staged.append((s, target, rel))
         _fsync_dir(staging)
@@ -1558,6 +1672,19 @@ def migrate_rollback(paths: Optional[ProductPaths] = None, *,
                 "aliases": [str(legacy) for legacy, _ in _legacy_pairs(paths)
                             if legacy.is_symlink()],
                 "restored": []}
+    journal = InstallJournal(paths.journal_dir)
+    with _migration_lock_ctx(journal) as lock_err:
+        if lock_err is not None:
+            return {"state": BLOCKED,
+                    "detail": str(lock_err),
+                    "paths": [], "restored": [],
+                    "blocks_resume": False}
+        return _migrate_rollback_apply(paths, bdir)
+
+
+def _migrate_rollback_apply(paths: ProductPaths,
+                            bdir: Optional[Path]) -> Dict[str, Any]:
+    """Locked rollback body (see migrate_rollback)."""
     restored = []
     failed = []
     for legacy, canonical in _legacy_pairs(paths):

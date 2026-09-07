@@ -4,7 +4,7 @@ from __future__ import annotations
 import json, sys, time, urllib.request
 from pathlib import Path
 
-CACHE_DIR = Path.home() / ".cache" / "openclaw-voice-bridge" / "inboxes"
+CACHE_DIR = Path.home() / ".cache" / "qubit-voicebridge" / "inboxes"
 CACHE_FILE = CACHE_DIR / "tiktok.json"
 CACHE_TTL_S = 300
 CDP = "http://127.0.0.1:9222"

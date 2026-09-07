@@ -2,12 +2,19 @@
 
 Load order:
   1. defaults (this module)
-  2. YAML file at ~/.config/openclaw-voice-bridge/voice.yaml (or $VOICE_BRIDGE_CONFIG)
+  2. YAML file at ~/.config/qubit-voicebridge/voice.yaml (or $VOICE_BRIDGE_CONFIG)
   3. environment overrides: VOICE_BRIDGE__SECTION__KEY (double underscores nest;
      single "_" inside a segment stays part of the key, e.g.
      VOICE_BRIDGE__INTENT__LOCAL_LLM__MODEL -> intent.local_llm.model).
      Legacy VOICE_BRIDGE_SECTION_KEY form still works but cannot reach keys
      that contain underscores.
+
+This module is the single centralized home of the product identity and the
+XDG-aware path resolver (Packet 8S): every caller (Config, CLI, install /
+migrate flows) resolves canonical config/state/data/cache paths from here.
+Legacy ``openclaw-voice-bridge`` / ``qubit-voice-agent`` locations are only
+ever READ through explicit compatibility detection
+(:func:`detect_legacy_configs`); nothing writes to a legacy path.
 
 All sections map 1:1 to the example config in config/voice.example.yaml.
 """
@@ -17,13 +24,111 @@ import copy
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
 
-DEFAULT_CONFIG_PATH = Path("~/.config/openclaw-voice-bridge/voice.yaml").expanduser()
-DEFAULT_STATE_DIR = Path("~/.local/state/openclaw-voice-bridge").expanduser()
-DEFAULT_DATA_DIR = Path("~/.local/share/openclaw-voice-bridge").expanduser()
+# ---------------------------------------------------------------------------
+# Canonical product identity (Packet 8S). The internal import package stays
+# ``voicebridge``; the two legacy names are compatibility-only.
+# ---------------------------------------------------------------------------
+PRODUCT_NAME = "qubit-voicebridge"
+PRODUCT_TITLE = "Qubit VoiceBridge"
+LEGACY_NAME = "openclaw-voice-bridge"
+LEGACY_NAME_7D = "qubit-voice-agent"
+LEGACY_NAMES = (LEGACY_NAME, LEGACY_NAME_7D)
+_LEGACY_CONFIG_FILES = ("voice.yaml",)
+
+
+def _xdg_base(env: str, default: str) -> Path:
+    """XDG-aware base directory: honored env var wins (whitespace ignored),
+    otherwise ``~/<default>``. Never returns ``.``."""
+    raw = os.environ.get(env, "")
+    if raw is not None and str(raw).strip():
+        return Path(str(raw).strip()).expanduser()
+    return Path("~").expanduser() / default
+
+
+def canonical_config_dir() -> Path:
+    return _xdg_base("XDG_CONFIG_HOME", ".config") / PRODUCT_NAME
+
+
+def canonical_state_dir() -> Path:
+    return _xdg_base("XDG_STATE_HOME", ".local/state") / PRODUCT_NAME
+
+
+def canonical_data_dir() -> Path:
+    return _xdg_base("XDG_DATA_HOME", ".local/share") / PRODUCT_NAME
+
+
+def canonical_cache_dir() -> Path:
+    return _xdg_base("XDG_CACHE_HOME", ".cache") / PRODUCT_NAME
+
+
+def canonical_config_path() -> Path:
+    return canonical_config_dir() / "voice.yaml"
+
+
+DEFAULT_CONFIG_PATH = canonical_config_path()
+DEFAULT_STATE_DIR = canonical_state_dir()
+DEFAULT_DATA_DIR = canonical_data_dir()
+
+
+def resolve_config_path(path: Optional[Path | str] = None) -> Path:
+    """Resolve the effective config file path without touching the fs.
+
+    Precedence: explicit ``path`` > non-empty ``VOICE_BRIDGE_CONFIG`` >
+    canonical default. An empty/whitespace ``VOICE_BRIDGE_CONFIG`` safely
+    falls back to the canonical default (never ``.``). A path that exists
+    as a directory fails closed with ``ValueError`` (never a bare
+    ``IsADirectoryError`` from a later ``open``)."""
+    if path is not None:
+        text = str(path).strip()
+        if not text:
+            return canonical_config_path()
+        candidate = Path(text).expanduser()
+    else:
+        raw = os.environ.get("VOICE_BRIDGE_CONFIG", "")
+        if raw is None or not str(raw).strip():
+            return canonical_config_path()
+        candidate = Path(str(raw).strip()).expanduser()
+    if candidate.exists() and candidate.is_dir():
+        raise ValueError(
+            f"config path is a directory, refusing to read it as a file: "
+            f"{candidate}")
+    return candidate
+
+
+def detect_legacy_configs() -> List[Dict[str, Any]]:
+    """Explicit compatibility detection for legacy config locations.
+
+    Read-only: only reports which legacy ``voice.yaml`` files exist and
+    whether each legacy directory is a real directory, a healthy compat
+    alias, or a mismatched alias. Never creates, moves, or writes anything.
+    The only sanctioned READ of a legacy file goes through this record
+    (:meth:`Config.load`); writes always target the canonical path."""
+    out: List[Dict[str, Any]] = []
+    for family in LEGACY_NAMES:
+        legacy_dir = _xdg_base("XDG_CONFIG_HOME", ".config") / family
+        rec: Dict[str, Any] = {"family": family, "dir": str(legacy_dir)}
+        if not legacy_dir.exists() and not legacy_dir.is_symlink():
+            rec["state"] = "ABSENT"
+        elif legacy_dir.is_symlink():
+            target = os.path.realpath(legacy_dir)
+            rec["resolves"] = target
+            rec["state"] = ("ALIAS_OK" if target == str(canonical_config_dir())
+                            else "ALIAS_MISMATCH")
+        else:
+            rec["state"] = "REAL_DIR"
+        for name in _LEGACY_CONFIG_FILES:
+            cand = legacy_dir / name
+            try:
+                if cand.is_file():
+                    rec.setdefault("files", []).append(str(cand))
+            except OSError:
+                continue
+        out.append(rec)
+    return out
 
 DEFAULTS: Dict[str, Any] = {
     "audio": {
@@ -163,7 +268,7 @@ DEFAULTS: Dict[str, Any] = {
         "ollama_model": "qubit-brain4",
         "classify_timeout_s": 8.0,
         "conversation_backend": "local",
-        "templates_path": "~/.config/openclaw-voice-bridge/task-templates.yaml",  # daily-task templates (spoken phrase -> known task)    # bridge IS the voice: local model answers ALL chat instantly
+        "templates_path": "~/.config/qubit-voicebridge/task-templates.yaml",  # daily-task templates (spoken phrase -> known task)    # bridge IS the voice: local model answers ALL chat instantly
                                     # (chitchat + questions). Only TASKS go through OpenClaw/Hermes.
                                     # deepseek/perplexity = last-resort fallbacks
         # Hybrid local LLM: tiny 3-4B answers SHORT conversational turns locally
@@ -370,6 +475,7 @@ def _env_overrides() -> Dict[str, Any]:
 class Config:
     data: Dict[str, Any]
     path: Optional[Path] = None
+    legacy_source: Optional[str] = None
 
     # --- helpers ---
     def section(self, name: str) -> Dict[str, Any]:
@@ -385,15 +491,32 @@ class Config:
 
     @classmethod
     def load(cls, path: Optional[Path] = None) -> "Config":
-        cfg_path = Path(path) if path else Path(
-            os.environ.get("VOICE_BRIDGE_CONFIG", DEFAULT_CONFIG_PATH))
+        cfg_path = resolve_config_path(path)
         data = deep_merge(DEFAULTS, {})
-        if cfg_path.exists():
+        legacy_source: Optional[str] = None
+        if cfg_path.exists() and cfg_path.is_file():
             with open(cfg_path) as fh:
                 loaded = yaml.safe_load(fh) or {}
             data = deep_merge(data, loaded)
+        elif path is None and not cfg_path.exists():
+            # Explicit compatibility read: canonical absent, so consult the
+            # detected legacy locations (read-only). Writes still target the
+            # canonical path — legacy paths are never written after migration.
+            for rec in detect_legacy_configs():
+                for cand in rec.get("files", []):
+                    try:
+                        with open(cand) as fh:
+                            loaded = yaml.safe_load(fh) or {}
+                    except OSError:
+                        continue
+                    data = deep_merge(data, loaded)
+                    legacy_source = cand
+                    break
+                if legacy_source is not None:
+                    break
         data = deep_merge(data, _env_overrides())
-        return cls(data=data, path=cfg_path if cfg_path.exists() else None)
+        return cls(data=data, path=cfg_path if cfg_path.exists() else None,
+                   legacy_source=legacy_source)
 
     # --- resolved paths ---
     def state_dir(self) -> Path:

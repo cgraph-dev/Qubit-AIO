@@ -312,7 +312,7 @@ def clean_install_required_steps(cfg: Any) -> List[str]:
     return [
         "python >= 3.11 venv installed from pyproject.toml",
         "declared deps only (check_clean_imports / clean_venv_check --check)",
-        "config present at ~/.config/openclaw-voice-bridge/voice.yaml",
+        "config present at ~/.config/qubit-voicebridge/voice.yaml",
         "model artifact pulled: qubit-brain4 (digest recorded by doctor)",
         "piper voice downloaded under model_dir",
         "systemd user unit rendered with machine overrides preserved",

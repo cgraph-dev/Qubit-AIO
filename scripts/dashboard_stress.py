@@ -26,9 +26,9 @@ import wave
 from pathlib import Path
 
 HOME = Path.home()
-STATE = HOME / ".local/state/openclaw-voice-bridge"
+STATE = HOME / ".local/state/qubit-voicebridge"
 EVENTS = STATE / "events.jsonl"
-BRIDGE_UNIT = "openclaw-voice-bridge.service"
+BRIDGE_UNIT = "qubit-voicebridge.service"
 
 
 # --------------------------------------------------------------------- utils
@@ -394,7 +394,7 @@ def main() -> int:  # pragma: no cover
     ap.add_argument("--allow-restart", action="store_true",
                     help="Packet 7A: enable implicit bridge/model restarts "
                          "(default is MONITOR-ONLY — restarts are prohibited)")
-    ap.add_argument("--wav", default=str(Path("/tmp/openclaw-voice-bridge/stress-probe.wav")))
+    ap.add_argument("--wav", default=str(Path("/tmp/qubit-voicebridge/stress-probe.wav")))
     args = ap.parse_args()
     wav = _ensure_probe_wav(args.wav)
     if args.watch:

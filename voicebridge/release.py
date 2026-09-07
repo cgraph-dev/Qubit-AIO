@@ -220,7 +220,7 @@ DEVICE_TOKEN_SHAPES = (re.compile(r"\bScarlett\b|\bHyperX\b|\bAT2020\b"),)
 # personalization, not core portable dependencies; the certification records
 # them as a separate typed category. `voicebridge/local/actions.py` is NOT on
 # this list since Packet 8K removed personal launcher targets from it — they
-# moved to the operator-local override ~/.config/openclaw-voice-bridge/
+# moved to the operator-local override ~/.config/qubit-voicebridge/
 # local-actions.yaml, outside the repository.
 PERSONALIZATION_FILES = (
     "config/task-templates.yaml",

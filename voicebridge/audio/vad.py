@@ -145,10 +145,17 @@ def _make_vad_gate(backend: str, aggressiveness: int,
 
 
 def _default_silero_model() -> Path:
-    cand = Path.home() / ".local/share/openclaw-voice-bridge/models/silero_vad_v5.onnx"
-    if not cand.exists():
-        raise FileNotFoundError(f"silero_vad_v5.onnx not found at {cand}")
-    return cand
+    from ..config import canonical_data_dir
+    candidates = [
+        canonical_data_dir() / "models" / "silero_vad_v5.onnx",
+        Path.home() / ".local/share/qubit-voice-agent/models/silero_vad_v5.onnx",
+        Path.home() / ".local/share/openclaw-voice-bridge/models/silero_vad_v5.onnx",
+    ]
+    for cand in candidates:
+        if cand.exists():
+            return cand
+    raise FileNotFoundError(
+        f"silero_vad_v5.onnx not found at {candidates[0]}")
 
 
 @dataclass

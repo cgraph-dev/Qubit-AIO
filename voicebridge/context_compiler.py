@@ -33,6 +33,8 @@ ACTIVE_MAX_CHARS = 1600
 RECALL_MAX_CHARS = 1200
 
 _CORE_FACTS_CANDIDATES = (
+    "~/.config/qubit-voicebridge/personal-knowledge.md",
+    "~/.config/qubit-voice-agent/personal-knowledge.md",
     "~/.config/openclaw-voice-bridge/personal-knowledge.md",
 )
 

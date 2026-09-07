@@ -7,7 +7,7 @@ every time — deterministic, instant, zero tokens — and the local model
 stays free for actual conversation.
 
 Template file: config/task-templates.yaml (installed to
-~/.config/openclaw-voice-bridge/task-templates.yaml). Format:
+~/.config/qubit-voicebridge/task-templates.yaml). Format:
 
     templates:
       - name: check-projects-status

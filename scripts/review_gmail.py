@@ -4,7 +4,7 @@ from __future__ import annotations
 import json, os, sys, subprocess, time
 from pathlib import Path
 
-CACHE_DIR = Path.home() / ".cache" / "openclaw-voice-bridge" / "inboxes"
+CACHE_DIR = Path.home() / ".cache" / "qubit-voicebridge" / "inboxes"
 CACHE_FILE = CACHE_DIR / "gmail.json"
 CACHE_TTL_S = 300  # 5 min fresh
 HIMALAYA = os.path.expanduser("~/.local/bin/himalaya")

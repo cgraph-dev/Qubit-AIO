@@ -46,7 +46,7 @@ def main() -> int:
     from voicebridge.tts.piper import PiperTTS
     tts = PiperTTS(model_dir=cfg.model_dir(), voice=cfg.get("tts", "voice", default="en_US-amy-medium"))
     tts.load()
-    wav = tts.synthesize(sample, Path("/tmp/openclaw-voice-bridge/roundtrip-sample.wav"))
+    wav = tts.synthesize(sample, Path("/tmp/qubit-voicebridge/roundtrip-sample.wav"))
     stage("   ", f"     -> {wav} ({wav.stat().st_size} bytes)")
     t_syn = time.time()
 
@@ -97,7 +97,7 @@ def main() -> int:
     t_dispatch = time.time()
 
     stage("5/6", "spoken summary rendered by piper")
-    final = tts.synthesize("Round trip complete.", Path("/tmp/openclaw-voice-bridge/roundtrip-final.wav"))
+    final = tts.synthesize("Round trip complete.", Path("/tmp/qubit-voicebridge/roundtrip-final.wav"))
     print(f"      -> {final}")
 
     stage("6/6", "checking event journal for the full pipeline")

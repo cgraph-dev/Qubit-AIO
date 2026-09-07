@@ -4,7 +4,7 @@ from __future__ import annotations
 import json, sys, subprocess, time
 from pathlib import Path
 
-CACHE_DIR = Path.home() / ".cache" / "openclaw-voice-bridge" / "inboxes"
+CACHE_DIR = Path.home() / ".cache" / "qubit-voicebridge" / "inboxes"
 CACHE_FILE = CACHE_DIR / "messenger.json"
 CACHE_TTL_S = 300
 VENV_PY = sys.executable  # portable: the bridge venv python invokes this script
