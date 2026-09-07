@@ -51,11 +51,23 @@ MAX_WORKDIR_BYTES = 100 * 1024 * 1024
 # Child-process resource ceilings enforced with setrlimit in preexec.
 RLIMIT_AS_BYTES = 4 * 1024 * 1024 * 1024
 RLIMIT_FSIZE_BYTES = 512 * 1024 * 1024
-RLIMIT_NPROC = 128
+# Process-count headroom over the live owner-process count. Applied INSIDE
+# the sandbox (prlimit) rather than preexec: capping NPROC before user-
+# namespace creation breaks the setup itself on busy machines (observed
+# EAGAIN). Floor keeps hermetic determinism on quiet machines.
+RLIMIT_NPROC_MARGIN = 128
+RLIMIT_NPROC_FLOOR = 512
 RLIMIT_NOFILE = 256
 
 # Orphaned disposable-worktree sweep age (bases older than this are reaped).
 ORPHAN_MAX_AGE_S = 7200.0
+
+# Fixed safe PATH for every OpenCode child. The parent PATH is NEVER copied:
+# it may contain personal directories, OpenCode directories, writable
+# locations, or other user-controlled entries that would let a malicious or
+# compromised binary resolution escape supervision. Both directories are
+# root-owned system locations present inside the confinement sandbox.
+SAFE_PATH = "/usr/bin:/bin"
 
 # Directories that can never be a project root or workdir.
 _SECRET_DIR_NAMES = frozenset({

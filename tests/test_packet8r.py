@@ -519,8 +519,7 @@ def test_child_env_sanitized(tmp_path, monkeypatch):
     assert set(env) <= set(OC._SAFE_ENV_ALLOW)
 
 
-def test_env_allowlist_forbids_dangerous_names():
-    # The allowlist is fixed: none of these may ever be copied, and there is
+def test_env_allowlist_forbids_dangerous_names():    # The allowlist is fixed: none of these may ever be copied, and there is
     # no knob to add them. This pins the invariant even for names that cannot
     # be safely set in a live test process (LD_PRELOAD, GIT_DIR, ...).
     forbidden = ("HOME", "PYTHONPATH", "LD_PRELOAD", "BASH_ENV", "ENV",
@@ -1283,3 +1282,131 @@ def test_voice_runtime_not_wired():
                           capture_output=True, text=True, timeout=120)
     assert proc.returncode == 0, proc.stderr[:500]
     assert proc.stdout.strip() == "False"
+
+
+# ---------------------------------------------------------------------------
+# Fixed PATH + filesystem confinement (Bubblewrap boundary)
+# ---------------------------------------------------------------------------
+
+def test_malicious_parent_path_never_inherited(tmp_path, monkeypatch):
+    evil = tmp_path / "evil-bin"
+    evil.mkdir()
+    monkeypatch.setenv(
+        "PATH", f"{evil}:{tmp_path}/.opencode/bin:/tmp/writable:/usr/bin:/bin")
+    env = OC.sanitized_env()
+    assert env["PATH"] == OC.SAFE_PATH == "/usr/bin:/bin"
+    assert "evil-bin" not in env["PATH"]
+    assert ".opencode" not in env["PATH"]
+
+
+def _confinement_here():
+    ok, _, _ = OC.confinement_available()
+    return ok
+
+
+def test_confinement_argv_shape():
+    if not _confinement_here():
+        pytest.skip("bubblewrap confinement unavailable on this platform")
+    inner = OC.build_argv("/bin/true", Path("/tmp/wt"), "Do work")
+    argv = OC.build_confinement_argv(
+        "/usr/bin/bwrap", "/bin/true", Path("/tmp/wt"), inner,
+        {"PATH": OC.SAFE_PATH})
+    assert argv[0] == "/usr/bin/bwrap"
+    assert "--unshare-net" not in argv  # network retained for providers
+    assert "--ro-bind" in argv and "/usr" in argv
+    assert "--tmpfs" in argv and "/tmp" in argv
+    assert OC.CONFINED_HOME in argv
+    tail = argv[argv.index("--") + 1:]
+    # prlimit applies the process-count cap INSIDE the sandbox (capping
+    # NPROC before namespace creation breaks the setup itself).
+    assert tail[0] == "prlimit"
+    assert tail[1].startswith("--nproc=")
+    assert tail[2] == "--"
+    assert tail[3:] == ["/opencode-bin", "run", "--format", "json",
+                        "--dir", "/tmp/wt", "Do work"]
+    assert "--auto" not in tail and "serve" not in tail
+    joined = " ".join(argv)
+    assert os.path.expanduser("~") not in joined
+
+
+def test_confinement_blocks_outside_writes(tmp_path):
+    if not _confinement_here():
+        pytest.skip("bubblewrap confinement unavailable on this platform")
+    # Escape attempts use HOST-absolute paths. Anything the child writes
+    # outside the bound workdir lands in sandbox-local storage (private
+    # tmpfs, discarded at exit) — so the assertions that matter are
+    # HOST-side: no host file may appear, and the intended workdir write
+    # must succeed. (In-sandbox "success" of a contained write is
+    # meaningless; only host truth counts.)
+    home_probe = tmp_path / "home-hit.txt"
+    checkout = tmp_path / "other-checkout"
+    checkout.mkdir()
+    workdir = tmp_path / "wt"
+    workdir.mkdir()
+    # NOTE: the probe script must live INSIDE the bound workdir — the sandbox
+    # sees nothing else, which is exactly the property under test.
+    script = workdir / "probe.sh"
+    script.write_text(
+        "#!/bin/sh\n"
+        "touch ok-inside.txt && echo WT-OK\n"
+        f"touch {home_probe} 2>/dev/null; echo HOME-ATTEMPTED\n"
+        f"touch {checkout}/x 2>/dev/null; echo CHECKOUT-ATTEMPTED\n"
+        "touch /tmp/escape.txt 2>/dev/null; echo TMP-ATTEMPTED\n"
+        "touch /etc/vb-probe 2>/dev/null; echo ETC-ATTEMPTED\n"
+        "touch /root/vb-probe 2>/dev/null; echo ROOT-ATTEMPTED\n")
+    script.chmod(0o700)
+    out = OC.real_run_opencode(
+        [str(script)], workdir, {"PATH": OC.SAFE_PATH}, 30.0)
+    assert out["state"] == "OK", out
+    assert "WT-OK" in out["stdout"]
+    # Host-side truth: nothing escaped the sandbox.
+    assert (workdir / "ok-inside.txt").exists()
+    assert not home_probe.exists()
+    assert list(checkout.iterdir()) == []
+    assert not Path("/tmp/escape.txt").exists()
+    assert not Path("/etc/vb-probe").exists()
+
+
+def test_confinement_minimal_visible_surface(tmp_path):
+    if not _confinement_here():
+        pytest.skip("bubblewrap confinement unavailable on this platform")
+    workdir = tmp_path / "wt"
+    workdir.mkdir()
+    script = workdir / "inv.sh"
+    script.write_text(
+        "#!/bin/sh\n"
+        "echo \"--- root:\"; ls / | sort | tr '\\n' ' '; echo\n"
+        "echo \"--- etc:\"; ls /etc 2>/dev/null | sort | tr '\\n' ' '; echo\n"
+        "echo \"--- home:\"; ls -A \"$HOME\" 2>/dev/null | tr '\\n' ' '; echo\n"
+        "echo \"--- home-val: $HOME\"\n"
+        "test -e /root/.ssh && echo SSH-VISIBLE || echo SSH-ABSENT\n"
+        "test -e /home/trick/.opencode && echo CONFIG-VISIBLE || echo CONFIG-ABSENT\n")
+    script.chmod(0o700)
+    out = OC.real_run_opencode(
+        [str(script)], workdir, {"PATH": OC.SAFE_PATH}, 30.0)
+    assert out["state"] == "OK", out
+    text = out["stdout"]
+    assert "SSH-ABSENT" in text
+    assert "CONFIG-ABSENT" in text
+    assert f"home-val: {OC.CONFINED_HOME}" in text
+    for secret in ("passwd", "shadow", "ssh", "gpg", "opencode"):
+        assert secret not in text.split("--- etc:")[1].split("--- home:")[0]
+
+
+def test_confinement_unavailable_disables_live(tmp_path, monkeypatch):
+    import voicebridge.opencode.confinement as _C
+    monkeypatch.setattr(_C, "confinement_available",
+                        lambda: (False, "", "no userns here"))
+    out = OC.real_run_opencode(
+        ["/bin/true"], tmp_path, {"PATH": OC.SAFE_PATH}, 10.0)
+    assert out["state"] == "failed"
+    assert out["code"] == "CONFINEMENT_UNAVAILABLE"
+
+
+def test_confined_run_end_to_end_fail_closed(tmp_path):
+    if not _confinement_here():
+        pytest.skip("bubblewrap confinement unavailable on this platform")
+    runner = _runner(tmp_path)
+    root = _project(tmp_path)
+    out = _full(runner, root)
+    assert out["state"] == "OK"  # fake transport; confinement applies live

@@ -49,6 +49,10 @@ Invariants enforced here (each has a test in tests/test_packet8r.py):
   high-impact even under a power profile and always needs a fresh human
   confirmation bound to the exact action hash. Non-disposable (in-project)
   writes additionally require a prior ``preview`` hash (``expected_hash``).
+- Live children run confined (``confinement`` module: Bubblewrap ro-system,
+  private /tmp+HOME, approved workdir read-write; network retained for
+  provider calls). No confinement on the platform means no live execution
+  (typed ``CONFINEMENT_UNAVAILABLE``), never an unconfined run.
 - Never auto-commit, push, publish, install dependencies, alter services or
   permissions, access accounts, delete files, or run arbitrary shell. The
   executor argv is exactly ``[binary, run, --format, json, --dir, workdir,
@@ -82,7 +86,9 @@ from .policy import (
     RLIMIT_AS_BYTES,
     RLIMIT_FSIZE_BYTES,
     RLIMIT_NOFILE,
-    RLIMIT_NPROC,
+    RLIMIT_NPROC_FLOOR,
+    RLIMIT_NPROC_MARGIN,
+    SAFE_PATH,
     OpenCodeError,
     _ALLOWED_FLAGS,
     _FORBIDDEN_TOKENS,
@@ -95,6 +101,13 @@ from .policy import (
     flag_untrusted,
     load_task_text,
     resolve_project_root,
+)
+from .confinement import (
+    BWRAP_BINARY_DEST,
+    CONFINED_HOME,
+    build_confinement_argv,
+    confinement_available,
+    find_confinement_binary,
 )
 from .runner import OpenCodeRunner, opencode_runner, request_coding_run
 from .runs import (
@@ -138,6 +151,8 @@ from .workdir import (
 __all__ = [
     "ACT_PLAN",
     "ACT_RUN",
+    "BWRAP_BINARY_DEST",
+    "CONFINED_HOME",
     "DEFAULT_BINARY",
     "DEFAULT_TIMEOUT_S",
     "MAX_DIFFSTAT_LINES",
@@ -154,7 +169,9 @@ __all__ = [
     "RLIMIT_AS_BYTES",
     "RLIMIT_FSIZE_BYTES",
     "RLIMIT_NOFILE",
-    "RLIMIT_NPROC",
+    "RLIMIT_NPROC_FLOOR",
+    "RLIMIT_NPROC_MARGIN",
+    "SAFE_PATH",
     "OpenCodeError",
     "OpenCodeRunner",
     "RunOpencode",
@@ -188,6 +205,9 @@ __all__ = [
     "_validate_workdir",
     "_write_state",
     "build_argv",
+    "build_confinement_argv",
+    "confinement_available",
+    "find_confinement_binary",
     "flag_untrusted",
     "load_task_text",
     "opencode_action_specs",

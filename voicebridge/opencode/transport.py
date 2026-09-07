@@ -17,7 +17,8 @@ from .policy import (
     RLIMIT_AS_BYTES,
     RLIMIT_FSIZE_BYTES,
     RLIMIT_NOFILE,
-    RLIMIT_NPROC,
+    RLIMIT_NPROC_MARGIN,
+    SAFE_PATH,
     OpenCodeError,
     _FORBIDDEN_TOKENS,
     _RUN_SUBCOMMAND,
@@ -37,12 +38,19 @@ _SAFE_ENV_ALLOW = ("PATH", "LANG", "LC_ALL", "LC_MESSAGES", "TZ")
 
 
 def sanitized_env() -> Dict[str, str]:
-    """Build the minimal child environment (never inherits secrets)."""
+    """Build the minimal child environment (never inherits secrets).
+
+    PATH is the fixed SAFE_PATH constant — the parent PATH is never copied,
+    so personal, writable, or attacker-controlled directories can never
+    influence binary resolution inside the child.
+    """
     env: Dict[str, str] = {}
     for name in _SAFE_ENV_ALLOW:
+        if name == "PATH":
+            continue
         if name in os.environ:
             env[name] = os.environ[name]
-    env.setdefault("PATH", "/usr/bin:/bin")
+    env["PATH"] = SAFE_PATH
     return env
 
 
@@ -70,22 +78,44 @@ RunOpencode = Callable[[List[str], Path, Dict[str, str], float],
 
 def real_run_opencode(argv: List[str], workdir: Path, env: Dict[str, str],
                       timeout_s: float) -> Dict[str, Any]:
-    """Run the pinned binary one-shot; kill/reap on timeout; never shell.
+    """Run the pinned binary one-shot, confined; kill/reap on timeout.
 
-    The child is confined with setrlimit CPU/AS/FSIZE/NPROC/NOFILE ceilings
-    in preexec (plus its own process group for kill/reap). No shell, no
-    server argv, bounded output.
+    The child ALWAYS runs inside the Bubblewrap filesystem boundary (ro
+    system, private /tmp+HOME, approved workdir read-write). If confinement
+    cannot be established, no process is spawned and a typed
+    CONFINEMENT_UNAVAILABLE failure is returned. The confined child is
+    further limited with setrlimit CPU/AS/FSIZE/NPROC/NOFILE ceilings in
+    preexec (plus its own process group for kill/reap). No shell, no server
+    argv, bounded output.
     """
     if _looks_like_server_argv(argv):
         raise OpenCodeError("refusing server/auto-approve opencode argv")
+    from .confinement import build_confinement_argv, confinement_available
+    if not argv or not argv[0]:
+        return {"state": "failed", "code": "BINARY_MISSING",
+                "detail": "no executable supplied"}
+    import shutil as _shutil
+    binary = (argv[0] if os.path.isabs(argv[0])
+              else (_shutil.which(argv[0]) or ""))
+    if not binary:
+        return {"state": "failed", "code": "BINARY_MISSING",
+                "detail": f"executable not found: {argv[0]}"[:200]}
+    argv = [binary] + list(argv[1:])
+    ok, bwrap, reason = confinement_available()
+    if not ok:
+        return {"state": "failed", "code": "CONFINEMENT_UNAVAILABLE",
+                "detail": f"live execution disabled: {reason}; "
+                          "re-qualify the platform before any live run"
+                [:300]}
+    confined = build_confinement_argv(bwrap, argv[0], workdir, argv, env)
     try:
         proc = subprocess.Popen(
-            argv, cwd=str(workdir), env=env, stdin=subprocess.DEVNULL,
+            confined, cwd=str(workdir), env=env, stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, preexec_fn=lambda: _limited_preexec(timeout_s))
     except FileNotFoundError:
         return {"state": "failed", "code": "BINARY_MISSING",
-                "detail": "opencode executable not found"}
+                "detail": "confinement binary not found"}
     except Exception as exc:
         return {"state": "failed", "code": "SPAWN_FAILED",
                 "detail": str(exc)[:200]}
@@ -193,7 +223,13 @@ def _probe_version(binary: str) -> str:
 
 
 def _limited_preexec(cpu_s: float) -> None:
-    """Child-side confinement: new session + CPU/AS/FSIZE/NPROC/NOFILE caps."""
+    """Child-side confinement: new session + CPU/AS/FSIZE/NOFILE caps.
+
+    NPROC is deliberately NOT capped here: capping it before user-namespace
+    creation breaks the setup itself on busy machines (observed EAGAIN), so
+    the process cap is applied inside the sandbox via prlimit (see
+    confinement.build_confinement_argv).
+    """
     try:
         os.setsid()
         try:
@@ -206,7 +242,6 @@ def _limited_preexec(cpu_s: float) -> None:
                        (RLIMIT_AS_BYTES, RLIMIT_AS_BYTES))
         _res.setrlimit(_res.RLIMIT_FSIZE,
                        (RLIMIT_FSIZE_BYTES, RLIMIT_FSIZE_BYTES))
-        _res.setrlimit(_res.RLIMIT_NPROC, (RLIMIT_NPROC, RLIMIT_NPROC))
         _res.setrlimit(_res.RLIMIT_NOFILE, (RLIMIT_NOFILE, RLIMIT_NOFILE))
     except Exception:
         os._exit(127)

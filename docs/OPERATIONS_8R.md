@@ -12,15 +12,17 @@ contracts), `runs` (spawn-safe executors), `state` (enablement/config),
 `runner` (broker-bound runner + shared entry). Same public surface as the
 former monolith (`voicebridge.opencode.*` imports unchanged).
 
-Containment boundary (read before live qualification): disposable worktrees
-isolate the project checkout, and a tripwire fails any run that dirties the
-checkout outside its worktree (`PROJECT_TOUCHED`). Task files must live
-inside the approved root; outside symlinks fail closed. Residual,
-documented: the child is NOT filesystem-sandboxed — absolute-path writes
-outside the repository (e.g. /etc, other checkouts) are not mechanically
-blocked. Live runs must assume a hostile child can touch owner-readable
-paths: use a dedicated disposable clone, least-privilege OS user, and
-review every diff.
+Containment boundary: every live child runs inside Bubblewrap (ro /usr +
+merged-usr symlinks, /proc, /dev, private /tmp, private empty HOME, ro
+network prerequisites, pinned binary single-file ro-bind, approved workdir
+read-write). The original checkout, other checkouts, real HOME, credentials,
+host /tmp, and system dirs do not exist inside. The network namespace is
+deliberately retained (provider API calls); writes the child makes outside
+its workdir land in discarded sandbox storage. If Bubblewrap/user-namespaces
+are unavailable, live execution is disabled as CONFINEMENT_UNAVAILABLE —
+never an unconfined run. A checkout tripwire additionally fails any run that
+dirties the project checkout outside its disposable worktree
+(`PROJECT_TOUCHED`).
 
 Channel parity (honest contract): CLI has FULL parity (grant, preview,
 prepare, execute, cancel, receipts, enable/disable); the authenticated

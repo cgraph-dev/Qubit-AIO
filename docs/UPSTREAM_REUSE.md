@@ -1692,4 +1692,19 @@ CLOSE-OUT (plan §6.2 architecture gate resolved, same upstream posture):
     dashboard read-only/bypass-refusal tests over a live loopback server;
     fresh-interpreter voice-wiring test. Documented residual: the child is
     not filesystem-sandboxed (see OPERATIONS_8R containment boundary).
+
+CONFINEMENT CLOSE-OUT (same upstream posture, reuses plan-blessed
+    Bubblewrap 0.9.0 + the isolated.py search/smoke shape — no new
+    dependency, daemon, or runtime): new voicebridge/opencode/confinement.py
+    (~150 lines) builds the sandbox argv (ro /usr+merged-usr symlinks,
+    /proc, /dev, private /tmp+HOME, ro resolv/hosts/CA, single-file ro-bind
+    of the pinned binary, approved workdir read-write, prlimit NPROC cap
+    inside). Parent PATH is never inherited (fixed SAFE_PATH). Proven
+    behaviorally: workdir writes succeed while original checkout, other
+    checkouts, real HOME, host /tmp, /etc, and /root stay untouched
+    host-side; minimal surface inventory shows no SSH/config/passwd;
+    version pin still enforced; unavailability fails closed as
+    CONFINEMENT_UNAVAILABLE with no spawn. NPROC capping moved inside via
+    prlimit after proving preexec caps break namespace setup on busy
+    machines. Network namespace retained by design (provider calls).
 ```
