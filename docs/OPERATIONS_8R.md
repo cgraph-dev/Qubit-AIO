@@ -4,6 +4,24 @@ Status: implementation (hermetic) + verification-driven repair. No live
 coding run is authorized by this packet. Every command below is read-only or
 synthetic unless it says **live**.
 
+Architecture (plan §6.2 gate): the local WRAP is `voicebridge/opencode/`
+— focused modules, each under 300 lines, no new runtime dependency:
+`policy` (pin/budgets/validation), `transport` (env/argv/probe/confined
+spawn/parsing), `workdir` (worktrees/validation/sweep/diffs), `specs` (8F
+contracts), `runs` (spawn-safe executors), `state` (enablement/config),
+`runner` (broker-bound runner + shared entry). Same public surface as the
+former monolith (`voicebridge.opencode.*` imports unchanged).
+
+Containment boundary (read before live qualification): disposable worktrees
+isolate the project checkout, and a tripwire fails any run that dirties the
+checkout outside its worktree (`PROJECT_TOUCHED`). Task files must live
+inside the approved root; outside symlinks fail closed. Residual,
+documented: the child is NOT filesystem-sandboxed — absolute-path writes
+outside the repository (e.g. /etc, other checkouts) are not mechanically
+blocked. Live runs must assume a hostile child can touch owner-readable
+paths: use a dedicated disposable clone, least-privilege OS user, and
+review every diff.
+
 Channel parity (honest contract): CLI has FULL parity (grant, preview,
 prepare, execute, cancel, receipts, enable/disable); the authenticated
 dashboard has READ-ONLY parity (`GET /api/opencode`: status/list/check on the
@@ -68,10 +86,11 @@ cancelled idempotently; timeouts SIGKILL the whole process group.
 `MISSING_CREDENTIALS` / `DISPOSABLE_UNAVAILABLE` / `TIMEOUT` / `EXIT_<n>` /
 `EMPTY_OUTPUT` / `MALFORMED_OUTPUT` / `PATCH_MALFORMED` /
 `TRANSPORT_MALFORMED` / `LIMIT_EXCEEDED` / `SYMLINK_ESCAPE` /
-`VALIDATION_CRASH` / `PROVIDER_OUTAGE` / `RUN_CRASH` / `SPAWN_FAILED` /
-`SERIALIZATION_FAILED`) · `stale_target` (preview hash changed, or
-`PREVIEW_REQUIRED` for in-project writes without a hash) ·
-`idempotent_replay` · `cancelled` · `ADAPTER_DISABLED`
+`PROJECT_TOUCHED` / `VALIDATION_CRASH` / `PROVIDER_OUTAGE` / `RUN_CRASH` /
+`SPAWN_FAILED` / `SERIALIZATION_FAILED`) · `stale_target` (preview hash
+changed, or `PREVIEW_REQUIRED` for in-project writes without a hash) ·
+`idempotent_replay` · `cancelled` · `replayed` (single-use confirmation
+re-use refused) · `ADAPTER_DISABLED``
 (`CONFIG_DISABLED` / `NOT_ENABLED` / `EMERGENCY_STOP`).
 
 A failed or partial run is never reported complete. Code changes are

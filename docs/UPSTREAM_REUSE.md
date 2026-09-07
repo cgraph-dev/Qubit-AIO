@@ -1679,4 +1679,17 @@ REPAIR 2026-09-07 (independent-verification findings, no new upstream
     (VERSION_MISMATCH/VERSION_UNKNOWN); in-project writes mechanically
     require a preview hash (PREVIEW_REQUIRED); voice/tray execution
     explicitly documented as NOT wired (CLI full, dashboard read-only).
+
+CLOSE-OUT (plan §6.2 architecture gate resolved, same upstream posture):
+    the ~1200-line monolith is decomposed into voicebridge/opencode/
+    focused modules (policy/transport/workdir/specs/runs/state/runner),
+    each under 300 lines with no new runtime dependency (stdlib + existing
+    voicebridge contracts only; import-hygiene regression test). Public
+    surface unchanged (voicebridge.opencode.*). Added: project-checkout
+    tripwire (PROJECT_TOUCHED) for absolute-path writes outside disposable
+    worktrees; confirmation expiry/replay/changed-args denial tests;
+    registered-worktree orphan prune; rlimit triple evidence; behavioral
+    dashboard read-only/bypass-refusal tests over a live loopback server;
+    fresh-interpreter voice-wiring test. Documented residual: the child is
+    not filesystem-sandboxed (see OPERATIONS_8R containment boundary).
 ```

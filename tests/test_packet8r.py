@@ -97,15 +97,18 @@ def _ok_run(capture=None):
 
 def _runner(tmp_path, *, cfg=None, grants=(("act.opencode.run", "code"),
             ("act.opencode.plan", "code")), run_opencode=None,
-            version_probe=None, executors=None):
+            version_probe=None, executors=None, confirmation_ttl_s=None):
     # Default binary is /bin/true (exists everywhere): hermetic tests must
     # not depend on a real OpenCode install. The version probe is faked to
     # the pin for the same reason; dedicated tests cover mismatch/unknown.
     cfg = cfg or _cfg(tmp_path, binary="/bin/true")
     probe = (version_probe if version_probe is not None
              else (lambda _b: OC.PINNED_OPENCODE_VERSION))
-    runner = OC.opencode_runner(cfg, run_opencode=run_opencode or _ok_run(),
-                                version_probe=probe, executors=executors)
+    kw = dict(run_opencode=run_opencode or _ok_run(),
+              version_probe=probe, executors=executors)
+    if confirmation_ttl_s is not None:
+        kw["confirmation_ttl_s"] = confirmation_ttl_s
+    runner = OC.opencode_runner(cfg, **kw)
     for cap, scope in grants:
         runner.perms.grant(cap, requested_by="user", confirmed=True,
                            scopes=(scope,))
@@ -583,6 +586,107 @@ def test_idempotent_replay(tmp_path):
     assert second["state"] == "idempotent_replay"
 
 
+def test_expired_confirmation_denied(tmp_path):
+    # Confirmation TTL floor is 1s (capability contract): issue, outlive it,
+    # then prove the stale confirmation cannot execute.
+    runner = _runner(tmp_path, confirmation_ttl_s=1.0)
+    root = _project(tmp_path)
+    env = A.build_envelope(OC.opencode_spec(OC.ACT_RUN),
+                           args={"project": str(root),
+                                 "task": "Add a hello function",
+                                 "disposable": True},
+                           target=str(root), scope="code")
+    rec = runner.prepare(OC.ACT_RUN, env, issued_by="user")
+    time.sleep(1.3)
+    out = runner.execute(OC.ACT_RUN, args={"project": str(root),
+                                            "task": "Add a hello function",
+                                            "disposable": True},
+                         target=str(root), scope="code", source="user",
+                         confirmation_id=rec["confirmation_id"])
+    assert out["state"] in ("denied", "expired")
+    assert out["code"] in ("EXPIRED_CONFIRMATION", "CONFIRMATION_REQUIRED",
+                           "UNKNOWN_CONFIRMATION_ID")
+
+
+def test_replayed_confirmation_denied(tmp_path):
+    runner = _runner(tmp_path)
+    root = _project(tmp_path)
+    env = A.build_envelope(OC.opencode_spec(OC.ACT_RUN),
+                           args={"project": str(root),
+                                 "task": "Add a hello function",
+                                 "disposable": True},
+                           target=str(root), scope="code")
+    rec = runner.prepare(OC.ACT_RUN, env, issued_by="user")
+    first = runner.execute(OC.ACT_RUN, args={"project": str(root),
+                                              "task": "Add a hello function",
+                                              "disposable": True},
+                           target=str(root), scope="code", source="user",
+                           confirmation_id=rec["confirmation_id"])
+    assert first["state"] == "OK"
+    second = runner.execute(OC.ACT_RUN, args={"project": str(root),
+                                               "task": "Add a hello function",
+                                               "disposable": True},
+                            target=str(root), scope="code", source="user",
+                            confirmation_id=rec["confirmation_id"])
+    # Single-use confirmation: replay must not execute (typed denial in the
+    # runner's replayed/denied vocabulary, never success).
+    assert second["state"] in ("denied", "replayed")
+    assert second["code"] in ("REPLAYED_CONFIRMATION", "CONFIRMATION_REQUIRED",
+                              "UNKNOWN_CONFIRMATION_ID", "NOT_GRANTED")
+
+
+def test_changed_args_rejected(tmp_path):
+    runner = _runner(tmp_path)
+    root = _project(tmp_path)
+    env = A.build_envelope(OC.opencode_spec(OC.ACT_RUN),
+                           args={"project": str(root),
+                                 "task": "Add a hello function",
+                                 "disposable": True},
+                           target=str(root), scope="code")
+    rec = runner.prepare(OC.ACT_RUN, env, issued_by="user")
+    out = runner.execute(OC.ACT_RUN, args={"project": str(root),
+                                            "task": "Add a DIFFERENT task",
+                                            "disposable": True},
+                         target=str(root), scope="code", source="user",
+                         confirmation_id=rec["confirmation_id"])
+    # Changed arguments invalidate the hash-bound confirmation: the run must
+    # not execute (stale-target/denied vocabulary, never success).
+    assert out["state"] in ("denied", "stale_target")
+    assert out["code"] in ("TARGET_MISMATCH", "ARGS_MISMATCH",
+                           "TARGET_SCOPE_MISMATCH", "CONFIRMATION_REQUIRED",
+                           "STALE_TARGET")
+
+
+def test_project_touch_tripwire_fails_closed(tmp_path):
+    if _git() is None:
+        pytest.skip("git unavailable")
+
+    def _clean(argv, workdir, env, timeout_s):
+        return {"state": "OK", "code": "OK",
+                "stdout": json.dumps({"text": "ok"}), "stderr": ""}
+
+    runner = _runner(tmp_path, run_opencode=_clean)
+    root = _project(tmp_path)
+    out = _full(runner, root)
+    assert out["state"] == "OK"  # control: workdir-only writes are clean
+
+    def _escape(argv, workdir, env, timeout_s):
+        # Absolute-path write into the project checkout, outside the
+        # disposable worktree (the worktree itself lives outside the project
+        # tree, so the escape target is the known approved root).
+        (root / "evil-outside.txt").write_text("pwned\n")
+        return {"state": "OK", "code": "OK",
+                "stdout": json.dumps({"text": "evil"}), "stderr": ""}
+
+    runner2 = _runner(tmp_path, run_opencode=_escape)
+    out2 = _full(runner2, root)
+    assert out2["state"] == "failed"
+    assert out2["code"] == "PROJECT_TOUCHED"
+    assert out2.get("partial") is True
+    assert (root / "evil-outside.txt").exists()  # tripwire reports; cleanup
+    (root / "evil-outside.txt").unlink()         # of user files is refused
+
+
 # ---------------------------------------------------------------------------
 # Worktrees: disposable isolation, dirty/clean, in-project
 # ---------------------------------------------------------------------------
@@ -838,22 +942,30 @@ def test_tray_has_no_execution_path():
 
 
 def test_import_hygiene_no_new_dependencies():
-    # voicebridge/opencode.py may import stdlib + voicebridge.* only: a new
-    # third-party runtime dependency would break clean installs.
+    # Every voicebridge/opencode/* module may import stdlib + voicebridge.*
+    # only: a new third-party runtime dependency would break clean installs.
+    # Each module stays under the 300-line architecture gate (plan §6.2).
     import ast as _ast
-    tree = _ast.parse((REPO_ROOT / "voicebridge" / "opencode.py")
-                      .read_text(encoding="utf-8"))
     stdlib = set(sys.stdlib_module_names)
-    for node in _ast.walk(tree):
-        if isinstance(node, _ast.Import):
-            for a in node.names:
-                top = a.name.split(".")[0]
-                assert top in stdlib or top == "voicebridge", a.name
-        elif isinstance(node, _ast.ImportFrom):
-            if node.level:
-                continue
-            top = (node.module or "").split(".")[0]
-            assert top in stdlib or top == "voicebridge", node.module
+    pkg = REPO_ROOT / "voicebridge" / "opencode"
+    mods = sorted(pkg.glob("*.py"))
+    assert len(mods) >= 7  # __init__ + focused submodules, no monolith
+    for path in mods:
+        src = path.read_text(encoding="utf-8")
+        assert len(src.splitlines()) <= 300, path.name
+        tree = _ast.parse(src)
+        for node in _ast.walk(tree):
+            if isinstance(node, _ast.Import):
+                for a in node.names:
+                    top = a.name.split(".")[0]
+                    assert top in stdlib or top == "voicebridge", (
+                        path.name, a.name)
+            elif isinstance(node, _ast.ImportFrom):
+                if node.level:
+                    continue
+                top = (node.module or "").split(".")[0]
+                assert top in stdlib or top == "voicebridge", (
+                    path.name, node.module)
 
 
 def test_in_project_requires_preview_hash(tmp_path):
