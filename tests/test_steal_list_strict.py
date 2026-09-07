@@ -388,7 +388,7 @@ class TestItem1AirLLMLive:
             assert old not in ps, f"old brain resident alongside 4B: {old}"
 
     def test_g05_box_config_routes_to_brain4(self):
-        cfg_path = Path.home() / ".config/openclaw-voice-bridge/voice.yaml"
+        cfg_path = Path.home() / ".config/qubit-voicebridge/voice.yaml"
         cfg = yaml.safe_load(cfg_path.read_text())
         assert cfg["intent"]["local_llm"]["model"] == "qubit-brain4"
         assert cfg["summarizer"]["ollama_model"] == "qubit-brain4"

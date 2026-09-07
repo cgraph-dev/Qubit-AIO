@@ -834,3 +834,20 @@ def test_no_competing_legacy_unit_enabled():
         r = subprocess.run(["systemctl", "--user", "is-enabled", legacy],
                            capture_output=True, text=True, timeout=15)
         assert r.stdout.strip() != "enabled", f"{legacy} must not stay enabled"
+
+
+def test_branding_rollback_never_touches_live_home(tmp_path):
+    """branding_rollback with an isolated home must not create, move, or
+    delete anything under the operator's real HOME (regression: full-suite
+    runs deleted live compat aliases)."""
+    from voicebridge import profiles as _prof
+    home = tmp_path / "home"
+    (home / ".config" / "qubit-voicebridge").mkdir(parents=True)
+    bdir = tmp_path / "b"
+    bdir.mkdir()
+    before = sorted(str(p) for p in Path.home().glob(".config/*voice*"))
+    out = _prof.branding_rollback(None, bdir, repo=tmp_path / "repo",
+                                  home=home)
+    assert out["state"] in ("OK", "MISSING")
+    after = sorted(str(p) for p in Path.home().glob(".config/*voice*"))
+    assert before == after

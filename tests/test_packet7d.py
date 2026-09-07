@@ -395,7 +395,7 @@ def test_branding_staged_apply_verify_rollback_cycle(tmp_path):
     assert (repo / "pyproject.toml").read_text() != before
     v = P.branding_verify(cfg, repo=repo)
     assert v["state"] == "VERIFIED", v
-    out = P.branding_rollback(cfg, bdir, repo=repo)
+    out = P.branding_rollback(cfg, bdir, repo=repo, home=tmp_path / "home")
     assert out["state"] == "OK"
     assert out["restored"]
     assert (repo / "pyproject.toml").read_text() == before
@@ -408,7 +408,7 @@ def test_branding_rollback_restores_full_backup(tmp_path):
     before = (repo / "pyproject.toml").read_text()
     P.branding_plan(cfg, dry_run=False, backup_dir=bdir, repo=repo)
     assert (repo / "pyproject.toml").read_text() != before
-    out = P.branding_rollback(cfg, bdir, repo=repo)
+    out = P.branding_rollback(cfg, bdir, repo=repo, home=tmp_path / "home")
     assert out["state"] == "OK"
     assert out["restored"]
     assert (repo / "pyproject.toml").read_text() == before
@@ -519,7 +519,8 @@ def test_cli_branding_commands(tmp_path, capsys):
     assert rc == 0  # VERIFIED
     capsys.readouterr()
     rc = cli(["branding", "rollback", "--backup-dir", str(bdir),
-              "--repo", str(repo), "--config", str(cfg_path)])
+              "--repo", str(repo), "--home", str(tmp_path / "cli-home"),
+              "--config", str(cfg_path)])
     assert rc == 0
 
 

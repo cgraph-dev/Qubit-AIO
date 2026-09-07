@@ -29,7 +29,7 @@ from voicebridge.config import Config as _Cfg
 _CFG = _Cfg.load()
 BASE = f"http://127.0.0.1:{_CFG.get('webui', 'port', default=8890)}"
 TOKEN = str(_CFG.get('webui', 'token', default='') or '')
-WAV = Path.home() / ".local/state/openclaw-voice-bridge/tap-utterance.wav"
+WAV = Path.home() / ".local/state/qubit-voicebridge/tap-utterance.wav"
 
 
 def _bridge_up() -> bool:

@@ -12,7 +12,7 @@ import pytest
 
 from voicebridge.voice_id import SpeakerVerifier, SpeakerUnavailable
 
-MODELS = Path.home() / ".local/share/openclaw-voice-bridge/models"
+MODELS = Path.home() / ".local/share/qubit-voicebridge/models"
 
 
 @pytest.fixture()

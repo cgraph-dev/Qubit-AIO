@@ -247,6 +247,10 @@ def build_parser() -> argparse.ArgumentParser:
     brand_roll.add_argument("--backup-dir", type=Path, required=True)
     brand_roll.add_argument("--repo", type=Path, default=None,
                             help="target repository root (default: this repo)")
+    brand_roll.add_argument("--home", type=Path, default=None,
+                            help="scope runtime restore/alias removal to this "
+                                 "home dir (tests use a tmp home; default is "
+                                 "the operator HOME)")
     perm = add("permissions", help="Packet 7E permission profiles + scoped grants")
     perm_sub = perm.add_subparsers(dest="permissions_command")
     perm_mode = perm_sub.add_parser("mode", parents=[common],
@@ -1740,7 +1744,8 @@ def _cmd_branding(cfg, args) -> int:
             print("\nLIMITATION: " + out["limitation"])
         return 0 if out["state"] == "VERIFIED" else 1
     if cmd == "rollback":
-        out = P.branding_rollback(cfg, args.backup_dir, repo=args.repo)
+        out = P.branding_rollback(cfg, args.backup_dir, repo=args.repo,
+                                  home=getattr(args, "home", None))
         print(_json.dumps(out, indent=2, sort_keys=True))
         return 0 if out["state"] == "OK" else 2
     print(f"ERROR: unknown branding command {cmd!r}")

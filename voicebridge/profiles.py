@@ -1089,9 +1089,14 @@ def branding_verify(cfg: Any, repo: Optional[Path] = None) -> Dict[str, Any]:
     }
 
 
-def branding_rollback(cfg: Any, backup_dir: Path, repo: Optional[Path] = None) -> Dict[str, Any]:
+def branding_rollback(cfg: Any, backup_dir: Path, repo: Optional[Path] = None,
+                      home: Optional[Path] = None) -> Dict[str, Any]:
     """Restore every branding backup (repo files + runtime config/state/data)
-    and remove the compat aliases created by the migration. Reversible."""
+    and remove the compat aliases created by the migration. Reversible.
+
+    ``home`` scopes steps 2–3 to an isolated home directory (tests must pass
+    a tmp home — the operator's live HOME is never touched by a rollback
+    unless explicitly requested with ``home=None``)."""
     bdir = Path(backup_dir)
     if not bdir.exists():
         return {"state": MISSING, "detail": f"no backup at {bdir}"}
@@ -1116,13 +1121,14 @@ def branding_rollback(cfg: Any, backup_dir: Path, repo: Optional[Path] = None) -
         restored.append("systemd/unit-renamed-back")
     # 2) restore runtime config/state/data to the canonical tree (Packet 8S;
     # legacy trees are only compat aliases and are never written)
+    homep = Path(home) if home else Path.home()
     for name in ("voice.yaml", "state", "data", "models", "memory",
                  "reports", "device.json", "profiles.json"):
         bak = bdir / "runtime" / name
         if bak.exists():
-            dst = Path("~/.config/qubit-voicebridge").expanduser() / name
+            dst = homep / ".config/qubit-voicebridge" / name
             if name in ("voice.yaml",):
-                dst = Path("~/.config/qubit-voicebridge").expanduser() / name
+                dst = homep / ".config/qubit-voicebridge" / name
             dst.parent.mkdir(parents=True, exist_ok=True)
             if bak.is_dir():
                 shutil.copytree(bak, dst, dirs_exist_ok=True)
@@ -1131,7 +1137,7 @@ def branding_rollback(cfg: Any, backup_dir: Path, repo: Optional[Path] = None) -
             restored.append(f"runtime/{name}")
     # 3) remove compat aliases (the old name symlinks point back to new paths)
     for old, _new in BRANDING_PATH_PAIRS:
-        oldp = Path.home() / old
+        oldp = homep / old
         if oldp.is_symlink():
             try:
                 oldp.unlink()
