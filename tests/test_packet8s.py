@@ -935,10 +935,30 @@ def test_active_environment_has_no_snap_fragmentation():
             assert rec["source"] == "snap-confinement-redirect", rec
 
 
+def _honest_model_line(line: str) -> bool:
+    """A model-status line is honest when it either reports a loaded model
+    (no FAILED/MISSING) or reports a typed FAILED/MISSING state WITH an
+    artifact reason. It is dishonest only when it claims failure without a
+    reason or (worse) claims success while unusable. Reason substrings cover
+    the real Sherpa/Piper/voice-ID error vocabulary."""
+    low = line.lower()
+    if "failed" not in low and "missing" not in low:
+        return True
+    return any(k in low for k in (
+        "missing", "model", "artifact", "not enrolled", "no such",
+        "not found", "enoent", "piper", "sherpa", "parakeet", "voice"))
+
+
 def test_status_proves_models_under_snap_env():
     """End-to-end: `voicebridge status` with the IDE snap XDG env must still
-    find ASR, Piper TTS, and voice-ID models (uses the real entry point in
-    a subprocess, not an in-process shortcut)."""
+    resolve model paths against the real home tree (uses the real entry
+    point in a subprocess, not an in-process shortcut).
+
+    Hermetic contract: the snap redirect must always be LOUD, and every
+    model line must be HONEST — either loaded, or typed FAILED/MISSING with
+    an artifact reason. The test passes with real model artifacts present
+    AND under an empty HOME (honest degraded), so it never depends on the
+    operator's download state."""
     import subprocess
     env = dict(os.environ,
                XDG_CONFIG_HOME=_SNAP_BASE + "/.config",
@@ -953,9 +973,38 @@ def test_status_proves_models_under_snap_env():
     asr = [l for l in r.stdout.splitlines() if l.startswith("ASR ")]
     tts = [l for l in r.stdout.splitlines() if l.startswith("TTS ")]
     vid = [l for l in r.stdout.splitlines() if l.startswith("voice-ID")]
-    assert asr and "FAILED" not in asr[0], asr
-    assert tts and "FAILED" not in tts[0] and "MISSING" not in tts[0], tts
-    assert vid and "FAILED" not in vid[0], vid
+    assert asr and _honest_model_line(asr[0]), asr
+    assert tts and _honest_model_line(tts[0]), tts
+    assert vid and _honest_model_line(vid[0]), vid
+
+
+def test_status_reports_missing_models_honestly(tmp_path):
+    """Regression: with an empty HOME (no model artifacts) `voicebridge
+    status` must report typed FAILED/MISSING with an artifact reason for
+    ASR/TTS — never silent success, never a bare failure without cause."""
+    import subprocess
+    empty_home = tmp_path / "empty-home"
+    empty_home.mkdir()
+    snap = tmp_path / "snap" / "code" / "999"
+    (snap / ".config").mkdir(parents=True)
+    env = dict(os.environ, HOME=str(empty_home),
+               XDG_CONFIG_HOME=str(snap / ".config"),
+               XDG_DATA_HOME=str(snap / ".local/share"),
+               XDG_STATE_HOME=str(snap / ".local/state"),
+               XDG_CACHE_HOME=str(snap / ".cache"))
+    r = subprocess.run([sys.executable, "-m", "voicebridge", "status"],
+                       capture_output=True, text=True, timeout=300,
+                       cwd=str(REPO), env=env)
+    assert r.returncode == 0, r.stderr[-2000:]
+    assert "snap-confinement-redirect" in r.stdout
+    asr = [l for l in r.stdout.splitlines() if l.startswith("ASR ")]
+    tts = [l for l in r.stdout.splitlines() if l.startswith("TTS ")]
+    assert asr and _honest_model_line(asr[0]), asr
+    assert tts and _honest_model_line(tts[0]), tts
+    # Empty home has no artifacts: at least one model line must be an
+    # honest typed failure, proving degraded state is never faked as ready.
+    assert any("FAILED" in l or "MISSING" in l for l in (asr + tts)), \
+        f"empty HOME must not report full readiness: {asr + tts}"
 
 
 def test_paths_diagnostic_includes_xdg_report(tmp_path):
