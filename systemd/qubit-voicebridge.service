@@ -1,0 +1,38 @@
+[Unit]
+Description=Qubit VoiceBridge (push-to-talk voice interface)
+After=network.target
+# OpenClaw gateway + ollama (local LLM) should be up first if they exist as units:
+After=openclaw-gateway.service ollama.service
+Wants=ollama.service
+
+[Service]
+Type=simple
+# __PROJECT_DIR__ is replaced with the actual path by scripts/install.sh
+ExecStart=__PROJECT_DIR__/.venv/bin/python -m voicebridge run
+WorkingDirectory=__PROJECT_DIR__
+Restart=on-failure
+RestartSec=3
+# Hotkeys resolve the REAL X11 session at runtime (voicebridge/display) and only
+# report active when the display is genuinely reachable — do NOT hardcode
+# DISPLAY/XAUTHORITY here (a stale machine value silently disables PTT). If your
+# session env is not inherited, import it once:
+#   systemctl --user import-environment DISPLAY XAUTHORITY
+# Headless/manual PTT needs no DISPLAY (use --no-hotkey / manual Enter PTT).
+# Environment=DISPLAY=:0
+# Environment=XAUTHORITY=/run/user/1000/gdm/Xauthority
+Environment=VOICE_BRIDGE_CONFIG=%h/.config/qubit-voicebridge/voice.yaml
+# Only needed if you use the whisper fallback ASR on CUDA with a non-standard
+# CUDA install (sherpa/moonshine run on CPU by default):
+# Environment=LD_LIBRARY_PATH=/usr/local/lib/ollama/cuda_v12
+#
+# Resource guardrails — PORTABLE DEFAULTS are commented; hardware/session values
+# (exact byte limits, CUDA lib path, real XAUTHORITY) are MACHINE OVERRIDES that
+# live only in the installed user unit. scripts/install.sh backs up the
+# installed unit before any overwrite and never re-applies these automatically.
+# Recommended machine override block (tune per host, keep out of this template):
+#   MemoryHigh=1500M
+#   MemoryMax=2G
+#   Nice=-5
+
+[Install]
+WantedBy=default.target

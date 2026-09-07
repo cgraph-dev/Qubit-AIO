@@ -185,7 +185,7 @@ def test_declared_dependencies_parse():
 
 def test_sbom_never_fabricates_versions(tmp_path):
     sbom = R.sbom(REPO)
-    assert sbom["package"] == "qubit-voice-agent"
+    assert sbom["package"] == "qubit-voicebridge"
     assert "notices" in sbom and sbom["notices"]
     for rec in sbom["main"]:
         assert rec["name"] and rec["constraint"]
@@ -355,7 +355,7 @@ def test_unit_verify_renders_and_verifies():
     assert res["all_ok"] is True
     assert res["units"]
     names = {u["unit"] for u in res["units"]}
-    assert "qubit-voice-agent.service" in names
+    assert "qubit-voicebridge.service" in names
     assert "openclaw-communications-monitor.timer" in names
     for u in res["units"]:
         assert u["state"] == "OK", u

@@ -13,15 +13,15 @@ set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="$PROJECT_DIR/.venv"
-DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/qubit-voice-agent"
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/qubit-voicebridge"
 MODELS="$DATA_DIR/models"
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/qubit-voice-agent"
-STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/qubit-voice-agent"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/qubit-voicebridge"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/qubit-voicebridge"
 OLLAMA_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
 
 SR="https://github.com/k2-fsa/sherpa-onnx/releases/download"
 
-echo "==> Qubit Voice Agent install"
+echo "==> Qubit VoiceBridge install"
 echo "    project : $PROJECT_DIR"
 echo "    models  : $MODELS"
 echo "    config  : $CONFIG_DIR/voice.yaml"

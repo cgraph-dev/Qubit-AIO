@@ -1,5 +1,5 @@
-# Qubit Voice Agent — portable example configuration.
-# Install copies this to ~/.config/qubit-voice-agent/voice.yaml on a fresh
+# Qubit VoiceBridge — portable example configuration.
+# Install copies this to ~/.config/qubit-voicebridge/voice.yaml on a fresh
 # machine (scripts/install.sh). Every value is optional; the bridge has sane
 # defaults. Tune AFTER first boot: mic levels, silence timing, keys.
 #
@@ -124,7 +124,7 @@ intent:
     timeout_s: 8.0     # local model chat timeout (was 4s — journal showed real timeouts)
     max_tokens: 100
   conversation_backend: local      # bridge answers ALL chat (<0.5s); only tasks -> OpenClaw/Hermes
-  templates_path: ~/.config/qubit-voice-agent/task-templates.yaml  # daily-task templates
+  templates_path: ~/.config/qubit-voicebridge/task-templates.yaml  # daily-task templates
   deepseek_url: https://api.deepseek.com/chat/completions
   deepseek_model: deepseek-v4-flash
   deepseek_env: ~/.hermes/.env     # DEEPSEEK_API_KEY lives here
@@ -229,4 +229,4 @@ webui:
 logging:
   level: INFO
   jsonl: true               # structured event journal (observability)
-  jsonl_path: null          # default: ~/.local/state/qubit-voice-agent/events.jsonl
+  jsonl_path: null          # default: ~/.local/state/qubit-voicebridge/events.jsonl

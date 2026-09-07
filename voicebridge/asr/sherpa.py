@@ -77,7 +77,7 @@ class SherpaASR(ASRProvider):
             lines = [w.strip() for w in self.hotwords.split(",") if w.strip()]
             if not lines:
                 return None
-            path = Path("/tmp/qubit-voice-agent") / "asr-hotwords.txt"
+            path = Path("/tmp/qubit-voicebridge") / "asr-hotwords.txt"
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("\n".join(lines) + "\n")
             return str(path)

@@ -31,6 +31,8 @@ SYSTEM_PROMPT = (
 # part of the SYSTEM prompt so it costs tokens once per turn, not per request.
 def _load_dialogs() -> str:
     candidates = [
+        Path(os.path.expanduser("~/.config/qubit-voicebridge/dialogs.md")),
+        Path(os.path.expanduser("~/.config/qubit-voice-agent/dialogs.md")),
         Path(os.path.expanduser("~/.config/openclaw-voice-bridge/dialogs.md")),
         resources.resource_path("config/dialogs.md"),
     ]

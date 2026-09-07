@@ -77,7 +77,7 @@ class OpenAITTS(TTSProvider):
         if self._key is None:
             self.load()
         assert self._key
-        out_path = Path(out_path) if out_path else Path(f"/tmp/qubit-voice-agent/tts-openai-{abs(hash(text))%10**8}.wav")
+        out_path = Path(out_path) if out_path else Path(f"/tmp/qubit-voicebridge/tts-openai-{abs(hash(text))%10**8}.wav")
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
         payload: dict = {

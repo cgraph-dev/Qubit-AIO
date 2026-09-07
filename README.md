@@ -1,4 +1,4 @@
-# Qubit Voice Agent
+# Qubit VoiceBridge
 
 > 📘 **Read `docs/VOICE_BRIDGE_SYSTEM.md`** for the full system map, what we
 > cherry-picked from open-source (CopilotKit/AirLLM/OpenSandbox), the roadmap,
@@ -48,7 +48,7 @@ long coding output, and can be interrupted mid-speech — **only by your voice**
 
 ## Personal knowledge
 
-The bridge reads `~/.config/qubit-voice-agent/personal-knowledge.md` (shipped as
+The bridge reads `~/.config/qubit-voicebridge/personal-knowledge.md` (shipped as
 `config/personal-knowledge.md`, installed by `install.sh`) and serves it through the
 bounded context compiler (Packet 4B): each chat turn gets a secret-stripped,
 size-capped excerpt of your facts — no whole-file injection and no restart needed,
@@ -67,7 +67,7 @@ checkout or repository-local virtualenv — and is lock + journal guarded,
 idempotent, and typed:
 
 ```bash
-pip install qubit-voice-agent        # from the release artifact
+pip install qubit-voicebridge        # from the release artifact
 voicebridge product install          # typed prerequisite probe (dry-run, zero writes)
 voicebridge product install --apply  # stage config/resources + compat aliases
 voicebridge product first-run        # beginner-friendly status wizard (read-only)
@@ -80,7 +80,7 @@ listener, and a token is never placed in a URL, argument, or file. Dashboard
 pairing is reported truthfully (`REQUIRES_PAIRING` / `PAIRED`), never as a
 fabricated "token generated".
 
-Existing installations on the legacy OpenClaw Voice Bridge paths keep working
+Existing installations on legacy install paths keep working
 and migrate with a reversible, backed-up flow:
 
 ```bash
@@ -91,8 +91,8 @@ voicebridge product migrate --apply  # backed-up migration + compat alias
 For a developer checkout the classic scripted installer remains available:
 
 ```bash
-git clone https://github.com/cgraph-dev/qubit-voice-agent.git
-cd qubit-voice-agent
+git clone https://github.com/cgraph-dev/qubit-voicebridge.git
+cd qubit-voicebridge
 
 # prereqs (one-time): uv, ollama
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -103,7 +103,7 @@ curl -fsSL https://ollama.com/install.sh | sh      # then: ollama serve
 
 The installer (idempotent) creates the venv, installs deps, downloads the
 models (piper voice, Moonshine ASR, Silero VAD, eres2net voice-ID), pulls
-llama3.2:3b into ollama, and writes `~/.config/qubit-voice-agent/voice.yaml`
+llama3.2:3b into ollama, and writes `~/.config/qubit-voicebridge/voice.yaml`
 from `config/voice.example.yaml`.
 
 Optional keys for the cloud paths:
@@ -130,7 +130,7 @@ Auto-start (optional):
 
 ```bash
 ./scripts/install.sh --with-systemd     # renders + enables the user service
-systemctl --user status qubit-voice-agent
+systemctl --user status qubit-voicebridge
 ```
 
 Headless / SSH (no X11): `voicebridge run --no-hotkey` and press Enter to
@@ -214,7 +214,7 @@ what the agent is doing live.
   returns `{request_id}` instantly, then poll `GET /api/result/<id>` for
   `{text, route, summary, audio_b64}`. `GET /api/activity` = the feed.
   `GET /api/status` = health. Every API route is authenticated with the
-  `X-Api-Token` header (`webui.token` in `~/.config/qubit-voice-agent/voice.yaml`).
+  `X-Api-Token` header (`webui.token` in `~/.config/qubit-voicebridge/voice.yaml`).
   Query-string tokens are always rejected (Packet 1B) — the token never appears
   in URLs, history, or logs.
 
@@ -244,7 +244,7 @@ reads it out. Zero API cost, ~0.3s for the compression step.
 ## Configuration
 
 Full reference: `config/voice.example.yaml` (installed to
-`~/.config/qubit-voice-agent/voice.yaml`). Key knobs:
+`~/.config/qubit-voicebridge/voice.yaml`). Key knobs:
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -273,10 +273,10 @@ or `--runtime` (adds typed live probes: Ollama residency, gateway, CDP, isolatio
 ## Observability
 
 Every turn is logged as structured events to
-`~/.local/state/qubit-voice-agent/events.jsonl`:
+`~/.local/state/qubit-voicebridge/events.jsonl`:
 
 ```bash
-tail -f ~/.local/state/qubit-voice-agent/events.jsonl | jq -c '{t:.ts, e:.event}'
+tail -f ~/.local/state/qubit-voicebridge/events.jsonl | jq -c '{t:.ts, e:.event}'
 ```
 
 Watch for `mic.utterance`, `asr.transcribe`, `routing.decision`,
@@ -286,7 +286,7 @@ Watch for `mic.utterance`, `asr.transcribe`, `routing.decision`,
 ## Troubleshooting
 
 - **"It doesn't talk back"** — check the SERVICE journal first, not the
-  events file: `journalctl --user -u qubit-voice-agent.service -n 50`.
+  events file: `journalctl --user -u qubit-voicebridge.service -n 50`.
   A crash-restart loop looks like silence; the traceback is in the journal.
 - **`vad.silero.unavailable` at startup** — Silero failed to load, you're on
   webrtcvad. Check `silero_vad_v5.onnx` exists under the models dir.

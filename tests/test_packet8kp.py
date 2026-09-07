@@ -662,7 +662,11 @@ def test_migrate_interrupted_before_alias_resumes(tmp_path):
     paths = _paths(tmp_path)
     _legacy_install(paths)
     for legacy, canonical in P._legacy_pairs(paths):
+        if not legacy.exists() or legacy.is_symlink():
+            continue
         canonical.parent.mkdir(parents=True, exist_ok=True)
+        if canonical.exists():
+            continue  # second legacy family sharing one canonical target
         legacy.rename(canonical)
     out = P.migrate(paths, dry_run=False)
     assert out["state"] == "OK"

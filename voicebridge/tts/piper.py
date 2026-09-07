@@ -74,7 +74,7 @@ class PiperTTS(TTSProvider):
         # ENGLISH ONLY: single voice, no per-language switching (language arg
         # kept for API compatibility and ignored).
         obj = self._get_voice(self.voice)
-        out_path = Path(out_path) if out_path else Path(f"/tmp/qubit-voice-agent/tts-{abs(hash(text))%10**8}.wav")
+        out_path = Path(out_path) if out_path else Path(f"/tmp/qubit-voicebridge/tts-{abs(hash(text))%10**8}.wav")
         out_path.parent.mkdir(parents=True, exist_ok=True)
         with _GLOBAL_TTS_LOCK:
             with self._lock:

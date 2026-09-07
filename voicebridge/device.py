@@ -61,7 +61,7 @@ def capabilities(cfg: Any) -> Dict[str, Any]:
 def profile(cfg: Any) -> Dict[str, Any]:
     """Current device profile: identity + capability snapshot + enrollment."""
     state_dir = cfg.state_dir() if hasattr(cfg, "state_dir") else Path(
-        "~/.local/state/openclaw-voice-bridge").expanduser()
+        "~/.local/state/qubit-voicebridge").expanduser()
     p = _enroll_path(state_dir)
     data: Dict[str, Any] = {"machine_id": machine_id(),
                             "enrolled": False,
@@ -81,7 +81,7 @@ def enroll(cfg: Any, *, model_alias: Optional[str] = None,
     the model alias it was enrolled for. Never reads/copies secrets or browser
     profiles."""
     state_dir = cfg.state_dir() if hasattr(cfg, "state_dir") else Path(
-        "~/.local/state/openclaw-voice-bridge").expanduser()
+        "~/.local/state/qubit-voicebridge").expanduser()
     Path(state_dir).mkdir(parents=True, exist_ok=True)
     try:
         os.chmod(Path(state_dir), 0o700)

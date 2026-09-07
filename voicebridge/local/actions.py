@@ -26,15 +26,23 @@ log = get_logger()
 #
 # Personal launcher targets and project roots are machine-specific and MUST
 # NOT ship in distributable runtime code. They live in an operator-local YAML
-# at ~/.config/openclaw-voice-bridge/local-actions.yaml (honours
-# $XDG_CONFIG_HOME). The installed package works on any machine with portable
+# at ~/.config/qubit-voicebridge/local-actions.yaml (honours
+# $XDG_CONFIG_HOME; legacy openclaw-voice-bridge/qubit-voice-agent paths are
+# read as fallback). The installed package works on any machine with portable
 # generic defaults (launchers by name, home-directory file/screenshot dirs);
 # the operator override only customises that operator's machine.
 # ---------------------------------------------------------------------------
 def _operator_config_path() -> Path:
     xdg = os.environ.get("XDG_CONFIG_HOME")
     base = Path(xdg) if xdg else Path.home() / ".config"
-    return base / "openclaw-voice-bridge" / "local-actions.yaml"
+    canon = base / "qubit-voicebridge" / "local-actions.yaml"
+    if canon.exists():
+        return canon
+    for legacy in ("qubit-voice-agent", "openclaw-voice-bridge"):
+        cand = base / legacy / "local-actions.yaml"
+        if cand.exists():
+            return cand
+    return canon
 
 
 def _load_operator_overrides() -> Dict[str, Any]:
@@ -437,7 +445,7 @@ def _a_quick_note(params: Dict[str, Any]) -> str:
     if not text:
         return "What should I note down?"
     from pathlib import Path; import datetime
-    p = Path.home() / ".config" / "openclaw-voice-bridge" / "quick-notes.md"
+    p = Path.home() / ".config" / "qubit-voicebridge" / "quick-notes.md"
     p.parent.mkdir(parents=True, exist_ok=True)
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     with open(p, "a") as f: f.write(f"\n- [{ts}] {text}\n")

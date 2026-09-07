@@ -747,62 +747,105 @@ def upgrade_profile(cfg: Any, kind: str, profile_id: str, *,
 
 
 # ---------------------------------------------------------------------------
-# Branding migration (Qubit Voice Agent), reversible
+# Branding migration (Qubit Voice Agent), reversible — Packet 7D stage kept
+# as history. Packet 8S canonical identity is Qubit VoiceBridge /
+# qubit-voicebridge; both openclaw-voice-bridge and qubit-voice-agent are
+# legacy sources.
 # ---------------------------------------------------------------------------
 OLD_NAME = "openclaw-voice-bridge"
-NEW_NAME = "qubit-voice-agent"
+NEW_NAME = "qubit-voicebridge"
+# 7D intermediate installed identity (Packet 8S legacy source).
+INTERMEDIATE_NAME = "qubit-voice-agent"
+OLD_TITLE = "Qubit Voice Agent"
+NEW_TITLE = "Qubit VoiceBridge"
+# Packet 8S canonical identity (final). The 7D NEW_NAME is a legacy source.
+CANONICAL_NAME_8S = "qubit-voicebridge"
+CANONICAL_TITLE_8S = "Qubit VoiceBridge"
+LEGACY_NAMES_8S = (OLD_NAME, NEW_NAME)
 
 # Repository files whose references must be updated together for a consistent
 # branding migration (package metadata, service unit, launchers, docs, config
 # template). Each entry is (relative path, list of (old, new) literal pairs).
 BRANDING_FILE_EDITS = [
     ("pyproject.toml", [
-        ('name = "openclaw-voice-bridge"', 'name = "qubit-voice-agent"'),
+        ('name = "openclaw-voice-bridge"', 'name = "qubit-voicebridge"'),
+        ('name = "qubit-voice-agent"', 'name = "qubit-voicebridge"'),
         ("description = \"Local push-to-talk voice bridge for OpenClaw",
-         "description = \"Qubit Voice Agent — local push-to-talk voice agent"),
+         "description = \"Qubit VoiceBridge — local push-to-talk voice agent"),
+        ("description = \"Qubit Voice Agent — local push-to-talk voice agent",
+         "description = \"Qubit VoiceBridge — local push-to-talk voice agent"),
     ]),
     ("systemd/openclaw-voice-bridge.service", [
-        ("Description=OpenClaw Voice Bridge", "Description=Qubit Voice Agent"),
-        ("openclaw-voice-bridge.service", "qubit-voice-agent.service"),
+        ("Description=OpenClaw Voice Bridge", "Description=Qubit VoiceBridge"),
+        ("Description=Qubit Voice Agent", "Description=Qubit VoiceBridge"),
+        ("openclaw-voice-bridge.service", "qubit-voicebridge.service"),
+        ("qubit-voice-agent.service", "qubit-voicebridge.service"),
     ]),
     ("scripts/install.sh", [
-        ("openclaw-voice-bridge", "qubit-voice-agent"),
-        ("OpenClaw Voice Bridge install", "Qubit Voice Agent install"),
+        ("openclaw-voice-bridge", "qubit-voicebridge"),
+        ("qubit-voice-agent", "qubit-voicebridge"),
+        ("OpenClaw Voice Bridge install", "Qubit VoiceBridge install"),
+        ("Qubit Voice Agent install", "Qubit VoiceBridge install"),
     ]),
     ("scripts/run.sh", [
-        ("openclaw-voice-bridge", "qubit-voice-agent"),
+        ("openclaw-voice-bridge", "qubit-voicebridge"),
+        ("qubit-voice-agent", "qubit-voicebridge"),
     ]),
     ("scripts/install_systemd_unit.sh", [
-        ("openclaw-voice-bridge.service", "qubit-voice-agent.service"),
-        ("openclaw-voice-bridge", "qubit-voice-agent"),
+        ("openclaw-voice-bridge.service", "qubit-voicebridge.service"),
+        ("qubit-voice-agent.service", "qubit-voicebridge.service"),
+        ("openclaw-voice-bridge", "qubit-voicebridge"),
+        ("qubit-voice-agent", "qubit-voicebridge"),
     ]),
     ("config/voice.example.yaml", [
-        ("OpenClaw Voice Bridge", "Qubit Voice Agent"),
-        ("openclaw-voice-bridge", "qubit-voice-agent"),
+        ("OpenClaw Voice Bridge", "Qubit VoiceBridge"),
+        ("Qubit Voice Agent", "Qubit VoiceBridge"),
+        ("openclaw-voice-bridge", "qubit-voicebridge"),
+        ("qubit-voice-agent", "qubit-voicebridge"),
     ]),
     ("README.md", [
-        ("openclaw-voice-bridge", "qubit-voice-agent"),
-        ("OpenClaw Voice Bridge", "Qubit Voice Agent"),
+        ("openclaw-voice-bridge", "qubit-voicebridge"),
+        ("qubit-voice-agent", "qubit-voicebridge"),
+        ("OpenClaw Voice Bridge", "Qubit VoiceBridge"),
+        ("Qubit Voice Agent", "Qubit VoiceBridge"),
     ]),
     ("docs/AGENT_PROMPT_PACK.md", [
-        ("openclaw-voice-bridge", "qubit-voice-agent"),
+        ("openclaw-voice-bridge", "qubit-voicebridge"),
     ]),
     ("docs/VOICE_BRIDGE_SYSTEM.md", [
-        ("openclaw-voice-bridge", "qubit-voice-agent"),
-        ("OpenClaw Voice Bridge", "Qubit Voice Agent"),
+        ("openclaw-voice-bridge", "qubit-voicebridge"),
+        ("qubit-voice-agent", "qubit-voicebridge"),
+        ("OpenClaw Voice Bridge", "Qubit VoiceBridge"),
+        ("Qubit Voice Agent", "Qubit VoiceBridge"),
     ]),
 ]
 
 # Runtime path pairs to migrate (with a compat alias from the old name).
+# 7D stage pairs are preserved as history; 8S adds the final canonical stage.
 BRANDING_PATH_PAIRS = [
     (".config/openclaw-voice-bridge", ".config/qubit-voice-agent"),
     (".local/state/openclaw-voice-bridge", ".local/state/qubit-voice-agent"),
     (".local/share/openclaw-voice-bridge", ".local/share/qubit-voice-agent"),
+    (".config/openclaw-voice-bridge", ".config/qubit-voicebridge"),
+    (".local/state/openclaw-voice-bridge", ".local/state/qubit-voicebridge"),
+    (".local/share/openclaw-voice-bridge", ".local/share/qubit-voicebridge"),
+    (".config/qubit-voice-agent", ".config/qubit-voicebridge"),
+    (".local/state/qubit-voice-agent", ".local/state/qubit-voicebridge"),
+    (".local/share/qubit-voice-agent", ".local/share/qubit-voicebridge"),
+]
+BRANDING_PATH_PAIRS_8S = [
+    (".config/openclaw-voice-bridge", ".config/qubit-voicebridge"),
+    (".local/state/openclaw-voice-bridge", ".local/state/qubit-voicebridge"),
+    (".local/share/openclaw-voice-bridge", ".local/share/qubit-voicebridge"),
+    (".config/qubit-voice-agent", ".config/qubit-voicebridge"),
+    (".local/state/qubit-voice-agent", ".local/state/qubit-voicebridge"),
+    (".local/share/qubit-voice-agent", ".local/share/qubit-voicebridge"),
 ]
 
-# Docs that intentionally KEEP the old name as HISTORICAL MIGRATION TEXT — they
-# document the openclaw-voice-bridge -> qubit-voice-agent rename itself (e.g.
-# the Packet 7D prompt "rename from `openclaw-voice-bridge` to `qubit-voice-agent`").
+# Docs that intentionally KEEP old names as HISTORICAL MIGRATION TEXT — they
+# document the openclaw-voice-bridge -> qubit-voice-agent (7D) and ->
+# qubit-voicebridge (8S) renames themselves (e.g. the Packet 7D prompt
+# "rename from `openclaw-voice-bridge` to `qubit-voice-agent`").
 # Old-name references in these files are always REPORTED by the verifier and the
 # plan, but they never FAIL branding verification and are never rewritten by an
 # apply (preserving the migration history). Executable package/service/config/
@@ -818,8 +861,9 @@ def _repo_root() -> Path:
 
 
 def _branding_ref_scan(repo: Optional[Path] = None) -> Dict[str, Any]:
-    """Read-only scan: which files still reference the old name, and whether
-    the new name is in place. Returns {file: {old_hits, new_hits, renamed}}."""
+    """Read-only scan: which files still reference an old name (original or
+    7D intermediate), and whether the 8S canonical name is in place.
+    Returns {file: {old_hits, new_hits, renamed}}."""
     root = Path(repo) if repo else _repo_root()
     scan: Dict[str, Dict[str, Any]] = {}
     for rel, _pairs in BRANDING_FILE_EDITS:
@@ -828,19 +872,24 @@ def _branding_ref_scan(repo: Optional[Path] = None) -> Dict[str, Any]:
         if not p.exists():
             # the systemd unit may have been renamed to the new identifier
             if rel == f"systemd/{OLD_NAME}.service":
-                newp = root / f"systemd/{NEW_NAME}.service"
-                if newp.exists():
-                    text = newp.read_text(errors="replace")
-                    scan[rel] = {"old_hits": text.count(OLD_NAME),
-                                 "new_hits": text.count(NEW_NAME),
-                                 "missing": False, "renamed": True,
+                for cand_name in (NEW_NAME, INTERMEDIATE_NAME):
+                    newp = root / f"systemd/{cand_name}.service"
+                    if newp.exists():
+                        text = newp.read_text(errors="replace")
+                        scan[rel] = {"old_hits": text.count(OLD_NAME) + text.count(INTERMEDIATE_NAME),
+                                     "new_hits": text.count(NEW_NAME),
+                                     "missing": False, "renamed": True,
+                                     "historical": historical}
+                        break
+                else:
+                    scan[rel] = {"old_hits": 0, "new_hits": 0, "missing": True,
                                  "historical": historical}
-                    continue
+                continue
             scan[rel] = {"old_hits": 0, "new_hits": 0, "missing": True,
                          "historical": historical}
             continue
         text = p.read_text(errors="replace")
-        scan[rel] = {"old_hits": text.count(OLD_NAME),
+        scan[rel] = {"old_hits": text.count(OLD_NAME) + text.count(INTERMEDIATE_NAME),
                      "new_hits": text.count(NEW_NAME), "missing": False,
                      "renamed": False, "historical": historical}
     return scan
@@ -864,8 +913,9 @@ def branding_plan(cfg: Any, *, dry_run: bool = True,
                   backup_dir: Optional[Path] = None,
                   repo: Optional[Path] = None,
                   migrate_paths: bool = False) -> Dict[str, Any]:
-    """Prepare/perform the openclaw-voice-bridge -> qubit-voice-agent
-    migration. dry-run lists every reference change. --apply rewrites the
+    """Prepare/perform the openclaw-voice-bridge/qubit-voice-agent ->
+    qubit-voicebridge migration (Packet 8S canonical). dry-run lists every
+    reference change. --apply rewrites the
     repository files (under `repo`, default = this repo) with a full backup;
     the runtime config/state/data path migration happens ONLY when
     `migrate_paths=True` (an explicit, separate operator decision) — it is
@@ -944,8 +994,11 @@ def branding_plan(cfg: Any, *, dry_run: bool = True,
         text = src.read_text(errors="replace")
         for old, new in pairs:
             text = text.replace(old, new)
-        # generic token fallback (covers any residual old name)
+        # generic token fallback (covers any residual old name, both the
+        # original and the 7D intermediate identity)
         text = text.replace(OLD_NAME, NEW_NAME)
+        text = text.replace(INTERMEDIATE_NAME, NEW_NAME)
+        text = text.replace(OLD_TITLE, NEW_TITLE)
         fd, tmp = tempfile.mkstemp(dir=str(src.parent),
                                    prefix=f".{src.name}.brand.",
                                    suffix=".tmp")
@@ -953,11 +1006,13 @@ def branding_plan(cfg: Any, *, dry_run: bool = True,
             fh.write(text)
         os.replace(tmp, src)
     # 2b) rename the systemd unit file to the new identifier (content already
-    #     rewritten above)
+    #     rewritten above). Either legacy filename converges to canonical.
     old_unit = root / "systemd" / f"{OLD_NAME}.service"
+    mid_unit = root / "systemd" / f"{INTERMEDIATE_NAME}.service"
     new_unit = root / "systemd" / f"{NEW_NAME}.service"
-    if old_unit.exists() and not new_unit.exists():
-        os.replace(old_unit, new_unit)
+    for cand in (old_unit, mid_unit):
+        if cand.exists() and not new_unit.exists():
+            os.replace(cand, new_unit)
     # 3) runtime compat aliases ONLY when explicitly requested (never in tests
     #    or a plain repo apply). Existing state is moved to the new path and a
     #    symlink keeps the old name working; rollback reverses this.
@@ -983,10 +1038,11 @@ def branding_plan(cfg: Any, *, dry_run: bool = True,
 
 def branding_verify(cfg: Any, repo: Optional[Path] = None) -> Dict[str, Any]:
     """Consistency check. VERIFIED when every file reference and runtime path
-    agrees on qubit-voice-agent; PARTIAL when some remain; PLANNED when none
-    have been migrated yet. Read-only. When the live repository is not yet
-    migrated (the intended operator-gated state), an explicit `limitation`
-    field documents why 7D branding is pending rather than silently passing."""
+    agrees on qubit-voicebridge (Packet 8S canonical); PARTIAL when some
+    remain; PLANNED when none have been migrated yet. Read-only. When the live
+    repository is not yet migrated (the intended operator-gated state), an
+    explicit `limitation` field documents why branding is pending rather than
+    silently passing."""
     root = Path(repo) if repo else _repo_root()
     scan = _branding_ref_scan(root)
     # Historical reference files are REPORTED but never fail branding; executable
@@ -1026,7 +1082,7 @@ def branding_verify(cfg: Any, repo: Optional[Path] = None) -> Dict[str, Any]:
         "historical_references": historical,
         "paths": paths_new,
         "limitation": limitation,
-        "note": ("all references agree on qubit-voice-agent"
+        "note": ("all references agree on qubit-voicebridge"
                  if state == "VERIFIED" else
                  "migration incomplete; run `voicebridge branding plan "
                  "--apply` with a backup, then re-verify"),
@@ -1051,8 +1107,11 @@ def branding_rollback(cfg: Any, backup_dir: Path, repo: Optional[Path] = None) -
             restored.append(rel)
     # 1b) restore the systemd unit filename (migration renames it)
     old_unit = root / "systemd" / f"{OLD_NAME}.service"
+    mid_unit = root / "systemd" / f"{INTERMEDIATE_NAME}.service"
     new_unit = root / "systemd" / f"{NEW_NAME}.service"
-    if new_unit.exists() and not old_unit.exists():
+    if new_unit.exists() and not old_unit.exists() and not mid_unit.exists():
+        # backups restore the original filename when it was captured; only
+        # rename back when neither legacy filename was restored
         os.replace(new_unit, old_unit)
         restored.append("systemd/unit-renamed-back")
     # 2) restore runtime config/state/data

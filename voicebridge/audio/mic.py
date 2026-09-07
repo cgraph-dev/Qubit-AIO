@@ -379,7 +379,7 @@ class MicCapture:
         except Exception:
             pass
 
-        out_dir = out_dir or Path("/tmp/qubit-voice-agent")
+        out_dir = out_dir or Path("/tmp/qubit-voicebridge")
         out_dir.mkdir(parents=True, exist_ok=True)
         wav_path = out_dir / f"utt-{int(time.time()*1000)}.wav"
         with wave.open(str(wav_path), "wb") as wf:

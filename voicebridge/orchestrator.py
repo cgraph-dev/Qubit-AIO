@@ -622,7 +622,7 @@ class VoiceOrchestrator:
         # model entirely for recurring tasks — deterministic + 0 tokens)
         self._templates = TaskTemplates.load(
             path=self.cfg.get("intent", "templates_path",
-                              default="~/.config/openclaw-voice-bridge/task-templates.yaml"),
+                              default="~/.config/qubit-voicebridge/task-templates.yaml"),
             defaults_path=resources.resource_path("config/task-templates.yaml")
             if resources.resource_path("config/task-templates.yaml").exists()
             else None)
@@ -899,7 +899,7 @@ class VoiceOrchestrator:
             log.warning("TTS not available; would say: %s", text[:120])
             return False
         try:
-            path = self._tts.synthesize(text, Path("/tmp/qubit-voice-agent") / f"tts-{uuid.uuid4().hex[:10]}.wav")
+            path = self._tts.synthesize(text, Path("/tmp/qubit-voicebridge") / f"tts-{uuid.uuid4().hex[:10]}.wav")
         except Exception as exc:
             # Hot-fallback: OpenAI network/key hiccup must never silence the bridge — fall back to local Piper instantly
             log_event("tts.synthesize.failed", provider=getattr(self._tts, "name", "unknown"), error=str(exc)[:200])
@@ -908,7 +908,7 @@ class VoiceOrchestrator:
                     from .tts.piper import PiperTTS as _FallbackPiper
                     _fb = _FallbackPiper(model_dir=self.cfg.model_dir(), voice=self.cfg.get("tts", "voice", default="en_US-amy-medium"))
                     _fb.load()
-                    path = _fb.synthesize(text, Path("/tmp/qubit-voice-agent") / f"tts-fb-{uuid.uuid4().hex[:10]}.wav")
+                    path = _fb.synthesize(text, Path("/tmp/qubit-voicebridge") / f"tts-fb-{uuid.uuid4().hex[:10]}.wav")
                     log_event("tts.fallback", provider="piper", reason=str(exc)[:120])
                 except Exception as exc2:
                     log.warning("TTS fallback also failed: %s", exc2)
@@ -1030,7 +1030,7 @@ class VoiceOrchestrator:
                 try:
                     path = self._tts.synthesize(
                         sentence,
-                        Path("/tmp/qubit-voice-agent") / f"tts-{uuid.uuid4().hex[:10]}.wav")
+                        Path("/tmp/qubit-voicebridge") / f"tts-{uuid.uuid4().hex[:10]}.wav")
                     q.put(path)
                 except Exception as exc:
                     log.warning("stream synth: %s", exc)
@@ -3512,7 +3512,7 @@ class VoiceOrchestrator:
     @staticmethod
     def _make_beep(freq: float = 880.0, dur_s: float = 0.08) -> Path:
         """Generate a short sine beep WAV (cached) for capture start/end feedback."""
-        path = Path("/tmp/qubit-voice-agent") / f"beep-{int(freq)}-{int(dur_s*1000)}.wav"
+        path = Path("/tmp/qubit-voicebridge") / f"beep-{int(freq)}-{int(dur_s*1000)}.wav"
         if path.exists():
             return path
         path.parent.mkdir(parents=True, exist_ok=True)

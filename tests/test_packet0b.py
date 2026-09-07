@@ -211,23 +211,23 @@ def test_migration_fresh_install_writes_unit(tmp_path):
     home = _fresh_home(tmp_path)
     r = _run_helper(home)
     assert r.returncode == 0 and "installed atomically" in r.stdout
-    unit = home / ".config/systemd/user/qubit-voice-agent.service"
+    unit = home / ".config/systemd/user/qubit-voicebridge.service"
     assert "__PROJECT_DIR__" not in unit.read_text()
 
 
 def test_migration_idempotent_identical_unit(tmp_path):
     home = _fresh_home(tmp_path)
     assert _run_helper(home).returncode == 0
-    before = (home / ".config/systemd/user/qubit-voice-agent.service").read_text()
+    before = (home / ".config/systemd/user/qubit-voicebridge.service").read_text()
     r = _run_helper(home)
     assert r.returncode == 0 and "idempotent" in r.stdout
-    after = (home / ".config/systemd/user/qubit-voice-agent.service").read_text()
+    after = (home / ".config/systemd/user/qubit-voicebridge.service").read_text()
     assert before == after
 
 
 def test_migration_preserves_divergent_unit(tmp_path):
     home = _fresh_home(tmp_path)
-    unit = home / ".config/systemd/user/qubit-voice-agent.service"
+    unit = home / ".config/systemd/user/qubit-voicebridge.service"
     unit.write_text(TUNED)
     r = _run_helper(home)
     assert r.returncode == 0 and "PRESERVED" in r.stdout
@@ -236,7 +236,7 @@ def test_migration_preserves_divergent_unit(tmp_path):
     assert len(backups) == 1          # snapshot taken even in preserve mode
     assert backups[0].read_text() == TUNED                             # faithful copy
     assert (home / ".config/systemd/user/"
-                  "qubit-voice-agent.service.template-new").exists()
+                   "qubit-voicebridge.service.template-new").exists()
 
 
 def test_migration_force_overwrite_and_rollback_drill(tmp_path):
@@ -244,7 +244,7 @@ def test_migration_force_overwrite_and_rollback_drill(tmp_path):
     restoring the newest backup returns the exact prior tuned unit."""
     import glob as _glob
     home = _fresh_home(tmp_path)
-    unit = home / ".config/systemd/user/qubit-voice-agent.service"
+    unit = home / ".config/systemd/user/qubit-voicebridge.service"
     unit.write_text(TUNED)
     r = _run_helper(home, force="1")
     assert r.returncode == 0 and "FORCED" in r.stdout

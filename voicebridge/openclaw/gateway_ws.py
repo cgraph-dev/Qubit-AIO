@@ -110,7 +110,7 @@ class GatewayClient:
             "role": "operator", "scopes": SCOPES,
             "caps": [], "commands": [], "permissions": {},
             "auth": {"token": self.token}, "locale": "en-US",
-            "userAgent": "qubit-voice-agent/0.1.0",
+            "userAgent": "qubit-voicebridge/1.0.0",
         }
         await self.ws.send(json.dumps({"type": "req", "id": "connect",
                                        "method": "connect", "params": params}))

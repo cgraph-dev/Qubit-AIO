@@ -24,7 +24,7 @@ def build_parser() -> argparse.ArgumentParser:
     # without SUPPRESS the subparser default would clobber a value the top level
     # already parsed (e.g. `--config X websites list` silently ignoring X).
     common.add_argument("--config", type=Path, default=argparse.SUPPRESS,
-                        help="path to voice.yaml (default ~/.config/openclaw-voice-bridge/voice.yaml)")
+                        help="path to voice.yaml (default ~/.config/qubit-voicebridge/voice.yaml; legacy openclaw-voice-bridge/qubit-voice-agent paths resolve via compat alias)")
     common.add_argument("--no-hotkey", action="store_true",
                         default=argparse.SUPPRESS,
                         help="disable hotkey; use manual Enter PTT (headless/SSH)")
@@ -227,10 +227,10 @@ def build_parser() -> argparse.ArgumentParser:
     prof_roll.add_argument("--backup", type=Path, default=None)
     prof_roll.add_argument("--apply", action="store_true",
                            help="actually roll back (default: dry-run)")
-    brand = add("branding", help="Qubit Voice Agent branding migration (dry-run/backup/verify/rollback)")
+    brand = add("branding", help="Qubit VoiceBridge branding migration (dry-run/backup/verify/rollback)")
     brand_sub = brand.add_subparsers(dest="branding_command")
     brand_plan = brand_sub.add_parser("plan", parents=[common],
-                                      help="prepare the openclaw-voice-bridge -> qubit-voice-agent migration")
+                                      help="prepare the openclaw-voice-bridge/qubit-voice-agent -> qubit-voicebridge migration")
     brand_plan.add_argument("--apply", action="store_true", default=False,
                             help="perform the migration with a backup (default: dry-run plan only)")
     brand_plan.add_argument("--migrate-paths", action="store_true", default=False,
@@ -1124,7 +1124,7 @@ def _cmd_roundtrip(cfg, text: str | None, model: str | None, orch) -> int:
     print("[1/6] synth sample speech (piper) ...")
     tts = PiperTTS(model_dir=cfg.model_dir(), voice=cfg.get("tts", "voice", default="en_US-amy-medium"))
     tts.load()
-    wav = tts.synthesize(sample, Path("/tmp/qubit-voice-agent/roundtrip-sample.wav"))
+    wav = tts.synthesize(sample, Path("/tmp/qubit-voicebridge/roundtrip-sample.wav"))
     print(f"      -> {wav}")
 
     print("[2/6] transcribe (whisper) ...")
@@ -1151,7 +1151,7 @@ def _cmd_roundtrip(cfg, text: str | None, model: str | None, orch) -> int:
     print("[5/6] final spoken summary rendered by piper ...")
     # The orchestrator already spoke the summary; render it to a file to verify.
     # Re-run the last summary from events is overkill — synthesize a fixed check line.
-    check = tts.synthesize("Round trip complete.", Path("/tmp/qubit-voice-agent/roundtrip-final.wav"))
+    check = tts.synthesize("Round trip complete.", Path("/tmp/qubit-voicebridge/roundtrip-final.wav"))
     print(f"      -> {check}")
 
     print("[6/6] roundtrip OK")
@@ -1552,10 +1552,13 @@ def _bridge_service_active() -> bool:
     """True when the voice-bridge user service is running (holds the mic)."""
     try:
         import subprocess
-        r = subprocess.run(["systemctl", "--user", "is-active",
-                            "openclaw-voice-bridge.service"],
-                           capture_output=True, text=True, timeout=5)
-        return (r.stdout or "").strip() == "active"
+        for unit in ("qubit-voicebridge.service", "qubit-voice-agent.service",
+                     "openclaw-voice-bridge.service"):
+            r = subprocess.run(["systemctl", "--user", "is-active", unit],
+                               capture_output=True, text=True, timeout=5)
+            if (r.stdout or "").strip() == "active":
+                return True
+        return False
     except Exception:
         return True   # fail-safe: refuse the check rather than open a 2nd stream
 

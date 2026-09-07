@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-PACKAGE_NAME = "qubit-voice-agent"
+PACKAGE_NAME = "qubit-voicebridge"
 PACKAGE_VERSION = "1.0.0"
 SUPPORTED_TARGET = {
     "os": "ubuntu",
@@ -347,7 +347,7 @@ def uninstall_plan(cfg: Any) -> Dict[str, Any]:
         "action": "uninstall",
         "requires_confirmation": True,
         "steps_if_confirmed": [
-            "disable + remove only the qubit-voice-agent user unit",
+            "disable + remove only the qubit-voicebridge user unit",
             "remove the .venv and repo checkout",
         ],
         "preserves_by_default": ["state dir (memory/reports/cursors)",
@@ -366,7 +366,7 @@ DISTRIBUTABLE_FILES = [
     ("scripts/install_systemd_unit.sh", "installer"),
     ("scripts/run.sh", "launcher"),
     ("config/voice.example.yaml", "config-template"),
-    ("systemd/qubit-voice-agent.service", "systemd-template"),
+    ("systemd/qubit-voicebridge.service", "systemd-template"),
     ("pyproject.toml", "metadata"),
     ("docs/OPERATIONS_7C.md", "metadata"),
 ]

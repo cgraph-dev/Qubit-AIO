@@ -390,7 +390,7 @@ def _project_license_text(repo: Optional[Path] = None) -> str:
             return lic.strip()
     except OSError:
         pass
-    return ("Qubit Voice Agent Educational Project License — see the root "
+    return ("Qubit VoiceBridge Educational Project License — see the root "
             "LICENSE; applies only to original Qubit material. Third-party/"
             "upstream-derived material remains under its original license per "
             "THIRD_PARTY_NOTICES.md and docs/UPSTREAM_REUSE.md.")
@@ -408,7 +408,7 @@ def sbom(repo: Optional[Path] = None) -> Dict[str, Any]:
         recs.append({"name": d["name"], "constraint": d["spec"],
                      "installed": installed.get(d["name"], "unknown")})
     return {
-        "package": "qubit-voice-agent",
+        "package": "qubit-voicebridge",
         "version": _package_version(),
         "python": platform.python_version(),
         "main": recs,
@@ -494,7 +494,7 @@ def _normalize_import(name: str) -> str:
     return name.replace("-", "_").split(".")[0].lower()
 
 
-def declared_module_names_from_metadata(dist_name: str = "qubit-voice-agent"
+def declared_module_names_from_metadata(dist_name: str = "qubit-voicebridge"
                                         ) -> set[str]:
     """Import names allowed by the INSTALLED package metadata (Requires-Dist
     including extras with markers). Used by the in-venv clean checks so a
@@ -692,7 +692,7 @@ def filesystem_modes_check(root: Optional[Path] = None) -> List[Dict[str, str]]:
             bad.append("machine path")
         if scan_text_secrets(text):
             bad.append("secret")
-        if unit.name == "qubit-voice-agent.service" and re.search(
+        if unit.name == "qubit-voicebridge.service" and re.search(
                 r"^Memory(Max|High)|^Nice=|^CPUQuota=", text, re.M):
             bad.append("hardcoded resource directive")
         results.append({
@@ -1317,7 +1317,7 @@ def release_manifest(artifact_dir: Path,
     sizes, public signer fingerprint). Never contains secret key material."""
     return {
         "schema_version": RELEASE_MANIFEST_SCHEMA,
-        "project": "qubit-voice-agent",
+        "project": "qubit-voicebridge",
         "checksums": SHA256SUMS_NAME,
         "signer_fingerprint": approved_signer_fingerprint(env),
         "artifacts": [

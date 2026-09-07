@@ -1,15 +1,15 @@
 [project]
-name = "qubit-voice-agent"
+name = "qubit-voicebridge"
 version = "1.0.0"
-description = "Qubit Voice Agent — local push-to-talk voice agent: Moonshine ASR, Silero VAD, voice-ID, local LLM, piper TTS — 5 GB VRAM budget."
+description = "Qubit VoiceBridge — local push-to-talk voice agent: Moonshine ASR, Silero VAD, voice-ID, local LLM, piper TTS — 5 GB VRAM budget."
 readme = "README.md"
-# The project's own LICENSE is the Qubit Voice Agent Educational Project
+# The project's own LICENSE is the Qubit VoiceBridge Educational Project
 # License: it applies ONLY to original Qubit material (see the root LICENSE
 # file and docs/LICENSING.md). Third-party/upstream-derived material remains
 # under its original license and is recorded in THIRD_PARTY_NOTICES.md and
 # docs/UPSTREAM_REUSE.md. The repository as a whole is not an OSI-approved
 # open-source project.
-license = { text = "Qubit Voice Agent Educational Project License — Copyright © 2026 Qubit by Tricky; applies only to original Qubit material. Third-party/upstream-derived material remains under its original license; see LICENSE, docs/LICENSING.md, and THIRD_PARTY_NOTICES.md." }
+license = { text = "Qubit VoiceBridge Educational Project License — Copyright © 2026 Qubit by Tricky; applies only to original Qubit material. Third-party/upstream-derived material remains under its original license; see LICENSE, docs/LICENSING.md, and THIRD_PARTY_NOTICES.md." }
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
 requires-python = ">=3.11"
 dependencies = [

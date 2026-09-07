@@ -237,7 +237,7 @@ def test_no_script_eval_or_dynamic_function() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Packet 8L polish regression: consistent Qubit Voice Agent branding, the
+# Packet 8L polish regression: consistent Qubit VoiceBridge branding, the
 # Talk-page onboarding panel, canonical pairing guidance, and a single shared
 # visual palette (near-black + restrained lime). These are additive checks —
 # they never weaken the existing Packet 8L contract tests above.
@@ -245,12 +245,12 @@ def test_no_script_eval_or_dynamic_function() -> None:
 
 def test_branding_title_on_every_page() -> None:
     """Every dashboard page carries the product name in a consistent
-    ``<title>`` ("Qubit Voice Agent — <Section>")."""
+    ``<title>`` ("Qubit VoiceBridge — <Section>")."""
     for page in PAGES:
         text = _read(page)
         title = re.search(r"<title>(.*?)</title>", text, flags=re.S)
         assert title, f"{page}: missing <title>"
-        assert title.group(1).strip().startswith("Qubit Voice Agent"), \
+        assert title.group(1).strip().startswith("Qubit VoiceBridge"), \
             f"{page}: title must start with the product name, got {title.group(1)!r}"
 
 
@@ -264,7 +264,7 @@ def test_talk_page_has_onboarding_help_panel() -> None:
     assert "How Qubit works" in text, "Talk help panel missing its heading"
     for needle in ["Pair device", "Activity", "Reports", "Settings"]:
         assert needle in text, f"Talk onboarding must mention the {needle} step"
-    assert '~/.config/qubit-voice-agent/voice.yaml' in text, \
+    assert '~/.config/qubit-voicebridge/voice.yaml' in text, \
         "Talk onboarding must name the canonical token location"
     assert "webui.token" in text
     # every onboarding link (inside the help panel only) must be a >=44px
@@ -283,14 +283,17 @@ def test_talk_page_has_onboarding_help_panel() -> None:
 
 def test_token_setup_uses_canonical_qubit_path() -> None:
     """Packet 8L polish: the pairing page must reference the canonical
-    ``qubit-voice-agent`` config path (never the legacy
-    ``openclaw-voice-bridge`` name) and the real ``webui.token`` key."""
+    ``qubit-voicebridge`` config path (never the legacy
+    ``openclaw-voice-bridge``/``qubit-voice-agent`` names) and the real
+    ``webui.token`` key."""
     text = _read("token-setup.html")
     assert "openclaw-voice-bridge" not in text, \
         "token-setup must not name the legacy config path"
+    assert "qubit-voice-agent/voice.yaml" not in text, \
+        "token-setup must not name the 7D intermediate path"
     assert "webui.token" in text and "voice.yaml" in text, \
         "token-setup must point at webui.token in voice.yaml"
-    assert "qubit-voice-agent" in text, "token-setup must use the canonical product path"
+    assert "qubit-voicebridge" in text, "token-setup must use the canonical product path"
     assert "vbApiTest" in text  # candidate token is tested before saving
 
 

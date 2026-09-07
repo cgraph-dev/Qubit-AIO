@@ -201,7 +201,7 @@ one shared capability registry (`voicebridge/broker.py`):
 ---
 
 ## 6. Config reference (live, tuned)
-Provided in `~/.config/qubit-voice-agent/voice.yaml` + defaults in
+Provided in `~/.config/qubit-voicebridge/voice.yaml` + defaults in
 `config/voice.yaml` + `voicebridge/config.py` (read the file for exact values).
 
 ---

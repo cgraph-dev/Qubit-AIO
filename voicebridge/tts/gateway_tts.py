@@ -40,7 +40,7 @@ class GatewayTTS(TTSProvider):
             raise TTSUnavailable("gateway tts.speak returned nothing")
         audio_b64, _mime, fmt = result
         out_path = Path(out_path) if out_path else Path(
-            f"/tmp/qubit-voice-agent/tts-gw-{abs(hash(text))%10**8}.wav")
+            f"/tmp/qubit-voicebridge/tts-gw-{abs(hash(text))%10**8}.wav")
         out_path.parent.mkdir(parents=True, exist_ok=True)
         data = base64.b64decode(audio_b64)
         # Gateway returns raw PCM (pcm16) or encoded audio; wrap PCM in WAV.

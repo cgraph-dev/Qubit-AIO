@@ -236,7 +236,7 @@ def test_branding_plan_dry_run_is_read_only(tmp_path):
     cfg = _cfg(tmp_path)
     plan = P.branding_plan(cfg, dry_run=True)
     assert plan["dry_run"] is True
-    assert plan["new_name"] == "qubit-voice-agent"
+    assert plan["new_name"] == "qubit-voicebridge"
     assert any("pyproject.toml" in s for s in plan["file_steps"])
     assert any("systemd" in s for s in plan["file_steps"])
     assert "memory" in plan["preserves"]
@@ -272,21 +272,29 @@ def _staged_repo(tmp_path: Path) -> Path:
             except OSError:
                 continue
     # normalize to the pre-branding identity so the transition is observable
+    # (Packet 8S canonical is qubit-voicebridge; the 7D intermediate
+    # qubit-voice-agent is also normalized back to the original name)
     for p in dest.rglob("*"):
         if p.is_file() and p.suffix in (".toml", ".md", ".yaml", ".sh", ".service"):
             try:
                 text = p.read_text()
             except OSError:
                 continue
+            text = text.replace("qubit-voicebridge", "openclaw-voice-bridge")
             text = text.replace("qubit-voice-agent", "openclaw-voice-bridge")
             text = text.replace("qubit_voice_agent", "openclaw_voice_bridge")
+            text = text.replace("Qubit VoiceBridge", "OpenClaw Voice Bridge")
+            text = text.replace("Qubit Voice Agent", "OpenClaw Voice Bridge")
             p.write_text(text)
     # restore the pre-branding systemd unit FILENAME (the edit rules target the
-    # old-named template; apply renames it to qubit-voice-agent.service)
-    new_unit = dest / "systemd" / "qubit-voice-agent.service"
+    # old-named template; apply renames it to qubit-voicebridge.service)
+    new_unit = dest / "systemd" / "qubit-voicebridge.service"
+    mid_unit = dest / "systemd" / "qubit-voice-agent.service"
     old_unit = dest / "systemd" / "openclaw-voice-bridge.service"
-    if new_unit.exists() and not old_unit.exists():
-        new_unit.rename(old_unit)
+    for cand in (new_unit, mid_unit):
+        if cand.exists() and not old_unit.exists():
+            cand.rename(old_unit)
+            break
     return dest
 
 
@@ -298,12 +306,12 @@ def test_branding_apply_migrates_repo_and_verify_returns_verified(tmp_path):
     assert plan["backup"] == str(bdir)
     assert Path(bdir).exists()
     assert plan["backup_files"]
-    # repo files were actually rewritten to qubit-voice-agent
-    assert 'name = "qubit-voice-agent"' in (repo / "pyproject.toml").read_text()
+    # repo files were actually rewritten to qubit-voicebridge (8S canonical)
+    assert 'name = "qubit-voicebridge"' in (repo / "pyproject.toml").read_text()
     # the systemd unit was renamed to the new identifier
-    new_unit = repo / "systemd" / "qubit-voice-agent.service"
+    new_unit = repo / "systemd" / "qubit-voicebridge.service"
     assert new_unit.exists()
-    assert "Qubit Voice Agent" in new_unit.read_text()
+    assert "Qubit VoiceBridge" in new_unit.read_text()
     assert not (repo / "systemd" / "openclaw-voice-bridge.service").exists()
     # verify returns VERIFIED (not PLANNED) after the migration
     v = P.branding_verify(cfg, repo=repo)
@@ -320,7 +328,7 @@ def test_branding_verify_reports_partial_and_planned(tmp_path):
     # migrate only pyproject -> PARTIAL
     (repo / "pyproject.toml").write_text(
         (repo / "pyproject.toml").read_text().replace(
-            'name = "openclaw-voice-bridge"', 'name = "qubit-voice-agent"'))
+            'name = "openclaw-voice-bridge"', 'name = "qubit-voicebridge"'))
     v2 = P.branding_verify(cfg, repo=repo)
     assert v2["state"] == "PARTIAL"
     assert "pyproject.toml" not in v2["files_remaining"]
@@ -354,7 +362,7 @@ def test_branding_unapproved_old_name_reference_still_fails(tmp_path):
     P.branding_plan(cfg, dry_run=False, backup_dir=bdir, repo=repo)
     # reintroduce an UNapproved old-name reference in an executable file
     pp = repo / "pyproject.toml"
-    pp.write_text(pp.read_text().replace('name = "qubit-voice-agent"',
+    pp.write_text(pp.read_text().replace('name = "qubit-voicebridge"',
                                          'name = "openclaw-voice-bridge"'))
     v = P.branding_verify(cfg, repo=repo)
     assert v["state"] == "PARTIAL", v
@@ -680,7 +688,7 @@ def test_api_branding_and_export_state(tmp_path, monkeypatch):
     try:
         st, body = _get(ui, "/api/branding")
         assert st == 200
-        assert body["new_name"] == "qubit-voice-agent"
+        assert body["new_name"] == "qubit-voicebridge"
         assert body["state"] in ("VERIFIED", "PARTIAL", "PLANNED")
         # export-state requires enrollment + passphrase; missing passphrase
         # (after enroll) -> DENIED
@@ -699,7 +707,7 @@ def test_settings_page_served(tmp_path, monkeypatch):
                 f"http://127.0.0.1:{ui._server.server_port}/settings",
                 timeout=5) as r:
             html = r.read().decode()
-        assert "Qubit Voice Agent" in html
+        assert "Qubit VoiceBridge" in html
         assert "/api/profiles" in html
     finally:
         ui.stop()

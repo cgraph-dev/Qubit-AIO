@@ -2,9 +2,11 @@
 first-run, service ownership, desktop shortcut, optional tray, capability
 defaults, and the packaging/private-source boundary.
 
-Qubit Voice Agent is the canonical public identity. The internal import
-package stays ``voicebridge``; existing ``openclaw-voice-bridge`` paths keep an
-explicit compatibility alias and a reversible migration.
+Packet 8S: Qubit VoiceBridge is the canonical public identity
+(installed/repository identity ``qubit-voicebridge``). The internal import
+package stays ``voicebridge``; ``openclaw-voice-bridge`` (original) and
+``qubit-voice-agent`` (7D intermediate) are explicit legacy compatibility
+identities with a reversible migration.
 
 Design rules (all hermetic by default):
 - Never read from one path and write to another in the same operation.
@@ -53,9 +55,13 @@ from typing import Any, Dict, List, Optional
 
 from . import resources
 
-# Canonical public identity.
-PRODUCT_NAME = "qubit-voice-agent"
+# Canonical public identity (Packet 8S).
+PRODUCT_NAME = "qubit-voicebridge"
+PRODUCT_TITLE = "Qubit VoiceBridge"
 LEGACY_NAME = "openclaw-voice-bridge"
+# 7D intermediate installed identity; existing 7D/8K-P installs use it.
+LEGACY_NAME_7D = "qubit-voice-agent"
+LEGACY_NAMES = (LEGACY_NAME, LEGACY_NAME_7D)
 PRODUCT_VERSION = "1.0.0"
 
 # Typed result states.
@@ -166,6 +172,9 @@ class ProductPaths:
     legacy_base: Path
     legacy_state: Path
     legacy_data: Path
+    legacy7d_base: Path = Path(".")
+    legacy7d_state: Path = Path(".")
+    legacy7d_data: Path = Path(".")
 
     @property
     def map(self) -> Dict[str, str]:
@@ -183,6 +192,9 @@ class ProductPaths:
             "legacy_config": str(self.legacy_base),
             "legacy_state": str(self.legacy_state),
             "legacy_data": str(self.legacy_data),
+            "legacy7d_config": str(self.legacy7d_base),
+            "legacy7d_state": str(self.legacy7d_state),
+            "legacy7d_data": str(self.legacy7d_data),
         }
 
     def owned_dirs(self) -> List[Path]:
@@ -205,6 +217,9 @@ def default_paths(base: Optional[Path] = None) -> ProductPaths:
         legacy = b / "legacy"
         legacy_state = b / "legacy-state"
         legacy_data = b / "legacy-data"
+        legacy7d = b / "legacy7d"
+        legacy7d_state = b / "legacy7d-state"
+        legacy7d_data = b / "legacy7d-data"
     else:
         b = Path("~").expanduser()
         cfg = _xdg("XDG_CONFIG_HOME", ".config") / PRODUCT_NAME
@@ -214,6 +229,9 @@ def default_paths(base: Optional[Path] = None) -> ProductPaths:
         legacy = _xdg("XDG_CONFIG_HOME", ".config") / LEGACY_NAME
         legacy_state = _xdg("XDG_STATE_HOME", ".local/state") / LEGACY_NAME
         legacy_data = _xdg("XDG_DATA_HOME", ".local/share") / LEGACY_NAME
+        legacy7d = _xdg("XDG_CONFIG_HOME", ".config") / LEGACY_NAME_7D
+        legacy7d_state = _xdg("XDG_STATE_HOME", ".local/state") / LEGACY_NAME_7D
+        legacy7d_data = _xdg("XDG_DATA_HOME", ".local/share") / LEGACY_NAME_7D
     return ProductPaths(
         base=b,
         config_dir=cfg,
@@ -229,6 +247,9 @@ def default_paths(base: Optional[Path] = None) -> ProductPaths:
         legacy_base=legacy,
         legacy_state=legacy_state,
         legacy_data=legacy_data,
+        legacy7d_base=legacy7d,
+        legacy7d_state=legacy7d_state,
+        legacy7d_data=legacy7d_data,
     )
 
 
@@ -270,14 +291,18 @@ def path_map_diagnostic(paths: Optional[ProductPaths] = None) -> Dict[str, Any]:
 
 
 def _legacy_pairs(paths: ProductPaths) -> List[tuple]:
-    """(legacy, canonical) directory pairs. The legacy openclaw-voice-bridge
-    path is kept as an explicit compatibility alias so any code that still
-    reads the old name resolves to the same physical tree — it can never read
-    one config while another path writes a different one."""
+    """(legacy, canonical) directory pairs. Both legacy identities —
+    ``openclaw-voice-bridge`` (original) and ``qubit-voice-agent`` (7D
+    intermediate) — are kept as explicit compatibility aliases so any code
+    that still reads an old name resolves to the same physical tree — it can
+    never read one config while another path writes a different one."""
     return [
         (paths.legacy_base, paths.config_dir),
         (paths.legacy_state, paths.state_dir),
         (paths.legacy_data, paths.data_dir),
+        (paths.legacy7d_base, paths.config_dir),
+        (paths.legacy7d_state, paths.state_dir),
+        (paths.legacy7d_data, paths.data_dir),
     ]
 
 
@@ -599,7 +624,8 @@ def install_steps(paths: Optional[ProductPaths] = None, *,
         steps.append({
             "step": "migration",
             "state": BLOCKED,
-            "detail": "legacy openclaw-voice-bridge directories are present; "
+            "detail": "legacy openclaw-voice-bridge/qubit-voice-agent "
+                      "directories are present; "
                       "run `voicebridge product migrate` (reversible, backed "
                       "up) before installing so the install cannot read one "
                       "tree while the runtime writes another",
@@ -1237,24 +1263,29 @@ def _next_action(step: str, state: str) -> str:
 # 5. Branding migration (reversible, backed up, compatible-alias based)
 # ---------------------------------------------------------------------------
 def branding_status(paths: Optional[ProductPaths] = None) -> Dict[str, Any]:
-    """Read-only branding/migration status: whether the legacy
-    openclaw-voice-bridge path exists and whether a compat alias is present.
+    """Read-only branding/migration status for the Packet 8S Qubit
+    VoiceBridge identity: whether either legacy path (openclaw-voice-bridge
+    or qubit-voice-agent) exists and whether compat aliases are present.
     Never performs the migration itself."""
     paths = paths or default_paths()
-    legacy = paths.legacy_base
     canonical = paths.config_dir
-    legacy_exists = legacy.exists()
-    alias = legacy.is_symlink() if legacy_exists else False
-    if not legacy_exists:
+    legacies = [paths.legacy_base, paths.legacy7d_base]
+    existing = [lg for lg in legacies if lg.exists()]
+    if not existing:
         return {"state": "FRESH", "detail": "no legacy installation detected",
-                "legacy": str(legacy)}
-    if legacy_exists and not canonical.exists():
+                "legacy": str(paths.legacy_base)}
+    if any((not canonical.exists()) for _ in existing):
+        first = existing[0]
         return {"state": "LEGACY_ONLY",
-                "detail": "legacy OpenClaw Voice Bridge state detected at "
-                          f"{legacy}; migrate before continuing",
-                "legacy": str(legacy), "alias": alias}
+                "detail": "legacy Qubit VoiceBridge predecessor state "
+                          f"detected at {first}; migrate before continuing",
+                "legacy": str(first),
+                "alias": first.is_symlink(),
+                "legacies": [str(p) for p in existing]}
     return {"state": "MIGRATED", "detail": "canonical path present; legacy "
-            "compat alias in place", "legacy": str(legacy), "alias": alias}
+            "compat alias in place", "legacy": str(existing[0]),
+            "alias": existing[0].is_symlink(),
+            "legacies": [str(p) for p in existing]}
 
 
 # ---------------------------------------------------------------------------
@@ -1369,8 +1400,9 @@ def migrate(paths: Optional[ProductPaths] = None, *,
                     "resumed": resumed, "backup_dir": None,
                     "detail": "migration resumed; compat aliases completed"}
         return {"state": "FRESH", "run_id": run_id,
-                "detail": "no legacy openclaw-voice-bridge directories to "
-                          "migrate (all pairs are absent or already aliased)",
+                "detail": "no legacy openclaw-voice-bridge/qubit-voice-agent "
+                          "directories to migrate (all pairs are absent or "
+                          "already aliased)",
                 "pairs": alias["pairs"], "moved": [], "backup_dir": None}
     bdir = Path(backup_dir) if backup_dir else \
         (paths.backup_dir / f"migration-{run_id}")
@@ -1595,8 +1627,11 @@ def service_owner(paths: Optional[ProductPaths] = None, *,
         (Path("~").expanduser() / ".config/systemd/user")
     unit = udir / f"{PRODUCT_NAME}.service"
     legacy_unit = udir / f"{LEGACY_NAME}.service"
+    legacy7d_unit = udir / f"{LEGACY_NAME_7D}.service"
     canon_exists = unit.exists()
-    legacy_exists = legacy_unit.exists()
+    legacy_exists = legacy_unit.exists() or legacy7d_unit.exists()
+    legacy_names = ", ".join(
+        p.name for p in (legacy_unit, legacy7d_unit) if p.exists())
     stale = legacy_exists
     stale_state = "STALE" if stale else "NONE"
     if not canon_exists and not legacy_exists:
@@ -1606,12 +1641,13 @@ def service_owner(paths: Optional[ProductPaths] = None, *,
                         "automatically)")
     elif canon_exists and legacy_exists:
         state = "DUPLICATE"
-        state_detail = ("both the canonical and legacy units exist; exactly "
+        state_detail = (f"both the canonical and legacy units exist "
+                        f"({legacy_names}); exactly "
                         "one service must own one listener — disable the "
                         "legacy unit explicitly")
     elif legacy_exists:
         state = "STALE"
-        state_detail = ("only the legacy openclaw-voice-bridge unit exists; "
+        state_detail = (f"only a legacy unit exists ({legacy_names}); "
                         "migrate then install the canonical unit so exactly "
                         "one service owns one listener")
     else:
@@ -1636,8 +1672,8 @@ def service_owner(paths: Optional[ProductPaths] = None, *,
         "stale_detection": f"typed: `systemctl --user is-active "
                            f"{PRODUCT_NAME}.service` + pid check",
         "stale_legacy_unit": stale_state,
-        "stale_legacy_unit_detail": (f"legacy unit {legacy_unit.name} present; "
-                                     "disable it explicitly before/after "
+        "stale_legacy_unit_detail": (f"legacy unit(s) {legacy_names} present; "
+                                     "disable explicitly before/after "
                                      "migration so exactly one service owns "
                                      "one listener" if stale else
                                      "no legacy unit; single canonical unit "
@@ -1718,9 +1754,9 @@ def desktop_shortcut(paths: Optional[ProductPaths] = None, *,
         content = (
             "[Desktop Entry]\n"
             "Type=Application\n"
-            f"Name={PRODUCT_NAME.title()} Voice Agent\n"
+            f"Name={PRODUCT_TITLE}\n"
             f"Exec={exec_argv}\n"
-            f"Comment=Open the Qubit Voice Agent dashboard (authenticated)\n"
+            f"Comment=Open the {PRODUCT_TITLE} dashboard (authenticated)\n"
             "Terminal=false\n"
             "Categories=Utility;\n"
         )
