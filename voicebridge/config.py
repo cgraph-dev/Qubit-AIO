@@ -130,6 +130,29 @@ def detect_legacy_configs() -> List[Dict[str, Any]]:
         out.append(rec)
     return out
 
+
+def resolve_model_file(relative: Path | str) -> Path:
+    """Canonical-first, legacy-fallback resolution for model artifact FILES.
+
+    Returns the canonical ``<data>/models/<relative>`` path when it exists;
+    otherwise the first existing legacy copy (read-only compatibility read —
+    the caller must never write through the returned legacy path; downloads
+    and bootstrap always target the canonical tree); otherwise the canonical
+    path (so missing-file errors and acquisition flows name the canonical
+    location). Never touches the filesystem beyond existence checks."""
+    rel = Path(relative)
+    canon = canonical_data_dir() / "models" / rel
+    if canon.exists():
+        return canon
+    for family in LEGACY_NAMES:
+        cand = _xdg_base("XDG_DATA_HOME", ".local/share") / family / "models" / rel
+        try:
+            if cand.exists():
+                return cand
+        except OSError:
+            continue
+    return canon
+
 DEFAULTS: Dict[str, Any] = {
     "audio": {
         "output_device": "",        # portaudio device index for TTS (pin to headphones); "" = system default

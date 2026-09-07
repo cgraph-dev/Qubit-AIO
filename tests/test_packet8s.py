@@ -652,3 +652,48 @@ def test_physical_folder_migration_procedure(tmp_path):
     assert not src.exists()  # old path is not a second active checkout
     assert _hashes(dst) == before
     assert _hashes(backup) == before
+
+
+# ---------------------------------------------------------------------------
+# 11. Read-only model compat fallback (repair: preserve working setup)
+# ---------------------------------------------------------------------------
+def test_resolve_model_file_prefers_canonical(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    canon = tmp_path / "data" / "qubit-voicebridge" / "models" / "m.bin"
+    canon.parent.mkdir(parents=True)
+    canon.write_text("canonical")
+    legacy = tmp_path / "data" / "openclaw-voice-bridge" / "models" / "m.bin"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text("legacy")
+    assert C.resolve_model_file("m.bin") == canon
+
+
+def test_resolve_model_file_falls_back_to_legacy_read_only(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    legacy = tmp_path / "data" / "qubit-voice-agent" / "models" / "m.bin"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text("legacy")
+    resolved = C.resolve_model_file("m.bin")
+    assert resolved == legacy
+    # the canonical path (for errors/downloads) still names the new identity
+    assert "qubit-voicebridge" in str(C.canonical_data_dir())
+
+
+def test_resolve_model_file_missing_names_canonical(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    resolved = C.resolve_model_file("nope/m.bin")
+    assert str(resolved).endswith("qubit-voicebridge/models/nope/m.bin")
+
+
+def test_sherpa_paths_use_legacy_models_when_unmigrated(tmp_path, monkeypatch):
+    from voicebridge.asr.sherpa import SherpaASR
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    engine_dir = "sherpa-onnx-moonshine-base-en-quantized-2026-02-27"
+    legacy_enc = (tmp_path / "data" / "openclaw-voice-bridge" / "models"
+                  / engine_dir / "encoder_model.ort")
+    legacy_enc.parent.mkdir(parents=True)
+    legacy_enc.write_text("x")
+    asr = SherpaASR(engine="moonshine",
+                    model_dir=tmp_path / "data" / "qubit-voicebridge" / "models")
+    paths = asr._paths()
+    assert paths["encoder"] == legacy_enc

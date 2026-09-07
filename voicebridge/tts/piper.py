@@ -42,6 +42,13 @@ class PiperTTS(TTSProvider):
         onnx = self.model_dir / f"{v}.onnx"
         jsonp = self.model_dir / f"{v}.onnx.json"
         if not onnx.exists():
+            # Read-only compat: an unmigrated install keeps working from the
+            # legacy model copy; downloads still target the canonical tree.
+            from ..config import resolve_model_file
+            legacy_onnx = resolve_model_file(Path(f"{v}.onnx"))
+            if legacy_onnx.exists() and str(legacy_onnx) != str(onnx):
+                return legacy_onnx, legacy_onnx.parent / f"{v}.onnx.json"
+        if not onnx.exists():
             raise TTSUnavailable(
                 f"piper voice not found: {onnx}\n"
                 "Download it (see README): "

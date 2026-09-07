@@ -86,19 +86,31 @@ class SherpaASR(ASRProvider):
 
     # ---- model wiring -------------------------------------------------------
     def _paths(self):
-        base = self.model_dir / _ENGINES[self.engine]["dir"]
+        from ..config import resolve_model_file
+        engine_dir = _ENGINES[self.engine]["dir"]
+        base = self.model_dir / engine_dir
         if self.engine == "moonshine":
-            return {
-                "encoder": base / "encoder_model.ort",
-                "decoder": base / "decoder_model_merged.ort",
-                "tokens": base / "tokens.txt",
+            wanted = {
+                "encoder": "encoder_model.ort",
+                "decoder": "decoder_model_merged.ort",
+                "tokens": "tokens.txt",
             }
-        return {
-            "encoder": base / "encoder.int8.onnx",
-            "decoder": base / "decoder.int8.onnx",
-            "joiner": base / "joiner.int8.onnx",
-            "tokens": base / "tokens.txt",
-        }
+        else:
+            wanted = {
+                "encoder": "encoder.int8.onnx",
+                "decoder": "decoder.int8.onnx",
+                "joiner": "joiner.int8.onnx",
+                "tokens": "tokens.txt",
+            }
+        out = {}
+        for key, name in wanted.items():
+            first_party = base / name
+            # Canonical-first; an unmigrated install transparently reads the
+            # legacy model copy (read-only compat — downloads still target
+            # the canonical tree).
+            out[key] = first_party if first_party.exists() else \
+                resolve_model_file(Path(engine_dir) / name)
+        return out
 
     def load(self) -> None:
         with self._lock:
