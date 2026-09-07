@@ -851,3 +851,117 @@ def test_branding_rollback_never_touches_live_home(tmp_path):
     assert out["state"] in ("OK", "MISSING")
     after = sorted(str(p) for p in Path.home().glob(".config/*voice*"))
     assert before == after
+
+
+# ---------------------------------------------------------------------------
+# 13. Snap-confinement XDG redirect (Packet 8S close-out)
+# ---------------------------------------------------------------------------
+_SNAP_BASE = "/home/trick/snap/code/261"
+
+
+def _snap_env(monkeypatch, tmp_path, rev="261"):
+    base = f"/home/trick/snap/code/{rev}"
+    monkeypatch.setenv("XDG_CONFIG_HOME", base + "/.config")
+    monkeypatch.setenv("XDG_DATA_HOME", base + "/.local/share")
+    monkeypatch.setenv("XDG_STATE_HOME", base + "/.local/state")
+    monkeypatch.setenv("XDG_CACHE_HOME", base + "/.cache")
+
+
+def test_snap_xdg_redirects_to_real_home_canonical(monkeypatch, tmp_path):
+    _snap_env(monkeypatch, tmp_path, rev="261")
+    assert str(C.canonical_data_dir()) == \
+        str(Path.home() / ".local/share/qubit-voicebridge")
+    assert str(C.canonical_config_dir()) == \
+        str(Path.home() / ".config/qubit-voicebridge")
+    assert str(C.canonical_state_dir()) == \
+        str(Path.home() / ".local/state/qubit-voicebridge")
+    assert "snap" not in C.canonical_data_dir().parts
+    report = {r["var"]: r for r in C.xdg_report()}
+    assert report["XDG_DATA_HOME"]["source"] == "snap-confinement-redirect"
+    assert "snap" in report["XDG_DATA_HOME"]["raw"]
+
+
+def test_snap_redirect_is_loud_not_silent(monkeypatch, tmp_path):
+    _snap_env(monkeypatch, tmp_path, rev="262")
+    report = C.xdg_report()
+    redirected = [r for r in report
+                  if r["source"] == "snap-confinement-redirect"]
+    assert len(redirected) == 4
+    for r in redirected:
+        assert r["raw"].startswith("/home/trick/snap/code/262")
+        assert "snap" not in r["effective"]
+
+
+def test_normal_xdg_values_are_honored(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg-data"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg-config"))
+    assert C.canonical_data_dir() == \
+        tmp_path / "xdg-data" / "qubit-voicebridge"
+    assert C.canonical_config_dir() == \
+        tmp_path / "xdg-config" / "qubit-voicebridge"
+    report = {r["var"]: r for r in C.xdg_report()}
+    assert report["XDG_DATA_HOME"]["source"] == "env"
+
+
+def test_unset_xdg_uses_real_home_defaults(monkeypatch):
+    for var in ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME",
+                "XDG_CACHE_HOME"):
+        monkeypatch.delenv(var, raising=False)
+    assert C.canonical_data_dir() == \
+        Path.home() / ".local/share/qubit-voicebridge"
+
+
+def test_service_equivalent_environment(monkeypatch, tmp_path):
+    """systemd user services see standard (or unset) XDG vars: canonical
+    paths must equal the real-home tree the installer and monitor use."""
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    for var in ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME",
+                "XDG_CACHE_HOME"):
+        monkeypatch.delenv(var, raising=False)
+    assert C.canonical_data_dir() == \
+        tmp_path / "home" / ".local/share" / "qubit-voicebridge"
+    assert C.resolve_config_path() == \
+        tmp_path / "home" / ".config" / "qubit-voicebridge" / "voice.yaml"
+
+
+def test_active_environment_has_no_snap_fragmentation():
+    """Runs under the REAL active environment (no monkeypatching): the
+    effective canonical data path must never sit inside snap confinement,
+    no matter what XDG the IDE/snap session exports."""
+    assert "snap" not in C.canonical_data_dir().parts, \
+        f"canonical data fragmented by active env: {C.canonical_data_dir()}"
+    for rec in C.xdg_report():
+        if rec["raw"] and "snap" in rec["raw"]:
+            assert rec["source"] == "snap-confinement-redirect", rec
+
+
+def test_status_proves_models_under_snap_env():
+    """End-to-end: `voicebridge status` with the IDE snap XDG env must still
+    find ASR, Piper TTS, and voice-ID models (uses the real entry point in
+    a subprocess, not an in-process shortcut)."""
+    import subprocess
+    env = dict(os.environ,
+               XDG_CONFIG_HOME=_SNAP_BASE + "/.config",
+               XDG_DATA_HOME=_SNAP_BASE + "/.local/share",
+               XDG_STATE_HOME=_SNAP_BASE + "/.local/state",
+               XDG_CACHE_HOME=_SNAP_BASE + "/.cache")
+    r = subprocess.run([sys.executable, "-m", "voicebridge", "status"],
+                       capture_output=True, text=True, timeout=300,
+                       cwd=str(REPO), env=env)
+    assert r.returncode == 0, r.stderr[-2000:]
+    assert "snap-confinement-redirect" in r.stdout
+    asr = [l for l in r.stdout.splitlines() if l.startswith("ASR ")]
+    tts = [l for l in r.stdout.splitlines() if l.startswith("TTS ")]
+    vid = [l for l in r.stdout.splitlines() if l.startswith("voice-ID")]
+    assert asr and "FAILED" not in asr[0], asr
+    assert tts and "FAILED" not in tts[0] and "MISSING" not in tts[0], tts
+    assert vid and "FAILED" not in vid[0], vid
+
+
+def test_paths_diagnostic_includes_xdg_report(tmp_path):
+    diag = P.path_map_diagnostic(_paths(tmp_path))
+    assert diag["product"] == "qubit-voicebridge"
+    assert "xdg" in diag
+    assert {r["var"] for r in diag["xdg"]} == {
+        "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"}
+    assert "token" not in json.dumps(diag).lower()

@@ -277,13 +277,16 @@ def ensure_owned_dirs(paths: ProductPaths, *, dry_run: bool = True
 
 def path_map_diagnostic(paths: Optional[ProductPaths] = None) -> Dict[str, Any]:
     """Report the effective path map + platform support in diagnostics
-    (no secrets)."""
+    (no secrets). Includes the XDG resolution report so snap-confinement
+    redirects are visible, never silent."""
+    from .config import xdg_report
     paths = paths or default_paths()
     return {
         "product": PRODUCT_NAME,
         "version": PRODUCT_VERSION,
         "platform": platform_supported(),
         "paths": paths.map,
+        "xdg": xdg_report(),
     }
 
 

@@ -39,14 +39,66 @@ LEGACY_NAME_7D = "qubit-voice-agent"
 LEGACY_NAMES = (LEGACY_NAME, LEGACY_NAME_7D)
 _LEGACY_CONFIG_FILES = ("voice.yaml",)
 
+# Snap-confinement redirects are LOUD, never silent: every decision is
+# recorded here and surfaced via xdg_report() (product paths diagnostic,
+# status output, repair/doctor flows).
+_XDG_REDIRECTS: List[Dict[str, Any]] = []
+_XDG_VARS = ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME",
+             "XDG_CACHE_HOME")
+_XDG_DEFAULTS = {"XDG_CONFIG_HOME": ".config", "XDG_DATA_HOME": ".local/share",
+                 "XDG_STATE_HOME": ".local/state", "XDG_CACHE_HOME": ".cache"}
+
+
+def _is_snap_confinement(p: Path) -> bool:
+    """True when a path lives inside a snap sandbox (e.g. VS Code's
+    ``~/snap/code/<rev>/...``). Snap-confined processes inherit sandbox
+    XDG_*_HOME values that must not fragment the voice bridge's data tree."""
+    return "snap" in p.parts
+
 
 def _xdg_base(env: str, default: str) -> Path:
     """XDG-aware base directory: honored env var wins (whitespace ignored),
-    otherwise ``~/<default>``. Never returns ``.``."""
+    otherwise ``~/<default>``. Never returns ``.``.
+
+    A value inside snap confinement is NOT honored: the sandbox path would
+    fragment installs per snap revision. It redirects to the real-home
+    default LOUDLY (recorded in _XDG_REDIRECTS, reported by xdg_report())."""
     raw = os.environ.get(env, "")
     if raw is not None and str(raw).strip():
-        return Path(str(raw).strip()).expanduser()
+        candidate = Path(str(raw).strip()).expanduser()
+        if _is_snap_confinement(candidate):
+            effective = Path("~").expanduser() / default
+            if not any(r["var"] == env and r["raw"] == str(raw).strip()
+                       for r in _XDG_REDIRECTS):
+                _XDG_REDIRECTS.append({
+                    "var": env, "raw": str(raw).strip(),
+                    "effective": str(effective),
+                    "reason": "snap-confinement-redirect"})
+            return effective
+        return candidate
     return Path("~").expanduser() / default
+
+
+def xdg_report() -> List[Dict[str, Any]]:
+    """Effective XDG resolution for every directory variable: raw value,
+    effective base, and source (``env`` | ``default`` |
+    ``snap-confinement-redirect``). Read-only; the redirect is never silent."""
+    out: List[Dict[str, Any]] = []
+    for env in _XDG_VARS:
+        raw = os.environ.get(env, "")
+        raw_text = str(raw).strip() if raw is not None else ""
+        effective = str(_xdg_base(env, _XDG_DEFAULTS[env]))
+        redir = next((r for r in _XDG_REDIRECTS
+                      if r["var"] == env and r["raw"] == raw_text), None)
+        if redir is not None:
+            source = "snap-confinement-redirect"
+        elif raw_text:
+            source = "env"
+        else:
+            source = "default"
+        out.append({"var": env, "raw": raw_text, "effective": effective,
+                    "source": source})
+    return out
 
 
 def canonical_config_dir() -> Path:
@@ -541,16 +593,17 @@ class Config:
         return cls(data=data, path=cfg_path if cfg_path.exists() else None,
                    legacy_source=legacy_source)
 
-    # --- resolved paths ---
+    # --- resolved paths (runtime XDG resolution — never the import-time
+    # constants, so CLI, service, installer, and status always agree) ---
     def state_dir(self) -> Path:
-        p = Path(self.get("logging", "jsonl_path") or DEFAULT_STATE_DIR)
+        p = Path(self.get("logging", "jsonl_path") or canonical_state_dir())
         if not self.get("logging", "jsonl"):
-            p = DEFAULT_STATE_DIR
+            p = canonical_state_dir()
         p.mkdir(parents=True, exist_ok=True)
         return p
 
     def data_dir(self) -> Path:
-        p = DEFAULT_DATA_DIR
+        p = canonical_data_dir()
         p.mkdir(parents=True, exist_ok=True)
         return p
 

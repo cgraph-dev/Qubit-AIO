@@ -500,8 +500,8 @@ def _write_config(cfg: Any, update: Dict[str, Any]) -> Path:
     import yaml
     path = getattr(cfg, "path", None)
     if path is None:
-        from .config import DEFAULT_CONFIG_PATH
-        path = DEFAULT_CONFIG_PATH
+        from .config import resolve_config_path
+        path = resolve_config_path()
     path = Path(path).expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
     data: Dict[str, Any] = {}

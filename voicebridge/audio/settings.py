@@ -270,8 +270,8 @@ def find_output(selector: str) -> Optional[DeviceInfo]:
 def _config_path(cfg: Any) -> Path:
     p = getattr(cfg, "path", None)
     if p is None:
-        from ..config import DEFAULT_CONFIG_PATH
-        p = DEFAULT_CONFIG_PATH
+        from ..config import resolve_config_path
+        p = resolve_config_path()
     return Path(p).expanduser()
 
 

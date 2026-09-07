@@ -1008,6 +1008,13 @@ def _cmd_status(cfg) -> int:
     print(f"default model    : {info.default_model or '(none)'}")
     print(f"tier aliases     : {info.models or '(none)'}")
     print(f"free VRAM        : {current_vram_mb()} MiB")
+    # Snap-confinement XDG redirects are LOUD, never silent: one line per
+    # redirected variable so status shows exactly which data tree is used.
+    from .config import xdg_report
+    for _entry in xdg_report():
+        if _entry["source"] == "snap-confinement-redirect":
+            print(f"xdg                : {_entry['var']} snap-confinement-"
+                  f"redirect (sandbox value ignored) -> {_entry['effective']}")
     # ASR
     asr_cfg = cfg.section("asr")
     if asr_cfg.get("provider", "sherpa") == "sherpa":
@@ -1266,8 +1273,8 @@ def _cmd_flags(cfg, args, explicit_config: Path | None) -> int:
 
     target = explicit_config or cfg.path
     if target is None:
-        from .config import DEFAULT_CONFIG_PATH
-        target = Path(DEFAULT_CONFIG_PATH).expanduser()
+        from .config import resolve_config_path
+        target = resolve_config_path()
     target = Path(target)
 
     if cmd == "set":
