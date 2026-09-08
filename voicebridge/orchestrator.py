@@ -1,4 +1,4 @@
-"""Voice bridge orchestrator: mic -> ASR -> classify -> route -> OpenClaw -> speak.
+"""Voice bridge orchestrator: mic -> ASR -> classify -> route -> agent runtime -> speak.
 
 Runs the whole loop with interruption support:
   * push-to-talk (hold key) or manual Enter-toggle
@@ -1420,7 +1420,7 @@ class VoiceOrchestrator:
                 final_text = verdict.dry_run_instruction + "\n\n" + task_text
 
             if self.dry_run:
-                self.speak(f"Dry run mode: I would send this task to OpenClaw: {trim_spoken(final_text, 300)}")
+                self.speak(f"Dry run mode: I would send this task to the agent runtime: {trim_spoken(final_text, 300)}")
                 return
 
             if verdict.require_confirm or force_confirm:
@@ -1433,15 +1433,16 @@ class VoiceOrchestrator:
                 return
 
             # executor ask-mode: until the user gets a bigger GPU / smarter model,
-            # let THEM pick who runs the task (Hermes vs OpenClaw) instead of
-            # always defaulting to OpenClaw. The next utterance is interpreted by
-            # _handle_executor_answer(). Web/phone requests skip the question —
-            # the website is the OpenClaw control surface; asking "who should run
+            # let THEM pick who runs the task (voice runtime vs agent runtime)
+            # instead of always defaulting to the agent runtime. The next
+            # utterance is interpreted by _handle_executor_answer(). Web/phone
+            # requests skip the question —
+            # the website is the agent control surface; asking "who should run
             # this?" over the phone UI adds friction with no benefit.
             if (self.cfg.get("openclaw", "ask_executor", default=False)
                     and not self._web_mode):
                 self.executor_choice.request(final_text, model or self._current_model() or "")
-                self.speak("Who should handle this — OpenClaw or Hermes?")
+                self.speak("Who should handle this — the agent runtime or the voice runtime?")
                 log_event("executor.ask", task=final_text[:160])
                 return
 
@@ -2297,26 +2298,27 @@ class VoiceOrchestrator:
 
     # ------------------------------------------------------------- executor
     def _handle_executor_answer(self, text: str) -> None:
-        """Interpret the answer to 'OpenClaw or Hermes?' and dispatch."""
+        """Interpret the answer to 'agent runtime or voice runtime?' and dispatch.
+        Users may still say the legacy backend names; both route the same way."""
         pending = self.executor_choice.take()
         if not pending:
             return
         low = text.strip().lower()
         log_event("executor.answer", text=low[:120], task=pending.task_text[:160])
         hermes_re = re.compile(
-            r"\b(hermes|use hermes|hermes agent|ask hermes)\b", re.I)
+            r"\b(hermes|use hermes|hermes agent|ask hermes|voice runtime)\b", re.I)
         openclaw_re = re.compile(
-            r"\b(openclaw|open claw|claw|qubit|use (the )?agent)\b", re.I)
+            r"\b(openclaw|open claw|claw|qubit|agent runtime|use (the )?agent)\b", re.I)
         if hermes_re.search(low) and not openclaw_re.search(low):
-            self.speak("Using Hermes.")
+            self.speak("Using the voice runtime.")
             self._handle_hermes(pending.task_text)
         elif openclaw_re.search(low):
-            self.speak("Using OpenClaw.")
+            self.speak("Using the agent runtime.")
             self._launch_task(pending.task_text, pending.model or None)
         else:
             # "you pick" / "whatever" / "either" / unparseable: default to
-            # OpenClaw (the established agent path)
-            self.speak("I'll use OpenClaw for that.")
+            # the agent runtime (the established agent path)
+            self.speak("I'll use the agent runtime for that.")
             self._launch_task(pending.task_text, pending.model or None)
 
     # ------------------------------------------------------------- confirm

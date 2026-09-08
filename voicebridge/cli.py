@@ -17,7 +17,7 @@ def _shared_power(cfg):
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="voicebridge",
-        description="Local push-to-talk voice bridge for OpenClaw (ASR + intent + gateway + TTS).")
+        description="Qubit Agent (Qubit VoiceBridge): local push-to-talk voice interface (ASR + intent + gateway + TTS).")
     common = argparse.ArgumentParser(add_help=False)
     # NOTE: these options also exist at the top level so `voicebridge --config X
     # <subcommand> …` works. Each subparser re-declares them via `parents=[common]`;
@@ -1001,6 +1001,7 @@ def _cmd_status(cfg) -> int:
     from .openclaw.discovery import discover_gateway, current_vram_mb
     from .logging_setup import get_logger
     get_logger()  # init handlers before discovery internals log
+    print("Qubit Agent — Qubit VoiceBridge status")
     info = discover_gateway(cfg)
     print(f"gateway url      : {info.url}")
     print(f"gateway token    : {'found' if info.token else 'MISSING'}")
@@ -1131,7 +1132,7 @@ def _cmd_roundtrip(cfg, text: str | None, model: str | None, orch) -> int:
     from .asr.whisper import FasterWhisperASR
 
     sample = text or ("Open the current project, inspect the Stripe webhook flow, "
-                      "and tell OpenClaw to patch the signature verification and add structured logs.")
+                      "and tell Qubit to patch the signature verification and add structured logs.")
     print("[1/6] synth sample speech (piper) ...")
     tts = PiperTTS(model_dir=cfg.model_dir(), voice=cfg.get("tts", "voice", default="en_US-amy-medium"))
     tts.load()
@@ -1152,7 +1153,7 @@ def _cmd_roundtrip(cfg, text: str | None, model: str | None, orch) -> int:
     print(f"      -> kind={intent.kind} conf={intent.confidence:.2f} reason={intent.reason}")
     assert intent.kind in ("coding", "conversation"), "expected a coding (or conversation) intent"
 
-    print("[4/6] dispatch to OpenClaw (this can take a while on local models) ...")
+    print("[4/6] dispatch to the agent runtime (this can take a while on local models) ...")
     if model:
         cfg.data.setdefault("openclaw", {})["model"] = model
     task_text = intent.task_text or tr.text

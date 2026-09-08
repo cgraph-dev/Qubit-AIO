@@ -1,8 +1,8 @@
-"""qubit-dev terminal — hermes/openclaw-style CLI for the voice bridge.
+"""qubit-dev terminal — Qubit Agent CLI for the voice bridge.
 
 Commands (inside the REPL every line starting with / is a slash command):
   /help                  — this help
-  /status                — gateway + keep_alive + hermes state
+  /status                — gateway + keep_alive + runtime state
   /activity [limit] [q]  — tail the activity feed (like Dashboard Activity)
   /logs [limit] [q]      — tail events.jsonl (the source of truth, like in Dashboard Logs)
   /interrupt [mode]      — interrupt the current task (mode: interrupt|stop)
@@ -10,7 +10,7 @@ Commands (inside the REPL every line starting with / is a slash command):
   /clear                 — clear screen
   /quit, /exit           — leave
 
-Bare text without / is treated as /talk <text>, same as hermes chat.
+Bare text without / is treated as /talk <text>, same as Qubit chat.
 Flags:  --attach  starts the bridge in-process so /talk is synchronous (no HTTP hop).
 """
 from __future__ import annotations
@@ -33,7 +33,7 @@ Usage:
 
 Slash commands inside the REPL:
   /help                      this help
-  /status                    bridge + gateway + hermes state
+  /status                    bridge + gateway + runtime state
   /health [window_s]         live health (status + recent errors + ASR/turn timings)
   /watch [rows]              live activity tail (run in a loop; Ctrl-C to stop)
   /activity [limit] [q]      recent activity (limit default 20)
@@ -332,7 +332,7 @@ def handle_slash(line: str, cfg, orch=None) -> Optional[str]:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="qubit-dev", description="Qubit voice-bridge terminal (like hermes/openclaw). Bare text = talk. Slash commands: /help /status /logs /activity /interrupt /talk /clear /quit")
+    p = argparse.ArgumentParser(prog="qubit-dev", description="Qubit Agent terminal for Qubit VoiceBridge. Bare text = talk. Slash commands: /help /status /logs /activity /interrupt /talk /clear /quit")
     p.add_argument("text", nargs="*", help="one-shot talk text (bare) or slash command like /status")
     p.add_argument("--config", type=Path, default=None, help="path to voice.yaml")
     p.add_argument("--attach", action="store_true", help="attach bridge in-process so /talk is synchronous")
@@ -368,7 +368,7 @@ def main(argv=None) -> int:
         except Exception as e:
             print(f"attach failed: {e} — continuing without bridge (HTTP mode).")
 
-    print("qubit-dev — Qubit voice-bridge terminal. Type /help for commands. Bare text = talk. Ctrl-D to quit.")
+    print("qubit-dev — Qubit Agent terminal. Type /help for commands. Bare text = talk. Ctrl-D to quit.")
     # History file
     hist_path = Path.home() / ".local/state/qubit-dev/history"
     hist_path.parent.mkdir(parents=True, exist_ok=True)

@@ -21,7 +21,7 @@ OLLAMA_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
 
 SR="https://github.com/k2-fsa/sherpa-onnx/releases/download"
 
-echo "==> Qubit VoiceBridge install"
+echo "==> Qubit Agent install"
 echo "    project : $PROJECT_DIR"
 echo "    models  : $MODELS"
 echo "    config  : $CONFIG_DIR/voice.yaml"

@@ -1,9 +1,13 @@
 # Packet 8T-F close-out matrix (human companion)
 
 Machine-readable: `docs/MATRIX_8T_F.json` (authoritative; every id below is
-parity-tested). Verdicts: REUSE / ADAPT / MISSING / DEFER / REJECTED.
-Statuses: IMPLEMENTED (in foundation + tested) / DEFERRED (justified) /
-REJECTED (must not re-enter without review).
+parity-tested). Gate rule enforced in tests: every row with verdict
+REUSE/ADAPT has status IMPLEMENTED with proof; anything else is verdict
+DEFER/REJECTED/MISSING. (The older `FEATURE_MATRIX_8U.json` rates upstream
+reusability for future 8U tickets — a different axis, not foundation
+integration.)
+
+## What actually executes pinned Hermes code
 
 ## What actually executes pinned Hermes code
 
@@ -19,7 +23,7 @@ REJECTED (must not re-enter without review).
    version/argv/session/timeout/cancel/redaction proven live
    (`tests/test_real_hermes.py`). Operator installs untouched.
 
-## IMPLEMENTED rows (14)
+## IMPLEMENTED rows (16)
 
 H-ansi-strip, H-sqlite-txn, H-real-exec, H-approvals (Qubit confirmations),
 H-estop (latch+cancel; cross-wire to `hermes pause` deferred),
@@ -29,7 +33,7 @@ paths), O-cron (monitor validation), O-skills (7E manifests),
 O-onboard (8T setup), O-memory (5B/8P stores), O-models (8Q gateway),
 Q-voice + Q-broker (Qubit-owned, suites cited).
 
-## DEFERRED rows (12)
+## DEFERRED rows (14)
 
 H-stream/streaming (Qubit owns; httpx dep), H-stt/H-tts (Qubit contracts
 authoritative), H-wake (second listener + license), H-browser (8U),

@@ -51,7 +51,7 @@
       "id": "H-stream",
       "capability": "SSE chunk loop with retry/circuit-breaker",
       "upstream": "hermes-agent agent/chat_completion_helpers.py",
-      "verdict": "REUSE",
+      "verdict": "DEFER",
       "status": "DEFERRED",
       "reason": "Qubit owns streaming (orchestrator/local_llm, proven in 8H-adjacent suites); importing the Hermes loop would add httpx/pydantic deps. Revisit if Qubit streaming is ever replaced."
     },
@@ -59,7 +59,7 @@
       "id": "H-stt",
       "capability": "Pluggable STT incl. faster-whisper",
       "upstream": "hermes-agent tools/transcription_*.py",
-      "verdict": "ADAPT",
+      "verdict": "DEFER",
       "status": "DEFERRED",
       "reason": "Qubit ASR contract (Sherpa/whisper) is authoritative and proven; no STT code taken. Revisit only on a proven ASR gap."
     },
@@ -67,7 +67,7 @@
       "id": "H-tts",
       "capability": "Multi-provider TTS incl. Piper",
       "upstream": "hermes-agent tools/tts_*.py",
-      "verdict": "ADAPT",
+      "verdict": "DEFER",
       "status": "DEFERRED",
       "reason": "Qubit TTS contract (Piper default, ducking/barge-in) is authoritative and proven; no TTS code taken."
     },
@@ -75,7 +75,7 @@
       "id": "H-wake",
       "capability": "Wake-word mic loop (openWakeWord/sherpa)",
       "upstream": "hermes-agent tools/wake_word*.py",
-      "verdict": "ADAPT",
+      "verdict": "DEFER",
       "status": "DEFERRED",
       "reason": "Would create a second listener (forbidden); Porcupine needs commercial license. Wake-word is a later packet per plan."
     },
@@ -83,7 +83,7 @@
       "id": "H-browser",
       "capability": "A11y-snapshot browser click/type/nav",
       "upstream": "hermes-agent tools/browser_*.py",
-      "verdict": "ADAPT",
+      "verdict": "DEFER",
       "status": "DEFERRED",
       "reason": "Packet 8U scope; 8B loopback CDP stays the only browser authority for 8T-F."
     },
@@ -91,7 +91,7 @@
       "id": "H-files",
       "capability": "Scoped file read/write/search",
       "upstream": "hermes-agent tools/file_operations*.py",
-      "verdict": "ADAPT",
+      "verdict": "DEFER",
       "status": "DEFERRED",
       "reason": "Packet 8W scope; file Safety review + broker argv schemas required first."
     },
@@ -99,7 +99,7 @@
       "id": "H-terminal",
       "capability": "Terminal/PTY tools + hardline approval detection",
       "upstream": "hermes-agent tools/terminal_tool*.py + approval_detection.py",
-      "verdict": "ADAPT",
+      "verdict": "DEFER",
       "status": "DEFERRED",
       "reason": "Qubit has no shell-string execution path by construction (broker.py forbids shell=True), so the detector has no true-positive call site; vendoring it unwired would imitate integration. Revisit with 8V terminal work."
     },
@@ -107,7 +107,7 @@
       "id": "H-acp",
       "capability": "ACP stdio protocol for IDEs",
       "upstream": "hermes-agent acp_adapter/ (agent-client-protocol MIT)",
-      "verdict": "ADAPT",
+      "verdict": "DEFER",
       "status": "DEFERRED",
       "reason": "Packet 8X scope; needs Qubit permission/edit-approval wrapper ticket first."
     },
@@ -115,7 +115,7 @@
       "id": "H-sessions",
       "capability": "SQLite WAL+FTS session/message store",
       "upstream": "hermes-agent hermes_state_*.py",
-      "verdict": "ADAPT",
+      "verdict": "DEFER",
       "status": "DEFERRED",
       "reason": "Would duplicate Qubit MemoryStore/journal (forbidden second memory). Schema ideas on record; never share ~/.hermes DB."
     },
@@ -123,7 +123,7 @@
       "id": "H-gateway",
       "capability": "Multi-platform gateway/cron/batch",
       "upstream": "hermes-agent gateway/ cron/ batch_runner.py",
-      "verdict": "ADAPT",
+      "verdict": "DEFER",
       "status": "DEFERRED",
       "reason": "Qubit owns ports/sockets/timers (8D/8I). No gateway code taken; broker admission required first."
     },
@@ -219,7 +219,7 @@
       "id": "O-frames",
       "capability": "Typed gateway-protocol frame guards",
       "upstream": "openclaw packages/gateway-protocol/",
-      "verdict": "REUSE",
+      "verdict": "DEFER",
       "status": "DEFERRED",
       "reason": "Qubit has no WS transport; SSE events already fail closed (2A conformance). Full frame-guard adoption is 8U transport work."
     },
@@ -227,7 +227,7 @@
       "id": "O-browser",
       "capability": "Browser bridge auth/profiles/doctor",
       "upstream": "openclaw extensions/browser/",
-      "verdict": "ADAPT",
+      "verdict": "DEFER",
       "status": "DEFERRED",
       "reason": "Packet 8U scope; 8B read-only contracts stay authoritative."
     },
@@ -243,7 +243,7 @@
       "id": "O-board",
       "capability": "Board HTTP store + sandboxed widgets",
       "upstream": "openclaw src/gateway/board-*.ts",
-      "verdict": "ADAPT",
+      "verdict": "DEFER",
       "status": "DEFERRED",
       "reason": "Dashboard scope; webui.py overlaps unrelated dirty work and server-side policy must come first."
     },
@@ -275,7 +275,7 @@
       "id": "O-docker",
       "capability": "Digest-pinned multi-stage runtime",
       "upstream": "openclaw Dockerfile",
-      "verdict": "ADAPT",
+      "verdict": "DEFER",
       "status": "DEFERRED",
       "reason": "8K owns Qubit packaging; pattern documented, no Dockerfile taken."
     },

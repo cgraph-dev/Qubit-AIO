@@ -1,4 +1,4 @@
-"""Voice Dashboard — phone web UI for the OpenClaw voice bridge.
+"""Voice Dashboard — Qubit Agent web UI for Qubit VoiceBridge.
 
 Talk from any browser on the LAN (PC or phone), watch live activity, and
 get spoken replies that are ALWAYS the local model's short summary — never
@@ -131,7 +131,7 @@ def _event_to_feed_item(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 "summary": ev.get("summary", ""), "route": "local-script",
                 "detail": f"{ev.get('raw_len', '')} chars raw"}
     if evt == "openclaw.dispatch":
-        return {"kind": "status", "text": "dispatched to OpenClaw",
+        return {"kind": "status", "text": "dispatched to the agent runtime",
                 "route": "openclaw",
                 "detail": str(ev.get("task", ""))[:300]}
     if evt == "openclaw.result":
@@ -140,10 +140,10 @@ def _event_to_feed_item(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 "route": "openclaw",
                 "detail": f"elapsed {ev.get('elapsed_s', '')}s · {ev.get('reply_len', '')} chars"}
     if evt == "openclaw.summary":
-        return {"kind": "summary", "text": "OpenClaw task",
+        return {"kind": "summary", "text": "Agent task",
                 "summary": ev.get("summary", ""), "route": "openclaw"}
     if evt == "openclaw.request.failed" or evt == "openclaw.request.exception":
-        return {"kind": "fail", "text": "OpenClaw request",
+        return {"kind": "fail", "text": "Agent request",
                 "route": "openclaw",
                 "detail": str(ev.get("error", ev.get("reason", "")))[:300]}
     if evt == "safety.verdict":
@@ -174,23 +174,23 @@ def _event_to_feed_item(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 "summary": ev.get("summary",""), "route": "local",
                 "detail": str(ev.get("text",""))[:160]}
     if evt == "hermes.summary":
-        return {"kind": "summary", "text": "Hermes task",
+        return {"kind": "summary", "text": "Voice task",
                 "summary": ev.get("summary",""), "route": "hermes"}
     if evt == "hermes.task":
-        return {"kind": "status", "text": "Hermes task dispatched",
+        return {"kind": "status", "text": "Voice task dispatched",
                 "route": "hermes", "detail": str(ev.get("task",""))[:300]}
     if evt == "system.command":
         cmd = ev.get("command","") or "system"
         return {"kind": "status", "text": f"system:{cmd}",
                 "route": "system", "detail": cmd}
     if evt == "hermes.result.discarded":
-        return {"kind": "status", "text": "Hermes task interrupted",
+        return {"kind": "status", "text": "Voice task interrupted",
                 "route": "hermes", "detail": ev.get("why","")}
     if evt == "openclaw.error":
-        return {"kind": "fail", "text": "OpenClaw error",
+        return {"kind": "fail", "text": "Agent error",
                 "route": "openclaw", "detail": str(ev.get("error",""))[:300]}
     if evt == "openclaw.status":
-        return {"kind": "status", "text": "OpenClaw running",
+        return {"kind": "status", "text": "Agent runtime running",
                 "route": "openclaw", "detail": f"elapsed {ev.get('elapsed_s','')}s"}
     if evt == "openclaw.progress":
         return {"kind": "status", "text": "OpenClaw progress",
