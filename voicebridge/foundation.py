@@ -18,10 +18,9 @@ from __future__ import annotations
 from typing import Any, Dict, List, Mapping, Optional
 
 # --- 8T-F canonical identity (single source; CLI/docs/installer mirror it) ---
-# Canonical public identity: Qubit VoiceBridge. Canonical product/runtime
-# identity: Qubit. (Qubit Agent was the 8T-F draft name; Qubit is canonical.)
-PRODUCT_NAME = "Qubit"
-PUBLIC_IDENTITY = "Qubit VoiceBridge"
+# Public product: Qubit Agent. Voice subsystem: Qubit VoiceBridge.
+PRODUCT_NAME = "Qubit Agent"
+PUBLIC_IDENTITY = "Qubit Agent"
 VOICE_SUBSYSTEM = "Qubit VoiceBridge"
 INSTALL_IDENTITY = "qubit-voicebridge"
 IMPORT_PACKAGE = "voicebridge"

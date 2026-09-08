@@ -8,7 +8,7 @@
 > 🔊 **Read `docs/AUDIO_SETUP.md`** for the working HyperX audio config (mic + output)
 > — read this FIRST before touching any audio/mic/TTS setting.
 
-A **production-style local voice interface for Qubit VoiceBridge (Qubit runtime)** — push-to-talk,
+A **production-style local voice interface for Qubit Agent (Qubit VoiceBridge)** — push-to-talk,
 natural speech in, spoken results out. Built for an **RTX 3070 Ti 8 GB** box
 but runs on any Linux PC with a mic. It routes commands into your *existing*
 OpenClaw gateway, agents, and APIs (no OpenClaw config changes), summarizes

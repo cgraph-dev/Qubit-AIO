@@ -987,6 +987,8 @@ class ActionReceipt:
     created_at: float
     finished_at: Optional[float]
     duration_ms: float
+    # 8T-F (OpenClaw execution-receipt provenance): which runtime executed.
+    runtime: str = "qubit-broker"
 
     def to_dict(self) -> Dict[str, Any]:
         return {"receipt_id": self.receipt_id,
@@ -1004,6 +1006,7 @@ class ActionReceipt:
                 "idempotency_key": self.idempotency_key,
                 "rollback_kind": self.rollback_kind,
                 "compensation": redact_text(self.compensation),
+                "runtime": self.runtime,
                 "created_at": self.created_at,
                 "finished_at": self.finished_at,
                 "duration_ms": self.duration_ms}
@@ -1031,7 +1034,8 @@ class ActionReceipt:
                    compensation=str(d.get("compensation", "")),
                    created_at=float(d.get("created_at", 0.0)),
                    finished_at=d.get("finished_at"),
-                   duration_ms=float(d.get("duration_ms", 0.0)))
+                   duration_ms=float(d.get("duration_ms", 0.0)),
+                   runtime=str(d.get("runtime", "qubit-broker")))
 
 
 class ActionStore:
@@ -1372,9 +1376,11 @@ class ActionRunner:
                  clock: Callable[[], float] = time.time,
                  confirmation_ttl_s: Optional[float] = None,
                  max_preview_chars: int = MAX_PREVIEW_CHARS,
-                 power: Optional[Any] = None):
+                 power: Optional[Any] = None,
+                 runtime_label: str = "qubit-broker"):
         self.cfg = cfg
         self.clock = clock
+        self.runtime_label = str(runtime_label or "qubit-broker")
         self.max_preview_chars = int(max_preview_chars)
         self.enabled = bool(enabled)
         self.executors = dict(executors or {})
@@ -1623,6 +1629,7 @@ class ActionRunner:
             confirmation_id=confirmation_id or "",
             idempotency_key=env.get("idempotency_key", ""),
             rollback_kind=spec.rollback_kind, compensation="",
+            runtime=self.runtime_label,
             created_at=self.clock(), finished_at=None, duration_ms=0.0)
         self.store.save_receipt(receipt)
         return receipt

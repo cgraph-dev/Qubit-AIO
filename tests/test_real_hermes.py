@@ -23,9 +23,14 @@ from voicebridge.runtime import real_hermes as RH  # noqa: E402
 from voicebridge.runtime.real_hermes import (RealHermesDenied,  # noqa: E402
                                              RealHermesRuntime)
 
-ISOLATED_BIN = Path("/tmp/hermes-isolated/venv/bin/hermes")
-ISOLATED_HOME = Path("/tmp/hermes-isolated/home")
-CLONE = Path("/tmp/upstream-8tfr2/hermes-agent")
+ISOLATED_BIN = Path(os.environ.get("QUBIT_8TF_HERMES_BIN",
+                                   "/tmp/hermes-isolated2/venv/bin/hermes"))
+ISOLATED_HOME = Path(os.environ.get("QUBIT_8TF_HERMES_HOME",
+                                    "/tmp/hermes-isolated2/home"))
+CLONE = Path(os.environ.get("QUBIT_8TF_HERMES_CLONE",
+                             "/tmp/upstream-8tfv3/hermes-agent"))
+OPENCLAW_CLONE = Path(os.environ.get("QUBIT_8TF_OPENCLAW_CLONE",
+                                     "/tmp/upstream-8tfv3/openclaw"))
 MODEL = "huihui_ai/llama3.2-abliterate:3b"
 SESSION = "qubit-8tf-proof"
 
@@ -68,7 +73,7 @@ def test_real_hermes_version_identity():
 
 def test_isolated_source_matches_pinned_clone():
     _require_setup()
-    src = Path("/tmp/hermes-isolated/src/cli.py")
+    src = ISOLATED_BIN.parents[2] / "src" / "cli.py"
     assert src.is_file()
     assert _sha(src) == _sha(CLONE / "cli.py"), \
         "isolated install must be byte-identical to the pinned clone file"
@@ -96,7 +101,7 @@ def test_openclaw_argv_matches_pinned_docs():
     """Qubit's OpenClaw CLI argv must exist in the pinned OpenClaw docs."""
     from voicebridge.openclaw import cli_backend as CB
 
-    doc = (Path("/tmp/upstream-8tfr2/openclaw/docs/cli/agent.md")).read_text()
+    doc = (OPENCLAW_CLONE / "docs/cli/agent.md").read_text()
     argv = ["openclaw", "agent", "--agent", "main", "--session-key", "k",
             "--message-file", "f", "--json", "--timeout", "60"]
     assert CB.CliBackend is not None

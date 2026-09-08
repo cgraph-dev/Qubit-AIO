@@ -1,5 +1,5 @@
 [Unit]
-Description=Qubit VoiceBridge (Qubit runtime push-to-talk voice interface)
+Description=Qubit Agent (Qubit VoiceBridge push-to-talk voice interface)
 After=network.target
 # OpenClaw gateway + ollama (local LLM) should be up first if they exist as units:
 After=openclaw-gateway.service ollama.service

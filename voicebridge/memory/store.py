@@ -180,6 +180,12 @@ class MemoryStore:
             """UPDATE memories SET mkey = scope || char(0) || mkey
                WHERE instr(mkey, scope || char(0)) != 1;""",
         ]
+        # NOTE (8T-F): the vendored pinned-Hermes write_txn (IMMEDIATE +
+        # guarded rollback) was tried here and REVERTED: executescript()
+        # implicitly commits any pending transaction, so an explicit BEGIN
+        # IMMEDIATE wrapper ends with "cannot commit - no transaction is
+        # active" on every fresh open. The deferred `with self._conn:`
+        # transaction is the compatible shape for executescript migrations.
         with self._conn:  # atomic migration transaction
             for i in range(version, len(migrations)):
                 self._conn.executescript(migrations[i])

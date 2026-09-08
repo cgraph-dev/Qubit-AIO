@@ -1,7 +1,7 @@
 [project]
 name = "qubit-voicebridge"
 version = "1.0.0"
-description = "Qubit VoiceBridge — local push-to-talk voice agent (Qubit runtime): Moonshine ASR, Silero VAD, voice-ID, local LLM, piper TTS — 5 GB VRAM budget."
+description = "Qubit Agent (Qubit VoiceBridge) — local push-to-talk voice agent: Moonshine ASR, Silero VAD, voice-ID, local LLM, piper TTS — 5 GB VRAM budget."
 readme = "README.md"
 # The project's own LICENSE is the Qubit VoiceBridge Educational Project
 # License: it applies ONLY to original Qubit material (see the root LICENSE

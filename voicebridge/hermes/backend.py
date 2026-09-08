@@ -11,6 +11,7 @@ import subprocess
 from typing import Optional
 
 from ..logging_setup import get_logger, log_event
+from ..upstream.hermes_ansi_strip import strip_ansi
 
 log = get_logger()
 
@@ -76,5 +77,8 @@ class HermesBackend:
             raise RuntimeError(f"hermes exited {proc.returncode}: {err}")
         if not out:
             out = "(hermes returned no text)"
+        # 8T-F: vendored pinned-Hermes sanitizer — terminal escapes from agent
+        # output must never reach Qubit prompts, receipts, or dashboard text.
+        out = strip_ansi(out)
         log_event("hermes.task.done", reply=out[:300])
         return out

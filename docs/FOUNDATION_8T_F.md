@@ -43,13 +43,17 @@ No vendoring: no Hermes module is small and valuable enough to justify a
 copy (leaf candidates are trivial contextvars or httpx-bound), so Qubit
 executes the pinned implementation itself instead of imitating it:
 
-- Isolated install: `/tmp/hermes-isolated/venv` (editable install of a
+- Isolated install: `/tmp/hermes-isolated2/venv` (editable install of a
   hash-verified copy of the pinned clone; `src/cli.py` sha256 identical to
-  the clone), `HERMES_HOME=/tmp/hermes-isolated/home` with a local-only
+  the clone), `HERMES_HOME=/tmp/hermes-isolated2/home` with a local-only
   config (`provider: ollama`, `huihui_ai/llama3.2-abliterate:3b`, 128K
-  override). Recreate with: `uv venv /tmp/hermes-isolated/venv`,
-  `cp -a <clone> /tmp/hermes-isolated/src`,
-  `uv pip install --python .../venv/bin/python -e .../src`.
+  override). Recreate with: `uv venv /tmp/hermes-isolated2/venv`,
+  `cp -a <clone> /tmp/hermes-isolated2/src`,
+  `uv pip install --python .../venv/bin/python -e .../src`, then write the
+  local-only `config.yaml` above. Override paths in tests via
+  `QUBIT_8TF_HERMES_BIN` / `QUBIT_8TF_HERMES_HOME`. NOTE: `/tmp` is
+  operator-ephemeral (wiped between sessions); the durable proof is the
+  vendored in-tree execution, the isolated runs re-verify on demand.
 - Proven: `hermes --version` → `Hermes Agent v0.21.1 (2026.9.7)` from the
   isolated path; `chat -q/-Q/--continue/--create-if-missing/--provider/-m`
   flags read from the REAL `chat --help`; stdout carries only the reply,

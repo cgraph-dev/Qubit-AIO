@@ -1,0 +1,307 @@
+{
+  "schema": "qubit-8tf-matrix/1",
+  "packet": "8T-F close-out (foundation must USE pinned Hermes, not imitate it)",
+  "upstreams": {
+    "hermes-agent": {
+      "url": "https://github.com/NousResearch/hermes-agent",
+      "tag": "v2026.9.7",
+      "commit": "2237be355906fbe6065ce1815711eee52b2d646e",
+      "license": "MIT (Copyright (c) 2025 Nous Research)",
+      "clone": "/tmp/upstream-8tfv3/hermes-agent (read-only)"
+    },
+    "openclaw": {
+      "url": "https://github.com/openclaw/openclaw",
+      "tag": "v2026.9.2",
+      "commit": "3928bad9badfcb6c7d140530435e806fb8092190",
+      "license": "MIT (Copyright (c) 2026 OpenClaw Foundation)",
+      "clone": "/tmp/upstream-8tfv3/openclaw (read-only)"
+    }
+  },
+  "statuses": {
+    "IMPLEMENTED": "in the Qubit foundation and tested (vendored code, wired behavior, or proven Qubit-owned counterpart)",
+    "DEFERRED": "justified postponement with reason and owner packet; not counted as integrated",
+    "REJECTED": "not integrated and must not re-enter without new review"
+  },
+  "rows": [
+    {
+      "id": "H-ansi-strip",
+      "capability": "ANSI/control escape sanitizing of tool output",
+      "upstream": "hermes-agent tools/ansi_strip.py",
+      "verdict": "REUSE",
+      "status": "IMPLEMENTED",
+      "proof": "voicebridge/upstream/hermes_ansi_strip.py (verbatim); wired in runtime/real_hermes.py turn + hermes/backend.py run_task; differential tests/test_upstream_vendored.py"
+    },
+    {
+      "id": "H-sqlite-txn",
+      "capability": "SQLite IMMEDIATE txn + idempotent ADD COLUMN",
+      "upstream": "hermes-agent hermes_cli/sqlite_util.py",
+      "verdict": "REUSE",
+      "status": "IMPLEMENTED",
+      "proof": "voicebridge/upstream/hermes_sqlite_util.py (verbatim); write_txn tried in memory/store.py and REVERTED with root cause (executescript implicit-commit); differential tests; reserved for non-executescript writes"
+    },
+    {
+      "id": "H-real-exec",
+      "capability": "Pinned Hermes agent turns (chat -q/-Q/--continue)",
+      "upstream": "hermes-agent cli + agent",
+      "verdict": "ADAPT",
+      "status": "IMPLEMENTED",
+      "proof": "voicebridge/runtime/real_hermes.py supervises isolated install; version/argv/session/timeout/cancel/redaction proven in tests/test_real_hermes.py against local Ollama"
+    },
+    {
+      "id": "H-stream",
+      "capability": "SSE chunk loop with retry/circuit-breaker",
+      "upstream": "hermes-agent agent/chat_completion_helpers.py",
+      "verdict": "REUSE",
+      "status": "DEFERRED",
+      "reason": "Qubit owns streaming (orchestrator/local_llm, proven in 8H-adjacent suites); importing the Hermes loop would add httpx/pydantic deps. Revisit if Qubit streaming is ever replaced."
+    },
+    {
+      "id": "H-stt",
+      "capability": "Pluggable STT incl. faster-whisper",
+      "upstream": "hermes-agent tools/transcription_*.py",
+      "verdict": "ADAPT",
+      "status": "DEFERRED",
+      "reason": "Qubit ASR contract (Sherpa/whisper) is authoritative and proven; no STT code taken. Revisit only on a proven ASR gap."
+    },
+    {
+      "id": "H-tts",
+      "capability": "Multi-provider TTS incl. Piper",
+      "upstream": "hermes-agent tools/tts_*.py",
+      "verdict": "ADAPT",
+      "status": "DEFERRED",
+      "reason": "Qubit TTS contract (Piper default, ducking/barge-in) is authoritative and proven; no TTS code taken."
+    },
+    {
+      "id": "H-wake",
+      "capability": "Wake-word mic loop (openWakeWord/sherpa)",
+      "upstream": "hermes-agent tools/wake_word*.py",
+      "verdict": "ADAPT",
+      "status": "DEFERRED",
+      "reason": "Would create a second listener (forbidden); Porcupine needs commercial license. Wake-word is a later packet per plan."
+    },
+    {
+      "id": "H-browser",
+      "capability": "A11y-snapshot browser click/type/nav",
+      "upstream": "hermes-agent tools/browser_*.py",
+      "verdict": "ADAPT",
+      "status": "DEFERRED",
+      "reason": "Packet 8U scope; 8B loopback CDP stays the only browser authority for 8T-F."
+    },
+    {
+      "id": "H-files",
+      "capability": "Scoped file read/write/search",
+      "upstream": "hermes-agent tools/file_operations*.py",
+      "verdict": "ADAPT",
+      "status": "DEFERRED",
+      "reason": "Packet 8W scope; file Safety review + broker argv schemas required first."
+    },
+    {
+      "id": "H-terminal",
+      "capability": "Terminal/PTY tools + hardline approval detection",
+      "upstream": "hermes-agent tools/terminal_tool*.py + approval_detection.py",
+      "verdict": "ADAPT",
+      "status": "DEFERRED",
+      "reason": "Qubit has no shell-string execution path by construction (broker.py forbids shell=True), so the detector has no true-positive call site; vendoring it unwired would imitate integration. Revisit with 8V terminal work."
+    },
+    {
+      "id": "H-acp",
+      "capability": "ACP stdio protocol for IDEs",
+      "upstream": "hermes-agent acp_adapter/ (agent-client-protocol MIT)",
+      "verdict": "ADAPT",
+      "status": "DEFERRED",
+      "reason": "Packet 8X scope; needs Qubit permission/edit-approval wrapper ticket first."
+    },
+    {
+      "id": "H-sessions",
+      "capability": "SQLite WAL+FTS session/message store",
+      "upstream": "hermes-agent hermes_state_*.py",
+      "verdict": "ADAPT",
+      "status": "DEFERRED",
+      "reason": "Would duplicate Qubit MemoryStore/journal (forbidden second memory). Schema ideas on record; never share ~/.hermes DB."
+    },
+    {
+      "id": "H-gateway",
+      "capability": "Multi-platform gateway/cron/batch",
+      "upstream": "hermes-agent gateway/ cron/ batch_runner.py",
+      "verdict": "ADAPT",
+      "status": "DEFERRED",
+      "reason": "Qubit owns ports/sockets/timers (8D/8I). No gateway code taken; broker admission required first."
+    },
+    {
+      "id": "H-approvals",
+      "capability": "Per-tool smart approvals, destructive confirmations",
+      "upstream": "hermes-agent tools/approval_smart.py",
+      "verdict": "ADAPT",
+      "status": "IMPLEMENTED",
+      "proof": "Mapped to Qubit ConfirmationStore (model-issued forbidden, expiring single-use, destructive needs fresh confirmation); conformance tests/test_upstream_vendored.py; yolo/off modes have no Qubit counterpart by design"
+    },
+    {
+      "id": "H-estop",
+      "capability": "ESTOP sentinel + bounded receipts + pause",
+      "upstream": "hermes-agent agent/estop.py",
+      "verdict": "REUSE",
+      "status": "IMPLEMENTED",
+      "proof": "Qubit PowerControl latch+cancel proven (8O suite + runtime e-stop tests); cross-wiring to `hermes pause` DEFERRED (no live install to wire without touching operator state)"
+    },
+    {
+      "id": "H-cloudmem",
+      "capability": "Cloud memory/Hub sync",
+      "upstream": "hermes-agent honcho/mem0 extras",
+      "verdict": "REJECTED",
+      "reason": "Exfiltration + foreign ToS; local memory only.",
+      "status": "REJECTED"
+    },
+    {
+      "id": "H-desktop",
+      "capability": "Electron desktop shell",
+      "upstream": "hermes-agent apps/desktop/",
+      "verdict": "REJECTED",
+      "reason": "Duplicate surface + heavy supply chain.",
+      "status": "REJECTED"
+    },
+    {
+      "id": "H-cloudbrowser",
+      "capability": "Camofox cloud browser",
+      "upstream": "hermes-agent tools/browser_camofox*.py",
+      "verdict": "REJECTED",
+      "reason": "Page content to third party.",
+      "status": "REJECTED"
+    },
+    {
+      "id": "H-installer",
+      "capability": "Shell/Docker/Nix installer",
+      "upstream": "hermes-agent setup-hermes.sh, Dockerfile",
+      "verdict": "REJECTED",
+      "reason": "Qubit owns packaging/install (8K).",
+      "status": "REJECTED"
+    },
+    {
+      "id": "O-secretref",
+      "capability": "Server-side SecretRef credential references",
+      "upstream": "openclaw src/secrets/",
+      "verdict": "REUSE",
+      "status": "IMPLEMENTED",
+      "proof": "voicebridge/providers/credentials.py SecretRef + gateway wiring; live gateway tests; secrets never serialized"
+    },
+    {
+      "id": "O-approvals",
+      "capability": "Exec approvals with expiry/leases",
+      "upstream": "openclaw src/gateway/exec-approval-*",
+      "verdict": "REUSE",
+      "status": "IMPLEMENTED",
+      "proof": "Qubit expiring single-use confirmations + no-renewal-without-human; conformance tests/test_upstream_vendored.py; default-deny kept"
+    },
+    {
+      "id": "O-audit",
+      "capability": "Append-only audit events + execution receipts",
+      "upstream": "openclaw src/audit/",
+      "verdict": "REUSE",
+      "status": "IMPLEMENTED",
+      "proof": "Qubit ActionStore/audit + NEW runtime provenance field on every receipt; redaction + correlation tests"
+    },
+    {
+      "id": "O-sessions",
+      "capability": "Session-keyed runs + abort controllers",
+      "upstream": "openclaw src/gateway/session-*.ts, chat-abort.ts",
+      "verdict": "REUSE",
+      "status": "IMPLEMENTED",
+      "proof": "Qubit run cancellation (orchestrator cancel/abort, broker cancel, ActionRunner cancel paths) proven in 8O/8F suites + runtime cancel tests; cited in matrix doc"
+    },
+    {
+      "id": "O-cron",
+      "capability": "Durable jobs + delivery validation",
+      "upstream": "openclaw src/cron/",
+      "verdict": "REUSE",
+      "status": "IMPLEMENTED",
+      "proof": "Qubit monitor (timezone validation, dedupe, quiet-hours, overlap lease, bounded retry) proven in 8D/8I suites; cited in matrix doc"
+    },
+    {
+      "id": "O-frames",
+      "capability": "Typed gateway-protocol frame guards",
+      "upstream": "openclaw packages/gateway-protocol/",
+      "verdict": "REUSE",
+      "status": "DEFERRED",
+      "reason": "Qubit has no WS transport; SSE events already fail closed (2A conformance). Full frame-guard adoption is 8U transport work."
+    },
+    {
+      "id": "O-browser",
+      "capability": "Browser bridge auth/profiles/doctor",
+      "upstream": "openclaw extensions/browser/",
+      "verdict": "ADAPT",
+      "status": "DEFERRED",
+      "reason": "Packet 8U scope; 8B read-only contracts stay authoritative."
+    },
+    {
+      "id": "O-skills",
+      "capability": "Skill sandbox/contract for first-party skills",
+      "upstream": "openclaw src/skills/ packages/plugin-sdk",
+      "verdict": "ADAPT",
+      "status": "IMPLEMENTED",
+      "proof": "Qubit 7E SkillManifest validation (versioned, licensed, hash-pinned, disabled-until-enabled) proven in 7E suite; ClawHub third-party auto-install stays REJECTED"
+    },
+    {
+      "id": "O-board",
+      "capability": "Board HTTP store + sandboxed widgets",
+      "upstream": "openclaw src/gateway/board-*.ts",
+      "verdict": "ADAPT",
+      "status": "DEFERRED",
+      "reason": "Dashboard scope; webui.py overlaps unrelated dirty work and server-side policy must come first."
+    },
+    {
+      "id": "O-onboard",
+      "capability": "Guided onboarding + doctor repair flows",
+      "upstream": "openclaw src/commands/onboard-*.ts",
+      "verdict": "ADAPT",
+      "status": "IMPLEMENTED",
+      "proof": "Qubit setup checklist + audio wizard + repair planner + diagnostics proven in 8T suite; cited in matrix doc"
+    },
+    {
+      "id": "O-memory",
+      "capability": "Per-agent turns + memory files + state DB",
+      "upstream": "openclaw src/sessions/ src/memory/",
+      "verdict": "REUSE",
+      "status": "IMPLEMENTED",
+      "proof": "Qubit MemoryStore tiers/provenance/expiry/correction + verified skills proven in 5B/8P suites; cited in matrix doc"
+    },
+    {
+      "id": "O-models",
+      "capability": "Multi-provider registry + catalog",
+      "upstream": "openclaw src/llm/model-registry.ts",
+      "verdict": "REUSE",
+      "status": "IMPLEMENTED",
+      "proof": "Qubit 8Q provider gateway (local default, allowlists, budgets, typed fallback) proven in 8Q suite; cited in matrix doc"
+    },
+    {
+      "id": "O-docker",
+      "capability": "Digest-pinned multi-stage runtime",
+      "upstream": "openclaw Dockerfile",
+      "verdict": "ADAPT",
+      "status": "DEFERRED",
+      "reason": "8K owns Qubit packaging; pattern documented, no Dockerfile taken."
+    },
+    {
+      "id": "O-clawhub",
+      "capability": "Third-party plugin auto-install",
+      "upstream": "openclaw src/plugins/clawhub.ts",
+      "verdict": "REJECTED",
+      "reason": "Unreviewed code; allowlist + hash-pin + manual review only.",
+      "status": "REJECTED"
+    },
+    {
+      "id": "Q-voice",
+      "capability": "Mic/ASR/TTS/playback/hotkeys/PTT (Qubit-owned)",
+      "upstream": "none",
+      "verdict": "MISSING",
+      "status": "IMPLEMENTED",
+      "proof": "Existing audio/orchestrator contracts unchanged; proven in audio/8H-adjacent suites + runtime TTS-path test"
+    },
+    {
+      "id": "Q-broker",
+      "capability": "Capability broker + 7E/8E/8F/8O policy (Qubit-owned)",
+      "upstream": "none",
+      "verdict": "MISSING",
+      "status": "IMPLEMENTED",
+      "proof": "3A/1B/7E/8F/8O suites green; no-bypass tests in upstreans spike + runtime suites"
+    }
+  ]
+}
