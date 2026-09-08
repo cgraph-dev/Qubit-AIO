@@ -193,10 +193,10 @@ def _event_to_feed_item(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return {"kind": "status", "text": "Agent runtime running",
                 "route": "openclaw", "detail": f"elapsed {ev.get('elapsed_s','')}s"}
     if evt == "openclaw.progress":
-        return {"kind": "status", "text": "OpenClaw progress",
+        return {"kind": "status", "text": "Agent progress",
                 "route": "openclaw", "detail": f"elapsed {ev.get('elapsed_s','')}s"}
     if evt == "hermes.error":
-        return {"kind": "fail", "text": "Hermes error",
+        return {"kind": "fail", "text": "Voice error",
                 "route": "hermes", "detail": str(ev.get("error",""))[:300]}
     if evt == "boss_talk":
         return {"kind": "status", "text": ev.get("phrase","boss talk"),

@@ -108,8 +108,30 @@ def test_activity_feed_qubit_text_preserved_routes():
 
 
 # ---------------------------------------------------------------------------
-# Orchestrator speech routes the same backends under Qubit names
+# Residual surfaces: no upstream product identity in user-facing strings
 # ---------------------------------------------------------------------------
+RESIDUAL_BAD = [
+    '"OpenClaw task"', '"Hermes task"', '"OpenClaw progress"',
+    '"Hermes error"', '"OpenClaw Voice Bridge — push-to-talk"',
+    '"OpenClaw route:', '"# OpenClaw full report',
+    '"Using Hermes."', '"Using OpenClaw."', """"I'll use OpenClaw""",
+    "OpenClaw or Hermes?", "voice bridge for OpenClaw",
+    "same as hermes chat", "(like hermes", "voice-bridge terminal (like",
+]
+
+
+def test_no_residual_upstream_product_strings():
+    orch_text = (REPO_ROOT / "voicebridge" / "orchestrator.py").read_text()
+    webui_text = (REPO_ROOT / "voicebridge" / "webui.py").read_text()
+    cli_text = (REPO_ROOT / "voicebridge" / "cli.py").read_text()
+    term_text = (REPO_ROOT / "voicebridge" / "terminal.py").read_text()
+    for bad in RESIDUAL_BAD:
+        for name, text in (("orchestrator", orch_text), ("webui", webui_text),
+                           ("cli", cli_text), ("terminal", term_text)):
+            assert bad not in text, f"{name} still shows {bad!r}"
+    for page in PAGES:
+        html = (FRONTEND / page).read_text()
+        assert "Hermes" not in html, page
 def _orch(tmp_path, monkeypatch):
     from voicebridge import config as C
 
@@ -125,6 +147,11 @@ def _orch(tmp_path, monkeypatch):
     orch._handle_hermes = lambda task: handled.append(("voice", task))
     orch._launch_task = lambda task, model=None: handled.append(("agent", task))
     return orch, spoken, handled
+
+
+# ---------------------------------------------------------------------------
+# Orchestrator speech routes the same backends under Qubit names
+# ---------------------------------------------------------------------------
 
 
 def test_executor_answers_route_qubit_named_backends(tmp_path, monkeypatch):

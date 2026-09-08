@@ -31,11 +31,11 @@ class DispatchBlocked(RuntimeError):
 
 
 WORKER_CAPS = {
-    "openclaw.gateway.task": ("openclaw", "send a task through the OpenClaw gateway"),
-    "openclaw.cli.task": ("openclaw", "run a task through the OpenClaw CLI"),
-    "hermes.task": ("hermes", "run a task through the Hermes CLI"),
-    "openclaw.create_session": ("openclaw", "create an OpenClaw task session"),
-    "openclaw.abort": ("openclaw", "abort a running OpenClaw task"),
+    "openclaw.gateway.task": ("openclaw", "send a task through the agent gateway"),
+    "openclaw.cli.task": ("openclaw", "run a task through the agent CLI"),
+    "hermes.task": ("hermes", "run a task through the voice runtime CLI"),
+    "openclaw.create_session": ("openclaw", "create an agent task session"),
+    "openclaw.abort": ("openclaw", "abort a running agent task"),
 }
 
 

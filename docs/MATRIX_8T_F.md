@@ -23,9 +23,9 @@ integration.)
    version/argv/session/timeout/cancel/redaction proven live
    (`tests/test_real_hermes.py`). Operator installs untouched.
 
-## IMPLEMENTED rows (16)
+## IMPLEMENTED rows (15)
 
-H-ansi-strip, H-sqlite-txn, H-real-exec, H-approvals (Qubit confirmations),
+H-ansi-strip, H-real-exec, H-approvals (Qubit confirmations),
 H-estop (latch+cancel; cross-wire to `hermes pause` deferred),
 O-secretref (wired), O-approvals (expiry/settle-once/no-renewal),
 O-audit (+ new receipt `runtime` provenance), O-sessions (cancellation
@@ -33,15 +33,18 @@ paths), O-cron (monitor validation), O-skills (7E manifests),
 O-onboard (8T setup), O-memory (5B/8P stores), O-models (8Q gateway),
 Q-voice + Q-broker (Qubit-owned, suites cited).
 
-## DEFERRED rows (14)
+## DEFERRED rows (15)
 
-H-stream/streaming (Qubit owns; httpx dep), H-stt/H-tts (Qubit contracts
-authoritative), H-wake (second listener + license), H-browser (8U),
-H-files (8W), H-terminal incl. approval_detection (no shell-string path
-exists by construction — vendoring it unwired would imitate integration),
-H-acp (8X), H-sessions store (would duplicate memory), H-gateway (8D/8I
-own), O-frames (no WS transport; 8U work), O-browser (8U), O-board
-(dashboard scope), O-docker (8K owns).
+H-sqlite-txn (write_txn attempted live and reverted with root cause —
+executescript implicit-commit; module vendored, differential-tested,
+reserved for non-executescript writes), H-stream/streaming (Qubit owns;
+httpx dep), H-stt/H-tts (Qubit contracts authoritative), H-wake (second
+listener + license), H-browser (8U), H-files (8W), H-terminal incl.
+approval_detection (no shell-string path exists by construction —
+vendoring it unwired would imitate integration), H-acp (8X),
+H-sessions store (would duplicate memory), H-gateway (8D/8I own),
+O-frames (no WS transport; 8U work), O-browser (8U), O-board (dashboard
+scope), O-docker (8K owns).
 
 ## REJECTED rows (5)
 

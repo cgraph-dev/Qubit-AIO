@@ -1655,18 +1655,18 @@ class VoiceOrchestrator:
                 if self._hermes is not None:
                     log_event("openclaw.failover.hermes", reason="gateway error")
                     self._handle_hermes(task_text,
-                                        notice="OpenClaw is unreachable. Routing to Hermes.")
+                                        notice="The agent runtime is unreachable. Routing to the voice runtime.")
                     return
-                self.speak("OpenClaw rejected the task. Check the logs.")
+                self.speak("The agent runtime rejected the task. Check the logs.")
                 return
             except Exception as exc:
                 log_event("openclaw.request.exception", error=str(exc)[:200])
                 if self._hermes is not None:
                     log_event("openclaw.failover.hermes", reason=str(exc)[:120])
                     self._handle_hermes(task_text,
-                                        notice="OpenClaw is unreachable. Routing to Hermes.")
+                                        notice="The agent runtime is unreachable. Routing to the voice runtime.")
                     return
-                self.speak("Something went wrong talking to OpenClaw.")
+                self.speak("Something went wrong talking to the agent runtime.")
                 return
         elif self._route == "cli" and self._cli:
             boss = _boss_phrase()
@@ -1684,9 +1684,9 @@ class VoiceOrchestrator:
                 log_event("openclaw.error", session_key=session_key, error=str(exc)[:300])
                 if self._hermes is not None:
                     log_event("openclaw.failover.hermes", reason=str(exc)[:120])
-                    self._handle_hermes(task_text, notice="OpenClaw hit an error. Routing to Hermes.")
+                    self._handle_hermes(task_text, notice="The agent runtime hit an error. Routing to the voice runtime.")
                     return
-                self.speak("OpenClaw hit an error. Check the logs.")
+                self.speak("The agent runtime hit an error. Check the logs.")
                 return
             self.task.set_active(session_key, "", task_text, model or "")
             self._handle_agent_result(session_key, result.reply, result.status, result.elapsed_s)
@@ -1697,7 +1697,7 @@ class VoiceOrchestrator:
                 self._handle_hermes(task_text,
                                     notice="OpenClaw is not reachable. Routing to Hermes.")
                 return
-            self.speak("OpenClaw is not reachable. Start the gateway and try again.")
+            self.speak("The agent runtime is not reachable. Start the gateway and try again.")
 
     def _progress_loop(self) -> None:
         """Periodic talk-back while a big task runs — local Qubit checks what
@@ -1846,7 +1846,7 @@ class VoiceOrchestrator:
                               status="failed", error=exc.message,
                               elapsed_s=round(time.time() - t0, 2))
                     self.task.clear()
-                    self.speak("OpenClaw failed the task. Check the logs.")
+                    self.speak("The agent runtime failed the task. Check the logs.")
                     return
                 except Exception as exc:
                     log_event("openclaw.error", session_key=session_key, run_id=run_id, error=str(exc)[:200], elapsed_s=round(time.time() - t0, 2))
@@ -1867,7 +1867,7 @@ class VoiceOrchestrator:
                               status="failed", error=str(exc)[:200],
                               elapsed_s=round(time.time() - t0, 2))
                     self.task.clear()
-                    self.speak("OpenClaw failed the task. Check the logs.")
+                    self.speak("The agent runtime failed the task. Check the logs.")
                     return
                 if not self.task.active:
                     # interrupted (Ctrl) or cancelled while we were blocked in
@@ -1886,7 +1886,7 @@ class VoiceOrchestrator:
                         timeout_spoken = True
                         log_event("openclaw.result", session_key=session_key, run_id=run_id,
                                   status="timeout", elapsed_s=round(time.time() - t0, 2))
-                        self.speak("The task is still running in OpenClaw. "
+                        self.speak("The task is still running in the agent runtime. "
                                    "I'll keep tracking it and let you know when it's done.")
                         self.task.last_progress_spoken = time.time()
                     continue  # still going; poll again
@@ -1899,7 +1899,7 @@ class VoiceOrchestrator:
                     log_event("openclaw.result", session_key=session_key, run_id=run_id,
                               status=st, elapsed_s=round(time.time() - t0, 2))
                     self.task.clear()
-                    self.speak(f"OpenClaw finished the task with status {st}. Check the logs.")
+                    self.speak(f"The agent runtime finished the task with status {st}. Check the logs.")
                 return
             self.task.clear()
 
@@ -2034,7 +2034,7 @@ class VoiceOrchestrator:
             pass
         if not reply.strip():
             try:
-                self.speak("OpenClaw finished the task. I couldn't pull the final "
+                self.speak("The agent runtime finished the task. I couldn't pull the final "
                            "text from the session — check the dashboard for details, "
                            "or ask me what it did.")
             except Exception:
@@ -2084,7 +2084,7 @@ class VoiceOrchestrator:
         except Exception:
             pass
         try:
-            self.feed_push({"kind": "summary", "text": "OpenClaw task",
+            self.feed_push({"kind": "summary", "text": "Agent task",
                             "summary": summary, "route": "openclaw", "raw": reply[:50000]})
         except Exception:
             pass
@@ -2114,7 +2114,7 @@ class VoiceOrchestrator:
             safe = _re2.sub(r"[^a-zA-Z0-9._:-]", "_", session_key)[:120] or "report"
             path = rdir / f"{safe}.md"
             import time as _tm2
-            header = "# OpenClaw full report — {}\n\n- status: {}\n- elapsed: {}s\n- at: {}\n\n---\n\n".format(session_key, status, round(elapsed_s,1), _tm2.strftime("%Y-%m-%d %H:%M:%S"))
+            header = "# Qubit Agent full report — {}\n\n- status: {}\n- elapsed: {}s\n- at: {}\n\n---\n\n".format(session_key, status, round(elapsed_s,1), _tm2.strftime("%Y-%m-%d %H:%M:%S"))
             from .redaction import redact_text as _rt
             persisted = _rt(header + (reply or ""))
             path.write_text(persisted, errors="replace")
@@ -2170,7 +2170,7 @@ class VoiceOrchestrator:
             self.muted = False
             self.speak("Unmuted.")
         elif cmd == "help":
-            self.speak("Hold the talk key, say a task for OpenClaw, like: "
+            self.speak("Hold the talk key, say a task for Qubit, like: "
                        "inspect the webhook flow and patch the signature check. "
                        "Say stop to cancel. Say status for health.")
         elif cmd == "stop":
@@ -2875,7 +2875,7 @@ class VoiceOrchestrator:
     def _handle_local(self, intent: Intent, text: str) -> None:
         """Whitelisted direct PC action (volume, apps, screenshot, ...)."""
         if not self.cfg.get("local", "enabled", default=True):
-            self.speak("Local actions are disabled; routing to OpenClaw.")
+            self.speak("Local actions are disabled; routing to the agent runtime.")
             self._dispatch_coding(text)
             return
         name = intent.params.get("action")
@@ -2988,7 +2988,7 @@ class VoiceOrchestrator:
             self._enqueue_task(task, self._current_model(), provider="hermes")
             return
         if self._hermes is None:
-            self.speak("Hermes is not enabled; routing to OpenClaw instead.")
+            self.speak("The voice runtime is not enabled; routing to the agent runtime instead.")
             self._dispatch_coding(task)
             return
         hermes = self._hermes
@@ -3035,13 +3035,13 @@ class VoiceOrchestrator:
                 _humming_stop.set()
                 self._hermes_busy = False
                 log_event("hermes.error", task=task[:200], error="timeout")
-                self.speak("Hermes timed out. Try again, or ask me instead.")
+                self.speak("The voice runtime timed out. Try again, or ask me instead.")
                 return
             except Exception as exc:
                 _humming_stop.set()
                 self._hermes_busy = False
                 log_event("hermes.error", task=task[:200], error=str(exc)[:300])
-                self.speak(f"Hermes failed: {str(exc)[:120]}")
+                self.speak(f"The voice runtime failed: {str(exc)[:120]}")
                 return
             _humming_stop.set()
             self._hermes_busy = False
@@ -3089,7 +3089,7 @@ class VoiceOrchestrator:
                     self.shared.append_agent_report(summary, raw=reply, provider="hermes", session_key=self.task.session_key or "hermes")
                 except Exception:
                     pass
-                self.feed_push({"kind": "summary", "text": "Hermes task", "summary": summary, "route": "hermes", "raw": reply[:50000], "links": _hl[:20]})
+                self.feed_push({"kind": "summary", "text": "Voice task", "summary": summary, "route": "hermes", "raw": reply[:50000], "links": _hl[:20]})
             except Exception:
                 pass
             try:
@@ -3298,7 +3298,7 @@ class VoiceOrchestrator:
     def run(self) -> None:
         self.start()
         print("=" * 60)
-        print("OpenClaw Voice Bridge — push-to-talk")
+        print("Qubit Agent (Qubit VoiceBridge) — push-to-talk")
         if self._duplex is not None:
             print("  PersonaPlex full-duplex lane: talk naturally; tasks are routed.")
         if self._ptt_supported:
@@ -3306,7 +3306,7 @@ class VoiceOrchestrator:
             print(f"  Hold {hold} and speak. Esc cancels. Ctrl+C to quit.")
         else:
             print("  Hotkeys unavailable (no X). Press Enter to start/stop recording.")
-        print(f"  ASR: {self._asr.name}  |  TTS: {self._tts.name}  |  OpenClaw route: {self._route}")
+        print(f"  ASR: {self._asr.name}  |  TTS: {self._tts.name}  |  Agent route: {self._route}")
         print("=" * 60)
 
         if self._duplex is not None:

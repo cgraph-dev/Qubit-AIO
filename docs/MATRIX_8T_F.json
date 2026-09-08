@@ -35,9 +35,9 @@
       "id": "H-sqlite-txn",
       "capability": "SQLite IMMEDIATE txn + idempotent ADD COLUMN",
       "upstream": "hermes-agent hermes_cli/sqlite_util.py",
-      "verdict": "REUSE",
-      "status": "IMPLEMENTED",
-      "proof": "voicebridge/upstream/hermes_sqlite_util.py (verbatim); write_txn tried in memory/store.py and REVERTED with root cause (executescript implicit-commit); differential tests; reserved for non-executescript writes"
+      "verdict": "DEFER",
+      "status": "DEFERRED",
+      "reason": "write_txn attempted live in memory/store.py and REVERTED with root cause: executescript() implicitly commits, breaking explicit BEGIN IMMEDIATE ('cannot commit - no transaction is active' on every fresh open; restore test re-green after revert). Comms-store DML batches assessed: 13 shared lock sites, rewiring all changes cross-process lock behavior for marginal gain. Module stays vendored, differential-tested, reserved for non-executescript writes."
     },
     {
       "id": "H-real-exec",
