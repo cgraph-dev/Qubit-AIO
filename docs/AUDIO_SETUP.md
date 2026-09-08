@@ -16,7 +16,7 @@
 - The **HyperX Cloud III headset** is no longer the active input; the effective
   config now pins the Scarlett by stable name.
 
-## The live config — `~/.config/openclaw-voice-bridge/voice.yaml`
+## The live config — `~/.config/qubit-voicebridge/voice.yaml`
 ```yaml
 mic:
   device: null              # never a transient PortAudio index
@@ -38,7 +38,7 @@ To (re)pin the microphone by stable name (never by index):
 ```
 voicebridge audio select mic "Scarlett 2i2 4th Gen: USB Audio"
 voicebridge audio status
-systemctl --user restart openclaw-voice-bridge.service
+systemctl --user restart qubit-voicebridge.service
 ```
 
 ## Critical rules (do NOT break)

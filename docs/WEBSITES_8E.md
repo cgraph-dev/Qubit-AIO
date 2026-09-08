@@ -259,13 +259,15 @@ token, or secret URL appears in records, logs, fixtures, events, or test output.
 
 The dashboard/serving change takes effect when the running bridge process
 restarts. The exact controlled command depends on the installed unit (the
-repository template and installer use `qubit-voice-agent.service`; the operator
-should confirm with `systemctl --user list-units 'qubit-voice-agent*'
+repository template and installer use `qubit-voicebridge.service`; legacy
+`qubit-voice-agent.service` / `openclaw-voice-bridge.service` installs are
+stale/compat-only — the operator should confirm with
+`systemctl --user list-units 'qubit-voicebridge*' 'qubit-voice-agent*'
 'openclaw*'`):
 
 ```bash
-systemctl --user restart qubit-voice-agent.service   # or the actual installed unit
-journalctl --user -u qubit-voice-agent.service --since "-2 min"   # verify
+systemctl --user restart qubit-voicebridge.service   # or the actual installed unit
+journalctl --user -u qubit-voicebridge.service --since "-2 min"   # verify
 ```
 
 Then in the browser: open `/token-setup` and re-store the token (or clear the

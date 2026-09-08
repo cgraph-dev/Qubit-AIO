@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install the OpenClaw Voice Bridge on a FRESH machine (or re-run to repair).
+# Install Qubit Agent (Qubit VoiceBridge) on a FRESH machine (or re-run to repair).
 # Idempotent. Does NOT touch your OpenClaw installation, agents, or providers.
 #
 #   ./scripts/install.sh                    # venv, deps, models, config

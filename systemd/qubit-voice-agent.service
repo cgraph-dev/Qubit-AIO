@@ -1,3 +1,8 @@
+# LEGACY REFERENCE ONLY — DO NOT INSTALL. The canonical unit is
+# systemd/qubit-voicebridge.service. This file is kept readable so existing
+# checkouts and diagnostics can identify stale installs; installing it
+# alongside the canonical unit is reported as DUPLICATE, and a legacy-only
+# install is reported as STALE (see voicebridge/product.py service_owner).
 [Unit]
 Description=Qubit Voice Agent (push-to-talk voice interface)
 After=network.target

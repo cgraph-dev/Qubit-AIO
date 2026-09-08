@@ -27,7 +27,7 @@ helper and `EventSource` cannot send the `X-Api-Token` header.
 | `/reports` | `frontend/reports.html` Reports | toolbar (search/category/days/refresh/prune), status (`#conn`, aria-live), meta, report feed (DOM-built cards), inline typed status message | `/api/status`, `/api/reports`, `/api/reports/prune` |
 | `/settings` | `frontend/settings.html` Settings | beginner/advanced toggle, health, model/STT/TTS/voice profiles, audio, permissions, permissions mode, websites, actions, device, export/import, upgrade, reset, branding | all via `api()` wrapper around `vbApi` (`/api/status`, `/api/profiles`, `/api/providers/*`, `/api/audio/*`, `/api/permissions*`, `/api/websites*`, `/api/actions*`, `/api/device*`, `/api/state/*`, `/api/upgrade*`, `/api/branding*`) |
 | `/approvals` | `frontend/approvals.html` Approvals | pending list (DOM-built cards), approve/deny buttons (addEventListener + `data-id`) | `/api/approvals`, `/api/approvals/respond` |
-| `/token-setup` | `frontend/token-setup.html` Pair device | token input (password), save & test (via `vbApiTest`), plain-language result; help copy points at the canonical `webui.token` value in `~/.config/qubit-voice-agent/voice.yaml` | `/api/status` |
+| `/token-setup` | `frontend/token-setup.html` Pair device | token input (password), save & test (via `vbApiTest`), plain-language result; help copy points at the canonical `webui.token` value in `~/.config/qubit-voicebridge/voice.yaml` | `/api/status` |
 
 Shared static assets:
 

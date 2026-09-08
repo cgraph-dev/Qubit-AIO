@@ -8,7 +8,73 @@ logs, reports, or telemetry.
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
+
+
+@dataclass(frozen=True)
+class SecretRef:
+    """Packet 8T-F — server-side credential reference (OpenClaw SecretRef shape,
+    resolved only through Qubit policy).
+
+    ``source`` is "env" (``name`` = variable) or "file" (``name`` = path).
+    Values are resolved server-side via :func:`resolve_key` and the browser /
+    private-DB refusals below; the value must never be logged, and the file
+    path is redacted to kind-only in output. Anything else fails closed.
+    """
+    source: str
+    name: str
+
+
+def resolve_secret_ref(ref: SecretRef | Mapping[str, str] | str,
+                       provider: str = "secret-ref") -> tuple[str, str]:
+    """Resolve a SecretRef to (value, code); code is "" on success.
+
+    Accepts a SecretRef, a {"source","name"} mapping, or a legacy
+    "env:NAME"/"file:PATH" string. Refuses unknown sources, browser-secret
+    paths, and OpenCode private databases with AUTH_MISSING (never raises
+    for policy reasons — callers treat missing as typed degraded).
+    """
+    source: str
+    name: str
+    if isinstance(ref, SecretRef):
+        source, name = ref.source, ref.name
+    elif isinstance(ref, Mapping):
+        source, name = str(ref.get("source", "")), str(ref.get("name", ""))
+    elif isinstance(ref, str):
+        text = ref.strip()
+        if text.startswith("env:") or text.startswith("file:"):
+            source, name = text.split(":", 1)
+        else:
+            return "", "AUTH_MISSING"
+    else:
+        return "", "AUTH_MISSING"
+    source, name = source.strip(), name.strip()
+    if source not in ("env", "file") or not name:
+        return "", "AUTH_MISSING"
+    if source == "file" and (looks_like_browser_secret(name)
+                             or looks_like_opencode_private_db(name)):
+        return "", "AUTH_MISSING"
+    return resolve_key(provider, f"{source}:{name}")
+
+
+def redact_secret_ref(ref: SecretRef | Mapping[str, str] | str) -> str:
+    """Kind-only descriptor for logs: never the value or full path."""
+    if isinstance(ref, SecretRef):
+        source, name = ref.source, ref.name
+    elif isinstance(ref, Mapping):
+        source, name = str(ref.get("source", "")), str(ref.get("name", ""))
+    elif isinstance(ref, str):
+        return redact_ref(ref)
+    else:
+        return "missing"
+    source = source.strip()
+    if source == "env" and name.strip():
+        return f"env:{name.strip()[:64]}"
+    if source == "file" and name.strip():
+        return "file:<redacted-path>"
+    return "missing"
 
 
 def resolve_key(provider: str, ref: str) -> tuple[str, str]:

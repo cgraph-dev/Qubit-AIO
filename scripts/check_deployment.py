@@ -110,7 +110,7 @@ def check_deployment(template: Path) -> list[tuple[str, str, str]]:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Packet 7A deployment-template check")
-    ap.add_argument("--template", default=str(REPO / "systemd/qubit-voice-agent.service"))
+    ap.add_argument("--template", default=str(REPO / "systemd/qubit-voicebridge.service"))
     args = ap.parse_args(argv)
     results = check_deployment(Path(args.template))
     order = {"FAIL": 0, "WARN": 1}

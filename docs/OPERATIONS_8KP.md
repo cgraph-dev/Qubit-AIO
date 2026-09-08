@@ -73,17 +73,17 @@ step.
 
 | Category | Location (Linux, honours `$XDG_*`) |
 |---|---|
-| config | `$XDG_CONFIG_HOME/qubit-voice-agent` |
-| user data | `$XDG_DATA_HOME/qubit-voice-agent` |
-| runtime state | `$XDG_STATE_HOME/qubit-voice-agent` |
-| model files | `$XDG_DATA_HOME/qubit-voice-agent/models` |
-| cache/temp | `$XDG_CACHE_HOME/qubit-voice-agent` |
-| logs | `$XDG_STATE_HOME/qubit-voice-agent/logs` |
-| exports | `$XDG_STATE_HOME/qubit-voice-agent/exports` |
-| backups | `$XDG_STATE_HOME/qubit-voice-agent/backups` |
-| install journal | `$XDG_STATE_HOME/qubit-voice-agent/install-journal` |
+| config | `$XDG_CONFIG_HOME/qubit-voicebridge` |
+| user data | `$XDG_DATA_HOME/qubit-voicebridge` |
+| runtime state | `$XDG_STATE_HOME/qubit-voicebridge` |
+| model files | `$XDG_DATA_HOME/qubit-voicebridge/models` |
+| cache/temp | `$XDG_CACHE_HOME/qubit-voicebridge` |
+| logs | `$XDG_STATE_HOME/qubit-voicebridge/logs` |
+| exports | `$XDG_STATE_HOME/qubit-voicebridge/exports` |
+| backups | `$XDG_STATE_HOME/qubit-voicebridge/backups` |
+| install journal | `$XDG_STATE_HOME/qubit-voicebridge/install-journal` |
 | packaged resources | installed package `voicebridge/_data` (checkout fallback) |
-| legacy (compat alias) | `$XDG_CONFIG_HOME/openclaw-voice-bridge` etc. |
+| legacy (compat alias) | `$XDG_CONFIG_HOME/openclaw-voice-bridge`, `$XDG_CONFIG_HOME/qubit-voice-agent` etc. |
 
 The path map is stable across restart, upgrade, rollback, uninstall, multiple
 users, and multiple graphical sessions (proven by tests). Only owned
@@ -280,7 +280,7 @@ python -m pytest tests/test_packet8k.py                # 8K regressions
 python -m compileall -q voicebridge scripts tests      # byte-compile
 python -m pip check                                     # dependency integrity
 git diff --check                                        # whitespace
-systemd-analyze verify systemd/qubit-voice-agent.service
+systemd-analyze verify systemd/qubit-voicebridge.service
 python scripts/release_qualify.py --static --json       # 8K static certification
 graft build                                             # repo context graph refresh
 ```
