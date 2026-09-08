@@ -25,24 +25,30 @@ Status: implemented (code-side). Packet 8U is NOT started.
 | URL | https://github.com/NousResearch/hermes-agent | https://github.com/openclaw/openclaw |
 | Tag | v2026.9.7 | v2026.9.2 |
 | Commit | 2237be355906fbe6065ce1815711eee52b2d646e | 3928bad9badfcb6c7d140530435e806fb8092190 |
-| Clone | /tmp/upstream-8tf/hermes-agent | /tmp/upstream-8tf/openclaw |
+| Clone | /tmp/upstream-8tfr2/hermes-agent | /tmp/upstream-8tfr2/openclaw |
 | License | MIT © 2025 Nous Research | MIT © 2026 OpenClaw Foundation |
 | Notices/locks | uv.lock | pnpm-lock.yaml, THIRD_PARTY_NOTICES.md |
 
-Acquired 2026-09-08 (UTC). Both clones read-only inputs, `git status` clean
-at implementation end; operator's live `~/.hermes` / `~/.openclaw` installs
-never touched. No production code copied from either clone. Model/plugin/
+Acquired 2026-09-08 (UTC); tags re-verified newest-stable at acquisition.
+Both clones read-only inputs, `git status` clean at implementation end;
+operator's live `~/.hermes` / `~/.openclaw` installs never touched. No
+production code copied from either clone (contract shapes only). Model/plugin/
 driver caveats: Porcupine key terms, cloud STT/TTS ToS, unpinned cua-driver,
 Playwright Chromium, Electron, cloud-memory ToS, extension models/voices —
 each needs its own review before any use (see UPSTREAM_REUSE R29/R30).
 
 ## 3. Feature matrix (8T-F delta on FEATURE_MATRIX_8U.json)
 
-- ADAPT implemented: server-side `SecretRef` (`voicebridge/providers/
-  credentials.py`: `SecretRef` + `resolve_secret_ref` + `redact_secret_ref`),
-  reusing the existing `resolve_key` env/file contract and browser-secret /
-  private-DB refusals. No caller behavior changed.
-- MISSING implemented: singularity audit (`voicebridge/foundation.py`:
+- ADAPT implemented (OpenClaw): server-side `SecretRef`
+  (`voicebridge/providers/credentials.py`) wired into the frontier gateway
+  (`providers/gateway.py` accepts `SecretRef`/mapping `key_ref`, normalized
+  to the same refusal/redaction contract — string behavior unchanged).
+- ADAPT implemented (Hermes): real adapted runtime (`voicebridge/runtime/`:
+  `HermesRuntime` supervisor + stdio `worker` speaking the pinned CLI
+  turn/session contract; minimal scrubbed environment; timeout/cancel/reap;
+  redacted receipts; e-stop refusal before spawn). Qubit starts it,
+  VoiceBridge text goes in, replies return to the Qubit TTS contract.
+- MISSING implemented: singularity audit (`voicebridge/foundation.py`);
   `collect_runtime_state` + `singularity_report` + `assert_foundation` +
   `disabled_competing_paths`); competing Hermes/OpenClaw voice paths are
   refused by policy, not executed.

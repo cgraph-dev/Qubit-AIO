@@ -8,6 +8,7 @@ fail closed or use a clearly typed local fallback.
 from __future__ import annotations
 
 import time
+from collections.abc import Mapping
 from typing import Any, Callable, Optional
 
 from ..logging_setup import log_event
@@ -15,9 +16,9 @@ from ..redaction import redact_text
 from . import frontier as _frontier
 from .catalog import ModelEntry, ProviderCatalog
 from .contracts import ProviderRequest, ProviderResult, UsageRecord
-from .credentials import (looks_like_browser_secret,
+from .credentials import (SecretRef, looks_like_browser_secret,
                            looks_like_opencode_private_db, redact_ref,
-                           resolve_key)
+                           redact_secret_ref, resolve_key)
 from .egress import classify_and_sanitize
 from .policy import FrontierPolicy, disclosure_block, get_governor
 
@@ -179,8 +180,17 @@ def run(req: ProviderRequest, cfg: Any,
                               identity=f"{provider}/{model}")
 
     # Credentials: env/file reference only; never OpenCode private DB.
+    # 8T-F ADAPT: key_ref also accepts a server-side SecretRef (OpenClaw
+    # SecretRef shape); it is normalized to the same string contract below,
+    # so every refusal and redaction below applies unchanged.
     pcfg = policy.provider_cfg(provider)
-    ref = str(pcfg.get("key_ref", "") or "")
+    raw_ref = pcfg.get("key_ref", "")
+    if isinstance(raw_ref, SecretRef):
+        ref = f"{raw_ref.source}:{raw_ref.name}"
+    elif isinstance(raw_ref, Mapping):
+        ref = f"{raw_ref.get('source', '')}:{raw_ref.get('name', '')}"
+    else:
+        ref = str(raw_ref or "")
     if looks_like_opencode_private_db(ref) or looks_like_opencode_private_db(
             str(pcfg.get("base_url", ""))):
         return ProviderResult(ok=False, code="AUTH_MISSING",

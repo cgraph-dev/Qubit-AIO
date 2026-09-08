@@ -140,3 +140,68 @@ def assert_foundation(report: Mapping[str, Any]) -> None:
 
 class FoundationError(RuntimeError):
     """Raised when the one-of-everything contract does not hold."""
+
+
+def describe() -> Dict[str, Any]:
+    """Static foundation description: identity, pins, refused paths."""
+    return {"schema": "qubit-foundation/1", "product": PRODUCT_NAME,
+            "voice_subsystem": VOICE_SUBSYSTEM,
+            "install_identity": INSTALL_IDENTITY,
+            "import_package": IMPORT_PACKAGE,
+            "legacy_identity": LEGACY_IDENTITY,
+            "hermes": {"url": HERMES_URL, "tag": HERMES_TAG,
+                       "commit": HERMES_COMMIT},
+            "openclaw": {"url": OPENCLAW_URL, "tag": OPENCLAW_TAG,
+                         "commit": OPENCLAW_COMMIT},
+            "primary_runtime_argv": list(PRIMARY_RUNTIME_ARGV),
+            "disabled_competing_paths": disabled_competing_paths()}
+
+
+def runtime_check(provider: str = "fixture") -> Dict[str, Any]:
+    """Real end-to-end probe: start the adapted runtime, ping, one turn,
+    status, stop. Returns the receipt-bearing result (never a mock)."""
+    from .runtime import HermesRuntime
+
+    rt = HermesRuntime(provider=provider)
+    try:
+        before = rt.status()
+        turn = rt.turn("foundation runtime check", session="foundation")
+        live = rt.status()
+        return {"verdict": "OK" if turn.get("ok") else "FAILED",
+                "before": before, "turn": turn, "live": live}
+    finally:
+        rt.stop()
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    import json as _json
+    import sys as _sys
+
+    args = list(argv if argv is not None else _sys.argv[1:])
+    cmd = args[0] if args else "describe"
+    if cmd == "describe":
+        _sys.stdout.write(_json.dumps(describe(), indent=2) + "\n")
+        return 0
+    if cmd == "check":
+        report = singularity_report({})
+        _sys.stdout.write(_json.dumps(report, indent=2) + "\n")
+        return 0  # audit ran; verdict (DEGRADED) is inside the JSON
+    if cmd == "runtime-check":
+        provider = "fixture"
+        for flag in args[1:]:
+            if flag.startswith("--provider="):
+                provider = flag.split("=", 1)[1]
+        try:
+            result = runtime_check(provider=provider)
+        except Exception as exc:
+            _sys.stdout.write(_json.dumps(
+                {"verdict": "FAILED", "error": str(exc)[:300]}) + "\n")
+            return 1
+        _sys.stdout.write(_json.dumps(result, indent=2) + "\n")
+        return 0 if result.get("verdict") == "OK" else 1
+    _sys.stderr.write(f"unknown foundation command: {cmd}\n")
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
