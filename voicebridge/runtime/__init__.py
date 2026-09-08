@@ -7,10 +7,11 @@ Qubit-supervised worker subprocess. All policy stays Qubit-side: the broker
 gates dispatch, PowerControl owns emergency stop, receipts/audit are Qubit
 append-only, and secrets are redacted at every boundary.
 """
+from . import provision
 from .real_hermes import (RealHermesDenied, RealHermesError,
                             RealHermesRuntime, stop_ollama_model)
 from .runtime import HermesRuntime, RuntimeDenied, RuntimeError
 
 __all__ = ["HermesRuntime", "RuntimeDenied", "RuntimeError",
            "RealHermesRuntime", "RealHermesDenied", "RealHermesError",
-           "stop_ollama_model"]
+           "stop_ollama_model", "provision"]

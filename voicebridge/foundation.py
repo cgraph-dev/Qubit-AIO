@@ -15,6 +15,7 @@ a kind is observed. It never starts listeners, servers, or runtimes itself.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional
 
 # --- 8T-F canonical identity (single source; CLI/docs/installer mirror it) ---
@@ -138,6 +139,109 @@ def assert_foundation(report: Mapping[str, Any]) -> None:
         raise FoundationError(
             f"foundation singularity not proven: {report.get('verdict')}: "
             f"{dict(report.get('detail', {}))}")
+
+
+# --- Anti-substitution gate: the Hermes source must be the pinned tree ------
+# Phase B gate: fail if the source is a Qubit imitation, the wrong commit,
+# an operator install, or a temporary directory.
+HERMES_ENTRY_HASHES = {
+    "cli.py": "3b83554934147cb48048624d4ac69f5b6b9a61368b59e68f518e776890dd7b57",
+    "hermes_constants.py": "6e6e47b32e4aa8350afbd69e39e7d9648edc2c14558ce7464c2ff7ba3453a3a0",
+}
+HERMES_LAYOUT_MARKERS = ("cli.py", "LICENSE", "hermes_constants.py",
+                         "hermes_cli", "agent", "tools", "gateway")
+
+
+def _operator_roots() -> List[str]:
+    """Directories that must never count as Qubit foundation source."""
+    roots: List[str] = []
+    try:
+        import shutil
+        found = shutil.which("hermes")
+        if found:
+            roots.append(str(Path(found).resolve().parents[1]))
+    except Exception:
+        pass
+    home = Path("~/.hermes").expanduser()
+    roots.append(str(home))
+    return roots
+
+
+def check_not_temporary(candidate: Any) -> str:
+    """Raise unless the path lives outside /tmp. Tested directly."""
+    text = str(candidate)
+    if "/tmp/" in text or text.startswith("/tmp"):
+        raise FoundationError("TEMPORARY_SOURCE: Hermes source must not "
+                              "live under /tmp")
+    return text
+
+
+def check_not_operator(candidate: Any, *,
+                       forbidden_roots: Optional[List[str]] = None) -> str:
+    """Raise when the path sits inside an operator Hermes location."""
+    resolved = str(Path(str(candidate)).expanduser().resolve())
+    for root in (forbidden_roots if forbidden_roots is not None
+                 else _operator_roots()):
+        if root and (resolved == root or resolved.startswith(root.rstrip("/") + "/")):
+            raise FoundationError("OPERATOR_INSTALL: candidate is inside an "
+                                  "operator Hermes location")
+    return resolved
+
+
+def check_layout_and_commit(path: Path) -> str:
+    """Raise unless the Hermes layout fingerprint and pin commit hold."""
+    import hashlib as _hashlib
+    import subprocess as _subprocess
+
+    for marker in HERMES_LAYOUT_MARKERS:
+        if not (path / marker).exists():
+            raise FoundationError(
+                f"NOT_HERMES_SOURCE: missing layout marker {marker}")
+    try:
+        proc = _subprocess.run(
+            ["git", "-C", str(path), "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=30)
+    except Exception as exc:
+        raise FoundationError(f"SOURCE_UNVERIFIABLE: git probe failed: {exc}")
+    if proc.returncode != 0 or proc.stdout.strip() != HERMES_COMMIT:
+        raise FoundationError(
+            f"WRONG_COMMIT: HEAD={proc.stdout.strip()[:12]!r} != pin "
+            f"{HERMES_COMMIT[:12]}")
+    for rel, digest in HERMES_ENTRY_HASHES.items():
+        target = path / rel
+        try:
+            h = _hashlib.sha256()
+            with open(target, "rb") as fh:
+                for chunk in iter(lambda: fh.read(65536), b""):
+                    h.update(chunk)
+        except OSError as exc:
+            raise FoundationError(f"ENTRY_MISSING: {rel}: {exc}")
+        if h.hexdigest() != digest:
+            raise FoundationError(f"HASH_MISMATCH: {rel} differs from pin")
+    return proc.stdout.strip()
+
+
+def verify_hermes_source(candidate: Any,
+                         *,
+                         forbidden_roots: Optional[List[str]] = None,
+                         allow_temporary: bool = False) -> Dict[str, Any]:
+    """Prove a directory is the pinned Hermes source tree (Phase B gate).
+
+    Always proves layout fingerprint, pin commit, and entry hashes. The
+    /tmp and operator-location checks apply unless the caller explicitly
+    passes ``allow_temporary=True`` for read-only AUDIT of an isolated
+    clone (audit inputs live in temporary locations by design; they are
+    never accepted as the executed foundation).
+    Returns a VERIFIED record; raises FoundationError with a typed reason
+    otherwise. Pure inspection — never executes the candidate.
+    """
+    if not allow_temporary:
+        check_not_temporary(candidate)
+    resolved = check_not_operator(candidate, forbidden_roots=forbidden_roots)
+    check_layout_and_commit(Path(resolved))
+    return {"state": "VERIFIED", "source": resolved, "commit": HERMES_COMMIT,
+            "tag": HERMES_TAG, "license": "MIT (Copyright (c) 2025 Nous Research)",
+            "audit_only": bool(allow_temporary)}
 
 
 class FoundationError(RuntimeError):

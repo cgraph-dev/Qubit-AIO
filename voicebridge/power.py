@@ -1415,6 +1415,10 @@ class PowerControl:
         self._breakers: Dict[str, _CircuitBreaker] = {}
         self._slots: Dict[str, int] = {}
         self._active: Dict[str, Callable[[], None]] = {}
+        # 8T-F cross-wire: upstream runtimes (e.g. isolated Hermes `pause`)
+        # register here to halt NEW work on emergency stop. Empty by default
+        # (zero behavior change); listener exceptions never break the latch.
+        self._estop_listeners: List[Callable[[], None]] = []
         self._state_store = state_store
         self._state = {"enabled": False, "health": "disabled",
                        "emergency_stop": False, "global_disable": False,
@@ -1525,9 +1529,24 @@ class PowerControl:
                 cancel()
             except Exception:
                 pass
+        for listener in list(self._estop_listeners):
+            try:
+                listener()
+            except Exception:
+                pass
         log_event("power.emergency_stop", issued_by=issued_by)
         return {"state": "OK", "health": "degraded",
                 "detail": "global emergency stop latched; reset required"}
+
+    def on_estop(self, listener: Callable[[], None]) -> None:
+        """Register an upstream-runtime halt callback (8T-F cross-wire).
+
+        Invoked after the latch on every emergency_stop; never on reset
+        (upstream resume stays an explicit manual act). A failing listener
+        cannot break the latch or other listeners.
+        """
+        with self._lock:
+            self._estop_listeners.append(listener)
 
     def reset(self, *, issued_by: str = "user") -> Dict[str, Any]:
         """Clear the latches. REQUIRES explicit human authorization: a model/

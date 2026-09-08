@@ -40,16 +40,26 @@ each needs its own review before any use (see UPSTREAM_REUSE R29/R30).
 ## 2b. Real Hermes execution (close-out)
 
 No vendoring-only claim: Qubit BOTH vendors pinned modules (in-tree,
-§3) AND executes the pinned implementation from Qubit-owned space:
+§3) AND executes the pinned implementation from Qubit-owned space.
+This turn adds, beyond the prior supervisor + vendoring:
 
-- Provisioning: `voicebridge/runtime/provision.py` +
-  `scripts/install_hermes_runtime.sh` install the pinned clone into
-  `$XDG_DATA_HOME/qubit-voicebridge/runtimes/hermes-agent-<commit>/`
-  (source copy + isolated venv + INSTALL_RECEIPT.json), verified by
-  `git rev-parse`, LICENSE presence, entry-file hashes, and live
-  `hermes --version`. Never /tmp, never the operator install.
-- `RealHermesRuntime` defaults to those XDG paths (typed DISABLED when
-  absent); explicit overrides for hermetic tests.
+- `voicebridge/runtime/provision.py` + `scripts/install_hermes_runtime.sh`:
+  pinned clone into `$XDG_DATA_HOME/qubit-voicebridge/runtimes/` with
+  rev-parse/LICENSE/entry-hash/version verification + receipt;
+  `RealHermesRuntime` defaults to XDG paths (DISABLED when absent).
+- Pause cross-wire: `PowerControl.on_estop` listeners (empty by default)
+  + `RealHermesRuntime.pause()/resume()/bind_estop` (pause-only; reset
+  never resumes), proven live against the isolated install.
+- Runtime tiles: `GET /api/runtime` + settings card + CLI status lines
+  report the real provision state (read-only, redacted).
+- Deferral boundaries: `tests/test_runtime_tiles.py` proves each DEFER
+  reason in code (no shell paths, no second memory/scheduler, no
+  upstream pip imports, no hidden listeners).
+
+- Provisioning details: source copy + isolated venv + INSTALL_RECEIPT.json
+  under `runtimes/hermes-agent-<commit>/`, verified by `git rev-parse`,
+  LICENSE presence, entry-file hashes, and live `hermes --version`.
+  Never /tmp, never the operator install.
 - Live proof: real turns returned exact markers against local Ollama;
   helper model stopped after each run for VRAM hygiene.
 - THIRD_PARTY_NOTICES.md merge for the vendored files is pending

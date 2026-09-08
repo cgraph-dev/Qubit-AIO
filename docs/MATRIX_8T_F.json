@@ -35,9 +35,10 @@
       "id": "H-sqlite-txn",
       "capability": "SQLite IMMEDIATE txn + idempotent ADD COLUMN",
       "upstream": "hermes-agent hermes_cli/sqlite_util.py",
-      "verdict": "DEFER",
-      "status": "DEFERRED",
-      "reason": "write_txn attempted live in memory/store.py and REVERTED with root cause: executescript() implicitly commits, breaking explicit BEGIN IMMEDIATE ('cannot commit - no transaction is active' on every fresh open; restore test re-green after revert). Comms-store DML batches assessed: 13 shared lock sites, rewiring all changes cross-process lock behavior for marginal gain. Module stays vendored, differential-tested, reserved for non-executescript writes."
+      "verdict": "BLOCKED",
+      "status": "BLOCKED",
+      "reason": "write_txn attempted live in memory/store.py and REVERTED with root cause: executescript() implicitly commits, breaking explicit BEGIN IMMEDIATE ('cannot commit - no transaction is active' on every fresh open; restore test re-green after revert). Comms-store DML batches assessed: 13 shared lock sites, rewiring all changes cross-process lock behavior for marginal gain. Module stays vendored, differential-tested, reserved for non-executescript writes.",
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
     },
     {
       "id": "H-real-exec",
@@ -51,81 +52,91 @@
       "id": "H-stream",
       "capability": "SSE chunk loop with retry/circuit-breaker",
       "upstream": "hermes-agent agent/chat_completion_helpers.py",
-      "verdict": "DEFER",
-      "status": "DEFERRED",
-      "reason": "Qubit owns streaming (orchestrator/local_llm, proven in 8H-adjacent suites); importing the Hermes loop would add httpx/pydantic deps. Revisit if Qubit streaming is ever replaced."
+      "verdict": "BLOCKED",
+      "status": "BLOCKED",
+      "reason": "Qubit owns streaming (orchestrator/local_llm, proven in 8H-adjacent suites); importing the Hermes loop would add httpx/pydantic deps. Revisit if Qubit streaming is ever replaced.",
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
     },
     {
       "id": "H-stt",
       "capability": "Pluggable STT incl. faster-whisper",
       "upstream": "hermes-agent tools/transcription_*.py",
-      "verdict": "DEFER",
-      "status": "DEFERRED",
-      "reason": "Qubit ASR contract (Sherpa/whisper) is authoritative and proven; no STT code taken. Revisit only on a proven ASR gap."
+      "verdict": "BLOCKED",
+      "status": "BLOCKED",
+      "reason": "Qubit ASR contract (Sherpa/whisper) is authoritative and proven; no STT code taken. Revisit only on a proven ASR gap.",
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
     },
     {
       "id": "H-tts",
       "capability": "Multi-provider TTS incl. Piper",
       "upstream": "hermes-agent tools/tts_*.py",
-      "verdict": "DEFER",
-      "status": "DEFERRED",
-      "reason": "Qubit TTS contract (Piper default, ducking/barge-in) is authoritative and proven; no TTS code taken."
+      "verdict": "BLOCKED",
+      "status": "BLOCKED",
+      "reason": "Qubit TTS contract (Piper default, ducking/barge-in) is authoritative and proven; no TTS code taken.",
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
     },
     {
       "id": "H-wake",
       "capability": "Wake-word mic loop (openWakeWord/sherpa)",
       "upstream": "hermes-agent tools/wake_word*.py",
-      "verdict": "DEFER",
-      "status": "DEFERRED",
-      "reason": "Would create a second listener (forbidden); Porcupine needs commercial license. Wake-word is a later packet per plan."
+      "verdict": "BLOCKED",
+      "status": "BLOCKED",
+      "reason": "Would create a second listener (forbidden); Porcupine needs commercial license. Wake-word is a later packet per plan.",
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
     },
     {
       "id": "H-browser",
       "capability": "A11y-snapshot browser click/type/nav",
       "upstream": "hermes-agent tools/browser_*.py",
-      "verdict": "DEFER",
-      "status": "DEFERRED",
-      "reason": "Packet 8U scope; 8B loopback CDP stays the only browser authority for 8T-F."
+      "verdict": "BLOCKED",
+      "status": "BLOCKED",
+      "reason": "Packet 8U scope; 8B loopback CDP stays the only browser authority for 8T-F.",
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
     },
     {
       "id": "H-files",
       "capability": "Scoped file read/write/search",
       "upstream": "hermes-agent tools/file_operations*.py",
-      "verdict": "DEFER",
-      "status": "DEFERRED",
-      "reason": "Packet 8W scope; file Safety review + broker argv schemas required first."
+      "verdict": "BLOCKED",
+      "status": "BLOCKED",
+      "reason": "Packet 8W scope; file Safety review + broker argv schemas required first.",
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
     },
     {
       "id": "H-terminal",
       "capability": "Terminal/PTY tools + hardline approval detection",
       "upstream": "hermes-agent tools/terminal_tool*.py + approval_detection.py",
-      "verdict": "DEFER",
-      "status": "DEFERRED",
-      "reason": "Qubit has no shell-string execution path by construction (broker.py forbids shell=True), so the detector has no true-positive call site; vendoring it unwired would imitate integration. Revisit with 8V terminal work."
+      "verdict": "BLOCKED",
+      "status": "BLOCKED",
+      "reason": "Qubit has no shell-string execution path by construction (broker.py forbids shell=True), so the detector has no true-positive call site; vendoring it unwired would imitate integration. Revisit with 8V terminal work.",
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
     },
     {
       "id": "H-acp",
       "capability": "ACP stdio protocol for IDEs",
       "upstream": "hermes-agent acp_adapter/ (agent-client-protocol MIT)",
-      "verdict": "DEFER",
-      "status": "DEFERRED",
-      "reason": "Packet 8X scope; needs Qubit permission/edit-approval wrapper ticket first."
+      "verdict": "BLOCKED",
+      "status": "BLOCKED",
+      "reason": "Packet 8X scope; needs Qubit permission/edit-approval wrapper ticket first.",
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
     },
     {
       "id": "H-sessions",
       "capability": "SQLite WAL+FTS session/message store",
       "upstream": "hermes-agent hermes_state_*.py",
-      "verdict": "DEFER",
-      "status": "DEFERRED",
-      "reason": "Would duplicate Qubit MemoryStore/journal (forbidden second memory). Schema ideas on record; never share ~/.hermes DB."
+      "verdict": "BLOCKED",
+      "status": "BLOCKED",
+      "reason": "Would duplicate Qubit MemoryStore/journal (forbidden second memory). Schema ideas on record; never share ~/.hermes DB.",
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
     },
     {
       "id": "H-gateway",
       "capability": "Multi-platform gateway/cron/batch",
       "upstream": "hermes-agent gateway/ cron/ batch_runner.py",
-      "verdict": "DEFER",
-      "status": "DEFERRED",
-      "reason": "Qubit owns ports/sockets/timers (8D/8I). No gateway code taken; broker admission required first."
+      "verdict": "BLOCKED",
+      "status": "BLOCKED",
+      "reason": "Qubit owns ports/sockets/timers (8D/8I). No gateway code taken; broker admission required first.",
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
     },
     {
       "id": "H-approvals",
@@ -141,7 +152,7 @@
       "upstream": "hermes-agent agent/estop.py",
       "verdict": "REUSE",
       "status": "IMPLEMENTED",
-      "proof": "Qubit PowerControl latch+cancel proven (8O suite + runtime e-stop tests); cross-wiring to `hermes pause` DEFERRED (no live install to wire without touching operator state)"
+      "proof": "Qubit PowerControl latch+cancel proven (8O suite + runtime e-stop tests); cross-wire IMPLEMENTED: PowerControl.on_estop listeners + RealHermesRuntime.pause()/resume()/bind_estop, bound in production by VoiceOrchestrator init (no-op while unprovisioned), proven live against the isolated install in tests/test_real_hermes.py"
     },
     {
       "id": "H-cloudmem",
@@ -219,17 +230,19 @@
       "id": "O-frames",
       "capability": "Typed gateway-protocol frame guards",
       "upstream": "openclaw packages/gateway-protocol/",
-      "verdict": "DEFER",
-      "status": "DEFERRED",
-      "reason": "Qubit has no WS transport; SSE events already fail closed (2A conformance). Full frame-guard adoption is 8U transport work."
+      "verdict": "BLOCKED",
+      "status": "BLOCKED",
+      "reason": "Qubit has no WS transport; SSE events already fail closed (2A conformance). Full frame-guard adoption is 8U transport work.",
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
     },
     {
       "id": "O-browser",
       "capability": "Browser bridge auth/profiles/doctor",
       "upstream": "openclaw extensions/browser/",
-      "verdict": "DEFER",
-      "status": "DEFERRED",
-      "reason": "Packet 8U scope; 8B read-only contracts stay authoritative."
+      "verdict": "BLOCKED",
+      "status": "BLOCKED",
+      "reason": "Packet 8U scope; 8B read-only contracts stay authoritative.",
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
     },
     {
       "id": "O-skills",
@@ -243,9 +256,10 @@
       "id": "O-board",
       "capability": "Board HTTP store + sandboxed widgets",
       "upstream": "openclaw src/gateway/board-*.ts",
-      "verdict": "DEFER",
-      "status": "DEFERRED",
-      "reason": "Dashboard scope; webui.py overlaps unrelated dirty work and server-side policy must come first."
+      "verdict": "BLOCKED",
+      "status": "BLOCKED",
+      "reason": "Dashboard scope; webui.py overlaps unrelated dirty work and server-side policy must come first.",
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
     },
     {
       "id": "O-onboard",
@@ -275,9 +289,10 @@
       "id": "O-docker",
       "capability": "Digest-pinned multi-stage runtime",
       "upstream": "openclaw Dockerfile",
-      "verdict": "DEFER",
-      "status": "DEFERRED",
-      "reason": "8K owns Qubit packaging; pattern documented, no Dockerfile taken."
+      "verdict": "BLOCKED",
+      "status": "BLOCKED",
+      "reason": "8K owns Qubit packaging; pattern documented, no Dockerfile taken.",
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
     },
     {
       "id": "O-clawhub",

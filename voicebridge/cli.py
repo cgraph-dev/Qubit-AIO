@@ -1002,6 +1002,16 @@ def _cmd_status(cfg) -> int:
     from .logging_setup import get_logger
     get_logger()  # init handlers before discovery internals log
     print("Qubit Agent — Qubit VoiceBridge status")
+    from .runtime_inventory import runtime_inventory
+    try:
+        inv = runtime_inventory(cfg)
+        h = inv.get("hermes", {}) if isinstance(inv, dict) else {}
+        print(f"hermes runtime  : {h.get('state', 'UNAVAILABLE')}"
+              f"{(' (' + str(h.get('version', '')) + ')') if h.get('version') else ''}")
+        b = inv.get("broker", {}) if isinstance(inv, dict) else {}
+        print(f"emergency stop : {'LATCHED' if b.get('emergency_stop') else 'clear'}")
+    except Exception as exc:
+        print(f"runtime inventory: UNAVAILABLE ({str(exc)[:100]})")
     info = discover_gateway(cfg)
     print(f"gateway url      : {info.url}")
     print(f"gateway token    : {'found' if info.token else 'MISSING'}")

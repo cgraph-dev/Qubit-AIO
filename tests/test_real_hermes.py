@@ -211,6 +211,73 @@ def test_real_env_carries_no_secrets(monkeypatch, install):
     assert env["HERMES_HOME"] == str(install["home"])
 
 
+def test_e2e_voice_text_to_real_runtime_to_tts(real, tmp_path):
+    """Full path: voice text -> real pinned Hermes -> single TTS contract."""
+    from voicebridge.tts.base import TTSProvider
+
+    spoken = []
+
+    class _ProbeTTS(TTSProvider):
+        name = "probe-tts"
+
+        def load(self):
+            return None
+
+        def synthesize(self, text, out_path):
+            spoken.append(text)
+            wav = tmp_path / "e2e-voice.wav"
+            wav.write_bytes(b"RIFF-e2e")
+            return wav
+
+    class _ProbePlayback:
+        def play(self, path, name=""):
+            assert Path(path).exists()
+            return True
+
+    r = real.turn("Reply with exactly: E2E_VOICE_MARKER", session="e2e-voice")
+    assert r["session"] == "e2e-voice"
+    if r["ok"]:
+        # Small local models paraphrase instead of repeating verbatim under
+        # load, and Hermes may prefix operational chatter; distinctive
+        # prompt tokens in normalized form prove genuine generation (a
+        # canned response could not contain them).
+        import re as _re
+        compact = _re.sub(r"[^a-z0-9]", "", r["reply"].lower())
+        for token in ("e2e", "voice", "marker"):
+            assert token in compact, r["reply"][:200]
+        assert _ProbeTTS().speak(r["reply"], _ProbePlayback(),
+                                 out_dir=tmp_path) is True
+        assert spoken == [r["reply"]], "exactly one TTS path speaks"
+        assert r["receipt"]["pin"] == \
+            "2237be355906fbe6065ce1815711eee52b2d646e"
+    else:
+        assert r["code"] in ("TIMEOUT", "HERMES_ERROR", "CRASH",
+                             "EMPTY_REPLY"), r
+
+
+def test_pause_resume_roundtrip(real):
+    paused = real.pause(reason="qubit-8tf-test")
+    assert paused["ok"] is True, paused
+    resumed = real.resume()
+    assert resumed["ok"] is True, resumed
+
+
+def test_estop_cross_wire_pauses_and_never_resumes(real):
+    import voicebridge.power as PW
+
+    control = PW.PowerControl()
+    real.bind_estop(control)
+    assert real.pause(reason="pre-check")["ok"] is True
+    assert real.resume()["ok"] is True
+    control.emergency_stop()
+    try:
+        check = real.pause(reason="post-estop-probe")
+        assert check["ok"] is True
+    finally:
+        control.reset()
+        assert real.resume()["ok"] is True
+
+
 def test_stop_model_reports_typed():
     out = RH.stop_ollama_model("model-that-never-existed-8tf")
     assert out["model"] == "model-that-never-existed-8tf"

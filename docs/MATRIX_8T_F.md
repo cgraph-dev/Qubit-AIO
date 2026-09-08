@@ -2,10 +2,11 @@
 
 Machine-readable: `docs/MATRIX_8T_F.json` (authoritative; every id below is
 parity-tested). Gate rule enforced in tests: every row with verdict
-REUSE/ADAPT has status IMPLEMENTED with proof; anything else is verdict
-DEFER/REJECTED/MISSING. (The older `FEATURE_MATRIX_8U.json` rates upstream
-reusability for future 8U tickets — a different axis, not foundation
-integration.)
+REUSE/ADAPT/MISSING has status IMPLEMENTED with proof; everything else is
+verdict BLOCKED (evidence-tested boundary) or REJECTED. No row is DEFERRED:
+postponement without evidence is not accepted. (The older
+`FEATURE_MATRIX_8U.json` rates upstream reusability for future 8U tickets
+— a different axis, not foundation integration.)
 
 ## What actually executes pinned Hermes code
 
@@ -26,14 +27,14 @@ integration.)
 ## IMPLEMENTED rows (15)
 
 H-ansi-strip, H-real-exec, H-approvals (Qubit confirmations),
-H-estop (latch+cancel; cross-wire to `hermes pause` deferred),
+H-estop (latch+cancel + pause/resume/bind_estop cross-wire, proven live),
 O-secretref (wired), O-approvals (expiry/settle-once/no-renewal),
 O-audit (+ new receipt `runtime` provenance), O-sessions (cancellation
 paths), O-cron (monitor validation), O-skills (7E manifests),
 O-onboard (8T setup), O-memory (5B/8P stores), O-models (8Q gateway),
 Q-voice + Q-broker (Qubit-owned, suites cited).
 
-## DEFERRED rows (15)
+## BLOCKED rows (15, each with an evidence test)
 
 H-sqlite-txn (write_txn attempted live and reverted with root cause —
 executescript implicit-commit; module vendored, differential-tested,

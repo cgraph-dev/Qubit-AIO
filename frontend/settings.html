@@ -132,6 +132,16 @@
      <div class="muted" id="power-list" style="margin-top:8px;font-size:12px"></div>
    </div>
 
+  <h2>Runtime</h2>
+  <div class="card">
+    <p class="muted" style="margin:0 0 6px">Qubit Agent foundation: product identity, agent-runtime provision state, vendored modules, voice/provider/session/approval/adapter health, and the broker emergency-stop latch. Read-only; every value comes from the authenticated backend.</p>
+    <div class="row">
+      <button onclick="runtimeStatus()">Check runtime</button>
+      <span id="runtime-state" class="muted"></span>
+    </div>
+    <div class="muted" id="runtime-list" style="margin-top:8px;font-size:12px"></div>
+  </div>
+
   <h2>Websites (advanced)</h2>
   <div class="card">
     <p class="muted" style="margin:0 0 6px">Versioned integration records and redacted progress/error logs. Each control calls the real backend; enabling, grants, and manifest linking require confirmation.</p>
@@ -460,6 +470,19 @@ async function powerReset(){
    show('power-state', renderResult(body));
  };
  confirmDialog('Reset emergency-stop / disable latches?', doIt);
+}
+async function runtimeStatus(){
+ const {body} = await api('/api/runtime');
+ if(!body || !body.product){ show('runtime-state', tag('UNAVAILABLE')); return; }
+ const p = body.product, h = body.hermes||{}, b = body.broker||{};
+ show('runtime-state', tag(h.state === 'DISABLED' ? 'DISABLED' : 'OK')
+   +' <span class="muted">'+esc(p.name)+' · hermes '+esc(h.state||'?')
+   +' · estop '+(b.emergency_stop ? 'LATCHED' : 'clear')+'</span>');
+ const rows = [];
+ if(h.version) rows.push('<div>'+esc(h.version)+' · '+esc(h.commit||'').slice(0,12)+'</div>');
+ if(body.voice) rows.push('<div>voice '+esc(body.voice.asr_provider||'?')+'/'+esc(body.voice.tts_provider||'?')+'</div>');
+ if(body.approvals && body.approvals.pending !== undefined) rows.push('<div>approvals pending '+esc(String(body.approvals.pending))+'</div>');
+ show('runtime-list', rows.join(''));
 }
 async function deviceStatus(){
  const {status,body} = await api('/api/device/status');

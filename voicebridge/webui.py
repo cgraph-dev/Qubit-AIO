@@ -835,6 +835,15 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self._send(401, b"unauthorized")
                 return
             self._json(self.app.status())
+        elif path == "/api/runtime":
+            # 8T-F: backend-authoritative runtime inventory (product,
+            # Hermes provision, vendored modules, voice, broker latch,
+            # approvals, adapters, providers). Read-only; typed states.
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            from .runtime_inventory import runtime_inventory
+            self._json(runtime_inventory(self.app.orch.cfg))
         elif path == "/api/activity":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")

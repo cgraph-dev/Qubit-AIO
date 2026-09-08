@@ -258,21 +258,24 @@ def test_matrix_complete_and_honest():
         "2237be355906fbe6065ce1815711eee52b2d646e"
     assert matrix["upstreams"]["openclaw"]["commit"] == \
         "3928bad9badfcb6c7d140530435e806fb8092190"
-    valid = {"REUSE", "ADAPT", "MISSING", "DEFER", "REJECTED"}
-    implemented = deferred = 0
+    valid = {"REUSE", "ADAPT", "MISSING", "BLOCKED", "REJECTED"}
+    implemented = blocked = 0
     for row in matrix["rows"]:
         assert row["verdict"] in valid, row
-        assert row["status"] in ("IMPLEMENTED", "DEFERRED", "REJECTED"), row
-        if row["status"] == "IMPLEMENTED":
-            implemented += 1
+        assert row["status"] in ("IMPLEMENTED", "BLOCKED",
+                                 "REJECTED"), row
+        if row["verdict"] in ("REUSE", "ADAPT", "MISSING"):
+            # Gate rule: no REUSE/ADAPT/MISSING row may remain unintegrated.
+            assert row["status"] == "IMPLEMENTED", row
             assert row.get("proof"), row
-        elif row["status"] == "DEFERRED":
-            deferred += 1
+            implemented += 1
+        elif row["status"] == "BLOCKED":
+            blocked += 1
             assert row.get("reason"), row
         else:
             assert row.get("reason"), row
     assert implemented >= 10, "too few implemented rows to close 8T-F"
-    assert deferred >= 5, "deferrals must be explicit, not hidden"
+    assert blocked >= 5, "blocks must be explicit with evidence, not hidden"
     companion = (REPO_ROOT / "docs" / "MATRIX_8T_F.md").read_text()
     for row in matrix["rows"]:
         assert row["id"] in companion, f"id missing from MD: {row['id']}"

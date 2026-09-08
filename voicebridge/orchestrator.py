@@ -346,6 +346,19 @@ class VoiceOrchestrator:
             log_event("broker.init.failed", error=str(exc)[:200])
             raise
         self._cli: Optional[CliBackend] = None
+        # 8T-F cross-wire: the provisioned Hermes runtime (if installed)
+        # pauses on Qubit emergency stop. Unprovisioned it reports DISABLED
+        # and the binding is a harmless no-op (pause refusal is swallowed).
+        # Bound here (not in start()) so the latch covers pre-audio states.
+        try:
+            from .runtime.real_hermes import RealHermesRuntime
+            self._real_runtime = RealHermesRuntime()
+            self._real_runtime.bind_estop(self._power_policy.control)
+            log_event("runtime.real.bind",
+                      state=self._real_runtime.version()["state"])
+        except Exception as exc:
+            self._real_runtime = None
+            log_event("runtime.real.bind.failed", error=str(exc)[:160])
         self._mic: Optional[MicCapture] = None
         self._mic_pin_source = ""   # last source re-pinned by capture (drift watch)
         self._mic_selfcheck = None  # last startup mic signal self-check result
@@ -663,6 +676,9 @@ class VoiceOrchestrator:
             else:
                 log_event("hermes.unavailable")
                 self._hermes = None
+
+        # 8T-F: production e-stop cross-wire lives in __init__
+        # (self._real_runtime bound to the power control there).
 
         # PersonaPlex full-duplex lane: REMOVED (user decision 2026-08-21).
         # Voice = local push-to-talk + DeepSeek. The adapter was deleted from

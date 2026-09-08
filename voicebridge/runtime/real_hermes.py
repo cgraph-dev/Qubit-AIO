@@ -170,6 +170,49 @@ class RealHermesRuntime:
         info["runtime"] = "hermes-real-isolated"
         return info
 
+    def _control(self, action: str, reason: str = "") -> Dict[str, Any]:
+        """Run `hermes pause|resume` against the ISOLATED home only."""
+        if not self.configured():
+            raise RealHermesDenied("DISABLED: no isolated Hermes configured")
+        argv = [str(self.binary), action]
+        if action == "pause" and reason:
+            argv += ["--reason", reason]
+        try:
+            proc = subprocess.run(argv, capture_output=True, text=True,
+                                  timeout=60, env=self._env())
+        except subprocess.TimeoutExpired:
+            return {"ok": False, "code": "TIMEOUT",
+                    "error": f"hermes {action} timed out"}
+        err = (proc.stderr or "").strip()
+        if proc.returncode != 0:
+            return {"ok": False, "code": "HERMES_ERROR",
+                    "error": redact(err[-300:] or f"rc={proc.returncode}")}
+        audit(f"real_{action}", reason=reason[:120] if reason else "")
+        return {"ok": True, "action": action,
+                "detail": redact(((proc.stdout or "").strip() or "done")[:200])}
+
+    def pause(self, reason: str = "qubit-emergency-stop") -> Dict[str, Any]:
+        """Halt NEW isolated-Hermes work (in-flight work is never killed by
+        Hermes itself; Qubit cancels its own runs separately)."""
+        return self._control("pause", reason)
+
+    def resume(self) -> Dict[str, Any]:
+        """Explicit manual resume (never called automatically on e-stop reset)."""
+        return self._control("resume")
+
+    def bind_estop(self, control: Any) -> None:
+        """8T-F cross-wire: Qubit emergency stop also pauses isolated Hermes.
+
+        Pause-only: reset() never resumes (explicit manual resume required).
+        """
+        def _on_estop() -> None:
+            try:
+                self.pause()
+            except Exception:
+                pass
+
+        control.on_estop(_on_estop)
+
 
 def stop_ollama_model(model: str, *, ollama_bin: str = "ollama") -> Dict[str, Any]:
     """Best-effort VRAM hygiene: unload a model we loaded for a real turn."""
