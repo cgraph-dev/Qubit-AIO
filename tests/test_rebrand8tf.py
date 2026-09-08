@@ -117,6 +117,7 @@ RESIDUAL_BAD = [
     '"Using Hermes."', '"Using OpenClaw."', """"I'll use OpenClaw""",
     "OpenClaw or Hermes?", "voice bridge for OpenClaw",
     "same as hermes chat", "(like hermes", "voice-bridge terminal (like",
+    'Routing to Hermes."',
 ]
 
 
@@ -129,6 +130,13 @@ def test_no_residual_upstream_product_strings():
         for name, text in (("orchestrator", orch_text), ("webui", webui_text),
                            ("cli", cli_text), ("terminal", term_text)):
             assert bad not in text, f"{name} still shows {bad!r}"
+    # Variable-routed speech: every notice= literal reaching speak() must
+    # already be Qubit-named (covers failover paths the static list misses).
+    import re as _re
+
+    for match in _re.finditer(r'notice="([^"]*)"', orch_text):
+        literal = match.group(1)
+        assert "Hermes" not in literal and "OpenClaw" not in literal, literal
     for page in PAGES:
         html = (FRONTEND / page).read_text()
         assert "Hermes" not in html, page

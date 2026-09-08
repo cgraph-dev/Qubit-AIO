@@ -1695,7 +1695,7 @@ class VoiceOrchestrator:
             if self._hermes is not None:
                 log_event("openclaw.failover.hermes", reason="no gateway route")
                 self._handle_hermes(task_text,
-                                    notice="OpenClaw is not reachable. Routing to Hermes.")
+                                    notice="The agent runtime is not reachable. Routing to the voice runtime.")
                 return
             self.speak("The agent runtime is not reachable. Start the gateway and try again.")
 
@@ -2978,10 +2978,10 @@ class VoiceOrchestrator:
         return True
 
     def _handle_hermes(self, task: str, notice: str = "") -> None:
-        """Explicit Hermes delegation (ask Hermes to ...) — background + interruptible.
+        """Explicit voice-runtime delegation — background + interruptible.
 
-        `notice` overrides the default ack (used by the OpenClaw→Hermes
-        failover path so the user hears WHY it routed to Hermes).
+        `notice` overrides the default ack (used by the agent-runtime
+        failover path so the user hears WHY it re-routed).
         """
         # Queue a new Hermes task while one is already running (don't interrupt).
         if self._busy_on_task():
