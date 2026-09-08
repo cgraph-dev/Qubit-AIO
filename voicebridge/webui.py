@@ -302,7 +302,7 @@ CHAT_PAGE = """<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Voice Dashboard</title>
+<title>Qubit Agent — Talk (offline fallback)</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -523,7 +523,7 @@ ACTIVITY_PAGE = r"""<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Voice Dashboard — Activity</title>
+<title>Qubit Agent — Activity (offline fallback)</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }

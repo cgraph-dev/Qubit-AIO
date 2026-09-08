@@ -56,6 +56,13 @@ def build_parser() -> argparse.ArgumentParser:
     tts.add_argument("text", nargs="+")
     tts.add_argument("--out", type=Path, default=None)
     add("status", help="print gateway/ASR/TTS/VRAM status and exit")
+    comp = add("completion", help="print shell completion script (Qubit Agent)")
+    comp.add_argument("shell", nargs="?", default="bash",
+                      choices=["bash", "zsh", "fish"],
+                      help="shell dialect (default: bash)")
+    comp.add_argument("--cmd", default="voicebridge",
+                      choices=["voicebridge", "qubit-dev"],
+                      help="command to complete (default: voicebridge)")
     roundtrip = add("roundtrip", help="end-to-end test: synth speech -> ASR -> classify -> gateway -> summarize -> TTS file")
     roundtrip.add_argument("--text", default=None, help="sample utterance (default: Stripe webhook example)")
     roundtrip.add_argument("--model", default=None, help="model override for the agent run")
@@ -915,6 +922,8 @@ def main(argv=None) -> int:
 
     if command == "status":
         return _cmd_status(cfg)
+    if command == "completion":
+        return _cmd_completion(args.shell, args.cmd)
     if command == "mic-test":
         return _cmd_mic_test(cfg)
     if command == "asr-test":
@@ -1077,6 +1086,20 @@ def _cmd_status(cfg) -> int:
     from .tts.piper import PiperTTS
     tts = PiperTTS(model_dir=cfg.model_dir(), voice=cfg.get("tts", "voice", default="en_US-amy-medium"))
     print(f"TTS              : piper/{tts.voice} {'OK' if tts.available() else 'MISSING VOICE'}")
+    return 0
+
+
+def _cmd_completion(shell: str, cmd: str) -> int:
+    """Print the generated shell completion script (read-only, stdout)."""
+    from .resources import resource_path
+
+    path = resource_path(f"completions/{cmd}.{shell}")
+    alt = Path(__file__).resolve().parent / "_data" / "completions" / f"{cmd}.{shell}"
+    candidate = path if path.is_file() else alt
+    if not candidate.is_file():
+        print(f"completion unavailable for {cmd}/{shell}", file=sys.stderr)
+        return 1
+    sys.stdout.write(candidate.read_text())
     return 0
 
 

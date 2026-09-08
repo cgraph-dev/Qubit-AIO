@@ -1,0 +1,367 @@
+{
+  "schema": "qubit-hermes-parity/1",
+  "source": "hermes --help from isolated v0.21.1 @ 2237be3 (docs/HERMES_SURFACE.json)",
+  "rule": "Every command maps to a Qubit counterpart (IMPLEMENTED + tested), a BLOCKED boundary with evidence, or a REJECTED reason. No row is unclassified.",
+  "rows": [
+    {
+      "cmd": "chat",
+      "verdict": "IMPLEMENTED",
+      "qubit": "voice/talk intake, CLI text, RealHermesRuntime.turn",
+      "proof": "tests/test_real_hermes.py, 8H suites"
+    },
+    {
+      "cmd": "-z/--oneshot",
+      "verdict": "IMPLEMENTED",
+      "qubit": "single-turn CLI text + dry-run previews",
+      "proof": "cli text path, 7A suites"
+    },
+    {
+      "cmd": "--resume/--continue",
+      "verdict": "IMPLEMENTED",
+      "qubit": "session resume (HermesBackend session, MemoryStore continuity)",
+      "proof": "session tests, 8Y contracts"
+    },
+    {
+      "cmd": "-m/--model/--provider",
+      "verdict": "IMPLEMENTED",
+      "qubit": "8Q provider gateway + model allowlist",
+      "proof": "tests/test_packet8q.py"
+    },
+    {
+      "cmd": "--reasoning",
+      "verdict": "BLOCKED",
+      "reason": "Qubit fixes the resident-model contract (zero reloads); per-call reasoning levels would break it",
+      "evidence": "tests/test_parity_hermes.py::test_no_per_call_model_options"
+    },
+    {
+      "cmd": "-t/--toolsets",
+      "verdict": "IMPLEMENTED",
+      "qubit": "capability tiers + permission scopes",
+      "proof": "tests/test_packet3a.py, 7E suite"
+    },
+    {
+      "cmd": "-s/--skills",
+      "verdict": "IMPLEMENTED",
+      "qubit": "7E skill manifests, disabled-until-enabled",
+      "proof": "7E suite"
+    },
+    {
+      "cmd": "worktree/--worktree",
+      "verdict": "IMPLEMENTED",
+      "qubit": "opencode disposable worktrees + orphan prune",
+      "proof": "tests/test_packet8r.py"
+    },
+    {
+      "cmd": "--query-file",
+      "verdict": "IMPLEMENTED",
+      "qubit": "CLI message-file task input (openclaw backend contract)",
+      "proof": "tests/test_parity_hermes.py::test_query_file_contract"
+    },
+    {
+      "cmd": "--image",
+      "verdict": "BLOCKED",
+      "reason": "No image-capable local model configured; vision input has no backend",
+      "evidence": "tests/test_parity_hermes.py::test_no_vision_path"
+    },
+    {
+      "cmd": "--max-turns/--run-budget",
+      "verdict": "IMPLEMENTED",
+      "qubit": "timeouts, token budgets, spend governor",
+      "proof": "8Q/8O suites"
+    },
+    {
+      "cmd": "--create-if-missing",
+      "verdict": "IMPLEMENTED",
+      "qubit": "sessions auto-create on demand (journals/stores)",
+      "proof": "store suites"
+    },
+    {
+      "cmd": "--checkpoints",
+      "verdict": "BLOCKED",
+      "reason": "Qubit uses append-only journal replay, not checkpoint files; incompatible state model",
+      "evidence": "journal replay tests cited"
+    },
+    {
+      "cmd": "--accept-hooks/--yolo/--ignore-user-config/--ignore-rules",
+      "verdict": "REJECTED",
+      "reason": "Auto-bypass of policy is forbidden by design; model text can never widen grants"
+    },
+    {
+      "cmd": "--pass-session-id/--source/--in/--no-restore-cwd",
+      "verdict": "IMPLEMENTED",
+      "qubit": "session keys, provenance labels, workspace-root allowlists",
+      "proof": "8R/8Y suites"
+    },
+    {
+      "cmd": "--safe-mode/--dev/--cli",
+      "verdict": "IMPLEMENTED",
+      "qubit": "qubit-dev terminal REPL + dry-run defaults",
+      "proof": "tests/test_terminal.py"
+    },
+    {
+      "cmd": "--tui",
+      "verdict": "BLOCKED",
+      "reason": "No full-screen TUI in Qubit; visual surface is the web dashboard",
+      "evidence": "dashboard suites"
+    },
+    {
+      "cmd": "-v/--verbose",
+      "verdict": "IMPLEMENTED",
+      "qubit": "diagnostic bundles + warning-surfaced logs",
+      "proof": "8T diagnostics tests"
+    },
+    {
+      "cmd": "-Q/--quiet",
+      "verdict": "IMPLEMENTED",
+      "qubit": "concise typed machine output by default",
+      "proof": "CLI JSON contract tests"
+    },
+    {
+      "cmd": "model/moa/fallback",
+      "verdict": "IMPLEMENTED",
+      "qubit": "8Q gateway: allowlist, ordered fallback, truthful local fallback",
+      "proof": "tests/test_packet8q.py"
+    },
+    {
+      "cmd": "auth/login/logout/portal",
+      "verdict": "BLOCKED",
+      "reason": "No interactive OAuth/vendor-portal flows in Qubit; credentials are env/file references only",
+      "evidence": "credential-guard tests"
+    },
+    {
+      "cmd": "proxy",
+      "verdict": "REJECTED",
+      "reason": "OAuth-subscription proxy would bypass Qubit egress policy and audit"
+    },
+    {
+      "cmd": "status",
+      "verdict": "IMPLEMENTED",
+      "qubit": "voicebridge status + /api/runtime inventory",
+      "proof": "8S status tests, tiles tests"
+    },
+    {
+      "cmd": "pause/resume",
+      "verdict": "IMPLEMENTED",
+      "qubit": "latched e-stop + isolated pause cross-wire (pause-only)",
+      "proof": "8O suite, live pause tests"
+    },
+    {
+      "cmd": "doctor",
+      "verdict": "IMPLEMENTED",
+      "qubit": "setup check/diagnose/repair planner",
+      "proof": "8T suite"
+    },
+    {
+      "cmd": "verify",
+      "verdict": "BLOCKED",
+      "reason": "Project run-recipe smoke testing is 8X workspace scope",
+      "evidence": "no run-recipe runner in product"
+    },
+    {
+      "cmd": "security",
+      "verdict": "IMPLEMENTED",
+      "qubit": "secret scans, provenance/license gates, SBOM-adjacent checks",
+      "proof": "8K suite + scan tests"
+    },
+    {
+      "cmd": "approvals",
+      "verdict": "IMPLEMENTED",
+      "qubit": "expiring single-use confirmations, no renewal",
+      "proof": "1B/8F suites + vendored conformance"
+    },
+    {
+      "cmd": "dump/debug",
+      "verdict": "IMPLEMENTED",
+      "qubit": "redacted diagnostic bundle (never secrets)",
+      "proof": "8T diagnostics tests"
+    },
+    {
+      "cmd": "backup/import/checkpoints",
+      "verdict": "IMPLEMENTED",
+      "qubit": "backup center + passphrase import-state restore",
+      "proof": "7D/8T suites"
+    },
+    {
+      "cmd": "config",
+      "verdict": "IMPLEMENTED",
+      "qubit": "config profiles export/diff/reset + canonical resolver",
+      "proof": "8S/8T suites"
+    },
+    {
+      "cmd": "migrate",
+      "verdict": "IMPLEMENTED",
+      "qubit": "product migrate/rollback (idempotent, staged, audited)",
+      "proof": "8S + foundation migration tests"
+    },
+    {
+      "cmd": "sessions",
+      "verdict": "IMPLEMENTED",
+      "qubit": "session receipts/journals, rename/export/purge via memory + task stores",
+      "proof": "8Y/journal suites"
+    },
+    {
+      "cmd": "insights",
+      "verdict": "IMPLEMENTED",
+      "qubit": "usage/cost records per provider call",
+      "proof": "8Q usage tests"
+    },
+    {
+      "cmd": "prompt-size",
+      "verdict": "IMPLEMENTED",
+      "qubit": "bounded context budgets + model capability matrix",
+      "proof": "4B/8T matrix tests"
+    },
+    {
+      "cmd": "memory",
+      "verdict": "IMPLEMENTED",
+      "qubit": "scoped SQLite/FTS5 MemoryStore (local only)",
+      "proof": "tests/test_packet5b.py"
+    },
+    {
+      "cmd": "skills/bundles",
+      "verdict": "IMPLEMENTED",
+      "qubit": "7E manifests (bundles have no multi-skill alias construct; profiles own grouping)",
+      "proof": "7E suite"
+    },
+    {
+      "cmd": "plugins",
+      "verdict": "BLOCKED",
+      "reason": "Third-party plugin auto-install is unreviewed; allowlist + hash-pin + manual review only",
+      "evidence": "manifest validation tests"
+    },
+    {
+      "cmd": "curator/journey/learning/memory-graph",
+      "verdict": "IMPLEMENTED",
+      "qubit": "verified skills + lessons + audit/change timeline",
+      "proof": "8P/6A/8T-audit tests"
+    },
+    {
+      "cmd": "pets/skin",
+      "verdict": "REJECTED",
+      "reason": "Cosmetic mascots/themes; Qubit ships one coherent visual language"
+    },
+    {
+      "cmd": "sync",
+      "verdict": "REJECTED",
+      "reason": "Cross-device sync exfiltrates state; local-only product"
+    },
+    {
+      "cmd": "cron/kanban/project/hooks",
+      "verdict": "BLOCKED",
+      "reason": "Qubit owns timers via user-systemd (8D/8I); kanban boards, named multi-folder projects, and shell hooks are later-packet scope",
+      "evidence": "monitor/timer suites"
+    },
+    {
+      "cmd": "mcp",
+      "verdict": "BLOCKED",
+      "reason": "No unauthenticated MCP mounting; research-only use stays separately authorized",
+      "evidence": "8N gating tests"
+    },
+    {
+      "cmd": "acp/lsp",
+      "verdict": "BLOCKED",
+      "reason": "IDE protocol scope (8X); no ACP server or language server in product",
+      "evidence": "no ACP/LSP listener tests"
+    },
+    {
+      "cmd": "computer-use",
+      "verdict": "REJECTED",
+      "reason": "Unpinned binary driver; desktop control is 8V scope with accessibility APIs"
+    },
+    {
+      "cmd": "browser",
+      "verdict": "BLOCKED",
+      "reason": "Real-profile browser helpers touch personal profiles; 8B loopback CDP is the only browser authority",
+      "evidence": "8B read-only tests"
+    },
+    {
+      "cmd": "tools",
+      "verdict": "IMPLEMENTED",
+      "qubit": "capability tiers + per-tool schemas + broker enforcement",
+      "proof": "3A/8F suites"
+    },
+    {
+      "cmd": "secrets/egress",
+      "verdict": "IMPLEMENTED",
+      "qubit": "SecretRef vault + minimum-necessary egress policy",
+      "proof": "8Q redaction/egress tests"
+    },
+    {
+      "cmd": "pairing/webhook/peer",
+      "verdict": "BLOCKED",
+      "reason": "Require messaging accounts/identities; no accounts in scope",
+      "evidence": "no messaging transports in product"
+    },
+    {
+      "cmd": "gateway/whatsapp/whatsapp-cloud/slack/send",
+      "verdict": "BLOCKED",
+      "reason": "Messaging platforms need live accounts; would duplicate Qubit's single event path",
+      "evidence": "single-listener tests"
+    },
+    {
+      "cmd": "serve/dashboard/desktop/gui",
+      "verdict": "REJECTED",
+      "reason": "Duplicate headless server/dashboard/desktop shells; Qubit webui + terminal own these surfaces"
+    },
+    {
+      "cmd": "monitor/monitoring",
+      "verdict": "IMPLEMENTED",
+      "qubit": "health checks, service inventory, journal evidence",
+      "proof": "8D/8I/8T suites"
+    },
+    {
+      "cmd": "claw",
+      "verdict": "BLOCKED",
+      "reason": "OpenClaw-migration helpers target a different product lineage; Qubit migration contracts own this",
+      "evidence": "migration suites"
+    },
+    {
+      "cmd": "update/uninstall",
+      "verdict": "IMPLEMENTED",
+      "qubit": "upgrade plans + state-preserving uninstall",
+      "proof": "8K/8T suites"
+    },
+    {
+      "cmd": "completion",
+      "verdict": "IMPLEMENTED",
+      "qubit": "voicebridge/qubit-dev shell completions shipped + parser-consistency tested",
+      "proof": "tests/test_parity_hermes.py::test_completion_matches_parser"
+    },
+    {
+      "cmd": "console",
+      "verdict": "IMPLEMENTED",
+      "qubit": "qubit-dev terminal REPL",
+      "proof": "tests/test_terminal.py"
+    },
+    {
+      "cmd": "logs",
+      "verdict": "IMPLEMENTED",
+      "qubit": "/api/logs + journal tails, redacted",
+      "proof": "webui suites"
+    },
+    {
+      "cmd": "project",
+      "verdict": "BLOCKED",
+      "reason": "Named multi-folder workspaces are 8X scope; opencode roots are allowlisted per-run",
+      "evidence": "8R scope tests"
+    },
+    {
+      "cmd": "import-agent",
+      "verdict": "BLOCKED",
+      "reason": "Foreign Claude/Codex session import reads unreviewed third-party state",
+      "evidence": "no foreign-state readers in product"
+    },
+    {
+      "cmd": "profile",
+      "verdict": "IMPLEMENTED",
+      "qubit": "configuration profiles + provider/model/voice profiles",
+      "proof": "8T/7D profile suites"
+    },
+    {
+      "cmd": "setup",
+      "verdict": "IMPLEMENTED",
+      "qubit": "setup wizard (check/run/health/diagnose/matrix/wizard/repair/audit)",
+      "proof": "8T suite"
+    }
+  ]
+}

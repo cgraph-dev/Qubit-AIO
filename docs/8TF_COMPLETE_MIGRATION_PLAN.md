@@ -1,12 +1,17 @@
 # Packet 8T-F Complete Migration Plan
 
-Status: **BLOCKED — 8U must not start yet**
+Status: **BLOCKED — full Hermes parity/rebrand is not yet independently verified**
 
 This is the execution plan for the product migration the owner requested. It
 is more specific than the ordinary 8T-F packet gate because the target is not
 merely “Qubit can call Hermes.” The target is one coherent Qubit product built
-from the pinned Hermes foundation, with Qubit VoiceBridge and the required
-OpenClaw capabilities integrated into it.
+from the pinned Hermes foundation, with Qubit VoiceBridge, full supported
+Hermes command/interface parity, and the required OpenClaw capabilities
+integrated into it.
+
+Reports that prove only a real Hermes subprocess, Hermes chat turns, or a
+Qubit supervisor are foundation evidence, not completion. They must not be
+used to claim that Qubit is a complete Hermes replacement.
 
 ## 1. Final architecture
 
@@ -55,20 +60,24 @@ worker, label, stub, or temporary external installation is not integration.
 2. The full Hermes capability inventory must be reconciled. Every capability
    is preserved, adapted, blocked with a written reason, or rejected with a
    written reason.
-3. Every OpenClaw capability marked `REUSE` or `ADAPT` must be integrated and
+3. The complete supported Hermes command and interface inventory must be
+   reconciled. Every supported user-facing command/workflow must be exposed
+   through Qubit or explicitly rejected/blocked with a typed reason; a
+   chat-only wrapper is a hard failure.
+4. Every OpenClaw capability marked `REUSE` or `ADAPT` must be integrated and
    tested before 8T-F passes. External-only is not integrated.
-4. Qubit owns one broker, permission system, session authority, memory policy,
+5. Qubit owns one broker, permission system, session authority, memory policy,
    audit path, emergency stop, configuration plane, and release plane.
-5. VoiceBridge owns one microphone/ASR/TTS/Right Ctrl/dashboard voice path.
-6. No upstream output can grant authority or widen permissions.
-7. No duplicate listener, router, gateway, scheduler, memory store, TTS path,
+6. VoiceBridge owns one microphone/ASR/TTS/Right Ctrl/dashboard voice path.
+7. No upstream output can grant authority or widen permissions.
+8. No duplicate listener, router, gateway, scheduler, memory store, TTS path,
    audit store, or event loop may operate.
-8. Existing user files, dirty work, installations, credentials, cookies,
+9. Existing user files, dirty work, installations, credentials, cookies,
    browser profiles, and private data must be preserved and never copied into
    the product artifact.
-9. Legal attribution and provenance must remain. Upstream names may not remain
+10. Legal attribution and provenance must remain. Upstream names may not remain
    as the apparent product, assistant, service, CLI, dashboard, or route name.
-10. Code-side limitations are blockers. Only genuinely operator-dependent
+11. Code-side limitations are blockers. Only genuinely operator-dependent
     tests may remain after implementation.
 
 ## 4. Work phases
@@ -97,6 +106,25 @@ Gate: no unknown source, capability, license, or dependency remains.
 
 Gate: a test must fail if the Hermes source is replaced by a Qubit imitation,
 wrong commit, operator install, or temporary directory.
+
+### Phase B2 — Migrate the complete supported Hermes interface
+
+Before VoiceBridge or OpenClaw work can be called complete, enumerate the
+actual pinned Hermes CLI and user-facing interfaces from its source and help
+output. For every command, subcommand, option, interactive workflow, session
+operation, skill/task/schedule operation, memory/model/provider operation, and
+coding/agent operation, record one of `IMPLEMENTED`, `BLOCKED`, or `REJECTED`.
+
+`IMPLEMENTED` means the operation is callable through a Qubit command or
+interface, preserves the required Hermes behavior, produces Qubit receipts,
+and passes through the Qubit broker and policy path. `BLOCKED` or `REJECTED`
+requires a typed error, user-facing explanation, owner, and regression test.
+Silently omitting a command, exposing only `hermes chat`, or telling the user
+to invoke the upstream binary directly is a failure.
+
+Add parity tests that compare the pinned Hermes behavior with the Qubit
+surface, plus negative tests proving no Qubit command can bypass grants,
+confirmation, audit, redaction, resource ceilings, or emergency stop.
 
 ### Phase C — Integrate Qubit VoiceBridge
 
@@ -202,6 +230,8 @@ Packet 8U remains blocked until all are true:
 - actual Hermes-derived Qubit foundation is proven;
 - no production dependence on `/tmp` or an operator Hermes installation;
 - Qubit VoiceBridge is integrated as the single voice path;
+- complete supported Hermes command/interface parity is implemented or
+  explicitly typed as blocked/rejected with no silent omissions;
 - required OpenClaw `REUSE`/`ADAPT` rows are integrated and tested;
 - user-facing rebrand and route/component organization are complete;
 - migration, packaging, rollback, and uninstall pass;
