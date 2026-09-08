@@ -18,7 +18,10 @@ from __future__ import annotations
 from typing import Any, Dict, List, Mapping, Optional
 
 # --- 8T-F canonical identity (single source; CLI/docs/installer mirror it) ---
-PRODUCT_NAME = "Qubit Agent"
+# Canonical public identity: Qubit VoiceBridge. Canonical product/runtime
+# identity: Qubit. (Qubit Agent was the 8T-F draft name; Qubit is canonical.)
+PRODUCT_NAME = "Qubit"
+PUBLIC_IDENTITY = "Qubit VoiceBridge"
 VOICE_SUBSYSTEM = "Qubit VoiceBridge"
 INSTALL_IDENTITY = "qubit-voicebridge"
 IMPORT_PACKAGE = "voicebridge"
@@ -145,6 +148,7 @@ class FoundationError(RuntimeError):
 def describe() -> Dict[str, Any]:
     """Static foundation description: identity, pins, refused paths."""
     return {"schema": "qubit-foundation/1", "product": PRODUCT_NAME,
+            "public_identity": PUBLIC_IDENTITY,
             "voice_subsystem": VOICE_SUBSYSTEM,
             "install_identity": INSTALL_IDENTITY,
             "import_package": IMPORT_PACKAGE,

@@ -26,7 +26,8 @@ from voicebridge.providers import credentials as C  # noqa: E402
 # Identity
 # ---------------------------------------------------------------------------
 def test_identity_constants():
-    assert F.PRODUCT_NAME == "Qubit Agent"
+    assert F.PRODUCT_NAME == "Qubit"
+    assert F.PUBLIC_IDENTITY == "Qubit VoiceBridge"
     assert F.VOICE_SUBSYSTEM == "Qubit VoiceBridge"
     assert F.INSTALL_IDENTITY == "qubit-voicebridge"
     assert F.IMPORT_PACKAGE == "voicebridge"
@@ -44,7 +45,7 @@ def test_install_sh_canonical_identity():
                        text=True, timeout=60)
     assert r.returncode == 0, r.stderr  # script still parses
     text = script.read_text()
-    assert "Qubit Agent" in text
+    assert "Qubit VoiceBridge" in text
     assert "Install the OpenClaw Voice Bridge" not in text
     assert "qubit-voicebridge" in text
 

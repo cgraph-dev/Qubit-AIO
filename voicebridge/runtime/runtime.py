@@ -22,6 +22,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
+from .common import audit
 from .worker import HERMES_PIN, RUNTIME_NAME
 
 DEFAULT_TIMEOUT_S = 120.0
@@ -38,10 +39,9 @@ class RuntimeDenied(RuntimeError):
 
 
 def _minimal_env(provider: str, repo_root: Path) -> Dict[str, str]:
-    keep = ("PATH", "HOME", "LANG", "LC_ALL", "TZ", "PYTHONHASHSEED",
-            "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME",
-            "XDG_CACHE_HOME")
-    env = {k: v for k, v in os.environ.items() if k in keep and v}
+    from .common import scrubbed_env
+
+    env = scrubbed_env()
     env["PYTHONPATH"] = str(repo_root) + (
         os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
     env["QUBIT_RUNTIME_PROVIDER"] = provider
@@ -50,16 +50,7 @@ def _minimal_env(provider: str, repo_root: Path) -> Dict[str, str]:
 
 
 def _audit(event: str, **fields: Any) -> None:
-    try:
-        from voicebridge.logging_setup import log_event
-        from voicebridge.redaction import redact_text
-
-        safe = {k: (redact_text(v) if isinstance(v, str) else v)
-                for k, v in fields.items()}
-        log_event(f"runtime.{event}", runtime=RUNTIME_NAME, pin=HERMES_PIN,
-                  **safe)
-    except Exception:
-        pass
+    audit(event, **fields)
 
 
 class HermesRuntime:

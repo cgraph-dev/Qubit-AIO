@@ -281,9 +281,9 @@ def test_rebrand_surfaces_qubit_agent():
 
     with open(REPO_ROOT / "pyproject.toml", "rb") as fh:
         meta = tomllib.load(fh)
-    assert meta["project"]["description"].startswith("Qubit Agent")
+    assert meta["project"]["description"].startswith("Qubit VoiceBridge")
     unit = (REPO_ROOT / "systemd" / "qubit-voicebridge.service").read_text()
-    assert "Qubit Agent" in unit.splitlines()[1]
+    assert "Qubit VoiceBridge (Qubit runtime" in unit.splitlines()[1]
 
 
 def test_worker_process_has_no_upstream_imports():

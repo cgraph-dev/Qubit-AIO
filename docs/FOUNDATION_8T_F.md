@@ -1,10 +1,10 @@
-# Packet 8T-F — Qubit Agent foundation migration (implementation record)
+# Packet 8T-F — Qubit foundation migration (implementation record)
 
 Status: implemented (code-side). Packet 8U is NOT started.
 
 ## 1. Identity applied in this packet
 
-- Product: **Qubit Agent**; voice subsystem: **Qubit VoiceBridge**.
+- Public identity: **Qubit VoiceBridge**; product/runtime identity: **Qubit**.
 - Canonical install identity: **qubit-voicebridge**; import package:
   **voicebridge**; `openclaw-voice-bridge`: legacy compat only.
 - Single source: `voicebridge/foundation.py` (identity constants + pins).
@@ -36,6 +36,41 @@ production code copied from either clone (contract shapes only). Model/plugin/
 driver caveats: Porcupine key terms, cloud STT/TTS ToS, unpinned cua-driver,
 Playwright Chromium, Electron, cloud-memory ToS, extension models/voices —
 each needs its own review before any use (see UPSTREAM_REUSE R29/R30).
+
+## 2b. Real Hermes execution (close-out)
+
+No vendoring: no Hermes module is small and valuable enough to justify a
+copy (leaf candidates are trivial contextvars or httpx-bound), so Qubit
+executes the pinned implementation itself instead of imitating it:
+
+- Isolated install: `/tmp/hermes-isolated/venv` (editable install of a
+  hash-verified copy of the pinned clone; `src/cli.py` sha256 identical to
+  the clone), `HERMES_HOME=/tmp/hermes-isolated/home` with a local-only
+  config (`provider: ollama`, `huihui_ai/llama3.2-abliterate:3b`, 128K
+  override). Recreate with: `uv venv /tmp/hermes-isolated/venv`,
+  `cp -a <clone> /tmp/hermes-isolated/src`,
+  `uv pip install --python .../venv/bin/python -e .../src`.
+- Proven: `hermes --version` → `Hermes Agent v0.21.1 (2026.9.7)` from the
+  isolated path; `chat -q/-Q/--continue/--create-if-missing/--provider/-m`
+  flags read from the REAL `chat --help`; stdout carries only the reply,
+  session metadata on stderr, missing sessions rc=1 typed.
+- Qubit supervisor: `voicebridge/runtime/real_hermes.py`
+  (`RealHermesRuntime`): explicit binary/home (DISABLED without them),
+  e-stop refusal before spawn, scrubbed allowlist env (no *KEY*/*TOKEN*/
+  *SECRET* passthrough, XDG redirected), timeout kill/reap, redacted
+  replies/errors/receipts with binary+pin provenance.
+- Live proof: real turns returned exact markers (`HERMES_LOCAL_OK`,
+  `QUBIT_REAL_OK`, `BRANCH_CHECK`) via Qubit's supervisor; helper model
+  stopped after each run (`ollama stop`) for VRAM hygiene. Note: loading
+  the helper evicts the resident `qubit-brain4` from VRAM; it reloads on
+  the next Qubit request (operator-visible as one slow first turn).
+- Qubit-backend argv conformance is asserted against the real `--help`
+  output; OpenClaw `CliBackend` argv asserted against pinned
+  `docs/cli/agent.md` (`--agent/--session-key/--message-file/--json/
+  --timeout`).
+- THIRD_PARTY_NOTICES.md unchanged: nothing vendored or distributed; the
+  isolated install is operator-ephemeral tooling, provenance recorded here
+  and in UPSTREAM_REUSE R29/R30.
 
 ## 3. Feature matrix (8T-F delta on FEATURE_MATRIX_8U.json)
 

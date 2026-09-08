@@ -18,7 +18,7 @@ records: `docs/UPSTREAM_REUSE.md` R29/R30.
 
 ## 1. Product identity (defined before any file move)
 
-- Product: **Qubit Agent**.
+- Public identity: **Qubit VoiceBridge**; product/runtime identity: **Qubit**.
 - Voice subsystem: **Qubit VoiceBridge**.
 - Canonical repository/install identity: **qubit-voicebridge** (unchanged;
   no migration to another name was proven safe in this task).
