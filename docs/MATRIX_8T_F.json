@@ -45,7 +45,7 @@
       "upstream": "hermes-agent cli + agent",
       "verdict": "ADAPT",
       "status": "IMPLEMENTED",
-      "proof": "voicebridge/runtime/real_hermes.py supervises isolated install; version/argv/session/timeout/cancel/redaction proven in tests/test_real_hermes.py against local Ollama"
+      "proof": "provision.py installs pinned clone to Qubit-owned XDG runtimes (rev-parse/LICENSE/entry-hash/version verified); RealHermesRuntime defaults to XDG paths (DISABLED when absent); live turns, session reuse, timeout, cancel, redaction proven in tests/test_real_hermes.py against local Ollama"
     },
     {
       "id": "H-stream",

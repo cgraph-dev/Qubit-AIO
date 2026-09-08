@@ -1707,4 +1707,152 @@ CONFINEMENT CLOSE-OUT (same upstream posture, reuses plan-blessed
     CONFINEMENT_UNAVAILABLE with no spawn. NPROC capping moved inside via
     prlimit after proving preexec caps break namespace setup on busy
     machines. Network namespace retained by design (provider calls).
+
+R28 — OPTIONAL DESIGN/ACCESSIBILITY SKILL SNAPSHOTS (2026-09-07)
+    The repository-local `skills/` folder contains instruction/reference
+    snapshots, not runtime code. Exact source commits, selected paths, license
+    evidence, and intentionally unimported items are recorded in
+    `skills/SOURCES.md`. The snapshots are not loaded by voicebridge and do
+    not grant capabilities, permissions, browser access, provider access, or
+    model authority. `anthropics/skills` frontend-design is Apache-2.0 with
+    its LICENSE.txt retained; the selected Vercel skills declare MIT in their
+    metadata; UI/UX Pro Max and Bencium declare MIT at repository level; and
+    AccessLint declares MIT in its plugin manifest. Vercel
+    `web-design-guidelines` is deliberately excluded pending license review,
+    and “Kyosaki” is excluded until its exact source is supplied.
+```
+
+R29 — HERMES AGENT AUDIT (Packet 8U preparation, 2026-09-08; NO CODE COPIED)
+```text
+LOCAL REQUIREMENT: Packet 8U preparation — audit upstream agent capabilities
+for REUSE/ADAPT/MISSING/REJECTED behind Qubit broker/policy; hermetic spike
+against the Hermes CLI contract with an isolated stub (no live binary).
+UPSTREAM REPOSITORY + COMMIT: https://github.com/NousResearch/hermes-agent @
+2237be355906fbe6065ce1815711eee52b2d646e (tag v2026.9.7, 2026-09-07).
+Clone: /tmp/upstream-8u/hermes-agent (fresh, read-only, outside the Qubit
+checkout and outside the operator's live ~/.hermes install; untouched —
+`git status` clean at audit end). Clone timestamp: 2026-09-08 (UTC, see
+/tmp/upstream-8u/CLONE_TIMESTAMP).
+SOURCE FILES + SYMBOLS (inspected, not copied):
+  agent/chat_completion_helpers.py (_iter_provider_stream_chunks),
+  agent/estop.py, agent/file_safety.py,
+  tools/transcription_*.py, tools/tts_*.py, tools/voice_mode.py,
+  tools/wake_word.py, tools/wake_word_engines.py,
+  tools/browser_snapshot.py, tools/browser_supervisor*.py,
+  tools/computer_use_tool.py, tools/file_operations*.py,
+  tools/terminal_tool*.py, tools/code_execution_tool.py,
+  tools/approval_smart.py, tools/skill_provenance.py,
+  acp_adapter/ (server, session, permissions, edit_approval),
+  hermes_state_sessions.py + schema/fts/wal/search, cron/, batch_runner.py,
+  gateway/run.py, tui_gateway/, web/, cli.py, setup-hermes.sh, uv.lock.
+UPSTREAM TESTS/FIXTURES: suite inspected for contract shapes only
+(evals/, tests/); hermetic Qubit spike uses isolated stubs, not upstream tests.
+LICENSE: MIT (Copyright (c) 2025 Nous Research) — VERIFIED at pinned commit
+(root LICENSE). Caveats (each needs its own review before any use):
+pvporcupine (Picovoice key/commercial terms), edge-tts/11labs/OpenAI/Mistral/
+XAI/Gemini (service ToS, no weight license), cua-driver binary (trycua,
+unpinned), Playwright Chromium, Electron, mautrix/python-olm, cloud memories
+(honcho/mem0/supermemory data ToS), Google/YouTube APIs.
+DECISION: AUDIT ONLY — no production copy/adapt in this task. REUSE rows
+(stream loop, ESTOP sentinel + receipts) and ADAPT rows (STT/TTS, wake-word,
+browser snapshot, file/terminal tools, ACP protocol, session schema ideas,
+gateway/cron/batch, smart approvals) feed the 8U task capsule; REJECTED rows
+(Camofox cloud, cua-driver, Electron desktop, cloud memory/Hub, dashboard/TUI
+as UI, vendor installer) are recorded in docs/FEATURE_MATRIX_8U.json.
+LOCAL DESTINATION: none (audit artifacts only: docs/FEATURE_MATRIX_8U.json/.md,
+tests/test_upstream8u.py hermetic spike with isolated stub runtime).
+DEPENDENCIES ADDED: none. Node/Python extras of upstream NOT installed.
+BEHAVIOR KEPT/OMITTED: n/a — nothing copied.
+IMPLEMENTATION STATUS: audited 2026-09-08; no implementation.
+```
+
+R31 — 8T-F FOUNDATION DECISION (2026-09-08; CORRECTED CONTRACT)
+```text
+Canonical architecture/status: docs/8TF_SOURCE_OF_TRUTH.md.
+
+The R29/R30 entries above are historical upstream audits and are not proof of
+integration. Packet 8T-F now requires a real Hermes-derived Qubit foundation:
+the resulting Qubit worktree must contain or directly import the selected,
+license-compliant Hermes implementation, and tests must prove the executed
+module/process/source identity. A Qubit-owned worker that imitates the Hermes
+CLI/JSON protocol, or a temporary external Hermes installation supervised by
+an otherwise unchanged Qubit tree, is REJECTED for 8T-F.
+
+OpenClaw capabilities marked REUSE or ADAPT in the 8T-F feature matrix must be
+implemented in the resulting Qubit foundation or explicitly fail the 8T-F
+acceptance gate. External-only capabilities are not counted as integrated.
+Qubit broker, grants, confirmation, audit, redaction, resource, emergency
+stop, state, and rollback contracts remain authoritative. Existing Hermes and
+OpenClaw installations remain untouched; the migration uses a clean worktree,
+provenance records, required notices, and a reversible rollback journal.
+```
+
+R30 — OPENCLAW AUDIT (Packet 8U preparation, 2026-09-08; NO CODE COPIED)
+```text
+LOCAL REQUIREMENT: same as R29, for OpenClaw gateway/skills/dashboard patterns.
+UPSTREAM REPOSITORY + COMMIT: https://github.com/openclaw/openclaw @
+3928bad9badfcb6c7d140530435e806fb8092190 (tag v2026.9.2, 2026-09-05).
+Clone: /tmp/upstream-8u/openclaw (fresh, read-only, outside the Qubit checkout
+and outside the operator's live ~/.openclaw install; untouched — `git status`
+clean at audit end).
+SOURCE FILES + SYMBOLS (inspected, not copied):
+  packages/gateway-protocol/src/ (validators, frame-guards.ts),
+  packages/gateway-client/src/client.ts, src/gateway/server*.ts,
+  src/gateway/session-*.ts, src/gateway/chat-abort.ts,
+  src/cli/program/register.agent*.ts, extensions/browser/ (bridge-api.ts,
+  browser-control-auth.ts, browser-doctor.ts), src/skills/, src/plugins/
+  (clawhub.ts, sandboxes), packages/plugin-sdk + package-contract,
+  src/gateway/board-*.ts + control-plane-*.ts, src/commands/onboard-*.ts,
+  src/sessions/conversation-turns.ts, src/memory/root-memory-files.ts,
+  packages/memory-host-sdk/, src/llm/model-registry.ts, src/config/
+  types.secrets.ts, src/secrets/ (runtime.ts, resolve.ts, ref-contract.ts),
+  src/cron/, src/gateway/exec-approval-*.ts, src/audit/, Dockerfile
+  (digest-pinned node:24-bookworm[-slim], bun:1.4.0).
+UPSTREAM TESTS/FIXTURES: inspected for contract shapes only; no upstream tests
+executed (Node toolchain not installed; Qubit proves behavior with hermetic stubs).
+LICENSE: MIT (Copyright (c) 2026 OpenClaw Foundation) — VERIFIED at pinned
+commit (root LICENSE + THIRD_PARTY_NOTICES.md for Pi/pi-mono MIT). Caveats:
+docs/assets, apps/{android,ios,macos}, extension-bundled models/TTS voices —
+per-asset license check required before shipping any in a Qubit artifact.
+DECISION: AUDIT ONLY. REUSE rows (gateway-protocol guards + typed client,
+session-key + abort, cron runner, exec approvals, audit receipts, SecretRef
+registry) and ADAPT rows (browser auth/profiles/doctor, skill sandbox/contract
+for first-party skills, board APIs, onboarding flow, Dockerfile pin pattern)
+feed the 8U capsule; ClawHub third-party auto-install is REJECTED (unreviewed).
+LOCAL DESTINATION: none (audit artifacts only, as R29).
+DEPENDENCIES ADDED: none. pnpm-lock.yaml recorded, not installed.
+BEHAVIOR KEPT/OMITTED: n/a — nothing copied.
+IMPLEMENTATION STATUS: audited 2026-09-08; no implementation.
+```
+
+R31 — VENDORED HERMES MODULES (Packet 8T-F close-out, 2026-09-08; COPIED + EXECUTED)
+```text
+LOCAL REQUIREMENT: 8T-F foundation must execute pinned Hermes code in-tree
+(no imitation, no /tmp-only install). Smallest justified stdlib-only units.
+UPSTREAM REPOSITORY + COMMIT: https://github.com/NousResearch/hermes-agent @
+2237be355906fbe6065ce1815711eee52b2d646e (tag v2026.9.7).
+Clone: /tmp/upstream-8tfv3/hermes-agent (fresh, read-only; clean at end).
+COPIED FILES (verbatim + provenance header; sha256 of body matches clone):
+  tools/ansi_strip.py -> voicebridge/upstream/hermes_ansi_strip.py
+    (strip_ansi, sanitize_display_text, strip_unicode_tags)
+  hermes_cli/sqlite_util.py -> voicebridge/upstream/hermes_sqlite_util.py
+    (write_txn, add_column_if_missing)
+UPSTREAM TESTS: hermes has no isolated unit tests for these files; Qubit
+proves equivalence with differential tests (vendored == pinned on an ANSI/
+control/unicode battery and sqlite commit/rollback/race cases) in
+tests/test_upstream_vendored.py.
+LICENSE: MIT (Copyright (c) 2025 Nous Research) — full text in
+voicebridge/upstream/ATTRIBUTION.md and per-module headers.
+DECISION: ADAPT — strip_ansi executes in hermes/backend.py run_task and
+runtime/real_hermes.py turn (live output paths). write_txn was tried in
+memory/store.py _migrate and REVERTED with root cause (executescript
+implicitly commits: "cannot commit - no transaction is active" on every
+fresh open); reserved for non-executescript writes. Deferred, not vendored:
+approval_detection.py (no shell-string execution path exists in Qubit by
+construction — broker.py forbids shell=True; vendoring it unwired would
+imitate integration), render (needs undeclared `rich`), tool_result_
+classification (Hermes-tool-name-specific), session stores (second memory).
+LOCAL DESTINATION: voicebridge/upstream/ (+ tests/test_upstream_vendored.py)
+DEPENDENCIES ADDED: none (both files stdlib-only: re / contextlib+sqlite3).
+IMPLEMENTATION STATUS: implemented 2026-09-08; differential + wiring tests green.
 ```

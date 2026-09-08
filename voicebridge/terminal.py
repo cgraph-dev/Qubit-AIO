@@ -79,7 +79,7 @@ def _status_text(cfg) -> str:
         lines.append(f"ollama: {e}")
     try:
         hv = cfg.get("hermes", "enabled", default=False)
-        lines.append(f"hermes: {'enabled' if hv else 'disabled'} (ask hermes ...)")
+        lines.append(f"hermes: {'enabled' if hv else 'disabled'} (voice runtime backend)")
     except Exception:
         pass
     return "\n".join(lines)

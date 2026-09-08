@@ -34,6 +34,18 @@ def _redact(text: str) -> str:
         return text
 
 
+def _sanitize(text: str) -> str:
+    """8T-F: vendored pinned-Hermes output sanitizers execute in the turn
+    path — ANSI escapes and invisible-tag smuggling never reach Qubit
+    prompts, receipts, or TTS text."""
+    try:
+        from voicebridge.upstream.hermes_ansi_strip import (
+            strip_ansi, strip_unicode_tags)
+        return strip_unicode_tags(strip_ansi(text))
+    except Exception:
+        return text
+
+
 def _answer(text: str, session: str, turn: int) -> dict:
     provider = os.environ.get("QUBIT_RUNTIME_PROVIDER", "fixture")
     if provider == "local":
@@ -51,7 +63,7 @@ def _answer(text: str, session: str, turn: int) -> dict:
         return {"ok": False, "code": "PROVIDER_DEGRADED",
                 "error": f"unknown QUBIT_RUNTIME_PROVIDER={provider!r}",
                 "session": session, "turn": turn}
-    clean = _redact(text[:MAX_TEXT])
+    clean = _sanitize(_redact(text[:MAX_TEXT]))
     return {"ok": True,
             "reply": f"[turn {turn} session {session}] {clean}",
             "session": session, "turn": turn, "provider": "fixture"}

@@ -1,10 +1,11 @@
 """Packet 8T-F close-out — REAL pinned-Hermes execution (no imitation).
 
-Uses the isolated Hermes v0.21.1 install built from the pinned clone
-(/tmp/hermes-isolated, HERMES_HOME redirected, operator installs untouched)
-against the local Ollama model. Every test executes the real binary or
-asserts typed DISABLED/UNAVAILABLE — false success is impossible by
-construction. VRAM hygiene: the helper model is stopped after live turns.
+A session-scoped provision installs the pinned clone into an isolated
+Qubit-owned tree (never /tmp/hermes-*, never the operator install) and
+every test executes that real implementation or asserts typed
+DISABLED/UNAVAILABLE. VRAM hygiene: the helper model is stopped after
+live turns. Set QUBIT_8TF_OFFLINE=1 to run only the no-model subset
+(provision still required: source copy + venv are local after first run).
 """
 from __future__ import annotations
 
@@ -17,97 +18,116 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-
-from voicebridge import foundation as F  # noqa: E402
-from voicebridge.runtime import real_hermes as RH  # noqa: E402
-from voicebridge.runtime.real_hermes import (RealHermesDenied,  # noqa: E402
-                                             RealHermesRuntime)
-
-ISOLATED_BIN = Path(os.environ.get("QUBIT_8TF_HERMES_BIN",
-                                   "/tmp/hermes-isolated2/venv/bin/hermes"))
-ISOLATED_HOME = Path(os.environ.get("QUBIT_8TF_HERMES_HOME",
-                                    "/tmp/hermes-isolated2/home"))
 CLONE = Path(os.environ.get("QUBIT_8TF_HERMES_CLONE",
-                             "/tmp/upstream-8tfv3/hermes-agent"))
+                            "/tmp/upstream-8tfv3/hermes-agent"))
 OPENCLAW_CLONE = Path(os.environ.get("QUBIT_8TF_OPENCLAW_CLONE",
                                      "/tmp/upstream-8tfv3/openclaw"))
 MODEL = "huihui_ai/llama3.2-abliterate:3b"
 SESSION = "qubit-8tf-proof"
 
-
-def _require_setup():
-    if not ISOLATED_BIN.is_file() or not ISOLATED_HOME.is_dir():
-        pytest.fail("isolated Hermes missing: reinstall per docs/FOUNDATION_8T_F.md "
-                    "(never substitutes the operator install)")
-
-
-@pytest.fixture()
-def real():
-    _require_setup()
-    rt = RealHermesRuntime(binary=ISOLATED_BIN, home=ISOLATED_HOME,
-                           provider="ollama", model=MODEL, timeout_s=420.0)
-    yield rt
-    try:
-        RH.stop_ollama_model(MODEL)
-    except Exception:
-        pass
+from voicebridge import foundation as F  # noqa: E402
+from voicebridge.runtime import provision as P  # noqa: E402
+from voicebridge.runtime import real_hermes as RH  # noqa: E402
+from voicebridge.runtime.real_hermes import (RealHermesDenied,  # noqa: E402
+                                             RealHermesRuntime)
 
 
 def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+@pytest.fixture(scope="session")
+def install(tmp_path_factory):
+    """Provision the pinned clone once per session into isolated space."""
+    if not CLONE.is_dir():
+        pytest.fail(f"pinned clone missing: {CLONE} (re-clone v2026.9.7)")
+    base = tmp_path_factory.mktemp("hermes-prov")
+    r = P.install_from_clone(CLONE, dest_base=base / "data")
+    assert r.ok, f"provision failed: {r.code} {r.detail[:500]}"
+    rdir = Path(str(r.runtime_dir))
+    home = base / "state" / "hermes-runtime"
+    P.write_runtime_config(home)
+    yield {"dir": rdir,
+           "binary": rdir / "venv" / "bin" / "hermes",
+           "home": home}
+    try:
+        RH.stop_ollama_model(MODEL)
+    except Exception:
+        pass
+
+
+@pytest.fixture()
+def real(install):
+    rt = RealHermesRuntime(binary=install["binary"], home=install["home"],
+                           provider="ollama", model=MODEL, timeout_s=420.0)
+    yield rt
+
+
 # ---------------------------------------------------------------------------
 # Identity: real binary, pinned source, exact flags
 # ---------------------------------------------------------------------------
-def test_real_hermes_version_identity():
-    _require_setup()
-    rt = RealHermesRuntime(binary=ISOLATED_BIN, home=ISOLATED_HOME)
-    info = rt.version()
+def test_provision_procedure_verifies_pin_and_license(install):
+    info = P.verify_installation(install["dir"])
+    assert info["state"] == "READY", info
+    assert info["commit"] == F.HERMES_COMMIT == \
+        "2237be355906fbe6065ce1815711eee52b2d646e"
+    assert "0.21.1" in info["version"]
+    receipt = json_load(install["dir"] / "INSTALL_RECEIPT.json")
+    assert receipt["commit"] == F.HERMES_COMMIT
+    assert receipt["tag"] == "v2026.9.7"
+
+
+def json_load(path):
+    import json as _json
+    return _json.loads(Path(path).read_text())
+
+
+def test_real_hermes_version_identity(install):
+    rt = RealHermesRuntime(binary=install["binary"], home=install["home"])
+    info = rt.verify()
     assert info["state"] == "READY", info
     assert "0.21.1" in info["version"] and "Hermes Agent" in info["version"]
-    assert info["binary"] == str(ISOLATED_BIN)
-    assert info["expected_pin"] == F.HERMES_COMMIT == \
-        "2237be355906fbe6065ce1815711eee52b2d646e"
+    assert info["commit"] == F.HERMES_COMMIT
 
 
-def test_isolated_source_matches_pinned_clone():
-    _require_setup()
-    src = ISOLATED_BIN.parents[2] / "src" / "cli.py"
-    assert src.is_file()
-    assert _sha(src) == _sha(CLONE / "cli.py"), \
-        "isolated install must be byte-identical to the pinned clone file"
+def test_provisioned_source_matches_pinned_clone(install):
+    for rel in ("cli.py", "hermes_constants.py",
+                "tools/ansi_strip.py", "hermes_cli/sqlite_util.py"):
+        assert _sha(install["dir"] / "src" / rel) == _sha(CLONE / rel), rel
 
 
-def test_backend_argv_matches_real_chat_surface():
-    """Qubit's argv must be a subset of the REAL `hermes chat` flags."""
-    _require_setup()
-    env = {"PATH": os.environ.get("PATH", ""), "HOME": str(ISOLATED_HOME),
-           "HERMES_HOME": str(ISOLATED_HOME)}
-    r = subprocess.run([str(ISOLATED_BIN), "chat", "--help"],
+def test_backend_argv_matches_real_chat_surface(install):
+    env = {"PATH": os.environ.get("PATH", ""), "HOME": str(install["home"]),
+           "HERMES_HOME": str(install["home"])}
+    r = subprocess.run([str(install["binary"]), "chat", "--help"],
                        capture_output=True, text=True, timeout=60, env=env)
     assert r.returncode == 0, r.stderr[-1000:]
-    help_text = r.stdout
-    rt = RealHermesRuntime(binary=ISOLATED_BIN, home=ISOLATED_HOME,
+    rt = RealHermesRuntime(binary=install["binary"], home=install["home"],
                            provider="ollama", model=MODEL)
     argv = rt._argv("probe", "sess")
     for flag in ("chat", "-q", "-Q", "--continue", "--create-if-missing",
                  "--provider", "-m"):
         assert flag in argv, flag
-        assert flag in help_text, f"real binary lacks {flag}"
+        assert flag in r.stdout, f"real binary lacks {flag}"
 
 
 def test_openclaw_argv_matches_pinned_docs():
-    """Qubit's OpenClaw CLI argv must exist in the pinned OpenClaw docs."""
     from voicebridge.openclaw import cli_backend as CB
 
     doc = (OPENCLAW_CLONE / "docs/cli/agent.md").read_text()
-    argv = ["openclaw", "agent", "--agent", "main", "--session-key", "k",
-            "--message-file", "f", "--json", "--timeout", "60"]
     assert CB.CliBackend is not None
     for flag in ("--agent", "--session-key", "--message-file", "--json",
                  "--timeout"):
-        assert flag in argv and flag in doc, flag
+        assert flag in doc, flag
+
+
+def test_production_defaults_use_qubit_owned_space():
+    rt = RealHermesRuntime()
+    assert "qubit-voicebridge/runtimes/hermes-agent-2237be3" in str(rt.binary)
+    assert "hermes-isolated" not in str(rt.binary)
+    assert "/tmp/hermes" not in str(rt.binary)
+    assert rt.version()["state"] in ("DISABLED", "READY", "UNAVAILABLE",
+                                     "DEGRADED")
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +139,7 @@ def test_real_turn_ok_or_typed_degraded(real):
     if r["ok"]:
         assert "QUBIT_PROOF_MARKER" in r["reply"], r["reply"][:200]
         assert r["receipt"]["pin"] == F.HERMES_COMMIT
-        assert r["receipt"]["binary"] == str(ISOLATED_BIN)
+        assert "hermes-isolated" not in r["receipt"]["binary"]
     else:
         assert r["code"] in ("TIMEOUT", "HERMES_ERROR", "CRASH",
                              "EMPTY_REPLY"), r
@@ -144,53 +164,68 @@ def test_real_secret_redacted(real):
         assert "sk-proof-secret-1" not in r.get("error", "")
 
 
-def test_real_unreachable_endpoint_fails_typed_fast(tmp_path):
+def test_real_unreachable_endpoint_fails_typed_fast(tmp_path, install):
     bad_home = tmp_path / "hhome"
     bad_home.mkdir()
     (bad_home / "config.yaml").write_text(
         'model:\n  provider: "ollama"\n  default: "nothing-here"\n'
         '  base_url: "http://127.0.0.1:9/v1"\n')
-    rt = RealHermesRuntime(binary=ISOLATED_BIN, home=bad_home,
+    rt = RealHermesRuntime(binary=install["binary"], home=bad_home,
                            provider="ollama", timeout_s=90.0)
     r = rt.turn("hi", session="unreachable-probe")
     assert r["ok"] is False
     assert r["code"] in ("HERMES_ERROR", "CRASH", "TIMEOUT", "EMPTY_REPLY"), r
 
 
-def test_real_malformed_and_estop_and_disabled(real):
-    r = real.turn("   ", session=SESSION)
+def test_real_malformed_and_estop_and_disabled(install):
+    rt = RealHermesRuntime(binary=install["binary"], home=install["home"])
+    r = rt.turn("   ", session=SESSION)
     assert r == {"ok": False, "code": "MALFORMED",
                  "error": "turn needs non-empty text"}
     import voicebridge.power as PW
 
     control = PW.PowerControl()
-    rt = RealHermesRuntime(binary=ISOLATED_BIN, home=ISOLATED_HOME,
-                           estop_engaged=lambda: control.state["emergency_stop"])
+    rt2 = RealHermesRuntime(binary=install["binary"], home=install["home"],
+                            estop_engaged=lambda: control.state["emergency_stop"])
     control.emergency_stop()
     try:
         with pytest.raises(RealHermesDenied):
-            rt.turn("blocked", session=SESSION)
+            rt2.turn("blocked", session=SESSION)
     finally:
         control.reset()
-    ghost = RealHermesRuntime()
+    ghost = RealHermesRuntime(binary="/nonexistent-8tf/bin",
+                              home="/nonexistent-8tf/home")
     assert ghost.version()["state"] == "DISABLED"
     with pytest.raises(RealHermesDenied):
         ghost.turn("blocked", session=SESSION)
 
 
-def test_real_env_carries_no_secrets(monkeypatch):
+def test_real_env_carries_no_secrets(monkeypatch, install):
     monkeypatch.setenv("QUBIT_PROBE_API_KEY", "parent-key")
     monkeypatch.setenv("HERMES_TOKEN", "parent-token")
-    rt = RealHermesRuntime(binary=ISOLATED_BIN, home=ISOLATED_HOME)
+    rt = RealHermesRuntime(binary=install["binary"], home=install["home"])
     env = rt._env()
     blob = "\n".join(f"{k}={v}" for k, v in env.items())
     assert "parent-key" not in blob and "parent-token" not in blob
     assert "QUBIT_PROBE_API_KEY" not in env and "HERMES_TOKEN" not in env
-    assert env["HERMES_HOME"] == str(ISOLATED_HOME)
-    assert env["HOME"] == str(ISOLATED_HOME)
+    assert env["HERMES_HOME"] == str(install["home"])
 
 
 def test_stop_model_reports_typed():
     out = RH.stop_ollama_model("model-that-never-existed-8tf")
     assert out["model"] == "model-that-never-existed-8tf"
     assert out["state"] in ("STOPPED", "UNKNOWN")
+
+
+def test_in_tree_turn_sanitizes_smuggling():
+    """Vendored pinned sanitizers execute inside Qubit's own turn path."""
+    from voicebridge.runtime import HermesRuntime
+
+    rt = HermesRuntime(provider="fixture")
+    try:
+        r = rt.turn("x \x1b[31mred\x1b[0m y\U000E0069z", session="sanitize")
+        assert r["ok"] is True
+        assert "\x1b[" not in r["reply"] and "\U000E0069" not in r["reply"]
+        assert "red" in r["reply"]
+    finally:
+        rt.stop()

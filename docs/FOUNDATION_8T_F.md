@@ -39,21 +39,22 @@ each needs its own review before any use (see UPSTREAM_REUSE R29/R30).
 
 ## 2b. Real Hermes execution (close-out)
 
-No vendoring: no Hermes module is small and valuable enough to justify a
-copy (leaf candidates are trivial contextvars or httpx-bound), so Qubit
-executes the pinned implementation itself instead of imitating it:
+No vendoring-only claim: Qubit BOTH vendors pinned modules (in-tree,
+§3) AND executes the pinned implementation from Qubit-owned space:
 
-- Isolated install: `/tmp/hermes-isolated2/venv` (editable install of a
-  hash-verified copy of the pinned clone; `src/cli.py` sha256 identical to
-  the clone), `HERMES_HOME=/tmp/hermes-isolated2/home` with a local-only
-  config (`provider: ollama`, `huihui_ai/llama3.2-abliterate:3b`, 128K
-  override). Recreate with: `uv venv /tmp/hermes-isolated2/venv`,
-  `cp -a <clone> /tmp/hermes-isolated2/src`,
-  `uv pip install --python .../venv/bin/python -e .../src`, then write the
-  local-only `config.yaml` above. Override paths in tests via
-  `QUBIT_8TF_HERMES_BIN` / `QUBIT_8TF_HERMES_HOME`. NOTE: `/tmp` is
-  operator-ephemeral (wiped between sessions); the durable proof is the
-  vendored in-tree execution, the isolated runs re-verify on demand.
+- Provisioning: `voicebridge/runtime/provision.py` +
+  `scripts/install_hermes_runtime.sh` install the pinned clone into
+  `$XDG_DATA_HOME/qubit-voicebridge/runtimes/hermes-agent-<commit>/`
+  (source copy + isolated venv + INSTALL_RECEIPT.json), verified by
+  `git rev-parse`, LICENSE presence, entry-file hashes, and live
+  `hermes --version`. Never /tmp, never the operator install.
+- `RealHermesRuntime` defaults to those XDG paths (typed DISABLED when
+  absent); explicit overrides for hermetic tests.
+- Live proof: real turns returned exact markers against local Ollama;
+  helper model stopped after each run for VRAM hygiene.
+- THIRD_PARTY_NOTICES.md merge for the vendored files is pending
+  (file shared with unrelated content); legal text is preserved in
+  `voicebridge/upstream/ATTRIBUTION.md` and per-module headers.
 - Proven: `hermes --version` → `Hermes Agent v0.21.1 (2026.9.7)` from the
   isolated path; `chat -q/-Q/--continue/--create-if-missing/--provider/-m`
   flags read from the REAL `chat --help`; stdout carries only the reply,

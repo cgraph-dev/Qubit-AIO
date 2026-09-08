@@ -26,6 +26,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from ..upstream.hermes_ansi_strip import strip_ansi
 from .common import audit, redact, scrubbed_env
 from .worker import HERMES_PIN
 
@@ -54,8 +55,15 @@ class RealHermesRuntime:
                  provider: str = "ollama", model: Optional[str] = None,
                  timeout_s: float = 300.0,
                  estop_engaged: Optional[Callable[[], bool]] = None) -> None:
-        self.binary = Path(binary) if binary else None
-        self.home = Path(home) if home else None
+        # Production defaults resolve to Qubit-owned XDG space (never /tmp,
+        # never the operator's installs). Tests pass explicit tmp paths.
+        if binary is None or home is None:
+            from .provision import hermes_home, runtime_dir
+            rd = runtime_dir()
+            binary = binary if binary is not None else rd / "venv" / "bin" / "hermes"
+            home = home if home is not None else hermes_home()
+        self.binary = Path(binary)
+        self.home = Path(home)
         self.provider = provider
         self.model = model
         self.timeout_s = timeout_s
@@ -63,8 +71,20 @@ class RealHermesRuntime:
 
     # -- configuration ------------------------------------------------------
     def configured(self) -> bool:
-        return (self.binary is not None and self.binary.is_file()
-                and self.home is not None and self.home.is_dir())
+        return self.binary.is_file() and self.home.is_dir()
+
+    def verify(self) -> Dict[str, Any]:
+        """Deep identity check: pin, LICENSE, entry hashes, live version."""
+        from .provision import verify_installation
+
+        try:
+            rdir = self.binary.parents[2]
+        except IndexError:
+            return {"state": "UNAVAILABLE", "reason": "BAD_LAYOUT",
+                    "detail": str(self.binary)}
+        info = verify_installation(rdir)
+        info["runtime"] = "hermes-real-isolated"
+        return info
 
     def _env(self) -> Dict[str, str]:
         assert self.home is not None
@@ -135,7 +155,8 @@ class RealHermesRuntime:
                     "error": redact(err[-300:] or "empty stdout"),
                     "session": session, "elapsed_ms": elapsed_ms}
         audit("real_turn", session=session, elapsed_ms=elapsed_ms, ok=True)
-        return {"ok": True, "reply": redact(reply), "session": session,
+        # 8T-F: vendored pinned-Hermes sanitizer runs on the live reply.
+        return {"ok": True, "reply": redact(strip_ansi(reply)), "session": session,
                 "elapsed_ms": elapsed_ms,
                 "receipt": {"runtime": "hermes-real-isolated",
                             "pin": HERMES_PIN,
