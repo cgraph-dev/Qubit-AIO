@@ -113,10 +113,15 @@ def test_query_file_contract():
 
 
 def test_no_per_call_model_options():
-    from voicebridge import foundation as F
+    # Superseded by tests/test_reasoning8tf.py: reasoning levels map to
+    # bounded num_predict presets; runner options (model/num_ctx/
+    # keep_alive) are proven untouched per call.
+    from voicebridge.local_llm import (DEFAULT_REASONING_BUDGET,
+                                       REASONING_BUDGETS,
+                                       resolve_reasoning_budget)
 
-    assert "runner options" in F.__doc__.lower() or True
-    import voicebridge.local_llm as _llm  # noqa: F401  (single resident contract)
+    assert resolve_reasoning_budget("ultra") == DEFAULT_REASONING_BUDGET
+    assert set(REASONING_BUDGETS) >= {"none", "low", "medium", "high"}
 
 
 def test_completion_matches_parser(tmp_path):
