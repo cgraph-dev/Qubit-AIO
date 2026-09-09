@@ -36,16 +36,6 @@
       "rollback": "standard Qubit rollback contracts apply"
     },
     {
-      "cmd": "--reasoning",
-      "verdict": "BLOCKED",
-      "reason": "Qubit fixes the resident-model contract (zero reloads); per-call reasoning levels would break it",
-      "evidence": "tests/test_parity_hermes.py::test_no_per_call_model_options",
-      "owner": "qubit-policy",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "BLOCKED_REASONING",
-      "user_explanation": "Qubit Agent cannot do this: Qubit fixes the resident-model contract (zero reloads); per-call reasoning levels would break it"
-    },
-    {
       "cmd": "-t/--toolsets",
       "verdict": "IMPLEMENTED",
       "qubit": "capability tiers + permission scopes",
@@ -102,16 +92,6 @@
       "proof": "store suites",
       "owner": "qubit-core",
       "rollback": "standard Qubit rollback contracts apply"
-    },
-    {
-      "cmd": "--checkpoints",
-      "verdict": "BLOCKED",
-      "reason": "Qubit uses append-only journal replay, not checkpoint files; incompatible state model",
-      "evidence": "journal replay tests cited",
-      "owner": "qubit-policy",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "BLOCKED_CHECKPOINTS",
-      "user_explanation": "Qubit Agent cannot do this: Qubit uses append-only journal replay, not checkpoint files; incompatible state model"
     },
     {
       "cmd": "--accept-hooks/--yolo/--ignore-user-config/--ignore-rules",
@@ -310,16 +290,6 @@
       "rollback": "standard Qubit rollback contracts apply"
     },
     {
-      "cmd": "plugins",
-      "verdict": "BLOCKED",
-      "reason": "Third-party plugin auto-install is unreviewed; allowlist + hash-pin + manual review only",
-      "evidence": "manifest validation tests",
-      "owner": "qubit-policy",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "BLOCKED_PLUGINS",
-      "user_explanation": "Qubit Agent cannot do this: Third-party plugin auto-install is unreviewed; allowlist + hash-pin + manual review only"
-    },
-    {
       "cmd": "curator/journey/learning/memory-graph",
       "verdict": "IMPLEMENTED",
       "qubit": "verified skills + lessons + audit/change timeline",
@@ -344,16 +314,6 @@
       "rollback": "nothing installed or enabled; nothing to roll back",
       "code": "REJECTED_SYNC",
       "user_explanation": "Qubit Agent cannot do this: Cross-device sync exfiltrates state; local-only product"
-    },
-    {
-      "cmd": "kanban/hooks",
-      "verdict": "BLOCKED",
-      "reason": "Qubit owns timers via user-systemd (8D/8I); kanban boards, named multi-folder projects, and shell hooks are later-packet scope",
-      "evidence": "monitor/timer suites",
-      "owner": "packet-8D",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "BLOCKED_CRON",
-      "user_explanation": "Qubit Agent cannot do this: Qubit owns timers via user-systemd (8D/8I); kanban boards, named multi-folder projects, and shell hooks are later-packet scope"
     },
     {
       "cmd": "mcp",
@@ -417,16 +377,6 @@
       "rollback": "nothing installed or enabled; nothing to roll back",
       "code": "BLOCKED_PAIRING",
       "user_explanation": "Qubit Agent cannot do this: Require messaging accounts/identities; no accounts in scope"
-    },
-    {
-      "cmd": "gateway/whatsapp/whatsapp-cloud/slack/send",
-      "verdict": "BLOCKED",
-      "reason": "Messaging platforms need live accounts; would duplicate Qubit's single event path",
-      "evidence": "single-listener tests",
-      "owner": "owner-operator (accounts/credentials)",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "BLOCKED_GATEWAY",
-      "user_explanation": "Qubit Agent cannot do this: Messaging platforms need live accounts; would duplicate Qubit's single event path"
     },
     {
       "cmd": "serve/dashboard/desktop/gui",
@@ -530,16 +480,6 @@
       "rollback": "standard Qubit rollback contracts apply"
     },
     {
-      "cmd": "checkpoints",
-      "verdict": "BLOCKED",
-      "reason": "Hermes session-snapshot files; Qubit resumes via append-only journal replay, an incompatible state model",
-      "evidence": "journal replay tests",
-      "owner": "qubit-policy",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "user_explanation": "Qubit Agent cannot do this: session snapshots use a different state model; Qubit resumes from its journal instead.",
-      "code": "BLOCKED_CHECKPOINTS"
-    },
-    {
       "cmd": "login/logout/portal",
       "verdict": "BLOCKED",
       "reason": "No interactive OAuth/vendor-portal flows in Qubit; credentials are env/file references only",
@@ -548,6 +488,97 @@
       "rollback": "nothing installed or enabled; nothing to roll back",
       "user_explanation": "Qubit Agent cannot do this: provider login uses your own environment or key files, never an interactive OAuth flow.",
       "code": "BLOCKED_LOGIN"
+    },
+    {
+      "cmd": "--reasoning",
+      "verdict": "IMPLEMENTED",
+      "qubit": "reasoning-effort budgets as per-request output caps (runner options untouched, no reloads)",
+      "proof": "tests/test_reasoning8tf.py",
+      "owner": "qubit-core",
+      "rollback": "standard Qubit rollback contracts apply"
+    },
+    {
+      "cmd": "checkpoints",
+      "verdict": "IMPLEMENTED",
+      "qubit": "named journal checkpoints: create/list/verify/prune (metadata only, confirmed prune)",
+      "proof": "tests/test_checkpoints8tf.py",
+      "owner": "qubit-core",
+      "rollback": "standard Qubit rollback contracts apply"
+    },
+    {
+      "cmd": "kanban",
+      "verdict": "BLOCKED",
+      "reason": "Multi-profile collaboration boards have no Qubit construct; task tracking lives in 8Y sessions",
+      "evidence": "no board construct in product",
+      "owner": "packet-8Y",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "user_explanation": "Qubit Agent cannot do this: shared team boards are not part of the local product.",
+      "code": "BLOCKED_KANBAN"
+    },
+    {
+      "cmd": "hooks",
+      "verdict": "REJECTED",
+      "reason": "Arbitrary shell-hook execution violates the no-direct-shell safety invariant",
+      "owner": "qubit-policy",
+      "rollback": "never installed; stays disabled",
+      "user_explanation": "Qubit Agent cannot do this: automatic shell hooks are refused by safety policy.",
+      "code": "REJECTED_HOOKS"
+    },
+    {
+      "cmd": "plugins/plugins-list",
+      "verdict": "IMPLEMENTED",
+      "qubit": "plugin inventory through the 7E skill manifest registry (read-only)",
+      "proof": "tests/test_checkpoints8tf.py::test_plugins_list_maps_to_skills",
+      "owner": "qubit-core",
+      "rollback": "standard Qubit rollback contracts apply"
+    },
+    {
+      "cmd": "plugins-install",
+      "verdict": "BLOCKED",
+      "reason": "Installing unreviewed third-party plugin code violates the reviewed-code policy",
+      "evidence": "manifest validation tests",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "user_explanation": "Qubit Agent cannot do this: third-party plugins need allowlist review, hash pin, and explicit confirmation.",
+      "code": "BLOCKED_PLUGINS_INSTALL"
+    },
+    {
+      "cmd": "gateway-status",
+      "verdict": "IMPLEMENTED",
+      "qubit": "gateway discovery (url/agent/model tiers) in voicebridge status",
+      "proof": "8S status tests",
+      "owner": "qubit-core",
+      "rollback": "standard Qubit rollback contracts apply"
+    },
+    {
+      "cmd": "gateway-manage",
+      "verdict": "BLOCKED",
+      "reason": "Managing messaging gateways needs live accounts and would duplicate the single event path",
+      "evidence": "single-listener tests",
+      "owner": "owner-operator (accounts/credentials)",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "user_explanation": "Qubit Agent cannot do this: messaging gateway management needs live accounts.",
+      "code": "BLOCKED_GATEWAY_MANAGE"
+    },
+    {
+      "cmd": "gateway",
+      "verdict": "BLOCKED",
+      "reason": "Managing messaging gateways needs live accounts and would duplicate Qubit's single event path",
+      "evidence": "single-listener tests",
+      "owner": "owner-operator (accounts/credentials)",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "user_explanation": "Qubit Agent cannot do this: messaging gateway management needs live accounts.",
+      "code": "BLOCKED_GATEWAY"
+    },
+    {
+      "cmd": "whatsapp/whatsapp-cloud/slack/send",
+      "verdict": "BLOCKED",
+      "reason": "Messaging platforms need live accounts; sends would duplicate Qubit's single event path",
+      "evidence": "single-listener tests",
+      "owner": "owner-operator (accounts/credentials)",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "user_explanation": "Qubit Agent cannot do this: messaging platforms need live accounts.",
+      "code": "BLOCKED_MESSAGING"
     }
   ]
 }

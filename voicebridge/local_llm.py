@@ -27,6 +27,25 @@ SYSTEM_PROMPT = (
     "what language the user used. Never reply in Romanian or any other language."
 )
 
+# Packet 8T-F: reasoning-effort budgets. Per-request num_predict presets
+# only — runner options (num_ctx, placement, keep-alive) are never touched,
+# so selecting a level cannot evict or reload the resident model. Unknown
+# levels fail closed to the default budget.
+REASONING_BUDGETS = {"none": 64, "minimal": 128, "low": 256,
+                     "medium": 512, "high": 1024, "max": 2048}
+DEFAULT_REASONING_BUDGET = 100
+
+
+def resolve_reasoning_budget(level: str | None) -> int:
+    """Map a reasoning-effort level to a bounded output budget."""
+    if level is None:
+        return DEFAULT_REASONING_BUDGET
+    key = str(level).strip().lower()
+    if key not in REASONING_BUDGETS:
+        return DEFAULT_REASONING_BUDGET
+    return REASONING_BUDGETS[key]
+
+
 # Few-shot dialog examples (style teaching). Loaded from config/dialogs.md —
 # part of the SYSTEM prompt so it costs tokens once per turn, not per request.
 def _load_dialogs() -> str:
@@ -348,12 +367,19 @@ def _chat_payload(text: str, conversation_prompt: str, model: str,
 def chat_local(text: str, conversation_prompt: str = "",
                model: str = "qubit-brain4", url: str = "http://127.0.0.1:11434",
                timeout_s: float = 4.0, max_tokens: int = 100,
-               context: str = "", num_ctx: Optional[int] = None) -> str:
+               context: str = "", num_ctx: Optional[int] = None,
+               reasoning: Optional[str] = None) -> str:
     """Return a short local reply, or "" on any failure (caller falls back).
 
     `context` = personal knowledge (MEMORY.md, personal-knowledge.md) the
     model should use when answering about the user's world.
+
+    `reasoning` (None/minimal/low/medium/high/max) selects a per-request
+    output budget only — never runner options, so the resident model is
+    never reloaded. Unknown levels fail closed to the default budget.
     """
+    if reasoning is not None:
+        max_tokens = resolve_reasoning_budget(reasoning)
     payload = _chat_payload(text, conversation_prompt, model, max_tokens,
                             context, stream=False, num_ctx=num_ctx)
     req = urllib.request.Request(

@@ -72,6 +72,23 @@ def build_parser() -> argparse.ArgumentParser:
     claw_sub.add_parser("status", parents=[common],
                         help="detect OpenClaw install state without changing it")
     add("verify-release", help="hermetic static release qualification (no build/install)")
+    ck = add("checkpoints", help="named journal checkpoints: inspect and prune (read-only by default)")
+    ck_sub = ck.add_subparsers(dest="checkpoints_command")
+    ck_create = ck_sub.add_parser("create", parents=[common],
+                                  help="record the current journal tail position")
+    ck_create.add_argument("name", help="checkpoint name")
+    ck_create.add_argument("--journal", default="",
+                           help="journal file (default: state approvals journal)")
+    ck_sub.add_parser("list", parents=[common],
+                      help="list checkpoints (read-only)")
+    ck_verify = ck_sub.add_parser("verify", parents=[common],
+                                  help="recompute digests and compare (read-only)")
+    ck_verify.add_argument("name", help="checkpoint name")
+    ck_prune = ck_sub.add_parser("prune", parents=[common],
+                                 help="delete a checkpoint record (needs --confirm)")
+    ck_prune.add_argument("name", help="checkpoint name")
+    ck_prune.add_argument("--confirm", action="store_true",
+                          help="explicit owner approval")
     sess = add("sessions", help="recent Qubit action sessions from receipts (redacted)")
     sess_sub = sess.add_subparsers(dest="sessions_command")
     sess_list = sess_sub.add_parser("list", parents=[common],
@@ -964,6 +981,8 @@ def main(argv=None) -> int:
         return _cmd_claw_status(cfg)
     if command == "verify-release":
         return _cmd_verify_static()
+    if command == "checkpoints":
+        return _cmd_checkpoints(cfg, args)
     if command == "sessions":
         return _cmd_sessions_list(cfg, args.limit
                                   if hasattr(args, "limit") else 20)
@@ -1213,6 +1232,33 @@ def _cmd_verify_static() -> int:
     out = verify_static()
     print(json.dumps(out, indent=2))
     return 0 if out.get("state") == "PASS" else 1
+
+
+def _cmd_checkpoints(cfg, args) -> int:
+    """Journal checkpoint inspect/prune (metadata only, explicit confirm)."""
+    from . import checkpoints as CK
+
+    sub = getattr(args, "checkpoints_command", None) or "list"
+    state_dir = cfg.state_dir()
+    if sub == "create":
+        journal = args.journal or str(state_dir / "approvals.jsonl")
+        try:
+            out = CK.create(state_dir, journal, args.name)
+        except CK.CheckpointError as exc:
+            print(json.dumps({"state": "FAILED", "detail": str(exc)}))
+            return 1
+        print(json.dumps(out, indent=2))
+        return 0
+    if sub == "verify":
+        print(json.dumps(CK.verify(state_dir, args.name), indent=2))
+        return 0
+    if sub == "prune":
+        out = CK.prune(state_dir, args.name,
+                       confirm=bool(getattr(args, "confirm", False)))
+        print(json.dumps(out, indent=2))
+        return 0 if out.get("state") == "OK" else 1
+    print(json.dumps({"checkpoints": CK.list_all(state_dir)}, indent=2))
+    return 0
 
 
 def _cmd_mic_test(cfg) -> int:

@@ -6,6 +6,7 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a audio
 complete -c voicebridge -n '__fish_use_subcommand' -f -a auth
 complete -c voicebridge -n '__fish_use_subcommand' -f -a branding
 complete -c voicebridge -n '__fish_use_subcommand' -f -a capability
+complete -c voicebridge -n '__fish_use_subcommand' -f -a checkpoints
 complete -c voicebridge -n '__fish_use_subcommand' -f -a claw
 complete -c voicebridge -n '__fish_use_subcommand' -f -a completion
 complete -c voicebridge -n '__fish_use_subcommand' -f -a device
