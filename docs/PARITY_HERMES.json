@@ -173,14 +173,12 @@
       "rollback": "standard Qubit rollback contracts apply"
     },
     {
-      "cmd": "auth/login/logout/portal",
-      "verdict": "BLOCKED",
-      "reason": "No interactive OAuth/vendor-portal flows in Qubit; credentials are env/file references only",
-      "evidence": "credential-guard tests",
-      "owner": "owner-operator (accounts/credentials)",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "BLOCKED_AUTH",
-      "user_explanation": "Qubit Agent cannot do this: No interactive OAuth/vendor-portal flows in Qubit; credentials are env/file references only"
+      "cmd": "auth",
+      "verdict": "IMPLEMENTED",
+      "owner": "qubit-core",
+      "rollback": "standard Qubit rollback contracts apply",
+      "qubit": "credential-reference inventory (names only, never values) via voicebridge auth status",
+      "proof": "tests/test_auth8tf.py"
     },
     {
       "cmd": "proxy",
@@ -277,7 +275,7 @@
       "cmd": "sessions",
       "verdict": "IMPLEMENTED",
       "qubit": "session receipts/journals, rename/export/purge via memory + task stores",
-      "proof": "8Y/journal suites",
+      "proof": "8Y/journal suites + voicebridge sessions list (tests/test_auth8tf.py)",
       "owner": "qubit-core",
       "rollback": "standard Qubit rollback contracts apply"
     },
@@ -546,6 +544,16 @@
       "rollback": "nothing installed or enabled; nothing to roll back",
       "user_explanation": "Qubit Agent cannot do this: session snapshots use a different state model; Qubit resumes from its journal instead.",
       "code": "BLOCKED_CHECKPOINTS"
+    },
+    {
+      "cmd": "login/logout/portal",
+      "verdict": "BLOCKED",
+      "reason": "No interactive OAuth/vendor-portal flows in Qubit; credentials are env/file references only",
+      "evidence": "credential-guard tests",
+      "owner": "owner-operator (accounts/credentials)",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "user_explanation": "Qubit Agent cannot do this: provider login uses your own environment or key files, never an interactive OAuth flow.",
+      "code": "BLOCKED_LOGIN"
     }
   ]
 }

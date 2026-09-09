@@ -57,6 +57,16 @@ def build_parser() -> argparse.ArgumentParser:
     tts.add_argument("text", nargs="+")
     tts.add_argument("--out", type=Path, default=None)
     add("status", help="print gateway/ASR/TTS/VRAM status and exit")
+    auth_p = add("auth", help="Qubit Agent credential-reference inventory (names only, never values)")
+    auth_sub = auth_p.add_subparsers(dest="auth_command")
+    auth_sub.add_parser("status", parents=[common],
+                        help="show configured providers and reference state (read-only)")
+    sess = add("sessions", help="recent Qubit action sessions from receipts (redacted)")
+    sess_sub = sess.add_subparsers(dest="sessions_command")
+    sess_list = sess_sub.add_parser("list", parents=[common],
+                                    help="list recent sessions (read-only)")
+    sess_list.add_argument("--limit", type=int, default=20,
+                           help="max sessions (default: 20, max: 100)")
     cap = add("capability", help="capability catalog: typed state for any Hermes command or Qubit capability (read-only)")
     cap.add_argument("action", nargs="?", default="summary",
                      choices=["check", "list", "summary"],
@@ -932,6 +942,13 @@ def main(argv=None) -> int:
 
     if command == "status":
         return _cmd_status(cfg)
+    if command == "auth":
+        return _cmd_auth_status(cfg)
+    if command == "sessions":
+        return _cmd_sessions_list(cfg, args.limit
+                                  if hasattr(args, "limit") else 20)
+    if command == "capability":
+        return _cmd_capability(args.action, args.name, args.state)
     if command == "completion":
         return _cmd_completion(args.shell, args.cmd)
     if command == "mic-test":
@@ -1125,6 +1142,22 @@ def _cmd_capability(action: str, name: str, state: str | None) -> int:
             print(item)
         return 0
     print(json.dumps(summary(), indent=2))
+    return 0
+
+
+def _cmd_auth_status(cfg) -> int:
+    """Credential-reference inventory (names only, never values)."""
+    from .auth_status import auth_status
+
+    print(json.dumps(auth_status(cfg), indent=2))
+    return 0
+
+
+def _cmd_sessions_list(cfg, limit: int = 20) -> int:
+    """Recent action sessions from receipts (redacted)."""
+    from .auth_status import recent_sessions
+
+    print(json.dumps(recent_sessions(cfg, limit), indent=2))
     return 0
 
 

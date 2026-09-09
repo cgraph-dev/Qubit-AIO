@@ -52,7 +52,8 @@ def _http(ui, method, path, body=None, token="test-token"):
     if data is not None:
         req.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(req, timeout=10) as r:
+        # 30s: local loopback server under full-suite CPU load.
+        with urllib.request.urlopen(req, timeout=30) as r:
             raw = r.read().decode()
             try:
                 return r.status, json.loads(raw or "{}")

@@ -441,10 +441,10 @@
       "verdict": "MISSING",
       "status": "IMPLEMENTED",
       "proof": "Existing audio/orchestrator contracts unchanged; proven in audio/8H-adjacent suites + runtime TTS-path test",
-      "owner": "qubit-policy",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "MISSING_Q_VOICE",
-      "user_explanation": "Qubit Agent cannot do this: "
+      "owner": "qubit-core",
+      "rollback": "standard Qubit rollback contracts apply",
+      "code": "OK",
+      "user_explanation": "Available through Qubit: single voice/session path (mic/ASR/TTS/PTT/dashboard voice, one listener, typed degraded states)"
     },
     {
       "id": "Q-broker",
@@ -453,10 +453,10 @@
       "verdict": "MISSING",
       "status": "IMPLEMENTED",
       "proof": "3A/1B/7E/8F/8O suites green; no-bypass tests in upstreans spike + runtime suites",
-      "owner": "qubit-policy",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "MISSING_Q_BROKER",
-      "user_explanation": "Qubit Agent cannot do this: "
+      "owner": "qubit-core",
+      "rollback": "standard Qubit rollback contracts apply",
+      "code": "OK",
+      "user_explanation": "Available through Qubit: single broker/policy path (capability broker, 7E/8E/8F/8O gates, one audit path, one e-stop)"
     }
   ]
 }

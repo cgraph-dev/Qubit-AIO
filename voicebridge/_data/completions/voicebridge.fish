@@ -3,7 +3,9 @@
 complete -c voicebridge -n '__fish_use_subcommand' -f -a actions
 complete -c voicebridge -n '__fish_use_subcommand' -f -a asr-test
 complete -c voicebridge -n '__fish_use_subcommand' -f -a audio
+complete -c voicebridge -n '__fish_use_subcommand' -f -a auth
 complete -c voicebridge -n '__fish_use_subcommand' -f -a branding
+complete -c voicebridge -n '__fish_use_subcommand' -f -a capability
 complete -c voicebridge -n '__fish_use_subcommand' -f -a completion
 complete -c voicebridge -n '__fish_use_subcommand' -f -a device
 complete -c voicebridge -n '__fish_use_subcommand' -f -a enroll
@@ -26,6 +28,7 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a product
 complete -c voicebridge -n '__fish_use_subcommand' -f -a profile
 complete -c voicebridge -n '__fish_use_subcommand' -f -a roundtrip
 complete -c voicebridge -n '__fish_use_subcommand' -f -a run
+complete -c voicebridge -n '__fish_use_subcommand' -f -a sessions
 complete -c voicebridge -n '__fish_use_subcommand' -f -a setup
 complete -c voicebridge -n '__fish_use_subcommand' -f -a skills
 complete -c voicebridge -n '__fish_use_subcommand' -f -a status
