@@ -482,6 +482,10 @@ async function runtimeStatus(){
  if(h.version) rows.push('<div>'+esc(h.version)+' · '+esc(h.commit||'').slice(0,12)+'</div>');
  if(body.voice) rows.push('<div>voice '+esc(body.voice.asr_provider||'?')+'/'+esc(body.voice.tts_provider||'?')+'</div>');
  if(body.approvals && body.approvals.pending !== undefined) rows.push('<div>approvals pending '+esc(String(body.approvals.pending))+'</div>');
+ if(body.capabilities && body.capabilities.states){
+   const s = body.capabilities.states;
+   rows.push('<div>capabilities '+esc(String(s.IMPLEMENTED||0))+' implemented · '+esc(String(s.BLOCKED||0))+' blocked · '+esc(String(s.REJECTED||0))+' rejected</div>');
+ }
  show('runtime-list', rows.join(''));
 }
 async function deviceStatus(){

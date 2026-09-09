@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -56,6 +57,15 @@ def build_parser() -> argparse.ArgumentParser:
     tts.add_argument("text", nargs="+")
     tts.add_argument("--out", type=Path, default=None)
     add("status", help="print gateway/ASR/TTS/VRAM status and exit")
+    cap = add("capability", help="capability catalog: typed state for any Hermes command or Qubit capability (read-only)")
+    cap.add_argument("action", nargs="?", default="summary",
+                     choices=["check", "list", "summary"],
+                     help="check one name, list names, or show state counts")
+    cap.add_argument("name", nargs="?", default="",
+                     help="capability name for check (e.g. chat, whatsapp, skills)")
+    cap.add_argument("--state", default=None,
+                     choices=["IMPLEMENTED", "BLOCKED", "REJECTED"],
+                     help="filter for list")
     comp = add("completion", help="print shell completion script (Qubit Agent)")
     comp.add_argument("shell", nargs="?", default="bash",
                       choices=["bash", "zsh", "fish"],
@@ -1100,6 +1110,21 @@ def _cmd_completion(shell: str, cmd: str) -> int:
         print(f"completion unavailable for {cmd}/{shell}", file=sys.stderr)
         return 1
     sys.stdout.write(candidate.read_text())
+    return 0
+
+
+def _cmd_capability(action: str, name: str, state: str | None) -> int:
+    """Capability catalog lookup (read-only, typed result)."""
+    from .capability_catalog import check, list_names, summary
+
+    if action == "check":
+        print(json.dumps(check(name or ""), indent=2))
+        return 0
+    if action == "list":
+        for item in list_names(state):
+            print(item)
+        return 0
+    print(json.dumps(summary(), indent=2))
     return 0
 
 

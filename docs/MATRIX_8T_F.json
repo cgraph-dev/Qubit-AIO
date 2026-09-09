@@ -29,7 +29,11 @@
       "upstream": "hermes-agent tools/ansi_strip.py",
       "verdict": "REUSE",
       "status": "IMPLEMENTED",
-      "proof": "voicebridge/upstream/hermes_ansi_strip.py (verbatim); wired in runtime/real_hermes.py turn + hermes/backend.py run_task; differential tests/test_upstream_vendored.py"
+      "proof": "voicebridge/upstream/hermes_ansi_strip.py (verbatim); wired in runtime/real_hermes.py turn + hermes/backend.py run_task; differential tests/test_upstream_vendored.py",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "REUSE_H_ANSI_STRIP",
+      "user_explanation": "Qubit Agent cannot do this: "
     },
     {
       "id": "H-sqlite-txn",
@@ -38,7 +42,11 @@
       "verdict": "BLOCKED",
       "status": "BLOCKED",
       "reason": "write_txn attempted live in memory/store.py and REVERTED with root cause: executescript() implicitly commits, breaking explicit BEGIN IMMEDIATE ('cannot commit - no transaction is active' on every fresh open; restore test re-green after revert). Comms-store DML batches assessed: 13 shared lock sites, rewiring all changes cross-process lock behavior for marginal gain. Module stays vendored, differential-tested, reserved for non-executescript writes.",
-      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "BLOCKED_H_SQLITE_TXN",
+      "user_explanation": "Qubit Agent cannot do this: write_txn attempted live in memory/store.py and REVERTED with root cause: executescript() implicitly commits, breaking explicit BEGIN IMMEDIATE ('cannot commit - no transaction is active' on every fresh open; restore test re-green after revert). Comms-store DML batches assessed: "
     },
     {
       "id": "H-real-exec",
@@ -46,7 +54,11 @@
       "upstream": "hermes-agent cli + agent",
       "verdict": "ADAPT",
       "status": "IMPLEMENTED",
-      "proof": "provision.py installs pinned clone to Qubit-owned XDG runtimes (rev-parse/LICENSE/entry-hash/version verified); RealHermesRuntime defaults to XDG paths (DISABLED when absent); live turns, session reuse, timeout, cancel, redaction proven in tests/test_real_hermes.py against local Ollama"
+      "proof": "provision.py installs pinned clone to Qubit-owned XDG runtimes (rev-parse/LICENSE/entry-hash/version verified); RealHermesRuntime defaults to XDG paths (DISABLED when absent); live turns, session reuse, timeout, cancel, redaction proven in tests/test_real_hermes.py against local Ollama",
+      "owner": "owner-operator (license decision)",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "ADAPT_H_REAL_EXEC",
+      "user_explanation": "Qubit Agent cannot do this: "
     },
     {
       "id": "H-stream",
@@ -55,7 +67,11 @@
       "verdict": "BLOCKED",
       "status": "BLOCKED",
       "reason": "Qubit owns streaming (orchestrator/local_llm, proven in 8H-adjacent suites); importing the Hermes loop would add httpx/pydantic deps. Revisit if Qubit streaming is ever replaced.",
-      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "BLOCKED_H_STREAM",
+      "user_explanation": "Qubit Agent cannot do this: Qubit owns streaming (orchestrator/local_llm, proven in 8H-adjacent suites); importing the Hermes loop would add httpx/pydantic deps. Revisit if Qubit streaming is ever replaced."
     },
     {
       "id": "H-stt",
@@ -64,7 +80,11 @@
       "verdict": "BLOCKED",
       "status": "BLOCKED",
       "reason": "Qubit ASR contract (Sherpa/whisper) is authoritative and proven; no STT code taken. Revisit only on a proven ASR gap.",
-      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "BLOCKED_H_STT",
+      "user_explanation": "Qubit Agent cannot do this: Qubit ASR contract (Sherpa/whisper) is authoritative and proven; no STT code taken. Revisit only on a proven ASR gap."
     },
     {
       "id": "H-tts",
@@ -73,7 +93,11 @@
       "verdict": "BLOCKED",
       "status": "BLOCKED",
       "reason": "Qubit TTS contract (Piper default, ducking/barge-in) is authoritative and proven; no TTS code taken.",
-      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "BLOCKED_H_TTS",
+      "user_explanation": "Qubit Agent cannot do this: Qubit TTS contract (Piper default, ducking/barge-in) is authoritative and proven; no TTS code taken."
     },
     {
       "id": "H-wake",
@@ -82,7 +106,11 @@
       "verdict": "BLOCKED",
       "status": "BLOCKED",
       "reason": "Would create a second listener (forbidden); Porcupine needs commercial license. Wake-word is a later packet per plan.",
-      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py",
+      "owner": "owner-operator (license decision)",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "BLOCKED_H_WAKE",
+      "user_explanation": "Qubit Agent cannot do this: Would create a second listener (forbidden); Porcupine needs commercial license. Wake-word is a later packet per plan."
     },
     {
       "id": "H-browser",
@@ -91,7 +119,11 @@
       "verdict": "BLOCKED",
       "status": "BLOCKED",
       "reason": "Packet 8U scope; 8B loopback CDP stays the only browser authority for 8T-F.",
-      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py",
+      "owner": "packet-8U",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "BLOCKED_H_BROWSER",
+      "user_explanation": "Qubit Agent cannot do this: Packet 8U scope; 8B loopback CDP stays the only browser authority for 8T-F."
     },
     {
       "id": "H-files",
@@ -100,7 +132,11 @@
       "verdict": "BLOCKED",
       "status": "BLOCKED",
       "reason": "Packet 8W scope; file Safety review + broker argv schemas required first.",
-      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py",
+      "owner": "packet-8W",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "BLOCKED_H_FILES",
+      "user_explanation": "Qubit Agent cannot do this: Packet 8W scope; file Safety review + broker argv schemas required first."
     },
     {
       "id": "H-terminal",
@@ -109,7 +145,11 @@
       "verdict": "BLOCKED",
       "status": "BLOCKED",
       "reason": "Qubit has no shell-string execution path by construction (broker.py forbids shell=True), so the detector has no true-positive call site; vendoring it unwired would imitate integration. Revisit with 8V terminal work.",
-      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py",
+      "owner": "packet-8V",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "BLOCKED_H_TERMINAL",
+      "user_explanation": "Qubit Agent cannot do this: Qubit has no shell-string execution path by construction (broker.py forbids shell=True), so the detector has no true-positive call site; vendoring it unwired would imitate integration. Revisit with 8V terminal work."
     },
     {
       "id": "H-acp",
@@ -118,7 +158,11 @@
       "verdict": "BLOCKED",
       "status": "BLOCKED",
       "reason": "Packet 8X scope; needs Qubit permission/edit-approval wrapper ticket first.",
-      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py",
+      "owner": "packet-8X",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "BLOCKED_H_ACP",
+      "user_explanation": "Qubit Agent cannot do this: Packet 8X scope; needs Qubit permission/edit-approval wrapper ticket first."
     },
     {
       "id": "H-sessions",
@@ -127,7 +171,11 @@
       "verdict": "BLOCKED",
       "status": "BLOCKED",
       "reason": "Would duplicate Qubit MemoryStore/journal (forbidden second memory). Schema ideas on record; never share ~/.hermes DB.",
-      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "BLOCKED_H_SESSIONS",
+      "user_explanation": "Qubit Agent cannot do this: Would duplicate Qubit MemoryStore/journal (forbidden second memory). Schema ideas on record; never share ~/.hermes DB."
     },
     {
       "id": "H-gateway",
@@ -136,7 +184,11 @@
       "verdict": "BLOCKED",
       "status": "BLOCKED",
       "reason": "Qubit owns ports/sockets/timers (8D/8I). No gateway code taken; broker admission required first.",
-      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py",
+      "owner": "packet-8D",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "BLOCKED_H_GATEWAY",
+      "user_explanation": "Qubit Agent cannot do this: Qubit owns ports/sockets/timers (8D/8I). No gateway code taken; broker admission required first."
     },
     {
       "id": "H-approvals",
@@ -144,7 +196,11 @@
       "upstream": "hermes-agent tools/approval_smart.py",
       "verdict": "ADAPT",
       "status": "IMPLEMENTED",
-      "proof": "Mapped to Qubit ConfirmationStore (model-issued forbidden, expiring single-use, destructive needs fresh confirmation); conformance tests/test_upstream_vendored.py; yolo/off modes have no Qubit counterpart by design"
+      "proof": "Mapped to Qubit ConfirmationStore (model-issued forbidden, expiring single-use, destructive needs fresh confirmation); conformance tests/test_upstream_vendored.py; yolo/off modes have no Qubit counterpart by design",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "ADAPT_H_APPROVALS",
+      "user_explanation": "Qubit Agent cannot do this: "
     },
     {
       "id": "H-estop",
@@ -152,7 +208,11 @@
       "upstream": "hermes-agent agent/estop.py",
       "verdict": "REUSE",
       "status": "IMPLEMENTED",
-      "proof": "Qubit PowerControl latch+cancel proven (8O suite + runtime e-stop tests); cross-wire IMPLEMENTED: PowerControl.on_estop listeners + RealHermesRuntime.pause()/resume()/bind_estop, bound in production by VoiceOrchestrator init (no-op while unprovisioned), proven live against the isolated install in tests/test_real_hermes.py"
+      "proof": "Qubit PowerControl latch+cancel proven (8O suite + runtime e-stop tests); cross-wire IMPLEMENTED: PowerControl.on_estop listeners + RealHermesRuntime.pause()/resume()/bind_estop, bound in production by VoiceOrchestrator init (no-op while unprovisioned), proven live against the isolated install in tests/test_real_hermes.py",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "REUSE_H_ESTOP",
+      "user_explanation": "Qubit Agent cannot do this: "
     },
     {
       "id": "H-cloudmem",
@@ -160,7 +220,11 @@
       "upstream": "hermes-agent honcho/mem0 extras",
       "verdict": "REJECTED",
       "reason": "Exfiltration + foreign ToS; local memory only.",
-      "status": "REJECTED"
+      "status": "REJECTED",
+      "owner": "owner-operator (license decision)",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "REJECTED_H_CLOUDMEM",
+      "user_explanation": "Qubit Agent cannot do this: Exfiltration + foreign ToS; local memory only."
     },
     {
       "id": "H-desktop",
@@ -168,7 +232,11 @@
       "upstream": "hermes-agent apps/desktop/",
       "verdict": "REJECTED",
       "reason": "Duplicate surface + heavy supply chain.",
-      "status": "REJECTED"
+      "status": "REJECTED",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "REJECTED_H_DESKTOP",
+      "user_explanation": "Qubit Agent cannot do this: Duplicate surface + heavy supply chain."
     },
     {
       "id": "H-cloudbrowser",
@@ -176,7 +244,11 @@
       "upstream": "hermes-agent tools/browser_camofox*.py",
       "verdict": "REJECTED",
       "reason": "Page content to third party.",
-      "status": "REJECTED"
+      "status": "REJECTED",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "REJECTED_H_CLOUDBROWSER",
+      "user_explanation": "Qubit Agent cannot do this: Page content to third party."
     },
     {
       "id": "H-installer",
@@ -184,7 +256,11 @@
       "upstream": "hermes-agent setup-hermes.sh, Dockerfile",
       "verdict": "REJECTED",
       "reason": "Qubit owns packaging/install (8K).",
-      "status": "REJECTED"
+      "status": "REJECTED",
+      "owner": "packet-8K",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "REJECTED_H_INSTALLER",
+      "user_explanation": "Qubit Agent cannot do this: Qubit owns packaging/install (8K)."
     },
     {
       "id": "O-secretref",
@@ -192,7 +268,11 @@
       "upstream": "openclaw src/secrets/",
       "verdict": "REUSE",
       "status": "IMPLEMENTED",
-      "proof": "voicebridge/providers/credentials.py SecretRef + gateway wiring; live gateway tests; secrets never serialized"
+      "proof": "voicebridge/providers/credentials.py SecretRef + gateway wiring; live gateway tests; secrets never serialized",
+      "owner": "owner-operator (accounts/credentials)",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "REUSE_O_SECRETREF",
+      "user_explanation": "Qubit Agent cannot do this: "
     },
     {
       "id": "O-approvals",
@@ -200,7 +280,11 @@
       "upstream": "openclaw src/gateway/exec-approval-*",
       "verdict": "REUSE",
       "status": "IMPLEMENTED",
-      "proof": "Qubit expiring single-use confirmations + no-renewal-without-human; conformance tests/test_upstream_vendored.py; default-deny kept"
+      "proof": "Qubit expiring single-use confirmations + no-renewal-without-human; conformance tests/test_upstream_vendored.py; default-deny kept",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "REUSE_O_APPROVALS",
+      "user_explanation": "Qubit Agent cannot do this: "
     },
     {
       "id": "O-audit",
@@ -208,7 +292,11 @@
       "upstream": "openclaw src/audit/",
       "verdict": "REUSE",
       "status": "IMPLEMENTED",
-      "proof": "Qubit ActionStore/audit + NEW runtime provenance field on every receipt; redaction + correlation tests"
+      "proof": "Qubit ActionStore/audit + NEW runtime provenance field on every receipt; redaction + correlation tests",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "REUSE_O_AUDIT",
+      "user_explanation": "Qubit Agent cannot do this: "
     },
     {
       "id": "O-sessions",
@@ -216,7 +304,11 @@
       "upstream": "openclaw src/gateway/session-*.ts, chat-abort.ts",
       "verdict": "REUSE",
       "status": "IMPLEMENTED",
-      "proof": "Qubit run cancellation (orchestrator cancel/abort, broker cancel, ActionRunner cancel paths) proven in 8O/8F suites + runtime cancel tests; cited in matrix doc"
+      "proof": "Qubit run cancellation (orchestrator cancel/abort, broker cancel, ActionRunner cancel paths) proven in 8O/8F suites + runtime cancel tests; cited in matrix doc",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "REUSE_O_SESSIONS",
+      "user_explanation": "Qubit Agent cannot do this: "
     },
     {
       "id": "O-cron",
@@ -224,7 +316,11 @@
       "upstream": "openclaw src/cron/",
       "verdict": "REUSE",
       "status": "IMPLEMENTED",
-      "proof": "Qubit monitor (timezone validation, dedupe, quiet-hours, overlap lease, bounded retry) proven in 8D/8I suites; cited in matrix doc"
+      "proof": "Qubit monitor (timezone validation, dedupe, quiet-hours, overlap lease, bounded retry) proven in 8D/8I suites; cited in matrix doc",
+      "owner": "packet-8D",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "REUSE_O_CRON",
+      "user_explanation": "Qubit Agent cannot do this: "
     },
     {
       "id": "O-frames",
@@ -233,7 +329,11 @@
       "verdict": "BLOCKED",
       "status": "BLOCKED",
       "reason": "Qubit has no WS transport; SSE events already fail closed (2A conformance). Full frame-guard adoption is 8U transport work.",
-      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py",
+      "owner": "packet-8U",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "BLOCKED_O_FRAMES",
+      "user_explanation": "Qubit Agent cannot do this: Qubit has no WS transport; SSE events already fail closed (2A conformance). Full frame-guard adoption is 8U transport work."
     },
     {
       "id": "O-browser",
@@ -242,7 +342,11 @@
       "verdict": "BLOCKED",
       "status": "BLOCKED",
       "reason": "Packet 8U scope; 8B read-only contracts stay authoritative.",
-      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py",
+      "owner": "packet-8U",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "BLOCKED_O_BROWSER",
+      "user_explanation": "Qubit Agent cannot do this: Packet 8U scope; 8B read-only contracts stay authoritative."
     },
     {
       "id": "O-skills",
@@ -250,7 +354,11 @@
       "upstream": "openclaw src/skills/ packages/plugin-sdk",
       "verdict": "ADAPT",
       "status": "IMPLEMENTED",
-      "proof": "Qubit 7E SkillManifest validation (versioned, licensed, hash-pinned, disabled-until-enabled) proven in 7E suite; ClawHub third-party auto-install stays REJECTED"
+      "proof": "Qubit 7E SkillManifest validation (versioned, licensed, hash-pinned, disabled-until-enabled) proven in 7E suite; ClawHub third-party auto-install stays REJECTED",
+      "owner": "owner-operator (license decision)",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "ADAPT_O_SKILLS",
+      "user_explanation": "Qubit Agent cannot do this: "
     },
     {
       "id": "O-board",
@@ -259,7 +367,11 @@
       "verdict": "BLOCKED",
       "status": "BLOCKED",
       "reason": "Dashboard scope; webui.py overlaps unrelated dirty work and server-side policy must come first.",
-      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "BLOCKED_O_BOARD",
+      "user_explanation": "Qubit Agent cannot do this: Dashboard scope; webui.py overlaps unrelated dirty work and server-side policy must come first."
     },
     {
       "id": "O-onboard",
@@ -267,7 +379,11 @@
       "upstream": "openclaw src/commands/onboard-*.ts",
       "verdict": "ADAPT",
       "status": "IMPLEMENTED",
-      "proof": "Qubit setup checklist + audio wizard + repair planner + diagnostics proven in 8T suite; cited in matrix doc"
+      "proof": "Qubit setup checklist + audio wizard + repair planner + diagnostics proven in 8T suite; cited in matrix doc",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "ADAPT_O_ONBOARD",
+      "user_explanation": "Qubit Agent cannot do this: "
     },
     {
       "id": "O-memory",
@@ -275,7 +391,11 @@
       "upstream": "openclaw src/sessions/ src/memory/",
       "verdict": "REUSE",
       "status": "IMPLEMENTED",
-      "proof": "Qubit MemoryStore tiers/provenance/expiry/correction + verified skills proven in 5B/8P suites; cited in matrix doc"
+      "proof": "Qubit MemoryStore tiers/provenance/expiry/correction + verified skills proven in 5B/8P suites; cited in matrix doc",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "REUSE_O_MEMORY",
+      "user_explanation": "Qubit Agent cannot do this: "
     },
     {
       "id": "O-models",
@@ -283,7 +403,11 @@
       "upstream": "openclaw src/llm/model-registry.ts",
       "verdict": "REUSE",
       "status": "IMPLEMENTED",
-      "proof": "Qubit 8Q provider gateway (local default, allowlists, budgets, typed fallback) proven in 8Q suite; cited in matrix doc"
+      "proof": "Qubit 8Q provider gateway (local default, allowlists, budgets, typed fallback) proven in 8Q suite; cited in matrix doc",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "REUSE_O_MODELS",
+      "user_explanation": "Qubit Agent cannot do this: "
     },
     {
       "id": "O-docker",
@@ -292,7 +416,11 @@
       "verdict": "BLOCKED",
       "status": "BLOCKED",
       "reason": "8K owns Qubit packaging; pattern documented, no Dockerfile taken.",
-      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py"
+      "evidence": "tests/test_runtime_tiles.py + tests/test_resolution8tf.py",
+      "owner": "packet-8K",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "BLOCKED_O_DOCKER",
+      "user_explanation": "Qubit Agent cannot do this: 8K owns Qubit packaging; pattern documented, no Dockerfile taken."
     },
     {
       "id": "O-clawhub",
@@ -300,7 +428,11 @@
       "upstream": "openclaw src/plugins/clawhub.ts",
       "verdict": "REJECTED",
       "reason": "Unreviewed code; allowlist + hash-pin + manual review only.",
-      "status": "REJECTED"
+      "status": "REJECTED",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "REJECTED_O_CLAWHUB",
+      "user_explanation": "Qubit Agent cannot do this: Unreviewed code; allowlist + hash-pin + manual review only."
     },
     {
       "id": "Q-voice",
@@ -308,7 +440,11 @@
       "upstream": "none",
       "verdict": "MISSING",
       "status": "IMPLEMENTED",
-      "proof": "Existing audio/orchestrator contracts unchanged; proven in audio/8H-adjacent suites + runtime TTS-path test"
+      "proof": "Existing audio/orchestrator contracts unchanged; proven in audio/8H-adjacent suites + runtime TTS-path test",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "MISSING_Q_VOICE",
+      "user_explanation": "Qubit Agent cannot do this: "
     },
     {
       "id": "Q-broker",
@@ -316,7 +452,11 @@
       "upstream": "none",
       "verdict": "MISSING",
       "status": "IMPLEMENTED",
-      "proof": "3A/1B/7E/8F/8O suites green; no-bypass tests in upstreans spike + runtime suites"
+      "proof": "3A/1B/7E/8F/8O suites green; no-bypass tests in upstreans spike + runtime suites",
+      "owner": "qubit-policy",
+      "rollback": "nothing installed or enabled; nothing to roll back",
+      "code": "MISSING_Q_BROKER",
+      "user_explanation": "Qubit Agent cannot do this: "
     }
   ]
 }

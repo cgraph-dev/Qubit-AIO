@@ -134,6 +134,8 @@ def _providers(cfg: Any) -> Dict[str, Any]:
 
 def runtime_inventory(cfg: Any) -> Dict[str, Any]:
     """Assemble the real runtime inventory; every leaf is observed or typed."""
+    from .capability_catalog import summary as _cap_summary
+
     inv = {
         "schema": "qubit-runtime-inventory/1",
         "product": {"name": F.PRODUCT_NAME,
@@ -147,5 +149,6 @@ def runtime_inventory(cfg: Any) -> Dict[str, Any]:
         "approvals": _approvals(cfg),
         "adapters": _adapters(cfg),
         "providers": _providers(cfg),
+        "capabilities": _safe(_cap_summary),
     }
     return inv
