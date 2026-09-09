@@ -70,12 +70,12 @@
     {
       "cmd": "--image",
       "verdict": "BLOCKED",
-      "reason": "No image-capable local model configured; vision input has no backend",
+      "reason": "Vision input has no Qubit provider path: no CLI entry point accepts image input and no chat/provider module handles image payloads (model-packet scope; qwen3-vl:8b is present on disk but unwired, and loading it would evict the resident model on the 8GB GPU)",
       "evidence": "tests/test_parity_hermes.py::test_no_vision_path",
       "owner": "qubit-policy",
       "rollback": "nothing installed or enabled; nothing to roll back",
       "code": "BLOCKED_IMAGE",
-      "user_explanation": "Qubit Agent cannot do this: No image-capable local model configured; vision input has no backend"
+      "user_explanation": "Qubit Agent cannot do this: image input has no vision backend yet; text, voice, and file task input work instead"
     },
     {
       "cmd": "--max-turns/--run-budget",

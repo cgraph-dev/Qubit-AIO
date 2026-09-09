@@ -201,3 +201,37 @@ def test_no_messaging_transports_in_product():
             if f"import {mod}" in toks or f"from {mod}" in toks:
                 offenders.append(f"{path}:{mod}")
     assert offenders == [], offenders
+
+
+def test_no_vision_path():
+    """BLOCKED --image: no image entry point and no multimodal plumbing.
+
+    Vision input has no Qubit provider path: neither CLI surface accepts
+    image input, and no chat/provider module handles image payloads, so a
+    Hermes `--image` query cannot be honored (or silently dropped) here.
+    """
+    from voicebridge.cli import build_parser
+    from voicebridge.terminal import build_parser as build_terminal
+
+    assert "--image" not in build_parser().format_help()
+    assert "--image" not in build_terminal().format_help().lower()
+    offenders = []
+    for path in (REPO_ROOT / "voicebridge").rglob("*.py"):
+        if "__pycache__" in path.parts:
+            continue
+        try:
+            import ast
+            tree = ast.parse(path.read_text())
+        except Exception:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                arg_names = {a.arg for a in node.args.args}
+                arg_names |= {a.arg for a in node.args.kwonlyargs}
+                if arg_names & {"images", "image_path", "vision_model"}:
+                    offenders.append(f"{path}:{node.name}")
+    assert offenders == [], offenders
+    from voicebridge.capability_catalog import check
+
+    out = check("--image")
+    assert out["state"] == "BLOCKED" and out["code"] == "BLOCKED_IMAGE", out
