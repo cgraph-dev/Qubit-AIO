@@ -2353,6 +2353,15 @@ class VoiceOrchestrator:
 
     # ------------------------------------------------------------- confirm
     def _handle_confirm(self) -> None:
+        # Packet 8T-F voice registry: a "yes" first settles a pending voice
+        # confirmation from the shared journal; otherwise fall through to
+        # the local-broker confirmation path below.
+        try:
+            from . import voice_commands as VC
+            if VC.confirm_voice_turn(self):
+                return
+        except Exception as exc:
+            log_event("voice.registry.confirm_error", error=str(exc)[:160])
         pending = self.confirmations.take()
         if not pending:
             self.speak("There's nothing to confirm.")
@@ -2424,6 +2433,13 @@ class VoiceOrchestrator:
         self._launch_task(payload.get("task", ""), payload.get("model"))
 
     def _handle_cancel_utterance(self) -> None:
+        # Packet 8T-F voice registry: cancellations also deny pending voice
+        # confirmations; the branches below keep their existing speech.
+        try:
+            from . import voice_commands as VC
+            VC.cancel_voice_turn(self)
+        except Exception as exc:
+            log_event("voice.registry.cancel_error", error=str(exc)[:160])
         if self.confirmations.pending:
             self.confirmations.clear()
             self.speak("Cancelled.")
@@ -3251,6 +3267,17 @@ class VoiceOrchestrator:
         if self.classifier and (_h := self.classifier._hermes_request(text)):
             self._handle_hermes(_h.task_text or text)
             return
+        # Packet 8T-F voice registry: deterministic capability commands run
+        # through policy gates before templates/model fallback. System,
+        # confirm, and cancel turns never enter the registry; anything
+        # unmatched falls through untouched.
+        if intent.kind not in ("system", "confirm", "cancel"):
+            try:
+                from . import voice_commands as VC
+                if VC.handle_turn(self, intent.kind, text):
+                    return
+            except Exception as exc:
+                log_event("voice.registry.error", error=str(exc)[:160])
         # daily-task templates win over the model-based classifier: a matched
         # template dispatches the known task text directly (0 tokens, instant)
         tmpl = self._templates.match(text) if self._templates is not None else None

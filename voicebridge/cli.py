@@ -759,6 +759,23 @@ def build_parser() -> argparse.ArgumentParser:
                          choices=["", "draft", "approved", "queued", "sent", "failed"])
     mg_show = mg_sub.add_parser("show", parents=[common], help="show one message")
     mg_show.add_argument("msg_id")
+    vo = add("voice", help="Voice command registry (resolve/execute/confirm/cancel)")
+    vo_sub = vo.add_subparsers(dest="voice_command")
+    vo_say = vo_sub.add_parser("say", parents=[common],
+                               help="resolve + execute one request (typed text in)")
+    vo_say.add_argument("text", nargs="+", help="request text, e.g. 'list projects'")
+    vo_say.add_argument("--session", default="cli")
+    vo_say.add_argument("--json", action="store_true")
+    vo_confirm = vo_sub.add_parser("confirm", parents=[common],
+                                   help="consume a pending confirmation (latest or id)")
+    vo_confirm.add_argument("confirmation_id", nargs="?", default="")
+    vo_confirm.add_argument("--session", default="cli")
+    vo_cancel = vo_sub.add_parser("cancel", parents=[common],
+                                  help="deny pending confirmations")
+    vo_cancel.add_argument("confirmation_id", nargs="?", default="")
+    vo_cancel.add_argument("--session", default="cli")
+    vo_sub.add_parser("commands", parents=[common],
+                      help="list every voice command with aliases and help")
     bn = add("brain", help="Multi-principal profiles, accounts, vault refs, onboarding")
     bn_sub = bn.add_subparsers(dest="brain_command")
     bn_padd = bn_sub.add_parser("principal-add", parents=[common],
@@ -1682,6 +1699,8 @@ def main(argv=None) -> int:
         return _cmd_gateway(cfg, args)
     if command == "peer":
         return _cmd_peer(cfg, args)
+    if command == "voice":
+        return _cmd_voice(cfg, args)
     if command == "brain":
         return _cmd_brain(cfg, args)
     if command == "tui":
@@ -3889,6 +3908,68 @@ def _cmd_brain(cfg, args) -> int:
                            "rollback": "registry untouched; nothing saved"},
                           indent=2))
         return rc
+
+
+def _cmd_voice(cfg, args) -> int:
+    """voicebridge voice say|confirm|cancel|commands.
+
+    The same resolve/execute/confirm/cancel pipeline the microphone path
+    uses, driven by typed text (no audio). Confirmations minted here land
+    in the shared ApprovalJournal; "yes" turns consume them exactly once.
+    """
+    import json as _json
+    from . import voice_commands as VC
+    cmd = getattr(args, "voice_command", None) or "commands"
+    session = getattr(args, "session", "") or "cli"
+    ctx = VC.make_ctx(cfg, actor="cli:user", session=session, source="cli")
+    as_json = bool(getattr(args, "json", False))
+    if cmd == "commands":
+        out = {"state": "OK", "commands": [
+            {"id": e.id, "title": e.title, "aliases": list(e.aliases),
+             "args": [{"name": a.name, "type": a.type, "required": a.required,
+                       "choices": list(a.choices)} for a in e.args],
+             "confirm": e.confirm, "scope": list(e.scope),
+             "examples": list(e.examples), "help": e.help}
+            for e in sorted(VC.REGISTRY.values(), key=lambda e: e.id)]}
+        print(_json.dumps(out, indent=2))
+        return 0
+    if cmd == "say":
+        text = " ".join(getattr(args, "text", []) or [])
+        resolution = VC.resolve(text)
+        if resolution.kind in (VC.CLARIFY, VC.AMBIGUOUS, VC.UNKNOWN):
+            speech = resolution.speech or "I didn't understand that."
+            if as_json:
+                print(_json.dumps({"state": resolution.kind, "speech": speech},
+                                  indent=2))
+            else:
+                print(speech)
+            return 0 if resolution.kind != VC.UNKNOWN else 1
+        out = VC.execute(ctx, resolution)
+        if as_json:
+            print(_json.dumps({"state": out.kind,
+                               "speech": out.speech,
+                               "confirmation_id": out.confirmation_id,
+                               "receipt": out.receipt}, indent=2,
+                              default=str))
+        else:
+            print(out.speech)
+            if out.confirmation_id:
+                print(f"confirmation: {out.confirmation_id} "
+                      f"(voice confirm {out.confirmation_id} "
+                      f"--session {session})")
+        return 0 if out.kind in (VC.EXECUTED, VC.NEEDS_CONFIRM) else 2
+    if cmd == "confirm":
+        cid = (getattr(args, "confirmation_id", "") or "").strip() or None
+        out = VC.confirm_pending(ctx, cid)
+        print(out.speech)
+        return 0 if out.kind == VC.EXECUTED else 2
+    if cmd == "cancel":
+        cid = (getattr(args, "confirmation_id", "") or "").strip() or None
+        out = VC.cancel_pending(ctx, cid)
+        print(out.speech)
+        return 0 if out.kind == VC.EXECUTED else 2
+    print(f"ERROR: unknown voice command {cmd!r}")
+    return 2
 
 
 def _cmd_memory(cfg, args) -> int:
