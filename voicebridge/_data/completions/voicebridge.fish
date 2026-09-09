@@ -29,6 +29,7 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a permissions
 complete -c voicebridge -n '__fish_use_subcommand' -f -a power
 complete -c voicebridge -n '__fish_use_subcommand' -f -a product
 complete -c voicebridge -n '__fish_use_subcommand' -f -a profile
+complete -c voicebridge -n '__fish_use_subcommand' -f -a project
 complete -c voicebridge -n '__fish_use_subcommand' -f -a roundtrip
 complete -c voicebridge -n '__fish_use_subcommand' -f -a run
 complete -c voicebridge -n '__fish_use_subcommand' -f -a sessions

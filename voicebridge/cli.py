@@ -374,6 +374,63 @@ def build_parser() -> argparse.ArgumentParser:
     sk_roll.add_argument("skill_id")
     sk_roll.add_argument("--backup", type=Path, default=None)
     sk_roll.add_argument("--confirm", action="store_true")
+    pj = add("project", help="Named multi-folder workspaces (Qubit registry)")
+    pj_sub = pj.add_subparsers(dest="project_command")
+    pj_create = pj_sub.add_parser("create", parents=[common],
+                                  help="create a workspace (dry-run unless --confirm)")
+    pj_create.add_argument("name", help="human name, e.g. 'Website Redesign'")
+    pj_create.add_argument("folders", nargs="*", help="folder paths (first = primary)")
+    pj_create.add_argument("--slug", default="", help="explicit slug override")
+    pj_create.add_argument("--description", default="")
+    pj_create.add_argument("--primary", default="", help="primary folder path")
+    pj_create.add_argument("--use", action="store_true", help="set active after create")
+    pj_create.add_argument("--confirm", action="store_true")
+    pj_list = pj_sub.add_parser("list", parents=[common], help="list workspaces")
+    pj_list.add_argument("--archived", action="store_true", help="include archived")
+    pj_show = pj_sub.add_parser("show", parents=[common], help="show one workspace")
+    pj_show.add_argument("slug")
+    pj_add = pj_sub.add_parser("add-folder", parents=[common],
+                               help="add a folder (dry-run unless --confirm)")
+    pj_add.add_argument("slug")
+    pj_add.add_argument("folder")
+    pj_add.add_argument("--confirm", action="store_true")
+    pj_rm = pj_sub.add_parser("remove-folder", parents=[common],
+                              help="remove a folder (dry-run unless --confirm)")
+    pj_rm.add_argument("slug")
+    pj_rm.add_argument("folder")
+    pj_rm.add_argument("--confirm", action="store_true")
+    pj_rename = pj_sub.add_parser("rename", parents=[common],
+                                  help="rename a workspace (dry-run unless --confirm)")
+    pj_rename.add_argument("slug")
+    pj_rename.add_argument("new_name")
+    pj_rename.add_argument("--confirm", action="store_true")
+    pj_primary = pj_sub.add_parser("set-primary", parents=[common],
+                                   help="set the primary folder (dry-run unless --confirm)")
+    pj_primary.add_argument("slug")
+    pj_primary.add_argument("folder")
+    pj_primary.add_argument("--confirm", action="store_true")
+    pj_use = pj_sub.add_parser("use", parents=[common],
+                               help="set the active workspace (dry-run unless --confirm)")
+    pj_use.add_argument("slug", nargs="?", default="")
+    pj_use.add_argument("--clear", action="store_true", help="clear the active pointer")
+    pj_use.add_argument("--confirm", action="store_true")
+    pj_archive = pj_sub.add_parser("archive", parents=[common],
+                                   help="archive a workspace (dry-run unless --confirm)")
+    pj_archive.add_argument("slug")
+    pj_archive.add_argument("--confirm", action="store_true")
+    pj_restore = pj_sub.add_parser("restore", parents=[common],
+                                   help="restore an archived workspace (dry-run unless --confirm)")
+    pj_restore.add_argument("slug")
+    pj_restore.add_argument("--confirm", action="store_true")
+    pj_bind = pj_sub.add_parser("bind-board", parents=[common],
+                                help="bind a kanban board (typed refusal until kanban lands)")
+    pj_bind.add_argument("slug")
+    pj_bind.add_argument("--board", required=True)
+    pj_bind.add_argument("--confirm", action="store_true")
+    pj_roll = pj_sub.add_parser("rollback", parents=[common],
+                                help="restore the registry from a backup (dry-run unless --confirm)")
+    pj_roll.add_argument("--backup", default="")
+    pj_roll.add_argument("--confirm", action="store_true")
     mem = add("memory", help="Packet 8M semantic memory (GENOME contract; disabled by default)")
     mem_sub = mem.add_subparsers(dest="memory_command")
     mem_status = mem_sub.add_parser("status", parents=[common],
@@ -1073,6 +1130,8 @@ def main(argv=None) -> int:
         return _cmd_permissions(cfg, args)
     if command == "skills":
         return _cmd_skills(cfg, args)
+    if command == "project":
+        return _cmd_project(cfg, args)
     if command == "memory":
         return _cmd_memory(cfg, args)
     if command == "websites":
@@ -2292,6 +2351,83 @@ def _cmd_skills(cfg, args) -> int:
     except (P.PermissionError, P.SkillValidationError) as exc:
         print(_json.dumps({"state": "failed", "detail": str(exc)}, indent=2))
         return 2
+
+
+def _cmd_project(cfg, args) -> int:
+    """voicebridge project create|list|show|add-folder|remove-folder|rename|
+    set-primary|use|archive|restore|bind-board|rollback.
+
+    Named multi-folder workspaces on the canonical Qubit registry. Mutating
+    subcommands preview under top-level --dry-run and require --confirm to
+    persist; they refuse while the emergency stop is latched. `bind-board`
+    is a typed refusal until kanban boards exist.
+    """
+    import json as _json
+    from . import projects as PJ
+    cmd = getattr(args, "project_command", None) or "list"
+    confirm = bool(getattr(args, "confirm", False))
+    try:
+        if cmd not in ("list", "show") and PJ.estop_engaged(cfg):
+            print(_json.dumps(PJ.refuse_estop(f"project {cmd}"), indent=2))
+            return 3
+        if getattr(args, "dry_run", False) and cmd not in ("list", "show"):
+            print(_json.dumps({"state": "preview", "would": f"project {cmd}"},
+                              indent=2))
+            return 0
+        if cmd == "list":
+            out = PJ.list_projects(cfg, include_archived=bool(
+                getattr(args, "archived", False)))
+        elif cmd == "show":
+            out = PJ.show(cfg, args.slug)
+        elif cmd == "create":
+            out = PJ.create(cfg, args.name, list(getattr(args, "folders", []) or []),
+                            slug=getattr(args, "slug", "") or "",
+                            description=getattr(args, "description", "") or "",
+                            primary=getattr(args, "primary", "") or "",
+                            requested_by="cli:user", confirmed=confirm,
+                            use=bool(getattr(args, "use", False)))
+        elif cmd == "add-folder":
+            out = PJ.add_folder(cfg, args.slug, args.folder,
+                                requested_by="cli:user", confirmed=confirm)
+        elif cmd == "remove-folder":
+            out = PJ.remove_folder(cfg, args.slug, args.folder,
+                                   requested_by="cli:user", confirmed=confirm)
+        elif cmd == "rename":
+            out = PJ.rename(cfg, args.slug, args.new_name,
+                            requested_by="cli:user", confirmed=confirm)
+        elif cmd == "set-primary":
+            out = PJ.set_primary(cfg, args.slug, args.folder,
+                                 requested_by="cli:user", confirmed=confirm)
+        elif cmd == "use":
+            out = PJ.use(cfg, args.slug, requested_by="cli:user",
+                         confirmed=confirm,
+                         clear=bool(getattr(args, "clear", False)))
+        elif cmd == "archive":
+            out = PJ.archive(cfg, args.slug,
+                             requested_by="cli:user", confirmed=confirm)
+        elif cmd == "restore":
+            out = PJ.restore(cfg, args.slug,
+                             requested_by="cli:user", confirmed=confirm)
+        elif cmd == "bind-board":
+            out = PJ.bind_board(cfg, args.slug, args.board,
+                                requested_by="cli:user", confirmed=confirm)
+        elif cmd == "rollback":
+            out = PJ.rollback(cfg, requested_by="cli:user", confirmed=confirm,
+                              backup=getattr(args, "backup", "") or "")
+        else:
+            print(f"ERROR: unknown project command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except PJ.ProjectError as exc:
+        rc = 3 if exc.code == PJ.CONFIRM_CODE else 2
+        print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                           "code": exc.code,
+                           "detail": PJ.redact_spec(exc.detail)[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "registry untouched; nothing to roll back"},
+                          indent=2))
+        return rc
 
 
 def _cmd_memory(cfg, args) -> int:

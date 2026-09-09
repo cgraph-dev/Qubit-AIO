@@ -437,13 +437,11 @@
     },
     {
       "cmd": "project",
-      "verdict": "BLOCKED",
-      "reason": "Named multi-folder workspaces are 8X scope; opencode roots are allowlisted per-run",
-      "evidence": "8R scope tests",
-      "owner": "packet-8X",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "BLOCKED_PROJECT",
-      "user_explanation": "Qubit Agent cannot do this: Named multi-folder workspaces are 8X scope; opencode roots are allowlisted per-run"
+      "verdict": "IMPLEMENTED",
+      "qubit": "voicebridge project create/list/show/add-folder/remove-folder/rename/set-primary/use/archive/restore/rollback (canonical registry, 8R-validated folders, --confirm, e-stop gated; bind-board typed-refused PROJECT_NO_BOARD until kanban lands)",
+      "proof": "tests/test_projects8tf.py",
+      "owner": "qubit-core",
+      "rollback": "project rollback with --confirm restores audited backup snapshots"
     },
     {
       "cmd": "import-agent",
