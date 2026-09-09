@@ -162,12 +162,11 @@
     },
     {
       "cmd": "proxy",
-      "verdict": "REJECTED",
-      "reason": "OAuth-subscription proxy would bypass Qubit egress policy and audit",
-      "owner": "owner-operator (accounts/credentials)",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "REJECTED_PROXY",
-      "user_explanation": "Qubit Agent cannot do this: OAuth-subscription proxy would bypass Qubit egress policy and audit"
+      "verdict": "IMPLEMENTED",
+      "qubit": "voicebridge proxy status/providers (server always NOT_RUNNING, per-provider eligibility references-only; start typed-refused PROXY_NO_SERVER, forwarding would bypass egress + audit)",
+      "proof": "tests/test_proxy8tf.py",
+      "owner": "qubit-core",
+      "rollback": "no server exists; nothing to roll back"
     },
     {
       "cmd": "status",

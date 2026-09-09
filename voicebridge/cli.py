@@ -597,6 +597,14 @@ def build_parser() -> argparse.ArgumentParser:
     th_reset = th_sub.add_parser("reset", parents=[common],
                                    help="restore the default preset (dry-run unless --confirm)")
     th_reset.add_argument("--confirm", action="store_true")
+    px = add("proxy", help="Forwarding-proxy inventory (no server runs)")
+    px_sub = px.add_subparsers(dest="proxy_command")
+    px_sub.add_parser("status", parents=[common],
+                      help="proxy server state (read-only)")
+    px_sub.add_parser("providers", parents=[common],
+                      help="per-provider eligibility (references only)")
+    px_sub.add_parser("start", parents=[common],
+                      help="refused: forwarding would bypass egress + audit")
     mem = add("memory", help="Packet 8M semantic memory (GENOME contract; disabled by default)")
     mem_sub = mem.add_subparsers(dest="memory_command")
     mem_status = mem_sub.add_parser("status", parents=[common],
@@ -1314,6 +1322,8 @@ def main(argv=None) -> int:
         return _cmd_lsp(cfg, args)
     if command == "theme":
         return _cmd_theme(cfg, args)
+    if command == "proxy":
+        return _cmd_proxy(cfg, args)
     if command == "memory":
         return _cmd_memory(cfg, args)
     if command == "websites":
@@ -2893,6 +2903,28 @@ def _cmd_theme(cfg, args) -> int:
                            "rollback": "theme untouched; nothing to roll back"},
                           indent=2))
         return rc
+
+
+def _cmd_proxy(cfg, args) -> int:
+    """voicebridge proxy status|providers|start.
+
+    Inventory only; starting a forwarder is typed-refused (egress invariant).
+    """
+    import json as _json
+    from . import proxy_status as PX
+    cmd = getattr(args, "proxy_command", None) or "status"
+    if cmd == "status":
+        out = PX.status()
+    elif cmd == "providers":
+        out = PX.providers(cfg)
+    elif cmd == "start":
+        print(_json.dumps(PX.refuse_start(), indent=2))
+        return 2
+    else:
+        print(f"ERROR: unknown proxy command {cmd!r}")
+        return 2
+    print(_json.dumps(out, indent=2, sort_keys=True))
+    return 0
 
 
 def _cmd_memory(cfg, args) -> int:

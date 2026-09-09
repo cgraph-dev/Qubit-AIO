@@ -22,7 +22,7 @@ ACCOUNT_BOUND = {
 
 ABSENT_COMMANDS = ("pairing", "webhook", "peer", "gateway", "whatsapp",
                    "whatsapp-cloud", "slack", "send", "portal", "login",
-                   "logout", "proxy", "sync", "pets", "skin", "serve",
+                   "logout", "sync", "pets", "skin", "serve",
                    "desktop", "gui", "dashboard", "hooks", "tui")
 
 
