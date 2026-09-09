@@ -272,7 +272,7 @@ DEFAULTS: Dict[str, Any] = {
         # OpenAI Realtime duplex lane (same orchestration, no GPU needed).
         # Active only when personaplex.enabled=true and personaplex.provider=realtime.
         "model": "gpt-4o-mini-realtime-preview",  # cheap lane; gpt-4o-realtime-preview for premium
-        "key_env": "~/.hermes/.env",    # OPENAI_API_KEY lives here
+        "key_env": "~/.config/qubit-voicebridge/.env",    # OPENAI_API_KEY lives here
         "reconnect_s": 5.0,
     },
     "hermes": {
@@ -316,7 +316,7 @@ DEFAULTS: Dict[str, Any] = {
         "interrupt": True,          # allow barge-in / stop speaking
         "edge": {"voice": "en-US-JennyNeural", "rate": "+0%"},
         "gateway": {"model": None},  # None = gateway default
-        "openai": {"voice": "nova", "model": "gpt-4o-mini-tts", "key_env": "~/.hermes/.env", "instructions": "Speak with a warm, soft and sexy tone, with a subtle, elegant Japanese accent. Gentle, breathy and intimate, slightly playful — like a caring Japanese girlfriend. Speak naturally, at a relaxed pace, clear and affectionate."},
+        "openai": {"voice": "nova", "model": "gpt-4o-mini-tts", "key_env": "~/.config/qubit-voicebridge/.env", "instructions": "Speak with a warm, soft and sexy tone, with a subtle, elegant Japanese accent. Gentle, breathy and intimate, slightly playful — like a caring Japanese girlfriend. Speak naturally, at a relaxed pace, clear and affectionate."},
         "hybrid": {"threshold_words": 18, "piper_voice": "en_US-amy-medium", "openai_voice": "nova", "openai_model": "gpt-4o-mini-tts"},
         "direct": True,          # strip emojis/pleasantries/filler from spoken output
     },
@@ -375,12 +375,12 @@ DEFAULTS: Dict[str, Any] = {
         },
         "deepseek_url": "https://api.deepseek.com/chat/completions",
         "deepseek_model": "deepseek-v4-flash",
-        "deepseek_env": "~/.hermes/.env",    # DEEPSEEK_API_KEY lives here
+        "deepseek_env": "~/.config/qubit-voicebridge/.env",    # DEEPSEEK_API_KEY lives here
         # Perplexity: used for web/current-info questions ("if needed")
         "perplexity_enabled": True,
         "perplexity_url": "https://api.perplexity.ai/chat/completions",
         "perplexity_model": "sonar-pro",
-        "perplexity_env": "~/.hermes/.env",  # PERPLEXITY_API_KEY lives here
+        "perplexity_env": "~/.config/qubit-voicebridge/.env",  # PERPLEXITY_API_KEY lives here
         # In duplex mode PersonaPlex answers conversation directly; this backend
         # is only used when the PersonaPlex lane is down.
         "duplex_conversation_fallback": True,

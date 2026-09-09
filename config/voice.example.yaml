@@ -127,12 +127,12 @@ intent:
   templates_path: ~/.config/qubit-voicebridge/task-templates.yaml  # daily-task templates
   deepseek_url: https://api.deepseek.com/chat/completions
   deepseek_model: deepseek-v4-flash
-  deepseek_env: ~/.hermes/.env     # DEEPSEEK_API_KEY lives here
+  deepseek_env: ~/.config/qubit-voicebridge/.env     # DEEPSEEK_API_KEY lives here
   # Perplexity: web/current-info questions (requires PERPLEXITY_API_KEY)
   perplexity_enabled: true
   perplexity_url: https://api.perplexity.ai/chat/completions
   perplexity_model: sonar-pro
-  perplexity_env: ~/.hermes/.env
+  perplexity_env: ~/.config/qubit-voicebridge/.env
   # Packet 8Q: optional frontier-provider gateway (DISABLED BY DEFAULT).
   # Enable only with allowlist + budgets + credential refs (env:/file:).
   # Never points at OpenCode's private auth store. Availability and price

@@ -8,7 +8,7 @@
 # Requires: bash, curl, uv (https://astral.sh/uv), ollama (https://ollama.com),
 #           a working mic + speaker, and (for hotkeys) an X11/Wayland session.
 # Keys (optional, for complex/web answers): DEEPSEEK_API_KEY and
-# PERPLEXITY_API_KEY in ~/.hermes/.env — see .env.example.
+# PERPLEXITY_API_KEY in ~/.config/qubit-voicebridge/.env — see .env.example.
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

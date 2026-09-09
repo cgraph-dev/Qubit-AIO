@@ -105,6 +105,20 @@ def _attach_router_pipeline(classifier, cfg) -> None:
         classifier.attach_router(None)
 
 
+_LEGACY_ENV_WARNED: set = set()
+
+
+def _warn_legacy_env_once(path: str) -> None:
+    """Loud one-time migration warning for the legacy key file (no values)."""
+    if path in _LEGACY_ENV_WARNED:
+        return
+    _LEGACY_ENV_WARNED.add(path)
+    log_event("config.legacy_env",
+              path=path,
+              detail="keys still load from the legacy operator-Hermes env "
+                     "file; move them to ~/.config/qubit-voicebridge/.env")
+
+
 def _hermes_default_model() -> str:
     """Read the default model name from the Hermes config (was in the removed
     personaplex.realtime helper). Returns '' when unavailable."""
@@ -459,14 +473,14 @@ class VoiceOrchestrator:
                              piper_voice=h.get("piper_voice", self.cfg.get("tts", "voice", default="en_US-amy-medium")),
                              openai_voice=h.get("openai_voice", "nova"),
                              openai_model=h.get("openai_model", "gpt-4o-mini-tts"),
-                             key_env=self.cfg.get("tts", "openai", "key_env", default="~/.hermes/.env"),
+                             key_env=self.cfg.get("tts", "openai", "key_env", default="~/.config/qubit-voicebridge/.env"),
                              instructions=self.cfg.get("tts", "openai", "instructions", default=""),
                              threshold_words=int(h.get("threshold_words", 18)))
         if provider == "openai":
             from .tts.openai_tts import OpenAITTS
             tts = OpenAITTS(voice=self.cfg.get("tts", "openai", "voice", default="nova"),
                             model=self.cfg.get("tts", "openai", "model", default="gpt-4o-mini-tts"),
-                            key_env=self.cfg.get("tts", "openai", "key_env", default="~/.hermes/.env"),
+                            key_env=self.cfg.get("tts", "openai", "key_env", default="~/.config/qubit-voicebridge/.env"),
                             instructions=self.cfg.get("tts", "openai", "instructions", default=""))
             if tts.available():
                 return tts
@@ -2702,7 +2716,7 @@ class VoiceOrchestrator:
         key = self._deepseek_key()
         if not key:
             log_event("conversation.deepseek.nokey",
-                      hint="set DEEPSEEK_API_KEY in ~/.hermes/.env")
+                      hint="set DEEPSEEK_API_KEY in ~/.config/qubit-voicebridge/.env")
             return ""
         url = self.cfg.get("intent", "deepseek_url",
                            default="https://api.deepseek.com/chat/completions")
@@ -2744,16 +2758,34 @@ class VoiceOrchestrator:
         return self._env_key("PERPLEXITY_API_KEY")
 
     def _env_key(self, name: str) -> str:
-        """Read a KEY from ~/.hermes/.env (or environment), never logging it."""
-        env_path = Path(self.cfg.get("intent", "deepseek_env",
-                                     default="~/.hermes/.env")).expanduser()
-        try:
-            for line in env_path.read_text(errors="replace").splitlines():
+        """Read a KEY from the canonical Qubit env file (or environment).
+
+        Canonical: ``~/.config/qubit-voicebridge/.env`` (or the configured
+        ``intent.deepseek_env`` path). A legacy ``~/.hermes/.env`` is still
+        honored when the canonical file is absent, with a loud one-time
+        migration warning — never silently. Values are never logged.
+        """
+        candidates = []
+        configured = str(self.cfg.get("intent", "deepseek_env", default="") or "")
+        if configured.strip():
+            candidates.append(configured.strip())
+        else:
+            candidates.append("~/.config/qubit-voicebridge/.env")
+        legacy = "~/.hermes/.env"
+        if legacy not in candidates:
+            candidates.append(legacy)
+        for index, candidate in enumerate(candidates):
+            env_path = Path(candidate).expanduser()
+            try:
+                lines = env_path.read_text(errors="replace").splitlines()
+            except Exception:
+                continue
+            for line in lines:
                 line = line.strip()
                 if line.startswith(name + "="):
+                    if index > 0:
+                        _warn_legacy_env_once(str(env_path))
                     return line.split("=", 1)[1].strip().strip('"').strip("'")
-        except Exception:
-            pass
         return os.environ.get(name, "")
 
     def _chat_perplexity(self, text: str) -> str:
@@ -2762,7 +2794,7 @@ class VoiceOrchestrator:
         key = self._perplexity_key()
         if not key:
             log_event("conversation.perplexity.nokey",
-                      hint="set PERPLEXITY_API_KEY in ~/.hermes/.env")
+                      hint="set PERPLEXITY_API_KEY in ~/.config/qubit-voicebridge/.env")
             return ""
         url = self.cfg.get("intent", "perplexity_url",
                            default="https://api.perplexity.ai/chat/completions")

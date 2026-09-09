@@ -43,7 +43,7 @@ long coding output, and can be interrupted mid-speech — **only by your voice**
 | Voice-ID (eres2net) | **local, CPU** | ~50ms/check; self 0.72-0.96 vs strangers ~0.3 |
 | TTS (piper amy) | **local, CPU** | Kokoro-82M optional (`tts.provider: kokoro`) |
 | Chat (all questions) | **local, GPU, ~3 GB** | `qubit-brain4` (Qwen3-4B) — English-only replies, 24/7 resident |
-| Task execution | **your OpenClaw** | only TASKS go here (coding, files, terminal, browser, repos); "ask Hermes" → Hermes CLI |
+| Task execution | **agent runtime** | only TASKS go here (coding, files, terminal, browser, repos), brokered through Qubit policy |
 | Cloud APIs | **fallback only** | DeepSeek/Perplexity when the local model or gateway is down |
 
 ## Personal knowledge
@@ -57,7 +57,7 @@ how you want answers, and replies **only in English** (documented language polic
 see docs/VOICE_BRIDGE_SYSTEM.md). Nothing personal is baked into the model artifact.
 
 Without the two API keys the bridge still fully works for local chat + all
-OpenClaw task routing; only long/web conversational answers fall back.
+agent task routing; only long/web conversational answers fall back.
 
 ## Install on a fresh PC
 
@@ -144,8 +144,8 @@ start/stop capture, or `voicebridge once` for a single utterance.
   go silent).
 - **Esc** — stop speech / cancel the current task.
 - Say things like: *"open the current project, inspect the Stripe webhook
-  flow, and tell OpenClaw to patch the signature verification and add
-  structured logs"* — it routes to your OpenClaw agent, tracks progress, and
+  flow, and tell the agent to patch the signature verification and add
+  structured logs"* — it routes to the Qubit agent runtime, tracks progress, and
   speaks a short summary at the end.
 - *"status"*, *"stop"*, *"mute"*, *"unmute"*, *"use turbo / normal / slow /
   hard / pro"* are built-in system commands.
@@ -175,7 +175,7 @@ voice, fast and low-resource (no GPU training):
 - **Follow-ups**: when the bridge asks a question (play mode, confirm, executor
   choice), it stays **active and online** — the dashboard shows **clickable
   option buttons** under the orb (e.g. "Windowed tab" / "Background audio",
-  "Yes" / "No" / "OpenClaw" / "Hermes") AND the mic keeps listening so you can
+  "Yes" / "No" / "Voice runtime" / "Agent runtime") AND the mic keeps listening so you can
   answer by voice in the same turn. Answer with a click or by speaking — no need
   to open a fresh message.
 
@@ -201,7 +201,7 @@ what the agent is doing live.
 - **Chat page**: `http://<this-pc-ip>:8890/` — hold/tap the button, speak,
   hear the reply (audio comes back to the phone; the PC speakers stay
   silent unless `webui.speak_web_locally` is on). Same pipeline as the mic:
-  ASR → route → OpenClaw/local → **the local brain's (qubit-brain4) ≤40-word summary** → TTS.
+  ASR → route → agent runtime/local → **the local brain's (qubit-brain4) ≤40-word summary** → TTS.
 - **Audio on the PC (opt-in)**: web/dashboard requests play in the browser once;
   they also speak through the PC speakers ONLY when `webui.speak_web_locally:
   true` is explicitly set. The tuned setup keeps it `false` so nothing
@@ -267,7 +267,7 @@ or `--runtime` (adds typed live probes: Ollama residency, gateway, CDP, isolatio
   outright — see `safety` in the config.
 - **Dry-run mode**: `safety.dry_run_first: true` makes coding tasks plan
   first and ask *"Do you want me to apply the patch?"* before acting.
-- Everything routes through **your OpenClaw safety policy** for terminal/file
+- Everything routes through **the Qubit broker policy** for terminal/file
   work; the bridge never bypasses it.
 
 ## Observability
