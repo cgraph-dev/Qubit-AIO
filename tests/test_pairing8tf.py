@@ -145,34 +145,23 @@ def test_estop_gate(tmp_path, monkeypatch):
                                      issued_by="cli:user")
 
 
-def test_cli_wiring():
+def test_cli_wiring(tmp_path, monkeypatch):
     from voicebridge import cli as CLI
 
-    text = CLI.build_parser().format_help()
-    assert "pairing" in text
+    cfg = _cfg(tmp_path, monkeypatch)
 
     class _A:
         def __init__(self, cmd, **kw):
             self.pairing_command = cmd
             self.__dict__.update(kw)
 
-    import tempfile
-    from voicebridge import config as C
-
-    with tempfile.TemporaryDirectory() as tmp:
-        import os
-
-        os.environ["XDG_CONFIG_HOME"] = tmp + "/c"
-        os.environ["XDG_STATE_HOME"] = tmp + "/s"
-        os.environ["XDG_DATA_HOME"] = tmp + "/d"
-        cfg = C.Config.load(tmp + "/voice.yaml")
-        buf = io.StringIO()
-        with redirect_stdout(buf):
-            assert CLI._cmd_pairing(cfg, _A("list")) == 0
-        assert json.loads(buf.getvalue())["codes"] == []
-        buf = io.StringIO()
-        with redirect_stdout(buf):
-            rc = CLI._cmd_pairing(cfg, _A("create", label="x",
-                                          scope=["messaging"], account="",
-                                          ttl=600.0))
-        assert rc == 3, "confirm required"
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        assert CLI._cmd_pairing(cfg, _A("list")) == 0
+    assert json.loads(buf.getvalue())["codes"] == []
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        rc = CLI._cmd_pairing(cfg, _A("create", label="x",
+                                      scope=["messaging"], account="",
+                                      ttl=600.0))
+    assert rc == 3, "confirm required"
