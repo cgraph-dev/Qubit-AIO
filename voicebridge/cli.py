@@ -2860,7 +2860,11 @@ def _cmd_browser(cfg, args) -> int:
     from . import browser as BR
     cmd = getattr(args, "browser_command", None) or "status"
     if cmd == "status":
-        out = BR.status(cfg)
+        # Packet 8A import boundary: only cli.py (allowlisted) touches the
+        # communications package; browser.py renders the probe (pure).
+        from .communications.monitor import cdp_precondition
+
+        out = BR.status(cdp_precondition(cfg))
     elif cmd == "close-profile":
         print(_json.dumps(
             BR.refuse_close_profile(getattr(args, "profile", "") or ""),

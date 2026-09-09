@@ -9,6 +9,7 @@ import io
 import json
 import subprocess
 from contextlib import redirect_stdout
+from pathlib import Path
 
 
 def _cfg(tmp_path, monkeypatch):
@@ -25,24 +26,45 @@ def _cfg(tmp_path, monkeypatch):
 def test_status_typed_states(tmp_path, monkeypatch):
     from voicebridge import browser as BR
 
-    out = BR.status(_cfg(tmp_path, monkeypatch))
-    assert out["schema"] == "qubit-browser/1"
+    for probe, state in (({"state": "OK", "cdp": True}, "OK"),
+                         ({"state": "BROWSER_RESTART_REQUIRED", "cdp": False,
+                           "detail": "restart it"}, "BROWSER_RESTART_REQUIRED"),
+                         ({}, "UNAVAILABLE"),
+                         ({"state": "BOGUS"}, "UNAVAILABLE")):
+        out = BR.status(probe)
+        assert out["schema"] == "qubit-browser/1"
+        assert out["state"] == state, (probe, out)
+        assert isinstance(out["cdp"], bool)
+        assert "loopback" in out["authority"]
+    assert "sk-" not in json.dumps(BR.status({"state": "OK"}))
+
+
+def test_status_matches_live_precondition_shape(tmp_path, monkeypatch):
+    from voicebridge.communications.monitor import cdp_precondition
+    from voicebridge import browser as BR
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    out = BR.status(cdp_precondition(cfg))
     assert out["state"] in ("OK", "BROWSER_RESTART_REQUIRED", "UNAVAILABLE")
-    assert isinstance(out["cdp"], bool)
-    assert "loopback" in out["authority"]
-    assert "sk-" not in json.dumps(out)
+
+
+def test_browser_module_respects_8a_import_boundary():
+    text = (Path(__file__).resolve().parents[1] / "voicebridge" / "browser.py"
+            ).read_text()
+    assert "voicebridge.communications" not in text
+    assert "from .communications" not in text
 
 
 def test_status_spawns_no_browser_control(tmp_path, monkeypatch):
     from voicebridge import browser as BR
 
     def _no_spawn(*a, **k):
-        raise AssertionError("status must not drive the browser")
+        raise AssertionError("rendering must not drive the browser")
 
     monkeypatch.setattr(subprocess, "run", _no_spawn)
     monkeypatch.setattr(subprocess, "Popen", _no_spawn)
-    out = BR.status(_cfg(tmp_path, monkeypatch))
-    assert out["state"] in ("OK", "BROWSER_RESTART_REQUIRED", "UNAVAILABLE")
+    out = BR.status({"state": "OK", "cdp": True})
+    assert out["state"] == "OK"
 
 
 def test_close_profile_refused(tmp_path, monkeypatch):
