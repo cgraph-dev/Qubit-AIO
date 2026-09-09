@@ -93,13 +93,11 @@
     },
     {
       "cmd": "--accept-hooks/--yolo/--ignore-user-config/--ignore-rules",
-      "verdict": "REJECTED",
-      "reason": "Auto-bypass of policy is forbidden by design; model text can never widen grants",
-      "owner": "qubit-policy",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "REJECTED_ACCEPT_HOOKS",
-      "user_explanation": "Qubit Agent cannot do this: Auto-bypass of policy is forbidden by design; model text can never widen grants",
-      "evidence": "tests/test_parity_hermes.py::test_no_bypass_flags_in_qubit_cli + tests/test_packet7e.py hard-deny/injection suites (scoped owner sessions via permissions mode set unrestricted with scopes/expiry/audit; model text can never elevate)"
+      "verdict": "IMPLEMENTED",
+      "qubit": "owner-authorized sessions via permissions mode set unrestricted (explicit scopes + expiry + audit); routine reversible work pre-authorizes inside scopes, hard-deny and mutating tiers still need fresh confirmation, bypass flags refused, model text can never elevate; voice 'permission mode' resolves through the registry with source-gate",
+      "proof": "tests/test_owner_session8tf.py + tests/test_packet7e.py (unrestricted/hard-deny/confirm/injection suites)",
+      "owner": "qubit-core",
+      "rollback": "permissions reset revokes grants and restores restricted (audited backups)"
     },
     {
       "cmd": "--pass-session-id/--source/--in/--no-restore-cwd",
@@ -367,13 +365,11 @@
     },
     {
       "cmd": "serve/dashboard/desktop/gui",
-      "verdict": "REJECTED",
-      "reason": "Duplicate headless server/dashboard/desktop shells; Qubit webui + terminal own these surfaces",
-      "owner": "qubit-policy",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "REJECTED_SERVE",
-      "user_explanation": "Qubit Agent cannot do this: Duplicate headless server/dashboard/desktop shells; Qubit webui + terminal own these surfaces",
-      "evidence": "tests/test_resolution8tf.py::test_singularity_one_listener_broker_policy_audit + tests/test_packet8kp.py service-ownership tests (single bridge serves dashboard; `voicebridge run` + user service own the surface)"
+      "verdict": "IMPLEMENTED",
+      "qubit": "single-authority surface: voicebridge run + user service + loopback webui probe (no second server); voice 'open dashboard/terminal' guidance resolves through the registry; singularity one-of-everything audited",
+      "proof": "tests/test_single_surface8tf.py + tests/test_resolution8tf.py::test_singularity_one_listener_broker_policy_audit + service-ownership tests",
+      "owner": "qubit-core",
+      "rollback": "no second server exists; run/service/webui probe unchanged"
     },
     {
       "cmd": "monitor/monitoring",

@@ -1187,6 +1187,18 @@ def _sum_project(result):
     return f"Project {proj.get('name', proj.get('slug', '?'))} ready."
 
 
+def _sum_permissions(result):
+    mode = str(result.get("mode", "restricted"))
+    scopes = result.get("scopes", [])
+    scope_text = ", ".join(scopes[:3]) if scopes else "no scopes"
+    return f"Permission mode {mode}, {scope_text}."
+
+
+def _sum_guidance(result):
+    guidance = str(result.get("guidance", "") or "")
+    return guidance if guidance else "See the help text."
+
+
 _SUMMARIES = {
     "generic": _generic_summary,
     "status": _sum_status,
@@ -1196,6 +1208,8 @@ _SUMMARIES = {
     "pairing_create": _sum_pairing_create,
     "kanban_task": _sum_kanban_task,
     "project": _sum_project,
+    "permissions": _sum_permissions,
+    "guidance": _sum_guidance,
 }
 
 
@@ -1637,9 +1651,10 @@ _E("brain", "Brain profiles",
 _E("permissions", "Permission mode",
    ("permission mode", "what are my permissions", "permission status",
     "am i restricted"),
-   "permissions", (),
+   "permissions", ("--accept-hooks/--yolo/--ignore-user-config/--ignore-rules",),
+   summary="permissions",
    examples=("qubit, permission mode",),
-   help="Mode, scopes, and expiry.")
+   help="Mode, scopes, and expiry (owner-authorized sessions).")
 _E("monitor", "Monitor check",
    ("run monitor check", "inbox monitor", "hourly check"),
    "monitor", ("monitor/monitoring", "cron"), confirm=True,
@@ -1713,12 +1728,15 @@ _E("completions", "Completion status",
    help="Shipped completion scripts.")
 _E("tui_help", "Open the board",
    ("open dashboard", "show dashboard", "open the board"),
-   "tui_guidance", ("--tui",),
+   "tui_guidance", ("--tui", "serve/dashboard/desktop/gui"),
+   summary="guidance",
    examples=("qubit, open dashboard",),
    help="How to open the visual surface.")
 _E("console_help", "Terminal help",
    ("open terminal", "terminal help", "command line help"),
-   "console_guidance", ("console", "--safe-mode/--dev/--cli"),
+   "console_guidance", ("console", "--safe-mode/--dev/--cli",
+                        "serve/dashboard/desktop/gui"),
+   summary="guidance",
    examples=("qubit, terminal help",),
    help="How to use the terminal REPL.")
 _E("mic_help", "Microphone help",

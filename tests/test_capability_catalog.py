@@ -45,7 +45,7 @@ def test_check_semantics_per_state():
     assert blocked["code"].startswith("BLOCKED_")
     assert "owner" in blocked and "rollback" in blocked
     assert blocked["explanation"]
-    rejected = check("--yolo")
+    rejected = check("H-cloudmem")
     assert rejected["state"] == "REJECTED"
     assert rejected["code"].startswith("REJECTED_")
     unknown = check("speak-to-mars")
