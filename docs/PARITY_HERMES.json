@@ -534,13 +534,11 @@
     },
     {
       "cmd": "plugins-install",
-      "verdict": "BLOCKED",
-      "reason": "Installing unreviewed third-party plugin code violates the reviewed-code policy",
-      "evidence": "manifest validation tests",
-      "owner": "qubit-policy",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "user_explanation": "Qubit Agent cannot do this: third-party plugins need allowlist review, hash pin, and explicit confirmation.",
-      "code": "BLOCKED_PLUGINS_INSTALL"
+      "verdict": "IMPLEMENTED",
+      "qubit": "voicebridge skills install <manifest> (local reviewed manifests validated + staged disabled with explicit --confirm; remote Git/index identifiers typed-refused BLOCKED_REMOTE_PLUGIN, never fetched; e-stop gated)",
+      "proof": "tests/test_plugins8tf.py",
+      "owner": "qubit-core",
+      "rollback": "skills remove/rollback with --confirm restores prior state (audited backups)"
     },
     {
       "cmd": "gateway-status",

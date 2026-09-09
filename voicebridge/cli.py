@@ -348,10 +348,14 @@ def build_parser() -> argparse.ArgumentParser:
     sk_show.add_argument("skill_id")
     sk_check = sk_sub.add_parser("check", parents=[common],
                                  help="validate a manifest file (read-only)")
-    sk_check.add_argument("manifest", type=Path)
+    sk_check.add_argument("manifest",
+                          help="local manifest file; remote Git/index "
+                               "identifiers are typed-refused, never fetched")
     sk_install = sk_sub.add_parser("install", parents=[common],
                                    help="validate + stage a skill disabled (dry-run unless --confirm)")
-    sk_install.add_argument("manifest", type=Path)
+    sk_install.add_argument("manifest",
+                            help="local manifest file; remote Git/index "
+                                 "identifiers are typed-refused, never fetched")
     sk_install.add_argument("--confirm", action="store_true")
     sk_enable = sk_sub.add_parser("enable", parents=[common],
                                   help="enable a staged/disabled skill (dry-run unless --confirm)")
@@ -865,6 +869,57 @@ def build_parser() -> argparse.ArgumentParser:
                        help="dashboard port (default: webui.port from config)")
     webui.add_argument("--json", action="store_true",
                        help="machine-readable typed result")
+    st = add("setup", help="Packet 8T one-click setup, installation health, "
+             "and lifecycle dashboard (dry-run by default; backend-owned states)")
+    st_sub = st.add_subparsers(dest="setup_command")
+    st_sub.add_parser("check", parents=[common],
+                      help="staged checklist with resume pointer (read-only)")
+    st_check_off = st_sub.add_parser("check-offline", parents=[common],
+                                     help="checklist in offline degraded mode (read-only)")
+    st_run = st_sub.add_parser("run", parents=[common],
+                               help="staged setup run (dry-run preview by default)")
+    st_run.add_argument("--apply", action="store_true",
+                        help="actually perform staged writes (default dry-run)")
+    st_run.add_argument("--confirm", action="store_true",
+                        help="explicit owner approval for network/service/desktop/data steps")
+    st_run.add_argument("--steps", default="",
+                        help="comma-separated step ids (default: all)")
+    st_sub.add_parser("health", parents=[common],
+                      help="backend-authoritative installation inventory (redacted)")
+    st_sub.add_parser("diagnose", parents=[common],
+                      help="redacted diagnostic bundle (never includes secrets)")
+    st_sub.add_parser("matrix", parents=[common],
+                      help="model capability matrix (local/cloud, fallback)")
+    st_sub.add_parser("wizard", parents=[common],
+                      help="microphone/output wizard data (never records audio)")
+    st_sub.add_parser("repair", parents=[common],
+                      help="ordered repair plan (finished work not repeated)")
+    st_sub.add_parser("audit", parents=[common],
+                      help="local audit/change timeline (bounded, redacted)")
+    st_exp = st_sub.add_parser("export", parents=[common],
+                               help="export redacted config profile (preview by default; "
+                                    "needs --apply --confirm to write)")
+    st_exp.add_argument("--out", type=Path, default=None,
+                        help="output file (default: <state_dir>/config-profile.json)")
+    st_exp.add_argument("--apply", action="store_true",
+                        help="actually write the file (default: preview only)")
+    st_exp.add_argument("--confirm", action="store_true",
+                        help="explicit owner approval (required with --apply)")
+    st_bk = st_sub.add_parser("backup", parents=[common],
+                              help="migration/backup center plan|migrate|migrate-rollback|rollback")
+    st_bk.add_argument("action", nargs="?", default="plan")
+    st_bk.add_argument("--apply", action="store_true")
+    st_bk.add_argument("--confirm", action="store_true")
+    st_bk.add_argument("--backup-dir", type=Path, default=None)
+    st_up = st_sub.add_parser("upgrade", parents=[common],
+                              help="upgrade contract preview/apply (never restarts services silently)")
+    st_up.add_argument("--apply", action="store_true")
+    st_up.add_argument("--confirm", action="store_true")
+    st_rb = st_sub.add_parser("rollback", parents=[common],
+                              help="rollback preview/apply (partial failures visible)")
+    st_rb.add_argument("--apply", action="store_true")
+    st_rb.add_argument("--confirm", action="store_true")
+    st_rb.add_argument("--backup-dir", type=Path, default=None)
     fr = add("frontier", help="Packet 8Q frontier-provider gateway "
              "(local default; cloud disabled unless explicitly enabled)")
     fr_sub = fr.add_subparsers(dest="frontier_command")
@@ -1046,6 +1101,8 @@ def main(argv=None) -> int:
         return _cmd_opencode(cfg, args)
     if command == "webui":
         return _cmd_webui(cfg, args)
+    if command == "setup":
+        return _cmd_setup(cfg, args)
 
     from .orchestrator import VoiceOrchestrator
     orch = VoiceOrchestrator(cfg, no_hotkey=args.no_hotkey, dry_run=args.dry_run)
@@ -1720,6 +1777,76 @@ def _cmd_product(cfg, args) -> int:
     return 2
 
 
+def _cmd_setup(cfg, args) -> int:
+    """voicebridge setup check|run|health|diagnose|matrix|wizard|repair|audit|
+    export|backup|upgrade|rollback (Packet 8T). Same backend as the dashboard;
+    dry-run by default, explicit --apply --confirm for mutations."""
+    import json as _json
+    from . import lifecycle as L
+    cmd = getattr(args, "setup_command", None) or "check"
+    if cmd in ("check", "check-offline"):
+        out = L.checklist(cfg, offline=(cmd == "check-offline"))
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] in ("READY", "DEGRADED", "PENDING") else 1
+    if cmd == "run":
+        raw_steps = getattr(args, "steps", "") or ""
+        wanted = [s.strip() for s in raw_steps.split(",") if s.strip()] or None
+        out = L.setup_run(steps=wanted, dry_run=not args.apply,
+                          confirm=bool(args.confirm))
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] in ("SUCCESS", "PENDING") else 1
+    if cmd == "health":
+        print(_json.dumps(L.health_inventory(cfg), indent=2, sort_keys=True))
+        return 0
+    if cmd == "diagnose":
+        print(_json.dumps(L.diagnostic_bundle(cfg), indent=2, sort_keys=True))
+        return 0
+    if cmd == "matrix":
+        print(_json.dumps(L.capability_matrix(cfg), indent=2, sort_keys=True))
+        return 0
+    if cmd == "wizard":
+        print(_json.dumps(L.audio_wizard(cfg), indent=2, sort_keys=True))
+        return 0
+    if cmd == "repair":
+        out = L.repair_order(cfg)
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] in ("READY", "DEGRADED", "PENDING") else 1
+    if cmd == "audit":
+        print(_json.dumps(L.audit_timeline(), indent=2, sort_keys=True))
+        return 0
+    if cmd == "export":
+        dest = args.out
+        if dest is None:
+            from . import product as P
+            dest = P.default_paths().state_dir / "config-profile.json"
+        out = L.config_export(cfg, dest, dry_run=not args.apply,
+                              confirm=bool(args.confirm))
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] in ("SUCCESS", "PENDING") else 1
+    if cmd == "backup":
+        out = L.backup_center(action=args.action or "plan",
+                              dry_run=not args.apply,
+                              confirm=bool(args.confirm),
+                              backup_dir=getattr(args, "backup_dir", None))
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] in ("READY", "SUCCESS", "PENDING",
+                                     "OK", "FRESH") else 1
+    if cmd == "upgrade":
+        out = L.upgrade_flow(dry_run=not args.apply,
+                             confirm=bool(args.confirm))
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] == "PENDING" else 1
+    if cmd == "rollback":
+        out = L.rollback_flow(dry_run=not args.apply,
+                              confirm=bool(args.confirm),
+                              backup_dir=getattr(args, "backup_dir", None))
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] in ("OK", "READY", "SUCCESS", "PENDING",
+                                     "MISSING") else 1
+    print(f"ERROR: unknown setup command {cmd!r}")
+    return 2
+
+
 def _print_certify_human(report) -> None:
     """Human-readable certification summary (never prints secret values)."""
     p = report["provenance"]
@@ -2034,16 +2161,68 @@ def _cmd_permissions(cfg, args) -> int:
         return 2
 
 
+def _skills_load_manifest(spec, _json, P, _PLUG):
+    """Load + validate a skill/plugin manifest for `skills check|install`.
+
+    Returns the validated manifest, or prints a typed refusal and returns
+    ``{"rc": <exit>}``. Remote identifiers are never fetched; missing files
+    never traceback; oversized files are refused before reading; user input
+    is echoed only redacted. `SkillValidationError` propagates to the
+    caller's typed handler.
+    """
+    verdict = _PLUG.classify_install_source(str(spec))
+    if verdict["kind"] == "remote":
+        print(_json.dumps(_PLUG.refuse_remote(verdict["identifier"]), indent=2))
+        return {"rc": 2}
+    if verdict["kind"] == "missing-file":
+        print(_json.dumps(
+            {"state": "FAILED", "code": _PLUG.IO_CODE,
+             "detail": f"no manifest file: {_PLUG.redact_spec(str(spec))[:160]}",
+             "owner": "qubit-policy",
+             "rollback": "nothing installed or enabled; nothing to roll back"},
+            indent=2))
+        return {"rc": 2}
+    try:
+        raw = _PLUG.load_manifest_bytes(verdict["path"])
+    except _PLUG.PluginInstallError as exc:
+        print(_json.dumps(
+            {"state": "FAILED", "code": exc.code,
+             "detail": _PLUG.redact_spec(exc.detail)[:300],
+             "owner": "qubit-policy",
+             "rollback": "nothing installed or enabled; nothing to roll back"},
+            indent=2))
+        return {"rc": 2}
+    try:
+        return P.SkillManifest.from_dict(_json.loads(raw))
+    except ValueError as exc:
+        print(_json.dumps(
+            {"state": "FAILED", "code": _PLUG.INVALID_CODE,
+             "detail": f"manifest is not valid JSON: "
+                       f"{_PLUG.redact_spec(str(exc))[:160]}",
+             "owner": "qubit-policy",
+             "rollback": "nothing installed or enabled; nothing to roll back"},
+            indent=2))
+        return {"rc": 2}
+
+
 def _cmd_skills(cfg, args) -> int:
     """voicebridge skills list|show|check|install|enable|disable|remove|rollback.
 
     install validates the manifest and stages the skill DISABLED; enable/disable/
     remove/rollback are dry-run by default and require --confirm to persist.
+    Hermes `plugins install` parity: a local reviewed manifest installs here;
+    remote Git/index identifiers are typed-refused (nothing is fetched);
+    mutating subcommands refuse while the emergency stop is latched.
     """
     import json as _json
     from . import permissions as P
+    from . import plugins as _PLUG
     cmd = getattr(args, "skills_command", None) or "list"
     store = P.permissions_store(cfg)
+    if cmd in ("install", "enable", "disable", "remove", "rollback") \
+            and _PLUG.estop_engaged(cfg):
+        print(_json.dumps(_PLUG.refuse_estop(f"skills {cmd}"), indent=2))
+        return 3
     try:
         if cmd == "list":
             out = {"state": "OK",
@@ -2057,12 +2236,14 @@ def _cmd_skills(cfg, args) -> int:
                 return 1
             out = s.to_dict()
         elif cmd == "check":
-            man = P.SkillManifest.from_dict(
-                _json.loads(Path(args.manifest).read_text()))
+            man = _skills_load_manifest(args.manifest, _json, P, _PLUG)
+            if isinstance(man, dict):  # typed refusal, already printed
+                return man["rc"]
             out = {"state": "OK", "valid": True, "manifest": man.to_dict()}
         elif cmd == "install":
-            man = P.SkillManifest.from_dict(
-                _json.loads(Path(args.manifest).read_text()))
+            man = _skills_load_manifest(args.manifest, _json, P, _PLUG)
+            if isinstance(man, dict):  # typed refusal, already printed
+                return man["rc"]
             if getattr(args, "dry_run", False):
                 out = {"state": "preview", "would_stage_disabled": man.skill_id,
                        "version": man.version}
