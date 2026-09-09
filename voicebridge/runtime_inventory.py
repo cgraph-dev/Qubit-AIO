@@ -143,7 +143,7 @@ def _vision(cfg: Any) -> Dict[str, Any]:
 
 def _messaging(cfg: Any) -> Dict[str, Any]:
     try:
-        from .messaging import account_list, list_msgs
+        from .messaging import account_list, inbox_list, list_msgs
 
         accounts = account_list(cfg).get("accounts", [])
         outbox = list_msgs(cfg).get("messages", [])
@@ -151,7 +151,8 @@ def _messaging(cfg: Any) -> Dict[str, Any]:
         for msg in outbox:
             states[msg.get("state", "?")] = states.get(msg.get("state", "?"), 0) + 1
         return {"state": "OK", "accounts": len(accounts),
-                "outbox": len(outbox), "outbox_states": states}
+                "outbox": len(outbox), "outbox_states": states,
+                "inbox": len(inbox_list(cfg).get("messages", []))}
     except Exception as exc:
         return {"state": "UNAVAILABLE", "detail": str(exc)[:160]}
 

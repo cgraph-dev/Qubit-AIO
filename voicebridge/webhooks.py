@@ -327,12 +327,15 @@ def _receipt(cfg: Any, sub_id: str, verdict: str, detail: str) -> None:
 
 
 def verify(cfg: Any, sub_id: str, payload: bytes, signature: str,
-           timestamp: float) -> Dict[str, Any]:
+           timestamp: float, *, sender: str = "",
+           record_inbox: bool = False) -> Dict[str, Any]:
     """Verify an inbound delivery (HMAC, freshness, replay, auth).
 
     Signature is hex HMAC-SHA256 over ``f"{timestamp}.{body}"``. Secret
     values are resolved for comparison only and never logged. Verified
-    deliveries record redacted receipts; nothing executes.
+    deliveries record redacted receipts; with ``record_inbox`` the payload
+    is additionally stored as a redacted-output inbound message (explicit
+    user issuance at the call site). Nothing executes.
     """
     from .providers.credentials import resolve_key
 
@@ -371,10 +374,23 @@ def verify(cfg: Any, sub_id: str, payload: bytes, signature: str,
     _receipt(cfg, rec["id"], "VALID", f"{len(body)} bytes, event evidence only")
     _audit("verified", "webhook-ingress",
            {"id": rec["id"], "bytes": len(body)})
-    return {"state": "VALID", "schema": "qubit-webhook-verify/1",
-            "subscription": rec["id"], "events": list(rec.get("events", [])),
-            "bytes": len(body),
-            "note": "receipt recorded; nothing executed or dispatched"}
+    out: Dict[str, Any] = {"state": "VALID", "schema": "qubit-webhook-verify/1",
+                           "subscription": rec["id"],
+                           "events": list(rec.get("events", [])),
+                           "bytes": len(body),
+                           "note": "receipt recorded; nothing executed or dispatched"}
+    if record_inbox:
+        from . import messaging as MG
+
+        try:
+            stored = MG.record_inbound(cfg, rec["id"], sender or "unknown",
+                                       body, requested_by="webhook-ingress",
+                                       confirmed=True)
+        except MG.MessagingError as exc:
+            raise WebhookError(exc.code if hasattr(exc, "code") else "WEBHOOK_BAD_INPUT",
+                               f"inbox record failed: {exc}") from exc
+        out["inbox_id"] = stored["message"]["id"]
+    return out
 
 
 def estop_engaged(cfg: Any) -> bool:

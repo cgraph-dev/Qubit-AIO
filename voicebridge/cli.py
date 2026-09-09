@@ -703,6 +703,10 @@ def build_parser() -> argparse.ArgumentParser:
                            help="delivery bytes file (never inline secrets)")
     wh_verify.add_argument("--signature", required=True, help="hex HMAC-SHA256")
     wh_verify.add_argument("--timestamp", type=float, required=True)
+    wh_verify.add_argument("--record-inbox", action="store_true",
+                           help="also store the verified payload as inbound")
+    wh_verify.add_argument("--sender", default="",
+                           help="sender label for the inbound record")
     wh_sub.add_parser("test", parents=[common],
                       help="dry-run delivery plan (no secret, no network)").add_argument(
                           "sub_id")
@@ -755,6 +759,21 @@ def build_parser() -> argparse.ArgumentParser:
                          choices=["", "draft", "approved", "queued", "sent", "failed"])
     mg_show = mg_sub.add_parser("show", parents=[common], help="show one message")
     mg_show.add_argument("msg_id")
+    mg_inbox = mg_sub.add_parser("inbox", parents=[common],
+                                 help="list inbound messages (redacted previews)")
+    mg_inbox.add_argument("--subscription", default="")
+    mg_inshow = mg_sub.add_parser("inbox-show", parents=[common],
+                                  help="show one inbound message")
+    mg_inshow.add_argument("msg_id")
+    mg_sum = mg_sub.add_parser("summarize", parents=[common],
+                               help="extractive digest of one inbound message")
+    mg_sum.add_argument("msg_id")
+    mg_reply = mg_sub.add_parser("draft-reply", parents=[common],
+                                 help="draft a linked reply (dry-run unless --confirm)")
+    mg_reply.add_argument("msg_id")
+    mg_reply.add_argument("--account", required=True)
+    mg_reply.add_argument("--body", required=True)
+    mg_reply.add_argument("--confirm", action="store_true")
     gw = add("gateway", help="Account-bound gateway records (no process supervision)")
     gw_sub = gw.add_subparsers(dest="gateway_command")
     gw_add = gw_sub.add_parser("add", parents=[common],
@@ -3482,7 +3501,9 @@ def _cmd_webhook(cfg, args) -> int:
                 return 2
             out = WH.verify(cfg, args.sub_id, payload,
                             getattr(args, "signature", "") or "",
-                            getattr(args, "timestamp", 0.0) or 0.0)
+                            getattr(args, "timestamp", 0.0) or 0.0,
+                            sender=getattr(args, "sender", "") or "",
+                            record_inbox=bool(getattr(args, "record_inbox", False)))
         else:
             print(f"ERROR: unknown webhook command {cmd!r}")
             return 2
@@ -3553,6 +3574,16 @@ def _cmd_msg(cfg, args) -> int:
             out = MG.list_msgs(cfg, state_filter=getattr(args, "state", "") or "")
         elif cmd == "show":
             out = MG.show(cfg, args.msg_id)
+        elif cmd == "inbox":
+            out = MG.inbox_list(cfg,
+                                subscription=getattr(args, "subscription", "") or "")
+        elif cmd == "inbox-show":
+            out = MG.inbox_show(cfg, args.msg_id)
+        elif cmd == "summarize":
+            out = MG.summarize(cfg, args.msg_id)
+        elif cmd == "draft-reply":
+            out = MG.draft_reply(cfg, args.msg_id, args.account, args.body,
+                                 requested_by="cli:user", confirmed=confirm)
         else:
             print(f"ERROR: unknown msg command {cmd!r}")
             return 2

@@ -302,6 +302,57 @@ def test_cli_wiring():
         assert out["state"] == "IMPLEMENTED", (token, out)
 
 
+def test_inbox_record_summarize_draft_reply(tmp_path, monkeypatch):
+    from voicebridge import messaging as MG
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    _acct(cfg)
+    try:
+        MG.record_inbound(cfg, "dep", "ci", b"hello world " * 50,
+                          confirmed=False)
+    except MG.MessagingError as exc:
+        assert exc.code == "MSG_CONFIRM_REQUIRED"
+    else:
+        raise AssertionError("record needs confirmation")
+    out = MG.record_inbound(cfg, "dep", "ci",
+                            b"production deploy finished ok token=abc123secret",
+                            confirmed=True)
+    assert out["message"]["sender"] == "ci"
+    assert "abc123secret" not in json.dumps(out)
+    assert len(MG.inbox_list(cfg)["messages"]) == 1
+    assert MG.inbox_list(cfg, subscription="other")["messages"] == []
+    digest = MG.summarize(cfg, out["message"]["id"])
+    assert digest["state"] == "OK" and digest["digest"]
+    assert "abc123secret" not in json.dumps(digest)
+    assert MG.inbox_show(cfg, out["message"]["id"])["message"]["summarized"] is True
+    reply = MG.draft_reply(cfg, out["message"]["id"], "team",
+                           "acknowledged", confirmed=True)
+    assert reply["message"]["in_reply_to"] == out["message"]["id"]
+    try:
+        MG.summarize(cfg, "in_missing")
+    except MG.MessagingError as exc:
+        assert exc.code == "MSG_NOT_FOUND"
+    else:
+        raise AssertionError("unknown inbox must fail")
+
+
+def test_inbox_caps_and_redacted_inventory(tmp_path, monkeypatch):
+    from voicebridge import messaging as MG
+    from voicebridge.runtime_inventory import runtime_inventory
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    try:
+        MG.record_inbound(cfg, "dep", "ci", b"x" * 10001, confirmed=True)
+    except MG.MessagingError as exc:
+        assert exc.code == "MSG_BAD_INPUT"
+    else:
+        raise AssertionError("oversized inbound refused")
+    MG.record_inbound(cfg, "dep", "ci", b"hi", confirmed=True)
+    inv = runtime_inventory(cfg)
+    assert inv["messaging"]["inbox"] == 1
+    assert "sk-" not in json.dumps(inv["messaging"])
+
+
 def test_dashboard_inventory_and_tile(tmp_path, monkeypatch):
     from voicebridge.runtime_inventory import runtime_inventory
 

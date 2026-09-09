@@ -42,8 +42,11 @@ from typing import Any, Dict, List, Optional
 SCHEMA = "qubit-messaging/1"
 ACCOUNTS_NAME = "msg-accounts.json"
 OUTBOX_NAME = "msg-outbox.json"
+INBOX_NAME = "msg-inbox.json"
 MAX_FILE_BYTES = 2_000_000
 MAX_BODY_CHARS = 4000
+MAX_INBOX_BODY_CHARS = 10000
+MAX_INBOX = 500
 MAX_TO_LEN = 160
 TRANSPORT_TIMEOUT_S = 15.0
 
@@ -593,6 +596,118 @@ def show(cfg: Any, msg_id: str) -> Dict[str, Any]:
     """Show one message (redacted preview)."""
     _, rec = _get_msg(cfg, msg_id)
     return {"state": "OK", "message": _public_msg(rec)}
+
+
+def _inbox_path(cfg: Any) -> Path:
+    return Path(cfg.state_dir()) / INBOX_NAME
+
+
+def _blank_inbox() -> Dict[str, Any]:
+    return {"schema": SCHEMA, "inbound": {}}
+
+
+def record_inbound(cfg: Any, subscription: str, sender: str, body: bytes, *,
+                   requested_by: str = "webhook-ingress",
+                   confirmed: bool = False) -> Dict[str, Any]:
+    """Store one verified inbound message (bounded, redacted outputs).
+
+    Bodies live only in the 0600 inbox file (user-private state, like
+    outbox drafts); every output carries previews/hashes. Untrusted
+    sender content is never executed, dispatched, or granted authority.
+    """
+    if not confirmed:
+        raise MessagingError(CONFIRM_CODE,
+                             "inbox record requires explicit confirmation")
+    clean_sender = (sender or "").strip()
+    if not clean_sender or len(clean_sender) > MAX_TO_LEN:
+        raise MessagingError(BAD_INPUT_CODE,
+                             f"sender must be 1..{MAX_TO_LEN} chars")
+    raw = body or b""
+    if len(raw) > MAX_INBOX_BODY_CHARS:
+        raise MessagingError(BAD_INPUT_CODE,
+                             f"inbound body exceeds {MAX_INBOX_BODY_CHARS} bytes")
+    try:
+        text = raw.decode("utf-8", errors="replace")
+    except Exception:
+        text = ""
+    state = _load_json(_inbox_path(cfg), _blank_inbox, "inbox")
+    if len(state["inbound"]) >= MAX_INBOX:
+        oldest = sorted(state["inbound"].values(),
+                        key=lambda r: r.get("received_at", 0))[:-MAX_INBOX + 1]
+        for stale in oldest:
+            del state["inbound"][stale["id"]]
+    msg_id = "in_" + uuid.uuid4().hex[:12]
+    rec = {"id": msg_id, "subscription": (subscription or "").strip()[:80],
+           "sender": clean_sender, "body": text,
+           "body_sha256": hashlib.sha256(raw).hexdigest(),
+           "received_at": _now(), "summarized": False}
+    state["inbound"][msg_id] = rec
+    _save_json(_inbox_path(cfg), state, "inbox")
+    _audit("inbox.record", requested_by,
+           {"message": msg_id, "subscription": rec["subscription"],
+            "body_sha256": rec["body_sha256"]})
+    return {"state": "OK", "message": _public_inbound(rec)}
+
+
+def _public_inbound(rec: Dict[str, Any]) -> Dict[str, Any]:
+    return {"id": rec["id"], "subscription": rec.get("subscription", ""),
+            "sender": _redact(rec.get("sender", ""))[:80],
+            "body_preview": _redact(rec.get("body", ""))[:200],
+            "body_sha256": rec.get("body_sha256", ""),
+            "received_at": rec.get("received_at"),
+            "summarized": bool(rec.get("summarized", False))}
+
+
+def _get_inbound(cfg: Any, msg_id: str) -> tuple[Dict[str, Any], Dict[str, Any]]:
+    state = _load_json(_inbox_path(cfg), _blank_inbox, "inbox")
+    rec = state["inbound"].get((msg_id or "").strip().lower())
+    if rec is None:
+        raise MessagingError(NOT_FOUND_CODE, f"no inbound {msg_id!r}")
+    return state, rec
+
+
+def inbox_list(cfg: Any, *, subscription: str = "") -> Dict[str, Any]:
+    """List inbound messages (redacted previews, newest first)."""
+    state = _load_json(_inbox_path(cfg), _blank_inbox, "inbox")
+    recs = sorted(state["inbound"].values(),
+                  key=lambda r: r.get("received_at", 0), reverse=True)
+    if (subscription or "").strip():
+        recs = [r for r in recs
+                if r.get("subscription") == subscription.strip()]
+    return {"state": "OK", "messages": [_public_inbound(r) for r in recs[:200]]}
+
+
+def inbox_show(cfg: Any, msg_id: str) -> Dict[str, Any]:
+    """Show one inbound message (redacted preview)."""
+    _, rec = _get_inbound(cfg, msg_id)
+    return {"state": "OK", "message": _public_inbound(rec)}
+
+
+def summarize(cfg: Any, msg_id: str) -> Dict[str, Any]:
+    """Extractive digest of one inbound message (deterministic, local)."""
+    from .summarizer import summarize_extractive
+
+    state, rec = _get_inbound(cfg, msg_id)
+    digest = summarize_extractive(rec.get("body", ""), max_chars=900)
+    rec["summarized"] = True
+    _save_json(_inbox_path(cfg), state, "inbox")
+    return {"state": "OK", "id": rec["id"], "digest": _redact(digest)[:900]}
+
+
+def draft_reply(cfg: Any, msg_id: str, account: str, body: str, *,
+                requested_by: str = "cli:user",
+                confirmed: bool = False) -> Dict[str, Any]:
+    """Draft a reply linked to an inbound message (same gates as draft)."""
+    state, rec = _get_inbound(cfg, msg_id)
+    out = draft(cfg, account, rec.get("sender", ""), body,
+                requested_by=requested_by, confirmed=confirmed)
+    body_rec_state, body_rec = _get_msg(cfg, out["message"]["id"])
+    body_rec["in_reply_to"] = rec["id"]
+    _save_msg(cfg, body_rec_state)
+    out["message"]["in_reply_to"] = rec["id"]
+    _audit("draft.reply", requested_by,
+           {"message": body_rec["id"], "in_reply_to": rec["id"]})
+    return out
 
 
 def estop_engaged(cfg: Any) -> bool:

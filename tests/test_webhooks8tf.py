@@ -119,6 +119,23 @@ def test_verify_auth_missing_and_test_plan(tmp_path, monkeypatch):
     assert plan["would_execute"] == "nothing: verified deliveries record receipts only"
 
 
+def test_verify_record_inbox_end_to_end(tmp_path, monkeypatch):
+    from voicebridge import webhooks as WH
+
+    monkeypatch.setenv("WH_SECRET", "k2")
+    cfg = _cfg(tmp_path, monkeypatch)
+    _add(cfg)
+    body = b'{"deploy": "ok"}'
+    ts = time.time()
+    out = WH.verify(cfg, "deploy", body, _sign("k2", ts, body), ts,
+                    sender="ci", record_inbox=True)
+    assert out["state"] == "VALID" and "inbox_id" in out
+    from voicebridge import messaging as MG
+
+    shown = MG.inbox_show(cfg, out["inbox_id"])["message"]
+    assert shown["sender"] == "ci" and shown["subscription"] == "deploy"
+
+
 def test_confirm_and_estop_gates(tmp_path, monkeypatch):
     from voicebridge import cli as CLI
     from voicebridge.power import power_control_store
