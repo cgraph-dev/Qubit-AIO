@@ -626,6 +626,35 @@ def build_parser() -> argparse.ArgumentParser:
                                 help="manual broker-audited delivery (shells NOT executed)")
     hk_fire.add_argument("--event", required=True)
     hk_fire.add_argument("--confirm", action="store_true")
+    sy = add("sync", help="Device-bound encrypted state handoff (user-carried)")
+    sy_sub = sy.add_subparsers(dest="sync_command")
+    sy_offer = sy_sub.add_parser("offer", parents=[common],
+                                 help="export an encrypted bundle to the outbox "
+                                      "(dry-run unless --confirm)")
+    sy_offer.add_argument("--passphrase", default="",
+                          help="offer passphrase (or VOICE_BRIDGE_PASSPHRASE)")
+    sy_offer.add_argument("--for-device", default="",
+                          help="bind to a destination device id (optional)")
+    sy_offer.add_argument("--confirm", action="store_true")
+    sy_sub.add_parser("list", parents=[common], help="list outbox offers")
+    sy_show = sy_sub.add_parser("show", parents=[common],
+                                help="show one offer manifest")
+    sy_show.add_argument("offer_id")
+    sy_revoke = sy_sub.add_parser("revoke", parents=[common],
+                                  help="tombstone an offer (dry-run unless --confirm)")
+    sy_revoke.add_argument("offer_id")
+    sy_revoke.add_argument("--confirm", action="store_true")
+    sy_accept = sy_sub.add_parser("accept", parents=[common],
+                                  help="preview (default) or apply a bundle")
+    sy_accept.add_argument("bundle", nargs="?", default="",
+                           help="bundle file (or use --offer)")
+    sy_accept.add_argument("--offer", default="",
+                           help="outbox offer id (enforces revocation/binding)")
+    sy_accept.add_argument("--passphrase", default="",
+                           help="bundle passphrase (or VOICE_BRIDGE_PASSPHRASE)")
+    sy_accept.add_argument("--apply", action="store_true",
+                           help="actually restore (needs --confirm + enrollment)")
+    sy_accept.add_argument("--confirm", action="store_true")
     for _hk_mut, _hk_help in (("revoke", "revoke a declaration"),
                               ("remove", "delete a declaration")):
         _p = hk_sub.add_parser(_hk_mut, parents=[common],
@@ -1365,6 +1394,8 @@ def main(argv=None) -> int:
         return _cmd_import_agent(cfg, args)
     if command == "hooks":
         return _cmd_hooks(cfg, args)
+    if command == "sync":
+        return _cmd_sync(cfg, args)
     if command == "memory":
         return _cmd_memory(cfg, args)
     if command == "websites":
@@ -3056,6 +3087,59 @@ def _cmd_hooks(cfg, args) -> int:
                            "detail": exc.detail[:300],
                            "owner": "qubit-policy",
                            "rollback": "registry untouched; nothing to roll back"},
+                          indent=2))
+        return rc
+
+
+def _cmd_sync(cfg, args) -> int:
+    """voicebridge sync offer|list|show|revoke|accept.
+
+    Opt-in encrypted device-bound handoff; the user carries the bundle file
+    and the passphrase between PCs. Nothing touches the network. Mutating
+    ops preview under --dry-run, require --confirm, and refuse while the
+    emergency stop is latched.
+    """
+    import json as _json
+    from . import sync as SY
+    cmd = getattr(args, "sync_command", None) or "list"
+    confirm = bool(getattr(args, "confirm", False))
+    try:
+        if cmd in ("offer", "revoke", "accept") and SY.estop_engaged(cfg):
+            print(_json.dumps(SY.refuse_estop(f"sync {cmd}"), indent=2))
+            return 3
+        if getattr(args, "dry_run", False) and cmd != "list" and cmd != "show":
+            print(_json.dumps({"state": "preview", "would": f"sync {cmd}"},
+                              indent=2))
+            return 0
+        if cmd == "list":
+            out = SY.list_offers(cfg)
+        elif cmd == "show":
+            out = SY.show(cfg, args.offer_id)
+        elif cmd == "offer":
+            out = SY.offer(cfg, getattr(args, "passphrase", "") or "",
+                           for_device=getattr(args, "for_device", "") or "",
+                           requested_by="cli:user", confirmed=confirm)
+        elif cmd == "revoke":
+            out = SY.revoke(cfg, args.offer_id,
+                            requested_by="cli:user", confirmed=confirm)
+        elif cmd == "accept":
+            out = SY.accept(cfg, getattr(args, "bundle", "") or "",
+                            getattr(args, "passphrase", "") or "",
+                            offer_id=getattr(args, "offer", "") or "",
+                            apply=bool(getattr(args, "apply", False)),
+                            requested_by="cli:user", confirmed=confirm)
+        else:
+            print(f"ERROR: unknown sync command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except SY.SyncError as exc:
+        rc = 3 if exc.code == SY.CONFIRM_CODE else 2
+        print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                           "code": exc.code,
+                           "detail": exc.detail[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "nothing exported or restored"},
                           indent=2))
         return rc
 

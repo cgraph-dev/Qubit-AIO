@@ -306,12 +306,11 @@
     },
     {
       "cmd": "sync",
-      "verdict": "REJECTED",
-      "reason": "Cross-device sync exfiltrates state; local-only product",
-      "owner": "qubit-policy",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "REJECTED_SYNC",
-      "user_explanation": "Qubit Agent cannot do this: Cross-device sync exfiltrates state; local-only product"
+      "verdict": "IMPLEMENTED",
+      "qubit": "voicebridge sync offer/list/show/revoke/accept (opt-in encrypted device-bound handoff on 7C primitives: user carries bundle + passphrase, revocation + device binding enforced, enrollment-gated apply, 7C merge/backup semantics; nothing touches the network)",
+      "proof": "tests/test_sync8tf.py",
+      "owner": "qubit-core",
+      "rollback": "revoke tombstones offers; accept --apply inherits 7C pre-restore backups"
     },
     {
       "cmd": "mcp",

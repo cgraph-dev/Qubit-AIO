@@ -44,6 +44,7 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a sessions
 complete -c voicebridge -n '__fish_use_subcommand' -f -a setup
 complete -c voicebridge -n '__fish_use_subcommand' -f -a skills
 complete -c voicebridge -n '__fish_use_subcommand' -f -a status
+complete -c voicebridge -n '__fish_use_subcommand' -f -a sync
 complete -c voicebridge -n '__fish_use_subcommand' -f -a task
 complete -c voicebridge -n '__fish_use_subcommand' -f -a theme
 complete -c voicebridge -n '__fish_use_subcommand' -f -a tts-test
