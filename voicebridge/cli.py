@@ -63,6 +63,17 @@ def build_parser() -> argparse.ArgumentParser:
                         help="show configured providers and reference state (read-only)")
     auth_sub.add_parser("logout", parents=[common],
                         help="verify no stored credentials linger (read-only scan)")
+    auth_login = auth_sub.add_parser("login", parents=[common],
+                                     help="manual-handoff enrollment steps for a provider "
+                                          "(guidance only; you log in yourself)")
+    auth_login.add_argument("--provider", required=True,
+                            help="provider name from the frontier config")
+    auth_login.add_argument("--open", action="store_true",
+                            help="also open the documented portal page locally")
+    auth_verify = auth_sub.add_parser("verify", parents=[common],
+                                      help="re-probe one provider reference (read-only)")
+    auth_verify.add_argument("--provider", required=True,
+                             help="provider name from the frontier config")
     mcp_p = add("mcp", help="MCP server inventory and mount policy (read-only)")
     mcp_sub = mcp_p.add_subparsers(dest="mcp_command")
     mcp_sub.add_parser("status", parents=[common],
@@ -1172,6 +1183,10 @@ def main(argv=None) -> int:
         sub = getattr(args, "auth_command", None) or "status"
         if sub == "logout":
             return _cmd_auth_logout(cfg)
+        if sub == "login":
+            return _cmd_auth_login(cfg, args)
+        if sub == "verify":
+            return _cmd_auth_verify(cfg, args)
         return _cmd_auth_status(cfg)
     if command == "mcp":
         return _cmd_mcp_status(cfg)
@@ -1401,6 +1416,25 @@ def _cmd_auth_logout(cfg) -> int:
     from .integration_status import logout_check
 
     out = logout_check(cfg)
+    print(json.dumps(out, indent=2))
+    return 0
+
+
+def _cmd_auth_login(cfg, args) -> int:
+    """Manual-handoff enrollment steps (guidance only, nothing captured)."""
+    from . import auth_login as AL
+
+    out = AL.login_plan(cfg, args.provider,
+                        open_browser=bool(getattr(args, "open", False)))
+    print(json.dumps(out, indent=2))
+    return 0 if out.get("state") == "OK" else 2
+
+
+def _cmd_auth_verify(cfg, args) -> int:
+    """Re-probe one provider credential reference (read-only check)."""
+    from . import auth_login as AL
+
+    out = AL.verify_provider(cfg, args.provider)
     print(json.dumps(out, indent=2))
     return 0
 

@@ -479,13 +479,11 @@
     },
     {
       "cmd": "login/logout/portal",
-      "verdict": "BLOCKED",
-      "reason": "No interactive OAuth/vendor-portal flows in Qubit; credentials are env/file references only",
-      "evidence": "credential-guard tests",
-      "owner": "owner-operator (accounts/credentials)",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "user_explanation": "Qubit Agent cannot do this: provider login uses your own environment or key files, never an interactive OAuth flow.",
-      "code": "BLOCKED_LOGIN"
+      "verdict": "IMPLEMENTED",
+      "qubit": "voicebridge auth login (manual-handoff guided enrollment: user completes 2FA/CAPTCHA/recovery in their own browser, nothing captured) + auth verify (read-only reference probe) + auth logout (residue scan) + auth status inventory",
+      "proof": "tests/test_auth_login8tf.py, tests/test_auth8tf.py",
+      "owner": "qubit-core",
+      "rollback": "nothing is written by enrollment; verify/logout are read-only"
     },
     {
       "cmd": "--reasoning",
