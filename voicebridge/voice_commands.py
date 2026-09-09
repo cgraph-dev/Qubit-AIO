@@ -808,9 +808,14 @@ def _b_permissions(ctx, args):
 
 
 def _b_monitor(ctx, args):
-    from .communications.monitor import run_hourly
-
-    return {"monitor": run_hourly(ctx.cfg)}
+    # Guidance backend (no communications import: Packet 8A boundary
+    # reserves that package to cli.py/webui.py/scripts). The bounded pass
+    # itself runs via `voicebridge monitor run` under its own confirmation;
+    # voice stages the same confirmation then hands off.
+    return {"monitor": {"state": "HANDOFF",
+                        "guidance": "run `voicebridge monitor run` for the "
+                                    "bounded hourly pass (its own --confirm); "
+                                    "this voice confirmation authorized the handoff"}}
 
 
 def _b_frontier(ctx, args):
@@ -985,10 +990,26 @@ def _b_lsp(ctx, args):
 
 
 def _b_browser(ctx, args):
-    from . import browser as BR
-    from .communications.monitor import cdp_precondition
+    # Direct loopback probe (no communications import: Packet 8A boundary
+    # reserves that package to cli.py/webui.py/scripts). Same endpoint the
+    # 8B path checks; UNAVAILABLE covers both down and restart-required
+    # (the CLI `browser status` distinguishes them).
+    import urllib.request as _u
 
-    return {"browser": BR.status(cdp_precondition(ctx.cfg))}
+    try:
+        with _u.urlopen("http://127.0.0.1:9222/json/version",
+                        timeout=2) as resp:
+            ok = resp.status == 200
+    except Exception:
+        ok = False
+    if ok:
+        return {"browser": {"state": "OK", "cdp": True,
+                            "authority": "loopback CDP read-only (Packet 8B); "
+                                         "personal profiles are never touched"}}
+    return {"browser": {"state": "UNAVAILABLE", "cdp": False,
+                        "detail": "no loopback CDP endpoint",
+                        "authority": "loopback CDP read-only (Packet 8B); "
+                                     "personal profiles are never touched"}}
 
 
 def _b_computer(ctx, args):
