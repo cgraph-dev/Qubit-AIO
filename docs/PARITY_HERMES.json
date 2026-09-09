@@ -335,12 +335,11 @@
     },
     {
       "cmd": "computer-use",
-      "verdict": "REJECTED",
-      "reason": "Unpinned binary driver; desktop control is 8V scope with accessibility APIs",
-      "owner": "packet-8V",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "REJECTED_COMPUTER_USE",
-      "user_explanation": "Qubit Agent cannot do this: Unpinned binary driver; desktop control is 8V scope with accessibility APIs"
+      "verdict": "IMPLEMENTED",
+      "qubit": "voicebridge computer-use status/doctor/permissions (display/accessibility/driver probes, control DISABLED; install typed-refused COMPUTER_USE_NO_DRIVER, control is 8V accessibility-API scope)",
+      "proof": "tests/test_computer_use8tf.py",
+      "owner": "qubit-core",
+      "rollback": "probes are read-only; nothing enabled or installed"
     },
     {
       "cmd": "browser",

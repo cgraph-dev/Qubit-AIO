@@ -528,6 +528,16 @@ def build_parser() -> argparse.ArgumentParser:
                    "decompose", "gc", "repair"):
         kb_sub.add_parser(_kb_un, parents=[common],
                           help="no Qubit construct yet (typed refusal)")
+    cu = add("computer-use", help="Desktop-control capability probes (control disabled)")
+    cu_sub = cu.add_subparsers(dest="computer_use_command")
+    cu_sub.add_parser("status", parents=[common],
+                      help="display/accessibility/driver state (read-only probes)")
+    cu_sub.add_parser("doctor", parents=[common],
+                      help="readiness checklist with guidance (no remediation)")
+    cu_sub.add_parser("permissions", parents=[common],
+                      help="control policy record (read-only)")
+    cu_sub.add_parser("install", parents=[common],
+                      help="refused: unpinned driver binaries are never downloaded")
     mem = add("memory", help="Packet 8M semantic memory (GENOME contract; disabled by default)")
     mem_sub = mem.add_subparsers(dest="memory_command")
     mem_status = mem_sub.add_parser("status", parents=[common],
@@ -1235,6 +1245,8 @@ def main(argv=None) -> int:
         return _cmd_project(cfg, args)
     if command == "kanban":
         return _cmd_kanban(cfg, args)
+    if command == "computer-use":
+        return _cmd_computer_use(cfg, args)
     if command == "memory":
         return _cmd_memory(cfg, args)
     if command == "websites":
@@ -2660,6 +2672,31 @@ def _cmd_kanban(cfg, args) -> int:
                            "rollback": "board untouched; nothing to roll back"},
                           indent=2))
         return rc
+
+
+def _cmd_computer_use(cfg, args) -> int:
+    """voicebridge computer-use status|doctor|permissions|install.
+
+    Read-only capability probes; control stays DISABLED (8V scope) and
+    driver download/install is typed-refused (pinned-source policy).
+    """
+    import json as _json
+    from . import computer_use as CU
+    cmd = getattr(args, "computer_use_command", None) or "status"
+    if cmd == "status":
+        out = CU.status()
+    elif cmd == "doctor":
+        out = CU.doctor()
+    elif cmd == "permissions":
+        out = CU.permissions()
+    elif cmd == "install":
+        print(_json.dumps(CU.refuse_install(), indent=2))
+        return 2
+    else:
+        print(f"ERROR: unknown computer-use command {cmd!r}")
+        return 2
+    print(_json.dumps(out, indent=2, sort_keys=True))
+    return 0
 
 
 def _cmd_memory(cfg, args) -> int:
