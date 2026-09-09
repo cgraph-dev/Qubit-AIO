@@ -51,15 +51,12 @@ def test_no_stub_commands_for_blocked_rows():
             f"{absent!r} must not exist as a CLI command (no stubs)"
 
 
-def test_import_agent_stays_blocked_without_readers():
+def test_import_agent_inspect_only_contract():
+    from voicebridge import import_agent as IA
     from voicebridge.capability_catalog import check
 
     out = check("import-agent")
-    assert out["state"] == "BLOCKED"
-    assert out["code"] == "BLOCKED_IMPORT_AGENT"
-    import pathlib
-
-    readers = [str(p) for p in
-               pathlib.Path("voicebridge").rglob("*.py")
-               if "agent_import" in p.name or "import_agent" in p.name]
-    assert readers == [], f"foreign-state readers must not exist: {readers}"
+    assert out["state"] == "IMPLEMENTED", out
+    assert callable(IA.inspect_tree) and callable(IA.refuse_import)
+    assert not hasattr(IA, "import_tree"), \
+        "no content-import API may exist (inspect-only contract)"

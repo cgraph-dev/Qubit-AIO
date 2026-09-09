@@ -605,6 +605,16 @@ def build_parser() -> argparse.ArgumentParser:
                       help="per-provider eligibility (references only)")
     px_sub.add_parser("start", parents=[common],
                       help="refused: forwarding would bypass egress + audit")
+    ia = add("import-agent", help="Foreign agent setup inventory (never imports)")
+    ia_sub = ia.add_subparsers(dest="import_agent_command")
+    ia_inspect = ia_sub.add_parser("inspect", parents=[common],
+                                   help="quarantined structural inventory (read-only)")
+    ia_inspect.add_argument("--source", default="",
+                            help="foreign agent tree (default: auto-detect below home)")
+    ia_inspect.add_argument("--kind", default="",
+                            choices=["", "claude-code", "codex"])
+    ia_sub.add_parser("import", parents=[common],
+                      help="refused: unreviewed state needs review first")
     mem = add("memory", help="Packet 8M semantic memory (GENOME contract; disabled by default)")
     mem_sub = mem.add_subparsers(dest="memory_command")
     mem_status = mem_sub.add_parser("status", parents=[common],
@@ -1324,6 +1334,8 @@ def main(argv=None) -> int:
         return _cmd_theme(cfg, args)
     if command == "proxy":
         return _cmd_proxy(cfg, args)
+    if command == "import-agent":
+        return _cmd_import_agent(cfg, args)
     if command == "memory":
         return _cmd_memory(cfg, args)
     if command == "websites":
@@ -2925,6 +2937,38 @@ def _cmd_proxy(cfg, args) -> int:
         return 2
     print(_json.dumps(out, indent=2, sort_keys=True))
     return 0
+
+
+def _cmd_import_agent(cfg, args) -> int:
+    """voicebridge import-agent inspect|import.
+
+    Quarantined read-only inventory; content import is typed-refused
+    (reviewed-code policy; credentials never imported).
+    """
+    import json as _json
+    from . import import_agent as IA
+    cmd = getattr(args, "import_agent_command", None) or "inspect"
+    try:
+        if cmd == "inspect":
+            source = getattr(args, "source", "") or ""
+            if not source.strip():
+                source = IA._default_source()
+            out = IA.inspect_tree(source, getattr(args, "kind", "") or "")
+        elif cmd == "import":
+            print(_json.dumps(IA.refuse_import(), indent=2))
+            return 2
+        else:
+            print(f"ERROR: unknown import-agent command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except IA.ImportAgentError as exc:
+        print(_json.dumps({"state": "FAILED", "code": exc.code,
+                           "detail": exc.detail[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "nothing imported; nothing to roll back"},
+                          indent=2))
+        return 2
 
 
 def _cmd_memory(cfg, args) -> int:

@@ -438,13 +438,11 @@
     },
     {
       "cmd": "import-agent",
-      "verdict": "BLOCKED",
-      "reason": "Foreign Claude/Codex session import reads unreviewed third-party state",
-      "evidence": "no foreign-state readers in product",
-      "owner": "qubit-policy",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "BLOCKED_IMPORT_AGENT",
-      "user_explanation": "Qubit Agent cannot do this: Foreign Claude/Codex session import reads unreviewed third-party state"
+      "verdict": "IMPLEMENTED",
+      "qubit": "voicebridge import-agent inspect (quarantined structural inventory: known filenames only, bounded, redacted, never executed/stored/symlink-followed) + import typed-refused IMPORT_AGENT_REVIEW_REQUIRED (reviewed artifacts install via skills install; credentials never imported)",
+      "proof": "tests/test_import_agent8tf.py",
+      "owner": "qubit-core",
+      "rollback": "inspect is read-only; nothing imported or stored"
     },
     {
       "cmd": "profile",
