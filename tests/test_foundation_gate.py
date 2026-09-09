@@ -194,3 +194,16 @@ def test_no_tmp_dependence_in_production_defaults(monkeypatch):
     assert "qubit-voicebridge/runtimes" in str(rt.binary)
     assert P.runtime_dir().is_absolute()
     assert "/tmp/hermes" not in str(P.runtime_dir())
+
+
+def test_provision_ignores_snap_confinement(monkeypatch):
+    """Snap XDG values must not fragment the single Qubit runtime tree."""
+    monkeypatch.setenv("XDG_DATA_HOME", "/home/trick/snap/code/261/.local/share")
+    monkeypatch.setenv("XDG_STATE_HOME", "/home/trick/snap/code/261/.local/state")
+    from voicebridge.config import canonical_data_dir, canonical_state_dir
+    from voicebridge.runtime import provision as P
+
+    assert "snap" not in str(P.runtime_dir())
+    assert P.runtime_dir() == canonical_data_dir() / "runtimes" / f"hermes-agent-{P.HERMES_COMMIT}"
+    assert "snap" not in str(P.hermes_home())
+    assert P.hermes_home() == canonical_state_dir() / "hermes-runtime"

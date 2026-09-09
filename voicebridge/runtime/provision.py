@@ -43,13 +43,26 @@ class ProvisionResult:
 
 
 def _xdg_data_home() -> Path:
-    raw = os.environ.get("XDG_DATA_HOME", "").strip()
-    return Path(raw).expanduser() if raw else Path("~/.local/share").expanduser()
+    # Canonical Qubit XDG resolution (Packet 8S): snap-confinement values
+    # (e.g. ~/snap/code/<rev>/.local/share) must NOT fragment the runtime
+    # tree. Delegate to voicebridge.config._xdg_base so provision,
+    # runtime_inventory, RealHermesRuntime, CLI status, and dashboard all
+    # resolve one effective directory.
+    try:
+        from voicebridge.config import _xdg_base as _canonical_base
+        return _canonical_base("XDG_DATA_HOME", ".local/share")
+    except Exception:
+        raw = os.environ.get("XDG_DATA_HOME", "").strip()
+        return Path(raw).expanduser() if raw else Path("~/.local/share").expanduser()
 
 
 def _xdg_state_home() -> Path:
-    raw = os.environ.get("XDG_STATE_HOME", "").strip()
-    return Path(raw).expanduser() if raw else Path("~/.local/state").expanduser()
+    try:
+        from voicebridge.config import _xdg_base as _canonical_base
+        return _canonical_base("XDG_STATE_HOME", ".local/state")
+    except Exception:
+        raw = os.environ.get("XDG_STATE_HOME", "").strip()
+        return Path(raw).expanduser() if raw else Path("~/.local/state").expanduser()
 
 
 def runtime_dir(base: Optional[Path] = None) -> Path:
