@@ -134,6 +134,8 @@ def _providers(cfg: Any) -> Dict[str, Any]:
 
 def runtime_inventory(cfg: Any) -> Dict[str, Any]:
     """Assemble the real runtime inventory; every leaf is observed or typed."""
+    from .auth_status import auth_status, recent_sessions
+    from .integration_status import claw_status, mcp_status
     from .capability_catalog import summary as _cap_summary
 
     inv = {
@@ -149,6 +151,10 @@ def runtime_inventory(cfg: Any) -> Dict[str, Any]:
         "approvals": _approvals(cfg),
         "adapters": _adapters(cfg),
         "providers": _providers(cfg),
+        "auth": _safe(auth_status, cfg),
+        "mcp": _safe(mcp_status, cfg),
+        "claw": _safe(claw_status, cfg),
+        "sessions": _safe(recent_sessions, cfg, 5),
         "capabilities": _safe(_cap_summary),
     }
     return inv

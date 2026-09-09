@@ -61,6 +61,17 @@ def build_parser() -> argparse.ArgumentParser:
     auth_sub = auth_p.add_subparsers(dest="auth_command")
     auth_sub.add_parser("status", parents=[common],
                         help="show configured providers and reference state (read-only)")
+    auth_sub.add_parser("logout", parents=[common],
+                        help="verify no stored credentials linger (read-only scan)")
+    mcp_p = add("mcp", help="MCP server inventory and mount policy (read-only)")
+    mcp_sub = mcp_p.add_subparsers(dest="mcp_command")
+    mcp_sub.add_parser("status", parents=[common],
+                       help="list configured MCP servers without mounting anything")
+    claw_p = add("claw", help="OpenClaw-lineage install detection (read-only)")
+    claw_sub = claw_p.add_subparsers(dest="claw_command")
+    claw_sub.add_parser("status", parents=[common],
+                        help="detect OpenClaw install state without changing it")
+    add("verify-release", help="hermetic static release qualification (no build/install)")
     sess = add("sessions", help="recent Qubit action sessions from receipts (redacted)")
     sess_sub = sess.add_subparsers(dest="sessions_command")
     sess_list = sess_sub.add_parser("list", parents=[common],
@@ -943,7 +954,16 @@ def main(argv=None) -> int:
     if command == "status":
         return _cmd_status(cfg)
     if command == "auth":
+        sub = getattr(args, "auth_command", None) or "status"
+        if sub == "logout":
+            return _cmd_auth_logout(cfg)
         return _cmd_auth_status(cfg)
+    if command == "mcp":
+        return _cmd_mcp_status(cfg)
+    if command == "claw":
+        return _cmd_claw_status(cfg)
+    if command == "verify-release":
+        return _cmd_verify_static()
     if command == "sessions":
         return _cmd_sessions_list(cfg, args.limit
                                   if hasattr(args, "limit") else 20)
@@ -1153,12 +1173,46 @@ def _cmd_auth_status(cfg) -> int:
     return 0
 
 
+def _cmd_auth_logout(cfg) -> int:
+    """Verify no stored credentials linger (read-only scan)."""
+    from .integration_status import logout_check
+
+    out = logout_check(cfg)
+    print(json.dumps(out, indent=2))
+    return 0
+
+
 def _cmd_sessions_list(cfg, limit: int = 20) -> int:
     """Recent action sessions from receipts (redacted)."""
     from .auth_status import recent_sessions
 
     print(json.dumps(recent_sessions(cfg, limit), indent=2))
     return 0
+
+
+def _cmd_mcp_status(cfg) -> int:
+    """MCP server inventory without mounting anything (read-only)."""
+    from .integration_status import mcp_status
+
+    print(json.dumps(mcp_status(cfg), indent=2))
+    return 0
+
+
+def _cmd_claw_status(cfg) -> int:
+    """OpenClaw-lineage install detection (read-only)."""
+    from .integration_status import claw_status
+
+    print(json.dumps(claw_status(cfg), indent=2))
+    return 0
+
+
+def _cmd_verify_static() -> int:
+    """Hermetic static release qualification (no build/install)."""
+    from .integration_status import verify_static
+
+    out = verify_static()
+    print(json.dumps(out, indent=2))
+    return 0 if out.get("state") == "PASS" else 1
 
 
 def _cmd_mic_test(cfg) -> int:

@@ -484,6 +484,8 @@ async function runtimeStatus(){
  if(body.approvals && body.approvals.pending !== undefined) rows.push('<div>approvals pending '+esc(String(body.approvals.pending))+'</div>');
  if(body.auth && body.auth.providers) rows.push('<div>credentials '+esc(String(body.auth.providers.filter(p=>p.configured).length))+'/'+esc(String(body.auth.providers.length))+' configured (names only)</div>');
  if(body.sessions && body.sessions.count !== undefined) rows.push('<div>sessions '+esc(String(body.sessions.count))+' recent</div>');
+ if(body.mcp) rows.push('<div>mcp '+esc(String((body.mcp.servers||[]).length))+' configured · '+esc(body.mcp.state||'?')+'</div>');
+ if(body.claw) rows.push('<div>claw lineage '+esc(body.claw.state||'?')+'</div>');
  if(body.capabilities && body.capabilities.states){
    const s = body.capabilities.states;
    rows.push('<div>capabilities '+esc(String(s.IMPLEMENTED||0))+' implemented · '+esc(String(s.BLOCKED||0))+' blocked · '+esc(String(s.REJECTED||0))+' rejected</div>');

@@ -6,6 +6,7 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a audio
 complete -c voicebridge -n '__fish_use_subcommand' -f -a auth
 complete -c voicebridge -n '__fish_use_subcommand' -f -a branding
 complete -c voicebridge -n '__fish_use_subcommand' -f -a capability
+complete -c voicebridge -n '__fish_use_subcommand' -f -a claw
 complete -c voicebridge -n '__fish_use_subcommand' -f -a completion
 complete -c voicebridge -n '__fish_use_subcommand' -f -a device
 complete -c voicebridge -n '__fish_use_subcommand' -f -a enroll
@@ -16,6 +17,7 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a flags
 complete -c voicebridge -n '__fish_use_subcommand' -f -a frontier
 complete -c voicebridge -n '__fish_use_subcommand' -f -a ghost
 complete -c voicebridge -n '__fish_use_subcommand' -f -a import-state
+complete -c voicebridge -n '__fish_use_subcommand' -f -a mcp
 complete -c voicebridge -n '__fish_use_subcommand' -f -a memory
 complete -c voicebridge -n '__fish_use_subcommand' -f -a mic-test
 complete -c voicebridge -n '__fish_use_subcommand' -f -a monitor
@@ -36,5 +38,6 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a task
 complete -c voicebridge -n '__fish_use_subcommand' -f -a tts-test
 complete -c voicebridge -n '__fish_use_subcommand' -f -a verified-skills
 complete -c voicebridge -n '__fish_use_subcommand' -f -a verify
+complete -c voicebridge -n '__fish_use_subcommand' -f -a verify-release
 complete -c voicebridge -n '__fish_use_subcommand' -f -a websites
 complete -c voicebridge -n '__fish_use_subcommand' -f -a webui

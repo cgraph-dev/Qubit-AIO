@@ -215,13 +215,11 @@
     },
     {
       "cmd": "verify",
-      "verdict": "BLOCKED",
-      "reason": "Project run-recipe smoke testing is 8X workspace scope",
-      "evidence": "no run-recipe runner in product",
-      "owner": "packet-8X",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "BLOCKED_VERIFY",
-      "user_explanation": "Qubit Agent cannot do this: Project run-recipe smoke testing is 8X workspace scope"
+      "verdict": "IMPLEMENTED",
+      "owner": "qubit-core",
+      "rollback": "standard Qubit rollback contracts apply",
+      "qubit": "voicebridge verify-release (static release qualification, no build/install)",
+      "proof": "tests/test_integration8tf.py"
     },
     {
       "cmd": "security",
@@ -359,13 +357,11 @@
     },
     {
       "cmd": "mcp",
-      "verdict": "BLOCKED",
-      "reason": "No unauthenticated MCP mounting; research-only use stays separately authorized",
-      "evidence": "8N gating tests",
-      "owner": "qubit-policy",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "BLOCKED_MCP",
-      "user_explanation": "Qubit Agent cannot do this: No unauthenticated MCP mounting; research-only use stays separately authorized"
+      "verdict": "IMPLEMENTED",
+      "owner": "qubit-core",
+      "rollback": "standard Qubit rollback contracts apply",
+      "qubit": "voicebridge mcp status (inventory + mount policy, never mounts)",
+      "proof": "tests/test_integration8tf.py"
     },
     {
       "cmd": "acp/lsp",
@@ -451,13 +447,11 @@
     },
     {
       "cmd": "claw",
-      "verdict": "BLOCKED",
-      "reason": "OpenClaw-migration helpers target a different product lineage; Qubit migration contracts own this",
-      "evidence": "migration suites",
-      "owner": "qubit-policy",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "BLOCKED_CLAW",
-      "user_explanation": "Qubit Agent cannot do this: OpenClaw-migration helpers target a different product lineage; Qubit migration contracts own this"
+      "verdict": "IMPLEMENTED",
+      "owner": "qubit-core",
+      "rollback": "standard Qubit rollback contracts apply",
+      "qubit": "voicebridge claw status (read-only lineage detection)",
+      "proof": "tests/test_integration8tf.py"
     },
     {
       "cmd": "update/uninstall",
