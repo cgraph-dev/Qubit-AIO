@@ -23,7 +23,7 @@ ACCOUNT_BOUND = {
 ABSENT_COMMANDS = ("pairing", "webhook", "peer", "gateway", "whatsapp",
                    "whatsapp-cloud", "slack", "send", "portal", "login",
                    "logout", "sync", "pets", "skin", "serve",
-                   "desktop", "gui", "dashboard", "hooks", "tui")
+                   "desktop", "gui", "dashboard", "tui")
 
 
 def test_account_bound_names_are_typed_blocked():

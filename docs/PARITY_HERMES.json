@@ -502,12 +502,11 @@
     },
     {
       "cmd": "hooks",
-      "verdict": "REJECTED",
-      "reason": "Arbitrary shell-hook execution violates the no-direct-shell safety invariant",
-      "owner": "qubit-policy",
-      "rollback": "never installed; stays disabled",
-      "user_explanation": "Qubit Agent cannot do this: automatic shell hooks are refused by safety policy.",
-      "code": "REJECTED_HOOKS"
+      "verdict": "IMPLEMENTED",
+      "qubit": "voicebridge hooks declare/list/show/validate/test/fire/revoke/remove/doctor (disabled registry with hash + hostile-marker screening; delivery = broker audit events, shell NEVER executes; --confirm, e-stop gated)",
+      "proof": "tests/test_hooks8tf.py",
+      "owner": "qubit-core",
+      "rollback": "revoke/remove with --confirm deletes declarations (audited)"
     },
     {
       "cmd": "plugins/plugins-list",

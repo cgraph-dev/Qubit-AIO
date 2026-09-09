@@ -605,6 +605,33 @@ def build_parser() -> argparse.ArgumentParser:
                       help="per-provider eligibility (references only)")
     px_sub.add_parser("start", parents=[common],
                       help="refused: forwarding would bypass egress + audit")
+    hk = add("hooks", help="Declared event subscriptions (shells never execute)")
+    hk_sub = hk.add_subparsers(dest="hooks_command")
+    hk_declare = hk_sub.add_parser("declare", parents=[common],
+                                   help="record a subscription disabled (dry-run unless --confirm)")
+    hk_declare.add_argument("name")
+    hk_declare.add_argument("--event", required=True)
+    hk_declare.add_argument("--shell", required=True,
+                            help="shell text for REVIEW ONLY (never executed)")
+    hk_declare.add_argument("--confirm", action="store_true")
+    hk_sub.add_parser("list", parents=[common], help="list declarations")
+    for _hk_ro, _hk_help in (("show", "show one declaration"),
+                             ("validate", "static screening (never executes)"),
+                             ("test", "dry-run delivery plan"),
+                             ("doctor", "registry health")):
+        _p = hk_sub.add_parser(_hk_ro, parents=[common], help=_hk_help)
+        if _hk_ro in ("show", "validate", "test"):
+            _p.add_argument("name")
+    hk_fire = hk_sub.add_parser("fire", parents=[common],
+                                help="manual broker-audited delivery (shells NOT executed)")
+    hk_fire.add_argument("--event", required=True)
+    hk_fire.add_argument("--confirm", action="store_true")
+    for _hk_mut, _hk_help in (("revoke", "revoke a declaration"),
+                              ("remove", "delete a declaration")):
+        _p = hk_sub.add_parser(_hk_mut, parents=[common],
+                               help=_hk_help + " (dry-run unless --confirm)")
+        _p.add_argument("name")
+        _p.add_argument("--confirm", action="store_true")
     ia = add("import-agent", help="Foreign agent setup inventory (never imports)")
     ia_sub = ia.add_subparsers(dest="import_agent_command")
     ia_inspect = ia_sub.add_parser("inspect", parents=[common],
@@ -1336,6 +1363,8 @@ def main(argv=None) -> int:
         return _cmd_proxy(cfg, args)
     if command == "import-agent":
         return _cmd_import_agent(cfg, args)
+    if command == "hooks":
+        return _cmd_hooks(cfg, args)
     if command == "memory":
         return _cmd_memory(cfg, args)
     if command == "websites":
@@ -2969,6 +2998,66 @@ def _cmd_import_agent(cfg, args) -> int:
                            "rollback": "nothing imported; nothing to roll back"},
                           indent=2))
         return 2
+
+
+def _cmd_hooks(cfg, args) -> int:
+    """voicebridge hooks declare|list|show|validate|test|fire|revoke|remove|doctor.
+
+    Declared event subscriptions with the shell permanently disarmed:
+    delivery appends broker audit events; nothing is ever executed.
+    Mutating ops preview under --dry-run, require --confirm, and refuse
+    while the emergency stop is latched.
+    """
+    import json as _json
+    from . import hooks as HK
+    cmd = getattr(args, "hooks_command", None) or "list"
+    confirm = bool(getattr(args, "confirm", False))
+    try:
+        if cmd in ("declare", "fire", "revoke", "remove") \
+                and HK.estop_engaged(cfg):
+            print(_json.dumps(HK.refuse_estop(f"hooks {cmd}"), indent=2))
+            return 3
+        if getattr(args, "dry_run", False) and cmd != "list" \
+                and cmd not in ("show", "validate", "test", "doctor"):
+            print(_json.dumps({"state": "preview", "would": f"hooks {cmd}"},
+                              indent=2))
+            return 0
+        if cmd == "list":
+            out = HK.list_hooks(cfg)
+        elif cmd == "show":
+            out = HK.show(cfg, args.name)
+        elif cmd == "declare":
+            out = HK.declare(cfg, args.name, args.event, args.shell,
+                             requested_by="cli:user", confirmed=confirm)
+        elif cmd == "validate":
+            out = HK.validate(cfg, args.name)
+        elif cmd == "test":
+            out = HK.test_plan(cfg, args.name)
+        elif cmd == "fire":
+            out = HK.fire(cfg, args.event,
+                          requested_by="cli:user", confirmed=confirm)
+        elif cmd == "revoke":
+            out = HK.revoke(cfg, args.name,
+                            requested_by="cli:user", confirmed=confirm)
+        elif cmd == "remove":
+            out = HK.remove(cfg, args.name,
+                            requested_by="cli:user", confirmed=confirm)
+        elif cmd == "doctor":
+            out = HK.doctor(cfg)
+        else:
+            print(f"ERROR: unknown hooks command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except HK.HookError as exc:
+        rc = 3 if exc.code == HK.CONFIRM_CODE else 2
+        print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                           "code": exc.code,
+                           "detail": exc.detail[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "registry untouched; nothing to roll back"},
+                          indent=2))
+        return rc
 
 
 def _cmd_memory(cfg, args) -> int:

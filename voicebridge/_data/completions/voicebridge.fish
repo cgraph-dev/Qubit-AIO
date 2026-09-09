@@ -20,6 +20,7 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a flag-drill
 complete -c voicebridge -n '__fish_use_subcommand' -f -a flags
 complete -c voicebridge -n '__fish_use_subcommand' -f -a frontier
 complete -c voicebridge -n '__fish_use_subcommand' -f -a ghost
+complete -c voicebridge -n '__fish_use_subcommand' -f -a hooks
 complete -c voicebridge -n '__fish_use_subcommand' -f -a import-agent
 complete -c voicebridge -n '__fish_use_subcommand' -f -a import-state
 complete -c voicebridge -n '__fish_use_subcommand' -f -a kanban
