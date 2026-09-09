@@ -343,13 +343,11 @@
     },
     {
       "cmd": "browser",
-      "verdict": "BLOCKED",
-      "reason": "Real-profile browser helpers touch personal profiles; 8B loopback CDP is the only browser authority",
-      "evidence": "8B read-only tests",
-      "owner": "qubit-policy",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "BLOCKED_BROWSER",
-      "user_explanation": "Qubit Agent cannot do this: Real-profile browser helpers touch personal profiles; 8B loopback CDP is the only browser authority"
+      "verdict": "IMPLEMENTED",
+      "qubit": "voicebridge browser status (8B loopback-CDP typed probe, read-only) + close-profile typed-refused BROWSER_CLOSE_REFUSED (personal profiles never touched)",
+      "proof": "tests/test_browser8tf.py",
+      "owner": "qubit-core",
+      "rollback": "probe is read-only; no session ever mutated"
     },
     {
       "cmd": "tools",

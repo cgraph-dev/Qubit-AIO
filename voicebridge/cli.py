@@ -538,6 +538,13 @@ def build_parser() -> argparse.ArgumentParser:
                       help="control policy record (read-only)")
     cu_sub.add_parser("install", parents=[common],
                       help="refused: unpinned driver binaries are never downloaded")
+    br = add("browser", help="Loopback browser state (read-only; profiles untouched)")
+    br_sub = br.add_subparsers(dest="browser_command")
+    br_sub.add_parser("status", parents=[common],
+                      help="loopback CDP state (read-only probe)")
+    br_close = br_sub.add_parser("close-profile", parents=[common],
+                                 help="refused: real profiles are never mutated")
+    br_close.add_argument("--profile", default="default")
     mem = add("memory", help="Packet 8M semantic memory (GENOME contract; disabled by default)")
     mem_sub = mem.add_subparsers(dest="memory_command")
     mem_status = mem_sub.add_parser("status", parents=[common],
@@ -1247,6 +1254,8 @@ def main(argv=None) -> int:
         return _cmd_kanban(cfg, args)
     if command == "computer-use":
         return _cmd_computer_use(cfg, args)
+    if command == "browser":
+        return _cmd_browser(cfg, args)
     if command == "memory":
         return _cmd_memory(cfg, args)
     if command == "websites":
@@ -2694,6 +2703,28 @@ def _cmd_computer_use(cfg, args) -> int:
         return 2
     else:
         print(f"ERROR: unknown computer-use command {cmd!r}")
+        return 2
+    print(_json.dumps(out, indent=2, sort_keys=True))
+    return 0
+
+
+def _cmd_browser(cfg, args) -> int:
+    """voicebridge browser status|close-profile.
+
+    Read-only loopback state; real-profile mutation is typed-refused.
+    """
+    import json as _json
+    from . import browser as BR
+    cmd = getattr(args, "browser_command", None) or "status"
+    if cmd == "status":
+        out = BR.status(cfg)
+    elif cmd == "close-profile":
+        print(_json.dumps(
+            BR.refuse_close_profile(getattr(args, "profile", "") or ""),
+            indent=2))
+        return 2
+    else:
+        print(f"ERROR: unknown browser command {cmd!r}")
         return 2
     print(_json.dumps(out, indent=2, sort_keys=True))
     return 0
