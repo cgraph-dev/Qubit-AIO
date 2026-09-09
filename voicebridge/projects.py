@@ -468,15 +468,50 @@ def restore(cfg: Any, slug: str, *, requested_by: str = "cli:user",
 
 def bind_board(cfg: Any, slug: str, board: str, *,
                requested_by: str = "cli:user",
-               confirmed: bool = False) -> Dict[str, Any]:
-    """Refuse board binding until kanban boards exist (typed, tested)."""
-    _load(cfg)
-    _check_slug(slug)
-    raise ProjectError(NO_BOARD_CODE,
-                       "Qubit Agent cannot do this yet: kanban boards are "
-                       "not implemented, so no board can be bound. "
-                       "Projects work standalone; binding arrives with "
-                       "kanban parity.")
+               confirmed: bool = False, unbind: bool = False) -> Dict[str, Any]:
+    """Bind (or unbind) a real kanban board (both sides stay consistent)."""
+    if not confirmed:
+        raise ProjectError(CONFIRM_CODE,
+                           "project bind-board requires explicit --confirm")
+    from .kanban import board_exists, set_board_project, KanbanError
+
+    if unbind:
+        def _do(state, rec):
+            old = rec.get("board")
+            if old:
+                try:
+                    set_board_project(cfg, old, None,
+                                      requested_by=requested_by)
+                except KanbanError:
+                    pass
+            rec["board"] = None
+
+        return _mutate(cfg, slug, requested_by, "bind-board", _do)
+    try:
+        from . import kanban as KB
+
+        clean_board = KB._check_board_slug(board)
+        exists = board_exists(cfg, clean_board)
+    except KanbanError as exc:
+        raise ProjectError(BAD_NAME_CODE, exc.detail) from exc
+    if not exists:
+        raise ProjectError(NO_BOARD_CODE,
+                           f"no board {board!r}; create it first with "
+                           f"`kanban boards-create {board} --confirm`")
+
+    def _do(state, rec):
+        previous = rec.get("board")
+        if previous and previous != clean_board:
+            try:
+                set_board_project(cfg, previous, None,
+                                  requested_by=requested_by)
+            except KanbanError:
+                pass
+        set_board_project(cfg, clean_board, rec["slug"],
+                          requested_by=requested_by)
+        rec["board"] = clean_board
+
+    return _mutate(cfg, slug, requested_by, "bind-board", _do)
 
 
 def rollback(cfg: Any, *, requested_by: str = "cli:user",

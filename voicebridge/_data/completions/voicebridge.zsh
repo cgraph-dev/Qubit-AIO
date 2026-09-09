@@ -2,7 +2,7 @@
 # scripts/gen_completions.py — do not hand-edit; regenerate instead.
 #compdef voicebridge
 _voicebridge() {
-    local -a commands=(actions asr-test audio auth branding capability checkpoints claw completion device enroll experiments export-state flag-drill flags frontier ghost import-state mcp memory mic-test monitor once opencode package permissions power product profile project roundtrip run sessions setup skills status task tts-test verified-skills verify verify-release websites webui)
+    local -a commands=(actions asr-test audio auth branding capability checkpoints claw completion device enroll experiments export-state flag-drill flags frontier ghost import-state kanban mcp memory mic-test monitor once opencode package permissions power product profile project roundtrip run sessions setup skills status task tts-test verified-skills verify verify-release websites webui)
     _describe 'voicebridge commands' commands
 }
 compdef _voicebridge voicebridge

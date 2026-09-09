@@ -423,14 +423,100 @@ def build_parser() -> argparse.ArgumentParser:
     pj_restore.add_argument("slug")
     pj_restore.add_argument("--confirm", action="store_true")
     pj_bind = pj_sub.add_parser("bind-board", parents=[common],
-                                help="bind a kanban board (typed refusal until kanban lands)")
+                                help="bind a kanban board (dry-run unless --confirm)")
     pj_bind.add_argument("slug")
-    pj_bind.add_argument("--board", required=True)
+    pj_bind.add_argument("--board", default="")
+    pj_bind.add_argument("--unbind", action="store_true",
+                         help="remove the board binding instead")
     pj_bind.add_argument("--confirm", action="store_true")
     pj_roll = pj_sub.add_parser("rollback", parents=[common],
                                 help="restore the registry from a backup (dry-run unless --confirm)")
     pj_roll.add_argument("--backup", default="")
     pj_roll.add_argument("--confirm", action="store_true")
+    kb = add("kanban", help="Local task boards (Qubit registry; execution ops delegate)")
+    kb_sub = kb.add_subparsers(dest="kanban_command")
+    kb_sub.add_parser("init", parents=[common],
+                      help="create the board store if missing (idempotent)")
+    kb_sub.add_parser("boards", parents=[common], help="list boards")
+    kb_bc = kb_sub.add_parser("boards-create", parents=[common],
+                              help="create a board (dry-run unless --confirm)")
+    kb_bc.add_argument("slug")
+    kb_bc.add_argument("--name", default="")
+    kb_bc.add_argument("--confirm", action="store_true")
+    kb_create = kb_sub.add_parser("create", parents=[common],
+                                  help="create a task (dry-run unless --confirm)")
+    kb_create.add_argument("title")
+    kb_create.add_argument("--body", default="")
+    kb_create.add_argument("--assignee", default="")
+    kb_create.add_argument("--priority", choices=["low", "normal", "high"],
+                           default="normal")
+    kb_create.add_argument("--board", default="main")
+    kb_create.add_argument("--confirm", action="store_true")
+    kb_list = kb_sub.add_parser("list", parents=[common], help="list tasks")
+    kb_list.add_argument("--board", default="")
+    kb_list.add_argument("--status", default="",
+                         choices=["", "open", "claimed", "blocked", "done", "archived"])
+    kb_list.add_argument("--limit", type=int, default=50)
+    kb_ls = kb_sub.add_parser("ls", parents=[common], help="list tasks")
+    kb_ls.add_argument("--board", default="")
+    kb_ls.add_argument("--status", default="",
+                       choices=["", "open", "claimed", "blocked", "done", "archived"])
+    kb_ls.add_argument("--limit", type=int, default=50)
+    kb_show = kb_sub.add_parser("show", parents=[common],
+                                help="show a task with comments + events")
+    kb_show.add_argument("task_id", type=int)
+    for _kb_mut, _kb_help in (
+            ("claim", "claim a task (dry-run unless --confirm)"),
+            ("assign", "set the assignee (dry-run unless --confirm)"),
+            ("reassign", "move a claim (dry-run unless --confirm)"),
+            ("reclaim", "release a claim (dry-run unless --confirm)"),
+            ("complete", "mark done (dry-run unless --confirm)"),
+            ("block", "mark blocked (dry-run unless --confirm)"),
+            ("unblock", "return to open (dry-run unless --confirm)"),
+            ("archive", "archive a task (dry-run unless --confirm)")):
+        _p = kb_sub.add_parser(_kb_mut, parents=[common], help=_kb_help)
+        _p.add_argument("task_id", type=int)
+        if _kb_mut in ("claim", "assign", "reassign"):
+            _p.add_argument("--assignee", default="")
+        _p.add_argument("--confirm", action="store_true")
+    kb_comment = kb_sub.add_parser("comment", parents=[common],
+                                   help="append a comment (dry-run unless --confirm)")
+    kb_comment.add_argument("task_id", type=int)
+    kb_comment.add_argument("body")
+    kb_comment.add_argument("--confirm", action="store_true")
+    kb_edit = kb_sub.add_parser("edit", parents=[common],
+                                help="edit title/body/priority (dry-run unless --confirm)")
+    kb_edit.add_argument("task_id", type=int)
+    kb_edit.add_argument("--title", default="")
+    kb_edit.add_argument("--body", default="")
+    kb_edit.add_argument("--priority", default="",
+                         choices=["", "low", "normal", "high"])
+    kb_edit.add_argument("--confirm", action="store_true")
+    kb_stats = kb_sub.add_parser("stats", parents=[common],
+                                 help="per-board status counts")
+    kb_stats.add_argument("--board", default="")
+    kb_log = kb_sub.add_parser("log", parents=[common],
+                               help="recent board events")
+    kb_log.add_argument("--board", default="")
+    kb_log.add_argument("--limit", type=int, default=50)
+    kb_sub.add_parser("export", parents=[common],
+                      help="dump the board snapshot as JSON (rollback)")
+    kb_import = kb_sub.add_parser("import", parents=[common],
+                                  help="restore a snapshot (dry-run unless --confirm)")
+    kb_import.add_argument("snapshot", type=Path)
+    kb_import.add_argument("--confirm", action="store_true")
+    for _kb_del in ("swarm", "dispatch", "daemon", "watch",
+                    "notify-subscribe", "notify-list", "notify-unsubscribe",
+                    "heartbeat", "runs"):
+        kb_sub.add_parser(_kb_del, parents=[common],
+                          help="delegates to a Qubit-native path (typed refusal)")
+    for _kb_un in ("set-model", "diagnostics", "diag", "link", "unlink",
+                   "attach", "attachments", "attach-rm", "schedule",
+                   "request-review", "request-changes", "reopen-review",
+                   "promote", "tail", "assignees", "context", "specify",
+                   "decompose", "gc", "repair"):
+        kb_sub.add_parser(_kb_un, parents=[common],
+                          help="no Qubit construct yet (typed refusal)")
     mem = add("memory", help="Packet 8M semantic memory (GENOME contract; disabled by default)")
     mem_sub = mem.add_subparsers(dest="memory_command")
     mem_status = mem_sub.add_parser("status", parents=[common],
@@ -1132,6 +1218,8 @@ def main(argv=None) -> int:
         return _cmd_skills(cfg, args)
     if command == "project":
         return _cmd_project(cfg, args)
+    if command == "kanban":
+        return _cmd_kanban(cfg, args)
     if command == "memory":
         return _cmd_memory(cfg, args)
     if command == "websites":
@@ -2409,8 +2497,9 @@ def _cmd_project(cfg, args) -> int:
             out = PJ.restore(cfg, args.slug,
                              requested_by="cli:user", confirmed=confirm)
         elif cmd == "bind-board":
-            out = PJ.bind_board(cfg, args.slug, args.board,
-                                requested_by="cli:user", confirmed=confirm)
+            out = PJ.bind_board(cfg, args.slug, getattr(args, "board", "") or "",
+                                requested_by="cli:user", confirmed=confirm,
+                                unbind=bool(getattr(args, "unbind", False)))
         elif cmd == "rollback":
             out = PJ.rollback(cfg, requested_by="cli:user", confirmed=confirm,
                               backup=getattr(args, "backup", "") or "")
@@ -2426,6 +2515,115 @@ def _cmd_project(cfg, args) -> int:
                            "detail": PJ.redact_spec(exc.detail)[:300],
                            "owner": "qubit-policy",
                            "rollback": "registry untouched; nothing to roll back"},
+                          indent=2))
+        return rc
+
+
+def _cmd_kanban(cfg, args) -> int:
+    """voicebridge kanban <op> — local task boards.
+
+    Board/task operations persist in the canonical SQLite store; execution-
+    shaped subcommands (swarm/dispatch/daemon/...) are typed-delegated to
+    their Qubit-native paths and remaining Hermes subcommands are typed-
+    refused. Mutating ops preview under --dry-run, require --confirm, and
+    refuse while the emergency stop is latched.
+    """
+    import json as _json
+    from . import kanban as KB
+    cmd = getattr(args, "kanban_command", None) or "list"
+    confirm = bool(getattr(args, "confirm", False))
+    _MUTATING = {"boards-create", "create", "claim", "assign", "reassign",
+                 "reclaim", "comment", "complete", "edit", "block",
+                 "unblock", "archive", "import"}
+    try:
+        if cmd in _MUTATING and KB.estop_engaged(cfg):
+            print(_json.dumps(KB.refuse_estop(f"kanban {cmd}"), indent=2))
+            return 3
+        if getattr(args, "dry_run", False) and cmd in _MUTATING:
+            print(_json.dumps({"state": "preview", "would": f"kanban {cmd}"},
+                              indent=2))
+            return 0
+        if cmd in KB.DELEGATED:
+            print(_json.dumps(KB.refuse_delegated(cmd), indent=2))
+            return 2
+        if cmd == "init":
+            out = KB.init(cfg)
+        elif cmd == "boards":
+            out = KB.boards_list(cfg)
+        elif cmd == "boards-create":
+            out = KB.boards_create(cfg, args.slug, getattr(args, "name", "") or "",
+                                   requested_by="cli:user", confirmed=confirm)
+        elif cmd == "create":
+            out = KB.create(cfg, args.title, board=args.board, body=args.body,
+                            assignee=args.assignee, priority=args.priority,
+                            requested_by="cli:user", confirmed=confirm)
+        elif cmd in ("list", "ls"):
+            out = KB.list_tasks(cfg, board=args.board, status=args.status,
+                                limit=args.limit)
+        elif cmd == "show":
+            out = KB.show(cfg, args.task_id)
+        elif cmd == "claim":
+            out = KB.claim(cfg, args.task_id, assignee=args.assignee,
+                           requested_by="cli:user", confirmed=confirm)
+        elif cmd == "assign":
+            out = KB.assign(cfg, args.task_id, args.assignee,
+                            requested_by="cli:user", confirmed=confirm)
+        elif cmd == "reassign":
+            out = KB.reassign(cfg, args.task_id, args.assignee,
+                              requested_by="cli:user", confirmed=confirm)
+        elif cmd == "reclaim":
+            out = KB.reclaim(cfg, args.task_id,
+                             requested_by="cli:user", confirmed=confirm)
+        elif cmd == "comment":
+            out = KB.comment(cfg, args.task_id, args.body,
+                             requested_by="cli:user", confirmed=confirm)
+        elif cmd == "complete":
+            out = KB.complete(cfg, args.task_id,
+                              requested_by="cli:user", confirmed=confirm)
+        elif cmd == "edit":
+            out = KB.edit(cfg, args.task_id, title=args.title, body=args.body,
+                          priority=args.priority,
+                          requested_by="cli:user", confirmed=confirm)
+        elif cmd == "block":
+            out = KB.block(cfg, args.task_id,
+                           requested_by="cli:user", confirmed=confirm)
+        elif cmd == "unblock":
+            out = KB.unblock(cfg, args.task_id,
+                             requested_by="cli:user", confirmed=confirm)
+        elif cmd == "archive":
+            out = KB.archive_task(cfg, args.task_id,
+                                  requested_by="cli:user", confirmed=confirm)
+        elif cmd == "stats":
+            out = KB.stats(cfg, board=args.board)
+        elif cmd == "log":
+            out = KB.log(cfg, board=args.board, limit=args.limit)
+        elif cmd == "export":
+            out = KB.export(cfg)
+        elif cmd == "import":
+            try:
+                snap = _json.loads(Path(args.snapshot).read_text(
+                    encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                print(_json.dumps({"state": "FAILED", "code": KB.IO_CODE,
+                                   "detail": KB.redact_spec(str(exc))[:200],
+                                   "owner": "qubit-policy",
+                                   "rollback": "board untouched"},
+                                  indent=2))
+                return 2
+            out = KB.import_snapshot(cfg, snap, requested_by="cli:user",
+                                     confirmed=confirm)
+        else:
+            print(_json.dumps(KB.refuse_unsupported(cmd), indent=2))
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except KB.KanbanError as exc:
+        rc = 3 if exc.code == KB.CONFIRM_CODE else 2
+        print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                           "code": exc.code,
+                           "detail": KB.redact_spec(exc.detail)[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "board untouched; nothing to roll back"},
                           indent=2))
         return rc
 
