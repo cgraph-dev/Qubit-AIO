@@ -100,7 +100,8 @@
       "owner": "qubit-policy",
       "rollback": "nothing installed or enabled; nothing to roll back",
       "code": "REJECTED_ACCEPT_HOOKS",
-      "user_explanation": "Qubit Agent cannot do this: Auto-bypass of policy is forbidden by design; model text can never widen grants"
+      "user_explanation": "Qubit Agent cannot do this: Auto-bypass of policy is forbidden by design; model text can never widen grants",
+      "evidence": "tests/test_parity_hermes.py::test_no_bypass_flags_in_qubit_cli + tests/test_packet7e.py hard-deny/injection suites"
     },
     {
       "cmd": "--pass-session-id/--source/--in/--no-restore-cwd",
@@ -375,7 +376,8 @@
       "owner": "qubit-policy",
       "rollback": "nothing installed or enabled; nothing to roll back",
       "code": "REJECTED_SERVE",
-      "user_explanation": "Qubit Agent cannot do this: Duplicate headless server/dashboard/desktop shells; Qubit webui + terminal own these surfaces"
+      "user_explanation": "Qubit Agent cannot do this: Duplicate headless server/dashboard/desktop shells; Qubit webui + terminal own these surfaces",
+      "evidence": "tests/test_resolution8tf.py::test_singularity_one_listener_broker_policy_audit + tests/test_packet8kp.py service-ownership tests (single bridge serves dashboard; `voicebridge run` + user service own the surface)"
     },
     {
       "cmd": "monitor/monitoring",
