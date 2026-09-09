@@ -656,6 +656,20 @@ def build_parser() -> argparse.ArgumentParser:
                            help="actually restore (needs --confirm + enrollment)")
     sy_accept.add_argument("--confirm", action="store_true")
     add("tui", help="live terminal board (same backend as status/dashboard)")
+    vs = add("vision", help="Approved vision analysis (explicit, VRAM-guarded)")
+    vs_sub = vs.add_subparsers(dest="vision_command")
+    vs_desc = vs_sub.add_parser("describe", parents=[common],
+                                help="analyze one image (dry-run unless --confirm)")
+    vs_desc.add_argument("image", help="local image path (png/jpeg/gif/webp/bmp)")
+    vs_desc.add_argument("--prompt", default="",
+                         help="analysis question (default: factual description)")
+    vs_desc.add_argument("--model", default="",
+                         help="vision model override (default: intent.vision.model)")
+    vs_desc.add_argument("--timeout", type=float, default=None,
+                         help="request timeout s (10..600)")
+    vs_desc.add_argument("--confirm", action="store_true")
+    vs_sub.add_parser("status", parents=[common],
+                      help="vision backend state (read-only, never loads)")
     for _hk_mut, _hk_help in (("revoke", "revoke a declaration"),
                               ("remove", "delete a declaration")):
         _p = hk_sub.add_parser(_hk_mut, parents=[common],
@@ -1399,6 +1413,8 @@ def main(argv=None) -> int:
         return _cmd_sync(cfg, args)
     if command == "tui":
         return _cmd_tui(cfg)
+    if command == "vision":
+        return _cmd_vision(cfg, args)
     if command == "memory":
         return _cmd_memory(cfg, args)
     if command == "websites":
@@ -3164,6 +3180,41 @@ def _cmd_tui(cfg) -> int:
         return 0
     print(_json.dumps(out, indent=2))
     return 2
+
+
+def _cmd_vision(cfg, args) -> int:
+    """voicebridge vision describe|status.
+
+    Explicit vision analysis inside the sanctioned resident swap cycle
+    (VRAM-guarded, confirmed, audited, resident always restored).
+    """
+    import json as _json
+    from . import vision as VI
+    cmd = getattr(args, "vision_command", None) or "status"
+    try:
+        if cmd == "status":
+            out = VI.status(cfg)
+        elif cmd == "describe":
+            out = VI.describe(cfg, args.image, prompt=getattr(args, "prompt", "") or "",
+                              model=getattr(args, "model", "") or "",
+                              requested_by="cli:user",
+                              confirmed=bool(getattr(args, "confirm", False)),
+                              timeout_s=getattr(args, "timeout", None))
+        else:
+            print(f"ERROR: unknown vision command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except VI.VisionError as exc:
+        rc = 3 if exc.code in (VI.CONFIRM_CODE, VI.ESTOP_CODE) else 2
+        print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                           "code": exc.code,
+                           "detail": exc.detail[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "resident model restored by the swap "
+                                       "cycle; no state written"},
+                          indent=2))
+        return rc
 
 
 def _cmd_memory(cfg, args) -> int:

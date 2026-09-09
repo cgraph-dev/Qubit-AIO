@@ -52,5 +52,6 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a tui
 complete -c voicebridge -n '__fish_use_subcommand' -f -a verified-skills
 complete -c voicebridge -n '__fish_use_subcommand' -f -a verify
 complete -c voicebridge -n '__fish_use_subcommand' -f -a verify-release
+complete -c voicebridge -n '__fish_use_subcommand' -f -a vision
 complete -c voicebridge -n '__fish_use_subcommand' -f -a websites
 complete -c voicebridge -n '__fish_use_subcommand' -f -a webui

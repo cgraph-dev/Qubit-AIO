@@ -69,13 +69,11 @@
     },
     {
       "cmd": "--image",
-      "verdict": "BLOCKED",
-      "reason": "Vision input has no Qubit provider path: no CLI entry point accepts image input and no chat/provider module handles image payloads (model-packet scope; qwen3-vl:8b is present on disk but unwired, and loading it would evict the resident model on the 8GB GPU)",
-      "evidence": "tests/test_parity_hermes.py::test_no_vision_path",
-      "owner": "qubit-policy",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "BLOCKED_IMAGE",
-      "user_explanation": "Qubit Agent cannot do this: image input has no vision backend yet; text, voice, and file task input work instead"
+      "verdict": "IMPLEMENTED",
+      "qubit": "voicebridge vision describe (magic-byte validation + size cap; /api/tags capability check; VRAM guard; explicit --confirm analysis inside the 4D deep_tier_cycle with keep_alive 0 + resident restore; redacted reply/audit; no temp files) + vision status (read-only probe)",
+      "proof": "tests/test_vision8tf.py",
+      "owner": "qubit-core",
+      "rollback": "resident restore is automatic via the swap cycle; nothing persists"
     },
     {
       "cmd": "--max-turns/--run-budget",

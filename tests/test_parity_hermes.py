@@ -204,11 +204,13 @@ def test_no_messaging_transports_in_product():
 
 
 def test_no_vision_path():
-    """BLOCKED --image: no image entry point and no multimodal plumbing.
+    """--image flag has no chat entry point; vision flows through the
+    guarded describe path (validated input, capability + VRAM checks,
+    confirmed swap cycle with resident restore).
 
-    Vision input has no Qubit provider path: neither CLI surface accepts
-    image input, and no chat/provider module handles image payloads, so a
-    Hermes `--image` query cannot be honored (or silently dropped) here.
+    Hermes `--image` attaches to any chat turn; Qubit deliberately keeps
+    image input out of the resident chat path (4B single-runner contract)
+    and serves it via `voicebridge vision describe` instead.
     """
     from voicebridge.cli import build_parser
     from voicebridge.terminal import build_parser as build_terminal
@@ -219,6 +221,8 @@ def test_no_vision_path():
     for path in (REPO_ROOT / "voicebridge").rglob("*.py"):
         if "__pycache__" in path.parts:
             continue
+        if path.name == "vision.py":
+            continue  # the guarded path itself
         try:
             import ast
             tree = ast.parse(path.read_text())
@@ -234,4 +238,5 @@ def test_no_vision_path():
     from voicebridge.capability_catalog import check
 
     out = check("--image")
-    assert out["state"] == "BLOCKED" and out["code"] == "BLOCKED_IMAGE", out
+    assert out["state"] == "IMPLEMENTED", out
+    assert out["code"] == "OK"
