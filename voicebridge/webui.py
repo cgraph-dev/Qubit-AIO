@@ -761,6 +761,18 @@ class WebUIHandler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path.startswith("/static/"):
             name = path.split("/", 2)[-1]
+            if name == "theme.css":
+                try:
+                    from . import themes as _TH
+                    body = _TH.css(self.app.orch.cfg).encode("utf-8")
+                except Exception:
+                    body = (b"/* Qubit theme: fallback to app.css as shipped */\n")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/css")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                return
             fpath = self._frontend_file(name)
             if fpath is not None:
                 low = name.lower()
@@ -824,6 +836,14 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self._file(fp, "text/html; charset=utf-8")
             else:
                 self._send(404, b"settings page not found")
+        elif path == "/setup" or path == "/setup.html":
+            # Packet 8T: one-click setup + health page (every control calls
+            # a real /api/setup/* endpoint; no frontend-only state).
+            fp = self._frontend_file("setup.html")
+            if fp is not None:
+                self._file(fp, "text/html; charset=utf-8")
+            else:
+                self._send(404, b"setup page not found")
         elif path == "/activity":
             fp = self._frontend_file("activity.html")
             if fp is not None:
@@ -1369,9 +1389,46 @@ class WebUIHandler(BaseHTTPRequestHandler):
             except Exception:
                 items = []
             self._json({"items": items})
+        elif path == "/api/setup/health":
+            # Packet 8T: backend-authoritative installation inventory
+            # (redacted; same backend as `voicebridge setup health`).
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            from . import lifecycle as LC
+            offline = "offline=1" in (self.path.split("?", 1)[1]
+                                      if "?" in self.path else "")
+            self._json(LC.health_inventory(self.app.orch.cfg,
+                                           offline=offline))
+        elif path == "/api/setup/checklist":
+            # Packet 8T: resumable staged checklist (read-only).
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            from . import lifecycle as LC
+            offline = "offline=1" in (self.path.split("?", 1)[1]
+                                      if "?" in self.path else "")
+            self._json(LC.checklist(self.app.orch.cfg, offline=offline))
+        elif path == "/api/setup/diagnostics":
+            # Packet 8T: redacted diagnostic bundle (never includes secrets).
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            from . import lifecycle as LC
+            self._json(LC.diagnostic_bundle(self.app.orch.cfg))
 
         elif path.startswith("/static/"):
             name = path.split("/", 2)[-1]
+            if name == "theme.css":
+                # Dynamic Qubit theme override (state-driven, after app.css).
+                # Best-effort: any failure falls back to app.css as shipped.
+                try:
+                    from . import themes as _TH
+                    body = _TH.css(self.app.orch.cfg).encode("utf-8")
+                except Exception:
+                    body = (b"/* Qubit theme: fallback to app.css as shipped */\n")
+                self._send(200, body, "text/css")
+                return
             fp = self._frontend_file(name)
             if fp is None:
                 self._send(404, b"not found")
@@ -1939,6 +1996,80 @@ class WebUIHandler(BaseHTTPRequestHandler):
                             "machine_id": rec.get("machine_id")})
             except Exception as exc:
                 self._json({"enrolled": False, "detail": str(exc)[:160]}, 403)
+        elif path == "/api/setup/run":
+            # Packet 8T: staged setup run. Dry-run preview by default;
+            # mutations need explicit {"apply": true, "confirm": true}.
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            from . import lifecycle as LC
+            try:
+                body = json.loads(
+                    self.rfile.read(int(self.headers.get("Content-Length", 0))
+                                    if self.headers.get("Content-Length") else 0)
+                    or b"{}")
+            except Exception:
+                self._json({"state": "FAILED", "detail": "bad JSON body"}, 400)
+                return
+            raw = body.get("steps") or []
+            # Pass the raw list through: unknown steps must fail closed in
+            # the backend, never be silently dropped here.
+            wanted = [str(s) for s in raw] or None
+            out = LC.setup_run(
+                steps=wanted,
+                dry_run=not bool(body.get("apply", False)),
+                confirm=bool(body.get("confirm", False)))
+            code = 200 if out["state"] in ("SUCCESS", "PENDING") else 409
+            self._json(out, code)
+        elif path == "/api/setup/export":
+            # Packet 8T: redacted config-profile export behind the same
+            # backend contract as the CLI (preview unless apply+confirm).
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            from . import lifecycle as LC
+            try:
+                body = json.loads(
+                    self.rfile.read(int(self.headers.get("Content-Length", 0))
+                                    if self.headers.get("Content-Length") else 0)
+                    or b"{}")
+            except Exception:
+                self._json({"state": "FAILED", "detail": "bad JSON body"}, 400)
+                return
+            raw_out = body.get("out")
+            try:
+                state_dir = self.app.orch.cfg.state_dir()
+            except Exception:
+                state_dir = None
+            if raw_out:
+                try:
+                    from pathlib import Path as _P
+                    cand = _P(str(raw_out))
+                    if not cand.is_absolute() and state_dir is not None:
+                        cand = _P(str(state_dir)) / cand
+                    ok = (state_dir is not None
+                          and _P(str(state_dir)).resolve() in
+                          cand.resolve().parents)
+                    if not ok:
+                        self._json({"state": "DENIED",
+                                    "detail": "export path must stay inside "
+                                              "the state directory"}, 403)
+                        return
+                    dest = cand
+                except Exception:
+                    self._json({"state": "FAILED",
+                                "detail": "unusable export path"}, 400)
+                    return
+            else:
+                from pathlib import Path as _P
+                dest = _P(str(state_dir)) / "config-profile.json" \
+                    if state_dir else _P("config-profile.json")
+            out = LC.config_export(self.app.orch.cfg, dest,
+                                   dry_run=not bool(body.get("apply", False)),
+                                   confirm=bool(body.get("confirm", False)))
+            code = 200 if out["state"] in ("SUCCESS", "PENDING") else \
+                (403 if out["state"] == "DENIED" else 409)
+            self._json(out, code)
         elif path == "/api/export-state":
             # Packet 7D: dashboard export calls the real encrypted exporter.
             if not self._api_token_ok():

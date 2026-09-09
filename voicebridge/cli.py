@@ -576,6 +576,27 @@ def build_parser() -> argparse.ArgumentParser:
                        help="refused: binaries never downloaded")
     lsp_sub.add_parser("restart", parents=[common],
                        help="typed no-client report (no persistent clients)")
+    th = add("theme", help="Optional Qubit themes and token tweaks")
+    th_sub = th.add_subparsers(dest="theme_command")
+    th_sub.add_parser("list", parents=[common], help="list built-in presets")
+    th_sub.add_parser("show", parents=[common],
+                      help="show the active preset + tweaks")
+    th_set = th_sub.add_parser("set", parents=[common],
+                               help="switch preset (dry-run unless --confirm)")
+    th_set.add_argument("name")
+    th_set.add_argument("--confirm", action="store_true")
+    th_tweak = th_sub.add_parser("set-tweak", parents=[common],
+                                 help="override one token (dry-run unless --confirm)")
+    th_tweak.add_argument("token", help="design token, e.g. --primary")
+    th_tweak.add_argument("color", help="#rgb or #rrggbb hex")
+    th_tweak.add_argument("--confirm", action="store_true")
+    th_clear = th_sub.add_parser("clear-tweak", parents=[common],
+                                 help="remove one override (dry-run unless --confirm)")
+    th_clear.add_argument("token")
+    th_clear.add_argument("--confirm", action="store_true")
+    th_reset = th_sub.add_parser("reset", parents=[common],
+                                   help="restore the default preset (dry-run unless --confirm)")
+    th_reset.add_argument("--confirm", action="store_true")
     mem = add("memory", help="Packet 8M semantic memory (GENOME contract; disabled by default)")
     mem_sub = mem.add_subparsers(dest="memory_command")
     mem_status = mem_sub.add_parser("status", parents=[common],
@@ -1291,6 +1312,8 @@ def main(argv=None) -> int:
         return _cmd_acp(cfg, args)
     if command == "lsp":
         return _cmd_lsp(cfg, args)
+    if command == "theme":
+        return _cmd_theme(cfg, args)
     if command == "memory":
         return _cmd_memory(cfg, args)
     if command == "websites":
@@ -2819,6 +2842,57 @@ def _cmd_lsp(cfg, args) -> int:
         return 2
     print(_json.dumps(out, indent=2, sort_keys=True))
     return 0
+
+
+def _cmd_theme(cfg, args) -> int:
+    """voicebridge theme list|show|set|set-tweak|clear-tweak|reset.
+
+    Optional cosmetics inside the coherent Qubit system. Mutating ops
+    preview under --dry-run, require --confirm, and refuse while the
+    emergency stop is latched.
+    """
+    import json as _json
+    from . import themes as TH
+    cmd = getattr(args, "theme_command", None) or "show"
+    confirm = bool(getattr(args, "confirm", False))
+    try:
+        if cmd in ("set", "set-tweak", "clear-tweak", "reset") \
+                and TH.estop_engaged(cfg):
+            print(_json.dumps(TH.refuse_estop(f"theme {cmd}"), indent=2))
+            return 3
+        if getattr(args, "dry_run", False) and cmd != "list" and cmd != "show":
+            print(_json.dumps({"state": "preview", "would": f"theme {cmd}"},
+                              indent=2))
+            return 0
+        if cmd == "list":
+            out = TH.list_themes()
+        elif cmd == "show":
+            out = TH.show(cfg)
+        elif cmd == "set":
+            out = TH.set_theme(cfg, args.name,
+                               requested_by="cli:user", confirmed=confirm)
+        elif cmd == "set-tweak":
+            out = TH.set_tweak(cfg, args.token, args.color,
+                               requested_by="cli:user", confirmed=confirm)
+        elif cmd == "clear-tweak":
+            out = TH.clear_tweak(cfg, args.token,
+                                 requested_by="cli:user", confirmed=confirm)
+        elif cmd == "reset":
+            out = TH.reset(cfg, requested_by="cli:user", confirmed=confirm)
+        else:
+            print(f"ERROR: unknown theme command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except TH.ThemeError as exc:
+        rc = 3 if exc.code == TH.CONFIRM_CODE else 2
+        print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                           "code": exc.code,
+                           "detail": exc.detail[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "theme untouched; nothing to roll back"},
+                          indent=2))
+        return rc
 
 
 def _cmd_memory(cfg, args) -> int:

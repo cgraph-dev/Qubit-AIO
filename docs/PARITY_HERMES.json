@@ -299,12 +299,11 @@
     },
     {
       "cmd": "pets/skin",
-      "verdict": "REJECTED",
-      "reason": "Cosmetic mascots/themes; Qubit ships one coherent visual language",
-      "owner": "qubit-policy",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "REJECTED_PETS",
-      "user_explanation": "Qubit Agent cannot do this: Cosmetic mascots/themes; Qubit ships one coherent visual language"
+      "verdict": "IMPLEMENTED",
+      "qubit": "voicebridge theme list/show/set/reset/set-tweak/clear-tweak (built-in presets + validated token tweaks, --confirm, e-stop gated, dashboard /static/theme.css layer; gallery pet downloads refused PETS_NO_DOWNLOADS)",
+      "proof": "tests/test_themes8tf.py",
+      "owner": "qubit-core",
+      "rollback": "theme reset restores the default preset (audited)"
     },
     {
       "cmd": "sync",
