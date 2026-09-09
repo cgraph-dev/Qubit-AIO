@@ -755,6 +755,65 @@ def build_parser() -> argparse.ArgumentParser:
                          choices=["", "draft", "approved", "queued", "sent", "failed"])
     mg_show = mg_sub.add_parser("show", parents=[common], help="show one message")
     mg_show.add_argument("msg_id")
+    gw = add("gateway", help="Account-bound gateway records (no process supervision)")
+    gw_sub = gw.add_subparsers(dest="gateway_command")
+    gw_add = gw_sub.add_parser("add", parents=[common],
+                               help="record a gateway (dry-run unless --confirm)")
+    gw_add.add_argument("gateway_id")
+    gw_add.add_argument("--provider", required=True,
+                        choices=["whatsapp", "whatsapp-cloud", "slack"])
+    gw_add.add_argument("--account", required=True)
+    gw_add.add_argument("--channel", required=True,
+                        choices=["webhook", "polling", "websocket"])
+    gw_add.add_argument("--key-ref", required=True,
+                        help="credential as env:VAR or file:PATH (never a value)")
+    gw_add.add_argument("--confirm", action="store_true")
+    gw_sub.add_parser("list", parents=[common], help="list gateways")
+    gw_show = gw_sub.add_parser("show", parents=[common], help="show one gateway")
+    gw_show.add_argument("gateway_id")
+    gw_rm = gw_sub.add_parser("remove", parents=[common],
+                              help="delete a record (dry-run unless --confirm)")
+    gw_rm.add_argument("gateway_id")
+    gw_rm.add_argument("--confirm", action="store_true")
+    gw_link = gw_sub.add_parser("link", parents=[common],
+                                help="typed link state (read-only)")
+    gw_link.add_argument("gateway_id")
+    for _gw_no in ("run", "start", "stop", "restart", "install"):
+        gw_sub.add_parser(_gw_no, parents=[common],
+                          help="refused: operator supervises gateway processes")
+    pe = add("peer", help="Peer gateways: registry, enrollment, typed delivery")
+    pe_sub = pe.add_subparsers(dest="peer_command")
+    pe_add = pe_sub.add_parser("add", parents=[common],
+                               help="record a peer (dry-run unless --confirm)")
+    pe_add.add_argument("peer_id")
+    pe_add.add_argument("--url", required=True)
+    pe_add.add_argument("--account", required=True)
+    pe_add.add_argument("--key-ref", required=True,
+                        help="credential as env:VAR or file:PATH (never a value)")
+    pe_add.add_argument("--confirm", action="store_true")
+    pe_sub.add_parser("list", parents=[common], help="list peers")
+    pe_show = pe_sub.add_parser("show", parents=[common], help="show one peer")
+    pe_show.add_argument("peer_id")
+    pe_rm = pe_sub.add_parser("remove", parents=[common],
+                              help="delete a peer (dry-run unless --confirm)")
+    pe_rm.add_argument("peer_id")
+    pe_rm.add_argument("--confirm", action="store_true")
+    pe_link = pe_sub.add_parser("link", parents=[common],
+                                help="typed link state (add --probe for a live check)")
+    pe_link.add_argument("peer_id")
+    pe_link.add_argument("--probe", action="store_true")
+    pe_dm = pe_sub.add_parser("dm", parents=[common],
+                              help="deliver a message (fresh exact --confirm)")
+    pe_dm.add_argument("peer_id")
+    pe_dm.add_argument("--to", required=True)
+    pe_dm.add_argument("--text", required=True)
+    pe_dm.add_argument("--confirm", action="store_true")
+    pe_run = pe_sub.add_parser("run", parents=[common],
+                               help="run a task on a peer (fresh exact --confirm)")
+    pe_run.add_argument("peer_id")
+    pe_run.add_argument("--agent", default="")
+    pe_run.add_argument("--text", required=True)
+    pe_run.add_argument("--confirm", action="store_true")
     add("tui", help="live terminal board (same backend as status/dashboard)")
     vs = add("vision", help="Approved vision analysis (explicit, VRAM-guarded)")
     vs_sub = vs.add_subparsers(dest="vision_command")
@@ -1517,6 +1576,10 @@ def main(argv=None) -> int:
         return _cmd_webhook(cfg, args)
     if command == "msg":
         return _cmd_msg(cfg, args)
+    if command == "gateway":
+        return _cmd_gateway(cfg, args)
+    if command == "peer":
+        return _cmd_peer(cfg, args)
     if command == "tui":
         return _cmd_tui(cfg)
     if command == "vision":
@@ -3501,6 +3564,110 @@ def _cmd_msg(cfg, args) -> int:
                            "code": exc.code, "detail": exc.detail[:300],
                            "owner": "qubit-policy",
                            "rollback": "outbox preserved; nothing sent twice"},
+                          indent=2))
+        return rc
+
+
+def _cmd_gateway(cfg, args) -> int:
+    """voicebridge gateway add|list|show|remove|link (+ refused supervision).
+
+    Records and link states are real; process supervision stays with the
+    operator (single event path invariant).
+    """
+    import json as _json
+    from . import gateway_peers as GW
+    cmd = getattr(args, "gateway_command", None) or "list"
+    confirm = bool(getattr(args, "confirm", False))
+    try:
+        if cmd in ("add", "remove") and GW.estop_engaged(cfg):
+            print(_json.dumps(GW.refuse_estop(f"gateway {cmd}"), indent=2))
+            return 3
+        if getattr(args, "dry_run", False) and cmd in ("add", "remove"):
+            print(_json.dumps({"state": "preview", "would": f"gateway {cmd}"},
+                              indent=2))
+            return 0
+        if cmd == "list":
+            out = GW.gateway_list(cfg)
+        elif cmd == "show":
+            out = GW.gateway_show(cfg, args.gateway_id)
+        elif cmd == "add":
+            out = GW.gateway_add(cfg, args.gateway_id, args.provider,
+                                 args.account, args.channel,
+                                 key_ref=args.key_ref,
+                                 requested_by="cli:user", confirmed=confirm)
+        elif cmd == "remove":
+            out = GW.gateway_remove(cfg, args.gateway_id,
+                                    requested_by="cli:user", confirmed=confirm)
+        elif cmd == "link":
+            out = GW.gateway_link(cfg, args.gateway_id)
+        elif cmd in ("run", "start", "stop", "restart", "install"):
+            print(_json.dumps(GW.refuse_supervision(cmd), indent=2))
+            return 2
+        else:
+            print(f"ERROR: unknown gateway command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except GW.GatewayError as exc:
+        rc = 3 if exc.code == GW.CONFIRM_CODE else 2
+        print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                           "code": exc.code, "detail": exc.detail[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "registries untouched; nothing delivered"},
+                          indent=2))
+        return rc
+
+
+def _cmd_peer(cfg, args) -> int:
+    """voicebridge peer add|list|show|remove|link|dm|run.
+
+    Registry, enrollment linkage, and credential-gated delivery; live
+    secrets stay operator-side.
+    """
+    import json as _json
+    from . import gateway_peers as GW
+    cmd = getattr(args, "peer_command", None) or "list"
+    confirm = bool(getattr(args, "confirm", False))
+    try:
+        if cmd in ("add", "remove", "dm", "run") and GW.estop_engaged(cfg):
+            print(_json.dumps(GW.refuse_estop(f"peer {cmd}"), indent=2))
+            return 3
+        if getattr(args, "dry_run", False) and cmd != "list" and cmd != "show" \
+                and cmd != "link":
+            print(_json.dumps({"state": "preview", "would": f"peer {cmd}"},
+                              indent=2))
+            return 0
+        if cmd == "list":
+            out = GW.peer_list(cfg)
+        elif cmd == "show":
+            out = GW.peer_show(cfg, args.peer_id)
+        elif cmd == "add":
+            out = GW.peer_add(cfg, args.peer_id, args.url, args.account,
+                              key_ref=args.key_ref,
+                              requested_by="cli:user", confirmed=confirm)
+        elif cmd == "remove":
+            out = GW.peer_remove(cfg, args.peer_id,
+                                 requested_by="cli:user", confirmed=confirm)
+        elif cmd == "link":
+            out = GW.peer_link(cfg, args.peer_id,
+                               probe=bool(getattr(args, "probe", False)))
+        elif cmd == "dm":
+            out = GW.peer_dm(cfg, args.peer_id, args.to, args.text,
+                             requested_by="cli:user", confirmed=confirm)
+        elif cmd == "run":
+            out = GW.peer_run(cfg, args.peer_id, args.agent, args.text,
+                              requested_by="cli:user", confirmed=confirm)
+        else:
+            print(f"ERROR: unknown peer command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except GW.GatewayError as exc:
+        rc = 3 if exc.code == GW.CONFIRM_CODE else 2
+        print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                           "code": exc.code, "detail": exc.detail[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "registries untouched; nothing delivered"},
                           indent=2))
         return rc
 

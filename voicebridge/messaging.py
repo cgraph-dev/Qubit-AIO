@@ -238,6 +238,15 @@ def _resolve_account_ref(rec: Dict[str, Any]) -> str:
     return rec.get("_key_path", "")
 
 
+def account_credential_ref(cfg: Any, account_id: str) -> str:
+    """Private credential reference for transport-side resolution.
+
+    Never print or log the result: it names the live reference. Only
+    gateway/link and send paths may call this.
+    """
+    return _resolve_account_ref(_get_account(cfg, account_id))
+
+
 def account_list(cfg: Any) -> Dict[str, Any]:
     """List accounts (redacted references)."""
     state = _load_json(_accounts_path(cfg), _blank_accounts, "accounts")

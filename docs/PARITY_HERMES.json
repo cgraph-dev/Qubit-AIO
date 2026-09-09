@@ -359,13 +359,11 @@
     },
     {
       "cmd": "pairing/webhook/peer",
-      "verdict": "BLOCKED",
-      "reason": "Pairing-code kernel and HMAC webhook verification are implemented and tested, but peer gateway registration and live enrollment need remote messaging accounts/identities; no accounts in scope",
-      "evidence": "tests/test_pairing8tf.py + tests/test_webhooks8tf.py + tests/test_boundaries8tf.py",
-      "owner": "owner-operator (accounts/credentials)",
-      "rollback": "kernel registries tombstone on revoke/remove (audited)",
-      "code": "BLOCKED_PAIRING",
-      "user_explanation": "Qubit Agent cannot do this yet: peer registration and live enrollment need messaging accounts."
+      "verdict": "IMPLEMENTED",
+      "qubit": "pairing create/approve/list/revoke (hashed single-use codes issuing real scoped grants) + webhook add/list/show/remove/verify/test (URL policy, HMAC verify, freshness, replay store, receipts-only) + peer add/list/show/remove/link/dm/run (URL policy, account binding, credential-gated HTTPS delivery, idempotent receipts)",
+      "proof": "tests/test_pairing8tf.py, tests/test_webhooks8tf.py, tests/test_gateway_peers8tf.py",
+      "owner": "qubit-core",
+      "rollback": "revoke/remove tombstones (grants revoked, audited)"
     },
     {
       "cmd": "serve/dashboard/desktop/gui",
@@ -531,23 +529,19 @@
     },
     {
       "cmd": "gateway-manage",
-      "verdict": "BLOCKED",
-      "reason": "Managing messaging gateways needs live accounts and would duplicate the single event path",
-      "evidence": "tests/test_boundaries8tf.py + tests/test_parity_hermes.py::test_no_messaging_transports_in_product",
-      "owner": "owner-operator (accounts/credentials)",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "user_explanation": "Qubit Agent cannot do this: messaging gateway management needs live accounts.",
-      "code": "BLOCKED_GATEWAY_MANAGE"
+      "verdict": "IMPLEMENTED",
+      "qubit": "voicebridge gateway add/list/show/remove/link (account-bound records, typed link states, audited) + enroll via pairing approvals; run/start/stop/restart/install typed-refused GATEWAY_NO_SUPERVISION (single event path; operator supervises processes)",
+      "proof": "tests/test_gateway_peers8tf.py",
+      "owner": "qubit-core",
+      "rollback": "gateway remove deletes records (audited)"
     },
     {
       "cmd": "gateway",
-      "verdict": "BLOCKED",
-      "reason": "Managing messaging gateways needs live accounts and would duplicate Qubit's single event path",
-      "evidence": "tests/test_boundaries8tf.py + tests/test_parity_hermes.py::test_no_messaging_transports_in_product",
-      "owner": "owner-operator (accounts/credentials)",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "user_explanation": "Qubit Agent cannot do this: messaging gateway management needs live accounts.",
-      "code": "BLOCKED_GATEWAY"
+      "verdict": "IMPLEMENTED",
+      "qubit": "voicebridge gateway records + link states (account/credential/policy) + status via runtime inventory; process supervision refused (single event path)",
+      "proof": "tests/test_gateway_peers8tf.py",
+      "owner": "qubit-core",
+      "rollback": "gateway remove deletes records (audited)"
     },
     {
       "cmd": "whatsapp/whatsapp-cloud/slack/send",

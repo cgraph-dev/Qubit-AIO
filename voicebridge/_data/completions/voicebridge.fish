@@ -19,6 +19,7 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a export-state
 complete -c voicebridge -n '__fish_use_subcommand' -f -a flag-drill
 complete -c voicebridge -n '__fish_use_subcommand' -f -a flags
 complete -c voicebridge -n '__fish_use_subcommand' -f -a frontier
+complete -c voicebridge -n '__fish_use_subcommand' -f -a gateway
 complete -c voicebridge -n '__fish_use_subcommand' -f -a ghost
 complete -c voicebridge -n '__fish_use_subcommand' -f -a hooks
 complete -c voicebridge -n '__fish_use_subcommand' -f -a import-agent
@@ -34,6 +35,7 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a once
 complete -c voicebridge -n '__fish_use_subcommand' -f -a opencode
 complete -c voicebridge -n '__fish_use_subcommand' -f -a package
 complete -c voicebridge -n '__fish_use_subcommand' -f -a pairing
+complete -c voicebridge -n '__fish_use_subcommand' -f -a peer
 complete -c voicebridge -n '__fish_use_subcommand' -f -a permissions
 complete -c voicebridge -n '__fish_use_subcommand' -f -a power
 complete -c voicebridge -n '__fish_use_subcommand' -f -a product
