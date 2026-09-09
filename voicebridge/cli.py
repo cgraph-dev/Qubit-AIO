@@ -759,6 +759,89 @@ def build_parser() -> argparse.ArgumentParser:
                          choices=["", "draft", "approved", "queued", "sent", "failed"])
     mg_show = mg_sub.add_parser("show", parents=[common], help="show one message")
     mg_show.add_argument("msg_id")
+    bn = add("brain", help="Multi-principal profiles, accounts, vault refs, onboarding")
+    bn_sub = bn.add_subparsers(dest="brain_command")
+    bn_padd = bn_sub.add_parser("principal-add", parents=[common],
+                                help="register a principal (dry-run unless --confirm)")
+    bn_padd.add_argument("principal_id")
+    bn_padd.add_argument("--kind", required=True,
+                         choices=["person", "organization", "employee"])
+    bn_padd.add_argument("--label", required=True)
+    bn_padd.add_argument("--confirm", action="store_true")
+    bn_sub.add_parser("principal-list", parents=[common],
+                      help="list principals")
+    bn_madd = bn_sub.add_parser("member-add", parents=[common],
+                                help="link employee to org (dry-run unless --confirm)")
+    bn_madd.add_argument("org")
+    bn_madd.add_argument("employee")
+    bn_madd.add_argument("--confirm", action="store_true")
+    bn_mrm = bn_sub.add_parser("member-remove", parents=[common],
+                               help="unlink (preserves data + audit)")
+    bn_mrm.add_argument("org")
+    bn_mrm.add_argument("employee")
+    bn_mrm.add_argument("--confirm", action="store_true")
+    bn_pset = bn_sub.add_parser("profile-set", parents=[common],
+                                help="set a profile field (dry-run unless --confirm)")
+    bn_pset.add_argument("principal")
+    bn_pset.add_argument("key")
+    bn_pset.add_argument("value")
+    bn_pset.add_argument("--identity", default="default")
+    bn_pset.add_argument("--purpose", default="")
+    bn_pset.add_argument("--trust", default="user",
+                         choices=["user", "observed", "inferred"])
+    bn_pset.add_argument("--retention-days", type=int, default=None)
+    bn_pset.add_argument("--confirm", action="store_true")
+    bn_pshow = bn_sub.add_parser("profile-show", parents=[common],
+                                 help="show a scoped profile (masked)")
+    bn_pshow.add_argument("principal")
+    bn_pshow.add_argument("--identity", default="default")
+    bn_pforget = bn_sub.add_parser("profile-forget", parents=[common],
+                                   help="delete field/identity/profile (dry-run unless --confirm)")
+    bn_pforget.add_argument("principal")
+    bn_pforget.add_argument("--identity", default="")
+    bn_pforget.add_argument("--key", default="")
+    bn_pforget.add_argument("--confirm", action="store_true")
+    bn_sub.add_parser("profile-sweep", parents=[common],
+                      help="delete expired fields (dry-run unless --confirm)").add_argument(
+                          "--confirm", action="store_true", dest="confirm")
+    bn_pexp = bn_sub.add_parser("profile-export", parents=[common],
+                                help="export scoped profile data")
+    bn_pexp.add_argument("principal")
+    bn_pexp.add_argument("--identity", default="")
+    bn_aadd = bn_sub.add_parser("account-add", parents=[common],
+                                help="bind an account alias (dry-run unless --confirm)")
+    bn_aadd.add_argument("alias")
+    bn_aadd.add_argument("--origin", required=True)
+    bn_aadd.add_argument("--principal", required=True)
+    bn_aadd.add_argument("--identity", default="default")
+    bn_aadd.add_argument("--label", default="")
+    bn_aadd.add_argument("--confirm", action="store_true")
+    bn_alist = bn_sub.add_parser("account-list", parents=[common],
+                                 help="list account bindings")
+    bn_alist.add_argument("--principal", default="")
+    bn_arm = bn_sub.add_parser("account-remove", parents=[common],
+                               help="remove a binding (dry-run unless --confirm)")
+    bn_arm.add_argument("alias")
+    bn_arm.add_argument("--confirm", action="store_true")
+    bn_vset = bn_sub.add_parser("vault-set", parents=[common],
+                                help="record a secret reference (dry-run unless --confirm)")
+    bn_vset.add_argument("name")
+    bn_vset.add_argument("--ref", required=True,
+                         help="env:VAR, file:PATH, or keyring:NAME (never a value)")
+    bn_vset.add_argument("--principal", default="")
+    bn_vset.add_argument("--confirm", action="store_true")
+    bn_vlist = bn_sub.add_parser("vault-list", parents=[common],
+                                 help="list references (kinds only)")
+    bn_vlist.add_argument("--principal", default="")
+    bn_vrm = bn_sub.add_parser("vault-remove", parents=[common],
+                               help="delete a reference (dry-run unless --confirm)")
+    bn_vrm.add_argument("name")
+    bn_vrm.add_argument("--confirm", action="store_true")
+    bn_on = bn_sub.add_parser("onboard", parents=[common],
+                              help="guided first-run setup (preview unless --confirm)")
+    bn_on.add_argument("--answers-file", default="",
+                       help="JSON answers file (no answers = show the plan)")
+    bn_on.add_argument("--confirm", action="store_true")
     mg_inbox = mg_sub.add_parser("inbox", parents=[common],
                                  help="list inbound messages (redacted previews)")
     mg_inbox.add_argument("--subscription", default="")
@@ -1599,6 +1682,8 @@ def main(argv=None) -> int:
         return _cmd_gateway(cfg, args)
     if command == "peer":
         return _cmd_peer(cfg, args)
+    if command == "brain":
+        return _cmd_brain(cfg, args)
     if command == "tui":
         return _cmd_tui(cfg)
     if command == "vision":
@@ -3699,6 +3784,109 @@ def _cmd_peer(cfg, args) -> int:
                            "code": exc.code, "detail": exc.detail[:300],
                            "owner": "qubit-policy",
                            "rollback": "registries untouched; nothing delivered"},
+                          indent=2))
+        return rc
+
+
+def _cmd_brain(cfg, args) -> int:
+    """voicebridge brain principal-*/profile-*/account-*/vault-*/onboard.
+
+    Multi-principal identity registry with provenance, retention, and
+    references-only vault. Mutating ops preview under --dry-run, require
+    --confirm, and refuse while the emergency stop is latched.
+    """
+    import json as _json
+    from . import brain as BR
+    cmd = getattr(args, "brain_command", None) or "principal-list"
+    confirm = bool(getattr(args, "confirm", False))
+    _MUTATING = {"principal-add", "member-add", "member-remove",
+                 "profile-set", "profile-forget", "profile-sweep",
+                 "account-add", "account-remove", "vault-set",
+                 "vault-remove", "onboard"}
+    try:
+        if cmd in _MUTATING and BR.estop_engaged(cfg):
+            print(_json.dumps(BR.refuse_estop(f"brain {cmd}"), indent=2))
+            return 3
+        if getattr(args, "dry_run", False) and cmd in _MUTATING:
+            print(_json.dumps({"state": "preview", "would": f"brain {cmd}"},
+                              indent=2))
+            return 0
+        if cmd == "principal-add":
+            out = BR.principal_add(cfg, args.principal_id, args.kind,
+                                   args.label, requested_by="cli:user",
+                                   confirmed=confirm)
+        elif cmd == "principal-list":
+            out = BR.principal_list(cfg)
+        elif cmd == "member-add":
+            out = BR.member_add(cfg, args.org, args.employee,
+                                requested_by="cli:user", confirmed=confirm)
+        elif cmd == "member-remove":
+            out = BR.member_remove(cfg, args.org, args.employee,
+                                   requested_by="cli:user", confirmed=confirm)
+        elif cmd == "profile-set":
+            out = BR.profile_set(cfg, args.principal, args.key, args.value,
+                                 identity=args.identity, purpose=args.purpose,
+                                 trust=args.trust,
+                                 retention_days=args.retention_days,
+                                 requested_by="cli:user", confirmed=confirm)
+        elif cmd == "profile-show":
+            out = BR.profile_show(cfg, args.principal, identity=args.identity)
+        elif cmd == "profile-forget":
+            out = BR.profile_forget(cfg, args.principal, identity=args.identity,
+                                    key=args.key, requested_by="cli:user",
+                                    confirmed=confirm)
+        elif cmd == "profile-sweep":
+            out = BR.profile_sweep(cfg, requested_by="cli:user",
+                                   confirmed=confirm)
+        elif cmd == "profile-export":
+            out = BR.profile_export(cfg, args.principal, identity=args.identity)
+        elif cmd == "account-add":
+            out = BR.account_add(cfg, args.alias, args.origin, args.principal,
+                                 identity=args.identity, label=args.label,
+                                 requested_by="cli:user", confirmed=confirm)
+        elif cmd == "account-list":
+            out = BR.account_list(cfg, principal=args.principal)
+        elif cmd == "account-remove":
+            out = BR.account_remove(cfg, args.alias,
+                                    requested_by="cli:user", confirmed=confirm)
+        elif cmd == "vault-set":
+            out = BR.vault_set(cfg, args.name, args.ref,
+                               principal=args.principal,
+                               requested_by="cli:user", confirmed=confirm)
+        elif cmd == "vault-list":
+            out = BR.vault_list(cfg, principal=args.principal)
+        elif cmd == "vault-remove":
+            out = BR.vault_remove(cfg, args.name,
+                                  requested_by="cli:user", confirmed=confirm)
+        elif cmd == "onboard":
+            answers_file = (getattr(args, "answers_file", "") or "").strip()
+            if not answers_file:
+                out = BR.onboard_plan()
+            else:
+                try:
+                    answers = _json.loads(Path(answers_file).read_text(
+                        encoding="utf-8"))
+                except (OSError, ValueError) as exc:
+                    print(_json.dumps(
+                        {"state": "FAILED", "code": "BRAIN_BAD_INPUT",
+                         "detail": f"answers unreadable: {exc}"[:200],
+                         "owner": "qubit-policy",
+                         "rollback": "nothing saved"}, indent=2))
+                    return 2
+                out = BR.onboard_apply(cfg, answers, requested_by="cli:user",
+                                       confirmed=confirm,
+                                       dry_run=bool(getattr(args, "dry_run", False)))
+        else:
+            print(f"ERROR: unknown brain command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except BR.BrainError as exc:
+        rc = 3 if exc.code == BR.CONFIRM_CODE else 2
+        print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                           "code": exc.code, "detail": exc.detail[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "registry untouched; nothing saved"},
                           indent=2))
         return rc
 

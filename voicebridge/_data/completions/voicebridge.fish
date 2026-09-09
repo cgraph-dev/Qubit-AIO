@@ -5,6 +5,7 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a actions
 complete -c voicebridge -n '__fish_use_subcommand' -f -a asr-test
 complete -c voicebridge -n '__fish_use_subcommand' -f -a audio
 complete -c voicebridge -n '__fish_use_subcommand' -f -a auth
+complete -c voicebridge -n '__fish_use_subcommand' -f -a brain
 complete -c voicebridge -n '__fish_use_subcommand' -f -a branding
 complete -c voicebridge -n '__fish_use_subcommand' -f -a browser
 complete -c voicebridge -n '__fish_use_subcommand' -f -a capability
