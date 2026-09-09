@@ -120,13 +120,11 @@
     },
     {
       "cmd": "--tui",
-      "verdict": "BLOCKED",
-      "reason": "No full-screen TUI in Qubit; visual surface is the web dashboard",
-      "evidence": "dashboard suites",
-      "owner": "qubit-policy",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "BLOCKED_TUI",
-      "user_explanation": "Qubit Agent cannot do this: No full-screen TUI in Qubit; visual surface is the web dashboard"
+      "verdict": "IMPLEMENTED",
+      "qubit": "voicebridge tui live terminal board (same runtime_inventory backend as status/dashboard; q quit, r refresh; read-only; typed TUI_NO_TTY/TUI_NO_CURSES outside a terminal)",
+      "proof": "tests/test_tui8tf.py",
+      "owner": "qubit-core",
+      "rollback": "read-only board; nothing started or changed"
     },
     {
       "cmd": "-v/--verbose",

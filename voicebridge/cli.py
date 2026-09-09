@@ -655,6 +655,7 @@ def build_parser() -> argparse.ArgumentParser:
     sy_accept.add_argument("--apply", action="store_true",
                            help="actually restore (needs --confirm + enrollment)")
     sy_accept.add_argument("--confirm", action="store_true")
+    add("tui", help="live terminal board (same backend as status/dashboard)")
     for _hk_mut, _hk_help in (("revoke", "revoke a declaration"),
                               ("remove", "delete a declaration")):
         _p = hk_sub.add_parser(_hk_mut, parents=[common],
@@ -1396,6 +1397,8 @@ def main(argv=None) -> int:
         return _cmd_hooks(cfg, args)
     if command == "sync":
         return _cmd_sync(cfg, args)
+    if command == "tui":
+        return _cmd_tui(cfg)
     if command == "memory":
         return _cmd_memory(cfg, args)
     if command == "websites":
@@ -3142,6 +3145,21 @@ def _cmd_sync(cfg, args) -> int:
                            "rollback": "nothing exported or restored"},
                           indent=2))
         return rc
+
+
+def _cmd_tui(cfg) -> int:
+    """voicebridge tui — live terminal board (read-only, same backend).
+
+    Outside a real terminal this prints the typed TUI_NO_TTY refusal
+    (piped/CI callers use `status` or the dashboard instead).
+    """
+    import json as _json
+    from . import tui as TUI
+    out = TUI.main(cfg)
+    if out.get("state") == "OK":
+        return 0
+    print(_json.dumps(out, indent=2))
+    return 2
 
 
 def _cmd_memory(cfg, args) -> int:
