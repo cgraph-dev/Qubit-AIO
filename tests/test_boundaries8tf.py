@@ -14,14 +14,9 @@ ACCOUNT_BOUND = {
     "peer": "BLOCKED_PAIRING",
     "gateway-manage": "BLOCKED_GATEWAY_MANAGE",
     "gateway": "BLOCKED_GATEWAY",
-    "whatsapp": "BLOCKED_MESSAGING",
-    "whatsapp-cloud": "BLOCKED_MESSAGING",
-    "slack": "BLOCKED_MESSAGING",
-    "send": "BLOCKED_MESSAGING",
 }
 
-ABSENT_COMMANDS = ("pairing", "webhook", "peer", "gateway", "whatsapp",
-                   "whatsapp-cloud", "slack", "send", "portal", "login",
+ABSENT_COMMANDS = ("peer", "gateway", "portal", "login",
                    "logout", "pets", "skin", "serve",
                    "desktop", "gui", "dashboard")
 

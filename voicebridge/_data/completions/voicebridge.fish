@@ -29,9 +29,11 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a mcp
 complete -c voicebridge -n '__fish_use_subcommand' -f -a memory
 complete -c voicebridge -n '__fish_use_subcommand' -f -a mic-test
 complete -c voicebridge -n '__fish_use_subcommand' -f -a monitor
+complete -c voicebridge -n '__fish_use_subcommand' -f -a msg
 complete -c voicebridge -n '__fish_use_subcommand' -f -a once
 complete -c voicebridge -n '__fish_use_subcommand' -f -a opencode
 complete -c voicebridge -n '__fish_use_subcommand' -f -a package
+complete -c voicebridge -n '__fish_use_subcommand' -f -a pairing
 complete -c voicebridge -n '__fish_use_subcommand' -f -a permissions
 complete -c voicebridge -n '__fish_use_subcommand' -f -a power
 complete -c voicebridge -n '__fish_use_subcommand' -f -a product
@@ -53,5 +55,6 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a verified-skills
 complete -c voicebridge -n '__fish_use_subcommand' -f -a verify
 complete -c voicebridge -n '__fish_use_subcommand' -f -a verify-release
 complete -c voicebridge -n '__fish_use_subcommand' -f -a vision
+complete -c voicebridge -n '__fish_use_subcommand' -f -a webhook
 complete -c voicebridge -n '__fish_use_subcommand' -f -a websites
 complete -c voicebridge -n '__fish_use_subcommand' -f -a webui

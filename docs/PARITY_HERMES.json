@@ -360,12 +360,12 @@
     {
       "cmd": "pairing/webhook/peer",
       "verdict": "BLOCKED",
-      "reason": "Require messaging accounts/identities; no accounts in scope",
-      "evidence": "tests/test_boundaries8tf.py + tests/test_parity_hermes.py::test_no_messaging_transports_in_product",
+      "reason": "Pairing-code kernel and HMAC webhook verification are implemented and tested, but peer gateway registration and live enrollment need remote messaging accounts/identities; no accounts in scope",
+      "evidence": "tests/test_pairing8tf.py + tests/test_webhooks8tf.py + tests/test_boundaries8tf.py",
       "owner": "owner-operator (accounts/credentials)",
-      "rollback": "nothing installed or enabled; nothing to roll back",
+      "rollback": "kernel registries tombstone on revoke/remove (audited)",
       "code": "BLOCKED_PAIRING",
-      "user_explanation": "Qubit Agent cannot do this: Require messaging accounts/identities; no accounts in scope"
+      "user_explanation": "Qubit Agent cannot do this yet: peer registration and live enrollment need messaging accounts."
     },
     {
       "cmd": "serve/dashboard/desktop/gui",
@@ -551,13 +551,11 @@
     },
     {
       "cmd": "whatsapp/whatsapp-cloud/slack/send",
-      "verdict": "BLOCKED",
-      "reason": "Messaging platforms need live accounts; sends would duplicate Qubit's single event path",
-      "evidence": "tests/test_boundaries8tf.py + tests/test_parity_hermes.py::test_no_messaging_transports_in_product",
-      "owner": "owner-operator (accounts/credentials)",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "user_explanation": "Qubit Agent cannot do this: messaging platforms need live accounts.",
-      "code": "BLOCKED_MESSAGING"
+      "verdict": "IMPLEMENTED",
+      "qubit": "voicebridge msg account-*/draft/approve/send/retry/link/list/show (provider records with vault-only refs; drafts + approval separation; fresh-confirm sends; credential-gated last mile MSG_NO_CREDENTIAL; classic-WhatsApp pairing linkage; idempotent receipts; retry/backoff; redacted audit) + pairing kernel (hashed single-use codes issuing real scoped grants) + webhooks kernel (HMAC verify, freshness, replay store)",
+      "proof": "tests/test_messaging8tf.py, tests/test_pairing8tf.py, tests/test_webhooks8tf.py",
+      "owner": "qubit-core",
+      "rollback": "account-remove/outbox preserved per-message; pairing revoke removes grants (audited)"
     }
   ]
 }

@@ -655,6 +655,106 @@ def build_parser() -> argparse.ArgumentParser:
     sy_accept.add_argument("--apply", action="store_true",
                            help="actually restore (needs --confirm + enrollment)")
     sy_accept.add_argument("--confirm", action="store_true")
+    pr = add("pairing", help="Enrollment pairing codes (hashed, single-use, granted)")
+    pr_sub = pr.add_subparsers(dest="pairing_command")
+    pr_create = pr_sub.add_parser("create", parents=[common],
+                                  help="issue a one-time code (dry-run unless --confirm)")
+    pr_create.add_argument("--label", required=True)
+    pr_create.add_argument("--scope", action="append", default=[],
+                           help="grant scope (repeatable, at least one)")
+    pr_create.add_argument("--account", default="",
+                           help="bind to a messaging account id (optional)")
+    pr_create.add_argument("--ttl", type=float, default=600.0)
+    pr_create.add_argument("--confirm", action="store_true")
+    pr_approve = pr_sub.add_parser("approve", parents=[common],
+                                   help="verify a code and issue its grant "
+                                        "(dry-run unless --confirm)")
+    pr_approve.add_argument("code")
+    pr_approve.add_argument("--confirm", action="store_true")
+    pr_sub.add_parser("list", parents=[common], help="list codes (redacted)")
+    pr_revoke = pr_sub.add_parser("revoke", parents=[common],
+                                  help="tombstone a code + revoke grant "
+                                       "(dry-run unless --confirm)")
+    pr_revoke.add_argument("code_id")
+    pr_revoke.add_argument("--confirm", action="store_true")
+    wh = add("webhook", help="Event subscriptions with HMAC verification (no listener)")
+    wh_sub = wh.add_subparsers(dest="webhook_command")
+    wh_add = wh_sub.add_parser("add", parents=[common],
+                               help="record a subscription (dry-run unless --confirm)")
+    wh_add.add_argument("sub_id")
+    wh_add.add_argument("--url", required=True)
+    wh_add.add_argument("--event", action="append", default=[],
+                        help="event name (repeatable, at least one)")
+    wh_add.add_argument("--secret", required=True,
+                        help="signing secret as env:VAR or file:PATH (never a value)")
+    wh_add.add_argument("--confirm", action="store_true")
+    wh_sub.add_parser("list", parents=[common], help="list subscriptions")
+    wh_show = wh_sub.add_parser("show", parents=[common],
+                                help="show one subscription")
+    wh_show.add_argument("sub_id")
+    wh_remove = wh_sub.add_parser("remove", parents=[common],
+                                  help="delete a subscription (dry-run unless --confirm)")
+    wh_remove.add_argument("sub_id")
+    wh_remove.add_argument("--confirm", action="store_true")
+    wh_verify = wh_sub.add_parser("verify", parents=[common],
+                                  help="verify one inbound delivery (HMAC + freshness + replay)")
+    wh_verify.add_argument("sub_id")
+    wh_verify.add_argument("--payload", required=True,
+                           help="delivery bytes file (never inline secrets)")
+    wh_verify.add_argument("--signature", required=True, help="hex HMAC-SHA256")
+    wh_verify.add_argument("--timestamp", type=float, required=True)
+    wh_sub.add_parser("test", parents=[common],
+                      help="dry-run delivery plan (no secret, no network)").add_argument(
+                          "sub_id")
+    mg = add("msg", help="Brokered messaging accounts + outbox (credential-gated sends)")
+    mg_sub = mg.add_subparsers(dest="msg_command")
+    mg_acct = mg_sub.add_parser("account-add", parents=[common],
+                                help="record a provider account (dry-run unless --confirm)")
+    mg_acct.add_argument("account_id")
+    mg_acct.add_argument("--provider", required=True,
+                         choices=["whatsapp", "whatsapp-cloud", "slack"])
+    mg_acct.add_argument("--label", required=True)
+    mg_acct.add_argument("--key-ref", required=True,
+                         help="credential as env:VAR or file:PATH (never a value)")
+    mg_acct.add_argument("--origin", default="")
+    mg_acct.add_argument("--phone-number-id", default="",
+                         help="whatsapp-cloud phone number id")
+    mg_acct.add_argument("--confirm", action="store_true")
+    mg_sub.add_parser("account-list", parents=[common], help="list accounts")
+    mg_show = mg_sub.add_parser("account-show", parents=[common],
+                                help="show one account")
+    mg_show.add_argument("account_id")
+    mg_rm = mg_sub.add_parser("account-remove", parents=[common],
+                              help="remove an account (dry-run unless --confirm)")
+    mg_rm.add_argument("account_id")
+    mg_rm.add_argument("--confirm", action="store_true")
+    mg_draft = mg_sub.add_parser("draft", parents=[common],
+                                 help="stage an outbox draft (dry-run unless --confirm)")
+    mg_draft.add_argument("--account", required=True)
+    mg_draft.add_argument("--to", required=True)
+    mg_draft.add_argument("--body", required=True)
+    mg_draft.add_argument("--idempotency-key", default="")
+    mg_draft.add_argument("--confirm", action="store_true")
+    mg_approve = mg_sub.add_parser("approve", parents=[common],
+                                   help="approve a draft (dry-run unless --confirm)")
+    mg_approve.add_argument("msg_id")
+    mg_approve.add_argument("--confirm", action="store_true")
+    mg_send = mg_sub.add_parser("send", parents=[common],
+                                help="send with fresh exact confirmation")
+    mg_send.add_argument("msg_id")
+    mg_send.add_argument("--confirm", action="store_true")
+    mg_retry = mg_sub.add_parser("retry", parents=[common],
+                                 help="re-attempt queued/failed (dry-run unless --confirm)")
+    mg_retry.add_argument("msg_id")
+    mg_retry.add_argument("--confirm", action="store_true")
+    mg_link = mg_sub.add_parser("link", parents=[common],
+                                help="typed link state (read-only)")
+    mg_link.add_argument("account_id")
+    mg_list = mg_sub.add_parser("list", parents=[common], help="list outbox")
+    mg_list.add_argument("--state", default="",
+                         choices=["", "draft", "approved", "queued", "sent", "failed"])
+    mg_show = mg_sub.add_parser("show", parents=[common], help="show one message")
+    mg_show.add_argument("msg_id")
     add("tui", help="live terminal board (same backend as status/dashboard)")
     vs = add("vision", help="Approved vision analysis (explicit, VRAM-guarded)")
     vs_sub = vs.add_subparsers(dest="vision_command")
@@ -1411,6 +1511,12 @@ def main(argv=None) -> int:
         return _cmd_hooks(cfg, args)
     if command == "sync":
         return _cmd_sync(cfg, args)
+    if command == "pairing":
+        return _cmd_pairing(cfg, args)
+    if command == "webhook":
+        return _cmd_webhook(cfg, args)
+    if command == "msg":
+        return _cmd_msg(cfg, args)
     if command == "tui":
         return _cmd_tui(cfg)
     if command == "vision":
@@ -3213,6 +3319,188 @@ def _cmd_vision(cfg, args) -> int:
                            "owner": "qubit-policy",
                            "rollback": "resident model restored by the swap "
                                        "cycle; no state written"},
+                          indent=2))
+        return rc
+
+
+def _cmd_pairing(cfg, args) -> int:
+    """voicebridge pairing create|approve|list|revoke.
+
+    Hashed one-time codes; approval issues a real scoped grant.
+    Mutating ops preview under --dry-run, require --confirm, and refuse
+    while the emergency stop is latched.
+    """
+    import json as _json
+    from . import pairing as PA
+    cmd = getattr(args, "pairing_command", None) or "list"
+    confirm = bool(getattr(args, "confirm", False))
+    try:
+        if cmd in ("create", "approve", "revoke") and PA.estop_engaged(cfg):
+            print(_json.dumps(PA.refuse_estop(f"pairing {cmd}"), indent=2))
+            return 3
+        if getattr(args, "dry_run", False) and cmd != "list":
+            print(_json.dumps({"state": "preview", "would": f"pairing {cmd}"},
+                              indent=2))
+            return 0
+        if cmd == "list":
+            out = PA.list_codes(cfg)
+        elif cmd == "create":
+            out = PA.create(cfg, args.label, list(getattr(args, "scope", []) or []),
+                            account=getattr(args, "account", "") or "",
+                            ttl_s=getattr(args, "ttl", 600.0) or 600.0,
+                            requested_by="cli:user", confirmed=confirm)
+        elif cmd == "approve":
+            out = PA.approve(cfg, args.code,
+                             requested_by="cli:user", confirmed=confirm)
+        elif cmd == "revoke":
+            out = PA.revoke(cfg, args.code_id,
+                            requested_by="cli:user", confirmed=confirm)
+        else:
+            print(f"ERROR: unknown pairing command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except PA.PairingError as exc:
+        rc = 3 if exc.code == PA.CONFIRM_CODE else 2
+        print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                           "code": exc.code, "detail": exc.detail[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "registry untouched; no grant issued"},
+                          indent=2))
+        return rc
+
+
+def _cmd_webhook(cfg, args) -> int:
+    """voicebridge webhook add|list|show|remove|verify|test.
+
+    Verified-only subscriptions: HMAC + freshness + replay checked on
+    verify; nothing executes or dispatches, ever.
+    """
+    import json as _json
+    from . import webhooks as WH
+    cmd = getattr(args, "webhook_command", None) or "list"
+    confirm = bool(getattr(args, "confirm", False))
+    try:
+        if cmd in ("add", "remove") and WH.estop_engaged(cfg):
+            print(_json.dumps(WH.refuse_estop(f"webhook {cmd}"), indent=2))
+            return 3
+        if getattr(args, "dry_run", False) and cmd not in ("list", "show", "test"):
+            print(_json.dumps({"state": "preview", "would": f"webhook {cmd}"},
+                              indent=2))
+            return 0
+        if cmd == "list":
+            out = WH.list_subs(cfg)
+        elif cmd == "show":
+            out = WH.show(cfg, args.sub_id)
+        elif cmd == "add":
+            out = WH.add(cfg, args.sub_id, args.url,
+                         list(getattr(args, "event", []) or []),
+                         getattr(args, "secret", "") or "",
+                         requested_by="cli:user", confirmed=confirm)
+        elif cmd == "remove":
+            out = WH.remove(cfg, args.sub_id,
+                            requested_by="cli:user", confirmed=confirm)
+        elif cmd == "test":
+            out = WH.test_plan(cfg, args.sub_id)
+        elif cmd == "verify":
+            try:
+                payload = Path(getattr(args, "payload", "") or "").read_bytes()
+            except OSError as exc:
+                print(_json.dumps({"state": "FAILED", "code": "WEBHOOK_BAD_INPUT",
+                                   "detail": f"payload unreadable: {exc}"[:200],
+                                   "owner": "qubit-policy",
+                                   "rollback": "nothing verified"}, indent=2))
+                return 2
+            if len(payload) > 1_000_000:
+                print(_json.dumps({"state": "FAILED", "code": "WEBHOOK_BAD_INPUT",
+                                   "detail": "payload exceeds 1MB cap",
+                                   "owner": "qubit-policy",
+                                   "rollback": "nothing verified"}, indent=2))
+                return 2
+            out = WH.verify(cfg, args.sub_id, payload,
+                            getattr(args, "signature", "") or "",
+                            getattr(args, "timestamp", 0.0) or 0.0)
+        else:
+            print(f"ERROR: unknown webhook command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except WH.WebhookError as exc:
+        rc = 3 if exc.code == WH.CONFIRM_CODE else 2
+        print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                           "code": exc.code, "detail": exc.detail[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "nothing verified or dispatched"},
+                          indent=2))
+        return rc
+
+
+def _cmd_msg(cfg, args) -> int:
+    """voicebridge msg account-*/draft/approve/send/retry/link/list/show.
+
+    Brokered outbox: fresh exact confirmation per send, credential-gated
+    last mile, idempotent receipts, redacted audit.
+    """
+    import json as _json
+    from . import messaging as MG
+    cmd = getattr(args, "msg_command", None) or "list"
+    confirm = bool(getattr(args, "confirm", False))
+    try:
+        _MUT = {"account-add", "account-remove", "draft", "approve",
+                "send", "retry"}
+        if cmd in _MUT and MG.estop_engaged(cfg):
+            print(_json.dumps(MG.refuse_estop(f"msg {cmd}"), indent=2))
+            return 3
+        if getattr(args, "dry_run", False) and cmd in _MUT:
+            print(_json.dumps({"state": "preview", "would": f"msg {cmd}"},
+                              indent=2))
+            return 0
+        if cmd == "account-add":
+            extra = {}
+            if getattr(args, "phone_number_id", ""):
+                extra["phone_number_id"] = args.phone_number_id
+            out = MG.account_add(cfg, args.account_id, args.provider,
+                                 args.label, key_ref=args.key_ref,
+                                 origin=getattr(args, "origin", "") or "",
+                                 extra=extra, requested_by="cli:user",
+                                 confirmed=confirm)
+        elif cmd == "account-list":
+            out = MG.account_list(cfg)
+        elif cmd == "account-show":
+            out = MG.account_show(cfg, args.account_id)
+        elif cmd == "account-remove":
+            out = MG.account_remove(cfg, args.account_id,
+                                    requested_by="cli:user", confirmed=confirm)
+        elif cmd == "draft":
+            out = MG.draft(cfg, args.account, args.to, args.body,
+                           idempotency_key=getattr(args, "idempotency_key", "") or "",
+                           requested_by="cli:user", confirmed=confirm)
+        elif cmd == "approve":
+            out = MG.approve(cfg, args.msg_id,
+                             requested_by="cli:user", confirmed=confirm)
+        elif cmd == "send":
+            out = MG.send(cfg, args.msg_id,
+                          requested_by="cli:user", confirmed=confirm)
+        elif cmd == "retry":
+            out = MG.retry(cfg, args.msg_id,
+                           requested_by="cli:user", confirmed=confirm)
+        elif cmd == "link":
+            out = MG.link(cfg, args.account_id)
+        elif cmd == "list":
+            out = MG.list_msgs(cfg, state_filter=getattr(args, "state", "") or "")
+        elif cmd == "show":
+            out = MG.show(cfg, args.msg_id)
+        else:
+            print(f"ERROR: unknown msg command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except MG.MessagingError as exc:
+        rc = 3 if exc.code == MG.CONFIRM_CODE else 2
+        print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                           "code": exc.code, "detail": exc.detail[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "outbox preserved; nothing sent twice"},
                           indent=2))
         return rc
 

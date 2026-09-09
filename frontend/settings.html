@@ -487,6 +487,7 @@ async function runtimeStatus(){
  if(body.mcp) rows.push('<div>mcp '+esc(String((body.mcp.servers||[]).length))+' configured · '+esc(body.mcp.state||'?')+'</div>');
   if(body.claw) rows.push('<div>claw lineage '+esc(body.claw.state||'?')+'</div>');
   if(body.vision) rows.push('<div>vision '+esc(body.vision.state||'?')+(body.vision.model?' · '+esc(body.vision.model):'')+'</div>');
+  if(body.messaging) rows.push('<div>messaging '+esc(String(body.messaging.accounts||0))+' accounts · '+esc(String(body.messaging.outbox||0))+' outbox</div>');
  if(body.capabilities && body.capabilities.states){
    const s = body.capabilities.states;
    rows.push('<div>capabilities '+esc(String(s.IMPLEMENTED||0))+' implemented · '+esc(String(s.BLOCKED||0))+' blocked · '+esc(String(s.REJECTED||0))+' rejected</div>');

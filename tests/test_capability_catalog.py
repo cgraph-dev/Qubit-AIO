@@ -40,7 +40,7 @@ def test_every_row_fully_evidenved():
 def test_check_semantics_per_state():
     ok = check("chat")
     assert ok["state"] == "IMPLEMENTED" and ok["code"] == "OK"
-    blocked = check("whatsapp")
+    blocked = check("gateway")
     assert blocked["state"] == "BLOCKED"
     assert blocked["code"].startswith("BLOCKED_")
     assert "owner" in blocked and "rollback" in blocked
@@ -83,7 +83,7 @@ def test_cli_capability_command():
     buf = io.StringIO()
     with redirect_stdout(buf):
         assert _cmd_capability("list", "", "BLOCKED") == 0
-    assert "whatsapp" in buf.getvalue().split()
+    assert "gateway" in buf.getvalue().split()
 
 
 def test_dashboard_inventory_carries_capabilities(tmp_path, monkeypatch):
