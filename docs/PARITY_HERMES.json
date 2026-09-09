@@ -101,7 +101,7 @@
       "rollback": "nothing installed or enabled; nothing to roll back",
       "code": "REJECTED_ACCEPT_HOOKS",
       "user_explanation": "Qubit Agent cannot do this: Auto-bypass of policy is forbidden by design; model text can never widen grants",
-      "evidence": "tests/test_parity_hermes.py::test_no_bypass_flags_in_qubit_cli + tests/test_packet7e.py hard-deny/injection suites"
+      "evidence": "tests/test_parity_hermes.py::test_no_bypass_flags_in_qubit_cli + tests/test_packet7e.py hard-deny/injection suites (scoped owner sessions via permissions mode set unrestricted with scopes/expiry/audit; model text can never elevate)"
     },
     {
       "cmd": "--pass-session-id/--source/--in/--no-restore-cwd",
