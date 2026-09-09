@@ -325,13 +325,11 @@
     },
     {
       "cmd": "acp/lsp",
-      "verdict": "BLOCKED",
-      "reason": "IDE protocol scope (8X); no ACP server or language server in product",
-      "evidence": "no ACP/LSP listener tests",
-      "owner": "packet-8X",
-      "rollback": "nothing installed or enabled; nothing to roll back",
-      "code": "BLOCKED_ACP",
-      "user_explanation": "Qubit Agent cannot do this: IDE protocol scope (8X); no ACP server or language server in product"
+      "verdict": "IMPLEMENTED",
+      "qubit": "voicebridge acp --check/--setup/--version (read-only probes + manual snippets, never writes; serve + --accept-hooks typed-refused) + voicebridge lsp status/list/which/restart (PATH-presence inventory, no spawn; install/install-all typed-refused LSP_NO_DOWNLOADS)",
+      "proof": "tests/test_acp_lsp8tf.py",
+      "owner": "qubit-core",
+      "rollback": "probes/snippets are read-only; nothing installed or started"
     },
     {
       "cmd": "computer-use",

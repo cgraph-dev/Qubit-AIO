@@ -545,6 +545,37 @@ def build_parser() -> argparse.ArgumentParser:
     br_close = br_sub.add_parser("close-profile", parents=[common],
                                  help="refused: real profiles are never mutated")
     br_close.add_argument("--profile", default="default")
+    acp = add("acp", help="Editor-integration checks (no ACP server shipped)")
+    acp.add_argument("--accept-hooks", action="store_true",
+                     help="refused: unseen hooks are never auto-approved")
+    acp.add_argument("--check", action="store_true",
+                     help="editor readiness probes (read-only)")
+    acp.add_argument("--setup", action="store_true",
+                     help="print a manual editor snippet (never writes)")
+    acp.add_argument("--setup-browser", action="store_true",
+                     help="print manual browser-integration steps")
+    acp.add_argument("--editor", default="vscode",
+                     help="editor for --setup (vscode|zed|jetbrains)")
+    acp.add_argument("--version", action="store_true",
+                     help="report the ACP server state")
+    acp.add_argument("--yes", "-y", action="store_true",
+                     help="accepted and ignored (no prompts exist)")
+    lsp = add("lsp", help="Language-server inventory (binaries never downloaded)")
+    lsp_sub = lsp.add_subparsers(dest="lsp_command")
+    lsp_sub.add_parser("status", parents=[common],
+                       help="layer state + inventory summary (read-only)")
+    lsp_sub.add_parser("list", parents=[common],
+                       help="known servers with PATH presence (read-only)")
+    lsp_which = lsp_sub.add_parser("which", parents=[common],
+                                   help="locate one server on PATH (read-only)")
+    lsp_which.add_argument("server")
+    lsp_install = lsp_sub.add_parser("install", parents=[common],
+                                     help="refused: binaries never downloaded")
+    lsp_install.add_argument("server", nargs="?", default="")
+    lsp_sub.add_parser("install-all", parents=[common],
+                       help="refused: binaries never downloaded")
+    lsp_sub.add_parser("restart", parents=[common],
+                       help="typed no-client report (no persistent clients)")
     mem = add("memory", help="Packet 8M semantic memory (GENOME contract; disabled by default)")
     mem_sub = mem.add_subparsers(dest="memory_command")
     mem_status = mem_sub.add_parser("status", parents=[common],
@@ -1256,6 +1287,10 @@ def main(argv=None) -> int:
         return _cmd_computer_use(cfg, args)
     if command == "browser":
         return _cmd_browser(cfg, args)
+    if command == "acp":
+        return _cmd_acp(cfg, args)
+    if command == "lsp":
+        return _cmd_lsp(cfg, args)
     if command == "memory":
         return _cmd_memory(cfg, args)
     if command == "websites":
@@ -2725,6 +2760,62 @@ def _cmd_browser(cfg, args) -> int:
         return 2
     else:
         print(f"ERROR: unknown browser command {cmd!r}")
+        return 2
+    print(_json.dumps(out, indent=2, sort_keys=True))
+    return 0
+
+
+def _cmd_acp(cfg, args) -> int:
+    """voicebridge acp --check|--setup|--version (no server shipped).
+
+    Bare `acp` would serve a second agent authority and is typed-refused;
+    --accept-hooks is typed-rejected (policy bypass).
+    """
+    import json as _json
+    from . import acp_lsp as AL
+    if getattr(args, "accept_hooks", False):
+        print(_json.dumps(AL.acp_refuse_accept_hooks(), indent=2))
+        return 2
+    if getattr(args, "setup", False) or getattr(args, "setup_browser", False):
+        if getattr(args, "setup_browser", False):
+            print(_json.dumps({
+                "state": "OK", "schema": "qubit-acp-browser-setup/1",
+                "handoff": "manual: launch Chromium yourself with "
+                           "--remote-debugging-port=9222, then confirm with "
+                           "`voicebridge browser status`; Qubit never "
+                           "launches or restarts your browser"}, indent=2))
+            return 0
+        out = AL.acp_setup_snippet(getattr(args, "editor", "") or "")
+        print(_json.dumps(out, indent=2))
+        return 0 if out.get("state") == "OK" else 2
+    if getattr(args, "check", False) or getattr(args, "version", False):
+        print(_json.dumps(AL.acp_check(), indent=2))
+        return 0
+    print(_json.dumps(AL.acp_refuse_serve(), indent=2))
+    return 2
+
+
+def _cmd_lsp(cfg, args) -> int:
+    """voicebridge lsp status|list|which|restart (+ refused install)."""
+    import json as _json
+    from . import acp_lsp as AL
+    cmd = getattr(args, "lsp_command", None) or "status"
+    if cmd == "status":
+        out = AL.lsp_status()
+    elif cmd == "list":
+        out = AL.lsp_list()
+    elif cmd == "which":
+        out = AL.lsp_which(getattr(args, "server", "") or "")
+        print(_json.dumps(out, indent=2))
+        return 0 if out.get("state") in ("PRESENT", "ABSENT") else 2
+    elif cmd == "restart":
+        out = AL.lsp_restart()
+    elif cmd in ("install", "install-all"):
+        print(_json.dumps(
+            AL.lsp_refuse_install(getattr(args, "server", "") or ""), indent=2))
+        return 2
+    else:
+        print(f"ERROR: unknown lsp command {cmd!r}")
         return 2
     print(_json.dumps(out, indent=2, sort_keys=True))
     return 0
