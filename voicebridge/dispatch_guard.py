@@ -1,7 +1,7 @@
-"""Temporary deny/confirm adapter for OpenClaw/Hermes worker dispatch (Packet 1B).
+"""Temporary deny/confirm adapter for Qubit worker dispatch.
 
 Wraps the three legacy choke points (gateway send_message, CLI run_task,
-hermes run_task) so every external worker call produces a PolicyEngine
+agent turns) so every worker call produces a PolicyEngine
 Decision first. Modes (config `safety.worker_dispatch`):
   confirm (default) — user-originated calls are auto-issued a short-lived,
                       single-use confirmation and flow through the store;
@@ -31,11 +31,8 @@ class DispatchBlocked(RuntimeError):
 
 
 WORKER_CAPS = {
-    "openclaw.gateway.task": ("openclaw", "send a task through the agent gateway"),
-    "openclaw.cli.task": ("openclaw", "run a task through the agent CLI"),
-    "hermes.task": ("hermes", "run a task through the voice runtime CLI"),
-    "openclaw.create_session": ("openclaw", "create an agent task session"),
-    "openclaw.abort": ("openclaw", "abort a running agent task"),
+    "agent.task": ("agent", "run a task through the Qubit agent"),
+    "agent.session": ("agent", "run a Qubit worker session"),
 }
 
 

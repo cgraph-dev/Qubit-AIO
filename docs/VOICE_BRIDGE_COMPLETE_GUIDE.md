@@ -59,7 +59,7 @@ At completion we should have:
 - real Chromium sessions for sites that need the user’s saved login state;
 - reports with timestamps, source links, citations, screenshots when available,
   failures, omissions, and a clear executive summary;
-- OpenClaw/Hermes workers connected through a controlled gateway;
+- Qubit worker sessions connected through the controlled broker;
 - structured logs, rollback, canary testing, backups, and reproducible tests;
 - an installable configuration that can be backed up and moved to another PC.
 
@@ -180,7 +180,7 @@ web         permitted web research
 browser     browser pages and saved sessions
 inbox       email or message inboxes
 reports     generated report artifacts
-worker      OpenClaw/Hermes task execution
+worker      Qubit worker-session execution
 memory      the assistant's approved memory
 ```
 
@@ -229,12 +229,12 @@ every file” is a destructive request and must be denied or explicitly
 confirmed. The worker returns output and artifacts to the assistant; it does
 not silently change the conversation’s rules.
 
-### OpenClaw and Hermes
+### Qubit worker
 
-Coding or long-running work can be sent through the existing OpenClaw/Hermes
-gateway. The voice bridge remains the front door: it chooses the route,
-passes only the approved task context, waits for progress/results, and gives a
-short local summary back to the user.
+Coding or long-running work runs as a native Qubit worker session. The voice
+bridge remains the front door: it chooses the route, passes only the approved
+task context, waits for progress/results, and gives a short local summary
+back to the user.
 
 ### Gmail, Instagram, Messenger, and other sites
 

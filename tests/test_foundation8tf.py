@@ -32,11 +32,11 @@ def test_identity_constants():
     assert F.INSTALL_IDENTITY == "qubit-voicebridge"
     assert F.IMPORT_PACKAGE == "voicebridge"
     assert F.LEGACY_IDENTITY == "openclaw-voice-bridge"
-    for pin in (F.HERMES_COMMIT, F.OPENCLAW_COMMIT):
-        assert len(pin) == 40 and all(c in "0123456789abcdef" for c in pin)
-    assert F.HERMES_URL.endswith("NousResearch/hermes-agent")
-    assert F.OPENCLAW_URL.endswith("openclaw/openclaw")
-    assert F.PRIMARY_RUNTIME_ARGV[:3] == ("hermes", "chat", "-q")
+    assert F.AGENT_TURN_PATH == "voicebridge.agent.turn"
+    assert F.AGENT_SESSION_PATH == "voicebridge.agent.run_session"
+    receipt = F.identity_receipt()
+    assert receipt["product"] == "Qubit Agent"
+    assert receipt["agent_turn"] == "voicebridge.agent.turn"
 
 
 def test_install_sh_canonical_identity():
@@ -103,13 +103,15 @@ def test_singularity_unobserved_is_degraded_not_ok():
     assert partial["detail"]["brokers"] == "SINGLE"
 
 
-def test_disabled_competing_paths_all_refused():
-    refused = F.disabled_competing_paths()
-    assert len(refused) >= 5
-    for entry in refused:
-        assert entry["verdict"] == "DISABLED" and entry["reason"]
-    joined = json.dumps(refused).lower()
-    assert "wake-word" in joined and "clawhub" in joined
+def test_native_authorities_cover_every_concern():
+    authorities = F.native_authorities()
+    assert len(authorities) >= 5
+    concerns = {entry["concern"] for entry in authorities}
+    assert {"agent turns", "worker sessions"} <= concerns
+    for entry in authorities:
+        assert entry["authority"] and "hermes" not in entry["authority"].lower()
+        assert "openclaw" not in entry["authority"].lower()
+    assert F.verify_runtime_identity()["state"] == "VERIFIED"
 
 
 # ---------------------------------------------------------------------------
@@ -224,7 +226,10 @@ def test_uninstall_preserves_state_by_default():
     assert "state" in preserved and "config" in preserved
 
 
-def test_foundation_pins_match_matrix():
+def test_provenance_pins_match_matrix():
     matrix = json.loads((REPO_ROOT / "docs" / "FEATURE_MATRIX_8U.json").read_text())
-    assert matrix["upstreams"]["hermes-agent"]["commit"] == F.HERMES_COMMIT
-    assert matrix["upstreams"]["openclaw"]["commit"] == F.OPENCLAW_COMMIT
+    for key in ("hermes-agent", "openclaw"):
+        pin = matrix["upstreams"][key]["commit"]
+        assert len(pin) == 40 and all(c in "0123456789abcdef" for c in pin)
+    record = (REPO_ROOT / "voicebridge" / "upstream" / "ATTRIBUTION.md").read_text()
+    assert matrix["upstreams"]["hermes-agent"]["commit"] in record

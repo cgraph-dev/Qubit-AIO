@@ -1,4 +1,4 @@
-"""Packet 8T-F — Hermes computer-use parity via capability probes.
+"""Qubit desktop-control capability probes.
 
 Proves control stays DISABLED with typed states, driver installs are
 refused (pinned-source policy), and probes spawn nothing and touch no

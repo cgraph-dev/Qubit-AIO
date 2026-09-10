@@ -1978,3 +1978,30 @@ DIVERGENCE FROM 8R RECORD: the operator install (~/.opencode/bin/opencode,
   binaries still win, otherwise the owned verified 1.18.29 copy is
   effective and the operator install is reported honestly as
   non-effective (status shows both).
+
+R33 — VENDORED MODULES RETIRED; NATIVE REPLACEMENTS (Qubit completion)
+```text
+REQUIREMENT: one unified Qubit product; no third-party product code in
+normal Qubit execution paths.
+RETIRED (deleted from the tree):
+  voicebridge/upstream/hermes_ansi_strip.py (was: tools/ansi_strip.py)
+  voicebridge/upstream/hermes_sqlite_util.py (was: hermes_cli/sqlite_util.py)
+  voicebridge/runtime/ (provision, real_hermes, runtime, worker, common)
+  voicebridge/hermes/ (backend)
+  scripts/install_hermes_runtime.sh
+NATIVE REPLACEMENTS (independent Qubit implementations, no copied expression):
+  voicebridge/textutil.py (strip_ansi, sanitize_display_text,
+    strip_unicode_tags, sanitize) — ECMA-48/Unicode grammar written from
+    the standards; differential battery vs the pinned oracle in
+    tests/test_upstream_vendored.py + adversarial tests/test_textutil8u.py
+  voicebridge/sqlstore.py (write_txn, add_column_if_missing) — same
+    behavioral contract with identifier validation added
+  voicebridge/agent.py (turn/run_session) — native agent over the local
+    model; proven in tests/test_agent8u.py
+LICENSE/PROVENANCE: MIT attribution for the retired vendoring retained in
+THIRD_PARTY_NOTICES.md (retirement section) and
+voicebridge/upstream/ATTRIBUTION.md (provenance record). The comparison
+clones at /tmp/pinned-upstream/* remain read-only differential oracles
+outside the product tree and are never executed by Qubit.
+DEPENDENCIES ADDED: none.
+```

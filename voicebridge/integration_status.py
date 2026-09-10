@@ -1,9 +1,8 @@
-"""Packet 8T-F — integration status surfaces (read-only, redacted).
+"""Qubit integration status surfaces (read-only, redacted).
 
-Proves Hermes `mcp`, `claw`, and `verify` parity behind Qubit contracts:
-MCP server inventory (policy-gated, names only), OpenClaw lineage-install
-detection (read-only discovery), and hermetic static release qualification.
-No mounting, no mutation, no secrets in output.
+MCP server inventory (policy-gated, names only), native worker-lane
+status, and hermetic static release qualification. No mounting, no
+mutation, no secrets in output.
 """
 from __future__ import annotations
 
@@ -29,29 +28,19 @@ def mcp_status(cfg: Any) -> Dict[str, Any]:
             "state": "OK" if not servers else "CONFIGURED"}
 
 
-def claw_status(cfg: Any) -> Dict[str, Any]:
-    """OpenClaw-lineage install detection (read-only; never mutates)."""
-    from .openclaw.discovery import OPENCLAW_DIR, discover_gateway
-
-    installed = bool(OPENCLAW_DIR.is_dir())
-    out: Dict[str, Any] = {
-        "schema": "qubit-claw-status/1",
-        "openclaw_dir_present": installed,
-        "qubit_migration": "openclaw-voice-bridge is legacy compat only; "
-                           "canonical identity is qubit-voicebridge",
+def worker_status(cfg: Any) -> Dict[str, Any]:
+    """Native Qubit worker-lane status (read-only; never mutates)."""
+    get = (lambda *p, default=None: cfg.get(*p, default=default)) \
+        if hasattr(cfg, "get") else (lambda *p, default=None: default)
+    return {
+        "schema": "qubit-worker-status/1",
+        "state": "OK",
+        "route": "local",
+        "agent_enabled": bool(get("agent", "enabled", default=True)),
+        "agent_model": str(get("agent", "model", default="") or
+                           "qubit-brain4"),
+        "queue": "see `qubit sessions` for active/queued work",
     }
-    if not installed:
-        out["state"] = "NOT_INSTALLED"
-        return out
-    try:
-        info = discover_gateway(cfg)
-        out.update(state="DETECTED" if info.url else "UNREACHABLE",
-                   gateway_url=str(info.url or ""),
-                   token_found=bool(info.token),
-                   agent=str(info.agent or ""))
-    except Exception as exc:
-        out.update(state="UNAVAILABLE", detail=str(exc)[:160])
-    return out
 
 
 def logout_check(cfg: Any) -> Dict[str, Any]:

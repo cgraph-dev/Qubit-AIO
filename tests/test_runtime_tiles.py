@@ -90,11 +90,9 @@ def test_runtime_route_reports_real_state(tmp_path):
         st, body = _http(ui, "GET", "/api/runtime")
         assert st == 200, body
         assert body["product"]["name"] == "Qubit Agent"
-        assert body["hermes"]["commit"] == \
-            "2237be355906fbe6065ce1815711eee52b2d646e"
-        assert body["hermes"]["state"] in ("DISABLED", "READY", "UNAVAILABLE",
-                                           "DEGRADED")
-        assert "vendored" in body and "voice" in body and "broker" in body
+        assert body["agent"]["runtime"] == "qubit-native"
+        assert body["agent"]["entry"] == "voicebridge.agent.turn"
+        assert "agent" in body and "voice" in body and "broker" in body
         assert "approvals" in body and "adapters" in body
         blob = json.dumps(body).lower()
         for secret in ("sk-", "token:", "cookie", "Bearer "):
@@ -121,7 +119,7 @@ def test_cli_status_shows_runtime_lines(tmp_path, monkeypatch, capsys):
 
     CLI._cmd_status(cfg)
     out = capsys.readouterr().out
-    assert "hermes runtime  :" in out
+    assert "agent runtime :" in out
     assert "emergency stop :" in out
 
 

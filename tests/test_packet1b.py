@@ -60,16 +60,14 @@ def test_every_worker_execution_is_guarded_and_no_raw_branches():
     for pat in forbidden:
         hits = re.findall(pat, guarded)
         assert not hits, f"unguarded execution remains: {pat} x{len(hits)}"
-    for cap in ("openclaw.gateway.task", "openclaw.cli.task", "hermes.task",
-                "openclaw.create_session", "openclaw.abort"):
+    for cap in ("agent.task", "agent.session"):
         assert f'"{cap}"' in src, f"{cap} not wired"
 
 
 def test_guard_registry_covers_exactly_the_wired_capabilities():
     g = WorkerGuard(_cfg("confirm"))
     names = set(g.engine.registry.names())
-    assert names == {"openclaw.gateway.task", "openclaw.cli.task", "hermes.task",
-                     "openclaw.create_session", "openclaw.abort"}
+    assert names == {"agent.task", "agent.session"}
 
 
 def test_decision_recorded_before_execution_for_every_cap():
@@ -81,11 +79,8 @@ def test_decision_recorded_before_execution_for_every_cap():
     caps.log_event = lambda e, **f: events.append(("decision", e))
     try:
         g = WorkerGuard(_cfg("confirm"))
-        for cap, kw in (("openclaw.gateway.task", {"session_key": "s", "task_text": "go"}),
-                        ("openclaw.cli.task", {"session_key": "s", "task_text": "go", "model": None}),
-                        ("hermes.task", {"task": "go"}),
-                        ("openclaw.create_session", {"key": "s", "label": "l", "message": "m"}),
-                        ("openclaw.abort", {"key": "s"})):
+        for cap, kw in (("agent.task", {"task": "go"}),
+                        ("agent.session", {"session_key": "s", "task_text": "go"})):
             _CURRENT_CAP["v"] = cap
             fn = lambda *a, **k: events.append(("executed", _CURRENT_CAP["v"]))
             before = len(events)
@@ -112,7 +107,7 @@ def _cfg(mode):
 def test_user_flow_auto_confirms_and_executes():
     calls = []
     g = WorkerGuard(_cfg("confirm"))
-    out = g.run("hermes.task", lambda text: calls.append(text) or "ok",
+    out = g.run("agent.task", lambda text: calls.append(text) or "ok",
                 "list files", source="user")
     assert out == "ok" and calls == ["list files"]
 
@@ -120,7 +115,7 @@ def test_user_flow_auto_confirms_and_executes():
 def test_deny_mode_blocks_even_user():
     g = WorkerGuard(_cfg("deny"))
     with pytest.raises(DispatchBlocked) as ei:
-        g.run("openclaw.cli.task", lambda *a: (_ for _ in ()).throw(
+        g.run("agent.session", lambda *a: (_ for _ in ()).throw(
             AssertionError("must never execute")), "x", source="user")
     assert ei.value.code == "WORKER_DISPATCH_DENIED"
 
@@ -129,14 +124,14 @@ def test_model_source_blocked_with_stolen_or_own_id():
     g = WorkerGuard(_cfg("confirm"))
     executed = []
     with pytest.raises(DispatchBlocked) as ei:
-        g.run("hermes.task", lambda t: executed.append(t), "payload",
+        g.run("agent.task", lambda t: executed.append(t), "payload",
               source="model")
     # uniform contract: issuance refusal surfaces as a typed dispatch block
     assert ei.value.code == "ISSUER_MODEL_FORBIDDEN"
     assert executed == []
     with pytest.raises(ConfirmationDenied):
         from voicebridge.capabilities import ConfirmationStore
-        ConfirmationStore().issue("hermes.task", {}, issued_by="model")
+        ConfirmationStore().issue("agent.task", {}, issued_by="model")
 
 
 def test_invalid_mode_rejected():
@@ -313,7 +308,7 @@ def test_worker_payload_sanitized_before_execution():
     g = WorkerGuard(_cfg("confirm"))
     seen = []
     secret = "token=supersecret9f8e7d"
-    g.run("hermes.task", lambda task: seen.append(task),
+    g.run("agent.task", lambda task: seen.append(task),
           f"deploy now {secret}", source="user")
     assert seen and secret not in seen[0] and "[REDACTED]" in seen[0]
 
@@ -325,7 +320,7 @@ def test_journal_log_event_redacts_central(tmp_path, monkeypatch):
     ls._EVENT_FILE = jf                     # test hook: module-level journal path
     ls._LOGGER = None
     try:
-        ls.log_event("hermes.task", text="password=hunter2 run it")
+        ls.log_event("agent.task", text="password=hunter2 run it")
         line = jf.read_text().strip().splitlines()[-1]
         assert "hunter2" not in line and "[REDACTED]" in line
     finally:
@@ -361,7 +356,6 @@ import types as _types
 from voicebridge.capabilities import PolicyEngine  # noqa: F401  (sink patching)
 import voicebridge.capabilities as _caps
 from voicebridge.orchestrator import VoiceOrchestrator as Orchestrator
-from voicebridge.openclaw.gateway_ws import GatewayError
 
 
 class _Rec:
@@ -374,12 +368,12 @@ class _Rec:
         return call
 
 
-def _make_orch(tmp_path, mode="confirm", route="gateway"):
+def _make_orch(tmp_path, mode="confirm", route="local"):
     events.clear()
     orch = Orchestrator.__new__(Orchestrator)          # skip heavy __init__
     cfg = Config.load()
     cfg.data.setdefault("safety", {})["worker_dispatch"] = mode
-    cfg.data["openclaw"]["progress_updates"] = False
+    cfg.data.setdefault("agent", {})["progress_updates"] = False
     orch.cfg = cfg
     orch._route = route
     orch._worker_guard = WorkerGuard(cfg)
@@ -390,130 +384,117 @@ def _make_orch(tmp_path, mode="confirm", route="gateway"):
         active=False, session_key="s0", run_id="r0",
         set_active=lambda *a, **k: events.append(("orch", "set_active")),
         clear=lambda: None)
-    orch._await_run = lambda *a, **k: events.append(("orch", "await_run"))
-    orch._spawn_waiter = lambda *a, **k: events.append(("orch", "spawn_waiter"))
-    orch._retry_gateway = lambda: events.append(("orch", "retry_gw"))
+    orch._await_session = lambda *a, **k: events.append(("orch", "await_session"))
     orch._interrupted_session = None
     orch._interrupted_task_text = None
-    orch._hermes_busy = False
+    orch._agent_busy = False
     orch._stop = threading.Event()
+    orch._cancel = threading.Event()
     orch._interrupt_requested = threading.Event()
-    orch.playback = _types.SimpleNamespace(stop=lambda: None)
+    orch.playback = _types.SimpleNamespace(stop=lambda: None, playing=False)
     orch._persist_full_report = lambda *a, **k: None
     orch._verify_task_result = lambda *a, **k: None
     orch._handle_agent_result = lambda *a, **k: events.append(("orch", "agent_result"))
     orch._dispatch_coding = lambda *a, **k: None
-    orch.gateway_info = None
     orch.feed_push = lambda *a, **k: None
-    orch._hermes = None
     return orch
 
 
-def _fake_gateway(run_ids=("r1",)):
-    class GW:
-        connected = True
-        def create_session(self, key=None, label=None, model=None, message=None,
-                           timeout=None):
-            events.append(("gw", "create_session"))
-            rid = run_ids[0] if run_ids else ""
-            return {"runId": rid}
-        def send_message(self, key=None, message=None, timeout=None):
-            events.append(("gw", "send_message"))
-            return {"runId": "r2"}
-        def abort(self, key=None, timeout=None):
-            events.append(("gw", "abort"))
-            return {}
-    return GW()
+def _wait_for(pred, timeout=15.0):
+    end = time.time() + timeout
+    while time.time() < end:
+        if pred():
+            return True
+        time.sleep(0.05)
+    return False
 
 
-def test_runtime_launch_gateway_decision_precedes_execution(tmp_path):
+def test_runtime_launch_session_decision_precedes_execution(tmp_path, monkeypatch):
+    import voicebridge.orchestrator as _orch_mod
+
     orch = _make_orch(tmp_path)
-    orch._gateway = _fake_gateway()
+    orch.task.active = True
+    monkeypatch.setattr(_orch_mod, "_agent_run_session",
+                        lambda *a, **k: events.append(("worker", "executed")) or
+                        {"state": "OK", "reply": "done", "session": "s"})
     orch._launch_task("summarize repo")
+    assert _wait_for(lambda: ("worker", "executed") in events), events
     kinds = [e for e in events if e[0] == "decision"]
     assert ("decision", "policy.decision") in kinds
-    first_dec = kinds[0]
-    # decision recorded BEFORE any gateway call
-    first_call = next(i for i, e in enumerate(events) if e[:2] == ("gw", "create_session"))
-    dec_idx = events.index(first_dec)
-    assert dec_idx < first_call
-    assert ("orch", "await_run") in events
+    dec_idx = events.index(("decision", "policy.decision"))
+    exec_idx = events.index(("worker", "executed"))
+    assert dec_idx < exec_idx, "decision must precede execution"
+    assert ("orch", "agent_result") in events
 
 
-def test_runtime_send_message_fallback_also_guarded(tmp_path):
+def test_runtime_launch_failure_speaks_typed_error(tmp_path, monkeypatch):
+    import voicebridge.orchestrator as _orch_mod
+
     orch = _make_orch(tmp_path)
-    orch._gateway = _fake_gateway(run_ids=())   # no runId → send fallback
+
+    def _boom(*a, **k):
+        raise RuntimeError("model down")
+    monkeypatch.setattr(_orch_mod, "_agent_run_session", _boom)
+    orch.task.active = True
     orch._launch_task("go")
-    assert ("gw", "send_message") in [e[:2] for e in events if e[0] == "gw"]
-    decisions = [i for i, e in enumerate(events) if e == ("decision", "policy.decision")]
-    send_i = next(i for i, e in enumerate(events) if e[:2] == ("gw", "send_message"))
-    # a decision exists before the fallback send too
-    assert any(d < send_i for d in decisions)
-
-
-def test_runtime_deny_mode_blocks_real_launch(tmp_path):
-    orch = _make_orch(tmp_path, mode="deny")
-    orch._hermes = None                     # failover impossible
-    orch._gateway = _fake_gateway()
-    orch._hermes = None                      # failover impossible → spoken error
-    orch._dispatch_coding = lambda *a, **k: None
-    orch._launch_task("should not run")          # deny mode must neutralize this
-    # NOTHING executed on the gateway...
-    assert not [e for e in events if e[0] == "gw"], "gateway executed despite deny!"
-    # ...and the user hears the explicit failure instead of silent success
+    assert _wait_for(lambda: any(e[:2] == ("orch", "speak") for e in events)), events
     speaks = [e[2] for e in events if e[:2] == ("orch", "speak") and len(e) > 2]
     joined = " | ".join(map(str, speaks))
-    assert "unreachable" in joined or "went wrong" in joined, \
+    assert "couldn't finish" in joined or "failed" in joined, speaks
+
+
+def test_runtime_deny_mode_blocks_real_launch(tmp_path, monkeypatch):
+    import voicebridge.orchestrator as _orch_mod
+
+    orch = _make_orch(tmp_path, mode="deny")
+    ran = []
+    monkeypatch.setattr(_orch_mod, "_agent_run_session",
+                        lambda *a, **k: ran.append(True) or {"state": "OK"})
+    orch._dispatch_coding = lambda *a, **k: None
+    orch.task.active = True
+    orch._launch_task("should not run")          # deny mode must neutralize this
+    assert _wait_for(lambda: any(e[:2] == ("orch", "speak") for e in events)), events
+    assert not ran, "session executed despite deny!"
+    speaks = [e[2] for e in events if e[:2] == ("orch", "speak") and len(e) > 2]
+    joined = " | ".join(map(str, speaks))
+    assert "can't run" in joined or "failed" in joined, \
         f"speaks={speaks!r} ALL={events!r}"
 
 
-def test_runtime_gateway_failover_routes_through_guarded_hermes(tmp_path):
+def test_runtime_session_worker_failure_is_typed(tmp_path, monkeypatch):
+    import voicebridge.orchestrator as _orch_mod
+
     orch = _make_orch(tmp_path)
 
-    class BoomGW:
-        def create_session(self, **k): raise GatewayError("down")
-        def send_message(self, *a, **k): raise GatewayError("down")
-    orch._gateway = BoomGW()
-
-    hermes_calls = []
-
-    class FakeHermes:
-        def run_task(self, task, timeout_s=None):
-            hermes_calls.append(task)
-            return "hermes done"
-    orch._hermes = FakeHermes()
-    orch.tts = _types.SimpleNamespace(speak=lambda *a, **k: None)
-    orch._humming_stop = threading.Event()
-    orch.muted = False
-
-    orch._launch_task("fix the bug")
-    assert hermes_calls and hermes_calls[0].startswith("fix the bug")
-    # TWO decisions recorded: the blocked gateway attempt AND the guarded hermes run
-    n_dec = sum(1 for e in events if e == ("decision", "policy.decision"))
-    assert n_dec >= 2
-    # no gateway execution happened
-    assert not [e for e in events if e[0] == "gw"]
+    def _boom(*a, **k):
+        raise RuntimeError("model down")
+    monkeypatch.setattr(_orch_mod, "_agent_run_session", _boom)
+    orch.task.active = True
+    orch._spawn_session_worker("sess1", "do it", 0.0)
+    assert _wait_for(lambda: any(e[:2] == ("orch", "speak") for e in events)), events
+    speaks = [e[2] for e in events if e[:2] == ("orch", "speak") and len(e) > 2]
+    assert any("failed" in str(x) or "can't run" in str(x) for x in speaks), speaks
 
 
-def test_runtime_continue_command_guarded(tmp_path):
+def test_runtime_continue_command_relaunches(tmp_path):
     orch = _make_orch(tmp_path)
-    orch._gateway = _fake_gateway()
     orch._interrupted_session = "sess9"
+    orch._interrupted_task_text = "old work"
+    launched = []
+    orch._launch_task = lambda text, model=None: launched.append(text)
     from voicebridge.intent.classifier import Intent
     intent = Intent(kind="system", task_text="continue",
                     params={"command": "continue"})
     orch._handle_system(intent)
-    assert ("gw", "send_message") in [e[:2] for e in events if e[0] == "gw"]
+    assert launched and "old work" in launched[0]
 
 
 def test_runtime_abort_guarded(tmp_path):
     orch = _make_orch(tmp_path)
-    orch._gateway = _fake_gateway()
     orch.task.active = True
     orch._abort_task("voice cancel")
-    assert ("gw", "abort") in [e[:2] for e in events if e[0] == "gw"]
-    decisions = [e for e in events if e == ("decision", "policy.decision")]
-    assert decisions                                    # recorded Decision exists
+    assert orch._cancel.is_set()
+    assert ("orch_log", "worker.abort") in events
 
 
 def test_model_labeled_launch_is_refused_at_runtime(tmp_path):
@@ -521,15 +502,13 @@ def test_model_labeled_launch_is_refused_at_runtime(tmp_path):
     this catches it: guard refuses non-user provenance even in confirm mode."""
     orch = _make_orch(tmp_path)
     calls = []
-    orch._gateway = _fake_gateway(calls)
     # simulate a compromised/mislabeled caller by forcing automation provenance
     orch._worker_guard.run.__defaults__                 # sanity: explicit required
     with pytest.raises(DispatchBlocked):
-        orch._worker_guard.run("openclaw.gateway.task",
-                               orch._gateway.create_session,
-                               key="k", label="l", message="m", model=None,
+        orch._worker_guard.run("agent.session",
+                               lambda: calls.append(True),
                                source="model")
-    assert not [e for e in events if e[0] == "gw"]
+    assert not calls
 
 
 # ==================== verifier round-3 repairs: debug sink + reconnect =====

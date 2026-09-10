@@ -5,7 +5,7 @@ Layers:
   asr/      speech-to-text adapters (faster-whisper active, PersonaPlex pluggable)
   tts/      text-to-speech adapters (piper active, edge/gateway optional)
   intent/   utterance classification + conversation/task/confirmation state
-  openclaw/ gateway discovery + WS protocol client (+ CLI fallback)
+  gateway/  JSON message-stream frame validation + dispatch
   safety/   destructive-action policy, allow/deny list, dry-run-first
   orchestrator.py  main loop wiring the layers together
 """

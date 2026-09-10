@@ -1,10 +1,7 @@
-"""Packet 8T-F — Hermes gateway/peer parity: records, enrollment, typed delivery.
+"""Qubit gateway/peer records: enrollment, typed delivery, link states.
 
-Hermes ``gateway {run,start,stop,restart,status,install,uninstall,list,
-setup,migrate-legacy,enroll}`` supervises messaging gateway processes and
-``peer {add,set,list,dm,run,status,stop}`` drives remote gateways. Qubit
-supervises exactly one event path (the bridge itself) and opens no public
-listener — so process supervision and live remote operation stay
+Qubit supervises exactly one event path (the bridge itself) and opens no
+public listener — so process supervision and live remote operation stay
 operator-side, while everything code-side is real:
 
 * gateways: account-bound records (provider, account, channel, key

@@ -8,6 +8,7 @@ CACHE_DIR = Path.home() / ".cache" / "qubit-voicebridge" / "inboxes"
 CACHE_FILE = CACHE_DIR / "messenger.json"
 CACHE_TTL_S = 300
 VENV_PY = sys.executable  # portable: the bridge venv python invokes this script
+# Legacy-operator fallback (migration compat, documented).
 CDP_SCRIPT = Path.home() / ".hermes/skills/communication/social-inbox-check/scripts/read_messenger.py"
 
 def cache_load(max_age_s=3600):

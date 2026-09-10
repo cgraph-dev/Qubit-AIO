@@ -38,7 +38,7 @@ Slash commands inside the REPL:
   /health [window_s]         live health (status + recent errors + ASR/turn timings)
   /watch [rows]              live activity tail (run in a loop; Ctrl-C to stop)
   /activity [limit] [q]      recent activity (limit default 20)
-  /logs [limit] [q]          tail events.jsonl (e.g. /logs 50 hermes)
+  /logs [limit] [q]          tail events.jsonl (e.g. /logs 50 worker)
   /interrupt [stop]          interrupt current task
   /talk <text>               send text as voice
   /clear                     clear screen
@@ -101,12 +101,7 @@ def _load_cfg(config_path: Optional[Path] = None):
 
 def _status_text(cfg) -> str:
     lines = []
-    try:
-        from voicebridge.openclaw.discovery import discover_gateway
-        info = discover_gateway(cfg)
-        lines.append(f"gateway: {info.url or '(none)'}  token: {'found' if info.token else 'MISSING'}  agent: {info.agent}  model: {info.default_model or '(default)'}")
-    except Exception as e:
-        lines.append(f"gateway: error {e}")
+    lines.append("worker: route=local (native Qubit worker session)")
     try:
         import urllib.request, json as _json
         j = _json.load(urllib.request.urlopen("http://127.0.0.1:8890/api/status", timeout=3))
@@ -123,8 +118,8 @@ def _status_text(cfg) -> str:
     except Exception as e:
         lines.append(f"ollama: {e}")
     try:
-        hv = cfg.get("hermes", "enabled", default=False)
-        lines.append(f"hermes: {'enabled' if hv else 'disabled'} (voice runtime backend)")
+        hv = cfg.get("agent", "enabled", default=True)
+        lines.append(f"agent: {'enabled' if hv else 'disabled'} (native Qubit turns)")
     except Exception:
         pass
     return "\n".join(lines)

@@ -1,9 +1,9 @@
-"""Packet 8U — gateway frame guards (Qubit-native O-frames).
+"""Qubit gateway frame guards (transport-neutral dispatch).
 
-Hermetic: pure unit checks plus a driven ``_reader`` against a fake
-websocket iterator. Proves oversize/malformed/misshapen frames are
+Hermetic: pure unit checks plus a driven ``FrameReader`` against a fake
+frame iterator. Proves oversize/malformed/misshapen frames are
 dropped individually (audited + counted) while valid responses and
-events still dispatch and the connection survives.
+events still dispatch and the stream survives.
 """
 from __future__ import annotations
 
@@ -11,14 +11,16 @@ import asyncio
 import json
 
 
-def _client():
-    from voicebridge.openclaw.gateway_ws import GatewayClient
+def _reader(events):
+    from voicebridge.gateway.gateway_ws import FrameReader
 
-    return GatewayClient("ws://127.0.0.1:9/", "test-token")
+    reader = FrameReader(
+        event_cb=lambda ev, payload: events.append((ev, payload)))
+    return reader
 
 
 def test_check_raw_accepts_valid():
-    from voicebridge.openclaw.gateway_ws import FrameGuard
+    from voicebridge.gateway.gateway_ws import FrameGuard
 
     guard = FrameGuard()
     msg = guard.check_raw('{"type": "event", "event": "x"}')
@@ -27,7 +29,7 @@ def test_check_raw_accepts_valid():
 
 
 def test_check_raw_rejects_oversize_invalid_and_nonobject():
-    from voicebridge.openclaw.gateway_ws import FrameGuard, GatewayError
+    from voicebridge.gateway.gateway_ws import FrameGuard, GatewayError
 
     guard = FrameGuard(max_bytes=16)
     for raw, code in (("x" * 17, "FRAME_TOO_LARGE"),
@@ -42,7 +44,7 @@ def test_check_raw_rejects_oversize_invalid_and_nonobject():
 
 
 def test_check_message_kinds():
-    from voicebridge.openclaw.gateway_ws import FrameGuard, GatewayError
+    from voicebridge.gateway.gateway_ws import FrameGuard, GatewayError
 
     guard = FrameGuard()
     assert guard.check_message({"type": "res", "id": "a"}) == "res"
@@ -59,15 +61,13 @@ def test_check_message_kinds():
 
 
 def test_reader_drops_bad_frames_and_keeps_connection():
-    from voicebridge.openclaw.gateway_ws import FrameGuard
+    from voicebridge.gateway.gateway_ws import FrameGuard
 
-    client = _client()
+    events = []
+    reader = _reader(events)
     loop = asyncio.new_event_loop()
     fut = loop.create_future()
-    client._pending["call-1"] = fut
-    events = []
-    client.event_cb = lambda ev, payload: events.append((ev, payload))
-    client.connected = True
+    reader.expect("call-1", fut)
 
     big = "x" * (FrameGuard().max_bytes + 1)
     frames = [
@@ -87,12 +87,10 @@ def test_reader_drops_bad_frames_and_keeps_connection():
                     yield frame
             return _gen()
 
-    client.ws = _FakeWS()
-    loop.run_until_complete(client._reader())
+    loop.run_until_complete(reader.drain(_FakeWS()))
     loop.close()
     assert fut.done() and fut.result() == {"hello": "world"}
     assert events == [("tick", {"n": 1})]
-    assert client.frame_guard.dropped == 2
-    assert client.frame_guard.ignored_unknown == 1
-    assert client.connected is True
-    assert client._pending == {}
+    assert reader.frame_guard.dropped == 2
+    assert reader.frame_guard.ignored_unknown == 1
+    assert reader._pending == {}

@@ -275,21 +275,22 @@ DEFAULTS: Dict[str, Any] = {
         "key_env": "~/.config/qubit-voicebridge/.env",    # OPENAI_API_KEY lives here
         "reconnect_s": 5.0,
     },
-    "hermes": {
-        "enabled": True,                # route "ask Hermes ..." tasks to `hermes chat -q`
-                                    # (only fires on explicit "ask Hermes" phrasing)
-        "cmd": "hermes",
-        "resume_session": "voice",      # continuity under a fixed session name
-        "timeout_s": 600,
-        "model": None,                  # None = hermes default (deepseek-v4-flash)
-        "prefer": True,                 # True = Hermes is default for all coding tasks; OpenClaw only for things Hermes can't do
+    "agent": {
+        "enabled": True,                # Qubit-native agent turns + worker sessions
+        "model": None,                  # None = Qubit default (qubit-brain4)
+        "session_prefix": "voice",
+        "skills_nudge": True,     # append "use your skills/tools" to every task
+        "task_timeout_s": 900,
+        "max_history_chars": 12000,   # truncate history fed to summarizer
+        "progress_updates": True,     # speak short status updates during long tasks
+        "progress_min_interval_s": 45,
     },
     "local": {
         "enabled": True,                # whitelisted direct PC actions (volume, apps, ...)
     },
     "memory": {
-        "enabled": True,                # load OpenClaw memory into the persona prompt;
-        "workspace": "~/.openclaw/workspace",  # save session notes here
+        "enabled": True,                # load local memory into the persona prompt;
+        "workspace": "~/.config/qubit-voicebridge/workspace",  # save session notes here
         "context_chars": 1500,          # max memory chars injected into text_prompt
         "save_notes": True,             # append session summary to memory/YYYY-MM-DD.md
         # Packet 8M: optional GENOME-compatible semantic memory adapter.
@@ -404,21 +405,6 @@ DEFAULTS: Dict[str, Any] = {
             "daily_usd": 1.0,
             "monthly_usd": 10.0,
         },
-    },
-    "openclaw": {
-        "gateway_url": None,     # auto-discovered: ws://127.0.0.1:18789
-        "token_file": "~/.openclaw/.env",
-        "agent": "main",
-        "model": None,           # None = FOLLOW the agent's selected default model
-                                 # (gateway default; e.g. deepseek flash today) — the
-                                 # voice uses whatever LLM OpenClaw/Hermes is set to
-        "session_prefix": "voice",
-        "ask_executor": False,          # True = ask "OpenClaw or Hermes?" before each coding task
-        "skills_nudge": True,     # append "use your skills/tools" to every task
-        "task_timeout_s": 900,
-        "max_history_chars": 12000,   # truncate history fed to summarizer
-        "progress_updates": True,     # speak short status updates during long tasks
-        "progress_min_interval_s": 45,
     },
     "safety": {
         "enabled": True,
@@ -573,6 +559,7 @@ class Config:
             with open(cfg_path) as fh:
                 loaded = yaml.safe_load(fh) or {}
             data = deep_merge(data, loaded)
+            data = _migrate_legacy_sections(data)
         elif path is None and not cfg_path.exists():
             # Explicit compatibility read: canonical absent, so consult the
             # detected legacy locations (read-only). Writes still target the
@@ -590,8 +577,10 @@ class Config:
                 if legacy_source is not None:
                     break
         data = deep_merge(data, _env_overrides())
+        data = _migrate_legacy_sections(data)
         return cls(data=data, path=cfg_path if cfg_path.exists() else None,
                    legacy_source=legacy_source)
+
 
     # --- resolved paths (runtime XDG resolution — never the import-time
     # constants, so CLI, service, installer, and status always agree) ---
@@ -613,12 +602,45 @@ class Config:
         return p
 
     def session_key(self, suffix: str = "") -> str:
-        prefix = self.get("openclaw", "session_prefix", default="voice")
-        agent = self.get("openclaw", "agent", default="main")
-        key = f"agent:{agent}:{prefix}"
+        prefix = self.get("agent", "session_prefix", default="voice")
+        key = f"qubit:{prefix}"
         if suffix:
             key += f":{suffix}"
         return key
 
     def as_yaml(self) -> str:
         return yaml.safe_dump(self.data, sort_keys=False)
+
+
+# Map legacy assistant sections onto the unified `agent` section.
+# Documented migration compat (docs/QUBIT_MIGRATION.md); the legacy names
+# survive only here and in that doc, never in product behavior.
+_LEGACY_SECTION_MAP = {
+    "openclaw": ("model", "session_prefix", "skills_nudge",
+                 "task_timeout_s", "max_history_chars",
+                 "progress_updates", "progress_min_interval_s"),
+    "hermes": ("enabled", "model"),
+}
+
+
+def _migrate_legacy_sections(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Fold retired `openclaw`/`hermes` user keys into `agent`.
+
+    Explicit `agent` keys always win; legacy sections are dropped after
+    folding so exactly one configuration tree remains at runtime.
+    """
+    if not isinstance(data, dict):
+        return data
+    agent = data.get("agent")
+    if not isinstance(agent, dict):
+        agent = {}
+        data["agent"] = agent
+    for section, keys in _LEGACY_SECTION_MAP.items():
+        legacy = data.get(section)
+        if not isinstance(legacy, dict):
+            continue
+        for key in keys:
+            if key in legacy and key not in agent:
+                agent[key] = legacy[key]
+        data.pop(section, None)
+    return data

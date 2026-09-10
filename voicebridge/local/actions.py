@@ -2,8 +2,8 @@
 
 Only whitelisted actions live here. Everything risky (rm, git reset --hard,
 package installs, browser actions with logins/payments, service restarts,
-file deletion) is *not* implemented locally — those route to OpenClaw where
-the safety policy + spoken confirmations apply.
+file deletion) is *not* implemented locally — those run as supervised
+worker sessions where the safety policy + spoken confirmations apply.
 
 Each action returns a short spoken status string.
 """

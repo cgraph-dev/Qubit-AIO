@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Install Qubit Agent (Qubit VoiceBridge) on a FRESH machine (or re-run to repair).
-# Idempotent. Does NOT touch your OpenClaw installation, agents, or providers.
+# Idempotent. Qubit-only: it never installs, launches, or requires a foreign assistant.
 #
 #   ./scripts/install.sh                    # venv, deps, models, config
 #   ./scripts/install.sh --with-systemd     # also install the systemd user service

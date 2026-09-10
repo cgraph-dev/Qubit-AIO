@@ -356,7 +356,7 @@ def test_unit_verify_renders_and_verifies():
     assert res["units"]
     names = {u["unit"] for u in res["units"]}
     assert "qubit-voicebridge.service" in names
-    assert "openclaw-communications-monitor.timer" in names
+    assert "qubit-communications-monitor.timer" in names
     for u in res["units"]:
         assert u["state"] == "OK", u
 

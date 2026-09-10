@@ -1,4 +1,4 @@
-"""Packet 8T-F — named journal checkpoints (Hermes `checkpoints` parity).
+"""Qubit named journal checkpoints.
 
 Records out-of-band positions (line count + sha256) over append-only JSONL
 journals so truncation or modification is detectable later — the exact gap

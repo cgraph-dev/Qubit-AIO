@@ -13,7 +13,7 @@ from .policy import DEFAULT_BINARY, PINNED_OPENCODE_VERSION
 
 
 def _xdg_data_home() -> Path:
-    """Canonical Qubit XDG data base (same rule as the Hermes provision:
+    """Canonical Qubit XDG data base (same rule as the Qubit runtime tree:
     snap-confinement values must not fragment the runtime tree)."""
     try:
         from ..config import _xdg_base as _canonical_base

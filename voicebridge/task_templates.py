@@ -1,4 +1,4 @@
-"""Daily-task templates: spoken phrase -> known OpenClaw/Hermes task text.
+"""Daily-task templates: spoken phrase -> known Qubit task text.
 
 The idea behind this module (and the reason it exists BEFORE the intent
 classifier): the user's recurring daily tasks should not cost a model
@@ -14,7 +14,7 @@ Template file: config/task-templates.yaml (installed to
         match:                      # regex, case-insensitive, any() wins
           - "check (my )?(projects|repos) status"
           - "status of (my )?projects"
-        kind: coding                # coding | hermes | conversation
+        kind: coding                # coding | agent | conversation
         task: "List the user's main projects under ~/Projects/Repos and report their git status, current branch, and any uncommitted changes. Keep it to a concise summary."
         ack: "Checking your projects."   # spoken immediately
 """
@@ -33,7 +33,7 @@ from .logging_setup import log_event
 @dataclass
 class TemplateMatch:
     name: str
-    kind: str            # coding | hermes | conversation | local-script
+    kind: str            # coding | agent | conversation | local-script
     task: str
     ack: str = ""
     script: str = ""     # local-script: shell command (can embed {question})
@@ -78,7 +78,9 @@ class TaskTemplates:
             if rx.search(low):
                 return TemplateMatch(
                     name=it.get("name", "template"),
-                    kind=it.get("kind", "coding"),
+                    kind=({"hermes": "agent"}.get(
+                        str(it.get("kind", "coding")), str(it.get(
+                            "kind", "coding")))),
                     task=it.get("task", text),
                     ack=it.get("ack", ""),
                     script=it.get("script", ""),

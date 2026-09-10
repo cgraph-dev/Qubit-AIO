@@ -113,7 +113,7 @@ def collect_secrets(cfg: Any) -> List[str]:
     wherever they occur inside arbitrary strings (not just under their own
     key). Only non-empty strings of length >= 4 qualify."""
     found: List[str] = []
-    sections = ("intent", "openclaw", "hermes", "webui", "communications",
+    sections = ("intent", "agent", "webui", "communications",
                 "providers", "frontier", "opencode")
     for section in sections:
         try:
@@ -419,7 +419,7 @@ _DEP_INVENTORY = (
     ("sounddevice", True, "mic capture + playback"),
     ("numpy", True, "audio math"),
     ("cloudpickle", True, "broker callable isolation"),
-    ("websockets", True, "OpenClaw gateway"),
+    ("websockets", True, "Qubit gateway protocol"),
     ("piper", True, "default TTS (piper-tts)"),
     ("faster_whisper", True, "optional ASR fallback"),
     ("webrtcvad", True, "optional VAD fallback"),
@@ -437,7 +437,7 @@ _TTS_MODULES = {"piper": ("voicebridge.tts.piper", "piper"),
                 "kokoro": ("voicebridge.tts.kokoro", "sherpa_onnx"),
                 "edge": ("voicebridge.tts.edge", "edge_tts"),
                 "openai": ("voicebridge.tts.openai_tts", None),
-                "gateway": ("voicebridge.tts.gateway_tts", None)}
+}
 
 
 def _dep_inventory() -> Dict[str, Any]:
@@ -649,7 +649,7 @@ def health_inventory(cfg: Any, paths: Any = None, *,
         _provider_state(cfg, offline=offline), secrets)
     cred_refs: Dict[str, str] = {}
     try:
-        for section in ("intent", "openclaw", "hermes", "webui"):
+        for section in ("intent", "agent", "webui"):
             try:
                 names = cfg.section(section) if cfg else {}
             except Exception:
@@ -722,11 +722,11 @@ def _timer_state() -> Dict[str, Any]:
     import subprocess
     try:
         r = subprocess.run(["systemctl", "--user", "is-active",
-                            "openclaw-communications-monitor.timer"],
+                            "qubit-communications-monitor.timer"],
                            capture_output=True, text=True, timeout=5)
         active = (r.stdout or "").strip()
         r2 = subprocess.run(["systemctl", "--user", "is-enabled",
-                             "openclaw-communications-monitor.timer"],
+                             "qubit-communications-monitor.timer"],
                             capture_output=True, text=True, timeout=5)
         enabled = (r2.stdout or "").strip()
         return {"state": "READY" if active == "active" else "PENDING",
@@ -846,8 +846,8 @@ def config_snapshot(cfg: Any) -> Dict[str, Any]:
         raw = {}
         for section in ("audio", "mic", "asr", "tts", "intent", "summarizer",
                         "webui", "permissions", "actions", "communications",
-                        "logging", "conversation", "hotkey", "openclaw",
-                        "hermes", "local", "memory", "reports"):
+                        "logging", "conversation", "hotkey", "agent",
+                        "local", "memory", "reports"):
             try:
                 val = cfg.section(section)
             except Exception:

@@ -180,9 +180,9 @@ def run(req: ProviderRequest, cfg: Any,
                               identity=f"{provider}/{model}")
 
     # Credentials: env/file reference only; never OpenCode private DB.
-    # 8T-F ADAPT: key_ref also accepts a server-side SecretRef (OpenClaw
-    # SecretRef shape); it is normalized to the same string contract below,
-    # so every refusal and redaction below applies unchanged.
+    # key_ref also accepts a server-side secret reference; it is normalized
+    # to the same string contract below, so every refusal and redaction
+    # below applies unchanged.
     pcfg = policy.provider_cfg(provider)
     raw_ref = pcfg.get("key_ref", "")
     if isinstance(raw_ref, SecretRef):

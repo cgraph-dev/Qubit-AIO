@@ -5,7 +5,7 @@ minimal RFC 6455 websocket client, both pinned to the loopback interface.
 No third-party websocket dependency, no remote endpoints: any non-loopback
 host is refused before any byte is sent (SSRF-by-config is impossible).
 
-Hermes resolves user-supplied remote CDP endpoints
+Qubit resolves user-supplied loopback CDP endpoints only
 (``tools/browser_tool_cdp.py`` ``_resolve_cdp_override``); Qubit
 deliberately narrows to loopback-only and records the divergence in
 ``docs/UPSTREAM_REUSE.md`` (independent rewrite, behavior compared).

@@ -1,4 +1,4 @@
-"""Packet 8T-F — journal checkpoints (Hermes checkpoints parity).
+"""Qubit named journal checkpoints.
 
 Proves named out-of-band journal positions: create records tail seq +
 digest without mutating the journal, verify recomputes (tamper-evident),

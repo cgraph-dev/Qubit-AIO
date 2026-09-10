@@ -9,6 +9,8 @@ CACHE_FILE = CACHE_DIR / "gmail.json"
 CACHE_TTL_S = 300  # 5 min fresh
 HIMALAYA = os.path.expanduser("~/.local/bin/himalaya")
 VENV_PY = sys.executable  # portable: the bridge venv python invokes this script
+# Legacy-operator fallback (migration compat, documented): the Qubit-native
+# inbox path is himalaya/cache above; this branch runs only when present.
 CDP_SCRIPT = Path.home() / ".hermes" / "skills" / "communication" / "social-inbox-check" / "scripts" / "read_gmail.py"
 
 def cache_load(max_age_s: int = 3600):

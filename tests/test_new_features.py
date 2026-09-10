@@ -89,8 +89,8 @@ def test_classifier_sticky_patterns():
     from voicebridge.intent.state import ConfirmationState, ConversationState
     from voicebridge.intent.classifier import Classifier
     clf = Classifier({"llm_classifier": False}, ConfirmationState(), ConversationState())
-    assert clf._sticky_route("route to hermes") == "hermes"
-    assert clf._sticky_route("use hermes for now") == "hermes"
+    assert clf._sticky_route("route to hermes") == "agent"
+    assert clf._sticky_route("use hermes for now") == "agent"
     assert clf._sticky_route("route to browser") == "browser"
     assert clf._sticky_route("hello there") is None
 

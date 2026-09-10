@@ -130,21 +130,65 @@ def _event_to_feed_item(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return {"kind": "summary", "text": ev.get("name", "local script"),
                 "summary": ev.get("summary", ""), "route": "local-script",
                 "detail": f"{ev.get('raw_len', '')} chars raw"}
+    if evt == "worker.dispatch":
+        return {"kind": "status", "text": "dispatched to the worker",
+                "route": "worker",
+                "detail": str(ev.get("task", ""))[:300]}
+    if evt == "worker.session.started":
+        return {"kind": "status", "text": "worker session started",
+                "route": "worker",
+                "detail": str(ev.get("session_key", ""))[:120]}
+    if evt == "worker.result":
+        return {"kind": "status",
+                "text": f"task {ev.get('status', 'done')}",
+                "route": "worker",
+                "detail": f"elapsed {ev.get('elapsed_s', '')}s"}
+    if evt == "worker.summary":
+        return {"kind": "summary", "text": "Worker task",
+                "summary": ev.get("summary", ""), "route": "worker"}
+    if evt == "worker.error" or evt == "worker.denied":
+        return {"kind": "fail", "text": "Worker task",
+                "route": "worker",
+                "detail": str(ev.get("error", ev.get("detail", "")))[:300]}
+    if evt == "worker.status" or evt == "worker.progress":
+        return {"kind": "status", "text": "Worker running",
+                "route": "worker",
+                "detail": f"elapsed {ev.get('elapsed_s', '')}s"}
+    if evt == "worker.abort" or evt == "worker.continue":
+        return {"kind": "status", "text": evt.replace(".", " "),
+                "route": "worker",
+                "detail": str(ev.get("session_key", ""))[:120]}
+    if evt == "agent.task":
+        return {"kind": "status", "text": "Agent task dispatched",
+                "route": "agent", "detail": str(ev.get("task", ""))[:300]}
+    if evt == "agent.summary":
+        return {"kind": "summary", "text": "Agent task",
+                "summary": ev.get("summary", ""), "route": "agent"}
+    if evt == "agent.error" or evt == "agent.unavailable" or evt == "agent.denied":
+        return {"kind": "fail", "text": "Agent task",
+                "route": "agent", "detail": str(ev.get("error", ev.get("detail", "")))[:300]}
+    if evt == "agent.result.discarded":
+        return {"kind": "status", "text": "Agent task interrupted",
+                "route": "agent", "detail": ev.get("why", "")}
+    if evt == "agent.session" or evt == "agent.turn":
+        return {"kind": "status", "text": "Agent turn",
+                "route": "agent",
+                "detail": f"elapsed {ev.get('elapsed_s', '')}s"}
     if evt == "openclaw.dispatch":
         return {"kind": "status", "text": "dispatched to the agent runtime",
-                "route": "openclaw",
+                "route": "worker",
                 "detail": str(ev.get("task", ""))[:300]}
     if evt == "openclaw.result":
         return {"kind": "status",
                 "text": f"task {ev.get('status', 'done')}",
-                "route": "openclaw",
+                "route": "worker",
                 "detail": f"elapsed {ev.get('elapsed_s', '')}s · {ev.get('reply_len', '')} chars"}
     if evt == "openclaw.summary":
         return {"kind": "summary", "text": "Agent task",
-                "summary": ev.get("summary", ""), "route": "openclaw"}
+                "summary": ev.get("summary", ""), "route": "worker"}
     if evt == "openclaw.request.failed" or evt == "openclaw.request.exception":
         return {"kind": "fail", "text": "Agent request",
-                "route": "openclaw",
+                "route": "worker",
                 "detail": str(ev.get("error", ev.get("reason", "")))[:300]}
     if evt == "safety.verdict":
         return {"kind": "routing", "text": str(ev.get("text", ""))[:160],
@@ -175,29 +219,29 @@ def _event_to_feed_item(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 "detail": str(ev.get("text",""))[:160]}
     if evt == "hermes.summary":
         return {"kind": "summary", "text": "Voice task",
-                "summary": ev.get("summary",""), "route": "hermes"}
+                "summary": ev.get("summary",""), "route": "agent"}
     if evt == "hermes.task":
         return {"kind": "status", "text": "Voice task dispatched",
-                "route": "hermes", "detail": str(ev.get("task",""))[:300]}
+                "route": "agent", "detail": str(ev.get("task",""))[:300]}
     if evt == "system.command":
         cmd = ev.get("command","") or "system"
         return {"kind": "status", "text": f"system:{cmd}",
                 "route": "system", "detail": cmd}
     if evt == "hermes.result.discarded":
         return {"kind": "status", "text": "Voice task interrupted",
-                "route": "hermes", "detail": ev.get("why","")}
+                "route": "agent", "detail": ev.get("why","")}
     if evt == "openclaw.error":
         return {"kind": "fail", "text": "Agent error",
-                "route": "openclaw", "detail": str(ev.get("error",""))[:300]}
+                "route": "worker", "detail": str(ev.get("error",""))[:300]}
     if evt == "openclaw.status":
         return {"kind": "status", "text": "Agent runtime running",
-                "route": "openclaw", "detail": f"elapsed {ev.get('elapsed_s','')}s"}
+                "route": "worker", "detail": f"elapsed {ev.get('elapsed_s','')}s"}
     if evt == "openclaw.progress":
         return {"kind": "status", "text": "Agent progress",
-                "route": "openclaw", "detail": f"elapsed {ev.get('elapsed_s','')}s"}
+                "route": "worker", "detail": f"elapsed {ev.get('elapsed_s','')}s"}
     if evt == "hermes.error":
         return {"kind": "fail", "text": "Voice error",
-                "route": "hermes", "detail": str(ev.get("error",""))[:300]}
+                "route": "agent", "detail": str(ev.get("error",""))[:300]}
     if evt == "boss_talk":
         return {"kind": "status", "text": ev.get("phrase","boss talk"),
                 "route": ev.get("target",""), "detail": str(ev.get("task",""))[:160]}
@@ -856,9 +900,9 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 return
             self._json(self.app.status())
         elif path == "/api/runtime":
-            # 8T-F: backend-authoritative runtime inventory (product,
-            # Hermes provision, vendored modules, voice, broker latch,
-            # approvals, adapters, providers). Read-only; typed states.
+            # Backend-authoritative runtime inventory (product, agent
+            # runtime, voice, broker latch, approvals, adapters,
+            # providers). Read-only; typed states.
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
                 return
@@ -937,6 +981,21 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self._file(fp, "text/html; charset=utf-8")
             else:
                 self._send(404, b"ops page not found")
+        elif path in ("/sessions", "/projects", "/models", "/skills",
+                      "/skills.html", "/tasks", "/tasks.html", "/security",
+                      "/security.html", "/devices", "/devices.html",
+                      "/messages", "/messages.html", "/memory",
+                      "/memory.html", "/system", "/system.html",
+                      "/sessions.html", "/projects.html", "/models.html"):
+            # Qubit family workspaces: catalog-driven controls over the
+            # same /api/ops backend as CLI and voice. No frontend-only
+            # state; every control needs a backend receipt to succeed.
+            name = path.strip("/").replace(".html", "") + ".html"
+            fp = self._frontend_file(name)
+            if fp is not None:
+                self._file(fp, "text/html; charset=utf-8")
+            else:
+                self._send(404, b"family page not found")
         elif path == "/api/ops":
             # Packet 8T-F: machine-readable operations catalog (Tier 1
             # voice-registry ops + Tier 2 extras with honest interfaces).
@@ -2740,7 +2799,7 @@ class WebUI:
         """Start a voice roundtrip in the background; returns a request id.
 
         The browser gets the id instantly (fast ack), then polls
-        /api/result/<id>. The heavy work (ASR -> route -> script/OpenClaw
+        /api/result/<id>. The heavy work (ASR -> route -> worker
         -> local summary -> TTS) runs on a worker thread so the phone UI
         never blocks on a 30s Perplexity search. ``rate`` is the browser's
         ACTUAL AudioContext sample rate (defaults to the 16 kHz contract).

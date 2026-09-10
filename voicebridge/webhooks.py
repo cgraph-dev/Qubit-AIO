@@ -1,6 +1,6 @@
-"""Packet 8T-F — Hermes webhook parity via verified-only subscriptions.
+"""Qubit webhooks via verified-only subscriptions.
 
-Hermes ``webhook {subscribe,add,list,ls,remove,rm,test}`` manages
+Qubit ``webhook {subscribe,add,list,ls,remove,rm,test}`` manages
 event-driven agent subscriptions. Qubit runs no public listener and
 auto-executes nothing — so this module provides the verification kernel
 plus a subscription registry, both fully hermetic:

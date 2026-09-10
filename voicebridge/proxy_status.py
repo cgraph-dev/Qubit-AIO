@@ -1,8 +1,7 @@
-"""Packet 8T-F — Hermes proxy parity via inventory + typed start refusal.
+"""Qubit proxy inventory + typed start refusal.
 
-Hermes ``proxy {start,status,providers}`` runs a local HTTP server that
-forwards OpenAI-compatible requests to OAuth-subscription providers. A
-forwarding server would bypass Qubit egress policy and audit, so Qubit
+A local forwarding proxy server would bypass Qubit egress policy and
+audit, so Qubit
 ships no proxy server. The Qubit-native surface is:
 
 * ``status`` — the proxy server state (always ``NOT_RUNNING``) plus the

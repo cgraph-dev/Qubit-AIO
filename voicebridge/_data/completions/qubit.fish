@@ -11,7 +11,6 @@ complete -c qubit -n '__fish_use_subcommand' -f -a branding
 complete -c qubit -n '__fish_use_subcommand' -f -a browser
 complete -c qubit -n '__fish_use_subcommand' -f -a capability
 complete -c qubit -n '__fish_use_subcommand' -f -a checkpoints
-complete -c qubit -n '__fish_use_subcommand' -f -a claw
 complete -c qubit -n '__fish_use_subcommand' -f -a completion
 complete -c qubit -n '__fish_use_subcommand' -f -a computer-use
 complete -c qubit -n '__fish_use_subcommand' -f -a device
@@ -68,3 +67,4 @@ complete -c qubit -n '__fish_use_subcommand' -f -a voice
 complete -c qubit -n '__fish_use_subcommand' -f -a webhook
 complete -c qubit -n '__fish_use_subcommand' -f -a websites
 complete -c qubit -n '__fish_use_subcommand' -f -a webui
+complete -c qubit -n '__fish_use_subcommand' -f -a worker

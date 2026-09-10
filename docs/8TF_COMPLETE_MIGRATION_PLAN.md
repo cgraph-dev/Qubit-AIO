@@ -1,17 +1,16 @@
 # Packet 8T-F Complete Migration Plan
 
-Status: **BLOCKED — full Hermes parity/rebrand is not yet independently verified**
+Status: **BLOCKED — native Qubit rebrand/runtime separation is not yet independently verified**
 
 This is the execution plan for the product migration the owner requested. It
 is more specific than the ordinary 8T-F packet gate because the target is not
-merely “Qubit can call Hermes.” The target is one coherent Qubit product built
-from the pinned Hermes foundation, with Qubit VoiceBridge, full supported
-Hermes command/interface parity, and the required OpenClaw capabilities
-integrated into it.
+merely “Qubit can call an upstream assistant.” The target is one coherent
+Qubit-owned product whose runtime, CLI, dashboard, voice path, and OpenClaw
+capabilities do not depend on an exposed upstream assistant.
 
-Reports that prove only a real Hermes subprocess, Hermes chat turns, or a
-Qubit supervisor are foundation evidence, not completion. They must not be
-used to claim that Qubit is a complete Hermes replacement.
+Reports that prove only an upstream subprocess, upstream chat turns, or a
+Qubit supervisor are reference evidence, not completion. They must not be used
+to claim that Qubit is a complete native product.
 
 The step-by-step acceptance list is [8TF_COMPLETION_CHECKLIST.md](8TF_COMPLETION_CHECKLIST.md).
 The implementing agent must keep it current and may not mark a box without
@@ -22,7 +21,7 @@ inspectable evidence.
 The required result is:
 
 ```text
-fresh pinned Hermes source foundation
+audited pinned upstream source
                  │
                  ▼
         Qubit Agent product and identity
@@ -40,10 +39,11 @@ Qubit VoiceBridge
     └── launches or supervises a separate Hermes installation
 ```
 
-A Qubit-owned provisioned Hermes runtime may be used as an installation
-mechanism, but the resulting Qubit product must contain or directly execute
-the pinned Hermes implementation as its foundation. A protocol-shaped Qubit
-worker, label, stub, or temporary external installation is not integration.
+Pinned upstream source may be used as a build and differential-test reference,
+and legally permitted source units may be adapted into Qubit. The final
+product must execute the Qubit-owned runtime and must not launch or expose an
+external upstream assistant. A protocol-shaped worker, renamed banner, or
+supervised upstream installation is not the final product.
 
 ## 2. Canonical locations and names
 
@@ -55,12 +55,14 @@ worker, label, stub, or temporary external installation is not integration.
 - `openclaw-voice-bridge`: legacy compatibility identity only
 - Fresh upstream clones: isolated clean worktrees outside existing operator
   installations
-- Hermes runtime source: part of the resulting Qubit foundation or its
-  verified packaged runtime, never an untracked `/tmp` dependency
+- Qubit runtime source: part of the resulting Qubit foundation or its
+  verified packaged runtime, never an untracked `/tmp` or upstream dependency
 
 ## 3. Non-negotiable rules
 
-1. Hermes must be the actual source foundation, not just a supervised backend.
+1. Qubit must be the effective source and runtime foundation, informed by
+   pinned upstream audits and legally permitted adaptations, not a supervised
+   upstream backend.
 2. The full Hermes capability inventory must be reconciled. Every capability
    is preserved, adapted, blocked with a written reason, or rejected with a
    written reason.
@@ -98,18 +100,19 @@ worker, label, stub, or temporary external installation is not integration.
 
 Gate: no unknown source, capability, license, or dependency remains.
 
-### Phase B — Build the Hermes-derived Qubit foundation
+### Phase B — Build the Qubit-owned runtime foundation
 
-- Create a clean migration worktree from the pinned Hermes source.
-- Integrate the Qubit control plane into that foundation.
-- Ensure the actual Hermes modules/process/source paths execute from the
-  resulting Qubit installation.
-- Remove reliance on temporary external Hermes paths.
-- Preserve supported Hermes behavior unless a documented blocker is approved.
+- Create a clean Qubit worktree from the audited source material.
+- Adapt only the smallest legally permitted upstream units into Qubit-owned
+  modules and entry points.
+- Ensure Qubit modules/process/source paths execute from the Qubit installation.
+- Remove reliance on temporary external upstream paths and binaries.
+- Preserve supported behavior through differential tests against the pinned
+  reference, without exposing the reference as a Qubit runtime dependency.
 - Add identity receipts containing verified source commit and package hashes.
 
-Gate: a test must fail if the Hermes source is replaced by a Qubit imitation,
-wrong commit, operator install, or temporary directory.
+Gate: a test must fail if the Qubit runtime is replaced by an upstream binary,
+wrong revision, operator install, or temporary directory.
 
 ### Phase B2 — Migrate the complete supported Hermes interface
 
@@ -137,7 +140,7 @@ confirmation, audit, redaction, resource ceilings, or emergency stop.
 
 ### Phase C — Integrate Qubit VoiceBridge
 
-Connect the existing VoiceBridge contracts to the Hermes-derived foundation:
+Connect the existing VoiceBridge contracts to the Qubit-owned runtime:
 
 - microphone and ASR;
 - Piper/TTS and playback;
@@ -257,8 +260,8 @@ route organization, migration, security, packaging, or tests as manual-only.
 
 Packet 8U remains blocked until all are true:
 
-- actual Hermes-derived Qubit foundation is proven;
-- no production dependence on `/tmp` or an operator Hermes installation;
+- actual Qubit-owned runtime foundation is proven;
+- no production dependence on `/tmp` or an operator upstream installation;
 - Qubit VoiceBridge is integrated as the single voice path;
 - complete supported Hermes command/interface parity is implemented or
   explicitly typed as blocked/rejected with no silent omissions;

@@ -1,15 +1,11 @@
-"""Final parity — O-docker: the Qubit-equivalent container/runtime workflow.
+"""Qubit pinned tool runtimes (container-workflow equivalent).
 
-OpenClaw ships Docker/multi-container infrastructure. Qubit does not add a
+Qubit does not add a
 Docker daemon, a second scheduler, or network image pulls (stack contract:
 no Docker/Kubernetes; no unpinned downloads; no hidden services). The
 supported equivalent is the **pinned confined-runtime workflow** this module
 owns:
 
-* ``hermes-runtime`` — the hash-verified Hermes venv provision
-  (``voicebridge.runtime.provision``: commit pin + entry-file sha256 +
-  INSTALL_RECEIPT.json), executed only inside Bubblewrap/systemd
-  confinement with rlimit ceilings;
 * ``opencode-binary`` — the pinned OpenCode executable
   (``voicebridge.opencode.policy``: exact version gate, argv allowlist,
   fixed SAFE_PATH, secret-dir refusal), executed only as one-shot
@@ -48,15 +44,6 @@ SCHEMA = "qubit-runtime-images/1"
 
 # Pinned registry. No tags, no ranges, no "latest".
 REGISTRY = (
-    {"name": "hermes-runtime",
-     "kind": "venv-provision",
-     "source": "https://github.com/NousResearch/hermes-agent",
-     "pin": "2237be355906fbe6065ce1815711eee52b2d646e",
-     "pin_tag": "v2026.9.7",
-     "license": "see THIRD_PARTY_NOTICES.md (Hermes entry)",
-     "purpose": "adapted Hermes worker executed via voicebridge.runtime",
-     "confinement": "bubblewrap + systemd transient unit + rlimit ceilings",
-     "max_disk_mb": 2500},
     {"name": "opencode-binary",
      "kind": "executable",
      "source": "https://github.com/sst/opencode",
@@ -163,25 +150,6 @@ def images() -> Dict[str, Any]:
         {k: v for k, v in r.items()} for r in REGISTRY]}
 
 
-def _hermes_provenance() -> Dict[str, Any]:
-    from .runtime import provision as PV
-
-    rdir = PV.runtime_dir()
-    receipt = rdir / "INSTALL_RECEIPT.json"
-    if not rdir.is_dir() or not receipt.is_file():
-        return {"installed": False}
-    try:
-        data = json.loads(receipt.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {"installed": True, "receipt": "UNREADABLE"}
-    verified = PV.verify_installation(rdir)
-    return {"installed": True, "dir": str(rdir),
-            "pin": PV.HERMES_COMMIT, "receipt": data,
-            "verified": bool(isinstance(verified, dict)
-                             and verified.get("state") == "READY"),
-            "verify": verified}
-
-
 def _opencode_provenance() -> Dict[str, Any]:
     """Provenance for the opencode-binary image.
 
@@ -222,17 +190,12 @@ def status(cfg: Any) -> Dict[str, Any]:
     for entry in REGISTRY:
         name = entry["name"]
         record = state["images"].get(name, {})
-        if name == "hermes-runtime":
-            prov = _hermes_provenance()
-        else:
-            prov = _opencode_provenance()
+        prov = _opencode_provenance()
         if not prov.get("installed"):
             st = "MISSING"
         elif not record or record.get("removed_at"):
             st = "STAGED"
-        elif prov.get("receipt") == "UNREADABLE" or (
-                name == "hermes-runtime" and not prov.get("verified")) or (
-                name == "opencode-binary" and not prov.get("effective")):
+        elif not prov.get("effective"):
             st = "DEGRADED"
         else:
             st = "READY"
@@ -274,38 +237,10 @@ def install(cfg: Any, name: str, *, requested_by: str = "cli:user",
     """Install a pinned runtime image (confirmed; digest-verified).
 
     Never downloads: the local artifact must already be staged (the
-    Hermes clone for ``hermes-runtime``, the pinned executable for
-    ``opencode-binary``). Missing artifacts are a typed NEEDS_STAGING
-    state with exact operator instructions."""
+    pinned executable for ``opencode-binary``). Missing artifacts are a
+    typed NEEDS_STAGING state with exact operator instructions."""
     _guard(cfg, f"install {name}", confirmed)
     entry = _check_name(name)
-    if entry["name"] == "hermes-runtime":
-        from .runtime import provision as PV
-
-        clone_raw = (os.environ.get("QUBIT_HERMES_CLONE", "") or "").strip()
-        clone = Path(clone_raw) if clone_raw else None
-        if clone is None or not clone.is_dir():
-            raise RuntimeImageError(
-                STAGING_CODE,
-                "hermes-runtime install needs the pinned clone staged"
-                " locally: set QUBIT_HERMES_CLONE to a directory whose"
-                f" HEAD is {PV.HERMES_COMMIT} (tag {PV.HERMES_TAG} from"
-                f" {PV.HERMES_URL}); nothing was downloaded and nothing"
-                " was installed")
-        res = PV.install_from_clone(clone)
-        if not res.ok:
-            raise RuntimeImageError(MISMATCH_CODE,
-                                    f"clone verification failed: {res.detail}")
-        assert res.runtime_dir is not None
-        digest = f"commit:{PV.HERMES_COMMIT}"
-        record = _record_install(cfg, name, digest, requested_by)
-        _audit("install", requested_by, {"image": name, "digest": digest})
-        return {"state": "OK", "image": name, "digest": digest,
-                "dir": str(res.runtime_dir),
-                "previous": record["previous"],
-                "rollback": ("previous receipt kept in state/"
-                             f"{STATE_FILE}; `qubit runtime rollback {name}"
-                             " --confirm` restores it")}
     from .opencode import policy as POL
     from .opencode import state as _OCS
 
@@ -439,9 +374,9 @@ def remove(cfg: Any, name: str, *, requested_by: str = "cli:user",
            confirmed: bool = False) -> Dict[str, Any]:
     """Remove an installed runtime (confirmed; audited; state kept).
 
-    Deletes the provisioned tree (Hermes runtime dir) or de-registers the
-    binary receipt; refuses while a supervised run is active. The audit
-    trail and the previous-receipt slot survive removal for forensics."""
+    Deletes the owned binary tree; refuses while a supervised run is
+    active. The audit trail and the previous-receipt slot survive removal
+    for forensics."""
     _guard(cfg, f"remove {name}", confirmed)
     entry = _check_name(name)
     if _runs_active(cfg):
@@ -450,15 +385,6 @@ def remove(cfg: Any, name: str, *, requested_by: str = "cli:user",
                                 " cancel it first (`qubit opencode cancel`)"
                                 " — refusing to pull a live runtime")
     removed: List[str] = []
-    if entry["name"] == "hermes-runtime":
-        from .runtime import provision as PV
-
-        rdir = PV.runtime_dir()
-        if rdir.is_dir():
-            import shutil as _sh
-
-            _sh.rmtree(rdir, ignore_errors=False)
-            removed.append(str(rdir))
     if entry["name"] == "opencode-binary":
         from .opencode import state as _OCS
 
@@ -521,21 +447,17 @@ def doctor(cfg: Any) -> Dict[str, Any]:
     else:
         findings.append({"check": "state_perms", "result": "no state yet"})
     for entry in REGISTRY:
-        prov = (_hermes_provenance() if entry["name"] == "hermes-runtime"
-                else _opencode_provenance())
-        if entry["name"] == "opencode-binary":
-            owned = prov.get("owned", {}) or {}
-            if owned.get("ok"):
-                result = (f"owned {owned['binary']} verified"
-                          f" ({owned['version']})")
-            elif prov.get("installed"):
-                result = (f"owned copy {owned.get('reason', 'MISSING')};"
-                          f" operator candidate {prov.get('binary')}"
-                          " (not effective until installed)")
-            else:
-                result = "not staged"
+        prov = _opencode_provenance()
+        owned = prov.get("owned", {}) or {}
+        if owned.get("ok"):
+            result = (f"owned {owned['binary']} verified"
+                      f" ({owned['version']})")
+        elif prov.get("installed"):
+            result = (f"owned copy {owned.get('reason', 'MISSING')};"
+                      f" operator candidate {prov.get('binary')}"
+                      " (not effective until installed)")
         else:
-            result = ("present" if prov.get("installed") else "not staged")
+            result = "not staged"
         findings.append({"check": f"artifact:{entry['name']}",
                          "result": result})
     findings.append({"check": "docker_daemon",

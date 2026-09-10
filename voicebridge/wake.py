@@ -13,7 +13,7 @@ path; arming the live microphone loop additionally needs mic hardware
 and the model files, and is a documented manual qualification
 (``docs/NATIVE_EQUIVALENTS_8U.md``).
 
-Hermes supports pluggable wake engines (``tools/wake_word*.py``,
+Qubit supports pluggable wake engines (openWakeWord-compatible bundles,
 ``wake_word_engines.py`` at the pinned ``v2026.9.7 @ 2237be3``
 revision); Qubit implements the keyword-spotter contract natively.
 Provenance is recorded in ``docs/UPSTREAM_REUSE.md``.

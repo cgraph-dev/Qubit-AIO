@@ -1,10 +1,9 @@
-"""Packet 8T-F — Hermes hooks parity via a declared-never-executed registry.
+"""Qubit hook subscriptions via a declared-never-executed registry.
 
-Hermes ``hooks {list,ls,test,revoke,remove,rm,doctor}`` inspects
-shell-script hooks from config and can auto-execute them. Automatic shell
+Qubit ``hooks {list,ls,test,revoke,remove,rm,doctor}`` inspects
+shell-script hooks from config and never auto-executes them. Automatic shell
 execution can never pass the Qubit broker (no-direct-shell invariant), so
-the Qubit-native conversion is an event-subscription registry with the
-shell permanently disarmed:
+the registry keeps the shell permanently disarmed:
 
 * ``declare`` — record a subscription (name, event pattern, shell text
   for REVIEW ONLY) with explicit ``--confirm``; declarations are stored

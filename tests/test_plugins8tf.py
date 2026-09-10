@@ -1,4 +1,4 @@
-"""Packet 8T-F — Hermes `plugins install` parity behind the Qubit skill contract.
+"""Qubit plugin installs behind the Qubit skill contract.
 
 Proves the safe subset is real (local reviewed manifests install staged
 DISABLED through broker-adjacent permission policy with confirmation, audit,
@@ -81,7 +81,7 @@ def test_classify_local_remote_missing(tmp_path):
     local = tmp_path / "p.json"
     local.write_text("{}")
     assert PLUG.classify_install_source(str(local))["kind"] == "local-file"
-    assert PLUG.classify_install_source("anpicasso/hermes-plugin-x")["kind"] == "remote"
+    assert PLUG.classify_install_source("anpicasso/qubit-plugin-x")["kind"] == "remote"
     assert PLUG.classify_install_source(
         "https://github.com/a/b.git")["kind"] == "remote"
     assert PLUG.classify_install_source("some-index-name")["kind"] == "remote"
@@ -157,8 +157,8 @@ def test_restart_persistence(tmp_path, monkeypatch):
 
 # ------------------------------------------------- unsafe subset refused
 @pytest.mark.parametrize("identifier", [
-    "anpicasso/hermes-plugin-chrome-profiles",
-    "https://github.com/anpicasso/hermes-plugin-x.git",
+    "anpicasso/qubit-plugin-chrome-profiles",
+    "https://github.com/anpicasso/qubit-plugin-x.git",
     " hermes-pack ",
 ])
 def test_remote_identifiers_never_fetched(tmp_path, monkeypatch, identifier):

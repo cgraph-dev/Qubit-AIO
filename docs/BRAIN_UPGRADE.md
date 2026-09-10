@@ -21,7 +21,7 @@
 ```dockerfile
 # Modelfile.qubit
 FROM huihui_ai/llama3.2-abliterate:3b
-SYSTEM """You are Qubit, Tricky's voice assistant. You NEVER forget routing: when the user says route to Hermes/OpenClaw/browser, you honor it for the next 8 turns. You produce professional reports via the generate_report.py helper. You speak directly, no filler."""
+SYSTEM """You are Qubit, Tricky's voice assistant. You NEVER forget routing: when the user says route to agent/worker/browser, you honor it for the next 8 turns. You produce professional reports via the generate_report.py helper. You speak directly, no filler."""
 PARAMETER temperature 0.4
 PARAMETER num_ctx 4096
 ```
@@ -49,7 +49,7 @@ Collect training data from `events.jsonl` + `shared_memory.jsonl`:
 ```python
 # build training set: 200-500 examples of (instruction → perfect report / routing)
 {"instruction": "fix the login bug", "output": "<professional report markdown + 40w summary>"}
-{"instruction": "route to hermes", "output": "Got it — routing to Hermes from now on."}
+{"instruction": "route to agent", "output": "Got it — routing to the agent from now on."}
 ```
 
 ```bash
@@ -78,8 +78,8 @@ events.jsonl + shared_memory.jsonl
 ## What We Already Ship (No Brain Edit Needed)
 
 - `scripts/generate_report.py` — the local agent never needs to reason about report format; it just calls the script (works even if the 3B is "retarded").
-- `voicebridge/shared_memory.py` — ledger survives reboots + provider switches (VS Code / OpenClaw / Hermes / local all share it).
-- `StickyRouteState` — `route to hermes` persists 8 turns / 10 min to disk (`sticky_route.json`), so the tiny brain doesn't need to remember.
+- `voicebridge/shared_memory.py` — ledger survives reboots + lane switches (agent / worker / browser / local all share it).
+- `StickyRouteState` — `route to agent` persists 8 turns / 10 min to disk (`sticky_route.json`), so the tiny brain doesn't need to remember.
 - `templates/professional_report.md` — the orchestrator's nudge tells the big-model worker to produce the two-layer report (full + 40w spoken).
 
 ## Recommendation For You

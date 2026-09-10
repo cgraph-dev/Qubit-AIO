@@ -55,7 +55,7 @@ tts:
   openai:
     voice: nova
     model: gpt-4o-mini-tts
-    key_env: ~/.hermes/.env
+    key_env: ~/.config/qubit-voicebridge/.env
     instructions: "Speak with a warm, soft and sexy tone, with a subtle, elegant Japanese accent. Gentle, breathy and intimate, slightly playful — like a caring Japanese girlfriend. Speak naturally, at a relaxed pace, clear and affectionate."
 intent:
   llm_classifier: true   # enabled for accent/broken-English (user approved ~20% cost)
@@ -66,35 +66,27 @@ intent:
     timeout_s: 8.0
     max_tokens: 100
   conversation_backend: local
-  templates_path: ~/.config/openclaw-voice-bridge/task-templates.yaml
+  templates_path: ~/.config/qubit-voicebridge/task-templates.yaml
   deepseek_url: https://api.deepseek.com/chat/completions
   deepseek_model: deepseek-v4-flash
-  deepseek_env: ~/.hermes/.env
+  deepseek_env: ~/.config/qubit-voicebridge/.env
   perplexity_enabled: true
   perplexity_url: https://api.perplexity.ai/chat/completions
   perplexity_model: sonar-pro
-  perplexity_env: ~/.hermes/.env
-openclaw:
-  gateway_url: null
-  token_file: ~/.openclaw/.env
-  agent: main
-  model: null
+  perplexity_env: ~/.config/qubit-voicebridge/.env
+# Qubit agent (native turns + worker sessions; the only task executor)
+agent:
+  enabled: true
+  model: null             # null = Qubit default (qubit-brain4)
   session_prefix: voice
-  ask_executor: true
   task_timeout_s: 900
   progress_updates: true
   progress_min_interval_s: 45
-hermes:
-  enabled: true
-  cmd: hermes
-  resume_session: voice
-  timeout_s: 600
-  model: null
 local:
   enabled: true
 memory:
   enabled: true
-  workspace: ~/.openclaw/workspace
+  workspace: ~/.config/qubit-voicebridge/workspace
   context_chars: 1500
   save_notes: true
 safety:

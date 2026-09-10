@@ -1,7 +1,7 @@
 """Packet 8I: operator-gated qualification harness for the real user-systemd
 oneshot/timer + notification path.
 
-Qualifies the EXISTING ``openclaw-communications-monitor`` hourly schedule and
+Qualifies the EXISTING ``qubit-communications-monitor`` hourly schedule and
 its notification path without changing them:
 
 - Hermetic stages run against synthetic fixtures in an ISOLATED qualification
@@ -45,8 +45,8 @@ from .monitor import (
 
 QUALIFY_ENV = "VOICE_BRIDGE_QUALIFY"
 QUALIFY_VERSION = 1
-ACCEL_SERVICE_NAME = "openclaw-communications-monitor-accel.service"
-ACCEL_TIMER_NAME = "openclaw-communications-monitor-accel.timer"
+ACCEL_SERVICE_NAME = "qubit-communications-monitor-accel.service"
+ACCEL_TIMER_NAME = "qubit-communications-monitor-accel.timer"
 
 # Hermetic notification simulation: the harness swaps these delivery functions
 # for fakes so the LOGIC (dedupe, quiet hours, ack, retry bounds) is qualified

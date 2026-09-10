@@ -1,6 +1,6 @@
-"""Packet 8T-F — Hermes acp/lsp parity via a bounded brokered adapter.
+"""Qubit editor integration via a bounded brokered adapter.
 
-Hermes ``acp`` starts an editor-integration protocol server and ``lsp``
+Qubit ``acp`` checks editor-integration protocol state and ``lsp``
 manages the language-server layer behind post-write diagnostics. Qubit
 ships no second agent authority and never downloads unpinned binaries, so
 this module provides the Qubit-native surface:
@@ -23,8 +23,8 @@ this module provides the Qubit-native surface:
   (unpinned binary downloads violate the pinned-source policy).
 
 The server-name/extension registry mirrors the conventional names shown
-by the pinned ``v2026.9.7`` ``hermes lsp list`` output (factual
-interoperability data; no Hermes source copied).
+by observed editor-protocol behavior (factual
+interoperability data; no third-party source copied).
 """
 from __future__ import annotations
 

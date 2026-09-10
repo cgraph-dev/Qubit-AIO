@@ -11,7 +11,6 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a branding
 complete -c voicebridge -n '__fish_use_subcommand' -f -a browser
 complete -c voicebridge -n '__fish_use_subcommand' -f -a capability
 complete -c voicebridge -n '__fish_use_subcommand' -f -a checkpoints
-complete -c voicebridge -n '__fish_use_subcommand' -f -a claw
 complete -c voicebridge -n '__fish_use_subcommand' -f -a completion
 complete -c voicebridge -n '__fish_use_subcommand' -f -a computer-use
 complete -c voicebridge -n '__fish_use_subcommand' -f -a device
@@ -68,3 +67,4 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a voice
 complete -c voicebridge -n '__fish_use_subcommand' -f -a webhook
 complete -c voicebridge -n '__fish_use_subcommand' -f -a websites
 complete -c voicebridge -n '__fish_use_subcommand' -f -a webui
+complete -c voicebridge -n '__fish_use_subcommand' -f -a worker

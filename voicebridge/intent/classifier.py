@@ -24,8 +24,8 @@ log = get_logger()
 
 # Broken-English / accent / ASR-error tolerant helpers
 _BROKEN_MAP = {
-    "open claw": "openclaw", "openclaw": "openclaw",
-    "hermes": "hermes",
+    "open claw": "worker", "openclaw": "worker",
+    "hermes": "agent",
     "root to": "route to",  # "root to open claw" ~ "route to openclaw"
     "trickish": "tricky", "micky": "mickey", "miki": "mickey",
 }
@@ -69,25 +69,26 @@ CANCEL_PATTERNS = [
 _WAKE_STRIP_RE = re.compile(r"^(?:hey\s+|ok\s+|okay\s+)?qubit[,.]?\s+",
                             re.IGNORECASE)
 
-# Sticky routing — explicit user preference that survives turns (fixes the 'forgets Hermes/browser' bug)
+# Sticky routing — explicit user preference that survives turns
 STICKY_PATTERNS = [
-    (r"\broute (this|it|everything|all)?\s*(to|through)\s+(hermes|openclaw|browser)\b", "route"),
-    (r"\buse (the )?(hermes|openclaw|browser)\b( for (this|now|everything|all))?", "use"),
-    (r"\b(always )?(use|route through) hermes\b", "hermes"),
-    (r"\b(always )?(use|route through) openclaw\b", "openclaw"),
+    (r"\broute (this|it|everything|all)?\s*(to|through)\s+(agent|worker|browser|hermes|openclaw|open claw)\b", "route"),
+    (r"\buse (the )?(agent|worker|browser|hermes|openclaw|open claw)\b( for (this|now|everything|all))?", "use"),
+    (r"\b(always )?(use|route through) (agent|hermes)\b", "agent"),
+    (r"\b(always )?(use|route through) (worker|openclaw|open claw)\b", "worker"),
     (r"\b(always )?(use|route through) browser\b", "browser"),
 ]
 
-# Explicit Hermes delegation ("ask Hermes to ...", "Hermes, ...").
-HERMES_PATTERNS = [
-    r"\b(ask|tell|have|let|get)\s+hermes\b",
-    r"^\s*hermes[,:]?\s+",
-    r"\broute (this|it|that)?\s*(to|through|via)\s+hermes\b",
-    r"\b(delegate|hand off|handoff)\s+(this|it)?\s*to\s+hermes\b",
+# Explicit delegation ("ask Qubit to ...", "Qubit, ..."; legacy "ask
+# Hermes/OpenClaw" phrasing still matches and runs on the Qubit agent).
+AGENT_PATTERNS = [
+    r"\b(ask|tell|have|let|get)\s+(qubit|agent|worker|hermes|openclaw)\b",
+    r"^\s*(qubit|agent|hermes)[,:]?\s+",
+    r"\broute (this|it|that)?\s*(to|through|via)\s+(qubit|agent|worker|hermes|openclaw)\b",
+    r"\b(delegate|hand off|handoff)\s+(this|it)?\s*to\s+(qubit|agent|worker|hermes|openclaw)\b",
     r"\buse\s+(the\s+)?(browser|chromium)\b.*\b(check|open|browse|look|search|find|watch|read|scrape|research|copy)\b",
-    r"\buse\s+(the\s+)?hermes\b",      # "use Hermes", "use Hermes agent"
-    r"\bhermes agent\b",
-    r"\b(send|give|hand)\s+(this|it|the task)\s+to\s+hermes\b",
+    r"\buse\s+(the\s+)?(qubit|agent|hermes)\b",
+    r"\bqubit agent\b",
+    r"\b(send|give|hand)\s+(this|it|the task)\s+to\s+(qubit|agent|worker|hermes|openclaw)\b",
 ]
 
 # Task-ish verbs/domains that strongly suggest a coding request.
@@ -135,13 +136,13 @@ CHITCHAT_RE = re.compile(
 
 @dataclass
 class Intent:
-    kind: str                       # system|confirm|cancel|conversation|coding|clarify|local|hermes|status
+    kind: str                       # system|confirm|cancel|conversation|coding|clarify|local|agent|status
     confidence: float = 0.5
     task_text: str = ""
     params: Dict[str, Any] = field(default_factory=dict)
     reason: str = ""
     source: str = "heuristic"       # heuristic | llm
-    backend: str = "openclaw"       # openclaw | hermes | local | chat | system
+    backend: str = "qubit"          # qubit | local | chat | system
 
 
 def normalize_broken_english(text: str) -> str:
@@ -188,9 +189,9 @@ class Classifier:
         self.cfg = cfg
         self.confirmations = confirmations
         self.conversation = conversation
-        # True while a Hermes/OpenClaw task is actually running — "stop"/"cancel"
+        # True while a worker task is actually running — "stop"/"cancel"
         # must ABORT then, even with no pending confirmation (2026-08-24 bug:
-        # 'stop the task' was downgraded to chitchat and Hermes kept running).
+        # 'stop the task' was downgraded to chitchat and the task kept running).
         self.busy_fn = busy_fn or (lambda: False)
         self.llm_enabled = bool(cfg.get("llm_classifier", True))
         # Packet 4B: alias/url come from the ONE canonical runner contract
@@ -255,31 +256,41 @@ class Classifier:
         return min(score, 1.5)
 
     def _sticky_route(self, text: str) -> Optional[str]:
-        """If text is an explicit routing preference, return target (hermes/openclaw/browser)."""
+        """If text is an explicit routing preference, return target (agent/worker/browser)."""
         low = text.lower().strip()
         for pat, _ in STICKY_PATTERNS:
             m = __import__("re").search(pat, low)
             if m:
                 # extract which target was mentioned
-                for t in ("hermes", "openclaw", "browser"):
+                for t in ("agent", "worker", "browser"):
                     if t in low[m.start():m.end()+20] or t in m.group(0):
                         return t
-                # fallback: find target anywhere in text
-                for t in ("hermes", "openclaw", "browser"):
-                    if t in low:
+                # legacy spoken names map to native lanes
+                for spoken, t in (("hermes", "agent"), ("openclaw", "worker"),
+                                  ("open claw", "worker")):
+                    if spoken in low:
                         return t
         return None
 
-    def _hermes_request(self, text: str) -> Optional[Intent]:
+    # Bare address or control words are not delegation: the "Qubit,"
+    # address prefix must not steal confirm/cancel/status turns.
+    _ADDRESS_ONLY_RE = re.compile(
+        r"^(qubit|hey qubit|ok qubit)?[,:]?\s*"
+        r"(cancel|stop|abort|confirm|yes|yeah|no|status|help|thanks?|thank you)"
+        r"(\s+(that|this|it|please|now))?[.!?]*\s*$")
+
+    def _agent_request(self, text: str) -> Optional[Intent]:
         low = text.lower().strip()
-        for pat in HERMES_PATTERNS:
+        for pat in AGENT_PATTERNS:
             if re.search(pat, low):
-                # strip the "ask hermes to" / "hermes," prefix so the task is clean
-                task = re.sub(r"^\s*hermes[,:]?\s*", "", low, flags=re.I)
-                task = re.sub(r"^(ask|tell|have|let|get)\s+hermes\s+(to\s+)?", "", task, flags=re.I)
+                # strip the "ask Qubit to" / "Qubit," prefix so the task is clean
+                task = re.sub(r"^\s*(qubit|hermes)[,:]?\s*", "", low, flags=re.I)
+                task = re.sub(r"^(ask|tell|have|let|get)\s+(qubit|hermes|openclaw)\s+(to\s+)?", "", task, flags=re.I)
                 task = task.strip(" .,;:") or text
-                return Intent("hermes", confidence=0.9, task_text=task,
-                              backend="hermes", reason="hermes delegation")
+                if self._ADDRESS_ONLY_RE.match(task) and len(task.split()) <= 3:
+                    return None
+                return Intent("agent", confidence=0.9, task_text=task,
+                              backend="qubit", reason="agent delegation")
         return None
 
     # ---- main entry -----------------------------------------------------------
@@ -340,9 +351,9 @@ class Classifier:
                           reason="perplexity named -> web/conversation path",
                           source="heuristic")
 
-        hermes_i = self._hermes_request(text)
-        if hermes_i:
-            return hermes_i
+        agent_i = self._agent_request(text)
+        if agent_i:
+            return agent_i
 
         # Weather/forecast fast-path: ALWAYS live-web info (Perplexity), never
         # the coding agent and never the baked brain (which can't know today's
@@ -411,10 +422,10 @@ class Classifier:
                     return Intent("local", confidence=conf, task_text=text,
                                   params={"llm_suggestion": llm.get("task", "")},
                                   backend="local", reason=llm.get("reason", ""), source="llm")
-                if kind == "hermes":
+                if kind == "agent":
                     task = llm.get("task") or text
-                    return Intent("hermes", confidence=conf, task_text=task,
-                                  backend="hermes", reason=llm.get("reason", ""), source="llm")
+                    return Intent("agent", confidence=conf, task_text=task,
+                                  backend="qubit", reason=llm.get("reason", ""), source="llm")
                 if kind in ("conversation", "clarify", "system", "confirm", "cancel"):
                     params = {}
                     if kind == "system" and llm.get("task"):

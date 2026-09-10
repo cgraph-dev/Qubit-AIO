@@ -2,7 +2,7 @@
 
 Puts existing trusted host tools (whitelisted local actions, user-configured
 local-script templates) behind the Packet 1A capability registry and ONE
-PolicyEngine shared with the OpenClaw/Hermes WorkerGuard.
+PolicyEngine shared with the Qubit WorkerGuard.
 
 Contract per tool (Phase 3 gate): typed input schema, declared side effects,
 permission tier, timeout, bounded output, correlation ID, audit event,

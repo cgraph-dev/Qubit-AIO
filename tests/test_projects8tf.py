@@ -1,4 +1,4 @@
-"""Packet 8T-F — Hermes `project` parity: named multi-folder workspaces.
+"""Qubit projects: named multi-folder workspaces.
 
 Proves the registry is real (validated folders, primary tracking, active
 pointer, archive/restore, audited rollback) and the unsafe/dependent paths
@@ -206,7 +206,7 @@ def test_primary_must_be_member(tmp_path, monkeypatch):
                               primary=beta, confirm=True))
     assert rc == 0, out
     assert out["project"]["primary"] == beta, \
-        "explicit primary joins the folders (Hermes parity)"
+        "explicit primary joins the folders"
     assert set(out["project"]["folders"]) == {alpha, beta}
 
 

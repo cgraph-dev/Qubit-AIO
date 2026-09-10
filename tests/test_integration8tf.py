@@ -49,16 +49,14 @@ def test_mcp_status_never_mounts(tmp_path, monkeypatch):
     assert "unauthenticated" in out["mount_policy"]
 
 
-def test_claw_status_readonly_and_redacted(tmp_path, monkeypatch):
-    from voicebridge.integration_status import claw_status
+def test_worker_status_readonly_and_redacted(tmp_path, monkeypatch):
+    from voicebridge.integration_status import worker_status
 
     cfg = _cfg(tmp_path, monkeypatch)
-    out = claw_status(cfg)
-    assert out["schema"] == "qubit-claw-status/1"
-    assert out["state"] in ("DETECTED", "UNREACHABLE", "NOT_INSTALLED",
-                            "UNAVAILABLE")
+    out = worker_status(cfg)
+    assert out["schema"] == "qubit-worker-status/1"
+    assert out["route"] == "local"
     blob = json.dumps(out)
-    assert "token_found" in blob
     assert "sk-" not in blob
 
 
@@ -76,7 +74,7 @@ def test_cli_wiring_for_new_commands(tmp_path, monkeypatch):
     from voicebridge import cli as CLI
 
     cfg = _cfg(tmp_path, monkeypatch)
-    for fn in (CLI._cmd_auth_status, CLI._cmd_mcp_status, CLI._cmd_claw_status,
+    for fn in (CLI._cmd_auth_status, CLI._cmd_mcp_status, CLI._cmd_worker_status,
                CLI._cmd_verify_static):
         assert callable(fn)
     buf = io.StringIO()
@@ -85,7 +83,7 @@ def test_cli_wiring_for_new_commands(tmp_path, monkeypatch):
     assert json.loads(buf.getvalue())["schema"] == "qubit-mcp-status/1"
     assert "auth" in CLI.build_parser().format_help()
     assert "mcp" in CLI.build_parser().format_help()
-    assert "claw" in CLI.build_parser().format_help()
+    assert "worker" in CLI.build_parser().format_help()
     assert "verify-release" in CLI.build_parser().format_help()
 
 
@@ -94,10 +92,10 @@ def test_dashboard_inventory_has_new_sections(tmp_path, monkeypatch):
 
     cfg = _cfg(tmp_path, monkeypatch)
     inv = runtime_inventory(cfg)
-    for section in ("auth", "mcp", "claw", "sessions", "capabilities"):
+    for section in ("auth", "mcp", "worker", "sessions", "capabilities"):
         assert section in inv, section
     blob = json.dumps(inv).lower()
     for secret in ("sk-", "token:", "cookie"):
         assert secret not in blob
     html = (REPO_ROOT / "frontend" / "settings.html").read_text()
-    assert "mcp.servers" in html and "claw.state" in html
+    assert "mcp.servers" in html and "worker.route" in html

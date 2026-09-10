@@ -518,10 +518,10 @@ def _b_mcp(ctx, args):
     return {"mcp": mcp_status(ctx.cfg)}
 
 
-def _b_claw(ctx, args):
-    from .integration_status import claw_status
+def _b_worker(ctx, args):
+    from .integration_status import worker_status
 
-    return {"claw": claw_status(ctx.cfg)}
+    return {"worker": worker_status(ctx.cfg)}
 
 
 def _b_memory(ctx, args):
@@ -1650,12 +1650,12 @@ def _runner_power(cfg):
 
 
 def _b_task_run(ctx, args):
-    """Run one typed task through the agent runtime (same runtime the CLI
-    ``task`` path prefers). Confirm-gated: agent execution only runs after
-    the voice pipeline's explicit confirmation. DISABLED (unprovisioned),
-    HERMES_DISABLED (config), and EMERGENCY_STOP surface as typed
-    unavailable states — never fake success."""
-    from .runtime.real_hermes import RealHermesRuntime, RealHermesDenied
+    """Run one typed task through the Qubit-native agent (same agent the
+    CLI ``task`` path uses). Confirm-gated: agent execution only runs
+    after the voice pipeline's explicit confirmation. DISABLED
+    (agent.enabled=false) and EMERGENCY_STOP surface as typed unavailable
+    states — never fake success."""
+    from .agent import AgentDenied, turn as agent_turn
 
     text = str(args.get("task_text", "") or "").strip()
     if not text and str(args.get("from_current", "")).lower() in (
@@ -1674,30 +1674,19 @@ def _b_task_run(ctx, args):
     if not text:
         raise ValueError("missing task text")
     try:
-        hcfg = ctx.cfg.section("hermes") if hasattr(ctx.cfg, "section") else {}
-    except Exception:
-        hcfg = {}
-    if not isinstance(hcfg, dict):
-        hcfg = {}
-    if not hcfg.get("enabled", True):
-        return {"task": {"state": "UNAVAILABLE", "code": "HERMES_DISABLED",
-                         "detail": "voice task dispatch is off "
-                                   "(hermes.enabled=false); the full routed "
-                                   "path stays available as `qubit task`"}}
-    rt = RealHermesRuntime(estop_engaged=lambda: _estop(ctx.cfg))
-    try:
-        res = rt.turn(text, session=ctx.session or "qubit-voice")
-    except RealHermesDenied as exc:
+        res = agent_turn(ctx.cfg, text, session=ctx.session or "qubit-voice",
+                         estop_engaged=lambda: _estop(ctx.cfg))
+    except AgentDenied as exc:
         msg = str(exc)
         code = "EMERGENCY_STOP" if "EMERGENCY_STOP" in msg else \
-            "RUNTIME_DISABLED"
+            "AGENT_DISABLED"
         return {"task": {"state": "UNAVAILABLE", "code": code,
                          "detail": msg[:160]}}
     if not isinstance(res, dict) or not res.get("ok"):
         return {"task": {"state": "UNAVAILABLE",
-                         "code": str((res or {}).get("code", "RUNTIME_ERROR")),
+                         "code": str((res or {}).get("code", "AGENT_ERROR")),
                          "detail": str((res or {}).get("error", ""))[:200]}}
-    return {"task": {"state": "OK", "runtime": "hermes",
+    return {"task": {"state": "OK", "runtime": "qubit",
                      "reply": str(res.get("reply", "")),
                      "receipt": res.get("receipt", {})}}
 
@@ -2446,7 +2435,7 @@ _BACKENDS: Dict[str, Callable] = {
     "sessions": _b_sessions, "capability": _b_capability,
     "checkpoints": _b_checkpoints, "auth_status": _b_auth_status,
     "auth_login": _b_auth_login, "auth_verify": _b_auth_verify,
-    "auth_logout": _b_auth_logout, "mcp": _b_mcp, "claw": _b_claw,
+    "auth_logout": _b_auth_logout, "mcp": _b_mcp, "worker": _b_worker,
     "memory": _b_memory, "skills": _b_skills, "projects": _b_projects,
     "kanban": _b_kanban, "themes": _b_themes, "proxy": _b_proxy,
     "runtime": _b_runtime,
@@ -2507,10 +2496,10 @@ def _generic_summary(result: Dict[str, Any]) -> str:
 
 def _sum_status(result):
     inv = result.get("inventory", {})
-    hermes = inv.get("hermes", {})
+    agent = inv.get("agent", {})
     broker = inv.get("broker", {})
     estop = "emergency stop latched" if broker.get("emergency_stop") else "all clear"
-    return (f"Qubit ready. Hermes runtime {hermes.get('state', 'unknown')}, "
+    return (f"Qubit ready. Agent runtime {agent.get('runtime', 'qubit-native')}, "
             f"{estop}.")
 
 
@@ -2987,11 +2976,12 @@ _E("mcp", "MCP servers",
    "mcp", ("mcp",),
    examples=("qubit, list mcp servers",),
    help="MCP inventory (never mounts).")
-_E("claw", "Lineage status",
-   ("claw status", "openclaw status", "lineage status"),
-   "claw", ("claw",),
-   examples=("qubit, claw status",),
-   help="OpenClaw-lineage detection.")
+_E("worker", "Worker status",
+   ("worker status", "agent status", "worker lane", "is the worker ready",
+    "claw status"),
+   "worker", ("worker", "claw"),
+   examples=("qubit, worker status",),
+   help="Native worker-lane status.")
 _E("memory_search", "Memory search",
    ("search memory", "what do you remember about", "recall"),
    "memory", ("memory",), args=(_R("query"),), fixed=(("action", "search"),),
@@ -3903,26 +3893,26 @@ _E("runtime_install", "Install runtime",
    ("install runtime", "install container", "set up runtime"),
    "runtime", ("runtime",), args=(_R("name"), _S("source")),
    fixed=(("action", "install"),), confirm=True, summary="runtime",
-   examples=("qubit, install runtime hermes-runtime",),
+   examples=("qubit, install runtime opencode-binary",),
    help="Install a pinned runtime from staged artifacts (confirmed; never downloads).")
 _E("runtime_upgrade", "Upgrade runtime",
    ("upgrade runtime", "upgrade container", "refresh runtime"),
    "runtime", ("runtime",), args=(_R("name"),),
    fixed=(("action", "upgrade"),), confirm=True, summary="runtime",
-   examples=("qubit, upgrade runtime hermes-runtime",),
+   examples=("qubit, upgrade runtime opencode-binary",),
    help="Re-verify and refresh a pinned runtime (confirmed).")
 _E("runtime_rollback", "Roll back runtime",
    ("roll back runtime", "rollback runtime", "restore runtime",
     "downgrade runtime"),
    "runtime", ("runtime",), args=(_R("name"),),
    fixed=(("action", "rollback"),), confirm=True, summary="runtime",
-   examples=("qubit, roll back runtime hermes-runtime",),
+   examples=("qubit, roll back runtime opencode-binary",),
    help="Restore the previous install receipt (confirmed).")
 _E("runtime_remove", "Remove runtime",
    ("remove runtime", "remove container", "uninstall runtime"),
    "runtime", ("runtime",), args=(_R("name"),),
    fixed=(("action", "remove"),), confirm=True, summary="runtime",
-   examples=("qubit, remove runtime hermes-runtime",),
+   examples=("qubit, remove runtime opencode-binary",),
    help="Remove an installed runtime (confirmed; audited).")
 _E("project_rename", "Rename project",
    ("rename project", "retitle project"),
@@ -4084,8 +4074,8 @@ _E("websites_show", "Show website",
 
 # ------------------------------------------- task-mandated natural commands
 # "Qubit, list my projects" / "show my sessions" are aliases on the entries
-# above; "run the task" dispatches one typed task through the agent runtime
-# (same Hermes runtime the CLI `task` path prefers), confirm-gated.
+# above; "run the task" dispatches one typed task through the Qubit agent
+# (same agent the CLI `task` path uses), confirm-gated.
 _E("task_run", "Run the task",
    ("run the task", "run task", "run that task", "execute the task",
     "do the task"),
@@ -4832,7 +4822,7 @@ CLI_COVERAGE = {
     "status": ("status",),
     "auth": ("auth_status", "auth_login", "auth_verify", "auth_logout"),
     "mcp": ("mcp",),
-    "claw": ("claw",),
+    "worker": ("worker",),
     "approvals": ("approvals",),
     "verify-release": ("verify_release",),
     "checkpoints": ("checkpoints_list", "checkpoints_write"),

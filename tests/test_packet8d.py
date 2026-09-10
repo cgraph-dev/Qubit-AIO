@@ -830,15 +830,15 @@ def test_monitor_health_reports_typed_fields(tmp_path):
 # ------------------------------------------------------------- install/rollback
 def test_render_units_has_project_dir_injected():
     units = render_units()
-    assert "openclaw-communications-monitor.service" in units
-    assert "openclaw-communications-monitor.timer" in units
-    assert "__PROJECT_DIR__" not in units["openclaw-communications-monitor.service"]
-    assert "__PROJECT_DIR__" not in units["openclaw-communications-monitor.timer"]
-    assert "__PROJECT_DIR__" not in units["openclaw-communications-monitor.service"]
-    svc = units["openclaw-communications-monitor.service"]
+    assert "qubit-communications-monitor.service" in units
+    assert "qubit-communications-monitor.timer" in units
+    assert "__PROJECT_DIR__" not in units["qubit-communications-monitor.service"]
+    assert "__PROJECT_DIR__" not in units["qubit-communications-monitor.timer"]
+    assert "__PROJECT_DIR__" not in units["qubit-communications-monitor.service"]
+    svc = units["qubit-communications-monitor.service"]
     assert "Type=oneshot" in svc
     assert "communications_monitor.py --hourly" in svc
-    tmr = units["openclaw-communications-monitor.timer"]
+    tmr = units["qubit-communications-monitor.timer"]
     assert "OnCalendar=hourly" in tmr and "Persistent=true" in tmr
 
 
@@ -849,8 +849,8 @@ def test_install_monitor_dry_run_writes_nothing(tmp_path, monkeypatch):
     out = install_monitor(cfg, dry_run=True, enable=False)
     assert out["state"] == "dry-run"
     unit_dir = tmp_path / "home" / ".config" / "systemd" / "user"
-    assert not (unit_dir / "openclaw-communications-monitor.service").exists()
-    assert not (unit_dir / "openclaw-communications-monitor.timer").exists()
+    assert not (unit_dir / "qubit-communications-monitor.service").exists()
+    assert not (unit_dir / "qubit-communications-monitor.timer").exists()
 
 
 def test_install_monitor_dry_run_never_creates_unit_dir(tmp_path, monkeypatch):
@@ -886,8 +886,8 @@ def test_install_monitor_never_enables_implicitly(tmp_path, monkeypatch):
     assert out["enable"]["state"] == "not_enabled"
     # units written atomically with a private mode
     unit_dir = tmp_path / "home" / ".config" / "systemd" / "user"
-    svc = unit_dir / "openclaw-communications-monitor.service"
-    tmr = unit_dir / "openclaw-communications-monitor.timer"
+    svc = unit_dir / "qubit-communications-monitor.service"
+    tmr = unit_dir / "qubit-communications-monitor.timer"
     assert svc.exists() and tmr.exists()
     assert oct(svc.stat().st_mode & 0o777) == "0o600"
     # implicit run: daemon-reload may run, but the TIMER is never enabled
@@ -898,8 +898,8 @@ def test_install_monitor_never_enables_implicitly(tmp_path, monkeypatch):
     assert out2["enable"]["state"] == "OK"
     enabled = [c for c in calls if "enable" in c]
     assert enabled, "explicit enable must invoke systemctl enable"
-    assert any("openclaw-communications-monitor.timer" in c for c in enabled)
-    assert not any("openclaw-communications-monitor.service" in c and "enable" in c
+    assert any("qubit-communications-monitor.timer" in c for c in enabled)
+    assert not any("qubit-communications-monitor.service" in c and "enable" in c
                    for c in calls)
 
 
@@ -923,9 +923,9 @@ def test_install_monitor_enable_starts_timer(tmp_path, monkeypatch):
     assert out["enable"]["state"] == "OK"
     starts = [c for c in calls if "start" in c]
     assert starts, "live enable must invoke systemctl start for the timer"
-    assert any("openclaw-communications-monitor.timer" in c for c in starts)
+    assert any("qubit-communications-monitor.timer" in c for c in starts)
     # the SERVICE unit is never started or enabled by live activation
-    assert not any("openclaw-communications-monitor.service" in c
+    assert not any("qubit-communications-monitor.service" in c
                    and ("start" in c or "enable" in c) for c in calls)
     # a failed start is reported as a failed enable (truthful return code)
     calls.clear()
@@ -962,7 +962,7 @@ def test_disable_monitor_reports_ok_when_timer_never_installed(tmp_path,
         lambda cmd, **kw: type("R", (), {
             "returncode": 1,
             "stderr": "Failed to disable unit: Unit file "
-                      "openclaw-communications-monitor.timer does not exist.\n",
+                      "qubit-communications-monitor.timer does not exist.\n",
             "stdout": ""})())
     out = M.disable_monitor()
     assert out["disable"]["state"] == "OK"
@@ -993,12 +993,12 @@ def test_rollback_stops_and_disables_live_timer(tmp_path, monkeypatch):
     assert out["disable"]["state"] == "OK"
     assert out["stop"]["state"] == "OK"
     cmds = [c for c in calls if any(x in c for x in ("disable", "stop"))]
-    assert any("disable" in c and "openclaw-communications-monitor.timer" in c
+    assert any("disable" in c and "qubit-communications-monitor.timer" in c
                for c in cmds)
-    assert any("stop" in c and "openclaw-communications-monitor.timer" in c
+    assert any("stop" in c and "qubit-communications-monitor.timer" in c
                for c in cmds)
     # the SERVICE unit is never disabled/stopped by a monitor rollback
-    assert not any("openclaw-communications-monitor.service" in c for c in cmds)
+    assert not any("qubit-communications-monitor.service" in c for c in cmds)
 
 
 def test_rollback_preserves_cursors_reports_evidence_notifications(tmp_path,
@@ -1067,7 +1067,7 @@ def test_monitor_cli_hourly_denies_without_authorization(tmp_path):
     assert r2.returncode == 0
     out2 = json.loads(r2.stdout)
     assert out2["dry_run"] is True
-    assert out2["files"]["openclaw-communications-monitor.timer"][
+    assert out2["files"]["qubit-communications-monitor.timer"][
         "exists"] is False
 
 
@@ -1101,8 +1101,8 @@ def test_cli_install_enable_without_env_denied(tmp_path):
     out = json.loads(r.stdout)
     assert out["dry_run"] is True
     unit_dir = fake_home / ".config" / "systemd" / "user"
-    assert not (unit_dir / "openclaw-communications-monitor.service").exists()
-    assert not (unit_dir / "openclaw-communications-monitor.timer").exists()
+    assert not (unit_dir / "qubit-communications-monitor.service").exists()
+    assert not (unit_dir / "qubit-communications-monitor.timer").exists()
 
 
 def test_cli_install_enable_with_env_enables_timer_only(tmp_path):
@@ -1135,8 +1135,8 @@ def test_cli_install_enable_with_env_enables_timer_only(tmp_path):
     assert out["state"] == "installed" and out["enabled"] is True
     assert out["enable"]["state"] == "OK"
     unit_dir = fake_home / ".config" / "systemd" / "user"
-    svc = unit_dir / "openclaw-communications-monitor.service"
-    tmr = unit_dir / "openclaw-communications-monitor.timer"
+    svc = unit_dir / "qubit-communications-monitor.service"
+    tmr = unit_dir / "qubit-communications-monitor.timer"
     assert svc.exists() and tmr.exists()
     assert oct(svc.stat().st_mode & 0o777) == "0o600"
     assert oct(tmr.stat().st_mode & 0o777) == "0o600"
@@ -1146,7 +1146,7 @@ def test_cli_install_enable_with_env_enables_timer_only(tmp_path):
                  "--config", str(tmp_path / "voice.yaml")],
                 capture_output=True, text=True, timeout=60, env=env)
     out2 = json.loads(r2.stdout)
-    assert out2["files"]["openclaw-communications-monitor.timer"]["backup"]
+    assert out2["files"]["qubit-communications-monitor.timer"]["backup"]
     backups = list(unit_dir.glob("*.bak.*"))
     assert backups
 

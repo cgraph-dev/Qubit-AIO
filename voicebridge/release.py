@@ -732,7 +732,7 @@ def resource_ceilings(root: Optional[Path] = None) -> Dict[str, Any]:
                 ceilings[name] = None
         else:
             ceilings[name] = None
-    svc = _read_capped(root / "systemd/openclaw-communications-monitor.service")
+    svc = _read_capped(root / "systemd/qubit-communications-monitor.service")
     t = re.search(r"^TimeoutStartSec=(\d+)", svc, re.M)
     ceilings["monitor_oneshot_timeout_s"] = int(t.group(1)) if t else None
     mh = re.search(r"^MemoryMax=(\S+)", svc, re.M)

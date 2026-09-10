@@ -1,4 +1,4 @@
-"""Packet 8T-F — Hermes `kanban` parity: local task boards, Qubit-owned.
+"""Qubit task boards: local task boards.
 
 Proves the board lifecycle is real (boards, atomic claims, comments,
 state machine, export/import rollback) and execution-shaped work is

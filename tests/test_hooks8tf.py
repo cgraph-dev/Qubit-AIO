@@ -1,4 +1,4 @@
-"""Packet 8T-F — Hermes hooks parity via a declared-never-executed registry.
+"""Qubit hook subscriptions via a declared-never-executed registry.
 
 Proves subscriptions record disabled with hash + findings, validation and
 dry-run plans never execute, delivery is broker-audited with shells

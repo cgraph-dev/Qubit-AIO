@@ -40,8 +40,8 @@ from .contracts import NotificationKind, NotificationRecord, NotificationStatus
 from .reports import ReportStore
 
 MONITOR_LEASE = "monitor:hourly"
-SERVICE_NAME = "openclaw-communications-monitor.service"
-TIMER_NAME = "openclaw-communications-monitor.timer"
+SERVICE_NAME = "qubit-communications-monitor.service"
+TIMER_NAME = "qubit-communications-monitor.timer"
 # Packet 8I: the oneshot's TimeoutStartSec (the maximum permitted service
 # runtime) and the default lease TTL. The lease MUST exceed the timeout by a
 # safety margin so a timer run can never outlive its own overlap lease. The

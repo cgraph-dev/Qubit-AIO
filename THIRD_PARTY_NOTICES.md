@@ -381,23 +381,23 @@ in distributions (full text at https://www.apache.org/licenses/LICENSE-2.0):
 > CONDITIONS OF ANY KIND, either express or implied. See the License for the
 > specific language governing permissions and limitations under the License.
 
-## Hermes agent — vendored sanitizer and SQLite primitives (Packet 8T-F)
+## Hermes agent — retired vendoring (native replacements shipped)
 
-Qubit ships two verbatim files from NousResearch/hermes-agent
+Qubit previously shipped two verbatim files from NousResearch/hermes-agent
 (MIT © 2025 Nous Research), reviewed at pinned commit
 `2237be355906fbe6065ce1815711eee52b2d646e` (tag `v2026.9.7`):
 
 - `voicebridge/upstream/hermes_ansi_strip.py` ← `tools/ansi_strip.py`
-  (`strip_ansi`, `sanitize_display_text`, `strip_unicode_tags`);
-  executes in `voicebridge/hermes/backend.py` and
-  `voicebridge/runtime/real_hermes.py` on live agent output.
 - `voicebridge/upstream/hermes_sqlite_util.py` ← `hermes_cli/sqlite_util.py`
-  (`write_txn`, `add_column_if_missing`); behavior proven by differential
-  tests, reserved for non-executescript writes (see UPSTREAM_REUSE.md R31).
 
-MIT License text requirement: include the copyright notice and this permission
-statement in distributions (full text in
-`voicebridge/upstream/ATTRIBUTION.md`):
+These files have been REMOVED and replaced by independent Qubit
+implementations (`voicebridge/textutil.py`, `voicebridge/sqlstore.py`)
+with differential tests against the pinned oracle plus adversarial
+tests. No Hermes source remains in the product. The MIT attribution is
+retained here and in `voicebridge/upstream/ATTRIBUTION.md` as the
+legally required provenance record for the retired vendoring.
+
+MIT License text requirement (retained provenance record):
 
 > Copyright (c) 2025 Nous Research
 >

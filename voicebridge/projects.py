@@ -1,8 +1,6 @@
-"""Packet 8T-F — Hermes ``project`` parity: named multi-folder workspaces.
+"""Qubit projects: named multi-folder workspaces.
 
-Hermes projects are human-named workspaces spanning multiple folders/repos
-(``hermes project --help`` from the pinned ``v2026.9.7 @ 2237be3`` runtime;
-no Hermes source is copied here — only the observed behavior is adapted).
+Qubit projects are human-named workspaces spanning multiple folders/repos.
 Qubit maps that surface onto one canonical registry file under the Qubit
 state dir (``projects.json``), never a legacy tree:
 
@@ -22,7 +20,7 @@ state dir (``projects.json``), never a legacy tree:
 * ``use`` persists the active-project pointer consumed by ``list``/``show``
   (and future workspace consumers); it changes no execution defaults.
 
-Hermes keeps project state per-profile; Qubit has one canonical state tree,
+Qubit has one canonical state tree,
 so the registry is global to the Qubit installation (documented divergence).
 """
 from __future__ import annotations
@@ -79,7 +77,7 @@ def redact_spec(text: str) -> str:
 
 
 def slugify(name: str) -> str:
-    """Derive a Hermes-style slug from a human name (lowercase, dashed)."""
+    """Derive a URL-safe slug from a human name (lowercase, dashed)."""
     slug = re.sub(r"[^a-z0-9]+", "-", (name or "").strip().lower()).strip("-")
     slug = re.sub(r"-{2,}", "-", slug)
     return slug[:MAX_SLUG_LEN]
@@ -247,7 +245,7 @@ def create(cfg: Any, name: str, folders: List[str], *, slug: str = "",
            description: str = "", primary: str = "",
            requested_by: str = "cli:user", confirmed: bool = False,
            use: bool = False) -> Dict[str, Any]:
-    """Create a named workspace (first folder = primary, Hermes parity)."""
+    """Create a named workspace (first folder = primary)."""
     if not confirmed:
         raise ProjectError(CONFIRM_CODE,
                            "project create requires explicit --confirm")
@@ -349,7 +347,7 @@ def _mutate(cfg: Any, slug: str, actor: str, op: str,
 def rename(cfg: Any, slug: str, name: str, *,
            requested_by: str = "cli:user",
            confirmed: bool = False) -> Dict[str, Any]:
-    """Rename a workspace (slug is stable; Hermes parity)."""
+    """Rename a workspace (slug is stable)."""
     if not confirmed:
         raise ProjectError(CONFIRM_CODE,
                            "project rename requires explicit --confirm")

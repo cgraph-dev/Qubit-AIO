@@ -183,7 +183,7 @@ class _FakeCfg:
                      "intent": {"local_llm": {"model": "qubit-brain4",
                                               "url": "http://127.0.0.1:11434"}},
                      "safety": {"tool_broker": True},
-                     "openclaw": {"token_file": "~/.openclaw/.env"}}
+                     "agent": {"key_file": "~/.config/qubit-voicebridge/agent.key"}}
 
     def get(self, *path, default=None):
         node = self.data
@@ -235,7 +235,7 @@ def test_export_import_roundtrip_preserves_sanitized_state(tmp_path):
     # secrets excluded
     joined = json.dumps(state)
     assert "super-secret-live-token-xyz" not in joined
-    assert "~/.openclaw/.env" not in joined
+    assert "agent.key" not in joined
     assert "/home/example/custom" not in joined
 
 
@@ -281,13 +281,13 @@ def test_export_excludes_machine_paths_and_secret_sections(tmp_path):
     payload = P.read_bundle(blob, "pass")
     state = payload["state"]
     conf = state["config_non_secret"]
-    # webui (token), openclaw (token_file), logging excluded entirely
-    assert "webui" not in conf and "openclaw" not in conf and "logging" not in conf
+    # webui (token), agent (key_file), logging excluded entirely
+    assert "webui" not in conf and "agent" not in conf and "logging" not in conf
     # machine-specific audio output pins excluded
     assert "output_device" not in conf.get("audio", {})
     joined = json.dumps(state)
     assert "super-secret-live-token-xyz" not in joined
-    assert "~/.openclaw" not in joined
+    assert "agent.key" not in joined
 
 
 @pytest.mark.skipif(not D.openssl_ok(), reason="DEGRADED: system OpenSSL missing")

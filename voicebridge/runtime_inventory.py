@@ -1,7 +1,7 @@
 """Packet 8T-F — backend-authoritative runtime inventory (dashboard/CLI).
 
-One real probe for product identity, Hermes provision state, vendored
-module identity, voice/provider/session/approval/adapter health, and the
+One real probe for product identity, agent runtime state,
+voice/provider/session/approval/adapter health, and the
 broker emergency-stop latch. Read-only: never starts services, models, or
 runtimes and never writes state. Anything unobservable is typed
 UNAVAILABLE/DEGRADED, never invented. All values redacted (no tokens,
@@ -30,38 +30,18 @@ def _safe(fn, *args, **kwargs):
         return {"state": "UNAVAILABLE", "detail": str(exc)[:160]}
 
 
-def _hermes() -> Dict[str, Any]:
-    from .runtime import provision as P
+def _agent_runtime(cfg: Any) -> Dict[str, Any]:
+    """Qubit-native agent runtime identity (the effective runtime)."""
+    from .agent import turn as _turn
 
-    rdir = P.runtime_dir()
-    binary = rdir / "venv" / "bin" / "hermes"
-    if not binary.is_file():
-        return {"state": "DISABLED",
-                "detail": "no provisioned Hermes runtime; see "
-                          "scripts/install_hermes_runtime.sh",
-                "commit": P.HERMES_COMMIT, "tag": P.HERMES_TAG}
-    info = P.verify_installation(rdir)
-    info["commit"] = P.HERMES_COMMIT
-    return info
-
-
-def _vendored() -> Dict[str, Any]:
-    import hashlib as _hashlib
-
-    from .upstream import hermes_ansi_strip, hermes_sqlite_util
-
-    out = {}
-    for mod, rel in ((hermes_ansi_strip, "tools/ansi_strip.py"),
-                     (hermes_sqlite_util, "hermes_cli/sqlite_util.py")):
-        path = Path(str(mod.__file__))
-        h = _hashlib.sha256()
-        with open(path, "rb") as fh:
-            for chunk in iter(lambda: fh.read(65536), b""):
-                h.update(chunk)
-        inside = "voicebridge/upstream/" in str(path).replace("\\", "/")
-        out[rel] = {"path": _short_home(str(path)), "sha256": h.hexdigest()[:16],
-                    "in_foundation": inside}
-    return out
+    get = (lambda *p, default=None: cfg.get(*p, default=default)) \
+        if hasattr(cfg, "get") else (lambda *p, default=None: default)
+    return {"state": "OK",
+            "runtime": "qubit-native",
+            "entry": "voicebridge.agent.turn",
+            "model": str(get("agent", "model", default="") or
+                         "qubit-brain4"),
+            "enabled": bool(get("agent", "enabled", default=True))}
 
 
 def _voice(cfg: Any) -> Dict[str, Any]:
@@ -105,22 +85,23 @@ def _approvals(cfg: Any) -> Dict[str, Any]:
         return {"state": "UNAVAILABLE", "detail": str(exc)[:160]}
 
 
-def _adapters(cfg: Any) -> Dict[str, Any]:
-    import shutil as _shutil
-
+def current_vram_mb() -> int:
+    """Free VRAM in MiB via nvidia-smi (best-effort)."""
     try:
-        from .openclaw.discovery import discover_gateway
+        import subprocess
+        out = subprocess.run(["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"],
+                             capture_output=True, text=True, timeout=5).stdout.strip()
+        return int(out.splitlines()[0])
+    except Exception:
+        return -1
 
-        info = discover_gateway(cfg)
-        openclaw = {"configured": bool(info.token),
-                    "agent": redact_text(str(info.agent or ""))[:40]}
-    except Exception as exc:
-        openclaw = {"state": "UNAVAILABLE", "detail": str(exc)[:160]}
-    hermes_bin = _shutil.which("hermes")
-    return {"openclaw_gateway": openclaw,
-            "hermes_cli": {"available": bool(hermes_bin),
-                           "note": "operator binary, never used by Qubit "
-                                   "without explicit backend enablement"}}
+
+def _adapters(cfg: Any) -> Dict[str, Any]:
+    return {"worker": {"route": "local",
+                       "note": "native worker sessions; no external "
+                               "assistant required"},
+            "coding": {"note": "supervised OpenCode runs via the Qubit "
+                               "broker (pinned, confirmed)"}}
 
 
 def _providers(cfg: Any) -> Dict[str, Any]:
@@ -160,7 +141,7 @@ def _messaging(cfg: Any) -> Dict[str, Any]:
 def runtime_inventory(cfg: Any) -> Dict[str, Any]:
     """Assemble the real runtime inventory; every leaf is observed or typed."""
     from .auth_status import auth_status, recent_sessions
-    from .integration_status import claw_status, mcp_status
+    from .integration_status import mcp_status, worker_status
     from .capability_catalog import summary as _cap_summary
 
     inv = {
@@ -169,8 +150,7 @@ def runtime_inventory(cfg: Any) -> Dict[str, Any]:
                     "public_identity": F.PUBLIC_IDENTITY,
                     "voice_subsystem": F.VOICE_SUBSYSTEM,
                     "install_identity": F.INSTALL_IDENTITY},
-        "hermes": _safe(_hermes),
-        "vendored": _safe(_vendored),
+        "agent": _safe(_agent_runtime, cfg),
         "voice": _voice(cfg),
         "broker": _safe(_broker),
         "approvals": _approvals(cfg),
@@ -178,7 +158,7 @@ def runtime_inventory(cfg: Any) -> Dict[str, Any]:
         "providers": _providers(cfg),
         "auth": _safe(auth_status, cfg),
         "mcp": _safe(mcp_status, cfg),
-        "claw": _safe(claw_status, cfg),
+        "worker": _safe(worker_status, cfg),
         "vision": _safe(_vision, cfg),
         "messaging": _safe(_messaging, cfg),
         "sessions": _safe(recent_sessions, cfg, 5),

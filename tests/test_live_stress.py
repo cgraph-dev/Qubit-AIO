@@ -42,14 +42,14 @@ def test_interrupt_storm_routing_stable():
         sticky = StickyRouteState(timeout_s=600, max_turns=100, state_dir=td)
         clf = Classifier({"llm_classifier": False}, ConfirmationState(), ConversationState())
 
-        # Simulate: route to hermes -> 20 rapid intents -> clear -> route to openclaw -> 20 more
-        sticky.set("hermes", reason="route to hermes")
-        assert sticky.target() == "hermes"
+        # Simulate: route to agent -> 20 rapid intents -> clear -> route to worker -> 20 more
+        sticky.set("agent", reason="route to agent")
+        assert sticky.target() == "agent"
 
         phrases = [
             "create a file in /tmp called foo.txt",
             "hello there",
-            "route to openclaw and fix the bug",
+            "route to worker and fix the bug",
             "ask hermes to check my inbox",
             "make a doc in tmp called bar and write hello",
             "route to browser and open cgraph.org",
@@ -64,24 +64,25 @@ def test_interrupt_storm_routing_stable():
             sticky.bump()
             # classifier must not crash under concurrency-ish load
             intent = clf.classify(text)
-            assert intent.kind in ("coding","conversation","hermes","local","system","confirm","cancel","clarify")
+            assert intent.kind in ("coding","conversation","agent","local","system","confirm","cancel","clarify")
 
         # clear
         sticky.clear()
         assert sticky.target() == ""
-        # after clear, hermes delegation still works via explicit phrase
+        # after clear, agent delegation still works via explicit phrase
+        # (legacy "ask hermes" phrasing maps to the agent lane)
         intent = clf.classify("ask hermes to check my inbox")
-        assert intent.kind == "hermes"
+        assert intent.kind == "agent"
 
 
 def test_interrupt_routing_survives_restart(tmp_path):
     """Sticky route must survive a simulated restart (new instance reads disk)."""
     from voicebridge.intent.state import StickyRouteState
     sr = StickyRouteState(timeout_s=600, max_turns=8, state_dir=tmp_path)
-    sr.set("hermes", reason="route to hermes for cgraph")
+    sr.set("agent", reason="route to agent for cgraph")
     # new process
     sr2 = StickyRouteState(timeout_s=600, max_turns=8, state_dir=tmp_path)
-    assert sr2.target() == "hermes", "sticky must survive restart (disk persistence)"
+    assert sr2.target() == "agent", "sticky must survive restart (disk persistence)"
     sr2.clear()
     sr3 = StickyRouteState(timeout_s=600, max_turns=8, state_dir=tmp_path)
     assert sr3.target() == ""
@@ -100,10 +101,10 @@ def test_continuous_tasks_with_route_interleaving(tmp_path):
     clf = Classifier({"llm_classifier": False}, ConfirmationState(), ConversationState())
 
     tasks = [
-        ("route to hermes", "hermes"),
+        ("route to agent", "agent"),
         ("check the stripe webhook flow", "coding"),
         ("read my gmail for valutrank", "coding"),  # template-ish
-        ("route to openclaw", "openclaw"),
+        ("route to worker", "worker"),
         ("generate a market analysis report for valutrank", "coding"),
     ]
     for text, _expected in tasks:
@@ -116,7 +117,7 @@ def test_continuous_tasks_with_route_interleaving(tmp_path):
         # ledger grows
         assert sm.recent(limit=100)
         # if sticky is set, the next coding task should be sticky-eligible
-        if sticky.target() and intent.kind in ("coding","hermes"):
+        if sticky.target() and intent.kind in ("coding","agent"):
             # simulate bump after turn
             sticky.bump()
 
@@ -215,7 +216,7 @@ def test_dashboard_reports_include_gmail_context(tmp_path):
     sm = SharedMemory(tmp_path)
     sm.append_user("check latest gmail for valutrank and cgraph", route="web")
     # simulate gmail script output being summarized into report
-    sm.append_agent_report("GMAIL — 3 messages (1 important, 1 unread). ValutRank invoice due.", raw="full...", provider="openclaw", session_key="voice:test")
+    sm.append_agent_report("GMAIL — 3 messages (1 important, 1 unread). ValutRank invoice due.", raw="full...", provider="qubit", session_key="voice:test")
     prompt = sm.as_prompt(max_chars=4000, max_turns=10)
     assert "valutrank" in prompt.lower()
     assert "GMAIL" in prompt or "invoice" in prompt.lower()
@@ -273,14 +274,14 @@ def test_continuous_hammer_40_turns():
         clf = Classifier({"llm_classifier": False}, ConfirmationState(), ConversationState())
 
         script = [
-            "route to hermes",
+            "route to agent",
             "check my gmail for valutrank",
             "generate a market analysis report",
             "route to browser",
             "open valutrank dashboard and screenshot it",
             "read my messenger conversations",
             "hello",
-            "route to openclaw",
+            "route to worker",
             "fix the login bug in cgraph",
             "check cgraph gmail",
             "clear route",

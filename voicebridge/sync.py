@@ -1,8 +1,8 @@
-"""Packet 8T-F — Hermes sync parity via device-bound encrypted handoff.
+"""Qubit device sync via device-bound encrypted handoff.
 
-Hermes ``sync`` replicates state across devices automatically. Automatic
-replication would exfiltrate vault-adjacent state, so the Qubit-native
-conversion is an opt-in, user-carried, encrypted handoff on top of the 7C
+Automatic
+replication would exfiltrate vault-adjacent state, so Qubit sync is
+an opt-in, user-carried, encrypted handoff on top of the 7C
 portable-state primitives (audited OpenSSL envelopes, passphrase/approved
 key, integrity hash, pre-restore backups):
 

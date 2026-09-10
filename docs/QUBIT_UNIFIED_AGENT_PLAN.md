@@ -11,9 +11,9 @@ It is separate from:
 - `SLM_FROM_SCRATCH_PLAN.md`, which covers the future Qubit learning model.
 
 This plan combines the useful capabilities of OpenClaw, Hermes, Atomic Agent,
-and Voice Bridge behind one Qubit interface. Packet 8T-F specifically uses a
-fresh pinned Hermes checkout as the source foundation for the new Qubit tree;
-it is not satisfied by merely supervising an external Hermes installation.
+and Voice Bridge behind one Qubit interface. Packet 8T-F audits pinned
+upstream sources and adapts only approved material into the Qubit-owned tree;
+it is not satisfied by supervising an external upstream installation.
 OpenClaw capabilities are integrated through the feature matrix and the full
 parity contract in `docs/QUBIT_FULL_PARITY_CONTRACT.md`, with provenance and
 license retained. “Selective” means selecting the smallest justified source
@@ -22,6 +22,20 @@ OpenClaw capability must eventually have a real Qubit implementation, a
 tested Qubit compatibility boundary, or a clearly identified operator-only
 qualification gate. Copying an entire second agent repository without
 ownership boundaries is not acceptable.
+
+The immutable owner contract is
+[`QUBIT_FROZEN_ACCEPTANCE_CONTRACT.md`](QUBIT_FROZEN_ACCEPTANCE_CONTRACT.md).
+Implementation agents may update code and evidence, but may not change the
+requirements in that contract to make progress appear complete.
+
+### Native Qubit completion authority
+
+The owner’s stricter completion target is defined in
+[`QUBIT_NATIVE_COMPLETION_PLAN.md`](QUBIT_NATIVE_COMPLETION_PLAN.md) and
+[`QUBIT_NATIVE_COMPLETION_CHECKLIST.md`](QUBIT_NATIVE_COMPLETION_CHECKLIST.md).
+Those documents supersede wording that treats Qubit as a supervisor of an
+upstream assistant. Until their gates pass, describe the product as an
+integration in progress, not as a complete native Qubit replacement.
 
 ### Packet 8S identity decision
 
@@ -95,8 +109,9 @@ Rows marked `BLOCKED`, `DEFERRED`, `REJECTED`, `CLI_ONLY`,
 be resolved before the final 1:1 release gate, or be explicitly classified as
 genuine operator-only tests that are code-complete and manually qualified.
 
-The current packet order remains valid: 8T-F establishes the Hermes-derived
-Qubit foundation, 8U–8AH add browser/desktop/files/IDE and other whole-computer
+The current packet order remains valid: 8T-F establishes the Qubit-owned
+foundation with upstream differential evidence, while 8U–8AH add
+browser/desktop/files/IDE and other whole-computer
 capabilities, and the final parity gate runs only after those packets. No agent
 may claim that 8T-F alone is final Hermes + OpenClaw parity while those later
 capability packets remain incomplete.

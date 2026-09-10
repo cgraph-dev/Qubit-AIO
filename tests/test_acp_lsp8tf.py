@@ -1,4 +1,4 @@
-"""Packet 8T-F — Hermes acp/lsp parity via a bounded brokered adapter.
+"""Qubit editor integration via a bounded brokered adapter.
 
 Proves editor checks are read-only, setup never writes live config, serve
 mode and hook auto-approval are refused, LSP inventory never executes or

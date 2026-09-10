@@ -987,7 +987,7 @@ class ActionReceipt:
     created_at: float
     finished_at: Optional[float]
     duration_ms: float
-    # 8T-F (OpenClaw execution-receipt provenance): which runtime executed.
+    # Execution-receipt provenance: which runtime executed.
     runtime: str = "qubit-broker"
 
     def to_dict(self) -> Dict[str, Any]:

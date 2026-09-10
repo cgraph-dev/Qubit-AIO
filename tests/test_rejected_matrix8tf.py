@@ -81,22 +81,18 @@ def test_rejected_cloud_browser_absent():
     assert refused["code"] == "BROWSER_CLOSE_REFUSED"
 
 
-def test_rejected_installer_qubit_owned():
-    """H-installer: packaging/install identity is Qubit; the Hermes
-    installer is never invoked (provision script installs the pinned
-    runtime into Qubit-owned XDG space, never a system install)."""
+def test_installer_qubit_owned_no_foreign_runtime():
+    """Packaging/install identity is Qubit; no foreign assistant runtime
+    is provisioned, launched, or required (the agent runs in-process)."""
     from voicebridge import foundation as F
 
     assert F.INSTALL_IDENTITY == "qubit-voicebridge"
     install_sh = (REPO_ROOT / "scripts" / "install.sh").read_text()
-    assert "hermes" not in install_sh.lower() or \
-        "does NOT touch" in install_sh or "do not" in install_sh.lower(), \
-        "installer must not drive a Hermes install"
-    prov = (REPO_ROOT / "scripts" / "install_hermes_runtime.sh").read_text()
-    assert "operator" in prov.lower() and "never" in prov.lower()
-    from voicebridge.runtime import provision as P
-
-    assert P.HERMES_COMMIT == "2237be355906fbe6065ce1815711eee52b2d646e"
+    assert "hermes" not in install_sh.lower(), \
+        "installer must not reference a foreign assistant"
+    assert not (REPO_ROOT / "scripts" / "install_hermes_runtime.sh").exists()
+    assert not (REPO_ROOT / "voicebridge" / "runtime").exists()
+    assert not (REPO_ROOT / "voicebridge" / "hermes").exists()
 
 
 def test_rejected_clawhub_remote_refused(tmp_path, monkeypatch):

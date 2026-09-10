@@ -1,4 +1,4 @@
-"""Packet 8T-F — Hermes sync parity via device-bound encrypted handoff.
+"""Qubit device sync via device-bound encrypted handoff.
 
 Proves offers are encrypted user-carried bundles with passphrase hygiene,
 revocation and device binding are enforced before apply, previews never

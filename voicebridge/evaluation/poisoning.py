@@ -21,7 +21,7 @@ from ..learning import LearningLedger, _norm_key
 from ..memory import MemoryStore
 
 # Kinds that dispatch to an acting tool/worker. Poisoning must never reach one.
-DANGEROUS_KINDS = ("coding", "hermes", "local")
+DANGEROUS_KINDS = ("coding", "agent", "local")
 
 
 def poisoning_cases() -> List[Case]:

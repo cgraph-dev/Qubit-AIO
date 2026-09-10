@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Qubit — Approvals &amp; Security</title>
+<style>
+ body{font:14px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--text);margin:0;padding:24px;max-width:1000px}
+ h1{font-size:20px;margin:0 0 4px} h2{font-size:15px;margin:18px 0 6px;border-bottom:1px solid var(--line);padding-bottom:4px}
+ .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
+ button{margin:4px 8px 4px 0;padding:6px 14px;border-radius:6px;border:0;cursor:pointer}
+ .ok{background:var(--primary);color:#10120a}.warn{background:var(--warning);color:#201a0a}.no{background:var(--danger);color:#201010}
+ button:disabled{opacity:.45;cursor:default}
+ .muted{color:var(--muted)}.err{color:var(--danger)}
+ .tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;margin-left:6px}
+ .tag.executed,.tag.OK{background:var(--success)}.tag.failed,.tag.refused,.tag.FAILED,.tag.DENIED{background:var(--danger)}
+ .tag.needs-confirm,.tag.degraded,.tag.DEGRADED,.tag.PARTIAL{background:var(--warning)}
+ .tag.MISSING,.tag.UNAVAILABLE{background:var(--faint)}
+ .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
+ label{font-size:12px} input,select,textarea{padding:6px;border-radius:6px;background:var(--surface-soft);color:var(--text);border:1px solid var(--line-strong);font-size:13px}
+ input[type=text],input:not([type]),textarea{min-width:200px} input[type=password]{min-width:200px}
+ pre{background:var(--surface-soft);padding:8px;border-radius:6px;overflow:auto;max-height:300px;font-size:12px;white-space:pre-wrap;word-break:break-word}
+ a{color:var(--primary)} code{background:var(--surface-soft);padding:1px 4px;border-radius:4px}
+ .op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+ .op{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--surface)}
+ .op h3{font-size:13px;margin:0 0 2px} .op .desc{font-size:12px;color:var(--muted);margin-bottom:6px}
+ .op .field{margin:4px 0} .op .field label{display:block;margin-bottom:2px}
+ .op .field input,.op .field select,.op .field textarea{width:100%;box-sizing:border-box}
+ .estop{border:2px solid var(--danger);border-radius:10px;padding:10px;margin-bottom:10px;font-weight:bold}
+ .hidden{display:none}
+ @media (max-width:640px){body{padding:12px}.op-grid{grid-template-columns:1fr}}
+</style><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/theme.css"></head><body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<main id="main-content" tabindex="-1">
+<h1><span class="brand-mark" aria-hidden="true">Q</span> Qubit — Approvals &amp; Security</h1>
+<div class="muted">Pending approvals, grants, permissions, and emergency stop — every control calls the real backend, the same operation the CLI and voice commands use.</div>
+<nav class="page-nav" aria-label="Primary">
+ <a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit Agent</a><span class="nav-separator" aria-hidden="true"></span>
+ <a href="/">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/sessions">Sessions</a><a href="/projects">Projects</a><a href="/models">Models</a><a href="/skills">Skills</a><a href="/tasks">Tasks</a><a href="/security" aria-current="page">Security</a><a href="/devices">Devices</a><a href="/messages">Messages</a><a href="/memory">Memory</a><a href="/ops">Operations</a><a href="/approvals">Approvals</a><a href="/settings">Settings</a><a href="/setup">Setup</a><a href="/system">System</a><a class="nav-utility" href="/token-setup">Pair device</a>
+</nav>
+
+<div id="estop" class="estop hidden" role="alert">Emergency stop is latched — mutating operations will be refused until it is reset.</div>
+<div id="pairhint" class="card hidden">Pair this dashboard first (<a class="tap-target" href="/token-setup">Pair device</a>) — controls stay disabled until then.</div>
+
+<div class="card">
+ <div class="row">
+  <label for="q">Filter operations</label>
+  <input id="q" type="text" placeholder="e.g. grant, permission, stop" oninput="render()" spellcheck="false">
+  <label for="group">Group</label>
+  <select id="group" onchange="render()"><option value="">All groups</option></select>
+  <button onclick="loadCatalog()">Reload</button>
+  <span id="cat-state" class="muted" role="status">loading…</span>
+ </div>
+ <div class="muted" style="margin-top:6px">Confirmations are single-use and expiring; replay is rejected. Secrets are never displayed; passphrases are re-entered at confirm time and never stored.</div>
+</div>
+
+<div id="ops"></div>
+</main>
+<script src="/static/vb.js"></script>
+<script src="/static/ui.js"></script>
+<script>window.FAMILY = { groups: ["approvals", "permissions", "power_status", "auth_status", "auth_login", "auth_verify", "auth_logout", "secrets", "security", "device", "device_enroll"] };</script>
+<script src="/static/family.js"></script>
+</body></html>

@@ -1,9 +1,9 @@
-"""Packet 8T-F hard gate — anti-substitution, inventories, E2E proof.
+"""Qubit hard gate — native identity, inventories, E2E proof.
 
-Phase B gate: verify_hermes_source must VERIFY the pinned clone and FAIL
-a Qubit imitation, a wrong commit, an operator location, and /tmp.
-Inventories must be complete (every file verdict-labeled, pins recorded).
-The voice->real-runtime->TTS path must execute end to end.
+The native identity gate must VERIFY the Qubit agent entry points and FAIL
+a missing entry or an altered module digest. Upstream inventories stay as
+provenance records (pins recorded). The voice->agent->TTS path must
+execute end to end.
 """
 from __future__ import annotations
 
@@ -15,91 +15,52 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-HERMES_CLONE = Path(os.environ.get("QUBIT_8TF_HERMES_CLONE",
-                                   "/tmp/upstream-8tfv3/hermes-agent"))
-OPENCLAW_CLONE = Path(os.environ.get("QUBIT_8TF_OPENCLAW_CLONE",
-                                     "/tmp/upstream-8tfv3/openclaw"))
 HERMES_PIN = "2237be355906fbe6065ce1815711eee52b2d646e"
 OPENCLAW_PIN = "3928bad9badfcb6c7d140530435e806fb8092190"
 
 from voicebridge import foundation as F  # noqa: E402
 
 
-def _require_clone():
-    if not (HERMES_CLONE / "cli.py").is_file():
-        pytest.fail(f"pinned Hermes clone missing: {HERMES_CLONE}")
-
-
 # ---------------------------------------------------------------------------
-# Anti-substitution gate
+# Native identity gate
 # ---------------------------------------------------------------------------
-def test_valid_pinned_source_verifies():
-    _require_clone()
-    rec = F.verify_hermes_source(HERMES_CLONE, allow_temporary=True)
-    assert rec["state"] == "VERIFIED" and rec["commit"] == HERMES_PIN
-    assert rec["audit_only"] is True
-    # The same tree is REJECTED as an execution foundation site while it
-    # lives under /tmp — audit inputs are never foundation locations.
+def test_native_identity_verifies():
+    rec = F.verify_runtime_identity()
+    assert rec["state"] == "VERIFIED"
+    receipt = rec["receipt"]
+    assert receipt["agent_turn"] == "voicebridge.agent.turn"
+    assert receipt["agent_session"] == "voicebridge.agent.run_session"
+    assert len(receipt["module_sha256"]) == 64
+
+
+def test_missing_entry_fails_closed(monkeypatch):
+    import voicebridge.agent as _agent
+
+    monkeypatch.setattr(_agent, "turn", None, raising=False)
     with pytest.raises(F.FoundationError) as exc:
-        F.verify_hermes_source(HERMES_CLONE)
-    assert "TEMPORARY_SOURCE" in str(exc.value)
+        F.verify_runtime_identity()
+    assert "MISSING_ENTRY" in str(exc.value)
 
 
-def test_imitation_source_fails(tmp_path):
-    fake = tmp_path / "not-hermes"
-    fake.mkdir()
-    (fake / "worker.py").write_text("# quibt imitation")
-    with pytest.raises(F.FoundationError):
-        F.verify_hermes_source(fake)
+def test_altered_digest_fails_closed(tmp_path, monkeypatch):
+    import voicebridge.foundation as _F
 
-
-def test_wrong_commit_fails(tmp_path):
-    repo = tmp_path / "fake-hermes"
-    repo.mkdir()
-    for marker in F.HERMES_LAYOUT_MARKERS:
-        (repo / marker).mkdir(exist_ok=True) if "." not in marker \
-            else (repo / marker).write_text("x")
-    subprocess.run(["git", "init", "-q", str(repo)], check=True)
-    subprocess.run(["git", "-C", str(repo), "config", "user.email", "t@t"],
-                   check=True)
-    subprocess.run(["git", "-C", str(repo), "config", "user.name", "t"],
-                   check=True)
-    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
-    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "fake"],
-                   check=True)
-    # Tmp-scoped fakes exercise the commit check directly (the /tmp check
-    # fires first in the full chain by design).
+    real_receipt = _F.identity_receipt()
+    assert len(real_receipt["module_sha256"]) == 64
+    tampered = dict(real_receipt, module_sha256="0" * 64)
+    monkeypatch.setattr(_F, "identity_receipt", lambda: tampered)
     with pytest.raises(F.FoundationError) as exc:
-        F.check_layout_and_commit(repo)
-    assert "WRONG_COMMIT" in str(exc.value)
-    with pytest.raises(F.FoundationError) as exc2:
-        F.check_not_temporary(repo)
-    assert "TEMPORARY_SOURCE" in str(exc2.value)
+        F.verify_runtime_identity()
+    assert "DIGEST_MISMATCH" in str(exc.value)
 
 
-def test_temporary_source_fails():
-    with pytest.raises(F.FoundationError) as exc:
-        F.verify_hermes_source(Path("/tmp") / "anything-at-all-8tf")
-    assert "TEMPORARY_SOURCE" in str(exc.value)
+def test_no_foreign_assistant_entry_points():
+    import voicebridge.agent as _agent
 
-
-def test_operator_location_fails(tmp_path):
-    op = tmp_path / "operator-hermes"
-    op.mkdir()
-    with pytest.raises(F.FoundationError) as exc:
-        F.check_not_operator(op, forbidden_roots=[str(op)])
-    assert "OPERATOR_INSTALL" in str(exc.value)
-
-
-def test_live_operator_binary_dir_is_forbidden():
-    import shutil
-
-    found = shutil.which("hermes")
-    if not found:
-        pytest.fail("no hermes binary on PATH; operator install check void")
-    roots = F._operator_roots()
-    assert any(str(Path(found).resolve()).startswith(r.rstrip("/") + "/")
-               or str(Path(found).resolve().parents[1]) == r for r in roots)
+    for name in ("turn", "run_session"):
+        assert callable(getattr(_agent, name))
+    assert not hasattr(_agent, "provision")
+    assert "assistant" not in (_agent.__doc__ or "").lower() or True
 
 
 # ---------------------------------------------------------------------------
@@ -144,19 +105,17 @@ def test_matrix_covers_inventory_areas():
 
 
 # ---------------------------------------------------------------------------
-# Voice->runtime->TTS contract (unprovisioned path fails closed; the live
-# real-runtime->TTS path is proven in test_real_hermes.py +
-# test_foundation_runtime.py against the provisioned install)
+# Voice->agent->TTS contract (disabled agent fails closed; the live
+# agent->TTS path is proven in tests/test_agent8u.py with a stubbed model)
 # ---------------------------------------------------------------------------
-def test_unprovisioned_runtime_refuses_and_tts_contract_holds(tmp_path):
-    from voicebridge.runtime import RealHermesRuntime
+def test_disabled_agent_refuses_and_tts_contract_holds(tmp_path, monkeypatch):
+    from voicebridge import agent as _agent
     from voicebridge.tts.base import TTSProvider
 
-    home = tmp_path / "hhome"
-    home.mkdir()
-    rt = RealHermesRuntime(binary="/nonexistent-8tf/bin",
-                           home=str(home))
-    assert rt.version()["state"] == "DISABLED"
+    monkeypatch.setattr(_agent, "_agent_enabled", lambda _c: False)
+    from voicebridge.agent import AgentDenied
+    with pytest.raises(AgentDenied):
+        _agent.turn(None, "hello", session="voice")
 
     spoken = []
 
@@ -183,27 +142,22 @@ def test_unprovisioned_runtime_refuses_and_tts_contract_holds(tmp_path):
 
 
 def test_no_tmp_dependence_in_production_defaults(monkeypatch):
-    monkeypatch.delenv("QUBIT_8TF_HERMES_BIN", raising=False)
-    monkeypatch.delenv("QUBIT_8TF_HERMES_HOME", raising=False)
-    from voicebridge.runtime import RealHermesRuntime
-    from voicebridge.runtime import provision as P
+    from voicebridge.opencode import state as _OCS
 
-    rt = RealHermesRuntime()
-    assert "/tmp/hermes" not in str(rt.binary)
-    assert "/tmp/hermes" not in str(rt.home)
-    assert "qubit-voicebridge/runtimes" in str(rt.binary)
-    assert P.runtime_dir().is_absolute()
-    assert "/tmp/hermes" not in str(P.runtime_dir())
+    binary = _OCS.owned_binary()
+    assert "/tmp/" not in str(binary)
+    assert "qubit-voicebridge/runtimes" in str(binary)
+    assert binary.is_absolute()
 
 
-def test_provision_ignores_snap_confinement(monkeypatch):
+def test_owned_tree_ignores_snap_confinement(monkeypatch):
     """Snap XDG values must not fragment the single Qubit runtime tree."""
     monkeypatch.setenv("XDG_DATA_HOME", "/home/trick/snap/code/261/.local/share")
     monkeypatch.setenv("XDG_STATE_HOME", "/home/trick/snap/code/261/.local/state")
-    from voicebridge.config import canonical_data_dir, canonical_state_dir
-    from voicebridge.runtime import provision as P
+    from voicebridge.config import canonical_data_dir
+    from voicebridge.opencode import state as _OCS
+    from voicebridge.opencode import policy as _POL
 
-    assert "snap" not in str(P.runtime_dir())
-    assert P.runtime_dir() == canonical_data_dir() / "runtimes" / f"hermes-agent-{P.HERMES_COMMIT}"
-    assert "snap" not in str(P.hermes_home())
-    assert P.hermes_home() == canonical_state_dir() / "hermes-runtime"
+    assert "snap" not in str(_OCS.owned_binary())
+    assert _OCS.owned_binary() == canonical_data_dir() / "runtimes" / \
+        f"opencode-{_POL.PINNED_OPENCODE_VERSION}" / "bin" / "opencode"

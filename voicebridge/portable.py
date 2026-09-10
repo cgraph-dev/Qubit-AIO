@@ -120,12 +120,12 @@ _SECRET_KEY_RE = __import__("re").compile(
     r"(?i)\b(token|secret|password|passwd|api[_-]?key|authorization|cookie|"
     r"credential)\b")
 _MACHINE_PATH_KEYS = {"output_device", "output_device_name", "frontend_dir"}
-_EXCLUDE_CONFIG_SECTIONS = {"webui", "openclaw", "logging"}
+_EXCLUDE_CONFIG_SECTIONS = {"webui", "agent", "logging"}
 
 
 def _sanitize_config(cfg: Any) -> Dict[str, Any]:
     """Non-secret configuration: drop secret-shaped keys and machine-specific
-    audio/GPU paths. webui/openclaw/logging sections are excluded entirely."""
+    audio/GPU paths. webui/agent/logging sections are excluded entirely."""
     data = getattr(cfg, "data", None) or {}
     out: Dict[str, Any] = {}
     for section, body in data.items():

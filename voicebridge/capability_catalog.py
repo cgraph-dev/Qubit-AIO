@@ -1,6 +1,6 @@
 """Packet 8T-F — unified capability catalog (CLI/dashboard truth source).
 
-Every Hermes command and matrix capability resolves to exactly one typed
+Every Qubit command and catalog capability resolves to exactly one typed
 state through Qubit contracts: IMPLEMENTED (routes to a real Qubit op),
 BLOCKED (typed refusal with reason, owner, and rollback behavior), or
 REJECTED (refused by policy with reason). Nothing is silently omitted:
@@ -57,6 +57,9 @@ def check(name: str) -> Dict[str, Any]:
         return {"state": "UNKNOWN_CAPABILITY", "code": "UNKNOWN_CAPABILITY",
                 "explanation": "Empty capability name.",
                 "owner": "qubit-policy", "rollback": "nothing to roll back"}
+    # Renamed Qubit commands resolve to their catalog row (the row keeps
+    # the upstream command token as its id for differential coverage).
+    key = {"worker": "claw"}.get(key, key)
     hits = [r for r in _rows()
             if r["id"].strip().lower().lstrip("-") == key]
     if not hits:

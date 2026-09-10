@@ -1,9 +1,8 @@
-"""Packet 8T-F — Hermes --tui parity via a terminal-native live board.
+"""Qubit live terminal board.
 
-Hermes ``--tui`` is a full-screen interactive terminal session. Qubit's
-visual surface is the web dashboard and its interactive terminal surface
-is the ``qubit-dev`` REPL, so the Qubit-native full-screen answer is a
-live operations board on the SAME backend both use
+Qubit's visual surface is the web dashboard and its interactive terminal
+surface is the ``qubit-dev`` REPL, so the Qubit-native full-screen answer
+is a live operations board on the SAME backend both use
 (:func:`runtime_inventory`): product + runtime state, broker/e-stop,
 providers, sessions, and capability counts, refreshed in place.
 
@@ -47,18 +46,18 @@ def render(inv: Dict[str, Any], width: int = 80) -> List[str]:
 
     try:
         product = inv.get("product", {}) if isinstance(inv, dict) else {}
-        hermes = inv.get("hermes", {}) if isinstance(inv, dict) else {}
+        agent = inv.get("agent", {}) if isinstance(inv, dict) else {}
         broker = inv.get("broker", {}) if isinstance(inv, dict) else {}
         providers = inv.get("providers", {}) if isinstance(inv, dict) else {}
         sessions = inv.get("sessions", {}) if isinstance(inv, dict) else {}
         capabilities = inv.get("capabilities", {}) if isinstance(inv, dict) else {}
         auth = inv.get("auth", {}) if isinstance(inv, dict) else {}
         name = str(product.get("public_identity", "Qubit Agent") or "Qubit Agent")
-        hstate = str(hermes.get("state", "?"))
+        hstate = str(agent.get("runtime", "qubit-native"))
         estop = "LATCHED" if broker.get("emergency_stop") else "clear"
         lines = [
             line(f"{name} — live board  (q quit · r refresh)"),
-            line(f"hermes runtime : {_cell(hstate, 24)}  "
+            line(f"agent runtime  : {_cell(hstate, 24)}  "
                  f"emergency stop : {_cell(estop, 10)}"),
             line(f"resident model : {_cell(providers.get('resident_alias', '?'), 30)}"),
             line(f"frontier route : {_cell(providers.get('route', providers.get('frontier', '?')), 30)}"),

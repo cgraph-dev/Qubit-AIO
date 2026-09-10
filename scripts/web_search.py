@@ -19,8 +19,10 @@ from pathlib import Path
 
 DDG_MIN_RESULTS = 2   # fewer than this -> fall back to Perplexity
 # Portable resolution: the bridge venv python runs this script, so the current
-# interpreter is the launcher; the Perplexity skill lives under the operator's
-# $HOME (documented skill path), never a machine-specific absolute path.
+# interpreter is the launcher; the Perplexity skill path below is a
+# legacy-operator fallback (migration compat, documented), never a
+# machine-specific absolute path. Qubit-native research runs DDG here and
+# the supervised browser lane in the product.
 BRIDGE_PYTHON = sys.executable
 PERPLEXITY_SCRIPT = (Path.home() / ".hermes/skills/research/perplexity-web-search"
                      / "scripts" / "perplexity_search.py")

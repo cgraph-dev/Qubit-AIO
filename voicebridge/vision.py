@@ -1,6 +1,6 @@
-"""Packet 8T-F — Hermes --image parity: approved vision analysis path.
+"""Qubit approved vision analysis path.
 
-Hermes ``chat --image IMAGE`` attaches a local image to a single query
+Qubit ``vision describe IMAGE`` attaches a local image to a single query
 (native vision model or pre-description). Qubit has no multimodal
 plumbing in the resident runner — and the 4B contract forbids silent
 model swaps — so the Qubit-native path runs approved vision work inside

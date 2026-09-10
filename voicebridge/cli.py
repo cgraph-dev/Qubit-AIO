@@ -95,10 +95,10 @@ def build_parser() -> argparse.ArgumentParser:
     mcp_sub = mcp_p.add_subparsers(dest="mcp_command")
     mcp_sub.add_parser("status", parents=[common],
                        help="list configured MCP servers without mounting anything")
-    claw_p = add("claw", help="OpenClaw-lineage install detection (read-only)")
-    claw_sub = claw_p.add_subparsers(dest="claw_command")
-    claw_sub.add_parser("status", parents=[common],
-                        help="detect OpenClaw install state without changing it")
+    worker_p = add("worker", help="Native Qubit worker-lane status (read-only)")
+    worker_sub = worker_p.add_subparsers(dest="worker_command")
+    worker_sub.add_parser("status", parents=[common],
+                          help="agent route, model, and enablement (read-only)")
     ap = add("approvals", help="Shared human-in-the-loop confirmations (same journal as voice + dashboard)")
     ap_sub = ap.add_subparsers(dest="approvals_command")
     ap_list = ap_sub.add_parser("list", parents=[common],
@@ -139,7 +139,7 @@ def build_parser() -> argparse.ArgumentParser:
                                     help="list recent sessions (read-only)")
     sess_list.add_argument("--limit", type=int, default=20,
                            help="max sessions (default: 20, max: 100)")
-    cap = add("capability", help="capability catalog: typed state for any Hermes command or Qubit capability (read-only)")
+    cap = add("capability", help="capability catalog: typed state for any Qubit capability (read-only)")
     cap.add_argument("action", nargs="?", default="summary",
                      choices=["check", "list", "summary"],
                      help="check one name, list names, or show state counts")
@@ -335,7 +335,7 @@ def build_parser() -> argparse.ArgumentParser:
     brand = add("branding", help="Qubit VoiceBridge branding migration (dry-run/backup/verify/rollback)")
     brand_sub = brand.add_subparsers(dest="branding_command")
     brand_plan = brand_sub.add_parser("plan", parents=[common],
-                                      help="prepare the openclaw-voice-bridge/qubit-voice-agent -> qubit-voicebridge migration")
+                                      help="prepare the legacy -> qubit-voicebridge migration")
     brand_plan.add_argument("--apply", action="store_true", default=False,
                             help="perform the migration with a backup (default: dry-run plan only)")
     brand_plan.add_argument("--migrate-paths", action="store_true", default=False,
@@ -1930,8 +1930,8 @@ def main(argv=None) -> int:
         return _cmd_auth_status(cfg)
     if command == "mcp":
         return _cmd_mcp_status(cfg)
-    if command == "claw":
-        return _cmd_claw_status(cfg)
+    if command == "worker":
+        return _cmd_worker_status(cfg)
     if command == "approvals":
         return _cmd_approvals(cfg, args)
     if command == "verify-release":
@@ -2076,7 +2076,7 @@ def main(argv=None) -> int:
                           file=sys.stderr)
                 return rc
             if args.model:
-                cfg.data.setdefault("openclaw", {})["model"] = args.model
+                cfg.data.setdefault("agent", {})["model"] = args.model
             orch.process_text(text)
         elif command == "roundtrip":
             return _cmd_roundtrip(cfg, args.text, args.model, orch)
@@ -2088,26 +2088,23 @@ def main(argv=None) -> int:
 
 
 def _cmd_status(cfg) -> int:
-    from .openclaw.discovery import discover_gateway, current_vram_mb
     from .logging_setup import get_logger
-    get_logger()  # init handlers before discovery internals log
+    get_logger()
     print("Qubit Agent — Qubit VoiceBridge status")
     from .runtime_inventory import runtime_inventory
     try:
         inv = runtime_inventory(cfg)
-        h = inv.get("hermes", {}) if isinstance(inv, dict) else {}
-        print(f"hermes runtime  : {h.get('state', 'UNAVAILABLE')}"
-              f"{(' (' + str(h.get('version', '')) + ')') if h.get('version') else ''}")
+        a = inv.get("agent", {}) if isinstance(inv, dict) else {}
+        print(f"agent runtime : {a.get('runtime', 'qubit-native')}"
+              f" ({a.get('model', '')})")
         b = inv.get("broker", {}) if isinstance(inv, dict) else {}
         print(f"emergency stop : {'LATCHED' if b.get('emergency_stop') else 'clear'}")
     except Exception as exc:
         print(f"runtime inventory: UNAVAILABLE ({str(exc)[:100]})")
-    info = discover_gateway(cfg)
-    print(f"gateway url      : {info.url}")
-    print(f"gateway token    : {'found' if info.token else 'MISSING'}")
-    print(f"default agent    : {info.agent}")
-    print(f"default model    : {info.default_model or '(none)'}")
-    print(f"tier aliases     : {info.models or '(none)'}")
+    w = inv.get("worker", {}) if isinstance(inv, dict) else {}
+    print(f"worker route   : {w.get('route', 'local')}")
+    print(f"agent model    : {cfg.get('agent', 'model', default='') or 'qubit-brain4'}")
+    from .runtime_inventory import current_vram_mb
     print(f"free VRAM        : {current_vram_mb()} MiB")
     # Snap-confinement XDG redirects are LOUD, never silent: one line per
     # redirected variable so status shows exactly which data tree is used.
@@ -2160,8 +2157,8 @@ def _cmd_status(cfg) -> int:
         print(f"voice-ID         : {state}")
     except Exception as exc:
         print(f"voice-ID         : FAILED ({str(exc)[:120]})")
-    # PersonaPlex / Hermes / local
-    print(f"hermes backend   : {'enabled' if cfg.get('hermes', 'enabled', default=False) else 'disabled'}")
+    # PersonaPlex / Qubit agent / local
+    print(f"agent backend    : {'enabled' if cfg.get('agent', 'enabled', default=True) else 'disabled'}")
     print(f"local actions    : {'enabled' if cfg.get('local', 'enabled', default=True) else 'disabled'}")
     # TTS
     from .tts.piper import PiperTTS
@@ -2251,11 +2248,11 @@ def _cmd_mcp_status(cfg) -> int:
     return 0
 
 
-def _cmd_claw_status(cfg) -> int:
-    """OpenClaw-lineage install detection (read-only)."""
-    from .integration_status import claw_status
+def _cmd_worker_status(cfg) -> int:
+    """Native Qubit worker-lane status (read-only)."""
+    from .integration_status import worker_status
 
-    print(json.dumps(claw_status(cfg), indent=2))
+    print(json.dumps(worker_status(cfg), indent=2))
     return 0
 
 
@@ -2516,7 +2513,7 @@ def _cmd_roundtrip(cfg, text: str | None, model: str | None, orch) -> int:
 
     print("[4/6] dispatch to the agent runtime (this can take a while on local models) ...")
     if model:
-        cfg.data.setdefault("openclaw", {})["model"] = model
+        cfg.data.setdefault("agent", {})["model"] = model
     task_text = intent.task_text or tr.text
     orch._dispatch_coding(task_text, model=model)
     print("      -> done")
@@ -2995,8 +2992,7 @@ def _bridge_service_active() -> bool:
     """True when the voice-bridge user service is running (holds the mic)."""
     try:
         import subprocess
-        for unit in ("qubit-voicebridge.service", "qubit-voice-agent.service",
-                     "openclaw-voice-bridge.service"):
+        for unit in ("qubit-voicebridge.service", "qubit-voice-agent.service"):
             r = subprocess.run(["systemctl", "--user", "is-active", unit],
                                capture_output=True, text=True, timeout=5)
             if (r.stdout or "").strip() == "active":
@@ -3341,7 +3337,7 @@ def _cmd_skills(cfg, args) -> int:
 
     install validates the manifest and stages the skill DISABLED; enable/disable/
     remove/rollback are dry-run by default and require --confirm to persist.
-    Hermes `plugins install` parity: a local reviewed manifest installs here;
+    Qubit `plugins install`: a local reviewed manifest installs here;
     remote Git/index identifiers are typed-refused (nothing is fetched);
     mutating subcommands refuse while the emergency stop is latched.
     """
@@ -3510,7 +3506,7 @@ def _cmd_kanban(cfg, args) -> int:
 
     Board/task operations persist in the canonical SQLite store; execution-
     shaped subcommands (swarm/dispatch/daemon/...) are typed-delegated to
-    their Qubit-native paths and remaining Hermes subcommands are typed-
+    their Qubit-native paths and removed shapes are typed-
     refused. Mutating ops preview under --dry-run, require --confirm, and
     refuse while the emergency stop is latched.
     """

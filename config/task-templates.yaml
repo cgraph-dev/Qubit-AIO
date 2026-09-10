@@ -8,7 +8,7 @@ templates:
   kind: local-script
   ack: Checking the weather.
   summary_words: 40
-  script: '~/Projects/Repos/openclaw-voice-bridge/.venv/bin/python ~/Projects/Repos/openclaw-voice-bridge/scripts/weather.py
+  script: '~/Projects/Repos/qubit-voicebridge/.venv/bin/python ~/Projects/Repos/qubit-voicebridge/scripts/weather.py
     "{question}" 1500
 
     '
@@ -25,7 +25,7 @@ templates:
   kind: local-script
   ack: Searching the web.
   summary_words: 35
-  script: '~/Projects/Repos/openclaw-voice-bridge/.venv/bin/python ~/Projects/Repos/openclaw-voice-bridge/scripts/web_search.py
+  script: '~/Projects/Repos/qubit-voicebridge/.venv/bin/python ~/Projects/Repos/qubit-voicebridge/scripts/web_search.py
     "{question}" 1500
 
     '
@@ -66,7 +66,7 @@ templates:
   - (what('s| is)|make|show|give me) (my |the )?(daily )?(plan|schedule|agenda)
   - what do i (have|need) (to do|today)
   kind: coding
-  task: 'Read today''s notes in ~/.openclaw/workspace/memory/ and any TODO/plan files
+  task: 'Read today''s notes in ~/.config/qubit-voicebridge/workspace/memory/ and any TODO/plan files
     in ~/Projects/Repos, and list the user''s top 3-5 items for today. If nothing
     is found, say so and suggest asking for a plan.
 
@@ -174,7 +174,7 @@ templates:
   - (what|any) (new )?(email|emails|messages?) (did|have|do) i (get|receive)
   - latest (email|emails|mail)
   kind: coding
-  task: 'Run the inbox script verbatim (no paraphrase): `python ~/Projects/Repos/openclaw-voice-bridge/scripts/review_gmail.py 12`. It outputs Categories, per-email From|Subject|When (e.g. 2 hours ago), and a final "Spoken:" line with the latest 3. Speak that Spoken line verbatim as your reply (who + subject + how long ago), then append the Categories line. Do NOT say "check notifications yourself".
+  task: 'Run the inbox script verbatim (no paraphrase): `python ~/Projects/Repos/qubit-voicebridge/scripts/review_gmail.py 12`. It outputs Categories, per-email From|Subject|When (e.g. 2 hours ago), and a final "Spoken:" line with the latest 3. Speak that Spoken line verbatim as your reply (who + subject + how long ago), then append the Categories line. Do NOT say "check notifications yourself".
 
     '
   ack: Checking your inbox.

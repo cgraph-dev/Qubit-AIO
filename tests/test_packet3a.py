@@ -458,8 +458,8 @@ def test_worker_guard_shares_broker_engine():
     register_worker_caps(b.registry)
     g = WorkerGuard(_Cfg("confirm"), engine=b.engine)
     assert g.engine is b.engine
-    assert "openclaw.gateway.task" in b.registry.names()
-    assert "hermes.task" in b.registry.names()
+    assert "agent.session" in b.registry.names()
+    assert "agent.task" in b.registry.names()
 
 
 def test_worker_guard_shared_engine_still_blocks_model_source():
@@ -467,7 +467,7 @@ def test_worker_guard_shared_engine_still_blocks_model_source():
     register_worker_caps(b.registry)
     g = WorkerGuard(_Cfg("confirm"), engine=b.engine)
     with pytest.raises(DispatchBlocked):
-        g.run("hermes.task", lambda t: t, "hi", source="model")
+        g.run("agent.task", lambda t: t, "hi", source="model")
 
 
 def test_worker_guard_exec_audit_redacted_and_correlated(monkeypatch):
@@ -477,7 +477,7 @@ def test_worker_guard_exec_audit_redacted_and_correlated(monkeypatch):
     b = build_host_broker()
     register_worker_caps(b.registry)
     g = WorkerGuard(_Cfg("confirm"), engine=b.engine)
-    out = g.run("hermes.task", lambda t: f"reply:{t}",
+    out = g.run("agent.task", lambda t: f"reply:{t}",
                 "authorization: Bearer abcdef123456",
                 source="user", correlation_id="cid-w-1")
     assert "reply:" in out

@@ -10,8 +10,8 @@
 
 A **production-style local voice interface for Qubit Agent (Qubit VoiceBridge)** — push-to-talk,
 natural speech in, spoken results out. Built for an **RTX 3070 Ti 8 GB** box
-but runs on any Linux PC with a mic. It routes commands into your *existing*
-OpenClaw gateway, agents, and APIs (no OpenClaw config changes), summarizes
+but runs on any Linux PC with a mic. It routes commands into the native Qubit worker (agent turns, brokered
+tools, supervised coding runs), summarizes
 long coding output, and can be interrupted mid-speech — **only by your voice**.
 
 ```
@@ -24,7 +24,7 @@ long coding output, and can be interrupted mid-speech — **only by your voice**
 │                    ├─ CONVERSATION ──► short: llama3.2:3b (local, 0.3s)             │
 │                    │                   long/complex: DeepSeek API (~1s)             │
 │                    │                   web/current: Perplexity API                  │
-│                    ├─ CODING TASK ────► OpenClaw gateway (existing agent, tools,    │
+│                    ├─ CODING TASK ────► Qubit worker (agent turns, tools,        │
 │                    │                     ACP, VS Code, terminal, browser, repos)    │
 │                    ├─ CONFIRM / CANCEL / STATUS / LOCAL ACTION                      │
 │                    └─ SYSTEM ─────────► bridge control                              │
@@ -43,7 +43,7 @@ long coding output, and can be interrupted mid-speech — **only by your voice**
 | Voice-ID (eres2net) | **local, CPU** | ~50ms/check; self 0.72-0.96 vs strangers ~0.3 |
 | TTS (piper amy) | **local, CPU** | Kokoro-82M optional (`tts.provider: kokoro`) |
 | Chat (all questions) | **local, GPU, ~3 GB** | `qubit-brain4` (Qwen3-4B) — English-only replies, 24/7 resident |
-| Task execution | **agent runtime** | only TASKS go here (coding, files, terminal, browser, repos), brokered through Qubit policy |
+| Task execution | **Qubit worker** | only TASKS go here (coding, files, terminal, browser, repos), brokered through Qubit policy |
 | Cloud APIs | **fallback only** | DeepSeek/Perplexity when the local model or gateway is down |
 
 ## Personal knowledge

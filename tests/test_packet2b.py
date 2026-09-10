@@ -368,8 +368,7 @@ def _real_orchestrator_skeleton(webui):
     orch.task = TaskState()
     orch.task.set_active("sess-1", "gw-run-77", "reorganize downloads")
     orch._webui = webui
-    orch._route = ""            # _abort_task skips gateway branch
-    orch._gateway = None
+    orch._cancel = __import__("threading").Event()
     orch._worker_guard = None
     return orch
 

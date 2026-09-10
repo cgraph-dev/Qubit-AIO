@@ -7,7 +7,7 @@ Each adapter is a thin, read-only wrapper over an existing capability:
   inbox     -> declaration contract only (real Chromium-CDP lands in 8B)
   reports   -> read-only manifest store scan (no deletion)
   web       -> bounded HTTP fetch (no form submission; SSRF-bounded)
-  worker    -> OpenClaw/Hermes: reads result history only
+  worker    -> Qubit worker: reads result history only
   memory    -> declaration contract only (store lands in 5B)
 """
 from __future__ import annotations

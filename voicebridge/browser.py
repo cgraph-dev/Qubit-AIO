@@ -1,8 +1,7 @@
-"""Packet 8T-F — Hermes browser parity via the scoped 8B loopback probe.
+"""Qubit browser surface via the scoped loopback probe.
 
-Hermes ``browser {close-profile}`` manages real-profile browsing sessions.
 Qubit never touches personal browser profiles: the only browser authority
-is the read-only loopback CDP path (Packet 8B). This module provides the
+is the read-only loopback CDP path. This module provides the
 Qubit-native surface:
 
 * ``status`` — renders the 8B CDP precondition probe as a typed state

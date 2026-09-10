@@ -120,7 +120,7 @@ and is unaffected by the model — that's the mic-gain fix (`mic.gain: 3.0` + Ai
 ## 3. From OpenSandbox — cleaner tools + vault (resource-light parts)
 
 ### Techniques we can lift
-1. **Credential vault pattern** → we keep secrets in `~/.hermes/.env` (uncommitted).
+1. **Credential vault pattern** → we keep secrets in `~/.config/qubit-voicebridge/.env` (uncommitted).
    Improve: one helper `get_secret(name)` + a warning if a required key is missing,
    and never echo secrets into logs/events.
 2. **Sandbox lifecycle API shape** (provision/run/terminate) → apply the *same shape*

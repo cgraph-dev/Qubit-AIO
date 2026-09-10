@@ -8,7 +8,7 @@ Two modes:
              repository systemd template vs installed user unit (read-only).
              Runs with no Ollama / audio / gateway / Chromium / systemd running.
   --runtime  everything in --static plus resolved effective values and live
-             probes (Ollama availability/residency, OpenClaw gateway TCP,
+             probes (Ollama availability/residency, Qubit worker lane,
              Chromium CDP loopback, Bubblewrap/systemd versions, audio devices).
              Every probe reports a typed state and degrades instead of failing
              when an optional dependency is absent.
@@ -391,18 +391,7 @@ def check_runtime(cfg, results) -> None:
         else:
             results.append(("ollama.resident", MISSING, "nothing loaded (cold start on first call)"))
 
-    gw = cfg.get("openclaw", "gateway_url")
-    host, port = "127.0.0.1", 18789
-    if gw and "://" in gw:
-        tail = gw.split("://", 1)[1]
-        hp = tail.split("/")[0]
-        host, _, ps_ = hp.partition(":")
-        port = int(ps_ or 18789)
-    try:
-        with socket.create_connection((host, port), timeout=1.5):
-            results.append(("gateway.tcp", ACTIVE, f"{host}:{port} accepting"))
-    except Exception as exc:
-        results.append(("gateway.tcp", MISSING, f"{host}:{port}: {exc.__class__.__name__}"))
+    results.append(("worker.lane", ACTIVE, "native agent turns + worker sessions"))
 
     cdp = _probe_http("http://127.0.0.1:9222/json/version", 1.5)
     if cdp and isinstance(cdp, dict):

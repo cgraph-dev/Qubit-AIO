@@ -1,9 +1,8 @@
-"""Packet 8T-F — Hermes pets/skin parity via optional Qubit themes.
+"""Qubit themes and cosmetics.
 
-Hermes ``skin {list,use,set}`` manages terminal skins and ``pets``
-installs animated sprite companions from a public gallery. Qubit ships
-one coherent visual language, so the Qubit-native conversion is optional
-themes and cosmetics inside that system — never mascots, never gallery
+Qubit ``theme {list,use,set}`` manages terminal themes inside
+one coherent visual language — optional
+themes and cosmetics inside that system, never gallery
 downloads:
 
 * ``theme list`` — built-in presets (read-only);

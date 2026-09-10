@@ -256,8 +256,8 @@ Never treat `unavailable`, `degraded`, or `failed` as a successful scan.
 Inspect the timer and its recent executions:
 
 ```bash
-systemctl --user status openclaw-communications-monitor.timer --no-pager -l
-journalctl --user -u openclaw-communications-monitor.service \
+systemctl --user status qubit-communications-monitor.timer --no-pager -l
+journalctl --user -u qubit-communications-monitor.service \
   --since '3 hours ago' --no-pager
 ```
 

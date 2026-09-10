@@ -459,7 +459,7 @@ class TestItem3ToolSchema:
     def test_schema_declares_every_route_as_a_tool(self):
         from voicebridge.intent.llm import SYSTEM_PROMPT
         for k in ("system", "confirm", "cancel", "coding", "local",
-                  "hermes", "conversation", "clarify"):
+                  "agent", "conversation", "clarify"):
             assert f'<tool name="{k}">' in SYSTEM_PROMPT, k
 
     def test_schema_carries_rules_and_json_contract(self):
@@ -477,13 +477,13 @@ class TestItem3ToolSchema:
     def test_valid_kinds_exact_set(self):
         from voicebridge.intent.llm import VALID_KINDS
         assert set(VALID_KINDS) == {"system", "confirm", "cancel", "coding",
-                                    "conversation", "clarify", "local", "hermes"}
+                                    "conversation", "clarify", "local", "agent"}
 
     def test_parse_plain_fenced_prose_garbage(self):
         from voicebridge.intent.llm import _parse_json_loose
         assert _parse_json_loose('{"kind":"coding"}') == {"kind": "coding"}
         assert _parse_json_loose('```json\n{"kind":"local"}\n```')["kind"] == "local"
-        assert _parse_json_loose('ok: {"kind":"hermes"} thanks')["kind"] == "hermes"
+        assert _parse_json_loose('ok: {"kind":"agent"} thanks')["kind"] == "agent"
         assert _parse_json_loose("utter garbage") is None
         assert _parse_json_loose("") is None
         # braces inside string values must not confuse the last-resort span

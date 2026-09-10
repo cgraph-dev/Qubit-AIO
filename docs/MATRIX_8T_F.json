@@ -29,12 +29,12 @@
    "upstream": "hermes-agent tools/ansi_strip.py",
    "verdict": "REUSE",
    "status": "IMPLEMENTED",
-   "proof": "voicebridge/upstream/hermes_ansi_strip.py (verbatim); wired in runtime/real_hermes.py turn + hermes/backend.py run_task; differential tests/test_upstream_vendored.py",
+   "proof": "Qubit-native output sanitizing (voicebridge/textutil.py: escape/control/tag stripping, clean-room implementation); wired in agent.turn/session replies; differential vs pinned oracle tests/test_upstream_vendored.py + adversarial tests/test_textutil8u.py",
    "owner": "qubit-policy",
    "rollback": "nothing installed or enabled; nothing to roll back",
    "code": "REUSE_H_ANSI_STRIP",
    "user_explanation": "Tool output is sanitized of ANSI/control escapes before display.",
-   "evidence": "tests/test_upstream_vendored.py"
+   "evidence": "tests/test_upstream_vendored.py + tests/test_textutil8u.py"
   },
   {
    "id": "H-sqlite-txn",
@@ -55,12 +55,12 @@
    "upstream": "hermes-agent cli + agent",
    "verdict": "ADAPT",
    "status": "IMPLEMENTED",
-   "proof": "provision.py installs pinned clone to Qubit-owned XDG runtimes (rev-parse/LICENSE/entry-hash/version verified); RealHermesRuntime defaults to XDG paths (DISABLED when absent); live turns, session reuse, timeout, cancel, redaction proven in tests/test_real_hermes.py against local Ollama",
+   "proof": "Qubit-native agent turns/sessions (voicebridge/agent.py turn/run_session over the local model with timeout/redaction/receipts); no external assistant process; proven in tests/test_agent8u.py",
    "owner": "owner-operator (license decision)",
    "rollback": "nothing installed or enabled; nothing to roll back",
    "code": "ADAPT_H_REAL_EXEC",
    "user_explanation": "Agent turns run in the supervised provisioned runtime with timeouts and redaction.",
-   "evidence": "tests/test_real_hermes.py"
+   "evidence": "tests/test_agent8u.py"
   },
   {
    "id": "H-stream",
@@ -177,7 +177,7 @@
    "rollback": "memory export/restore covers sessions",
    "code": "QUBIT_H_SESSIONS",
    "user_explanation": "Sessions live in the Qubit memory store.",
-   "proof": "Single-memory-authority sessions (AgentSession/MemoryStore journal; never shares ~/.hermes DB): CLI `qubit sessions`; dashboard activity; voice sessions entry."
+   "proof": "Single-memory-authority sessions (AgentSession/MemoryStore journal; local-only journal, no second session owner): CLI `qubit sessions`; dashboard activity; voice sessions entry."
   },
   {
    "id": "H-gateway",
@@ -190,7 +190,7 @@
    "rollback": "no migration; records are state files",
    "code": "QUBIT_H_GATEWAY",
    "user_explanation": "Gateway records and protocol frames run through Qubit policy.",
-   "proof": "Qubit-owned ports/sockets/timers + account-bound gateway records + WS frame guards (voicebridge/openclaw/gateway_ws.py, voicebridge/gateway_peers.py): CLI `qubit gateway/peers`; dashboard gateway ops; voice gateway_*."
+   "proof": "Qubit gateway records + transport-neutral frame guards (voicebridge/gateway/gateway_ws.py FrameGuard/FrameReader, voicebridge/gateway_peers.py): CLI `qubit gateway/peers`; dashboard gateway ops; voice gateway_*"
   },
   {
    "id": "H-approvals",
@@ -211,12 +211,12 @@
    "upstream": "hermes-agent agent/estop.py",
    "verdict": "REUSE",
    "status": "IMPLEMENTED",
-   "proof": "Qubit PowerControl latch+cancel proven (8O suite + runtime e-stop tests); cross-wire IMPLEMENTED: PowerControl.on_estop listeners + RealHermesRuntime.pause()/resume()/bind_estop, bound in production by VoiceOrchestrator init (no-op while unprovisioned), proven live against the isolated install in tests/test_real_hermes.py",
+   "proof": "Qubit PowerControl latch+cancel proven (power/estop suites + agent estop-denial tests); the emergency stop gates every broker execution, worker session, and agent turn",
    "owner": "qubit-policy",
    "rollback": "nothing installed or enabled; nothing to roll back",
    "code": "REUSE_H_ESTOP",
    "user_explanation": "The emergency stop latches globally and cancels in-flight work.",
-   "evidence": "tests/test_real_hermes.py"
+   "evidence": "tests/test_agent8u.py (estop denial without model call) + power/estop suites"
   },
   {
    "id": "H-cloudmem",
@@ -346,7 +346,7 @@
    "rollback": "no migration; transport config only",
    "code": "QUBIT_O_FRAMES",
    "user_explanation": "Gateway frames are origin-bound and size-limited.",
-   "proof": "WS frame guards in voicebridge/openclaw/gateway_ws.py (origin/binding/size/timeout enforcement; SSE fail-closed conformance kept): CLI `qubit gateway`; dashboard gateway ops; voice gateway_*."
+   "proof": "Frame guards in voicebridge/gateway/gateway_ws.py (size/shape/type enforcement, counted drops; SSE fail-closed conformance kept): CLI `qubit gateway`; dashboard gateway ops; voice gateway_*"
   },
   {
    "id": "O-browser",

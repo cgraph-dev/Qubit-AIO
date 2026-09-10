@@ -1,7 +1,7 @@
 # Audio Setup — the WORKING configuration (keep; do not "help" break it)
 
 > This is the verified-working audio config for the voice bridge on this PC.
-> Other agents (Hermes, OpenClaw, any coder) MUST read this BEFORE touching any
+> Any operator or tool MUST read this BEFORE touching any
 > audio/mic/TTS setting. It took many hours to stabilise — do not reinvent it.
 
 ## Hardware (currently connected)
@@ -108,7 +108,7 @@ quality to whatever sink is active (headphones, TV/HDMI, speakers):
 ## Recovery: crashes and bad inputs (2026-08-27)
 - **Hard crashes** self-heal: the user systemd unit runs `Restart=always`, so if
   the bridge ever dies it is relaunched automatically (see
-  `systemctl --user show openclaw-voice-bridge -p NRestarts`).
+  `systemctl --user show qubit-voicebridge -p NRestarts`).
 - **Capture** already retries a failing stream open 3× (0.2 s backoff) and runs a
   watchdog thread that force-closes a wedged device instead of freezing the PTT
   loop; failures log `mic.capture.error`/`mic.capture.timeout` and the agent says
@@ -120,7 +120,7 @@ quality to whatever sink is active (headphones, TV/HDMI, speakers):
   nothing is persisted as a transient numeric index (`voicebridge/audio/settings.py`).
 - Diagnosis commands: `voicebridge audio status`, `pactl info` (default
   sink/source), `scripts/diagnose_audio_usb.py`, and
-  `journalctl --user -u openclaw-voice-bridge --since "5 min ago"`.
+  `journalctl --user -u qubit-voicebridge --since "5 min ago"`.
 
 ## Hotkeys (Right Ctrl PTT)
 - Hold **Right Ctrl** to talk (config `hotkey.hold_key: ctrl_r`). A quick tap
@@ -131,7 +131,7 @@ quality to whatever sink is active (headphones, TV/HDMI, speakers):
   automatically within ~30s — you should never have to restart the service
   just to regain PTT.
 - If Right Ctrl does nothing: first check the bridge is up
-  (`systemctl --user is-active openclaw-voice-bridge`) and that the mic pin is
+  (`systemctl --user is-active qubit-voicebridge`) and that the mic pin is
   the Scarlett (`voicebridge audio status`). If the beep sounds but there is
   no spoken reply, the AT2020 is silent — enable 48V phantom power on the
   Scarlett front panel and confirm the input gain knob is up (the digital
@@ -144,12 +144,12 @@ quality to whatever sink is active (headphones, TV/HDMI, speakers):
   journal event appears when a drift is corrected), so PTT no longer depends
   on a restart. To force a re-pin anyway, run:
   ```
-  systemctl --user restart openclaw-voice-bridge
+  systemctl --user restart qubit-voicebridge
   ```
 - Troubleshoot PTT events with:
   ```
   voicebridge audio status
-  journalctl --user -u openclaw-voice-bridge --since "5 min ago" | grep -i hotkey
+  journalctl --user -u qubit-voicebridge --since "5 min ago" | grep -i hotkey
   ```
 
 ## References
@@ -157,4 +157,4 @@ quality to whatever sink is active (headphones, TV/HDMI, speakers):
 - Playback + device resolution: `voicebridge/audio/playback.py`
 - Mic capture + normalize: `voicebridge/audio/mic.py`
 - Stable audio settings contract: `voicebridge/audio/settings.py`
-- Bridge rebuild: `systemctl --user restart openclaw-voice-bridge`
+- Bridge rebuild: `systemctl --user restart qubit-voicebridge`

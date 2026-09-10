@@ -14,7 +14,7 @@ from typing import Any, Dict, Optional
 from ..logging_setup import log_event
 
 SYSTEM_PROMPT = """You are the intent router of a voice assistant that controls an
-OpenClaw coding agent. Classify the user's spoken utterance into EXACTLY ONE kind:
+Qubit worker. Classify the user's spoken utterance into EXACTLY ONE kind:
 """
 
 # CopilotKit-style tool schema (STEAL_LIST item 3): each route is defined as a
@@ -35,7 +35,7 @@ TOOL_SCHEMA = """
   Triggers: "no", "cancel", "never mind", "stop it".
 </tool>
 <tool name="coding">
-  A task for the OpenClaw coding agent.
+  A task for the Qubit worker.
   Triggers: open/inspect/patch/test/fix/refactor/run/review/commit/deploy,
   anything touching files, code, repos, terminals, browsers, or servers;
   questions about code that need inspecting a project ("why does X fail?").
@@ -45,9 +45,9 @@ TOOL_SCHEMA = """
   Triggers: volume up/down, mute mic, open an app, screenshot, media play/pause,
   clipboard, lock screen.
 </tool>
-<tool name="hermes">
-  The user explicitly asks Hermes to do something.
-  Triggers: "ask Hermes to ...", "Hermes, ...", "hand this to Hermes".
+<tool name="agent">
+  The user explicitly asks Qubit to do something.
+  Triggers: "ask Qubit to ...", "Qubit, ...", "hand this to Qubit".
 </tool>
 <tool name="conversation">
   Casual chat, general knowledge questions, small talk — NOT a task.
@@ -72,7 +72,7 @@ Rules:
 SYSTEM_PROMPT = SYSTEM_PROMPT + TOOL_SCHEMA
 
 VALID_KINDS = ("system", "confirm", "cancel", "coding", "conversation",
-               "clarify", "local", "hermes")
+               "clarify", "local", "agent")
 
 # Compact typed decision schema (Packet 4B): full JSON Schema for Ollama
 # structured outputs — enum-locked kind, bounded confidence, nothing else.

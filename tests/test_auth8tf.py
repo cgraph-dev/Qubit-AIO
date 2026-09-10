@@ -1,6 +1,6 @@
 """Packet 8T-F — auth inventory + sessions listing (read-only, redacted).
 
-Proves Hermes `auth`/`sessions` parity behind Qubit contracts: credential
+Proves Qubit `auth`/`sessions` behind Qubit contracts: credential
 REFERENCES (never values) per provider, redacted recent sessions from the
 receipt store, typed UNAVAILABLE states, and CLI command wiring.
 """

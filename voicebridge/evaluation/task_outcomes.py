@@ -37,12 +37,12 @@ def _route_expected_kinds(route: str, tool_status: str) -> tuple:
     """Acceptable classifier kinds for a recorded outcome's route.
 
     Real accepted tasks must still route the same way after any change: a
-    coding/worker task stays acting (coding/hermes); a conversational task
+    coding/worker task stays acting (coding/agent); a conversational task
     stays non-acting (conversation/clarify).
     """
     route = (route or "").lower()
-    if route in ("coding", "hermes"):
-        return ("coding", "hermes")
+    if route in ("coding", "agent", "hermes"):
+        return ("coding", "agent")
     if tool_status in ("failure", "error", "cancelled", "timed_out"):
         return ("conversation", "clarify")
     return ("conversation", "clarify")
@@ -300,7 +300,7 @@ class TaskOutcomeStore:
                 kind = cls.classify(question).kind
             except Exception:
                 continue
-            if kind in ("coding", "hermes", "local"):
+            if kind in ("coding", "agent", "local"):
                 continue  # acting acceptance -> no conversational label
             key = _norm_key(question)
             if key in seen:

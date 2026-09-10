@@ -33,7 +33,7 @@ def test_config_defaults(tmp_path):
 def test_config_session_key():
     cfg = Config.load(None)
     key = cfg.session_key("task-abc")
-    assert key == "agent:main:voice:task-abc"
+    assert key == "qubit:voice:task-abc"
 
 
 # --------------------------------------------------------------------------- safety

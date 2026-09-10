@@ -259,13 +259,13 @@ def test_run_this_task_stages_confirmation(tmp_path, monkeypatch):
     out = VC.execute(_ctx(cfg), res)
     assert out.kind == VC.NEEDS_CONFIRM, (out.kind, out.speech)
     assert out.confirmation_id
-    # No provisioned runtime hermetic: typed unavailable, never fake OK.
+    # Agent explicitly disabled hermetic: typed unavailable, never fake OK.
+    cfg.data.setdefault("agent", {})["enabled"] = False
     out2 = VC.confirm_pending(_ctx(cfg), out.confirmation_id)
     assert out2.kind == VC.EXECUTED, (out2.kind, out2.speech)
     task = out2.receipt["result"]["task"]
     assert task["state"] == "UNAVAILABLE", task
-    assert task["code"] in ("RUNTIME_DISABLED", "HERMES_DISABLED",
-                            "EMERGENCY_STOP"), task
+    assert task["code"] in ("AGENT_DISABLED", "EMERGENCY_STOP"), task
 
 
 def test_run_this_task_empty_is_typed(tmp_path, monkeypatch):
@@ -434,6 +434,7 @@ def test_dashboard_run_this_task_confirms(tmp_path, monkeypatch):
 
     cfg = _cfg(tmp_path, monkeypatch)
     _seed_task(cfg)
+    cfg.data.setdefault("agent", {})["enabled"] = False
     out = D.run_registry_op(cfg, "task_run_current", {},
                             actor="dashboard:user", session="dashboard")
     assert out["state"] == "needs-confirm", out

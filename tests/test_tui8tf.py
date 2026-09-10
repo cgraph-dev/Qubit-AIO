@@ -15,7 +15,7 @@ from contextlib import redirect_stdout
 def _inventory():
     return {
         "product": {"public_identity": "Qubit Agent"},
-        "hermes": {"state": "READY"},
+        "agent": {"runtime": "qubit-native", "state": "READY"},
         "broker": {"emergency_stop": False},
         "providers": {"resident_alias": "qubit-brain4", "route": "local"},
         "sessions": {"count": 3},
@@ -31,7 +31,7 @@ def test_render_pure_and_bounded():
     lines = TUI.render(_inventory(), 80)
     assert all(len(line) <= 80 for line in lines)
     blob = "\n".join(lines)
-    assert "Qubit Agent" in blob and "READY" in blob
+    assert "Qubit Agent" in blob and "qubit-native" in blob
     assert "states: IMPLEMENTED:60" in blob
     assert TUI.render({}, 80)[0].startswith("Qubit Agent")
     assert TUI.render(_inventory(), 10)[0].startswith("Qubit Agent")

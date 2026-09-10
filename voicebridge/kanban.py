@@ -1,9 +1,6 @@
-"""Packet 8T-F — Hermes ``kanban`` parity: a local task board, Qubit-owned.
+"""Qubit task boards: a local task board with widget canvas.
 
-Hermes kanban is a durable SQLite-backed task board with ~50 subcommands
-(``hermes kanban --help`` from the pinned ``v2026.9.7 @ 2237be3`` runtime;
-no Hermes source is copied here — only the observed task lifecycle is
-adapted). Qubit implements the board subset on one canonical SQLite file
+Qubit implements boards and tasks on one canonical SQLite file
 (``state/kanban.db``) and routes execution-shaped work to the authorities
 that already own it:
 
@@ -25,8 +22,7 @@ that already own it:
   ``KANBAN_UNSUPPORTED`` — no subcommand is silently omitted; every
   invocation gets a typed answer.
 
-Task assignees are free-text labels (Hermes binds named execution
-profiles; Qubit has no profiles — documented divergence). Execution of a
+Task assignees are free-text labels. Execution of a
 claimed task happens through the existing supervised run paths, never in
 this module.
 
@@ -226,7 +222,7 @@ def _get_board(conn: sqlite3.Connection, slug: str) -> sqlite3.Row:
 
 # ------------------------------------------------------------------- boards
 def init(cfg: Any) -> Dict[str, Any]:
-    """Create the board store if missing (idempotent, Hermes parity)."""
+    """Create the board store if missing (idempotent)."""
     conn = _connect(cfg)
     try:
         _migrate(conn)
@@ -321,7 +317,7 @@ def create(cfg: Any, title: str, *, board: str = "main", body: str = "",
            assignee: str = "", priority: str = "normal",
            requested_by: str = "cli:user",
            confirmed: bool = False) -> Dict[str, Any]:
-    """Create a task (status open; Hermes parity minus execution flags)."""
+    """Create a task (status open)."""
     if not confirmed:
         raise KanbanError(CONFIRM_CODE,
                           "kanban create requires explicit --confirm")
@@ -798,7 +794,7 @@ def refuse_delegated(subcommand: str) -> Dict[str, Any]:
 
 
 def refuse_unsupported(subcommand: str) -> Dict[str, Any]:
-    """Typed answer for remaining Hermes subcommands (no silent omission)."""
+    """Typed answer for removals without a Qubit construct (no silent omission)."""
     return {"state": "BLOCKED", "code": UNSUPPORTED_CODE,
             "subcommand": subcommand,
             "explanation": "Qubit Agent cannot do this: "
@@ -827,7 +823,7 @@ def refuse_estop(operation: str) -> Dict[str, Any]:
 
 # --------------------------------------------- widget canvas (O-board canvas)
 #
-# The task board above is the Hermes-kanban task lifecycle. The OpenClaw
+# The task board above is the Qubit task lifecycle. The
 # board/widget canvas is the visual surface around it: per-board column
 # layout, sandboxed widgets, per-board permission roles, and layout
 # snapshots for rollback. Same SQLite store, same confirm/estop/audit/

@@ -86,22 +86,25 @@ def test_activity_feed_qubit_text_preserved_routes():
     from voicebridge.webui import _event_to_feed_item as f
 
     cases = [
-        ({"event": "openclaw.dispatch", "task": "t"},
-         ("dispatched to the agent runtime", "openclaw")),
+        ({"event": "worker.dispatch", "task": "t"},
+         ("dispatched to the worker", "worker")),
+        ({"event": "worker.summary", "summary": "s"},
+         ("Worker task", "worker")),
+        ({"event": "worker.error", "error": "e"},
+         ("Worker task", "worker")),
+        ({"event": "worker.status", "elapsed_s": 1},
+         ("Worker running", "worker")),
+        ({"event": "agent.summary", "summary": "s"},
+         ("Agent task", "agent")),
+        ({"event": "agent.task", "task": "t"},
+         ("Agent task dispatched", "agent")),
+        ({"event": "agent.result.discarded", "why": "w"},
+         ("Agent task interrupted", "agent")),
+        # retired journal entries still render (history compat)
         ({"event": "openclaw.summary", "summary": "s"},
-         ("Agent task", "openclaw")),
-        ({"event": "openclaw.request.failed", "error": "e"},
-         ("Agent request", "openclaw")),
-        ({"event": "openclaw.error", "error": "e"},
-         ("Agent error", "openclaw")),
-        ({"event": "openclaw.status", "elapsed_s": 1},
-         ("Agent runtime running", "openclaw")),
-        ({"event": "hermes.summary", "summary": "s"},
-         ("Voice task", "hermes")),
+         ("Agent task", "worker")),
         ({"event": "hermes.task", "task": "t"},
-         ("Voice task dispatched", "hermes")),
-        ({"event": "hermes.result.discarded", "why": "w"},
-         ("Voice task interrupted", "hermes")),
+         ("Voice task dispatched", "agent")),
     ]
     for ev, (text, route) in cases:
         item = f(ev)
@@ -156,38 +159,31 @@ def _orch(tmp_path, monkeypatch):
     orch = VoiceOrchestrator(cfg, no_hotkey=True, dry_run=True)
     spoken, handled = [], []
     orch.speak = lambda text, *a, **k: spoken.append(text)
-    orch._handle_hermes = lambda task: handled.append(("voice", task))
+    orch._handle_agent = lambda task, notice="": handled.append(("voice", task))
     orch._launch_task = lambda task, model=None: handled.append(("agent", task))
     return orch, spoken, handled
 
 
 # ---------------------------------------------------------------------------
-# Orchestrator speech routes the same backends under Qubit names
+# Orchestrator speech routes the Qubit lanes under Qubit names
 # ---------------------------------------------------------------------------
-
-
-def test_executor_answers_route_qubit_named_backends(tmp_path, monkeypatch):
+def test_agent_worker_lanes_exist_without_legacy_choice(tmp_path, monkeypatch):
     orch, spoken, handled = _orch(tmp_path, monkeypatch)
-    orch.executor_choice.request("do the thing", "m")
-    orch._handle_executor_answer("use the voice runtime please")
-    assert spoken == ["Using the voice runtime."]
-    assert handled == [("voice", "do the thing")]
-
-    orch.executor_choice.request("do the other thing", "m")
-    orch._handle_executor_answer("agent runtime")
-    assert spoken[-1] == "Using the agent runtime."
-    assert handled[-1] == ("agent", "do the other thing")
-
-    orch.executor_choice.request("whatever", "m")
-    orch._handle_executor_answer("you pick")
-    assert spoken[-1] == "I'll use the agent runtime for that."
-    assert handled[-1] == ("agent", "whatever")
+    assert not hasattr(orch, "executor_choice"), \
+        "executor choice is retired: one worker lane, no question"
+    assert callable(orch._handle_agent) and callable(orch._launch_task)
     for line in spoken:
         assert "Hermes" not in line and "OpenClaw" not in line
 
 
 def test_legacy_backend_names_still_understood(tmp_path, monkeypatch):
-    orch, spoken, handled = _orch(tmp_path, monkeypatch)
-    orch.executor_choice.request("old habit", "m")
-    orch._handle_executor_answer("hermes")
-    assert handled == [("voice", "old habit")]
+    from voicebridge.intent.classifier import Classifier
+    from voicebridge.intent.state import ConfirmationState, ConversationState
+
+    clf = Classifier({"llm_classifier": False}, ConfirmationState(),
+                     ConversationState())
+    # legacy spoken names map to native lanes (documented migration aliases)
+    assert clf.classify("hermes, check the inbox").kind == "agent"
+    assert clf.classify("ask hermes to check my inbox").kind == "agent"
+    assert clf._sticky_route("route to openclaw") == "worker"
+    assert clf._sticky_route("route to hermes") == "agent"

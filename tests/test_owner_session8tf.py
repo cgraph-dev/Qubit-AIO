@@ -1,5 +1,5 @@
 """Packet 8T-F — owner-authorized sessions: the tested Qubit-native
-equivalent of Hermes bypass flags.
+equivalent of upstream bypass flags (typed refusals).
 
 Proves `--yolo/--accept-hooks/--ignore-user-config/--ignore-rules` have
 no Qubit counterpart (absence test), while the safe equivalent works:

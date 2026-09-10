@@ -5,7 +5,7 @@ premium). Voices: alloy, ash, ballad, coral, echo, fable, onyx, nova,
 shimmer, verse. Nova is the default — warm, natural, the user\'s previous
 choice.
 
-Requires OPENAI_API_KEY in ~/.hermes/.env or the environment, and
+Requires OPENAI_API_KEY in ~/.config/qubit-voicebridge/.env or the environment, and
 VOICE_TOOLS_OPENAI_KEY also accepted (legacy name on this box).
 Network-backed: piper stays the offline default; this is opt-in via
 tts.provider: openai.
@@ -34,7 +34,7 @@ def _read_key(env_path: Optional[Path] = None) -> str:
         v = os.environ.get(name, "").strip().strip('"').strip("'")
         if v:
             return v
-    # then ~/.hermes/.env
+    # then the legacy ~/.hermes/.env (migration compat)
     candidates = []
     if env_path:
         candidates.append(Path(env_path).expanduser())
@@ -54,7 +54,8 @@ class OpenAITTS(TTSProvider):
     name = "openai"
 
     def __init__(self, voice: str = DEFAULT_VOICE, model: str = DEFAULT_MODEL,
-                 key_env: str = "~/.hermes/.env", instructions: str = DEFAULT_INSTRUCTIONS) -> None:
+                 key_env: str = "~/.config/qubit-voicebridge/.env",
+                 instructions: str = DEFAULT_INSTRUCTIONS) -> None:
         self.voice = voice or DEFAULT_VOICE
         self.model = model or DEFAULT_MODEL
         self.key_env = key_env
@@ -64,7 +65,7 @@ class OpenAITTS(TTSProvider):
     def load(self) -> None:
         key = _read_key(Path(self.key_env) if self.key_env else None)
         if not key:
-            raise TTSUnavailable("OPENAI_API_KEY not found in env or ~/.hermes/.env — set it to use openai TTS")
+            raise TTSUnavailable("OPENAI_API_KEY not found in env or the Qubit env file — set it to use openai TTS")
         self._key = key
         log_event("tts.load", provider=self.name, voice=self.voice, model=self.model)
 

@@ -238,7 +238,8 @@ def test_run_due_default_executor_degrades_honestly(tmp_path, monkeypatch):
     assert state in ("OK", "UNAVAILABLE"), out
     if state == "UNAVAILABLE":
         assert out["results"][0]["code"] in (
-            "RUNTIME_DISABLED", "HERMES_DISABLED", "EMERGENCY_STOP"), out
+            "AGENT_DISABLED", "MODEL_UNAVAILABLE", "AGENT_ERROR",
+            "EMERGENCY_STOP"), out
 
 
 # ------------------------------------------------------------------- CLI

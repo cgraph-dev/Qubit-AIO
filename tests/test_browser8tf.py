@@ -1,4 +1,4 @@
-"""Packet 8T-F — Hermes browser parity via the scoped loopback probe.
+"""Qubit browser surface via the scoped loopback probe.
 
 Proves status is a read-only typed probe (never mutates a session) and
 real-profile closure is refused with a typed error.

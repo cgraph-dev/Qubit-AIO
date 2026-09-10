@@ -18,6 +18,9 @@ def _cfg(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "c"))
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "s"))
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "d"))
+    # Hermetic precedence: operator pin-binary env must not leak in.
+    monkeypatch.delenv("QUBIT_OPENCODE_PIN_BIN", raising=False)
+    monkeypatch.delenv("QUBIT_HERMES_CLONE", raising=False)
     p = tmp_path / "voice.yaml"
     p.write_text("logging:\n  jsonl: false\n")
     return C.Config.load(p)
@@ -53,6 +56,7 @@ def _cli(cfg, cmd, **kw):
     args.name = kw.get("name", "")
     args.confirm = kw.get("confirm", False)
     args.dry_run = kw.get("dry_run", False)
+    args.source = kw.get("source", "")
     buf = io.StringIO()
     with redirect_stdout(buf):
         rc = CLI._cmd_runtime(cfg, args)
@@ -65,7 +69,7 @@ def test_registry_pins_exact():
     out = RI.images()
     assert out["state"] == "OK"
     names = [r["name"] for r in out["images"]]
-    assert names == ["hermes-runtime", "opencode-binary"]
+    assert names == ["opencode-binary"]
     for row in out["images"]:
         assert row["pin"] and "latest" not in str(row["pin"]).lower()
         assert row["source"].startswith("https://")
@@ -80,9 +84,9 @@ def test_status_missing_without_artifacts(tmp_path, monkeypatch):
     out = RI.status(cfg)
     assert out["state"] == "OK"
     assert out["daemon"] == "none-required"
-    # Hermetic env has neither provisioned runtime nor opencode binary with
-    # the pin, so both report honestly (MISSING or DEGRADED — never READY
-    # without verification).
+    # Hermetic env has no owned binary with the pin, so the image reports
+    # honestly (MISSING, STAGED, or DEGRADED — never READY without
+    # verification).
     for row in out["runtimes"]:
         assert row["state"] in ("MISSING", "STAGED", "DEGRADED", "READY")
         if row["state"] == "READY":
@@ -93,14 +97,7 @@ def test_install_refuses_download_and_unknown(tmp_path, monkeypatch):
     from voicebridge import runtime_images as RI
 
     cfg = _cfg(tmp_path, monkeypatch)
-    monkeypatch.delenv("QUBIT_HERMES_CLONE", raising=False)
-    try:
-        RI.install(cfg, "hermes-runtime", requested_by="t", confirmed=True)
-        staged = True
-    except RI.RuntimeImageError as exc:
-        staged = False
-        assert exc.code == RI.STAGING_CODE
-        assert "nothing was downloaded" in exc.detail
+    monkeypatch.delenv("QUBIT_OPENCODE_PIN_BIN", raising=False)
     try:
         RI.install(cfg, "opencode-binary", requested_by="t", confirmed=True)
         binary_staged = True
@@ -113,10 +110,8 @@ def test_install_refuses_download_and_unknown(tmp_path, monkeypatch):
         RI.install(cfg, "ubuntu:latest", requested_by="t", confirmed=True)
     assert bad.value.code == RI.BAD_INPUT_CODE
     with pytest.raises(RI.RuntimeImageError) as nc:
-        RI.install(cfg, "hermes-runtime", requested_by="t", confirmed=False)
+        RI.install(cfg, "opencode-binary", requested_by="t", confirmed=False)
     assert nc.value.code == RI.CONFIRM_CODE
-    assert (staged, binary_staged) in ((False, False), (False, True),
-                                       (True, False), (True, True))
 
 
 def test_install_upgrade_rollback_remove_cycle(tmp_path, monkeypatch):
@@ -181,20 +176,20 @@ def test_version_drift_refused(tmp_path, monkeypatch):
 def test_cli_dashboard_voice_parity(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     rc, listed = _cli(cfg, "images")
-    assert rc == 0 and len(listed["images"]) == 2
+    assert rc == 0 and len(listed["images"]) == 1
     rc, st = _cli(cfg, "status")
     assert rc == 0 and st["state"] == "OK"
     rc, doc = _cli(cfg, "doctor")
     assert rc == 0 and doc["state"] == "OK"
     assert any(f["check"] == "docker_daemon" for f in doc["findings"])
-    rc, prev = _cli(cfg, "install", name="hermes-runtime")
+    rc, prev = _cli(cfg, "install", name="opencode-binary")
     assert rc == 3  # confirm required
     assert prev["code"] == "RUNTIME_CONFIRM_REQUIRED"
     voiced = _voice(cfg, "runtime_status")
     assert voiced.kind == "executed" and "Runtimes:" in voiced.speech
     dash = _dash(cfg, "runtime_images", {})
     assert dash["state"] == "executed", dash
-    assert len(dash["receipt"]["result"]["images"]) == 2
+    assert len(dash["receipt"]["result"]["images"]) == 1
     dash_doc = _dash(cfg, "runtime_doctor", {})
     assert dash_doc["state"] == "executed", dash_doc
 
@@ -207,9 +202,9 @@ def test_estop_latches_mutations(tmp_path, monkeypatch):
     import pytest
 
     with pytest.raises(RI.RuntimeImageError) as exc:
-        RI.install(cfg, "hermes-runtime", requested_by="t", confirmed=True)
+        RI.install(cfg, "opencode-binary", requested_by="t", confirmed=True)
     assert exc.value.code == RI.ESTOP_CODE
-    rc, out = _cli(cfg, "remove", name="hermes-runtime", confirm=True)
+    rc, out = _cli(cfg, "remove", name="opencode-binary", confirm=True)
     assert rc == 3 and out["code"] == RI.ESTOP_CODE
 
 

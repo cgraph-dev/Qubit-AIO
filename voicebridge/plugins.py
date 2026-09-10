@@ -1,15 +1,12 @@
-"""Packet 8T-F — Hermes ``plugins install`` parity behind the Qubit skill contract.
+"""Qubit plugin installs behind the Qubit skill contract.
 
-Hermes installs plugins from a Git URL, ``owner/repo`` shorthand, or a
-community-index name (``hermes plugins install --help`` from the pinned
-``v2026.9.7 @ 2237be3`` runtime; no Hermes source is copied here — only the
-observed behavior is adapted). Qubit maps that surface onto the existing 7E
+Qubit installs plugins from a Git URL, ``owner/repo`` shorthand, or a
+community-index name. Qubit maps that surface onto the existing 7E
 skill registry instead of fetching third-party code:
 
 * a local, already-reviewed Qubit-schema manifest file installs exactly like
   ``voicebridge skills install``: validated, staged DISABLED, enabled only
-  with a second explicit confirmation (mirrors Hermes "portable packages
-  install disabled");
+  with a second explicit confirmation (installs stay disabled until approved);
 * a remote identifier (URL, ``owner/repo``, bare index name) is refused with
   a typed ``BLOCKED_REMOTE_PLUGIN`` error: nothing is fetched, cloned, or
   executed until the source passes allowlist review with a pinned hash and
@@ -103,7 +100,7 @@ def classify_install_source(spec: str) -> Dict[str, Any]:
     if _OWNER_REPO_RE.match(raw):
         return {"kind": "remote", "identifier": raw}
     if _BARE_INDEX_RE.match(raw) and not lowered.endswith(".json"):
-        # Bare community-index name (Hermes resolves these remotely).
+        # Bare community-index name (resolved remotely on explicit request).
         return {"kind": "remote", "identifier": raw}
     return {"kind": "missing-file", "path": raw}
 

@@ -81,8 +81,8 @@ def test_parse_json_loose_fenced():
 
 
 def test_parse_json_loose_prose_wrapped():
-    raw = 'Sure! {"kind": "hermes", "task": "x"} hope that helps'
-    assert _parse_json_loose(raw)["kind"] == "hermes"
+    raw = 'Sure! {"kind": "agent", "task": "x"} hope that helps'
+    assert _parse_json_loose(raw)["kind"] == "agent"
 
 
 def test_parse_json_loose_garbage():
@@ -92,7 +92,7 @@ def test_parse_json_loose_garbage():
 
 def test_valid_kinds_cover_schema_tools():
     for k in ("system", "confirm", "cancel", "coding", "local",
-              "hermes", "conversation", "clarify"):
+              "agent", "conversation", "clarify"):
         assert k in VALID_KINDS
 
 

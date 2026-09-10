@@ -28,55 +28,14 @@ class ConversationState:
 
 
 @dataclass
-class PendingExecutorChoice:
-    """The bridge asked 'OpenClaw or Hermes?' and is waiting for the answer."""
-    task_text: str
-    model: str = ""
-    asked_at: float = field(default_factory=time.time)
-
-    def age_s(self) -> float:
-        return time.time() - self.asked_at
-
-
-class ExecutorChoiceState:
-    """One pending executor choice at a time; auto-expires."""
-
-    def __init__(self, timeout_s: float = 60.0) -> None:
-        self.timeout_s = timeout_s
-        self._pending: Optional[PendingExecutorChoice] = None
-
-    def request(self, task_text: str, model: str = "") -> None:
-        self._pending = PendingExecutorChoice(task_text, model)
-
-    def current(self) -> Optional[PendingExecutorChoice]:
-        if self._pending is None:
-            return None
-        if self._pending.age_s() > self.timeout_s:
-            self._pending = None
-        return self._pending
-
-    def take(self) -> Optional[PendingExecutorChoice]:
-        p = self.current()
-        self._pending = None
-        return p
-
-    def clear(self) -> None:
-        self._pending = None
-
-    @property
-    def pending(self) -> bool:
-        return self.current() is not None
-
-
-
-@dataclass
 class StickyRoute:
-    """Remembers the user's preferred executor across turns.
-    Set when the user says `route to hermes/openclaw/browser` or
-    `use hermes` — persists until explicitly cleared or overridden.
+    """Remembers the user's preferred lane across turns.
+    Set when the user says `route to agent/worker/browser` (legacy
+    "hermes"/"openclaw" phrasing maps to the same lanes) — persists until
+    explicitly cleared or overridden.
     The local LLM brain tends to forget; this is the reliable memory.
     """
-    target: str = ""  # hermes | openclaw | browser | "" (none)
+    target: str = ""  # agent | worker | browser | "" (none)
     reason: str = ""  # why it was set (for logging)
     set_at: float = field(default_factory=time.time)
     turns: int = 0    # how many turns it has survived
@@ -109,7 +68,7 @@ class StickyRouteState:
             import json as _js
             d = _js.loads(self._path.read_text(errors="replace"))
             t = str(d.get("target","")).lower().strip()
-            if t in ("hermes","openclaw","browser"):
+            if t in ("agent","worker","browser","hermes","openclaw"):
                 self._route = StickyRoute(target=t, reason=str(d.get("reason",""))[:120],
                                           set_at=float(d.get("set_at", time.time())),
                                           turns=int(d.get("turns",0)))
@@ -171,7 +130,7 @@ class StickyRouteState:
 
 @dataclass
 class TaskState:
-    """State of the currently dispatched OpenClaw task (if any)."""
+    """State of the currently dispatched worker task (if any)."""
 
     active: bool = False
     session_key: str = ""
@@ -204,7 +163,7 @@ class TaskState:
 class TaskQueue:
     """FIFO queue of tasks awaiting dispatch while another task is running.
 
-    Lets the user keep dictating tasks while OpenClaw/Hermes works — nothing is
+    Lets the user keep dictating tasks while the worker runs — nothing is
     lost and nothing hard-aborts a running task under load. Each entry carries
     the task text plus the model/provider it should run on.
     """

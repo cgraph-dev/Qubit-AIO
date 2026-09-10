@@ -1,6 +1,6 @@
-"""Packet 8T-F — Hermes messaging parity: accounts + brokered outbox.
+"""Qubit messaging: accounts + brokered outbox.
 
-Hermes ``send``/``whatsapp``/``whatsapp-cloud``/``slack`` deliver through
+Qubit ``send``/``whatsapp``/``whatsapp-cloud``/``slack`` deliver through
 live messaging transports. Qubit implements the complete code-side
 adapter; the live network is the last mile and stays credential-gated:
 

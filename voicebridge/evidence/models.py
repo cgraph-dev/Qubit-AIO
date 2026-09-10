@@ -1,7 +1,7 @@
 """Packet 5A: normalized read-only evidence + adapter contracts.
 
 One EvidenceRecord shape for every source (files, repos, browser, inbox,
-reports, web, OpenClaw/Hermes, memory), and an AdapterContract that declares
+reports, web, worker/agent, memory), and an AdapterContract that declares
 permissions (read/write/remember), scope, sensitivity, trust, freshness and
 citation rules. Read-only adapters are enforced structurally: they expose NO
 write/remember surface, and the registry refuses to register a read-only
@@ -37,7 +37,7 @@ class Scope(Enum):
     INBOX = "inbox"
     REPORTS = "reports"
     WEB = "web"
-    WORKER = "worker"          # OpenClaw/Hermes
+    WORKER = "worker"          # Qubit worker lane
     MEMORY = "memory"
 
 

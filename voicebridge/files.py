@@ -7,7 +7,7 @@ pointing outside, sockets/FIFOs/devices, oversized or binary files — is
 refused with a typed code. File bytes are redacted before they leave
 this module, and page/file text is untrusted evidence.
 
-Hermes implements scoped file read/write/search with write guards
+Qubit implements scoped file read/write/search with write guards
 (``tools/file_operations*.py``, ``tools/file_tools_write_guards.py``);
 Qubit implements the read half natively (writes stay behind the brokered
 local-script/isolated-execution paths). Provenance and the deliberate

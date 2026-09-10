@@ -22,7 +22,7 @@ class HybridTTS(TTSProvider):
     name = "hybrid"
     def __init__(self, model_dir: Path, piper_voice: str = "en_US-amy-medium",
                  openai_voice: str = "nova", openai_model: str = "gpt-4o-mini-tts",
-                 key_env: str = "~/.hermes/.env", instructions: str = "",
+                 key_env: str = "~/.config/qubit-voicebridge/.env", instructions: str = "",
                  threshold_words: int = 18) -> None:
         self.model_dir = Path(model_dir)
         self.piper_voice = piper_voice

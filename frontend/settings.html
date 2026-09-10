@@ -19,8 +19,7 @@
 <h1><span class="brand-mark" aria-hidden="true">Q</span> Qubit VoiceBridge</h1>
 <div class="muted">Settings · beginner mode by default; <button class="warn" onclick="toggleAdvanced()">Advanced</button></div>
 <nav class="page-nav" aria-label="Primary">
- <a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit Agent</a><span class="nav-separator" aria-hidden="true"></span>
- <a href="/">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/ops">Operations</a><a href="/settings" aria-current="page">Settings</a><a href="/setup">Setup</a><a class="nav-utility" href="/token-setup">Pair device</a>
+ <a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit Agent</a><span class="nav-separator" aria-hidden="true"></span><a href="/">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/sessions">Sessions</a><a href="/projects">Projects</a><a href="/models">Models</a><a href="/skills">Skills</a><a href="/tasks">Tasks</a><a href="/security">Security</a><a href="/devices">Devices</a><a href="/messages">Messages</a><a href="/memory">Memory</a><a href="/ops">Operations</a><a href="/approvals">Approvals</a><a href="/settings" aria-current="page">Settings</a><a href="/setup">Setup</a><a href="/system">System</a><a class="nav-utility" href="/token-setup">Pair device</a>
 </nav>
 
 <details class="help-panel">
@@ -474,18 +473,18 @@ async function powerReset(){
 async function runtimeStatus(){
  const {body} = await api('/api/runtime');
  if(!body || !body.product){ show('runtime-state', tag('UNAVAILABLE')); return; }
- const p = body.product, h = body.hermes||{}, b = body.broker||{};
- show('runtime-state', tag(h.state === 'DISABLED' ? 'DISABLED' : 'OK')
-   +' <span class="muted">'+esc(p.name)+' · hermes '+esc(h.state||'?')
+ const p = body.product, a = body.agent||{}, b = body.broker||{};
+ show('runtime-state', tag(a.enabled === false ? 'DISABLED' : 'OK')
+   +' <span class="muted">'+esc(p.name)+' · agent '+esc(a.runtime||'qubit-native')
    +' · estop '+(b.emergency_stop ? 'LATCHED' : 'clear')+'</span>');
  const rows = [];
- if(h.version) rows.push('<div>'+esc(h.version)+' · '+esc(h.commit||'').slice(0,12)+'</div>');
+ if(a.module_sha256) rows.push('<div>agent '+esc(a.runtime||'')+' · '+esc(a.module_sha256||'').slice(0,12)+'</div>');
  if(body.voice) rows.push('<div>voice '+esc(body.voice.asr_provider||'?')+'/'+esc(body.voice.tts_provider||'?')+'</div>');
  if(body.approvals && body.approvals.pending !== undefined) rows.push('<div>approvals pending '+esc(String(body.approvals.pending))+'</div>');
  if(body.auth && body.auth.providers) rows.push('<div>credentials '+esc(String(body.auth.providers.filter(p=>p.configured).length))+'/'+esc(String(body.auth.providers.length))+' configured (names only)</div>');
  if(body.sessions && body.sessions.count !== undefined) rows.push('<div>sessions '+esc(String(body.sessions.count))+' recent</div>');
  if(body.mcp) rows.push('<div>mcp '+esc(String((body.mcp.servers||[]).length))+' configured · '+esc(body.mcp.state||'?')+'</div>');
-  if(body.claw) rows.push('<div>claw lineage '+esc(body.claw.state||'?')+'</div>');
+  if(body.worker) rows.push('<div>worker '+esc(body.worker.route||'local')+' · '+(body.worker.agent_enabled === false ? 'disabled' : 'ready')+'</div>');
   if(body.vision) rows.push('<div>vision '+esc(body.vision.state||'?')+(body.vision.model?' · '+esc(body.vision.model):'')+'</div>');
   if(body.messaging) rows.push('<div>messaging '+esc(String(body.messaging.accounts||0))+' accounts · '+esc(String(body.messaging.outbox||0))+' outbox · '+esc(String(body.messaging.inbox||0))+' inbox</div>');
  if(body.capabilities && body.capabilities.states){

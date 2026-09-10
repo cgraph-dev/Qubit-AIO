@@ -11,8 +11,8 @@
 #   templates:
 #     - name: <id>
 #       match: [regex, ...]   # case-insensitive; any() wins
-#       kind: coding | hermes | conversation | local-script
-#       task: "<agent task text>"          # kind coding/hermes/conversation
+#       kind: coding | agent | conversation | local-script
+#       task: "<agent task text>"          # kind coding/agent/conversation
 #       script: "<shell command>"          # kind local-script; may embed {question}
 #       ack: "<spoken acknowledgement>"
 templates:

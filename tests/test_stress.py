@@ -48,15 +48,15 @@ def test_xinput_backend_kept():
 def test_orchestrator_logging_and_salvage():
     t = (ROOT/"voicebridge/orchestrator.py").read_text()
     for needle in [
-        'log_event("safety.verdict"','log_event("openclaw.dispatch"','log_event("openclaw.status"',
-        'log_event("openclaw.result"','log_event("openclaw.error"','log_event("hermes.task"',
-        'log_event("hermes.error"','log_event("boss_talk"','log_event("humming"',
-        'def _persist_full_report','def _verify_task_result','salvaged','bulletproof',
+        'log_event("safety.verdict"','log_event("worker.dispatch"','log_event("worker.status"',
+        'log_event("worker.result"','log_event("worker.error"','log_event("agent.task"',
+        'log_event("agent.error"','log_event("boss_talk"','log_event("humming"',
+        'def _persist_full_report','def _verify_task_result','discarded','bulletproof',
         'Screenshots/images are OPTIONAL','perplexity/ddg',
         'import random','_BOSS_PHRASES','_HUM_PHRASES','def _boss_phrase','def _hum_phrase',
     ]:
         assert needle in t, f"missing {needle!r}"
-    assert t.count('log_event("openclaw') >= 12
+    assert t.count('log_event("worker') >= 8 and t.count('log_event("agent') >= 4
 
 def test_boss_and_hum_variants():
     # force fresh import without cache pollution
@@ -73,21 +73,22 @@ def test_boss_and_hum_variants():
 
 def test_webui_maps_all_events():
     txt = (ROOT/"voicebridge/webui.py").read_text()
-    for e in ["openclaw.error","openclaw.status","hermes.error","boss_talk","humming","hermes.task"]:
+    for e in ["worker.error","worker.status","agent.error","boss_talk","humming","agent.task",
+              "openclaw.error","hermes.task"]:
         assert e in txt, f"webui missing {e}"
 
 def test_broken_english_routing_torture():
     from voicebridge.intent.classifier import Classifier, normalize_broken_english
     from voicebridge.intent.state import ConfirmationState, ConversationState
     cases = [
-        ("root to open claw and create text document in temp folder called trickish micky", "coding"),
-        ("route to openclaw and create the text document in temporary folder called trickish micky and write text tricky miki inside it", "coding"),
+        ("root to open claw and create text document in temp folder called trickish micky", "agent"),
+        ("route to openclaw and create the text document in temporary folder called trickish micky and write text tricky miki inside it", "agent"),
         ("creat file test html please", "coding"),
         ("make doc in tmp", "coding"),
         ("open claw fix stripe webhook", "coding"),
         ("hello how are you", "conversation"),
-        ("hermes write a report", "hermes"),
-        ("ask hermes to check inbox", "hermes"),
+        ("hermes write a report", "agent"),
+        ("ask hermes to check inbox", "agent"),
     ]
     c = Classifier({}, ConfirmationState(), ConversationState())
     fails = []
@@ -99,8 +100,8 @@ def test_broken_english_routing_torture():
     # normalization must fix known typos and be returned as task_text
     c2 = Classifier({}, ConfirmationState(), ConversationState())
     r = c2.classify("root to open claw delete trickish micky file")
-    assert "route to openclaw" in r.task_text and "tricky mickey" in r.task_text
-    assert normalize_broken_english("root to open claw delete trickish micky file") == "route to openclaw delete tricky mickey file"
+    assert "route to worker" in r.task_text and "tricky mickey" in r.task_text
+    assert normalize_broken_english("root to open claw delete trickish micky file") == "route to worker delete tricky mickey file"
 
 def test_summarizer_bulletproof_and_40w():
     from voicebridge.summarizer import summarize
@@ -129,7 +130,7 @@ def test_concurrency_hammer():
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
         futs = [ex.submit(job, i) for i in range(40)]
         res = [f.result(timeout=5) for f in futs]
-    assert len(res) == 40 and all(k in ("coding","conversation","hermes","local","system","clarify") for k in res)
+    assert len(res) == 40 and all(k in ("coding","conversation","agent","local","system","clarify") for k in res)
 
 def test_report_persist_and_verify_present():
     txt = (ROOT/"voicebridge/orchestrator.py").read_text()
@@ -626,12 +627,12 @@ def test_routing_success_rate_95():
         ("check my email", "coding"),           # template -> task lane
         ("what's the weather in bucharest", "conversation"),
         ("fix the login bug in the auth flow", "coding"),
-        ("route to hermes", "hermes"),
+        ("route to hermes", "agent"),
         ("status", "system"),
         ("stop", "system"),
         ("hello", "conversation"),
         ("how are you today", "conversation"),
-        ("use the browser to check github trending", "hermes"),
+        ("use the browser to check github trending", "agent"),
     ]
     with tempfile.TemporaryDirectory() as td:
         cfg = Config.load(pathlib.Path(td) / "none.yaml")

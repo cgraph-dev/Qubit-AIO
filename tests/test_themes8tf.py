@@ -1,4 +1,4 @@
-"""Packet 8T-F — Hermes pets/skin parity via optional Qubit themes.
+"""Qubit themes and cosmetics.
 
 Proves presets switch with confirmation/audit/rollback, token tweaks are
 validated, gallery downloads stay refused, the dashboard serves the

@@ -175,7 +175,7 @@ COMPLETE_EXAMPLES = {
     "auth_verify": "qubit, is xai configured",
     "auth_logout": "qubit, logout check",
     "mcp": "qubit, list mcp servers",
-    "claw": "qubit, claw status",
+    "worker": "qubit, worker status",
     "memory_search": "qubit, what do you remember about invoices",
     "memory_remember": "qubit, remember the gate code",
     "memory_forget": "qubit, forget memory 12",
@@ -393,10 +393,10 @@ COMPLETE_EXAMPLES = {
     "runtime_images": "qubit, list runtime images",
     "runtime_status": "qubit, runtime status",
     "runtime_doctor": "qubit, diagnose runtimes",
-    "runtime_install": "qubit, install runtime hermes-runtime",
-    "runtime_upgrade": "qubit, upgrade runtime hermes-runtime",
-    "runtime_rollback": "qubit, roll back runtime hermes-runtime",
-    "runtime_remove": "qubit, remove runtime hermes-runtime",
+    "runtime_install": "qubit, install runtime opencode-binary",
+    "runtime_upgrade": "qubit, upgrade runtime opencode-binary",
+    "runtime_rollback": "qubit, roll back runtime opencode-binary",
+    "runtime_remove": "qubit, remove runtime opencode-binary",
     "opencode_status": "qubit, opencode status",
     "opencode_list": "qubit, list opencode capabilities",
     "opencode_show": "qubit, show opencode capability demo",
@@ -777,14 +777,14 @@ def test_task_mandated_utterances_execute(tmp_path, monkeypatch):
     assert out.kind == VC.NEEDS_CONFIRM, (out.kind, out.speech)
     cid = out.confirmation_id
     assert cid
-    # Confirming without a provisioned Hermes runtime is a typed
-    # unavailable state (RUNTIME_DISABLED), not success and not a crash.
+    # Confirming with the agent explicitly disabled is a typed
+    # unavailable state (AGENT_DISABLED), not success and not a crash.
+    cfg.data.setdefault("agent", {})["enabled"] = False
     out2 = VC.confirm_pending(ctx, cid)
     assert out2.kind == VC.EXECUTED, (out2.kind, out2.speech)
     task = out2.receipt["result"]["task"]
     assert task["state"] == "UNAVAILABLE", task
-    assert task["code"] in ("RUNTIME_DISABLED", "HERMES_DISABLED",
-                            "EMERGENCY_STOP"), task
+    assert task["code"] in ("AGENT_DISABLED", "EMERGENCY_STOP"), task
 
 
 def test_task_run_honors_estop_and_config(tmp_path, monkeypatch):
@@ -792,13 +792,13 @@ def test_task_run_honors_estop_and_config(tmp_path, monkeypatch):
 
     cfg = _cfg(tmp_path, monkeypatch)
     ctx = _ctx(cfg)
-    # hermes.enabled=false short-circuits before any subprocess.
-    cfg.data.setdefault("hermes", {})["enabled"] = False
+    # agent.enabled=false short-circuits before any model call.
+    cfg.data.setdefault("agent", {})["enabled"] = False
     res = VC.resolve("qubit, run the task x")
     out = VC.execute(ctx, res)
     assert out.kind == VC.NEEDS_CONFIRM
     out2 = VC.confirm_pending(ctx, out.confirmation_id)
-    assert out2.receipt["result"]["task"]["code"] == "HERMES_DISABLED"
+    assert out2.receipt["result"]["task"]["code"] == "AGENT_DISABLED"
 
 
 def test_new_read_backends_execute_hermetic(tmp_path, monkeypatch):

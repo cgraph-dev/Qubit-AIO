@@ -33,12 +33,11 @@
 <h1><span class="brand-mark" aria-hidden="true">Q</span> Qubit VoiceBridge</h1>
 <div class="muted">Operations · every control calls the real backend — the same operation the CLI and voice commands use. Nothing here succeeds without a backend result.</div>
 <nav class="page-nav" aria-label="Primary">
- <a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit Agent</a><span class="nav-separator" aria-hidden="true"></span>
- <a href="/">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/ops" aria-current="page">Operations</a><a href="/settings">Settings</a><a href="/setup">Setup</a><a class="nav-utility" href="/token-setup">Pair device</a>
+ <a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit Agent</a><span class="nav-separator" aria-hidden="true"></span><a href="/">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/sessions">Sessions</a><a href="/projects">Projects</a><a href="/models">Models</a><a href="/skills">Skills</a><a href="/tasks">Tasks</a><a href="/security">Security</a><a href="/devices">Devices</a><a href="/messages">Messages</a><a href="/memory">Memory</a><a href="/ops" aria-current="page">Operations</a><a href="/approvals">Approvals</a><a href="/settings">Settings</a><a href="/setup">Setup</a><a href="/system">System</a><a class="nav-utility" href="/token-setup">Pair device</a>
 </nav>
 
 <div id="estop" class="estop hidden" role="alert">Emergency stop is latched — mutating operations will be refused until it is reset.</div>
-<div id="pairhint" class="card hidden">Pair this dashboard first (<a href="/token-setup">Pair device</a>) — controls stay disabled until then.</div>
+<div id="pairhint" class="card hidden">Pair this dashboard first (<a class="tap-target" href="/token-setup">Pair device</a>) — controls stay disabled until then.</div>
 
 <div class="card">
  <div class="row">
@@ -49,7 +48,7 @@
   <button onclick="loadCatalog()">Reload</button>
   <span id="cat-state" class="muted" role="status">loading…</span>
  </div>
- <div class="muted" style="margin-top:6px">Reads run immediately. Anything that changes state asks for confirmation first (approve in <a href="/approvals">Approvals</a> or inline below). Secrets are never displayed; passphrases are re-entered at confirm time and never stored.</div>
+ <div class="muted" style="margin-top:6px">Reads run immediately. Anything that changes state asks for confirmation first (approve in <a class="tap-target" href="/approvals">Approvals</a> or inline below). Secrets are never displayed; passphrases are re-entered at confirm time and never stored.</div>
 </div>
 
 <div id="ops"></div>

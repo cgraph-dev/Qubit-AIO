@@ -1,4 +1,4 @@
-"""Packet 8T-F — Hermes login/logout/portal parity via manual handoff.
+"""Qubit auth login/logout via manual handoff.
 
 Proves enrollment is guidance-only (nothing written, captured, or
 opened unless asked), verification is a read-only reference probe, and

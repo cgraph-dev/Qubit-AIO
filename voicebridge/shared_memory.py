@@ -1,23 +1,25 @@
-"""Unified Shared Memory — the single source of truth across ALL providers.
+"""Unified Shared Memory — the single source of truth for Qubit.
 
-Problem: OpenClaw, Hermes, browser and the local 3B each keep separate
-chats. When you say "route to hermes" and then give the *next* instruction,
-the local brain (or the other provider) has already forgotten the route,
-and neither provider sees what the other did yesterday.
+Problem: the agent, worker, browser and local chat lanes each keep
+separate chats. When you set a route and then give the *next*
+instruction, the lane that answers has already forgotten the route.
 
 Fix: a shared append-only ledger at ``<state_dir>/shared_memory.jsonl``
 that every turn appends to — user utterances, routing decisions, agent
 reports (full + summary), and local replies. On every dispatch the bridge
-injects the recent ledger window into the task prompt so the *next* agent
-— regardless of provider — sees the same story the previous one saw.
+injects the recent ledger window into the task prompt so the *next* lane
+sees the same story the previous one saw.
 
 The ledger also powers the dashboard: /api/reports and /api/activity now
-include shared history so switching providers doesn't blank the feed.
+include shared history so switching lanes doesn't blank the feed.
 
 File format: one JSON object per line::
   {"ts": 1714000000.0, "role": "user|assistant|system|agent",
-   "text": "...", "route": "openclaw|hermes|local|browser",
-   "provider": "openclaw|hermes|local", "session_key": "..."}
+   "text": "...", "route": "agent|worker|local|browser",
+   "provider": "qubit|local", "session_key": "..."}
+
+Historical rows may carry retired route names; readers treat route and
+provider as opaque labels.
 
 Kept small on read (last ~60 turns / ~8k chars) but never truncated on
 write — history survives restarts and provider toggles.
@@ -31,7 +33,7 @@ from typing import Any, Dict, List, Optional
 
 
 class SharedMemory:
-    """Persistent cross-provider ledger."""
+    """Persistent cross-lane ledger."""
 
     def __init__(self, state_dir: Path | str, max_chars: int = 8000, max_turns: int = 60) -> None:
         self.state_dir = Path(state_dir).expanduser()
@@ -127,7 +129,7 @@ class SharedMemory:
         lines.reverse()
         if not lines:
             return ""
-        return "Recent shared history (same across OpenClaw/Hermes/browser/local):\n" + "\n".join(lines)
+        return "Recent shared history (same across agent/worker/browser/local):\n" + "\n".join(lines)
 
     def clear(self) -> None:
         try:

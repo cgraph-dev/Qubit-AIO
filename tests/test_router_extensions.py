@@ -45,21 +45,21 @@ def test_local_screenshot():
     assert i.kind == "local" and i.params.get("action") == "screenshot"
 
 
-def test_hermes_delegation_prefix():
+def test_agent_delegation_prefix():
     i = _cls().classify("ask hermes to review the pr")
-    assert i.kind == "hermes" and i.backend == "hermes"
+    assert i.kind == "agent" and i.backend == "qubit"
     assert "review the pr" in i.task_text
 
 
-def test_hermes_delegation_direct():
+def test_agent_delegation_direct():
     i = _cls().classify("hermes, check the cron logs")
-    assert i.kind == "hermes"
+    assert i.kind == "agent"
     assert "cron" in i.task_text
 
 
-def test_coding_still_routes_to_openclaw():
+def test_coding_still_routes_to_qubit_worker():
     i = _cls().classify("open the current project and inspect the stripe webhook validation")
-    assert i.kind == "coding" and i.backend == "openclaw"
+    assert i.kind == "coding" and i.backend == "qubit"
 
 
 def test_conversation_untouched():

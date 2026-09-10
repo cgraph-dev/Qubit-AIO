@@ -19,7 +19,7 @@ mic (HyperX USB mono) --> 16k WAV
    -> ASR sherpa parakeet (fallback moonshine) (0.5s, CPU / 0 VRAM)
    -> [if empty: cached fallback]
    -> classifier (heuristic + optional LLM)
-   -> route (local | openclaw | hermes | browser | coding | conversation)
+   -> route (local | agent | worker | browser | coding | conversation)
    -> local model qubit-brain4 (Qwen3-4B sanitized artifact, resident)
       answers chat (~0.5s warm; personal facts served per-turn by the
       bounded context compiler — Packet 4B)
@@ -97,7 +97,7 @@ mic (HyperX USB mono) --> 16k WAV
 
 ### OpenSandbox — credential vault + isolated execution 🔜 PARTIAL
 - Realized: keep secrets in a vault, run untrusted code isolated.
-- We keep secrets in `~/.hermes/.env` (never committed/baked). Full sandboxing is
+- We keep secrets in `~/.config/qubit-voicebridge/.env` (never committed/baked). Full sandboxing is
   not critical because scripts are whitelisted, but see roadmap.
 
 ---
@@ -117,7 +117,7 @@ one shared capability registry (`voicebridge/broker.py`):
   shlex into a fixed argv skeleton ({question}/{text} become whole argv
   elements); shell metacharacters outside quotes fail registration. No
   shell string from any source is ever executed by the broker.
-- **Workers**: OpenClaw/Hermes dispatch shares the SAME engine/store via
+— **Workers**: Qubit worker sessions share the SAME engine/store via
   `WorkerGuard(cfg, engine=broker.engine)`; worker executions emit
   `worker.exec.start/finish` audit events with correlation ids.
 - **Fail-closed denials**: unknown tool, malformed args, out-of-scope,

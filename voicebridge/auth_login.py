@@ -1,7 +1,7 @@
-"""Packet 8T-F — Hermes login/logout/portal parity via manual-handoff enrollment.
+"""Qubit auth login/logout via manual-handoff enrollment.
 
-Hermes ``login`` runs interactive OAuth/vendor-portal flows, ``logout``
-clears stored credentials, and ``portal`` manages the vendor subscription.
+Qubit ``login`` guides interactive OAuth/vendor-portal flows, ``logout``
+clears stored credentials, and ``portal`` opens the vendor subscription.
 Qubit never automates those flows: the user personally completes login,
 2FA, CAPTCHA, and recovery challenges in their own browser (Brain
 credential design: manual handoff, never bypassed, guessed, or captured).

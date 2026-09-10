@@ -94,7 +94,7 @@ READ_OPS = {
     "checkpoints_list": {},
     "auth_status": {},
     "mcp": {},
-    "claw": {},
+    "worker": {},
     "memory_search": {"query": "invoices"},
     "skills_list": {},
     "projects_list": {},

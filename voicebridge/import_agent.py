@@ -1,8 +1,8 @@
-"""Packet 8T-F — Hermes import-agent parity via quarantined inspection.
+"""Qubit foreign-agent import via quarantined inspection.
 
-Hermes ``import-agent [{claude-code,codex}]`` maps another coding agent's
+Qubit ``import-agent [{claude-code,codex}]`` maps another coding agent's
 setup (instructions, permission allowlists, MCP servers, skills, memories)
-into Hermes equivalents with a preview, never importing API keys. Reading
+into Qubit equivalents with a preview, never importing API keys. Reading
 unreviewed third-party state into Qubit would violate the reviewed-code
 policy, so the Qubit-native surface is split:
 

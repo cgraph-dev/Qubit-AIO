@@ -58,11 +58,14 @@ def test_singularity_single_tts_selection(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# H-stream: runtime replies flow through the streaming TTS contract
+# Streaming: agent replies flow through the streaming TTS contract
 # ---------------------------------------------------------------------------
-def test_runtime_reply_streams_through_tts_sentences(tmp_path):
-    from voicebridge.runtime import HermesRuntime
+def test_runtime_reply_streams_through_tts_sentences(tmp_path, monkeypatch):
+    import voicebridge.local_llm as _llm
     from voicebridge.tts.base import TTSProvider
+
+    monkeypatch.setattr(_llm, "chat_local",
+                        lambda *a, **k: "first. second! third?")
 
     spoken = []
 
@@ -82,18 +85,16 @@ def test_runtime_reply_streams_through_tts_sentences(tmp_path):
         def play(self, path, name=""):
             return True
 
-    rt = HermesRuntime(provider="fixture")
-    try:
-        reply = rt.turn("first. second! third?", session="stream")["reply"]
-        sentences = [s.strip() for s in reply.replace("!", ".").split(".")
-                     if s.strip()]
-        assert len(sentences) >= 2
-        tts = _ProbeTTS()
-        for sent in sentences:
-            assert tts.speak(sent, _ProbePlayback(), out_dir=tmp_path) is True
-        assert spoken == sentences, "one TTS path renders every streamed unit"
-    finally:
-        rt.stop()
+    from voicebridge.agent import turn as _turn
+
+    reply = _turn(None, "first. second! third?", session="stream")["reply"]
+    sentences = [s.strip() for s in reply.replace("!", ".").split(".")
+                 if s.strip()]
+    assert len(sentences) >= 2
+    tts = _ProbeTTS()
+    for sent in sentences:
+        assert tts.speak(sent, _ProbePlayback(), out_dir=tmp_path) is True
+    assert spoken == sentences, "one TTS path renders every streamed unit"
 
 
 # ---------------------------------------------------------------------------
@@ -153,8 +154,8 @@ def test_no_dockerfile_in_repo():
 # ---------------------------------------------------------------------------
 def test_production_estop_binding_present_and_safe(tmp_path, monkeypatch):
     orch = _orch(tmp_path, monkeypatch)
-    assert orch._real_runtime is not None, \
-        "production must bind the real runtime (no-op while unprovisioned)"
+    assert orch._power_policy is not None, \
+        "production must own the power policy (single e-stop authority)"
     control = orch._power_policy.control
     out = control.emergency_stop()
     assert out["state"] == "OK"

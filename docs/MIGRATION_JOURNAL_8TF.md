@@ -216,3 +216,37 @@ Repaired every reported blocker with real backends and re-proved all gates:
    monitor=test_packet7a×1; ui=test_ui_browser_8l×24. Default `-m`
    filter stays: these gates need live services the hermetic default
    must not require.
+
+## Native completion turn (uncommitted): one Qubit runtime, product, and lane set
+
+Retired the supervision architecture; Qubit now executes natively:
+
+1. New `voicebridge/agent.py`: `turn` (single bounded model turn with
+   timeout/redaction/receipts) + `run_session` (planner tool step +
+   brokered local-tool execution + summary). Voice (`task_run*`), the
+   orchestrator (`_handle_agent`, `_launch_task`/`_spawn_session_worker`),
+   and schedules all share it. No external assistant process exists in
+   normal execution.
+2. Deleted: `voicebridge/runtime/`, `voicebridge/hermes/`,
+   vendored `voicebridge/upstream/hermes_*.py`,
+   `voicebridge/tts/gateway_tts.py`, `scripts/install_hermes_runtime.sh`,
+   `tests/test_real_hermes.py`; gateway package slimmed to
+   transport-neutral `gateway_ws.FrameGuard/FrameReader`
+   (`discovery.py`, `cli_backend.py`, WS clients removed).
+3. Clean-room replacements (no copied expression):
+   `voicebridge/textutil.py`, `voicebridge/sqlstore.py` — differential
+   batteries vs the pinned read-only oracle + adversarial
+   `tests/test_textutil8u.py`. MIT provenance retained (retirement
+   record) in `THIRD_PARTY_NOTICES.md`,
+   `voicebridge/upstream/ATTRIBUTION.md`, `docs/UPSTREAM_REUSE.md` R33.
+4. Rebrand: classifier/intents/routes/sessions/summaries/journal labels
+   are agent/worker lanes (legacy spoken names still understood and
+   mapped); `qubit claw` → `qubit worker`; config gains the unified
+   `agent` section with load-time legacy folding
+   (`docs/QUBIT_MIGRATION.md`); 10 catalog-driven dashboard family pages
+   (`/sessions /projects /models /skills /tasks /security /devices
+   /messages /memory /system`) plus shared `family.js`, unified nav,
+   44px touch-target repair; upstream names remain only in legal
+   notices, provenance records, fixtures, compat shims, and migration
+   docs. `qubit` CLI verified end to end (worker/status/capability/
+   runtime all report Qubit-native state).

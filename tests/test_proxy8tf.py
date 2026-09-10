@@ -1,4 +1,4 @@
-"""Packet 8T-F — Hermes proxy parity via inventory + typed start refusal.
+"""Qubit proxy inventory + typed start refusal.
 
 Proves no forwarding server runs or can be started here, provider
 eligibility reports references only, and nothing is fetched or opened.

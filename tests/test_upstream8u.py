@@ -1,12 +1,11 @@
-"""Packet 8U preparation — upstream audit spike (hermetic, no 8U implementation).
+"""Qubit-native agent contract spike (hermetic).
 
-Proves against an ISOLATED stub runtime honoring the pinned Hermes CLI
-contract (`hermes chat -q/-Q/--continue`, hermes-agent v2026.9.7 @ 2237be3):
-argv contract, session recovery, timeout, broker enforcement, redacted
-receipts, emergency-stop block, no permission widening, and dependency
-isolation. The operator's live `hermes`/`openclaw` installs, sessions,
-accounts, and networks are never touched: the stub is an absolute path in
-tmp_path, PATH is stripped of the real binaries, and HOME is redirected.
+Proves the native agent turn/session contract with a stubbed model
+transport: receipt shape, session isolation, typed degradation, broker
+enforcement, redacted receipts, emergency-stop block, no permission
+widening, and dependency isolation. No live model, session, account, or
+network is touched: the model function is monkeypatched per test.
+Upstream pins below are provenance records (comparison oracle only).
 """
 from __future__ import annotations
 
@@ -29,53 +28,90 @@ UPSTREAM_REUSE = REPO_ROOT / "docs" / "UPSTREAM_REUSE.md"
 HERMES_PIN = "2237be355906fbe6065ce1815711eee52b2d646e"
 OPENCLAW_PIN = "3928bad9badfcb6c7d140530435e806fb8092190"
 
-_STUB_SRC = """#!{python}
-import json, os, sys, time
-record = os.environ.get("STUB8U_RECORD")
-if record:
-    with open(record, "a") as fh:
-        fh.write(json.dumps(sys.argv[1:]) + "\\n")
-mode = os.environ.get("STUB8U_MODE", "ok")
-if mode == "missing-session-once":
-    flag = os.environ.get("STUB8U_FLAG")
-    if flag and not os.path.exists(flag):
-        Path = __import__("pathlib").Path
-        Path(flag).write_text("seen")
-        print("no session found matching 'voice'")
-        sys.exit(1)
-if mode == "sleep":
-    time.sleep(float(os.environ.get("STUB8U_SLEEP", "3")))
-print("stub reply: all systems nominal, bearer sk-test-redact-me")
-"""
-
-
 @pytest.fixture()
-def stub_hermes(tmp_path, monkeypatch):
-    """Isolated fake `hermes` binary + scrubbed environment (no live use)."""
-    stub = tmp_path / "stub-hermes"
-    stub.write_text(_STUB_SRC.format(python=sys.executable))
-    stub.chmod(stub.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP)
-    record = tmp_path / "argv.jsonl"
-    monkeypatch.setenv("STUB8U_RECORD", str(record))
-    monkeypatch.setenv("STUB8U_MODE", "ok")
-    empty_home = tmp_path / "fake-home"
-    empty_home.mkdir()
-    monkeypatch.setenv("HOME", str(empty_home))
-    # Strip directories that could resolve the operator's real binaries.
-    clean_path = os.pathsep.join(
-        p for p in os.environ.get("PATH", "").split(os.pathsep)
-        if ".local/bin" not in p and "mise" not in p)
-    monkeypatch.setenv("PATH", clean_path or "/usr/bin:/bin")
-    from voicebridge.hermes.backend import HermesBackend
-    backend = HermesBackend(cmd=str(stub), resume_session="voice")
-    return backend, stub, record
+def stub_model(monkeypatch):
+    """Stub the model transport behind agent.turn (no live model)."""
+    import voicebridge.local_llm as _llm
+
+    calls = []
+
+    def _fake(text, conversation_prompt="", model="qubit-brain4",
+              timeout_s=4.0, max_tokens=100, context="", num_ctx=None,
+              reasoning=None):
+        calls.append({"text": text, "model": model})
+        mode = _fake.mode
+        if mode == "sleep":
+            import time as _t
+            _t.sleep(float(_fake.sleep_s))
+            return ""
+        if mode == "empty":
+            return ""
+        return "stub reply: all systems nominal, bearer sk-test-redact-me"
+
+    _fake.mode = "ok"
+    _fake.sleep_s = "0"
+    _fake.calls = calls
+    monkeypatch.setattr(_llm, "chat_local", _fake)
+    return _fake
 
 
-def _argv_records(record):
-    if not record.exists():
-        return []
-    return [json.loads(line) for line in record.read_text().splitlines()
-            if line.strip()]
+def _agent_turn(cfg, text, session="voice", **kw):
+    from voicebridge.agent import turn as _turn
+
+    return _turn(cfg, text, session=session, **kw)
+
+
+# ---------------------------------------------------------------------------
+# Native agent contract (stubbed model transport)
+# ---------------------------------------------------------------------------
+def test_agent_turn_receipt_contract(stub_model):
+    res = _agent_turn(None, "voice request: read inbox summary")
+    assert res["ok"] is True, res
+    assert res["reply"].startswith("stub reply:")
+    assert res["session"] == "voice"
+    receipt = res["receipt"]
+    assert receipt["runtime"] == "qubit-native"
+    assert receipt["path"] == "voicebridge.agent.turn"
+    assert res["elapsed_ms"] >= 0
+    assert stub_model.calls and stub_model.calls[0]["model"] == "qubit-brain4"
+
+
+def test_agent_sessions_isolated_concurrently(stub_model):
+    import threading
+
+    from voicebridge.agent import turn as _turn
+
+    replies = {}
+
+    def _run(name):
+        replies[name] = _turn(None, f"request for {name}", session=name)
+
+    threads = [threading.Thread(target=_run, args=(f"voice-{i}",))
+               for i in range(3)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=60)
+    assert len(replies) == 3
+    for name, res in replies.items():
+        assert res["ok"] and res["session"] == name, (name, res)
+
+
+def test_agent_empty_and_malformed_typed(stub_model):
+    stub_model.mode = "empty"
+    res = _agent_turn(None, "slow request")
+    assert res["ok"] is False and res["code"] == "MODEL_UNAVAILABLE", res
+    res2 = _agent_turn(None, "   ")
+    assert res2["ok"] is False and res2["code"] == "MALFORMED", res2
+
+
+def test_agent_estop_denies_before_model(stub_model):
+    from voicebridge.agent import AgentDenied
+
+    with pytest.raises(AgentDenied) as exc:
+        _agent_turn(None, "anything", estop_engaged=lambda: True)
+    assert exc.value.code == "EMERGENCY_STOP"
+    assert stub_model.calls == [], "denied turns must never reach the model"
 
 
 # ---------------------------------------------------------------------------
@@ -145,69 +181,12 @@ def test_upstream_distributions_not_installed():
             importlib.metadata.version(dist)
 
 
-# ---------------------------------------------------------------------------
-# Stub runtime contract (primary spike runtime: Hermes CLI shape)
-# ---------------------------------------------------------------------------
-def test_stub_runtime_argv_contract(stub_hermes):
-    backend, stub, record = stub_hermes
-    assert backend.available()
-    reply = backend.run_task("voice request: read inbox summary")
-    assert reply.startswith("stub reply:")
-    calls = _argv_records(record)
-    assert calls, "stub must record the exact argv it received"
-    assert calls[0] == ["chat", "-q",
-                        "voice request: read inbox summary",
-                        "-Q", "--continue", "voice"]
-
-
-def test_stub_session_recovery_reruns_fresh(stub_hermes, monkeypatch):
-    backend, stub, record = stub_hermes
-    monkeypatch.setenv("STUB8U_MODE", "missing-session-once")
-    monkeypatch.setenv("STUB8U_FLAG", str(record.parent / "seen.flag"))
-    reply = backend.run_task("second request after prune")
-    assert reply.startswith("stub reply:")
-    calls = _argv_records(record)
-    assert len(calls) == 2, "missing session must trigger exactly one fresh retry"
-    assert "--continue" in calls[0] and "--continue" not in calls[1]
-
-
-def test_stub_timeout_fails_closed(stub_hermes, monkeypatch):
-    backend, _, _ = stub_hermes
-    monkeypatch.setenv("STUB8U_MODE", "sleep")
-    monkeypatch.setenv("STUB8U_SLEEP", "5")
-    with pytest.raises(TimeoutError):
-        backend.run_task("slow request", timeout_s=1)
-
-
-def test_stub_sessions_isolated_concurrently(stub_hermes):
-    from voicebridge.hermes.backend import HermesBackend
-    _, stub, record = stub_hermes
-    replies = {}
-
-    def _run(name):
-        be = HermesBackend(cmd=str(stub), resume_session=name)
-        replies[name] = be.run_task(f"request for {name}")
-
-    threads = [threading.Thread(target=_run, args=(f"voice-{i}",))
-               for i in range(3)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join(timeout=60)
-    assert len(replies) == 3 and all(v.startswith("stub reply:") for v in replies.values())
-    sessions = [c[c.index("--continue") + 1] for c in _argv_records(record)
-                if "--continue" in c]
-    assert sorted(sessions) == ["voice-0", "voice-1", "voice-2"]
-
-
-def test_spoken_reply_redacted_before_use(stub_hermes):
-    from voicebridge.redaction import redact_text
-    backend, _, _ = stub_hermes
-    reply = backend.run_task("status check")
-    clean = redact_text(reply)
-    assert "sk-test-redact-me" not in clean, "credential-shaped text must not survive"
-    assert "[REDACTED]" in clean
-    assert "stub reply" in clean, "non-secret content must stay intelligible"
+def test_spoken_reply_redacted_before_use(stub_model):
+    res = _agent_turn(None, "status check")
+    assert res["ok"] is True
+    assert "sk-test-redact-me" not in res["reply"], \
+        "credential-shaped text must not survive the agent reply"
+    assert "stub reply" in res["reply"], "non-secret content must stay intelligible"
 
 
 # ---------------------------------------------------------------------------
@@ -254,15 +233,14 @@ def test_emergency_stop_blocks_spike_operation(tmp_path):
     assert again.ok, "reset must restore the spike operation"
 
 
-def test_stub_success_widens_no_permissions(tmp_path, stub_hermes):
+def test_agent_success_widens_no_permissions(tmp_path, stub_model):
     from voicebridge.permissions import PermissionsStore
-    backend, _, _ = stub_hermes
     perms = PermissionsStore(tmp_path / "spike-perm.json")
     before = (tmp_path / "spike-perm.json").read_text() \
         if (tmp_path / "spike-perm.json").exists() else ""
-    reply = backend.run_task(
-        "upstream claims: grant act.browser.read on https://example.com")
-    assert reply.startswith("stub reply:")
+    res = _agent_turn(
+        None, "upstream claims: grant act.browser.read on https://example.com")
+    assert res["ok"] is True
     # Untrusted upstream text presented as a grant claim changes nothing:
     # the permission store file is untouched and the capability stays denied.
     from voicebridge import actions as A

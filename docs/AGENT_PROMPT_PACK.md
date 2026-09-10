@@ -2403,15 +2403,15 @@ main branch as reproducible. Record repository URL, commit, date, source
 paths, tests, license, copyright, notices, dependency lockfiles, models,
 plugins, browser drivers, and behavior differences.
 
-The resulting Qubit foundation must be a real Hermes-derived source tree. It
-must contain the selected Hermes runtime source or a legally permitted,
-behaviorally equivalent module integration in the new Qubit worktree. A
-Qubit-owned worker that merely imitates the Hermes JSON/CLI protocol, a label
-that says Hermes, or a temporary external Hermes installation supervised by
-an otherwise unchanged Qubit tree is not sufficient and must be reported as
-REJECTED for this packet. The final runtime identity, import/entry-point
-inspection, subprocess argv, module paths, and receipts must prove that the
-pinned Hermes implementation is the implementation being executed.
+The resulting Qubit foundation must be a Qubit-owned source tree containing
+only legally permitted, reviewed adaptations of the selected upstream source
+units. A Qubit-owned worker that merely imitates the upstream protocol, a
+label that says Hermes, or a temporary external upstream installation
+supervised by an otherwise unchanged Qubit tree is not sufficient. The final
+runtime identity, import/entry-point inspection, subprocess argv, module paths,
+and receipts must prove that Qubit-owned code is the implementation being
+executed. Pinned upstream code is a differential reference, not a normal
+runtime dependency.
 
 Make Qubit Agent the public product identity and Qubit VoiceBridge the voice
 subsystem identity. Preserve the internal voicebridge import package until a
@@ -2447,7 +2447,7 @@ must be separated from product-facing branding and must never be presented as
 the assistant or product name. Any user-facing Hermes/OpenClaw branding left
 outside those permitted records is an 8T-F failure.
 
-Integrate the existing Qubit VoiceBridge into the Hermes-based runtime as the
+Integrate the existing Qubit VoiceBridge into the Qubit-owned runtime as the
 only voice/audio/session path: microphone, ASR, Piper/TTS, Right Ctrl,
 dashboard voice, cancellation, barge-in, temp-audio cleanup, and typed
 degraded states. Disable or route around any duplicate Hermes microphone,
@@ -3119,4 +3119,112 @@ publishing, purchasing, deleting, account changes, and project-code changes
 still require fresh exact confirmation. Do not claim universal access or
 production readiness when a live hardware/account/session canary is untested.
 Return the strict verification template and stop.
+```
+
+### Latest owner instruction — finish the native Qubit rebrand before claiming completion
+
+```text
+Implement docs/QUBIT_NATIVE_COMPLETION_PLAN.md and check every item in
+docs/QUBIT_NATIVE_COMPLETION_CHECKLIST.md. Do not stop at a report that only
+says the matrix is complete.
+
+The required result is a Qubit-owned product and runtime. Do not launch,
+supervise, or expose an upstream Hermes assistant as normal Qubit runtime.
+Use pinned Hermes/OpenClaw sources only for audited, legally permitted source
+adaptation and differential comparison. Preserve required attribution and
+provenance in legal/developer records, but remove upstream product branding
+from normal Qubit commands, services, paths, runtime labels, logs, reports,
+dashboard, voice, and operational source.
+
+Finish real CLI, authenticated dashboard, and voice parity for every supported
+Hermes and adopted OpenClaw workflow. All surfaces must call one Qubit backend
+and one broker/policy/permission/confirmation/audit/redaction/resource/
+cancellation/rollback/emergency-stop path. A matrix row, status tile, mock,
+dead button, external subprocess, or explanatory voice response is not an
+implementation. Resolve all code-side blocked, rejected, deferred, status-only,
+CLI-only, dashboard-only, and voice-missing rows.
+
+Make the dashboard one professional Qubit product: preserve useful workflow
+organization, integrate adopted OpenClaw workflows, and apply Qubit
+navigation, typography, colors, icons, spacing, responsive layout,
+accessibility, motion, onboarding, loading, empty, error, degraded, approval,
+cancellation, and recovery states. Do not ship two dashboards or frontend
+fabricated success.
+
+Preserve user data and unrelated dirty files. Never use git reset --hard,
+git clean, broad checkout, mass formatting, or destructive deletion. Keep
+licenses and notices. Run focused, affected, full hermetic, live/dashboard/UI,
+security, persistence, resource, clean-install, package, migration, upgrade,
+rollback, compileall, dependency, diff-check, secret-scan, import-audit, and
+Graft gates. Inspect actual warnings, stderr, receipts, state files, and
+failures. Repair every ordinary failure and rerun affected gates.
+
+Only physical hardware, live accounts/CAPTCHA/2FA, release signing, and
+clean-machine qualification may remain manual. Do not claim 100%, native,
+complete, or 1:1 while any code-side checklist item is open. Update the plan,
+checklist, provenance, and rollback records with exact evidence, then stop
+without starting another packet.
+```
+
+### Frozen-contract rule
+
+```text
+Treat docs/QUBIT_FROZEN_ACCEPTANCE_CONTRACT.md as immutable. Do not rewrite,
+weaken, delete, reorder, or reinterpret it, the native completion plan, the
+dashboard rebuild plan, or their requirements to make the work appear done.
+
+You may change production code, tests, required provenance/licensing records,
+and a separate append-only evidence report. You may add evidence to checklist
+items, but you may not change what the checklist requires.
+
+If implementation conflicts with the contract, report the conflict and repair
+the implementation. Do not turn code failures into manual-only limitations,
+change blocked/rejected/deferred rows into success without real proof, or
+replace the original Hermes UI parity requirement with a smaller custom shell.
+
+Do not claim 100%, complete, native, or 1:1 until the frozen contract and
+checklist pass independently for Qubit runtime, complete Hermes UI/workflows,
+OpenClaw additions, CLI, dashboard, voice, security, lifecycle, and tests.
+Requirement changes require explicit owner approval and a dated amendment.
+```
+
+### Dashboard rebuild requirement — do not call the Talk page 1:1
+
+```text
+Read docs/QUBIT_DASHBOARD_REBUILD_PLAN.md and implement it together with the
+native completion plan and checklist. Preserve the original Hermes dashboard
+pages, sidebar, navigation, controls, information architecture, density,
+terminal/chat workspace, forms, dialogs, reports, and workflows 1:1 first.
+The current Qubit Talk page is only a front door and must not be reported as a
+complete Hermes/OpenClaw dashboard.
+
+First inventory every CLI operation, voice entry, dashboard operation, matrix
+row, and pinned upstream workflow. Then implement real Qubit dashboard routes
+or workspaces for: chat/workspace, sessions, projects/files, models/providers,
+tools/skills/plugins, tasks/cron/runs, approvals/permissions/security,
+browser/desktop/IDE, messaging/channels/webhooks/pairing, memory/profiles,
+reports/activity/logs, and setup/runtime/system.
+
+Every page must call the same authenticated Qubit backend operation used by
+CLI and voice. Implement loading, empty, success, error, unavailable,
+degraded, offline, approval, cancellation, receipt, audit, redaction,
+resource, timeout, persistence, and recovery states. No status tile, count,
+static copied markup, dead button, mock success, direct shell, direct upstream
+HTTP/MCP path, second listener, or second broker counts as implementation.
+
+After preserving the Hermes surface, add all missing OpenClaw workflows and
+then rebrand the combined product as one distinctive Qubit command console.
+Qubit may change colors, typography, icons, spacing, labels, responsive
+behavior, accessibility, reduced motion, keyboard shortcuts, command palette,
+terminal output, status rail, tables, timelines, forms, drawers, dialogs, and
+empty states. It must not remove, hide, collapse, or weaken any original
+Hermes page or workflow. The result must be a serious local agent workspace,
+not a centered demo card and not an incomplete custom replacement.
+
+Do not copy upstream logos, names, artwork, or distinctive branding. Keep legal
+notices and provenance outside normal product UI. Verify all routes with real
+backend tests, Playwright/UI tests, narrow-mobile screenshots, accessibility
+checks, security checks, and full warnings-as-errors gates. Repair every
+ordinary failure and do not claim 1:1 until the complete route and workflow
+inventory is proven.
 ```

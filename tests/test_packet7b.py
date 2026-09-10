@@ -267,12 +267,12 @@ def test_flag_drill_redacts_live_token():
     with tempfile.TemporaryDirectory() as td:
         cfg_path = Path(td) / "voice.yaml"
         cfg_path.write_text("webui:\n  token: supersecret-live-token-abc\n"
-                            "openclaw:\n  token_file: ~/.openclaw/.env\n")
+                            "agent:\n  api_key: super-secret-agent-key\n")
         cfg = Config.load(cfg_path)
         yaml_text = FF.redact_config_yaml(cfg)
         assert "supersecret-live-token-abc" not in yaml_text
         assert "[REDACTED]" in yaml_text
-        assert "~/.openclaw/.env" not in yaml_text
+        assert "super-secret-agent-key" not in yaml_text
 
 
 def test_log_event_never_crashes_on_non_serializable_fields(tmp_path, monkeypatch):

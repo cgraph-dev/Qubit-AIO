@@ -1,6 +1,6 @@
-"""Packet 8T-F — Hermes pairing parity via hashed one-time codes + grants.
+"""Qubit device pairing via hashed one-time codes + grants.
 
-Hermes ``pairing {list,approve,revoke,clear-pending}`` gates gateway user
+Qubit ``pairing {list,approve,revoke,clear-pending}`` gates dashboard user
 access with pairing codes. Qubit issues no network listener and runs no
 second authority; instead this module provides the code-side enrollment
 kernel behind the Qubit broker:

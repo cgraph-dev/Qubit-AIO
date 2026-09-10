@@ -1,8 +1,8 @@
-"""Packet 8T-F — Hermes computer-use parity via capability probes.
+"""Qubit desktop-control capability probes.
 
-Hermes ``computer-use {install,status,doctor,permissions}`` manages the
-``cua-driver`` binary used by its ``computer_use`` toolset. Qubit performs
-no desktop control outside Packet 8V accessibility APIs, and never
+Qubit ``computer-use {install,status,doctor,permissions}`` reports
+desktop-control readiness. Qubit performs
+no desktop control outside supervised accessibility APIs, and never
 downloads unpinned binaries — so this module provides the Qubit-native
 surface:
 

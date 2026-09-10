@@ -1,11 +1,13 @@
-"""Packet 8T-F close-out — vendored Hermes modules + OpenClaw conformance.
+"""Qubit-native text/store differentials + conformance.
 
-Proves: (1) vendored files behave byte-identically to the pinned source
-(differential tests importing the clone straight from /tmp/upstream-8tfv3);
-(2) vendored sanitizers execute in live Qubit output paths; (3) OpenClaw
-REUSE rows map to tested Qubit behavior (approvals lifecycle, receipts,
-events validation, skill manifests); (4) the close-out matrix is complete
-and honest (no row claims integration without proof).
+Proves: (1) Qubit's clean-room textutil/sqlstore behave identically to
+the pinned upstream oracle on adversarial batteries (differential tests
+importing the comparison clone straight from /tmp/upstream-8tfv3; the
+clone is a read-only oracle, never executed by Qubit); (2) native
+sanitizers execute in live Qubit output paths; (3) conformance rows map
+to tested Qubit behavior (approvals lifecycle, receipts, events
+validation, skill manifests); (4) the close-out matrix is complete and
+honest (no row claims integration without proof).
 """
 from __future__ import annotations
 
@@ -24,8 +26,8 @@ CLONE = Path(os.environ.get("QUBIT_8TF_HERMES_CLONE",
                             "/tmp/upstream-8tfv3/hermes-agent"))
 MATRIX = REPO_ROOT / "docs" / "MATRIX_8T_F.json"
 
-from voicebridge.upstream import hermes_ansi_strip as V_STRIP  # noqa: E402
-from voicebridge.upstream import hermes_sqlite_util as V_SQL  # noqa: E402
+from voicebridge import sqlstore as V_SQL  # noqa: E402
+from voicebridge import textutil as V_STRIP  # noqa: E402
 
 
 def _load_pinned(rel: str, name: str):
@@ -118,42 +120,23 @@ def test_add_column_matches_pinned_idempotent_and_race(pinned_sql, tmp_path):
 # ---------------------------------------------------------------------------
 # Live wiring: sanitizer executes in Qubit output paths
 # ---------------------------------------------------------------------------
-def test_hermes_backend_output_sanitized_by_vendored_code(tmp_path, monkeypatch):
-    from voicebridge.hermes.backend import HermesBackend
-
-    stub = tmp_path / "stub-ansi"
-    stub.write_text(
-        "#!" + sys.executable + "\n"
-        "import sys\n"
-        "print('\x1b[31mred reply\x1b[0m with bearer sk-stub-ansi-1')\n")
-    stub.chmod(stub.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP)
-    backend = HermesBackend(cmd=str(stub), resume_session="voice")
-    out = backend.run_task("anything")
-    assert "\x1b[" not in out, "vendored strip_ansi must execute on backend output"
-    assert "red reply" in out
-
-
-def test_real_hermes_reply_path_uses_vendored_sanitizer():
+def test_agent_reply_path_sanitizes_output():
     import inspect
 
-    from voicebridge.runtime import real_hermes as rh_module
+    from voicebridge import agent as _agent
 
-    src = inspect.getsource(rh_module.RealHermesRuntime.turn)
-    assert "strip_ansi" in src, "live reply path must call the vendored sanitizer"
-    from voicebridge.upstream.hermes_ansi_strip import strip_ansi as vendored
-
-    assert vendored("\x1b[1mdirty\x1b[0m") == "dirty"
+    src = inspect.getsource(_agent.turn)
+    assert "sanitize" in src, "live reply path must sanitize model output"
+    assert V_STRIP.sanitize("\x1b[1mdirty\x1b[0m") == "dirty"
 
 
-def test_vendored_provenance_headers_present():
-    for mod, src_rel in (
-            (V_STRIP, "tools/ansi_strip.py"),
-            (V_SQL, "hermes_cli/sqlite_util.py")):
-        header = Path(mod.__file__).read_text()[:1200]
-        assert "NousResearch/hermes-agent" in header
-        assert "2237be355906fbe6065ce1815711eee52b2d646e" in header
-        assert "Copyright (c) 2025 Nous Research" in header
-        assert src_rel in header
+def test_native_provenance_recorded():
+    header = Path(V_STRIP.__file__).read_text()[:800]
+    assert "Qubit text sanitizing" in header
+    assert "hermes" not in header.lower() or "upstream" in header.lower()
+    record = Path("voicebridge/upstream/ATTRIBUTION.md").read_text()
+    assert "2237be355906fbe6065ce1815711eee52b2d646e" in record
+    assert "retired" in record.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -190,13 +173,13 @@ def test_receipt_carries_runtime_provenance(tmp_path):
         REPO_ROOT / "tests" / "fixtures" / "actions" / "outcomes.json")
     runner = A.ActionRunner(store=store, perms=perms,
                             executors=A.make_fixture_executors(outcomes),
-                            runtime_label="hermes-real-isolated")
+                            runtime_label="qubit-native")
     r = runner.execute("act.browser.draft",
                        args={"recipient": "b@example.com", "subject": "s",
                              "body": "hello"},
                        target="https://mail.google.com", scope="web")
     assert r["state"] == "OK"
-    assert r["runtime"] == "hermes-real-isolated"
+    assert r["runtime"] == "qubit-native"
     persisted = [e for e in store.audit(20) if e.get("receipt_id") == r["receipt_id"]]
     assert persisted, "receipt must persist with its runtime provenance"
 

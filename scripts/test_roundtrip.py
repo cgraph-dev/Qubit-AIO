@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""End-to-end roundtrip test: synthetic voice -> ASR -> intent -> OpenClaw -> summary.
+"""End-to-end roundtrip test: synthetic voice -> ASR -> intent -> worker -> summary.
 
-This is the "one sample voice-to-OpenClaw roundtrip" test requested in the spec.
+This is the "one sample voice-to-worker roundtrip" test requested in the spec.
 It does NOT need a microphone: it synthesizes the sample utterance with piper,
 transcribes it with faster-whisper (GPU), classifies the intent, dispatches the
-task to the existing OpenClaw gateway (agent:main, per-session model override),
-waits for completion, summarizes, and renders the final spoken summary with
+task to the native Qubit worker session, waits for completion, summarizes,
+and renders the final spoken summary with
 piper. It asserts each stage and prints timings.
 
 Usage:
@@ -32,13 +32,13 @@ def main() -> int:
     ap.add_argument("--text", default=None)
     ap.add_argument("--model", default=None)
     ap.add_argument("--no-dispatch", action="store_true",
-                    help="stop after intent classification (no OpenClaw run)")
+                    help="stop after intent classification (no worker run)")
     args = ap.parse_args()
 
     cfg = Config.load()
     setup(level="INFO", jsonl=True, state_dir=cfg.state_dir())
     sample = args.text or ("Open the current project, inspect the Stripe webhook flow, "
-                           "and tell OpenClaw to patch the signature verification and add structured logs.")
+                           "and patch the signature verification and add structured logs.")
     t_start = time.time()
     stage = lambda n, msg: print(f"[{n}] {msg}")
 
@@ -85,9 +85,9 @@ def main() -> int:
         print(f"ROUNDTRIP (partial) OK in {time.time()-t_start:.1f}s")
         return 0
 
-    stage("4/6", f"dispatching to OpenClaw gateway (route={orch._route}, agent={orch.gateway_info.agent})")
+    stage("4/6", f"dispatching to the Qubit worker (route={orch._route})")
     if args.model:
-        cfg.data.setdefault("openclaw", {})["model"] = args.model
+        cfg.data.setdefault("agent", {})["model"] = args.model
     task_text = intent.task_text or tr.text
     # Bypass the confirmation gate for the *test* (it is not destructive), but
     # route through the same dispatch used by the bridge.
@@ -110,8 +110,8 @@ def main() -> int:
                 keys.add(json.loads(line).get("event"))
             except Exception:
                 pass
-        needed = {"asr.transcribe", "routing.decision", "openclaw.request", "tts.speak"}
-        # openclaw.result is present for ok/failed/timeout outcomes; a run that
+        needed = {"asr.transcribe", "routing.decision", "worker.dispatch", "tts.speak"}
+        # worker.result is present for ok/failed/timeout outcomes; a run that
         # is still going after task_timeout_s legitimately has no terminal result yet.
         missing = needed - keys
         print(f"      -> journal has {len(keys)} event types; missing: {missing or 'none'}")

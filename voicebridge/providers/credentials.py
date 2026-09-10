@@ -15,8 +15,8 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class SecretRef:
-    """Packet 8T-F — server-side credential reference (OpenClaw SecretRef shape,
-    resolved only through Qubit policy).
+    """Qubit server-side credential reference (resolved only through
+    Qubit policy).
 
     ``source`` is "env" (``name`` = variable) or "file" (``name`` = path).
     Values are resolved server-side via :func:`resolve_key` and the browser /

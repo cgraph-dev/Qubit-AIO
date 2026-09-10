@@ -1415,7 +1415,7 @@ class PowerControl:
         self._breakers: Dict[str, _CircuitBreaker] = {}
         self._slots: Dict[str, int] = {}
         self._active: Dict[str, Callable[[], None]] = {}
-        # 8T-F cross-wire: upstream runtimes (e.g. isolated Hermes `pause`)
+        # cross-wire: worker runtimes (e.g. session `pause`)
         # register here to halt NEW work on emergency stop. Empty by default
         # (zero behavior change); listener exceptions never break the latch.
         self._estop_listeners: List[Callable[[], None]] = []

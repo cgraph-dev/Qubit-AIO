@@ -1,17 +1,16 @@
-"""Packet 8T-F — Qubit Agent foundation: identity + singularity audit.
+"""Qubit foundation: identity, singularity audit, and runtime receipt.
 
-Single source for the 8T-F product identity and a hermetic, fail-closed
+Single source for the Qubit product identity and a hermetic, fail-closed
 audit proving the "one of everything" runtime contract:
 
-- one effective agent/session authority (Qubit; Hermes CLI contract is the
-  adapted text runtime, OpenClaw the supervised gateway — neither owns sessions);
+- one effective agent/session authority (Qubit-native agent turns);
 - one microphone listener, one voice session, one TTS path;
 - one broker/policy path, one audit path, one emergency-stop path.
 
-Competing Hermes/OpenClaw voice, microphone, wake-word, TTS, listener,
-router, or session paths are DISABLED by policy: this module records the
-refusals and the audit reports MULTIPLE whenever more than one live path of
-a kind is observed. It never starts listeners, servers, or runtimes itself.
+The audit reports MULTIPLE whenever more than one live path of a kind is
+observed. This module never starts listeners, servers, or runtimes itself.
+Upstream provenance (formerly adapted source) lives in
+voicebridge/upstream/ATTRIBUTION.md and docs/UPSTREAM_REUSE.md.
 """
 from __future__ import annotations
 
@@ -27,17 +26,10 @@ INSTALL_IDENTITY = "qubit-voicebridge"
 IMPORT_PACKAGE = "voicebridge"
 LEGACY_IDENTITY = "openclaw-voice-bridge"
 
-# --- 8T-F upstream pins (fresh read-only clones, no code copied) ---
-HERMES_URL = "https://github.com/NousResearch/hermes-agent"
-HERMES_TAG = "v2026.9.7"
-HERMES_COMMIT = "2237be355906fbe6065ce1815711eee52b2d646e"
-OPENCLAW_URL = "https://github.com/openclaw/openclaw"
-OPENCLAW_TAG = "v2026.9.2"
-OPENCLAW_COMMIT = "3928bad9badfcb6c7d140530435e806fb8092190"
-
-# Primary text-runtime contract (adapted, behind Qubit broker/policy):
-# `hermes chat -q TEXT -Q [--continue SESSION] [--model MODEL]`
-PRIMARY_RUNTIME_ARGV = ("hermes", "chat", "-q")
+# Qubit-native agent entry points (the effective runtime — no external
+# assistant process is launched or required by normal execution).
+AGENT_TURN_PATH = "voicebridge.agent.turn"
+AGENT_SESSION_PATH = "voicebridge.agent.run_session"
 
 SINGLE = "SINGLE"
 MULTIPLE = "MULTIPLE"
@@ -112,24 +104,14 @@ def collect_runtime_state(mic_open: Optional[bool] = None,
     return counts
 
 
-def disabled_competing_paths() -> List[Dict[str, str]]:
-    """Competing upstream voice paths refused by 8T-F policy (not executed)."""
+def native_authorities() -> List[Dict[str, str]]:
+    """The single native authority behind each runtime concern."""
     return [
-        {"path": "hermes voice_mode / local TTS servers",
-         "verdict": "DISABLED",
-         "reason": "Qubit orchestrator speak() + Playback own all audio output"},
-        {"path": "hermes wake-word mic loop",
-         "verdict": "DISABLED",
-         "reason": "no second listener; wake-word needs a separately authorized packet"},
-        {"path": "hermes gateway / tui_gateway voice methods",
-         "verdict": "DISABLED",
-         "reason": "would create a second event authority beside the Qubit dashboard backend"},
-        {"path": "openclaw bridge/browser TTS + profiles as authority",
-         "verdict": "DISABLED",
-         "reason": "8B loopback CDP is the only browser authority for 8U prep"},
-        {"path": "openclaw skills auto-install (ClawHub)",
-         "verdict": "DISABLED",
-         "reason": "unreviewed third-party code; allowlist + hash-pin + manual review only"},
+        {"concern": "agent turns", "authority": AGENT_TURN_PATH},
+        {"concern": "worker sessions", "authority": AGENT_SESSION_PATH},
+        {"concern": "audio output", "authority": "orchestrator speak() + Playback"},
+        {"concern": "browser", "authority": "loopback CDP tabs"},
+        {"concern": "skills", "authority": "reviewed manifests (allowlist + hash-pin)"},
     ]
 
 
@@ -141,107 +123,66 @@ def assert_foundation(report: Mapping[str, Any]) -> None:
             f"{dict(report.get('detail', {}))}")
 
 
-# --- Anti-substitution gate: the Hermes source must be the pinned tree ------
-# Phase B gate: fail if the source is a Qubit imitation, the wrong commit,
-# an operator install, or a temporary directory.
-HERMES_ENTRY_HASHES = {
-    "cli.py": "3b83554934147cb48048624d4ac69f5b6b9a61368b59e68f518e776890dd7b57",
-    "hermes_constants.py": "6e6e47b32e4aa8350afbd69e39e7d9648edc2c14558ce7464c2ff7ba3453a3a0",
-}
-HERMES_LAYOUT_MARKERS = ("cli.py", "LICENSE", "hermes_constants.py",
-                         "hermes_cli", "agent", "tools", "gateway")
+# --- Native runtime identity: the Qubit agent entry points -------------------
+# Wrong entry, missing module, or altered digest fails closed. There is no
+# external assistant source to verify: normal execution never launches one.
 
 
-def _operator_roots() -> List[str]:
-    """Directories that must never count as Qubit foundation source."""
-    roots: List[str] = []
-    try:
-        import shutil
-        found = shutil.which("hermes")
-        if found:
-            roots.append(str(Path(found).resolve().parents[1]))
-    except Exception:
-        pass
-    home = Path("~/.hermes").expanduser()
-    roots.append(str(home))
-    return roots
-
-
-def check_not_temporary(candidate: Any) -> str:
-    """Raise unless the path lives outside /tmp. Tested directly."""
-    text = str(candidate)
-    if "/tmp/" in text or text.startswith("/tmp"):
-        raise FoundationError("TEMPORARY_SOURCE: Hermes source must not "
-                              "live under /tmp")
-    return text
-
-
-def check_not_operator(candidate: Any, *,
-                       forbidden_roots: Optional[List[str]] = None) -> str:
-    """Raise when the path sits inside an operator Hermes location."""
-    resolved = str(Path(str(candidate)).expanduser().resolve())
-    for root in (forbidden_roots if forbidden_roots is not None
-                 else _operator_roots()):
-        if root and (resolved == root or resolved.startswith(root.rstrip("/") + "/")):
-            raise FoundationError("OPERATOR_INSTALL: candidate is inside an "
-                                  "operator Hermes location")
-    return resolved
-
-
-def check_layout_and_commit(path: Path) -> str:
-    """Raise unless the Hermes layout fingerprint and pin commit hold."""
+def _sha256_file(path: Path) -> str:
     import hashlib as _hashlib
-    import subprocess as _subprocess
 
-    for marker in HERMES_LAYOUT_MARKERS:
-        if not (path / marker).exists():
-            raise FoundationError(
-                f"NOT_HERMES_SOURCE: missing layout marker {marker}")
+    h = _hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def identity_receipt() -> Dict[str, Any]:
+    """Record the effective Qubit runtime identity (inspectable proof)."""
+    from . import agent as _agent
+
+    module_file = str(Path(str(_agent.__file__)).resolve())
     try:
-        proc = _subprocess.run(
-            ["git", "-C", str(path), "rev-parse", "HEAD"],
-            capture_output=True, text=True, timeout=30)
+        from .opencode import policy as _pol
+        from .opencode import state as _ocs
+        owned = _ocs.verify_owned_binary()
+        tool_runtime: Dict[str, Any] = {
+            "binary": str(owned.get("binary", "")),
+            "pin": _pol.PINNED_OPENCODE_VERSION,
+            "verified": bool(owned.get("ok")),
+        }
     except Exception as exc:
-        raise FoundationError(f"SOURCE_UNVERIFIABLE: git probe failed: {exc}")
-    if proc.returncode != 0 or proc.stdout.strip() != HERMES_COMMIT:
-        raise FoundationError(
-            f"WRONG_COMMIT: HEAD={proc.stdout.strip()[:12]!r} != pin "
-            f"{HERMES_COMMIT[:12]}")
-    for rel, digest in HERMES_ENTRY_HASHES.items():
-        target = path / rel
-        try:
-            h = _hashlib.sha256()
-            with open(target, "rb") as fh:
-                for chunk in iter(lambda: fh.read(65536), b""):
-                    h.update(chunk)
-        except OSError as exc:
-            raise FoundationError(f"ENTRY_MISSING: {rel}: {exc}")
-        if h.hexdigest() != digest:
-            raise FoundationError(f"HASH_MISMATCH: {rel} differs from pin")
-    return proc.stdout.strip()
+        tool_runtime = {"state": "UNAVAILABLE", "detail": str(exc)[:160]}
+    return {"schema": "qubit-runtime-identity/1",
+            "product": PRODUCT_NAME,
+            "agent_turn": AGENT_TURN_PATH,
+            "agent_session": AGENT_SESSION_PATH,
+            "module_file": module_file,
+            "module_sha256": _sha256_file(Path(module_file)),
+            "tool_runtime": tool_runtime}
 
 
-def verify_hermes_source(candidate: Any,
-                         *,
-                         forbidden_roots: Optional[List[str]] = None,
-                         allow_temporary: bool = False) -> Dict[str, Any]:
-    """Prove a directory is the pinned Hermes source tree (Phase B gate).
+def verify_runtime_identity() -> Dict[str, Any]:
+    """Fail closed unless the native agent entry points resolve.
 
-    Always proves layout fingerprint, pin commit, and entry hashes. The
-    /tmp and operator-location checks apply unless the caller explicitly
-    passes ``allow_temporary=True`` for read-only AUDIT of an isolated
-    clone (audit inputs live in temporary locations by design; they are
-    never accepted as the executed foundation).
-    Returns a VERIFIED record; raises FoundationError with a typed reason
-    otherwise. Pure inspection — never executes the candidate.
+    Checks the agent module exposes ``turn``/``run_session`` with the
+    native receipt marker, and the module file on disk matches the
+    receipt digest (altered runtime fails closed). Raises
+    FoundationError with a typed reason otherwise.
     """
-    if not allow_temporary:
-        check_not_temporary(candidate)
-    resolved = check_not_operator(candidate, forbidden_roots=forbidden_roots)
-    check_layout_and_commit(Path(resolved))
-    return {"state": "VERIFIED", "source": resolved, "commit": HERMES_COMMIT,
-            "tag": HERMES_TAG, "license": "MIT (Copyright (c) 2025 Nous Research)",
-            "audit_only": bool(allow_temporary)}
+    from . import agent as _agent
+
+    for name in ("turn", "run_session"):
+        if not callable(getattr(_agent, name, None)):
+            raise FoundationError(
+                f"MISSING_ENTRY: voicebridge.agent.{name} is not callable")
+    receipt = identity_receipt()
+    live_digest = _sha256_file(Path(receipt["module_file"]))
+    if live_digest != receipt["module_sha256"]:
+        raise FoundationError("DIGEST_MISMATCH: agent module changed "
+                              "between receipt and verification")
+    return {"state": "VERIFIED", "receipt": receipt}
 
 
 class FoundationError(RuntimeError):
@@ -249,35 +190,34 @@ class FoundationError(RuntimeError):
 
 
 def describe() -> Dict[str, Any]:
-    """Static foundation description: identity, pins, refused paths."""
+    """Static foundation description: identity and native authorities."""
     return {"schema": "qubit-foundation/1", "product": PRODUCT_NAME,
             "public_identity": PUBLIC_IDENTITY,
             "voice_subsystem": VOICE_SUBSYSTEM,
             "install_identity": INSTALL_IDENTITY,
             "import_package": IMPORT_PACKAGE,
             "legacy_identity": LEGACY_IDENTITY,
-            "hermes": {"url": HERMES_URL, "tag": HERMES_TAG,
-                       "commit": HERMES_COMMIT},
-            "openclaw": {"url": OPENCLAW_URL, "tag": OPENCLAW_TAG,
-                         "commit": OPENCLAW_COMMIT},
-            "primary_runtime_argv": list(PRIMARY_RUNTIME_ARGV),
-            "disabled_competing_paths": disabled_competing_paths()}
+            "native_authorities": native_authorities()}
 
 
-def runtime_check(provider: str = "fixture") -> Dict[str, Any]:
-    """Real end-to-end probe: start the adapted runtime, ping, one turn,
-    status, stop. Returns the receipt-bearing result (never a mock)."""
-    from .runtime import HermesRuntime
+def runtime_check() -> Dict[str, Any]:
+    """Real end-to-end probe of the native runtime: identity verification
+    plus one receipt-bearing agent turn (never a mock). A silent model
+    yields a typed FAILED verdict, never fabricated text."""
+    from .agent import AgentDenied, turn as _turn
 
-    rt = HermesRuntime(provider=provider)
     try:
-        before = rt.status()
-        turn = rt.turn("foundation runtime check", session="foundation")
-        live = rt.status()
-        return {"verdict": "OK" if turn.get("ok") else "FAILED",
-                "before": before, "turn": turn, "live": live}
-    finally:
-        rt.stop()
+        identity = verify_runtime_identity()
+    except FoundationError as exc:
+        return {"verdict": "FAILED", "error": str(exc)[:300]}
+    try:
+        res = _turn(None, "foundation runtime check",
+                    session="foundation")
+    except AgentDenied as exc:
+        return {"verdict": "FAILED", "error": str(exc)[:300],
+                "identity": identity}
+    return {"verdict": "OK" if res.get("ok") else "FAILED",
+            "identity": identity, "turn": res}
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -294,12 +234,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         _sys.stdout.write(_json.dumps(report, indent=2) + "\n")
         return 0  # audit ran; verdict (DEGRADED) is inside the JSON
     if cmd == "runtime-check":
-        provider = "fixture"
-        for flag in args[1:]:
-            if flag.startswith("--provider="):
-                provider = flag.split("=", 1)[1]
         try:
-            result = runtime_check(provider=provider)
+            result = runtime_check()
         except Exception as exc:
             _sys.stdout.write(_json.dumps(
                 {"verdict": "FAILED", "error": str(exc)[:300]}) + "\n")

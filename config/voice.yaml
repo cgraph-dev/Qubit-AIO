@@ -1,7 +1,7 @@
-# OpenClaw Voice Bridge — repository tuned baseline (machine-agnostic;
+# Qubit VoiceBridge — repository tuned baseline (machine-agnostic;
 # per-machine values live only in the user config, see docs/AUDIO_SETUP.md).
 # Machine-agnostic defaults live in config/voice.example.yaml (installed to
-# ~/.config/openclaw-voice-bridge/voice.yaml on fresh machines by install.sh).
+# ~/.config/qubit-voicebridge/voice.yaml on fresh machines by install.sh).
 
 # ---------------------------------------------------------------------------
 # Push-to-talk hotkeys
@@ -87,7 +87,7 @@ tts:
   openai:
     voice: nova
     model: gpt-4o-mini-tts
-    key_env: ~/.hermes/.env
+    key_env: ~/.config/qubit-voicebridge/.env
     instructions: "Speak with a warm, soft and sexy tone, with a subtle, elegant Japanese accent. Gentle, breathy and intimate, slightly playful — like a caring Japanese girlfriend. Speak naturally, at a relaxed pace, clear and affectionate."
 
 # ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ tts:
 intent:
   llm_classifier: true   # LLM fallback for accent/broken-English (user approved ~20% cost); deterministic heuristics run first
   local_llm:
-    enabled: true         # bridge answers casual talk itself (<0.5s); rest -> OpenClaw/Hermes
+    enabled: true         # bridge answers casual talk itself (<0.5s); rest -> worker sessions
                           # DeepSeek API handles long/complex/web asks
     model: qubit-brain4  # Qwen3-4B abliterated (Packet 4B sanitized artifact; /no_think via payload builders)
     url: http://127.0.0.1:11434
@@ -106,47 +106,36 @@ intent:
     # are never injected. Legacy inject_memory key is no longer read.
     num_ctx: 4096         # canonical runner contract (Packet 4B): compiled context + dialogs + history + output reserve fit with headroom
 
-  conversation_backend: local      # bridge answers ALL chat (<0.5s); only tasks -> OpenClaw/Hermes
-  templates_path: ~/.config/openclaw-voice-bridge/task-templates.yaml  # daily-task templates
+  conversation_backend: local      # bridge answers ALL chat (<0.5s); only tasks -> worker sessions
+  templates_path: ~/.config/qubit-voicebridge/task-templates.yaml  # daily-task templates
   deepseek_url: https://api.deepseek.com/chat/completions
   deepseek_model: deepseek-v4-flash
-  deepseek_env: ~/.hermes/.env     # DEEPSEEK_API_KEY lives here
+  deepseek_env: ~/.config/qubit-voicebridge/.env     # DEEPSEEK_API_KEY lives here
   # Perplexity: web/current-info questions (requires PERPLEXITY_API_KEY)
   perplexity_enabled: true
   perplexity_url: https://api.perplexity.ai/chat/completions
   perplexity_model: sonar-pro
-  perplexity_env: ~/.hermes/.env
+  perplexity_env: ~/.config/qubit-voicebridge/.env
 
 # ---------------------------------------------------------------------------
-# OpenClaw gateway (auto-discovered from ~/.openclaw/; these are overrides)
-openclaw:
-  gateway_url: null       # auto: ws://127.0.0.1:<port from openclaw config>
-  token_file: ~/.openclaw/.env
-  agent: main
-  model: null             # null = follow the agent's default model (deepseek flash)
+# Qubit agent (native turns + worker sessions; the only task executor)
+agent:
+  enabled: true
+  model: null             # null = Qubit default (qubit-brain4)
   session_prefix: voice
-  ask_executor: true       # ask 'OpenClaw or Hermes?' before each coding task (until a bigger GPU)
   task_timeout_s: 900
   progress_updates: true
   progress_min_interval_s: 45
 
-# Optional second executor (same machine as the bridge)
-hermes:
-  enabled: true           # 'ask Hermes to ...' -> local hermes CLI (opt-in phrasing)
-  cmd: hermes
-  resume_session: voice
-  timeout_s: 600
-  model: null
-
-# Local PC actions — whitelisted, safe, reversible. Risky actions go to
-# OpenClaw where the safety policy + confirmations apply.
+# Local PC actions — whitelisted, safe, reversible. Risky actions run as
+# supervised worker sessions where the safety policy + confirmations apply.
 local:
   enabled: true
 
-# Memory — loaded from the OpenClaw workspace into the persona prompt
+# Memory — loaded from the Qubit workspace into the persona prompt
 memory:
   enabled: true
-  workspace: ~/.openclaw/workspace
+  workspace: ~/.config/qubit-voicebridge/workspace
   context_chars: 1500
   save_notes: true
 
@@ -184,4 +173,4 @@ webui:
 logging:
   level: INFO
   jsonl: true               # structured event journal (observability)
-  jsonl_path: null          # default: ~/.local/state/openclaw-voice-bridge/events.jsonl
+  jsonl_path: null          # default: ~/.local/state/qubit-voicebridge/events.jsonl

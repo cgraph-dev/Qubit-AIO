@@ -13,7 +13,7 @@ autonomous loop — jobs run only when ``run_due`` is invoked explicitly
 timer. The monitor remains the sole autonomous scheduler; there is one
 scheduling authority, not two.
 
-Hermes implements cron jobs, a scheduler, executions, and a ledger
+Qubit implements cron jobs, a scheduler, executions, and a ledger
 (``cron/jobs.py``, ``cron/scheduler*.py``, ``cron/executions.py``,
 ``cron/ledger.py`` at the pinned ``v2026.9.7 @ 2237be3`` revision);
 Qubit implements the user-facing scheduling contract natively with a
@@ -445,25 +445,25 @@ def history(cfg: Any, job_id: int = 0, limit: int = 30) -> Dict[str, Any]:
 # --------------------------------------------------------------- execution
 def _default_executor(task_text: str, *, session: str,
                       estop_engaged: Callable[[], bool]) -> Dict[str, Any]:
-    """Dispatch one due job through the agent runtime (same runtime the
-    CLI ``task`` path prefers). Typed unavailable states, never fake OK."""
-    from .runtime.real_hermes import RealHermesRuntime, RealHermesDenied
+    """Dispatch one due job through the Qubit-native agent (same agent the
+    CLI ``task`` path uses). Typed unavailable states, never fake OK."""
+    from .agent import AgentDenied, turn as agent_turn
 
     if estop_engaged():
         return {"state": "UNAVAILABLE", "code": "EMERGENCY_STOP",
                 "detail": "emergency stop latched"}
-    rt = RealHermesRuntime(estop_engaged=estop_engaged)
     try:
-        res = rt.turn(task_text, session=session)
-    except RealHermesDenied as exc:
+        res = agent_turn(None, task_text, session=session,
+                         estop_engaged=estop_engaged)
+    except AgentDenied as exc:
         msg = str(exc)
         code = "EMERGENCY_STOP" if "EMERGENCY_STOP" in msg else \
-            "RUNTIME_DISABLED"
+            "AGENT_DISABLED"
         return {"state": "UNAVAILABLE", "code": code,
                 "detail": msg[:200]}
     if not isinstance(res, dict) or not res.get("ok"):
         return {"state": "UNAVAILABLE",
-                "code": str((res or {}).get("code", "RUNTIME_ERROR")),
+                "code": str((res or {}).get("code", "AGENT_ERROR")),
                 "detail": str((res or {}).get("error", ""))[:200]}
     return {"state": "OK", "code": "OK",
             "detail": str(res.get("reply", ""))[:300]}

@@ -1,9 +1,9 @@
-"""Packet 8T-F — credential-reference inventory + session listing.
+"""Qubit credential-reference inventory + session listing.
 
-Read-only surfaces proving Hermes `auth`/`sessions` parity behind Qubit
-contracts: credential REFERENCES (never values) per configured provider,
-and recent action sessions from the receipt store (redacted). No keys,
-tokens, cookies, or private bodies ever leave this module.
+Read-only surfaces behind Qubit contracts: credential REFERENCES (never
+values) per configured provider, and recent action sessions from the
+receipt store (redacted). No keys, tokens, cookies, or private bodies
+ever leave this module.
 """
 from __future__ import annotations
 

@@ -13,7 +13,7 @@ requires explicit confirmation (``confirmed=True`` from the CLI
 confirmation) and is audited. Page text is untrusted evidence: bounded,
 redacted, and marked as such — it can never widen a permission.
 
-Hermes implements tab supervision, cloud browsers, and remote CDP
+Qubit implements tab supervision over loopback CDP only
 endpoints (``tools/browser_tool*.py``, ``browser_camofox*.py``); Qubit
 implements only loopback tab operations natively. Provenance and the
 deliberate divergence are recorded in ``docs/UPSTREAM_REUSE.md``.

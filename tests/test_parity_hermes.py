@@ -1,11 +1,11 @@
-"""Packet 8T-F — Hermes command parity: every row mapped and proven.
+"""Qubit command parity: every upstream capability mapped and proven.
 
-The machine inventory (docs/HERMES_SURFACE.json, dumped from the real
-pinned binary) lists every Hermes subcommand. docs/PARITY_HERMES.json maps
-each to a Qubit counterpart (IMPLEMENTED), a tested boundary (BLOCKED), or
-a documented refusal (REJECTED). These tests prove the mapping behaviorally:
-no row is unclassified, IMPLEMENTED rows execute Qubit code paths, BLOCKED
-rows fail closed with typed states, and forbidden flags do not exist.
+The machine inventory (docs/HERMES_SURFACE.json, dumped from the pinned
+upstream binary) lists every upstream subcommand as a comparison oracle.
+docs/PARITY_HERMES.json maps each to its Qubit counterpart. These tests
+prove the mapping behaviorally: no row is unclassified, every mapped row
+executes a Qubit-native code path, unsafe rows fail closed with typed
+states, and forbidden flags do not exist.
 """
 from __future__ import annotations
 
@@ -71,8 +71,10 @@ def test_chat_maps_to_talk_and_runtime_turn():
         if isinstance(action, argparse._SubParsersAction):
             names = list(action.choices.keys())
     assert "task" in names and "status" in names
-    from voicebridge.hermes.backend import HermesBackend
-    assert HermesBackend(cmd="hermes", resume_session="voice").resume_session == "voice"
+    from voicebridge.agent import run_session, turn
+    from voicebridge import foundation as F
+    assert F.AGENT_TURN_PATH == "voicebridge.agent.turn"
+    assert callable(turn) and callable(run_session)
 
 
 def test_model_provider_fallback_defaults_local():
@@ -104,12 +106,15 @@ def test_status_pause_doctor_config_commands_exist():
         assert cmd in names, cmd
 
 
-def test_query_file_contract():
-    from voicebridge.openclaw.cli_backend import CliBackend
+def test_oneshot_argv_contract():
+    from pathlib import Path as _P
 
-    import inspect
-    src = inspect.getsource(CliBackend.run_task)
-    assert "--message-file" in src
+    from voicebridge.opencode.transport import build_argv
+
+    argv = build_argv("/bin/opencode", _P("/tmp/p"), "do work")
+    assert argv[1] == "run"
+    assert "--format" in argv and "--dir" in argv
+    assert "serve" not in argv and "--auto" not in argv
 
 
 def test_no_per_call_model_options():
