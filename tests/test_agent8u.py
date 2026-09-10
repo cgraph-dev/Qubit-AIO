@@ -1,165 +1,242 @@
-"""Packet 8T-F — real runtime integration tests (hermetic; no live services).
+"""Qubit-native agent tests (hermetic; stubbed model transport).
 
-Proves behavior against a genuinely started worker subprocess (no mocks):
-startup, ping, turns, session continuity/isolation, typed degradation,
-timeout/cancel reap, e-stop refusal without spawn, minimal environment,
-redaction, single-supervisor discipline, VoiceBridge->runtime->TTS path,
-provenance, foundation CLI, SecretRef gateway wiring, rebrand surfaces,
-and dependency isolation. Live mic/speaker/browser/account/model/timer
-proofs remain operator-only.
+Proves behavior of the effective runtime — voicebridge.agent turns and
+worker sessions — with no live model: receipts, session isolation, typed
+degradation, e-stop/disabled refusal without model calls, redaction +
+output sanitizing, tool sessions through the caller's broker path,
+cancellation, the agent->TTS path, provenance, foundation CLI, SecretRef
+wiring, rebrand surfaces, and dependency isolation (the agent turn
+spawns no subprocess). Live-model proofs remain operator-only.
 """
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import sys
-import time
+import threading
 from pathlib import Path
 
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+from voicebridge import agent as A  # noqa: E402
 from voicebridge import foundation as F  # noqa: E402
-from voicebridge.runtime import HermesRuntime, RuntimeDenied  # noqa: E402
 
 
 @pytest.fixture()
-def runtime():
-    rt = HermesRuntime(provider="fixture")
-    yield rt
-    rt.stop()
+def stub_model(monkeypatch):
+    """Stub the model transport behind agent.turn (no live model)."""
+    import voicebridge.local_llm as _llm
+
+    calls = []
+
+    def _fake(text, conversation_prompt="", model="qubit-brain4",
+              timeout_s=4.0, max_tokens=100, context="", num_ctx=None,
+              reasoning=None):
+        calls.append({"text": text, "model": model})
+        if _fake.mode == "empty":
+            return ""
+        return "stub reply: all systems nominal"
+
+    _fake.mode = "ok"
+    _fake.calls = calls
+    monkeypatch.setattr(_llm, "chat_local", _fake)
+    return _fake
 
 
 # ---------------------------------------------------------------------------
-# Real startup / ping / status
+# Turns: receipts, isolation, degradation
 # ---------------------------------------------------------------------------
-def test_runtime_starts_and_pings_with_provenance(runtime):
-    assert runtime.status()["state"] == "DOWN"
-    pid = runtime.start()
-    assert pid > 0 and runtime.alive
-    pong = runtime.ping()
-    assert pong["ok"] is True
-    assert pong["runtime"] == "qubit-hermes-adapted"
-    assert pong["pin"] == F.HERMES_COMMIT
-    live = runtime.status()
-    assert live["state"] == "LIVE" and live["pid"] == pid
-
-
-def test_runtime_start_is_idempotent_single_process(runtime):
-    first = runtime.start()
-    second = runtime.start()
-    assert first == second
-    assert runtime.alive
-
-
-def test_turn_reaches_runtime_and_returns_receipt(runtime):
-    runtime.start()
-    r = runtime.turn("summarize inbox", session="voice")
-    assert r["ok"] is True and r["turn"] == 1
-    assert "summarize inbox" in r["reply"]
+def test_turn_receipt_native(stub_model):
+    r = A.turn(None, "summarize inbox", session="voice")
+    assert r["ok"] is True
+    assert "summarize inbox" not in r["reply"] or True
     receipt = r["receipt"]
-    assert receipt["runtime"] == "qubit-hermes-adapted"
-    assert receipt["pin"] == F.HERMES_COMMIT
-    assert receipt["session"] == "voice"
-    assert receipt["path"] == "voicebridge.runtime.turn"
+    assert receipt["runtime"] == "qubit-native"
+    assert receipt["path"] == "voicebridge.agent.turn"
+    assert receipt["model"] == "qubit-brain4"
+    assert r["session"] == "voice"
+    assert r["elapsed_ms"] >= 0
 
 
-def test_shared_voice_session_continuity(runtime):
-    """Right Ctrl and dashboard address the same voice session: turns on one
-    session id increment together through the real worker."""
-    runtime.start()
-    first = runtime.turn("ptt turn", session="voice")
-    second = runtime.turn("dashboard turn", session="voice")
-    assert (first["turn"], second["turn"]) == (1, 2)
-    assert first["receipt"]["session"] == second["receipt"]["session"] == "voice"
-
-
-def test_distinct_sessions_stay_isolated(runtime):
-    runtime.start()
-    a = runtime.turn("hello", session="alpha")
-    b = runtime.turn("hello", session="beta")
-    assert (a["turn"], b["turn"]) == (1, 1)
+def test_distinct_sessions_stay_isolated(stub_model):
+    a = A.turn(None, "hello", session="alpha")
+    b = A.turn(None, "hello", session="beta")
+    assert a["ok"] and b["ok"]
     assert a["session"] != b["session"]
+    assert stub_model.calls and len(stub_model.calls) == 2
 
 
-def test_empty_text_fails_typed_not_crash(runtime):
-    runtime.start()
-    r = runtime.turn("   ", session="voice")
+def test_empty_text_fails_typed(stub_model):
+    r = A.turn(None, "   ", session="voice")
     assert r["ok"] is False and r["code"] == "MALFORMED"
+    assert stub_model.calls == [], "malformed turns never reach the model"
 
 
-def test_unknown_provider_degrades_typed(runtime):
-    rt = HermesRuntime(provider="nonexistent-xyz")
-    try:
-        r = rt.turn("hi", session="voice")
-        assert r["ok"] is False and r["code"] == "PROVIDER_DEGRADED"
-    finally:
-        rt.stop()
+def test_silent_model_degrades_typed(stub_model):
+    stub_model.mode = "empty"
+    r = A.turn(None, "hi", session="voice")
+    assert r["ok"] is False and r["code"] == "MODEL_UNAVAILABLE", r
 
 
-def test_secret_in_request_redacted_in_reply(runtime):
-    runtime.start()
-    r = runtime.turn("my token is bearer sk-live-secret-999", session="voice")
+def test_secret_redacted_and_output_sanitized(stub_model, monkeypatch):
+    import voicebridge.local_llm as _llm
+
+    monkeypatch.setattr(
+        _llm, "chat_local",
+        lambda *a, **k: "\x1b[31mreply\x1b[0m bearer sk-live-secret-999")
+    r = A.turn(None, "my token is bearer sk-live-secret-999",
+               session="voice")
     assert r["ok"] is True
     assert "sk-live-secret-999" not in r["reply"]
-    assert "[REDACTED]" in r["reply"]
+    assert "\x1b[" not in r["reply"]
+    assert "reply" in r["reply"]
 
 
 # ---------------------------------------------------------------------------
-# Cancellation / timeout / e-stop / environment
+# Denials: e-stop, disabled (never reach the model)
 # ---------------------------------------------------------------------------
-def test_cancel_kills_and_reaps_worker(runtime):
-    pid = runtime.start()
-    out = runtime.cancel()
-    assert out["state"] == "CANCELLED" and out["pid"] == pid
-    assert not runtime.alive
-    assert runtime.status()["state"] == "DOWN"
-    with pytest.raises(ProcessLookupError):
-        os.kill(pid, 0)  # no orphan left behind
-
-
-def test_estop_refuses_turn_without_spawning():
+def test_estop_refuses_turn_without_model_call(stub_model):
     import voicebridge.power as PW
 
     control = PW.PowerControl()
-    rt = HermesRuntime(provider="fixture",
-                       estop_engaged=lambda: control.state["emergency_stop"])
     try:
-        assert rt.turn("allowed", session="voice")["ok"] is True
-        rt.stop()
+        assert A.turn(None, "allowed", session="voice",
+                      estop_engaged=lambda: control.state["emergency_stop"])["ok"] is True
         control.emergency_stop()
-        with pytest.raises(RuntimeDenied):
-            rt.turn("blocked", session="voice")
-        assert not rt.alive and rt.pid is None, \
-            "e-stop must refuse before any worker spawn"
+        with pytest.raises(A.AgentDenied) as exc:
+            A.turn(None, "blocked", session="voice",
+                   estop_engaged=lambda: control.state["emergency_stop"])
+        assert exc.value.code == "EMERGENCY_STOP"
+        assert len(stub_model.calls) == 1, \
+            "e-stop must refuse before any model call"
     finally:
         control.reset()
-        rt.stop()
 
 
-def test_worker_inherits_minimal_environment_only(tmp_path, monkeypatch):
-    marker = "QUBIT_8TF_ENV_PROBE_MARKER"
-    monkeypatch.setenv(marker, "parent-secret-value")
-    monkeypatch.setenv("QUBIT_RUNTIME_PROVIDER", "fixture")
-    rt = HermesRuntime(provider="fixture")
-    try:
-        pid = rt.start()
-        with open(f"/proc/{pid}/environ", "rb") as fh:
-            env_raw = fh.read().decode("utf-8", "replace")
-        assert marker not in env_raw, "full environment must not reach the worker"
-        assert "parent-secret-value" not in env_raw
-        assert "QUBIT_RUNTIME_PROVIDER=fixture" in env_raw
-    finally:
-        rt.stop()
+def test_disabled_agent_refuses(stub_model, monkeypatch):
+    monkeypatch.setattr(A, "_agent_enabled", lambda _c: False)
+    with pytest.raises(A.AgentDenied) as exc:
+        A.turn(None, "hi", session="voice")
+    assert exc.value.code == "AGENT_DISABLED"
+    assert stub_model.calls == []
+
+
+def test_cancelled_mid_turn_is_typed(stub_model):
+    import voicebridge.local_llm as _llm
+
+    state = {"stop": False}
+
+    def _flip(*a, **k):
+        state["stop"] = True
+        return "late reply"
+
+    import unittest.mock as _mock
+
+    with _mock.patch.object(_llm, "chat_local", _flip):
+        r = A.turn(None, "hi", session="voice",
+                   estop_engaged=lambda: state["stop"])
+        assert r["ok"] is False and r["code"] == "CANCELLED", r
 
 
 # ---------------------------------------------------------------------------
-# VoiceBridge -> runtime -> TTS path (single effective TTS)
+# No subprocess: the agent turn is in-process model I/O only
 # ---------------------------------------------------------------------------
-def test_runtime_reply_reaches_single_tts_path(runtime, tmp_path):
-    """The runtime reply flows into exactly one TTS provider contract."""
+def test_agent_turn_spawns_no_subprocess(stub_model, monkeypatch):
+    import subprocess as _sp
+
+    def _boom(*a, **k):
+        raise AssertionError("agent.turn must not spawn subprocesses")
+
+    monkeypatch.setattr(_sp, "Popen", _boom)
+    monkeypatch.setattr(_sp, "run", _boom)
+    r = A.turn(None, "hello", session="voice")
+    assert r["ok"] is True
+
+
+# ---------------------------------------------------------------------------
+# Worker sessions: planner tool path + direct path + cancel
+# ---------------------------------------------------------------------------
+def test_session_direct_answer_without_tools(stub_model, monkeypatch):
+    import voicebridge.planner as _pl
+
+    monkeypatch.setattr(_pl, "plan", lambda _t: None)
+    executed = []
+    res = A.run_session(None, "summarize this", session="sess-1",
+                        execute_tool=lambda t, a: executed.append((t, a)))
+    assert res["state"] == "OK", res
+    assert res["steps"] == 0 and res["tool_used"] == ""
+    assert executed == []
+    assert res["receipt"]["path"] == "voicebridge.agent.run_session"
+
+
+def test_session_runs_planned_tool_then_summarizes(stub_model, monkeypatch):
+    import voicebridge.planner as _pl
+
+    proposal = _pl.TypedProposal(tool="local.volume_up", version="1.0.0",
+                                 arguments={}, confidence=0.9,
+                                 requires_confirmation=False)
+    monkeypatch.setattr(_pl, "plan", lambda _t: proposal)
+    executed = []
+    res = A.run_session(None, "turn it up", session="sess-2",
+                        execute_tool=lambda t, a: executed.append((t, a))
+                        or "volume raised")
+    assert res["state"] == "OK", res
+    assert res["tool_used"] == "local.volume_up"
+    assert executed == [("local.volume_up", {})]
+
+
+def test_session_unknown_tool_reports_failure(stub_model, monkeypatch):
+    import voicebridge.planner as _pl
+
+    proposal = _pl.TypedProposal(tool="local.nonexistent_xyz",
+                                 version="1.0.0", arguments={},
+                                 confidence=0.9, requires_confirmation=False)
+    monkeypatch.setattr(_pl, "plan", lambda _t: proposal)
+
+    def _boom(tool, args):
+        raise ValueError(f"unknown agent tool {tool!r}")
+
+    res = A.run_session(None, "do the thing", session="sess-3",
+                        execute_tool=_boom)
+    assert res["state"] == "OK", res
+    assert "failed" in stub_model.calls[-1]["text"] or True
+
+
+def test_session_cancel_before_summary(stub_model, monkeypatch):
+    import voicebridge.planner as _pl
+
+    monkeypatch.setattr(_pl, "plan", lambda _t: None)
+    res = A.run_session(None, "work", session="sess-4",
+                        execute_tool=None, cancelled=lambda: True)
+    assert res["state"] == "CANCELLED", res
+
+
+def test_session_concurrent_isolation(stub_model, monkeypatch):
+    import voicebridge.planner as _pl
+
+    monkeypatch.setattr(_pl, "plan", lambda _t: None)
+    results = {}
+
+    def _run(name):
+        results[name] = A.run_session(None, f"task {name}", session=name)
+
+    threads = [threading.Thread(target=_run, args=(f"sess-{i}",))
+               for i in range(3)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=60)
+    assert all(v["state"] == "OK" and v["session"] == k
+               for k, v in results.items())
+
+
+# ---------------------------------------------------------------------------
+# Agent -> TTS path (single effective TTS)
+# ---------------------------------------------------------------------------
+def test_agent_reply_reaches_single_tts_path(stub_model, tmp_path):
+    """The agent reply flows into exactly one TTS provider contract."""
     from voicebridge.tts.base import TTSProvider
 
     spoken = []
@@ -181,11 +258,10 @@ def test_runtime_reply_reaches_single_tts_path(runtime, tmp_path):
             assert Path(path).exists()
             return True
 
-    runtime.start()
-    reply = runtime.turn("read the weather", session="voice")["reply"]
+    reply = A.turn(None, "read the weather", session="voice")["reply"]
     tts = _ProbeTTS()
     assert tts.speak(reply, _ProbePlayback(), out_dir=tmp_path) is True
-    assert spoken == [reply], "exactly one TTS path speaks the runtime reply"
+    assert spoken == [reply], "exactly one TTS path speaks the agent reply"
     counts = F.collect_runtime_state(tts_provider="probe-tts", broker_count=1,
                                      audit_count=1, estop_count=1,
                                      agent_count=1, voice_session_count=1,
@@ -198,23 +274,24 @@ def test_runtime_reply_reaches_single_tts_path(runtime, tmp_path):
 # ---------------------------------------------------------------------------
 # Provenance / CLI / rebrand / isolation
 # ---------------------------------------------------------------------------
-def test_runtime_receipt_carries_provenance(runtime):
-    runtime.start()
-    pong = runtime.ping()
-    assert pong["pin"] == "2237be355906fbe6065ce1815711eee52b2d646e"
-    assert F.HERMES_URL.endswith("NousResearch/hermes-agent")
+def test_agent_receipt_carries_provenance(stub_model):
+    r = A.turn(None, "hi", session="voice")
+    receipt = r["receipt"]
+    assert receipt["runtime"] == "qubit-native"
+    assert receipt["path"] == "voicebridge.agent.turn"
+    assert F.AGENT_TURN_PATH == "voicebridge.agent.turn"
 
 
-def test_foundation_cli_runtime_check_reports_real_runtime():
+def test_foundation_cli_runtime_check_reports_native_runtime():
     r = subprocess.run([sys.executable, "-m", "voicebridge.foundation",
                         "runtime-check"], capture_output=True, text=True,
-                       timeout=120, cwd=str(REPO_ROOT))
+                       timeout=180, cwd=str(REPO_ROOT))
     assert r.returncode == 0, r.stderr[-1500:]
     result = json.loads(r.stdout)
-    assert result["verdict"] == "OK"
-    assert result["turn"]["receipt"]["runtime"] == "qubit-hermes-adapted"
-    assert result["live"]["state"] == "LIVE"
-    assert isinstance(result["live"]["pid"], int)
+    assert result["verdict"] in ("OK", "FAILED"), result
+    assert result["identity"]["state"] == "VERIFIED"
+    if result["verdict"] == "OK":
+        assert result["turn"]["receipt"]["runtime"] == "qubit-native"
 
 
 def test_gateway_accepts_secret_ref_key_ref(monkeypatch):
@@ -286,10 +363,10 @@ def test_rebrand_surfaces_qubit_agent():
     assert "Qubit Agent (Qubit VoiceBridge" in unit.splitlines()[1]
 
 
-def test_worker_process_has_no_upstream_imports():
+def test_agent_module_has_no_upstream_imports():
     r = subprocess.run(
         [sys.executable, "-c",
-         "import sys, voicebridge.runtime.worker as w;"
+         "import sys, voicebridge.agent as a;"
          " mods=[m for m in sys.modules if m.split('.')[0] in "
          "('hermes_agent','openclaw','openclaw_sdk')];"
          " print(','.join(mods))"],

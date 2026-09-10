@@ -1,1 +1,1 @@
-"""OpenClaw discovery + execution backends."""
+"""Qubit gateway protocol package (frame validation + dispatch)."""
