@@ -1947,10 +1947,12 @@ def _b_runtime(ctx, args):
         return RI.doctor(ctx.cfg)
     if action == "install":
         return RI.install(ctx.cfg, str(args.get("name", "")),
-                          requested_by="voice:user", confirmed=True)
+                          requested_by="voice:user", confirmed=True,
+                          source=str(args.get("source", "") or ""))
     if action == "upgrade":
         return RI.upgrade(ctx.cfg, str(args.get("name", "")),
-                          requested_by="voice:user", confirmed=True)
+                          requested_by="voice:user", confirmed=True,
+                          source=str(args.get("source", "") or ""))
     if action == "rollback":
         return RI.rollback(ctx.cfg, str(args.get("name", "")),
                            requested_by="voice:user", confirmed=True)
@@ -3899,7 +3901,7 @@ _E("runtime_doctor", "Runtime diagnosis",
    help="Resource/permission/hygiene diagnosis.")
 _E("runtime_install", "Install runtime",
    ("install runtime", "install container", "set up runtime"),
-   "runtime", ("runtime",), args=(_R("name"),),
+   "runtime", ("runtime",), args=(_R("name"), _S("source")),
    fixed=(("action", "install"),), confirm=True, summary="runtime",
    examples=("qubit, install runtime hermes-runtime",),
    help="Install a pinned runtime from staged artifacts (confirmed; never downloads).")

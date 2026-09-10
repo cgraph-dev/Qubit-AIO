@@ -183,15 +183,31 @@ def _hermes_provenance() -> Dict[str, Any]:
 
 
 def _opencode_provenance() -> Dict[str, Any]:
-    from .opencode import policy as POL
+    """Provenance for the opencode-binary image.
 
+    The Qubit-owned verified copy (materialized by install) is
+    authoritative: when present and digest-verified it is what Qubit
+    executes. Legacy operator candidates are reported alongside so no
+    surface can confuse them with the effective binary."""
+    from .opencode import policy as POL
+    from .opencode import state as _OCS
+
+    owned = _OCS.verify_owned_binary()
+    out: Dict[str, Any] = {"pin": POL.PINNED_OPENCODE_VERSION,
+                           "owned": owned}
+    if owned.get("ok"):
+        out.update({"installed": True, "binary": owned["binary"],
+                    "digest": f"sha256:{owned['sha256']}",
+                    "effective": True})
+        return out
     candidates = [Path(POL.DEFAULT_BINARY), Path(shutil.which("opencode") or "")]
     for cand in candidates:
         if cand and cand.is_file():
-            return {"installed": True, "binary": str(cand),
-                    "pin": POL.PINNED_OPENCODE_VERSION,
-                    "digest": _sha256_file(cand)}
-    return {"installed": False, "pin": POL.PINNED_OPENCODE_VERSION}
+            out.update({"installed": True, "binary": str(cand),
+                        "digest": _sha256_file(cand), "effective": False})
+            return out
+    out["installed"] = False
+    return out
 
 
 def status(cfg: Any) -> Dict[str, Any]:
@@ -215,7 +231,8 @@ def status(cfg: Any) -> Dict[str, Any]:
         elif not record or record.get("removed_at"):
             st = "STAGED"
         elif prov.get("receipt") == "UNREADABLE" or (
-                name == "hermes-runtime" and not prov.get("verified")):
+                name == "hermes-runtime" and not prov.get("verified")) or (
+                name == "opencode-binary" and not prov.get("effective")):
             st = "DEGRADED"
         else:
             st = "READY"
@@ -228,7 +245,7 @@ def status(cfg: Any) -> Dict[str, Any]:
         if prov.get("installed"):
             item["observed"] = {k: v for k, v in prov.items()
                                 if k in ("binary", "dir", "digest",
-                                         "verified", "receipt")
+                                         "verified", "receipt", "effective")
                                 and not isinstance(v, dict)}
         out.append(item)
     return {"state": "OK", "runtimes": out,
@@ -253,7 +270,7 @@ def _record_install(cfg: Any, name: str, digest: str,
 
 
 def install(cfg: Any, name: str, *, requested_by: str = "cli:user",
-            confirmed: bool = False) -> Dict[str, Any]:
+            confirmed: bool = False, source: str = "") -> Dict[str, Any]:
     """Install a pinned runtime image (confirmed; digest-verified).
 
     Never downloads: the local artifact must already be staged (the
@@ -290,19 +307,21 @@ def install(cfg: Any, name: str, *, requested_by: str = "cli:user",
                              f"{STATE_FILE}; `qubit runtime rollback {name}"
                              " --confirm` restores it")}
     from .opencode import policy as POL
+    from .opencode import state as _OCS
 
-    prov = _opencode_provenance()
-    if not prov.get("installed"):
+    staged = _staged_opencode_binary(source)
+    if staged is None:
         raise RuntimeImageError(
             STAGING_CODE,
             "opencode-binary install needs the pinned executable staged"
-            f" locally at {POL.DEFAULT_BINARY} (opencode"
+            " locally: pass --source <path>, set QUBIT_OPENCODE_PIN_BIN,"
+            f" or stage it at {POL.DEFAULT_BINARY} (opencode"
             f" {POL.PINNED_OPENCODE_VERSION} from {entry['source']});"
             " nothing was downloaded and nothing was installed")
     import subprocess as _sp
 
     try:
-        proc = _sp.run([str(prov["binary"]), "--version"],
+        proc = _sp.run([str(staged), "--version"],
                        capture_output=True, text=True, timeout=15)
         reported = ((proc.stdout or "") + (proc.stderr or "")).strip()[:80]
     except Exception as exc:
@@ -314,20 +333,60 @@ def install(cfg: Any, name: str, *, requested_by: str = "cli:user",
             f"staged binary reports {reported!r}; pinned version is"
             f" {POL.PINNED_OPENCODE_VERSION} — refusing to activate an"
             " unpinned executable")
-    digest = f"sha256:{prov['digest']}"
-    record = _record_install(cfg, name, digest, requested_by)
+    owned = _OCS.owned_binary()
+    owned.parent.mkdir(parents=True, exist_ok=True)
+    tmp = owned.parent / "opencode.tmp"
+    tmp.write_bytes(staged.read_bytes())
+    os.chmod(tmp, 0o755)
+    os.replace(tmp, owned)
+    try:
+        os.chmod(owned, 0o755)
+    except OSError:
+        pass
+    digest = _sha256_file(owned)
+    receipt = _OCS.owned_receipt_path()
+    receipt.write_text(json.dumps(
+        {"version": POL.PINNED_OPENCODE_VERSION, "sha256": digest,
+         "source": staged.name,
+         "installed_at": _now(), "installed_by": requested_by},
+        indent=2, sort_keys=True), encoding="utf-8")
+    try:
+        os.chmod(receipt, 0o600)
+    except OSError:
+        pass
+    digest_ref = f"sha256:{digest}"
+    record = _record_install(cfg, name, digest_ref, requested_by)
     _audit("install", requested_by,
            {"image": name, "digest": "<redacted-sha>"})
-    return {"state": "OK", "image": name, "digest": digest,
-            "binary": _redact(str(prov["binary"])),
+    return {"state": "OK", "image": name, "digest": digest_ref,
+            "binary": str(owned),
             "previous": record["previous"],
             "rollback": ("previous receipt kept in state/"
                          f"{STATE_FILE}; `qubit runtime rollback {name}"
                          " --confirm` restores it")}
 
 
+def _staged_opencode_binary(explicit: str = "") -> Optional[Path]:
+    """Locate the staged pinned binary without downloading anything.
+
+    Precedence: explicit --source, QUBIT_OPENCODE_PIN_BIN, the operator
+    install, then PATH. Returns None when nothing is staged."""
+    from .opencode import policy as POL
+
+    raw = (explicit or "").strip() or \
+        (os.environ.get("QUBIT_OPENCODE_PIN_BIN", "") or "").strip()
+    if raw:
+        cand = Path(raw).expanduser()
+        return cand if cand.is_file() else None
+    for cand in (Path(POL.DEFAULT_BINARY),
+                 Path(shutil.which("opencode") or "")):
+        if cand and str(cand) and cand.is_file():
+            return cand
+    return None
+
+
 def upgrade(cfg: Any, name: str, *, requested_by: str = "cli:user",
-            confirmed: bool = False) -> Dict[str, Any]:
+            confirmed: bool = False, source: str = "") -> Dict[str, Any]:
     """Re-verify and re-stage the pinned image (confirmed).
 
     Pins are exact, so "upgrade" means: re-run verification against the
@@ -337,7 +396,8 @@ def upgrade(cfg: Any, name: str, *, requested_by: str = "cli:user",
     entry = _check_name(name)
     state = _load(cfg)
     prev = state["images"].get(name)
-    out = install(cfg, name, requested_by=requested_by, confirmed=True)
+    out = install(cfg, name, requested_by=requested_by, confirmed=True,
+                  source=source)
     if isinstance(prev, dict) and prev.get("digest") and \
             out.get("digest") == prev.get("digest"):
         out["note"] = (f"{name} already at pin {entry['pin']}; receipt"
@@ -399,6 +459,15 @@ def remove(cfg: Any, name: str, *, requested_by: str = "cli:user",
 
             _sh.rmtree(rdir, ignore_errors=False)
             removed.append(str(rdir))
+    if entry["name"] == "opencode-binary":
+        from .opencode import state as _OCS
+
+        owned_dir = _OCS.owned_binary_dir()
+        if owned_dir.is_dir():
+            import shutil as _sh
+
+            _sh.rmtree(owned_dir, ignore_errors=False)
+            removed.append(str(owned_dir))
     state = _load(cfg)
     record = state["images"].pop(name, None)
     state["images"][name + ":removed"] = {
@@ -454,9 +523,21 @@ def doctor(cfg: Any) -> Dict[str, Any]:
     for entry in REGISTRY:
         prov = (_hermes_provenance() if entry["name"] == "hermes-runtime"
                 else _opencode_provenance())
+        if entry["name"] == "opencode-binary":
+            owned = prov.get("owned", {}) or {}
+            if owned.get("ok"):
+                result = (f"owned {owned['binary']} verified"
+                          f" ({owned['version']})")
+            elif prov.get("installed"):
+                result = (f"owned copy {owned.get('reason', 'MISSING')};"
+                          f" operator candidate {prov.get('binary')}"
+                          " (not effective until installed)")
+            else:
+                result = "not staged"
+        else:
+            result = ("present" if prov.get("installed") else "not staged")
         findings.append({"check": f"artifact:{entry['name']}",
-                         "result": ("present" if prov.get("installed")
-                                    else "not staged")})
+                         "result": result})
     findings.append({"check": "docker_daemon",
                      "result": "not required; Qubit runtimes never contact"
                                " a container daemon"})

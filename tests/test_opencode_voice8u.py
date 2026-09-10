@@ -343,3 +343,33 @@ def test_required_utterances_resolve(tmp_path, monkeypatch):
         "projects_active"
     assert VC.resolve("qubit, inspect this folder").entry.id == \
         "files_inspect"
+
+
+def test_cli_preview_carries_project(tmp_path, monkeypatch):
+    """Regression: `qubit opencode preview --project --task` must validate
+    (the CLI task envelope carries the required project arg)."""
+    import io
+    import json
+    from contextlib import redirect_stdout
+
+    from voicebridge import cli as CLI
+
+    cfg = _exec_cfg(tmp_path, monkeypatch)
+    root = _git_project(tmp_path)
+    args = type("A", (), {})()
+    args.opencode_command = "preview"
+    args.project = str(root)
+    args.task = "Add hello"
+    args.task_file = None
+    args.disposable = True
+    args.in_project = False
+    args.fixture = None
+    args.dry_run = False
+    args.timeout = None
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        rc = CLI._cmd_opencode(cfg, args)
+    out = json.loads(buf.getvalue())
+    assert rc == 0, out
+    assert out["state"] == "preview", out
+    assert out["action_hash"]

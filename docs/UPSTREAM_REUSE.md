@@ -1953,3 +1953,28 @@ IMPLEMENTED differentials) and openclaw v2026.9.2 @3928bad (gateway
 frames, board/widget, container, skill-install behavior contracts).
 LICENSES: unchanged; THIRD_PARTY_NOTICES.md needs no new entry.
 DEPENDENCIES ADDED: none.
+
+## Close-out-2 (2026-09-10) — pinned OpenCode executable provenance
+
+The 8R record above is extended (not replaced) with the exact staged
+artifact now executed by Qubit:
+
+ARTIFACT: https://github.com/sst/opencode/releases/download/v1.18.29/opencode-linux-x64.tar.gz
+TARBALL SHA256: ea800b7ff56226b70952126c9fc1e2517ca4c4b5682fd9d3f9e87449697a1194
+BINARY SHA256: ca6c0e1f42be3120595bf6848937e7586ec862c87fa7aa111e89c7cc6e9a4650
+VERSION: `opencode --version` → 1.18.29 (exact pin match)
+STAGED AT: /tmp/pinned-upstream/opencode-1.18.29/bin/opencode (disposable;
+  re-download per procedure above after cleanup)
+QUBIT-OWNED COPY: $XDG_DATA_HOME/qubit-voicebridge/runtimes/opencode-1.18.29/bin/opencode
+  + PIN.json digest receipt; materialized only by
+  `qubit runtime install opencode-binary --source <path> --confirm` after
+  --version verification; `verify_owned_binary()` gates execution without
+  spawning; the run path re-probes --version and fails closed on drift.
+LICENSE: MIT (Copyright (c) 2025 opencode); binary invoked at arm's
+  length, never bundled or redistributed — no new THIRD_PARTY_NOTICES
+  entry (operator/binary-supplied, same as the 8R record).
+DIVERGENCE FROM 8R RECORD: the operator install (~/.opencode/bin/opencode,
+  currently 1.18.30) is NO LONGER the effective binary: explicit config
+  binaries still win, otherwise the owned verified 1.18.29 copy is
+  effective and the operator install is reported honestly as
+  non-effective (status shows both).

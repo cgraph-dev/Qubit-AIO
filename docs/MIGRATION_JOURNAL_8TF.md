@@ -188,3 +188,31 @@ Repaired every reported blocker with real backends and re-proved all gates:
    because those gates need Ollama / running bridge / clean-venv /
    Playwright-chromium.
 5. No new upstream code copied; no THIRD_PARTY_NOTICES change.
+
+## Close-out-2 turn (2026-09-10, uncommitted): owned 1.18.29 + CLI preview fix
+
+1. Owned OpenCode binary: `qubit runtime install opencode-binary`
+   MATERIALIZES the verified binary into Qubit-owned
+   `$XDG_DATA_HOME/qubit-voicebridge/runtimes/opencode-1.18.29/bin/`
+   (+ `PIN.json` digest receipt); `_resolve_binary` prefers the owned
+   copy unless the operator configured an explicit different binary;
+   `status`/`runtime status` report it as effective; execution re-probes
+   --version and fails closed on mismatch. Live: owned bytes
+   sha256:ca6c0e1f…, `--version` → 1.18.29, `runtime status` READY
+   effective, `opencode status` resolves the owned path, no surface
+   reports 1.18.30. New `--source` on `runtime install/upgrade`,
+   QUBIT_OPENCODE_PIN_BIN env, optional voice `source` arg.
+2. Real bug fixed: `qubit opencode preview` omitted the required
+   `project` envelope arg (always failed validation); `_task_args` now
+   carries it + regression test `test_cli_preview_carries_project`.
+   CLI/voice/dashboard preview proven on the same owned backend.
+3. Deselected audit (61, each green in its gate): dashboard 4/4 (running
+   bridge), ui 24/24 (Playwright+chromium), live 32/32 (Ollama models,
+   mic, audio, inbox scripts), monitor 1/1 (clean-venv). Per-test list:
+   dashboard=test_dashboard_stress (status/text/voice/rctrl);
+   live=test_live_stress×13, test_mic_health×1,
+   test_packet4b×1+test_packet4c×1+test_packet5c_integration×3,
+   test_release_smoke×5, test_smoke(piper)×1, test_steal_list_strict×7;
+   monitor=test_packet7a×1; ui=test_ui_browser_8l×24. Default `-m`
+   filter stays: these gates need live services the hermetic default
+   must not require.

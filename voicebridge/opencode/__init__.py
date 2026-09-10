@@ -125,6 +125,10 @@ from .state import (
     _read_state,
     _resolve_binary,
     _write_state,
+    owned_binary,
+    owned_binary_dir,
+    owned_receipt_path,
+    verify_owned_binary,
 )
 from .transport import (
     _AUTH_FAILURE_MARKERS,
@@ -204,6 +208,10 @@ __all__ = [
     "_status_paths",
     "_validate_workdir",
     "_write_state",
+    "owned_binary",
+    "owned_binary_dir",
+    "owned_receipt_path",
+    "verify_owned_binary",
     "build_argv",
     "build_confinement_argv",
     "confinement_available",

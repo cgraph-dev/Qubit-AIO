@@ -263,3 +263,87 @@ def test_staged_pin_binary_proof(tmp_path, monkeypatch):
     # The installed user binary (1.18.30) must NOT satisfy the pin: with the
     # real environment the call refuses with MISMATCH (drift protection).
     assert POL.PINNED_OPENCODE_VERSION == "1.18.29"
+
+
+def test_install_materializes_owned_copy_and_runner_uses_it(tmp_path,
+                                                            monkeypatch):
+    """The installed binary is COPIED into Qubit-owned space and becomes
+    the effective executable: provenance reports effective, status is
+    READY, and the runner resolves the owned path (never the staging
+    path). Removing the owned bytes degrades honestly."""
+    import stat
+
+    from voicebridge import opencode as OC
+    from voicebridge import runtime_images as RI
+    from voicebridge.opencode import policy as POL
+    from voicebridge.opencode import state as OCS
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    fake = tmp_path / "opencode-stage"
+    fake.write_text("#!/bin/sh\necho \"" + POL.PINNED_OPENCODE_VERSION
+                    + "\"\n")
+    fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
+    monkeypatch.setattr(POL, "DEFAULT_BINARY", "/nonexistent-oc-test")
+    monkeypatch.setattr("shutil.which", lambda _n: None)
+    out = RI.install(cfg, "opencode-binary", requested_by="t",
+                     confirmed=True, source=str(fake))
+    assert out["state"] == "OK"
+    owned = OCS.owned_binary()
+    assert Path(out["binary"]) == owned
+    assert owned.is_file()
+    assert RI._sha256_file(owned) == RI._sha256_file(fake)
+    assert OCS.verify_owned_binary()["ok"] is True
+    row = next(r for r in RI.status(cfg)["runtimes"]
+               if r["name"] == "opencode-binary")
+    assert row["state"] == "READY", row
+    assert row["observed"]["effective"] is True
+    # The runner resolves the owned copy even though the staging path and
+    # operator paths exist or not: same backend, no bypass.
+    from voicebridge import config as C
+
+    p2 = tmp_path / "voice2.yaml"
+    p2.write_text("logging:\n  jsonl: false\nintent:\n  opencode:\n"
+                  "    enabled: true\n")
+    cfg2 = C.Config.load(p2)
+    runner = OC.opencode_runner(cfg2)
+    assert runner._ctx.binary == str(owned)
+    runner.enable(requested_by="user")
+    st = runner.status()
+    assert st["binary"] == str(owned)
+    # Real version probe spawns the owned binary: the reported version is
+    # the pin, never the operator's drifted install.
+    assert st["effective_enabled"] is True
+    assert POL.PINNED_OPENCODE_VERSION in st["installed_version"], st
+    assert st["version_match"] is True
+    # Deleting the owned bytes (simulated tamper) degrades: never READY.
+    owned.unlink()
+    assert OCS.verify_owned_binary()["ok"] is False
+    row2 = next(r for r in RI.status(cfg)["runtimes"]
+                if r["name"] == "opencode-binary")
+    assert row2["state"] in ("MISSING", "STAGED", "DEGRADED"), row2
+
+
+def test_explicit_config_binary_still_wins(tmp_path, monkeypatch):
+    """Operator-explicit config binary keeps precedence over the owned
+    copy (explicit choice, honestly reported)."""
+    import stat
+
+    from voicebridge import config as C
+    from voicebridge import opencode as OC
+    from voicebridge.opencode import policy as POL
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "c"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "s"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "d"))
+    state = tmp_path / "state"
+    state.mkdir(exist_ok=True)
+    explicit = tmp_path / "my-oc"
+    explicit.write_text("#!/bin/sh\necho explicit\n")
+    explicit.chmod(explicit.stat().st_mode | stat.S_IXUSR)
+    p = tmp_path / "voice.yaml"
+    p.write_text("logging:\n  jsonl: false\nintent:\n  opencode:\n"
+                 f"    enabled: true\n    binary: {explicit}\n")
+    cfg = C.Config.load(p)
+    runner = OC.opencode_runner(cfg)
+    assert runner._ctx.binary == str(explicit)
+    assert POL.PINNED_OPENCODE_VERSION == "1.18.29"

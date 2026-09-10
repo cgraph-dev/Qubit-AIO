@@ -667,6 +667,11 @@ def build_parser() -> argparse.ArgumentParser:
         _p = rt_sub.add_parser(_rt_mut, parents=[common], help=_rt_help)
         _p.add_argument("name", help="pinned image name (see `qubit runtime images`)")
         _p.add_argument("--confirm", action="store_true")
+        if _rt_mut in ("install", "upgrade"):
+            _p.add_argument("--source", default="",
+                            help="staged artifact path (opencode-binary); "
+                                 "else QUBIT_OPENCODE_PIN_BIN, operator "
+                                 "install, or PATH")
     br = add("browser", help="Loopback browser tabs (read-only unless --confirm; profiles untouched)")
     br_sub = br.add_subparsers(dest="browser_command")
     br_sub.add_parser("status", parents=[common],
@@ -3685,10 +3690,12 @@ def _cmd_runtime(cfg, args) -> int:
             out = RI.doctor(cfg)
         elif cmd == "install":
             out = RI.install(cfg, args.name, requested_by="cli:user",
-                             confirmed=confirm)
+                             confirmed=confirm,
+                             source=getattr(args, "source", "") or "")
         elif cmd == "upgrade":
             out = RI.upgrade(cfg, args.name, requested_by="cli:user",
-                             confirmed=confirm)
+                             confirmed=confirm,
+                             source=getattr(args, "source", "") or "")
         elif cmd == "rollback":
             out = RI.rollback(cfg, args.name, requested_by="cli:user",
                               confirmed=confirm)
@@ -6148,6 +6155,7 @@ def _cmd_opencode(cfg, args) -> int:
             out["task"] = task
         if tfile is not None:
             out["task_file"] = str(tfile)
+        out["project"] = getattr(args, "project", "") or "."
         disposable = not bool(getattr(args, "in_project", False))
         out["disposable"] = disposable
         timeout = getattr(args, "timeout", None)
