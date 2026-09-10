@@ -2,34 +2,8 @@
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Qubit VoiceBridge — Talk</title>
-<style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  body { margin:0; font: 16px/1.5 system-ui, sans-serif;
-         background:var(--bg); color:var(--text); min-height:100vh; }
-  .wrap { max-width:720px; margin:0 auto; padding:16px; }
-  header { display:flex; align-items:baseline; justify-content:space-between;
-           gap:8px; margin-bottom:8px; }
-  h1 { font-size:20px; margin:0; }
-  .status { font-size:13px; color:var(--muted); }
-  .status.live { color:var(--success); }
-  .ptt { width:100%; padding:36px 0; margin:24px 0; font-size:20px;
-         border:2px solid var(--line-strong); border-radius:16px; background:var(--surface);
-         color:var(--text); cursor:pointer; user-select:none; -webkit-user-select:none;
-         touch-action:none; transition: background .08s; }
-  .ptt:active, .ptt.hold { background:#1e2a11; border-color:var(--primary); color:var(--text); }
-  .ptt[disabled] { opacity:.4; cursor:wait; }
-  .hint { text-align:center; color:var(--muted); font-size:13px; margin-top:-16px; }
-  #transcript { margin-top:20px; }
-  .msg { padding:10px 12px; border-radius:10px; margin:8px 0; white-space:pre-wrap; }
-  .msg.user { background:rgb(216 243 106 / 8%); border:1px solid rgb(216 243 106 / 28%); }
-  .msg.assistant { background:var(--surface); border:1px solid var(--line); }
-  .msg.meta { background:transparent; color:var(--muted); font-size:13px; border:none; }
-  .err { color:var(--danger); }
-  a { color:var(--primary); text-decoration:none; }
-  .row { display:flex; gap:8px; align-items:center; }
-</style><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/theme.css"></head><body>
+<title>Qubit VoiceBridge — Workspace</title>
+<link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/theme.css"></head><body>
 <!--
 THESIS: A calm control surface for speaking to a local assistant.
 OWN-WORLD: Near-black surfaces, warm text, and a signal-lime action color make system state legible.
@@ -39,19 +13,25 @@ FORM: One primary action, quiet secondary controls, clear focus, and responsive 
 FINISH: Every state explains what happened and what the operator can safely do next.
 -->
 <a class="skip-link" href="#main-content">Skip to main content</a>
-<main class="wrap" id="main-content" tabindex="-1">
-  <header>
-    <div>
-      <h1><span class="brand-mark" aria-hidden="true">Q</span> Qubit VoiceBridge</h1>
-      <p class="page-lead">Speak or type a task. Qubit keeps the route and progress visible while you stay in control.</p>
+<main class="wrap workspace-shell" id="main-content" tabindex="-1">
+  <header class="workspace-header">
+    <div class="brand-lockup">
+      <span class="brand-mark brand-mark-large" aria-hidden="true">Q</span>
+      <div>
+        <h1>Qubit Voice Agent</h1>
+        <p class="page-lead">Your local command center for voice, tasks, approvals, and project work.</p>
+      </div>
     </div>
-    <div class="status-cluster"><span class="status" id="st" aria-live="polite">connecting…</span></div>
+    <div class="status-cluster status-card" aria-label="Bridge status">
+      <span class="status-dot" aria-hidden="true"></span>
+      <div><span class="status-label">Bridge status</span><span class="status" id="st" aria-live="polite">connecting…</span></div>
+    </div>
   </header>
   <nav class="page-nav" aria-label="Primary">
     <a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit Agent</a>
     <span class="nav-separator" aria-hidden="true"></span>
-    <a href="/" aria-current="page">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/settings">Settings</a>
-    <a class="nav-utility" href="/token-setup">Pair device</a>
+    <a href="/" aria-current="page">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/ops">Operations</a><a href="/settings">Settings</a>
+    <a href="/setup">Setup</a><a class="nav-utility" href="/token-setup">Pair device</a>
   </nav>
 
   <details class="help-panel">
@@ -67,17 +47,64 @@ FINISH: Every state explains what happened and what the operator can safely do n
     </div>
   </details>
 
-  <button class="ptt" id="ptt">Hold to talk</button>
-  <div class="hint">tap = toggle · release = send · esc = stop · <a href="#" class="tap-target" id="interruptBtn" style="color:var(--danger);">⏹ interrupt</a></div>
+  <section class="command-workspace" aria-label="Qubit command workspace">
+    <aside class="command-rail" aria-label="Quick actions">
+      <div class="rail-heading">Workspace</div>
+      <a class="rail-action rail-action-active" href="#talk"><span class="rail-icon" aria-hidden="true">◉</span><span><b>Talk</b><small>Ask Qubit anything</small></span></a>
+      <a class="rail-action" href="/activity"><span class="rail-icon" aria-hidden="true">↗</span><span><b>Activity</b><small>Live runs and events</small></span></a>
+      <a class="rail-action" href="/reports"><span class="rail-icon" aria-hidden="true">▤</span><span><b>Reports</b><small>Private result bundles</small></span></a>
+      <a class="rail-action" href="/ops"><span class="rail-icon" aria-hidden="true">⌘</span><span><b>Operations</b><small>Run approved actions</small></span></a>
+      <div class="rail-divider"></div>
+      <div class="rail-heading">Control</div>
+      <a class="rail-action" href="/settings"><span class="rail-icon" aria-hidden="true">⚙</span><span><b>Settings</b><small>Models, audio, access</small></span></a>
+      <a class="rail-action" href="/setup"><span class="rail-icon" aria-hidden="true">✦</span><span><b>Setup</b><small>Health and repairs</small></span></a>
+      <a class="rail-action" href="/token-setup"><span class="rail-icon" aria-hidden="true">⌁</span><span><b>Pair device</b><small>Connect this browser</small></span></a>
+      <div class="rail-footer"><span class="rail-footer-dot"></span> Local-first workspace<br><span class="rail-footer-muted">Your data stays on this PC</span></div>
+    </aside>
 
-  <div class="row talk-input-row" style="margin-top:14px;">
-    <label class="sr-only" for="textin">Type a task</label>
-    <input id="textin" type="text" placeholder="…or type a task (Enter to send)"
-           style="flex:1; padding:10px 12px; background:var(--surface-soft); border:1px solid var(--line-strong); color:var(--text); border-radius:8px; font-size:15px;">
-    <button id="textsend" class="ok" type="button" style="padding:10px 16px; border-radius:8px;">Send</button>
-  </div>
+    <div class="talk-column" id="talk">
+      <div class="section-heading">
+        <div><h2>What should Qubit do?</h2><span class="section-meta">VOICE + TEXT COMMANDS</span></div>
+        <span class="session-chip"><span class="session-dot"></span> Ready for input</span>
+      </div>
+      <div class="talk-stage">
+        <div class="talk-stage-orbit orbit-one" aria-hidden="true"></div>
+        <div class="talk-stage-orbit orbit-two" aria-hidden="true"></div>
+        <div class="talk-stage-content">
+          <span class="talk-glyph" aria-hidden="true">Q</span>
+          <button class="ptt" id="ptt">Hold to talk</button>
+          <p class="talk-stage-copy">Press and speak naturally. Qubit will show the plan before anything sensitive happens.</p>
+        </div>
+      </div>
+      <div class="hint"><span class="keycap">SPACE</span> hold to talk <span class="hint-separator">·</span> release to send <span class="hint-separator">·</span> <span class="keycap">ESC</span> stop <a href="#" class="tap-target interrupt-link" id="interruptBtn">interrupt</a></div>
 
-  <div id="transcript"></div>
+      <div class="typed-command">
+        <label for="textin">Or type a command</label>
+        <div class="row talk-input-row">
+          <input id="textin" type="text" placeholder="Try “summarize my active project”" autocomplete="off">
+          <button id="textsend" class="ok" type="button"><span aria-hidden="true">↗</span> Run command</button>
+        </div>
+      </div>
+
+      <section class="live-session" aria-labelledby="session-title">
+        <div class="live-session-header"><div><h2 id="session-title">Command activity</h2><span class="section-meta">LIVE SESSION</span></div><span class="live-pulse"><span></span> streaming</span></div>
+        <div id="transcript"><div class="empty-session"><span class="empty-icon" aria-hidden="true">✦</span><div><strong>Your conversation will appear here</strong><p>Speak or type a task to begin. Progress, approvals, and results stay visible in this session.</p></div></div></div>
+      </section>
+    </div>
+
+    <aside class="context-panel" aria-label="Workspace context">
+      <div class="context-header"><h3>At a glance</h3><span class="context-menu" aria-hidden="true">•••</span></div>
+      <div class="context-health"><span class="health-ring"><span>Q</span></span><div><strong>Qubit is ready</strong><p>Local bridge connected</p></div></div>
+      <div class="context-stat-grid"><div><strong>Local</strong><span>Runtime</span></div><div><strong>On</strong><span>Voice input</span></div><div><strong>Safe</strong><span>Action mode</span></div><div><strong>Live</strong><span>Audit trail</span></div></div>
+      <div class="context-divider"></div>
+      <h3>Next steps</h3>
+      <a class="context-link" href="/setup"><span>✦</span><span><b>Check installation</b><small>Review models, audio, and services</small></span><i>›</i></a>
+      <a class="context-link" href="/ops"><span>⌘</span><span><b>Open operations</b><small>Browse approved capabilities</small></span><i>›</i></a>
+      <a class="context-link" href="/token-setup"><span>⌁</span><span><b>Pair another device</b><small>Use Qubit from your phone</small></span><i>›</i></a>
+      <div class="context-note"><span aria-hidden="true">✓</span><p>Qubit asks before sending, publishing, deleting, or changing protected systems.</p></div>
+    </aside>
+  </section>
+
   <div class="workspace-actions" aria-label="Talk tools">
     <button type="button" class="quiet-action" id="lessonslink">Learned preferences</button>
     <button type="button" class="quiet-action" id="permslink">Permissions</button>
@@ -440,7 +467,7 @@ setStatus('ready');
 vbApi('/api/status').then(res => {
   const d = res.body || {};
   if (res.authRequired) { setStatus('not paired — open /token-setup'); return; }
-  if (res.ok && d.bridge === 'up') setStatus('bridge up · ' + d.route, true);
+  if (res.ok && d.bridge === 'up') setStatus('bridge up · ' + window.vbRouteLabel(d.route), true);
   else setStatus('bridge: ' + (d.bridge || res.error || 'offline'));
   // Voice is read-only: show the effective provider the backend reports.
   const vi = document.getElementById('voice-info');

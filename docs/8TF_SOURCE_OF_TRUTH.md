@@ -34,6 +34,9 @@ executed source/module/process identity.
 - Intended canonical product identity: **Qubit Agent**
 - Voice subsystem identity: **Qubit VoiceBridge**
 - Intended repository/install identity: `qubit-voicebridge`
+- Canonical CLI launcher: `qubit` (`voicebridge` is the documented
+  compatibility alias: same parser, same backend; shell completions
+  `qubit.{bash,zsh,fish}` canonical, `voicebridge.*` alias)
 - Internal Python compatibility package: `voicebridge`
 - `openclaw-voice-bridge`: legacy compatibility identity only
 - Fresh Hermes/OpenClaw clones: isolated sibling or temporary directories;

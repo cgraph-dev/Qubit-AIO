@@ -2,6 +2,7 @@
 # scripts/gen_completions.py — do not hand-edit; regenerate instead.
 complete -c voicebridge -n '__fish_use_subcommand' -f -a acp
 complete -c voicebridge -n '__fish_use_subcommand' -f -a actions
+complete -c voicebridge -n '__fish_use_subcommand' -f -a approvals
 complete -c voicebridge -n '__fish_use_subcommand' -f -a asr-test
 complete -c voicebridge -n '__fish_use_subcommand' -f -a audio
 complete -c voicebridge -n '__fish_use_subcommand' -f -a auth
@@ -17,15 +18,18 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a device
 complete -c voicebridge -n '__fish_use_subcommand' -f -a enroll
 complete -c voicebridge -n '__fish_use_subcommand' -f -a experiments
 complete -c voicebridge -n '__fish_use_subcommand' -f -a export-state
+complete -c voicebridge -n '__fish_use_subcommand' -f -a files
 complete -c voicebridge -n '__fish_use_subcommand' -f -a flag-drill
 complete -c voicebridge -n '__fish_use_subcommand' -f -a flags
 complete -c voicebridge -n '__fish_use_subcommand' -f -a frontier
 complete -c voicebridge -n '__fish_use_subcommand' -f -a gateway
 complete -c voicebridge -n '__fish_use_subcommand' -f -a ghost
 complete -c voicebridge -n '__fish_use_subcommand' -f -a hooks
+complete -c voicebridge -n '__fish_use_subcommand' -f -a ide
 complete -c voicebridge -n '__fish_use_subcommand' -f -a import-agent
 complete -c voicebridge -n '__fish_use_subcommand' -f -a import-state
 complete -c voicebridge -n '__fish_use_subcommand' -f -a kanban
+complete -c voicebridge -n '__fish_use_subcommand' -f -a lessons
 complete -c voicebridge -n '__fish_use_subcommand' -f -a lsp
 complete -c voicebridge -n '__fish_use_subcommand' -f -a mcp
 complete -c voicebridge -n '__fish_use_subcommand' -f -a memory
@@ -45,6 +49,8 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a project
 complete -c voicebridge -n '__fish_use_subcommand' -f -a proxy
 complete -c voicebridge -n '__fish_use_subcommand' -f -a roundtrip
 complete -c voicebridge -n '__fish_use_subcommand' -f -a run
+complete -c voicebridge -n '__fish_use_subcommand' -f -a runtime
+complete -c voicebridge -n '__fish_use_subcommand' -f -a schedules
 complete -c voicebridge -n '__fish_use_subcommand' -f -a sessions
 complete -c voicebridge -n '__fish_use_subcommand' -f -a setup
 complete -c voicebridge -n '__fish_use_subcommand' -f -a skills

@@ -118,6 +118,18 @@ distributions (full text at https://www.apache.org/licenses/LICENSE-2.0):
 > CONDITIONS OF ANY KIND, either express or implied. See the License for the
 > specific language governing permissions and limitations under the License.
 
+## Optional local skill snapshots
+
+The repository-local `skills/` folder contains third-party instruction and
+reference snapshots only; it is not imported by the runtime. Attribution,
+exact commits, selected source paths, and license evidence are maintained in
+`skills/SOURCES.md`. The included sources are Anthropic frontend-design
+(Apache-2.0), the selected Vercel skills (MIT metadata), UI/UX Pro Max (MIT),
+Bencium Controlled UX Designer (MIT), and AccessLint’s selected skills (MIT
+declared in its plugin manifest). Retain the upstream terms when sharing these
+files. Vercel Web Design Guidelines and the unidentified “Kyosaki” skill were
+not included because their exact licensing/source is unresolved.
+
 ---
 
 ## GENOME — semantic-memory contract (Packet 8M)

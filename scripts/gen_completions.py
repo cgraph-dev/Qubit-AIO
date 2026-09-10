@@ -2,8 +2,10 @@
 """Packet 8T-F — generate shell completions from the real Qubit parsers.
 
 Regenerate: python scripts/gen_completions.py  (writes voicebridge/_data/
-completions/*). `voicebridge completion <shell>` prints them; the parity
+completions/*). `qubit completion <shell>` prints them; the parity
 test fails if committed completions drift from the parser.
+Canonical launcher is `qubit`; `voicebridge` files are the byte-identical
+compatibility alias (same command list, compat prog name in the header).
 """
 from __future__ import annotations
 
@@ -72,13 +74,16 @@ def main() -> int:
     vb = _subcommands(build_voicebridge())
     qd = ["help", "status", "health", "watch", "activity", "logs",
           "interrupt", "talk", "clear"]
+    (outdir / "qubit.bash").write_text(_bash("qubit", vb))
+    (outdir / "qubit.zsh").write_text(_zsh("qubit", vb))
+    (outdir / "qubit.fish").write_text(_fish("qubit", vb))
     (outdir / "voicebridge.bash").write_text(_bash("voicebridge", vb))
     (outdir / "voicebridge.zsh").write_text(_zsh("voicebridge", vb))
     (outdir / "voicebridge.fish").write_text(_fish("voicebridge", vb))
     (outdir / "qubit-dev.bash").write_text(_bash("qubit-dev", qd))
     (outdir / "qubit-dev.zsh").write_text(_zsh("qubit-dev", qd))
     (outdir / "qubit-dev.fish").write_text(_fish("qubit-dev", qd))
-    print(f"wrote 6 completions ({len(vb)} voicebridge commands)")
+    print(f"wrote 9 completions ({len(vb)} qubit commands)")
     return 0
 
 

@@ -1625,7 +1625,7 @@ secret, raw page content, or duplicate route exists. Return VERIFIED, REJECTED,
 or VERIFIED WITH EXPLICIT LIMITATION and stop.
 ```
 
-## Phase 8 capability-expansion packets 8M–8R
+## Phase 8 capability-expansion and release packets 8M–8T
 
 These packets are optional extensions after 8L. They add broad, user-enabled
 capabilities without allowing model/page/tool text to grant authority. Use the
@@ -2093,9 +2093,1030 @@ operator authorization and a disposable worktree. Return VERIFIED, REJECTED,
 or VERIFIED WITH EXPLICIT LIMITATION and stop.
 ```
 
+### Packet 8R closure repair before Packet 8S
+
+#### Repair prompt
+
+```text
+Repair ONLY the rejected Packet 8R closure findings. Do not start Packet 8S,
+8T, or any other packet. Read AGENTS.md, the complete plan, this prompt pack,
+OPERATIONS_8R.md, the previous 8R verification, licensing/provenance records,
+and the entire 8R diff. Use Graft first. Preserve every unrelated dirty or
+untracked file byte-for-byte and use no reset --hard, git clean, broad
+checkout, or destructive cleanup.
+
+Close every finding with implementation plus regression tests:
+
+- status/version probing must never execute an arbitrary configured binary
+  outside the broker, must use a strict sanitized environment, and must not
+  run while the adapter is disabled unless the operation is explicitly typed
+  and authorized;
+- all disposable worktrees and generated temporary data must be cleaned in a
+  finally path after success, cancellation, timeout, transport exception,
+  worker crash, and partial failure, with orphan recovery and truthful output;
+- malformed OpenCode JSON/events/patches must fail closed rather than fall
+  back to a successful raw-text result;
+- task files must be inside the approved project/worktree scope, reject
+  symlink escapes and secret-target files, and never read an arbitrary path;
+- environment passthrough must be a small explicit allowlist and reject HOME,
+  PYTHONPATH, LD_PRELOAD, BASH_ENV, XDG config/runtime, Git override, shell,
+  display/session, credential, token, cookie, and API-key variables;
+- enforce generated-file count/bytes/disk/process/resource limits, bounded and
+  validated diffs, path/symlink containment, and truthful partial failure;
+- add real broker callers or explicitly revise the Packet 8R parity contract
+  for voice and tray; never claim parity from a unit test that calls the
+  adapter directly;
+- enforce the pinned executable/version policy or document and test an
+  explicit operator-gated mismatch state.
+
+Keep OpenCode disabled by default. Do not add a second listener, MCP bypass,
+automatic commit/push/publish/install/service/permission/account action, cloud
+egress, or arbitrary shell. Run focused 8R tests repeatedly, affected and
+full-hermetic tests with warnings as errors, security/resource/persistence/
+clean-install tests, compileall, pip check, diff check, and Graft build.
+Inspect warnings and failure output. Commit only the 8R repair files and
+return the strict verification template with evidence, failures, untested
+paths, repairs, rollback, and next safe action. Stop after the handoff.
+```
+
+### Packet 8S — Qubit VoiceBridge identity and release migration
+
+#### Implementation prompt
+
+```text
+Implement ONLY Packet 8S from docs/UNIFIED_AGENT_PLAN.md. Perform the final
+public-identity migration after Packet 8R. The public product name is Qubit
+VoiceBridge, the canonical installed identity is qubit-voicebridge, and the
+canonical repository folder is qubit-voicebridge. Keep the internal Python
+import package voicebridge unchanged. The existing openclaw-voice-bridge name
+is legacy compatibility only.
+
+The physical repository-folder rename is in scope. Do not move the active
+dirty checkout during implementation. Rehearse and verify the rename from a
+clean clone/release directory, prove Git metadata, packaging, scripts, and
+documentation work from the new qubit-voicebridge path, and document the
+operator step needed to move an existing checkout safely.
+
+Before editing, verify that Packet 8R has an independent VERIFIED closure. If
+the 8R closure is rejected or has unresolved security/boundary findings, stop
+and use the Packet 8R closure-repair prompt first; do not mask those findings
+inside the identity migration.
+
+Perform section 6.1 preflight, use Graft first, inspect all current product,
+installer, packaging, service, shortcut, config, state, cache, data, CLI,
+dashboard, documentation, and release callers. Preserve every unrelated
+dirty or untracked file byte-for-byte. Do not modify Packet 8R behavior or
+capability policy.
+
+Inventory and consistently update user-facing branding in package metadata,
+CLI help, dashboard titles, installer output, systemd units, desktop shortcuts,
+release artifacts, documentation, examples, diagnostics, and support text.
+Record intentional legacy references instead of blindly replacing them.
+
+Implement a reversible, idempotent, atomic migration from
+openclaw-voice-bridge config/state/data/cache/log/service paths to canonical
+Qubit VoiceBridge paths. Never read one tree while writing another. Preserve a
+tested legacy compatibility alias where practical. Never overwrite a real legacy
+directory, follow unsafe symlinks, delete user data, expose tokens in URLs or
+shortcuts, or copy secrets into logs, reports, artifacts, or metadata.
+
+Test fresh canonical install, legacy-only install, mixed/split trees, partial
+and interrupted migration, repeated migration, upgrade, rollback/downgrade,
+uninstall, read-only and disk-full failures, symlink/path traversal attempts,
+service restart, shortcut launch, and preservation of configs, state, memory,
+reports, browser settings, and audio settings. Prove exactly one effective
+config/state tree is used after each transition.
+
+Do not rename the voicebridge import package, add dependencies, add a listener,
+change browser/account/audio/model/timer behavior, weaken permissions, or
+change Packet 8R execution boundaries. Use safe rollback with git revert or
+reviewed file-specific patches; never use reset --hard, git clean, or broad
+checkout. Commit only Packet 8S files and stop after the handoff.
+
+Run focused migration/branding tests, affected release/install/unit/UI tests,
+warnings-as-errors, security/path/redaction/persistence/resource tests,
+clean-install and rollback tests, compileall, pip check, git diff --check,
+and Graft build. Inspect actual output and preserve exact counts.
+```
+
+#### Verification prompt
+
+```text
+Verify ONLY Packet 8S. Independently inspect the complete identity and
+migration diff and every product, installer, packaging, service, shortcut,
+config, state, data, CLI, dashboard, documentation, and release caller.
+Confirm Qubit VoiceBridge is the canonical public identity,
+qubit-voicebridge is the canonical installed identity and repository folder,
+voicebridge remains the internal import package, and
+openclaw-voice-bridge is only a documented legacy compatibility identity.
+
+Independently verify the physical folder migration from a clean clone. Confirm
+the project builds, installs, launches, resolves resources, and performs
+upgrade/rollback correctly from qubit-voicebridge, while an existing
+openclaw-voice-bridge checkout remains safely readable during migration.
+
+Test fresh install, canonical install, legacy-only install, mixed/split trees,
+partial/interrupted migration, repeated migration, upgrade, rollback,
+uninstall, read-only and disk-full failures, unsafe symlinks, path traversal,
+service restart, desktop shortcut launch, and preservation of config, state,
+memory, reports, browser settings, audio settings, and user data. Prove the
+runtime never reads one tree while writing another and that exactly one
+effective config/state tree exists.
+
+Verify no real legacy directory is overwritten, no secret/token appears in a
+URL, shortcut, log, report, artifact, or diagnostic, no duplicate service or
+listener is created, and no migration silently changes browser, account,
+audio, model, timer, permission, or Packet 8R behavior. Confirm compatibility
+aliases are atomic, idempotent, fail closed, and safely reversible.
+
+Run focused, affected, security, persistence, resource, clean-install,
+upgrade, rollback, warnings-as-errors, compileall, pip check, git diff --check,
+and Graft build. Inspect actual warnings and failure output. Confirm all
+unrelated dirty/untracked files are byte-identical and no unsafe rollback
+command was used. Return VERIFIED, REJECTED, or VERIFIED WITH EXPLICIT
+LIMITATION and stop; do not start another packet.
+```
+
+### Packet 8T — one-click setup, installation health, and lifecycle dashboard
+
+#### Implementation prompt
+
+```text
+Implement ONLY Packet 8T from docs/UNIFIED_AGENT_PLAN.md, after Packet 8S has
+an independent VERIFIED result. Do not start another packet. Perform section
+6.1 preflight, use Graft first, inspect the existing installer, CLI, config,
+profiles, release/upgrade/rollback, service, model, provider, audio, pairing,
+dashboard, and diagnostics callers. Preserve every unrelated dirty or
+untracked file byte-for-byte.
+
+Build one authenticated, backend-authoritative setup and operations surface.
+Provide a staged one-click setup flow with platform detection, prerequisite
+checks, standard per-user directories, declared component install/repair,
+local model/runtime setup, audio selection/testing, optional desktop
+integration, resumable progress, dry-run, cancellation, bounded logs, typed
+states, and safe rollback. Network downloads, service changes, desktop
+integration, provider enablement, and data migration require explicit owner
+confirmation. Never silently elevate privileges, start a service, overwrite
+user configuration, delete state, or copy secrets.
+
+Expose authenticated dashboard and CLI inventory for actual installed version,
+package/source provenance, OS/session, dependencies, model files and hashes,
+resident local model, provider/catalog state, credential-reference state,
+ASR/TTS, microphone/output, browser/CDP, timer, permissions, storage, and
+service state. Return references and typed statuses only: never key values,
+cookies, tokens, private paths, raw page text, or raw audio. The frontend must
+render backend states and may not invent readiness or repair success.
+
+Add dry-run and exact-confirmation controls for safe credential references,
+voice/audio and model/provider configuration, device tests, upgrade, rollback,
+missing-component repair, redacted diagnostics, and documentation. Preserve
+user data and tuned configuration by default; never silently restart/enable a
+service. Make partial repair/rollback visible and resumable.
+
+Include these ten improvements: resumable first-run checklist; redacted
+diagnostic export; provenance/update-channel view; model capability matrix;
+configuration profiles with diff/reset/import/export; microphone/output wizard;
+offline degraded mode with reconnect; ordered repair planner; migration and
+backup center; and local audit/change timeline.
+
+Test desktop/mobile onboarding, keyboard/screen-reader semantics, 320px
+reflow, 200% zoom, forced colors, reduced motion, 44px targets, offline/
+reconnect, session expiry, stale health, concurrent setup, crash/resume,
+cancellation, read-only/disk-full/permission failures, missing models, bad
+hashes, unavailable providers, wrong audio devices, rollback, uninstall, and
+clean install. Prove CLI/dashboard parity, backend ownership of every state,
+redacted diagnostics, bounded DOM/logs/resources, no duplicate route/listener,
+and no unapproved voice-hot-path change. Record provenance for reused code.
+Keep cloud, browser, timer, and tray features disabled unless explicitly
+enabled. Run focused, affected, security, persistence, resource, clean-install
+and rollback tests with warnings as errors, compileall, pip check, diff check,
+and Graft build. Commit only Packet 8T files and stop after the handoff.
+```
+
+#### Verification prompt
+
+```text
+Verify ONLY Packet 8T. Independently inspect the complete setup, installer,
+health, inventory, configuration, model/provider, credential-reference,
+voice/audio, upgrade/rollback, repair, diagnostics, CLI, dashboard, mobile,
+service, and migration diff plus every caller.
+
+Prove one authenticated backend state is shared by CLI and dashboard. Test
+fresh install, one-click setup, resume, cancel, dry-run, missing/degraded/
+blocked/failed/success states, dependency/model/provider inventory, safe key
+reference status, local model identity, ASR/TTS/device selection, wrong-device
+guidance, upgrade, rollback, repair, uninstall, and redacted diagnostics.
+Test desktop and narrow mobile widths, 320px reflow, 200% zoom, keyboard and
+screen reader flows, focus, contrast, forced colors, reduced motion, 44px
+targets, offline/reconnect, session expiry, stale data, concurrent setup,
+crash/resume, read-only/disk-full/permission failures, path traversal, unsafe
+symlinks, duplicate services/listeners, and partial rollback.
+
+Confirm no key/token/cookie/private path/raw page text/raw audio appears in
+records, logs, reports, diagnostics, URLs, or frontend state. Confirm no
+frontend-only success, no silent service restart/enable, no hidden network
+download, no privilege escalation, no data deletion, no duplicate route, and
+no voice/audio/model/timer/permission behavior changed outside the packet.
+Run focused, affected, accessibility/UI, security, persistence, resource,
+clean-install, upgrade, rollback, warnings-as-errors, compileall, pip check,
+git diff --check, and Graft build. Inspect warnings and failure output, prove
+the ten listed improvements, and return VERIFIED, REJECTED, or VERIFIED WITH
+EXPLICIT LIMITATION with evidence, failures, untested paths, repairs,
+rollback, and next safe action. Stop; do not start another packet.
+```
+
 ## Final handoff reminder
 
 Every agent must end with evidence and rollback. “Implemented” means code
 exists. “Verified” means an independent agent reproduced the relevant behavior.
 “Degraded” means a limitation is visible. “Done” is not a valid implementation
 handoff status.
+
+### Packet 8T-F — Qubit Agent foundation migration before Packet 8U
+
+#### Implementation prompt
+
+```text
+Implement ONLY Packet 8T-F. Do not start Packet 8U or any later packet.
+Read AGENTS.md, docs/8TF_SOURCE_OF_TRUTH.md, docs/QUBIT_FULL_PARITY_CONTRACT.md,
+the complete plan, this prompt pack, docs/OPERATIONS_8T_F.md,
+docs/8TF_COMPLETE_MIGRATION_PLAN.md,
+the current Qubit source, the current dirty-tree state, and all relevant
+licensing/provenance records.
+
+Use docs/8TF_COMPLETION_CHECKLIST.md as the required execution checklist.
+Check every item with inspectable evidence. Do not report completion while a
+required box is unchecked.
+
+NON-NEGOTIABLE OWNER REQUIREMENT: this packet is a complete Hermes
+rebrand/parity migration, not a supervisor-only integration. Do not stop after
+proving that Qubit can launch the real Hermes binary or complete Hermes chat
+turns. Read the full parity contract and inventory the pinned Hermes and
+OpenClaw CLI, dashboard, gateway, protocol, skill, memory, model, session,
+schedule, plugin, messaging, browser, project, board, and coding surfaces.
+Implement every requested capability behind Qubit’s public CLI, dashboard, and
+voice interface as appropriate. Preserve behavior while routing execution
+through Qubit’s broker, permissions, grants, confirmation, audit, redaction,
+resource, and emergency-stop paths.
+
+For anything that cannot safely or legally be exposed, add it to the matrix as
+BLOCKED or REJECTED with a typed Qubit error, user-facing explanation, owner,
+and regression test. Do not silently omit commands, expose only `chat`, tell
+the user to invoke an upstream Hermes binary, or count a renamed banner as
+parity. A partial command subset or external-only Hermes installation is a
+hard failure and requires continuing repair; do not return a limitation and
+do not start 8U.
+
+CLI and dashboard parity is mandatory. Do not count a dashboard inventory
+tile, capability count, read-only status endpoint, frontend placeholder, or
+catalog entry as dashboard implementation. Every applicable capability must
+have a real Qubit dashboard page, control, form, report, settings view, or
+action wired to the same backend operation used by CLI and voice. Test
+loading, empty, error, degraded, confirmation, cancellation, redaction, and
+emergency-stop states. Prove the dashboard cannot claim success without a
+real backend result.
+
+The seven currently rejected Hermes rows must also be adapted into Qubit-native
+features before this packet is complete:
+
+- safety bypass flags → scoped owner-authorized sessions that retain e-stop,
+  audit, expiry, and high-impact confirmation;
+- proxy → restricted target-bound proxy with secret isolation and resource
+  limits;
+- pets/skin → optional Qubit cosmetics/themes;
+- sync → opt-in encrypted selective profile/vault sync with conflicts and
+  rollback;
+- computer-use → bounded brokered desktop control;
+- serve/dashboard/desktop/gui → Qubit-owned UI without a second listener;
+- hooks → signed or allowlisted brokered event subscriptions.
+
+Do not expose raw `--yolo`, arbitrary hooks, unrestricted computer control,
+unbounded proxying, or a second Hermes server. Implement the useful behavior
+through Qubit contracts and add positive, negative, redaction, resource,
+persistence, rollback, and emergency-stop tests. The parity matrix must not
+retain these rows as `REJECTED` merely because implementation is unfinished.
+
+Create the new foundation from a fresh official Hermes repository clone outside
+the current Qubit checkout and outside any Hermes/OpenClaw installation used
+by the operator. Pin an exact reviewed Hermes commit. Do not treat a moving
+main branch as reproducible. Record repository URL, commit, date, source
+paths, tests, license, copyright, notices, dependency lockfiles, models,
+plugins, browser drivers, and behavior differences.
+
+The resulting Qubit foundation must be a real Hermes-derived source tree. It
+must contain the selected Hermes runtime source or a legally permitted,
+behaviorally equivalent module integration in the new Qubit worktree. A
+Qubit-owned worker that merely imitates the Hermes JSON/CLI protocol, a label
+that says Hermes, or a temporary external Hermes installation supervised by
+an otherwise unchanged Qubit tree is not sufficient and must be reported as
+REJECTED for this packet. The final runtime identity, import/entry-point
+inspection, subprocess argv, module paths, and receipts must prove that the
+pinned Hermes implementation is the implementation being executed.
+
+Make Qubit Agent the public product identity and Qubit VoiceBridge the voice
+subsystem identity. Preserve the internal voicebridge import package until a
+separate compatibility migration is proven. Do not destructively rename or
+overwrite the current dirty checkout. Build and test the migration in a clean
+worktree with a reversible backup and rollback journal.
+
+Complete the user-facing rebrand. The apparent product name must be Qubit
+Agent/Qubit VoiceBridge everywhere: CLI banners, prompts, help, errors,
+completion, dashboard titles and routes, navigation, API resource labels,
+installer output, service descriptions, shortcuts, package metadata, default
+paths, logs, reports, diagnostics, and support docs. Rework dashboard route and
+component organization, colors, fonts, spacing, icons, typography, layout,
+onboarding language, and design tokens so it is a coherent Qubit product, not
+Hermes with a voice wrapper. Add route, branding, accessibility, and visual
+regression tests. Do not use blind string replacement.
+
+The dashboard must combine the functional Hermes dashboard foundation with the
+adopted OpenClaw dashboard workflows. Preserve Hermes command/session/task
+organization and controls; incorporate OpenClaw UI patterns only for OpenClaw
+capabilities genuinely integrated into Qubit; then unify everything into one
+Qubit information architecture and design system. Do not ship two dashboards,
+paste OpenClaw pages beside Hermes pages, or replace the full Hermes workflow
+with a smaller custom shell. Every visible control must call the same real
+backend operation used by CLI and voice. Apply the frontend design standards
+for hierarchy, typography, color, spacing, responsive behavior, accessibility,
+motion, onboarding, loading, empty, error, degraded, approval, and recovery
+states, and prove those states with rendered and behavioral tests.
+
+Do not erase legally required Hermes/OpenClaw license, copyright, attribution,
+provenance, migration, or developer-only upstream references. Those references
+must be separated from product-facing branding and must never be presented as
+the assistant or product name. Any user-facing Hermes/OpenClaw branding left
+outside those permitted records is an 8T-F failure.
+
+Integrate the existing Qubit VoiceBridge into the Hermes-based runtime as the
+only voice/audio/session path: microphone, ASR, Piper/TTS, Right Ctrl,
+dashboard voice, cancellation, barge-in, temp-audio cleanup, and typed
+degraded states. Disable or route around any duplicate Hermes microphone,
+wake-word, TTS, router, or voice-session path. Prove one listener, one active
+voice session, one effective TTS path, and one audit/policy path.
+
+Adapt and integrate every requested OpenClaw capability identified by the
+feature matrix and the full parity contract; each capability must be present
+in the new Qubit foundation or have a documented, tested compatibility
+boundary that preserves the complete user workflow. Do not use “selected” as
+an excuse to omit difficult capabilities. A capability is not complete if it
+exists only as a status tile, matrix row, external process, CLI-only path,
+dashboard-only path, or voice description.
+Do not copy the whole OpenClaw repository. Do not create a second
+gateway, router, memory store, tool registry, permission system, browser
+authority, scheduler, audit store, or event loop. Every adapted capability
+must call the existing Qubit broker, grants, confirmation, redaction, audit,
+resource, emergency-stop, and rollback contracts.
+
+Do not stop with blocked or rejected rows when the reason is merely unfinished
+implementation. Resolve every code-side Hermes/OpenClaw gap, add the matching
+CLI/dashboard/voice path, and rerun the complete suite. Only genuine
+operator-only work may remain, and it must have a complete hermetic code path,
+typed state, tests, and an exact manual qualification step.
+
+Migrate the product identity, dashboard shell, CLI branding, installer,
+shortcuts, service templates, config defaults, state paths, documentation,
+package metadata, notices, and compatibility aliases. Preserve user config,
+memory, reports, models, audio selections, browser settings, and state. Never
+copy cookies, browser profiles, API keys, tokens, credentials, raw audio, or
+private page/file text.
+
+Add a REUSE/ADAPT/MISSING/REJECTED feature matrix covering voice, browser,
+desktop, files, IDE/OpenCode, memory, models/providers, dashboard, skills,
+tasks, schedules, and background work. Add regression tests for every bridge
+and migration boundary. The matrix must distinguish “implemented in the new
+Qubit foundation” from “available only in an external runtime”; an
+external-only capability cannot be counted as integrated. Do not implement
+the 8U browser workspace yet.
+
+Preserve every unrelated dirty or untracked file byte-for-byte. Never use
+git reset --hard, git clean, broad checkout, mass formatting, or destructive
+deletion. Commit only 8T-F files after complete diff inspection.
+
+Run focused and affected tests, full hermetic tests with warnings as errors,
+source/caller audits, license/dependency scans, compileall, pip/uv check, git
+diff --check, package build, isolated clean install, systemd verification,
+state migration, upgrade, rollback, and uninstall rehearsal. Inspect actual
+warnings, stderr, receipts, persisted files, and failure output. Do not claim
+live hardware, browser, account, model, timer, or clean-machine success when
+not performed.
+
+Return the strict 8T-F handoff and stop. Do not start Packet 8U. If the final
+Qubit tree does not execute the pinned Hermes implementation, or if requested
+OpenClaw ADAPT/REUSE rows remain external-only, return REJECTED and continue
+repairing 8T-F rather than claiming a limitation.
+```
+
+#### Verification prompt
+
+```text
+Verify ONLY Packet 8T-F. Read docs/QUBIT_FULL_PARITY_CONTRACT.md first.
+Independently inspect the fresh pinned Hermes source,
+selected OpenClaw source, complete migration diff, every caller, package,
+service, dashboard, CLI, installer, config, state, model, audio, and identity
+path. Verify exact licenses, notices, dependencies, source hashes, and
+provenance.
+
+Prove the new Qubit Agent foundation has exactly one agent/session authority,
+one voice/audio path, one listener, one effective TTS path, one broker, one
+permission system, one audit path, and one emergency-stop path. Test
+microphone/ASR/TTS/Right Ctrl/dashboard parity, cancellation, barge-in,
+restart, duplicate listener prevention, temp-audio cleanup, degraded states,
+and no-bypass behavior. Verify the executed process/module identity and source
+paths against the pinned Hermes clone. A Qubit worker that only imitates the
+Hermes protocol, or a temporary Hermes install outside the resulting Qubit
+tree, does not satisfy this proof.
+
+Prove every requested Hermes and OpenClaw capability is available through the
+Qubit CLI, authenticated dashboard, and Qubit voice path, with equivalent
+behavior and the same backend. Every OpenClaw capability marked REUSE or ADAPT
+in the 8T-F matrix must be actually present in the new Qubit foundation and
+adapted through Qubit contracts. Capabilities marked MISSING, DEFER, BLOCKED,
+REJECTED, CLI_ONLY, DASHBOARD_ONLY, VOICE_MISSING, or STATUS_ONLY are not
+parity and must either be repaired or be proven genuine operator-only gates;
+they must never be counted as complete. Prove OpenClaw capabilities cannot
+bypass grants, confirmations, redaction, audit, resource limits, or emergency
+stop. Prove no whole upstream repository, unreviewed plugin,
+credential, cookie, profile, secret, raw audio, private page text, or full
+environment was copied.
+
+Verify product rebranding, canonical folder/install identity, legacy aliases,
+config/state/model/audio/memory/report preservation, partial migration,
+interrupted migration, repeated migration, upgrade, rollback, uninstall,
+read-only, disk-full, unsafe symlink, and path traversal behavior. Verify no
+second service/listener is created and no unrelated dirty/untracked file is
+changed.
+
+Run focused, affected, security, persistence, resource, clean-install,
+upgrade, rollback, warnings-as-errors, compileall, pip/uv check,
+git diff --check, systemd-analyze verify, package scans, and Graft build.
+With explicit authorization only, run physical audio and live service checks;
+do not fabricate hardware, account, browser, or model evidence.
+
+Return VERIFIED, REJECTED, or VERIFIED WITH EXPLICIT LIMITATION and stop.
+Do not start Packet 8U.
+```
+
+### Packets 8U–8AH — whole-computer capability expansion
+
+These packets are planned after 8T. They are not implemented merely because
+the prompts exist. Run them one at a time, only after the previous packet has
+an independent verification result. The current broker, grants, scopes,
+redaction, audit, isolation, emergency stop, session, memory, and release
+contracts remain authoritative.
+
+#### Shared implementation rules for 8U–8AH
+
+```text
+Implement ONLY the named packet. Read AGENTS.md, the entire applicable plan,
+this prompt pack, the packet's operations document, licensing/provenance
+records, and all affected callers. Run graft map/ask/callers first. Inspect
+the complete diff before editing. Preserve every unrelated dirty or untracked
+file byte-for-byte. Do not start another packet.
+
+Reuse the existing capability registry, ActionBroker, 7E permissions, 8E
+scopes, 8F action contracts, 8O power control, 8Y session/journal contracts,
+redaction, audit, resource limits, and rollback mechanisms. Do not add a
+second router, listener, memory store, scheduler, audit store, permission
+system, browser authority, or direct shell/HTTP/MCP bypass. Every mutation
+must have one authenticated policy path and a typed preview/receipt.
+
+Before inventing a new implementation, perform an upstream-reuse preflight for
+the pinned Hermes and OpenClaw repositories. Map each requested capability to
+the smallest compatible upstream source and tests, record the exact commit,
+license, notices, dependencies, provenance, and behavior differences, then
+reuse or adapt that code behind Qubit contracts. Choose one implementation per
+capability; do not merge two competing routers, memories, tool registries,
+permission systems, browser authorities, or event loops. If upstream code is
+not reused, document the technical reason and add an equivalent contract test.
+Do not copy whole repositories, unreviewed plugins, secrets, profiles, or
+provider credentials.
+
+Every packet must classify its requirements before coding:
+
+- REUSE: upstream behavior already satisfies the Qubit contract;
+- ADAPT: upstream behavior exists but needs Qubit wrapping, policy, UI, or
+  compatibility work;
+- MISSING: implement only the smallest absent capability;
+- REJECTED: incompatible, unsafe, duplicated, unlicensed, or unsupported.
+
+When a requirement is REUSE, do not rewrite it. Add Qubit integration,
+negative/contract tests, provenance, and independent verification instead. A
+packet may therefore be verification-only or adaptation-only when upstream
+already supplies the implementation. Do not report an unchanged upstream
+feature as newly implemented by Qubit.
+
+Keep the feature disabled by default. Distinguish DECLARED, AVAILABLE,
+ENABLED, LIVE, DEGRADED, BLOCKED, FAILED, and VERIFIED; detection is not
+permission and a UI toggle is not execution. Page, model, tool, repository,
+clipboard, generated-code, and adapter output is untrusted and cannot grant,
+widen, renew, or confirm a permission. Never copy cookies, browser profiles,
+tokens, API keys, raw private page/file/audio text, or a full environment.
+Never silently elevate, install, enable a service, publish, send, purchase,
+delete, change an account, commit/push code, or modify project code without
+the required fresh exact confirmation. CAPTCHA, 2FA, recovery challenges,
+and login remain a manual handoff.
+
+Use only declared dependencies and record any upstream source, exact commit,
+license, notices, source path, and local changes. Add focused positive and
+negative tests, warning-as-error tests, security/injection tests, resource,
+persistence/concurrency/recovery, clean-install, and rollback tests. Run
+compileall, pip check, git diff --check, and graft build. Inspect warnings,
+stderr, receipts, persisted files, and failure output, not exit codes alone.
+End with the exact handoff template: status, files, evidence/counts,
+failures, untested paths, security/privacy findings, repairs, rollback, and
+next safe action. Use INCOMPLETE, BLOCKED, DEGRADED, or FAILED for an
+implementation handoff; never claim VERIFIED without independent verification.
+```
+
+#### Parallel-work rule for 8U–8AH
+
+```text
+To reduce elapsed time, research, source/license audits, fixture design, and
+read-only test preparation may run in parallel in isolated worktrees. Do not
+implement dependent production packets simultaneously in the same checkout.
+Merge one packet at a time, run its focused and affected verification, inspect
+the complete diff, and record the commit before starting the next dependent
+packet. A coordinator may prepare all task capsules, but may not skip packet
+gates, combine unrelated commits, or claim that parallel green tests prove
+the merged product. Preserve unrelated dirty/untracked files in every
+worktree.
+```
+
+#### Packet 8U — browser-first voice workspace
+
+```text
+Implement ONLY Packet 8U after 8T is independently verified. Build the
+browser-first voice workspace on the existing microphone, ASR, TTS,
+orchestrator, and broker. Connect only to an existing user-launched Chromium
+CDP or approved in-page bridge over authenticated loopback. Provide an
+authenticated browser-side toggle to attach, pause, or disconnect the current
+browser context; it must control the same backend session as the dashboard,
+Right Ctrl, and wake-word activation. Provide a generic
+read bridge for ordinary supported webpages, exposing bounded current-tab,
+selected-text, DOM/accessibility, visible-state, clipped-screenshot, and tab
+context without requiring a custom adapter for every website. Expose
+navigation, scroll, search, click, type, fill, and draft
+operations with streaming partial ASR/response/TTS, barge-in, reconnect, and
+typed auth-required, CAPTCHA/2FA, selector-drift, unavailable, and degraded
+states. Do not clone profiles, import cookies, launch a hidden browser, expose
+public CDP, or promise universal website control. Login/CAPTCHA/2FA must pause
+for a manual handoff. Per-origin/account grants must separate read/navigation/
+fill/draft from submit/send/publish/purchase/delete/account changes.
+
+Test hermetic DOM/accessibility fixtures, cross-origin and iframe boundaries,
+prompt injection, malformed selectors/tool output, tab switching, reconnect,
+redaction, bounded screenshots, streaming latency, cancellation, barge-in,
+and all typed states. With explicit authorization only, run a disposable
+real-browser canary. Return the strict handoff and stop.
+```
+
+Verification prompt:
+
+```text
+Verify ONLY Packet 8U. Independently inspect every browser/voice/ASR/TTS/CDP
+caller and the complete diff. Prove one authenticated broker path from
+“Hey Qubit,” Right Ctrl, dashboard, CLI, and the approved Comet/Chromium
+browser toggle to the same browser capability; no direct CDP/HTTP/MCP,
+profile/cookie import, hidden listener, or frontend-only state. Test origin and
+account binding, grant expiry/revocation, read versus draft versus high-impact
+actions, exact confirmation hashes, prompt injection, hostile DOM/tool output,
+iframes, selector drift, ambiguous tabs, reconnect, cancellation, barge-in,
+CAPTCHA/2FA/manual handoff, screenshot/clipboard/private-text redaction,
+resource bounds, audit, restart, and rollback. Run real browser steps only
+with explicit operator authorization and a disposable account/session. Run
+focused, affected, security, resource, persistence, clean-install,
+warnings-as-errors, compileall, pip check, diff check, and Graft build.
+Return VERIFIED, REJECTED, or VERIFIED WITH EXPLICIT LIMITATION and stop.
+```
+
+#### Packet 8V — desktop application control
+
+```text
+Implement ONLY Packet 8V after 8U verification. Add an opt-in adapter for
+declared Linux desktop sessions and supported applications using accessibility
+APIs/portals and semantic roles. Bind every operation to the selected user,
+display/session, application, window, and target. Support bounded launch,
+focus, menu/button/text/table/dialog interaction, selection, and readback.
+Screenshot/OCR or coordinate fallback must be visibly degraded, bounded, and
+confirmation-gated. Preserve focus/cursor, isolate X11/Wayland sessions,
+redact clipboard, and recover from app crash/reconnect. Never add a global
+keylogger, hidden listener, arbitrary event injector, or unrestricted desktop
+executor.
+
+Test multiple sessions, X11/Wayland, target ambiguity, focus/cursor changes,
+accessibility permission denial, clipboard redaction, app crash/reconnect,
+resource bounds, emergency stop, audit, restart, and rollback. Real apps need
+explicit operator authorization. Return the strict handoff and stop.
+```
+
+Verification prompt:
+
+```text
+Verify ONLY Packet 8V. Inspect every desktop adapter caller and prove all
+actions use the broker, grants, target/session binding, audit, isolation, and
+emergency stop. Test semantic roles, ambiguous windows, focus/cursor
+preservation, X11/Wayland selection, multi-session isolation, denied desktop
+permissions, screenshot/OCR degraded mode, clipboard redaction, injection,
+malformed adapter output, crash/reconnect, cancellation, resource limits,
+disabled-by-default behavior, and rollback. Do not use a global listener or
+coordinate-only unrestricted fallback. Run live desktop tests only with
+explicit authorization. Run the full required validation gates and return
+VERIFIED, REJECTED, or VERIFIED WITH EXPLICIT LIMITATION; stop.
+```
+
+#### Packet 8W — approved files and folders workspace
+
+```text
+Implement ONLY Packet 8W after 8U and 8V verification. Add one brokered file
+workspace with explicit approved roots and typed list/search/read/preview,
+write, copy/move/rename, archive/trash/restore, diff, snapshot, and undo
+operations. Enforce path traversal and symlink containment, secret-file and
+device-file refusal, quotas, file/count/size limits, read-only/disk-full
+handling, atomic writes, concurrent access, retention, and recoverable state.
+Deletes and broad changes require a fresh exact preview/confirmation. Model or
+repository text cannot expand a root or grant access. No whole-home default,
+direct shell fallback, hidden watcher, or raw file content in logs.
+
+Test traversal, symlink races, permissions, secret patterns, device files,
+large trees, disk-full/read-only, corrupt/newer state, concurrent writers,
+crash/restart, restore, redaction, audit, resource limits, clean install, and
+rollback. Return the strict handoff and stop.
+```
+
+Verification prompt:
+
+```text
+Verify ONLY Packet 8W. Prove root, user, project, session, and grant binding;
+read/reversible/delete separation; exact previews; symlink/path traversal and
+secret/device-file refusal; quotas; atomicity; fsync/rename boundaries;
+concurrency; crash recovery; corrupt/newer/read-only/disk-full behavior;
+redaction; audit; restart; uninstall; and rollback. Prove model, page,
+repository, and tool text cannot widen access. Inspect CLI/dashboard/voice
+parity and every caller, then run focused, security, resource, persistence,
+clean-install, warnings-as-errors, compileall, pip check, diff check, and
+Graft build. Return VERIFIED, REJECTED, or VERIFIED WITH EXPLICIT LIMITATION;
+stop.
+```
+
+#### Packet 8X — IDE-native engineering workspace
+
+```text
+Implement ONLY Packet 8X after 8W verification. Add declared VS Code,
+JetBrains, or editor integration for current workspace, open file, selection,
+diagnostics, tests, diffs, patch preview, and bounded test runs. Keep OpenCode
+as the optional supervised executor, not a second authority. Writes outside an
+approved disposable worktree require an exact diff/hash preview and fresh
+confirmation. Never auto-commit, push, publish, install packages, change
+services/permissions, or inherit API keys, cookies, desktop sessions, or the
+full environment. Repository instructions and generated code are untrusted.
+Test malformed patches, hostile instructions, traversal/symlinks, overflow,
+timeout, cancellation, crash/reap, concurrent runs, extension disconnect,
+provider outage, partial failure, restart, and rollback. Return the handoff.
+```
+
+Verification prompt:
+
+```text
+Verify ONLY Packet 8X. Prove IDE actions are brokered, authenticated,
+workspace/path bound, resource-limited, redacted, audited, cancellable, and
+disabled by default. Test hostile repository instructions, prompt injection,
+path traversal, symlinks, secret files, malformed/oversized patches, stale or
+replayed confirmations, target switching, timeout, crash/kill/reap,
+concurrency, provider outage, missing credentials, extension disconnect,
+restart, partial failure, clean install, and rollback. Prove no commit/push/
+publish/install/service/permission/account/destructive action is automatic;
+run live coding only in an authorized disposable worktree. Run all required
+gates and return VERIFIED, REJECTED, or VERIFIED WITH EXPLICIT LIMITATION;
+stop.
+```
+
+#### Packet 8Y — unified task context and session continuity
+
+```text
+Implement ONLY Packet 8Y after 8U–8X verification. Unify one task/session
+identity across voice, dashboard, CLI, browser, desktop, files, and IDE. Add
+an explicit context picker, source/provenance labels, bounded summaries,
+redaction and consent for sensitive sources, pause/resume/cancel/retry,
+progress, durable receipts, recovery, and clear account/project boundaries.
+Reuse the existing session, journal, memory, and audit authorities; do not add
+a second router, memory store, scheduler, or audit database. Context switches
+must not leak between accounts, apps, projects, or sessions, and no page/model
+text can authorize an action. Test restart, reconnect, concurrent sessions,
+context switching, stale receipts, prompt injection, limits, recovery, and
+rollback. Return the handoff and stop.
+```
+
+Verification prompt:
+
+```text
+Verify ONLY Packet 8Y. Prove voice/dashboard/CLI/browser/desktop/files/IDE
+share one authenticated session contract and that every context item has
+bounded provenance, consent, redaction, retention, and deletion behavior.
+Test account/project/session isolation, context switching, restart/reconnect,
+pause/resume/cancel/retry, stale/replayed receipts, concurrent tasks, crash
+recovery, prompt injection, raw page/file/audio leakage, resource limits,
+audit, and rollback. Prove no page/model/tool text changes policy or grants.
+Run all required validation and return VERIFIED, REJECTED, or VERIFIED WITH
+EXPLICIT LIMITATION; stop.
+```
+
+#### Packet 8Z — capability adapter lifecycle and local catalog
+
+```text
+Implement ONLY Packet 8Z after 8Y verification. Add a versioned local adapter
+manifest and backend-authoritative lifecycle for discover, validate, enable,
+disable, upgrade, downgrade, rollback, and remove. Each record must include
+source commit, license/notices, hash, dependencies, supported OS/session,
+scopes, risk tier, health, limits, and rollback. Start with a local catalog;
+do not add an uncontrolled marketplace. Bad manifests, unknown licenses,
+stale hashes, dependency conflicts, corrupt state, interrupted/partial
+installs, and hidden listeners must fail closed. Plugins may not bypass the
+broker, grants, isolation, audit, or emergency stop. Return the handoff.
+```
+
+Verification prompt:
+
+```text
+Verify ONLY Packet 8Z. Inspect the manifest schema, catalog, installer,
+loader, lifecycle state, provenance, license/notices, dependency and OS
+checks, every adapter caller, and complete diff. Test malformed/newer
+manifests, bad licenses/hashes, dependency conflicts, path traversal,
+symlinks, secrets, corrupt/read-only/disk-full state, interrupted install,
+partial upgrade, downgrade/rollback/remove, restart, concurrent lifecycle
+operations, offline mode, resource limits, audit, and hidden-listener/direct
+bypass attempts. Prove CLI/dashboard parity, disabled-by-default behavior,
+user-data preservation, and that no plugin can widen permissions or evade
+power control. Run all required gates and return VERIFIED, REJECTED, or
+VERIFIED WITH EXPLICIT LIMITATION; stop.
+```
+
+#### Packet 8AA — always-on presence and context plane
+
+```text
+Implement ONLY Packet 8AA after 8Z verification. Add an explicit always-on
+runtime mode with visible listening, paused, muted, and unavailable states.
+Support “Hey Qubit” wake-word activation and push-to-talk selection, including
+the existing Right Ctrl path. The authenticated dashboard and approved
+browser-side toggle must arm, pause, mute, and disconnect the same backend
+session; they must never create duplicate listeners or voice providers.
+Support immediate mute, session expiry,
+crash recovery, and bounded active-window/browser context refresh. Keep the
+existing audio/ASR/TTS contracts. Do not store raw audio by default and do not
+add a hidden microphone listener, global keylogger, screen recorder, or silent
+screenshot loop. Context sources must be opt-in, redacted, rate-limited,
+bounded, pausable, and removable. Add tests for idle resource use, false
+activations, barge-in, mute races, suspend/resume, restart, retention, and
+rollback. Return the strict handoff and stop.
+```
+
+Verification prompt:
+
+```text
+Verify ONLY Packet 8AA. Prove “Hey Qubit,” Right Ctrl, the dashboard, and the
+browser toggle all use one authenticated policy/session path for always-on
+mode, wake-word/PTT, privacy state, mute/pause, session expiry, and context
+refresh. Measure idle/active CPU and RAM, wake latency, false activations,
+refresh rate, cleanup, and audio responsiveness. Test microphone denial, mute
+races, suspend/resume, crash/restart, duplicate listeners/providers, raw-audio
+retention, context redaction, stale sessions, emergency stop, and rollback.
+Confirm no hidden listener, keylogger, screen recorder, or unbounded capture.
+Return VERIFIED, REJECTED, or VERIFIED WITH EXPLICIT LIMITATION; stop.
+```
+
+#### Packet 8AB — Firefox and multi-browser parity
+
+```text
+Implement ONLY Packet 8AB after 8AA verification. Add a separately declared
+Firefox browser-context adapter using a supported Firefox
+automation/accessibility boundary. Match the generic read contract for
+ordinary webpages before adding site-specific actions. Do not assume Chromium
+CDP behavior is portable. Bind browser, profile,
+session, account, origin, and tab explicitly. Support only the bounded 8U
+operations. Never copy cookies, profiles, tokens, or browser databases.
+Keep Chromium and Firefox grants isolated and report unsupported states
+truthfully. Add fixtures, provenance, license records, and a per-browser
+support matrix. Return the strict handoff and stop.
+```
+
+Verification prompt:
+
+```text
+Verify ONLY Packet 8AB. Inspect Firefox and Chromium callers, role binding,
+origin/account/session isolation, licenses, and dependencies. Test tab and
+page reads, navigation, fill/draft separation, selector drift, iframes,
+reconnect, profile isolation, auth/CAPTCHA/2FA handoff, redaction, resource
+limits, emergency stop, and rollback on both browsers. Prove no cookie/profile
+import, wrong-browser fallback, public listener, or direct bypass. Run live
+tests only with authorization and disposable sessions. Return VERIFIED,
+REJECTED, or VERIFIED WITH EXPLICIT LIMITATION; stop.
+```
+
+#### Packet 8AC — adapter SDK and website/app contract
+
+```text
+Implement ONLY Packet 8AC after 8AB verification. Create the smallest local
+adapter contract and fixture harness for adding websites or desktop apps
+without duplicating the router, broker, grants, audit, memory, or scheduler.
+Require a manifest containing identity, versions, origins/app IDs, operations,
+risk tiers, dependencies, privacy rules, limits, license/provenance, health,
+and rollback. Reject unknown operations and downloaded code by default. Add
+schema validation, compatibility checks, fixture tests, provenance, and safe
+removal. Return the strict handoff and stop.
+```
+
+Verification prompt:
+
+```text
+Verify ONLY Packet 8AC. Inspect the manifest, loader, registry, fixture
+runner, dependency/license checks, provenance, callers, and complete diff.
+Test malformed/newer manifests, unknown capabilities, bad hashes/licenses,
+dependency conflicts, traversal, symlinks, secrets, hidden listeners, direct
+broker bypasses, resource limits, disabled defaults, interrupted install,
+upgrade, downgrade, removal, rollback, and concurrent lifecycle operations.
+Prove adapters cannot widen grants, change policy, self-install, or execute
+outside the broker. Return VERIFIED, REJECTED, or VERIFIED WITH EXPLICIT
+LIMITATION; stop.
+```
+
+#### Packet 8AD — individually qualified website packs
+
+```text
+Implement ONLY Packet 8AD after 8AC verification. Add explicit website action
+packs one site family at a time, initially prioritizing Gmail, Messenger,
+Instagram, forums, and marketplaces. Generic ordinary webpage reading belongs
+to 8U/8AB; these packs are for site-specific controls and workflows. Do not
+claim universal action support. Each pack must define exact origins, supported
+read/navigation/fill/draft actions,
+account binding, selector drift, auth/CAPTCHA/2FA handoff, redaction, rate
+limits, fixtures, live canary, license/provenance, and rollback. Sending,
+publishing, purchasing, deleting, and account/security changes require fresh
+exact confirmation. Return the strict handoff and stop.
+```
+
+Verification prompt:
+
+```text
+Verify ONLY Packet 8AD. Verify every included website pack independently from
+manifest through broker, grants, audit, and emergency stop. Test exact
+origin/account binding, current-tab and selected-content reads, navigation,
+fill/draft, selector drift, login/CAPTCHA/2FA handoff, hostile page output,
+rate limits, reconnect, duplicate actions, private-text/token redaction,
+confirmation hashes, resource limits, and rollback. Use fixtures and only
+authorized disposable live accounts. Never generalize one site’s result to
+another. Return VERIFIED, REJECTED, or VERIFIED WITH EXPLICIT LIMITATION;
+stop.
+```
+
+#### Packet 8AE — individually qualified desktop application packs
+
+```text
+Implement ONLY Packet 8AE after 8AC verification. Add declared desktop-app
+packs one application family at a time, prioritizing IDEs, terminals, file
+managers, communication apps, and media tools. Use semantic accessibility APIs
+where available and report unsupported/degraded apps honestly. Each pack must
+define app identity/version, session/display binding, read/reversible/mutating
+operations, focus behavior, clipboard policy, limits, fixtures, provenance,
+live qualification, and rollback. Do not add a global keylogger or arbitrary
+coordinate injector. Return the strict handoff and stop.
+```
+
+Verification prompt:
+
+```text
+Verify ONLY Packet 8AE. Inspect every app pack, manifest, caller,
+accessibility boundary, session/display binding, and broker path. Test
+semantic discovery, version drift, ambiguous windows, focus/cursor
+preservation, X11/Wayland and multi-session isolation, denied accessibility
+permissions, clipboard/screenshot redaction, crash/reconnect, emergency
+stop, cancellation, resource limits, disabled defaults, and rollback. Prove
+one app’s grant cannot affect another app or session and no unrestricted
+fallback exists. Return VERIFIED, REJECTED, or VERIFIED WITH EXPLICIT
+LIMITATION; stop.
+```
+
+#### Packet 8AF — background processes, gaming coexistence, and performance
+
+```text
+Implement ONLY Packet 8AF after 8AE verification. Add bounded process and
+resource awareness so Qubit can report its own service, model, audio, browser,
+and declared-app health while demanding programs such as Steam games run.
+Use explicit allowlists, sampling limits, pause-on-fullscreen policy, and
+CPU/RAM/VRAM/audio budgets. Do not inspect or control arbitrary processes by
+default. Never capture game input or screen content silently. Return the
+strict handoff and stop.
+```
+
+Verification prompt:
+
+```text
+Verify ONLY Packet 8AF. Prove process/resource observation is allowlisted,
+redacted, bounded, and brokered, with no arbitrary process control, keylogging,
+screen capture, or game interference. Measure idle/background/active CPU, RAM,
+VRAM, audio latency, wake latency, and fullscreen/game behavior. Test
+pause/resume, suspend, process disappearance, permission denial, exhaustion,
+emergency stop, restart, concurrent sessions, audit, and rollback. Return
+VERIFIED, REJECTED, or VERIFIED WITH EXPLICIT LIMITATION; stop.
+```
+
+#### Packet 8AG — coverage matrix and production qualification
+
+```text
+Implement ONLY Packet 8AG after 8AD–8AF verification. Build a backend-
+authoritative support matrix for every shipped browser and application pack.
+Show declared, installed, available, enabled, live, degraded, blocked, and
+verified states; supported versions; permissions; limitations; measured
+latency/resource budgets; privacy behavior; and rollback status. Add no new
+capability without an adapter contract, tests, license/provenance, live
+qualification plan, and removal path. Expose the matrix through setup/CLI
+without secrets or raw private content. Return the strict handoff and stop.
+```
+
+Verification prompt:
+
+```text
+Verify ONLY Packet 8AG. Reconcile every website/app manifest, implementation,
+test, license, dependency, caller, support state, and rollback record. Prove
+detected is never reported as enabled and hermetic testing is never reported
+as live. Test stale versions, missing dependencies, denied permissions,
+unavailable targets, duplicate adapters/listeners, resource ceilings,
+redaction, audit, upgrade/downgrade, uninstall, and partial rollback. Run
+authorized live canaries for each claimed browser/app family; do not
+generalize results. Return VERIFIED, REJECTED, or VERIFIED WITH EXPLICIT
+LIMITATION; stop.
+```
+
+#### Packet 8AH — unified Qubit dashboard and upstream UI adaptation
+
+```text
+Implement ONLY Packet 8AH after 8AG verification. Replace the fragmented
+dashboard experience with one Qubit-native, responsive dashboard backed by the
+existing authenticated typed API and action broker. Consolidate the useful
+workflow categories found in the approved Hermes/OpenClaw interfaces:
+conversation and streaming tool output; voice and audio status; browser and
+desktop context; files and project workspace; IDE/OpenCode runs and diff
+previews; sessions, memory, skills, tasks and schedules; model/provider and
+safe API-key reference status; approvals and confirmations; adapter health;
+diagnostics, audit, setup, upgrade, rollback, and recovery.
+
+Do not merge a second router, session store, memory store, permission system,
+model selector, action executor, or event authority. Every dashboard control
+must call the existing backend contract, show truthful DECLARED/AVAILABLE/
+ENABLED/LIVE/DEGRADED/BLOCKED states, and fail closed. Mutations must use the
+same broker, grants, exact previews, confirmations, receipts, audit, and
+emergency stop as CLI and voice. Keep raw secrets, cookies, private page/file
+text, and raw audio out of the UI and diagnostics.
+
+Reuse or adapt upstream Hermes/OpenClaw UI code only after pinning exact
+commits, reviewing licenses/notices/dependencies, recording provenance, and
+preserving required attribution. Do not copy unreviewed whole repositories or
+their competing backend authorities. Add desktop, narrow-mobile, keyboard,
+screen-reader, reduced-motion, forced-colors, loading, error, offline,
+session-expiry, empty, degraded, and recovery states. Return the strict
+handoff and stop.
+```
+
+Verification prompt:
+
+```text
+Verify ONLY Packet 8AH. Independently inspect the route/component inventory,
+all Hermes/OpenClaw source reused or adapted, exact commits, licenses,
+notices, dependencies, provenance, and every dashboard caller. Prove there is
+one authenticated typed API path and one backend authority across dashboard,
+voice, CLI, browser, desktop, files, IDE/OpenCode, sessions, providers,
+approvals, setup, and audit. Prove no frontend-only state, secret, raw page
+content, raw file/audio content, duplicate route, direct executor, second
+listener, or permission bypass exists.
+
+Test chat/tool streaming, voice/PTT status, browser and desktop context,
+file/project previews, IDE/OpenCode receipts, sessions/memory/skills/tasks,
+provider inventory, safe key-reference display, approvals, adapter health,
+diagnostics, setup, upgrade/rollback, audit, offline/reconnect, session
+expiry/re-pairing, loading/error/degraded states, bounded DOM, stale data,
+concurrent updates, cancellation, emergency stop, and recovery. Test desktop
+and narrow mobile layouts at 320 pixels and 200% zoom, keyboard-only and
+screen-reader semantics, focus restoration, live announcements, contrast,
+forced colors, reduced motion, touch targets, and performance/resource
+budgets. Prove all dynamic data is safely rendered and all writes retain exact
+confirmation and audit behavior.
+
+Run focused, affected, accessibility/UI, security, resource, persistence,
+clean-install, warnings-as-errors, compileall, pip check, git diff --check,
+and Graft build. With explicit authorization, run the real authenticated
+dashboard against the same running backend; do not claim live parity from
+mock-only tests. Return VERIFIED, REJECTED, or VERIFIED WITH EXPLICIT
+LIMITATION and stop.
+```
+
+#### Whole-computer capability gate
+
+```text
+Before calling the product whole-computer capable, independently verify 8U–8AH
+in order. Prove the supported browser, desktop, file, and IDE matrix through
+one brokered policy path, with truthful DECLARED/AVAILABLE/ENABLED/LIVE states,
+bounded latency/resources, redacted audit, restart/recovery, and rollback.
+Routine low-risk actions may use a narrow expiring owner grant. Sending,
+publishing, purchasing, deleting, account changes, and project-code changes
+still require fresh exact confirmation. Do not claim universal access or
+production readiness when a live hardware/account/session canary is untested.
+Return the strict verification template and stop.
+```

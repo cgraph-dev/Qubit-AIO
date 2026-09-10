@@ -36,5 +36,22 @@
   "ghost.clipboard.read": {
     "state": "OK",
     "detail": "clipboard read; output redacted"
+  },
+  "ghost.desktop.screenshot": {
+    "state": "OK",
+    "detail": "clipped redacted desktop evidence captured (session backend)"
+  },
+  "ghost.input.key": {
+    "state": "OK",
+    "detail": "named key pressed on exact semantic target"
+  },
+  "ghost.input.cursor": {
+    "state": "OK",
+    "detail": "cursor moved to exact semantic target (no click)",
+    "compensation": "move the cursor back (best effort)"
+  },
+  "ghost.window.close": {
+    "state": "OK",
+    "detail": "window closed by bounded identifier"
   }
 }

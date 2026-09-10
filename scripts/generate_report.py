@@ -87,14 +87,34 @@ def infer_status(raw):
         return "partial"
     return "completed"
 
+# Qubit display labels for legacy internal route/backend tokens. Audit and
+# receipts keep raw tokens; user-facing reports render through this map.
+_QUBIT_LABELS = {
+    "openclaw": "Qubit gateway", "hermes": "Qubit agent",
+    "local": "Qubit local", "local-script": "Qubit local task",
+    "chat": "Qubit chat", "system": "Qubit system",
+    "voice": "Qubit voice", "gateway": "Qubit gateway", "web": "Qubit web",
+}
+
+
+def _qubit_label(token):
+    text = str(token or "").strip()
+    if not text:
+        return ""
+    if text.lower().startswith("qubit "):
+        return text.split()[0] + " " + " ".join(text.split()[1:])
+    key = text.lower().split()[0]
+    return _QUBIT_LABELS.get(key, text.split()[0])
+
+
 def auto_build(raw, args):
     raw=(raw or "").strip()
     task=args.task or "Task"
     project=args.project or ""
     status=args.status or infer_status(raw)
     elapsed=args.elapsed or ""
-    agent=args.agent or ""
-    route=args.route or ""
+    agent=_qubit_label(args.agent or "")
+    route=_qubit_label(args.route or "")
     # files
     files_arg=args.files or ""
     files=[]
@@ -244,8 +264,8 @@ def main():
     ap.add_argument("--task", default="")
     ap.add_argument("--project", default="")
     ap.add_argument("--status", default="", choices=["completed","partial","blocked","failed"], help="default: auto-inferred from raw")
-    ap.add_argument("--agent", default="", help="backend/model: openclaw | hermes | local")
-    ap.add_argument("--route", default="", help="route: openclaw | hermes | local-script | web")
+    ap.add_argument("--agent", default="", help="Qubit agent label: Qubit gateway | Qubit agent | Qubit local (legacy openclaw|hermes|local accepted, mapped)")
+    ap.add_argument("--route", default="", help="Qubit route label (legacy openclaw|hermes|local-script|web accepted, mapped)")
     ap.add_argument("--summary", default="", help="explicit 40w spoken summary (last paragraph)")
     ap.add_argument("--actions", default="", help="; separated")
     ap.add_argument("--files", default="", help="; separated entries path:Change:desc")
@@ -290,7 +310,7 @@ def main():
 
     # main output to stdout (piped to dashboard / spoken)
     sys.stdout.write(md)
-    if out_path and str(out_path)!=str(pathlib.Path(args.out).expanduser()) if args.out else False:
+    if args.out:
         pathlib.Path(args.out).expanduser().write_text(md, errors="replace")
 
 if __name__=="__main__":

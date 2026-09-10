@@ -1856,3 +1856,100 @@ LOCAL DESTINATION: voicebridge/upstream/ (+ tests/test_upstream_vendored.py)
 DEPENDENCIES ADDED: none (both files stdlib-only: re / contextlib+sqlite3).
 IMPLEMENTATION STATUS: implemented 2026-09-08; differential + wiring tests green.
 ```
+
+R32 — BROWSER TAB OPERATIONS, NATIVE REWRITE (Packet 8U; REWRITTEN, NOT COPIED)
+```text
+LOCAL REQUIREMENT: Qubit-native tab list/read/find/open/navigate/activate/
+fill/click/close over the user's already-running Chromium via loopback CDP,
+behind the Qubit broker/confirmation/audit contracts.
+UPSTREAM REPOSITORY + COMMIT: https://github.com/NousResearch/hermes-agent @
+2237be355906fbe6065ce1815711eee52b2d646e (tag v2026.9.7).
+SOURCE FILES INSPECTED (not copied): tools/browser_tool.py,
+tools/browser_tool_cdp.py (_resolve_cdp_override, supervisor lifecycle),
+tools/browser_tool_snapshot.py, tools/browser_tool_eval_policy.py,
+tools/browser_camofox.py, tools/browser_tool_cloud.py.
+UPSTREAM TESTS/FIXTURES: upstream browser tests assume the Hermes agent
+runtime; no isolated fixtures were portable, so Qubit proves behavior with
+its own hermetic fake-CDP suite (tests/test_browser_tabs8u.py).
+LICENSE: MIT (Copyright (c) 2025 Nous Research) — recorded; no upstream
+expression copied, so no notice is embedded in the new files.
+DECISION: REWRITE — independent loopback-only implementation. Deliberate
+divergences: (1) loopback 127.0.0.1:9222 only (Hermes accepts user-supplied
+remote CDP endpoints); (2) no cloud browsers, profiles, or extensions;
+(3) mutations require explicit confirmation + audit; (4) page/file text is
+untrusted evidence, bounded and redacted.
+LOCAL DESTINATION: voicebridge/cdp.py (stdlib WS+HTTP transport),
+voicebridge/browser_tabs.py (ops + ledger), CLI `qubit browser ...`,
+voice entries browser_*, dashboard Tier-1 (automatic).
+DEPENDENCIES ADDED: none.
+IMPLEMENTATION STATUS: implemented; hermetic fake-CDP tests green.
+```
+
+R33 — USER SCHEDULED JOBS, NATIVE REWRITE (Packet 8U; REWRITTEN, NOT COPIED)
+```text
+LOCAL REQUIREMENT: Qubit-native scheduled jobs (interval/daily/once) on the
+canonical SQLite store with atomic claim, typed per-job results, retained
+history, and CLI/dashboard/voice parity through broker confirmation/audit.
+UPSTREAM REPOSITORY + COMMIT: https://github.com/NousResearch/hermes-agent @
+2237be355906fbe6065ce1815711eee52b2d646e (tag v2026.9.7).
+SOURCE FILES INSPECTED (not copied): cron/jobs.py, cron/scheduler.py,
+cron/scheduler_preflight.py, cron/executions.py, cron/ledger.py,
+cron/occurrences.py, cron/lifecycle_guard.py.
+UPSTREAM TESTS/FIXTURES: upstream cron tests assume the Hermes runtime and
+detached workers; Qubit proves due computation, atomic claims, failure
+isolation, and history with its own suite (tests/test_schedules8u.py).
+LICENSE: MIT (Copyright (c) 2025 Nous Research) — recorded; no upstream
+expression copied.
+DECISION: REWRITE — narrower scope (no detached workers, no prompt
+rewriting, no suggestion catalog); execution dispatches through the same
+agent runtime the CLI `task` path prefers, with typed UNAVAILABLE states.
+LOCAL DESTINATION: voicebridge/schedules.py, CLI `qubit schedules ...`,
+voice entries schedules_*, dashboard Tier-1 (automatic).
+DEPENDENCIES ADDED: none (stdlib sqlite3).
+IMPLEMENTATION STATUS: implemented; hermetic tests green.
+```
+
+R34 — SCOPED FILES, IDE LAUNCHER, WAKE SPOTTER, FRAME GUARDS (Packet 8U; REWRITTEN, NOT COPIED)
+```text
+LOCAL REQUIREMENT: (a) read-only project-folder inspection confined to
+approved roots; (b) IDE open-only launcher (no editor control claimed);
+(c) wake-word readiness + file-based keyword detection inside the single
+audio listener; (d) typed gateway-protocol frame guards.
+UPSTREAM REPOSITORIES + COMMITS:
+https://github.com/NousResearch/hermes-agent @ 2237be3 (tag v2026.9.7):
+tools/file_operations.py, tools/file_operations_common.py,
+tools/file_tools_write_guards.py, tools/wake_word.py,
+tools/wake_word_engines.py (inspected, not copied);
+https://github.com/openclaw/openclaw @ 3928bad9badfcb6c7d140530435e806fb8092190:
+gateway protocol v4 (https://docs.openclaw.ai/gateway/protocol) behavior
+adapted as frame validation only (no OpenClaw source copied).
+LICENSES: Hermes MIT (Copyright (c) 2025 Nous Research); OpenClaw —
+recorded in THIRD_PARTY_NOTICES.md; no upstream expression copied.
+DECISION: REWRITE/ADAPT — (a) read half only (writes stay brokered);
+(b) open-only launcher with detached argv, no shell; (c) sherpa-onnx
+KeywordSpotter (already a declared dependency) behind a model-gated
+probe; live-loop arming is manual qualification (mic hardware + model
+files); (d) fail-frame guards wired into GatewayClient._reader without
+changing valid-traffic behavior.
+LOCAL DESTINATION: voicebridge/files.py, voicebridge/ide.py,
+voicebridge/wake.py, voicebridge/openclaw/gateway_ws.py (FrameGuard),
+CLI `qubit files|ide|audio wake-*`, voice entries files_*/ide_*/wake_status.
+DEPENDENCIES ADDED: none.
+IMPLEMENTATION STATUS: implemented; hermetic tests green
+(tests/test_files_ide8u.py, tests/test_wake8u.py,
+tests/test_gateway_frames8u.py).
+```
+
+## Final-parity turn (2026-09-10) — no new upstream reuse
+
+No upstream source was copied, vendored, or adapted this turn. All new
+behavior is Qubit-owned: kanban canvas layer, runtime_images registry,
+Ghost capability specs/schemas (contracts only — no upstream actuator
+code), OpenCode voice wiring (existing runner entry), export/import voice
+refusals, matrix/proof documentation. Pinned sources consulted read-only
+for differential evidence: hermes-agent v2026.9.7 @2237be3
+(HERMES_SURFACE.json command inventory; PARITY_HERMES.json 68/68
+IMPLEMENTED differentials) and openclaw v2026.9.2 @3928bad (gateway
+frames, board/widget, container, skill-install behavior contracts).
+LICENSES: unchanged; THIRD_PARTY_NOTICES.md needs no new entry.
+DEPENDENCIES ADDED: none.

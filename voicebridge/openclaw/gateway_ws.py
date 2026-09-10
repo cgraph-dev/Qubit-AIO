@@ -41,6 +41,75 @@ class GatewayError(Exception):
     details: Optional[Dict[str, Any]] = None
 
 
+FRAME_TYPES = ("res", "event")
+MAX_FRAME_BYTES = 8 * 1024 * 1024
+
+
+class FrameGuard:
+    """Typed gateway-protocol frame guards (Qubit-native O-frames).
+
+    Every inbound websocket frame is size-checked, JSON-validated, and
+    shape-checked before dispatch: oversize, malformed, or misshapen
+    frames are dropped individually with an audit event while the
+    connection survives (fail-frame, never fail-connection). Unknown
+    frame ``type`` values are ignored for forward compatibility and
+    counted. All decisions are fail-closed and counted for health.
+    """
+
+    def __init__(self, max_bytes: int = MAX_FRAME_BYTES) -> None:
+        self.max_bytes = int(max_bytes)
+        self.dropped = 0
+        self.ignored_unknown = 0
+
+    def check_raw(self, raw: Any) -> Dict[str, Any]:
+        if isinstance(raw, (bytes, bytearray)):
+            size = len(raw)
+            try:
+                text = bytes(raw).decode("utf-8", "replace")
+            except Exception as exc:
+                raise GatewayError("FRAME_NOT_JSON",
+                                   f"gateway frame undecodable ({exc})")
+        else:
+            text = str(raw)
+            size = len(text.encode("utf-8", "replace"))
+        if size > self.max_bytes:
+            raise GatewayError("FRAME_TOO_LARGE",
+                               f"gateway frame {size} bytes "
+                               f"(limit {self.max_bytes})")
+        try:
+            msg = json.loads(text)
+        except ValueError as exc:
+            raise GatewayError("FRAME_NOT_JSON",
+                               f"gateway frame is not JSON ({exc})")
+        if not isinstance(msg, dict):
+            raise GatewayError("FRAME_BAD_SHAPE",
+                               "gateway frame is not an object")
+        return msg
+
+    def check_message(self, msg: Dict[str, Any]) -> str:
+        kind = msg.get("type")
+        if not isinstance(kind, str) or not kind:
+            raise GatewayError("FRAME_BAD_SHAPE",
+                               "gateway frame has no type")
+        if kind not in FRAME_TYPES:
+            self.ignored_unknown += 1
+            return "ignore"
+        if kind == "res" and not msg.get("id"):
+            raise GatewayError("FRAME_BAD_SHAPE",
+                               "gateway response has no id")
+        if kind == "event" and not isinstance(msg.get("event"), str):
+            raise GatewayError("FRAME_BAD_SHAPE",
+                               "gateway event has no name")
+        return kind
+
+    def note_dropped(self, code: str) -> None:
+        self.dropped += 1
+        try:
+            log_event("openclaw.gateway.frame.drop", code=code)
+        except Exception:
+            pass
+
+
 @dataclass
 class RunResult:
     status: str            # ok | timeout | failed | aborted
@@ -71,6 +140,7 @@ class GatewayClient:
         self._reader_task: Optional[asyncio.Task] = None
         self._subscribed_sessions: set[str] = set()
         self._lock = asyncio.Lock()
+        self.frame_guard = FrameGuard()
 
     # ---- connection ----------------------------------------------------------
     async def connect(self) -> bool:
@@ -142,8 +212,15 @@ class GatewayClient:
         assert self.ws is not None
         try:
             async for raw in self.ws:
-                msg = json.loads(raw)
-                if msg.get("type") == "res":
+                try:
+                    msg = self.frame_guard.check_raw(raw)
+                    kind = self.frame_guard.check_message(msg)
+                except GatewayError as exc:
+                    self.frame_guard.note_dropped(exc.code)
+                    continue
+                if kind == "ignore":
+                    continue
+                if kind == "res":
                     fut = self._pending.pop(msg.get("id"), None)
                     if fut and not fut.done():
                         if msg.get("ok"):
@@ -153,7 +230,7 @@ class GatewayClient:
                             fut.set_exception(GatewayError(err.get("code", "RPC_ERROR"),
                                                            err.get("message", ""),
                                                            err.get("details")))
-                elif msg.get("type") == "event":
+                elif kind == "event":
                     ev = msg.get("event")
                     payload = msg.get("payload", {})
                     if self.event_cb:

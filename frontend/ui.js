@@ -181,6 +181,29 @@
       });
   }
 
+  /* Qubit display labels for internal route/backend tokens. The API and
+   * audit payloads keep the raw tokens (provenance + journal compat); every
+   * USER-FACING surface must render through this map so upstream project
+   * names never appear as the product, assistant, or runtime label.
+   * Unknown tokens pass through (developer visibility, never a claim). */
+  var ROUTE_LABELS = {
+    openclaw: 'Qubit gateway',
+    hermes: 'Qubit agent',
+    local: 'Qubit local',
+    'local-script': 'Qubit local task',
+    chat: 'Qubit chat',
+    system: 'Qubit system',
+    voice: 'Qubit voice',
+    gateway: 'Qubit gateway',
+    web: 'Qubit web'
+  };
+
+  function vbRouteLabel(token) {
+    var key = String(token == null ? '' : token).toLowerCase().split(/\s+/)[0];
+    if (!key) return '';
+    return ROUTE_LABELS[key] || String(token).split(/\s+/)[0];
+  }
+
   window.vbResolveBase = vbResolveBase;
   window.vbClear = vbClear;
   window.vbAppend = vbAppend;
@@ -188,6 +211,7 @@
   window.vbStatus = vbStatus;
   window.vbApiMessage = vbApiMessage;
   window.vbAnnounce = vbAnnounce;
+  window.vbRouteLabel = vbRouteLabel;
   window.vbSafeHTML = vbSafeHTML;
   window.vbStream = vbStream;
 })();

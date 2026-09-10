@@ -60,8 +60,13 @@ def check(name: str) -> Dict[str, Any]:
     hits = [r for r in _rows()
             if r["id"].strip().lower().lstrip("-") == key]
     if not hits:
+        try:
+            from .redaction import redact_text as _redact
+            shown = _redact(name)[:60]
+        except Exception:
+            shown = "?"
         return {"state": "UNKNOWN_CAPABILITY", "code": "UNKNOWN_CAPABILITY",
-                "explanation": f"Qubit knows no capability {name!r}.",
+                "explanation": f"Qubit knows no capability {shown!r}.",
                 "owner": "qubit-policy", "rollback": "nothing to roll back"}
     row = hits[0]
     state = _state_of(row)

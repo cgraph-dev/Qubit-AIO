@@ -308,6 +308,27 @@ def show(cfg: Any, slug: str) -> Dict[str, Any]:
             "project": _public(rec, state.get("active_slug") == rec["slug"])}
 
 
+def active_project(cfg: Any) -> Dict[str, Any]:
+    """Resolve "my active project": the workspace the active-project
+    pointer selects, with its details (read-only).
+
+    Shared by `qubit project active`, the voice `projects_active` entry
+    (same backend as CLI/dashboard), and any dashboard Tier-1 call. No
+    pointer set (or pointer dangling after restore/rollback) returns a
+    typed EMPTY state — never a fabricated workspace."""
+    state = _load(cfg)
+    slug = state.get("active_slug")
+    if not slug or slug not in state["projects"]:
+        return {"state": "EMPTY", "code": "NO_ACTIVE_PROJECT",
+                "detail": "no active workspace; set one with "
+                          "`qubit project use <slug> --confirm`",
+                "owner": "qubit-policy",
+                "rollback": "registry untouched; nothing to roll back"}
+    rec = state["projects"][slug]
+    return {"state": "OK",
+            "project": _public(rec, True)}
+
+
 def _mutate(cfg: Any, slug: str, actor: str, op: str,
             fn) -> Dict[str, Any]:
     state = _load(cfg)

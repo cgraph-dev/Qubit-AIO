@@ -64,6 +64,10 @@ def test_dashboard_pages_qubit_branded_and_accessible():
         assert 'lang="en"' in html, page
         assert 'aria-label="Primary"' in html, page
     assert "Hermes" not in "".join((FRONTEND / p).read_text() for p in PAGES)
+    from voicebridge import webui as W
+
+    assert "<title>Qubit Agent" in W.CHAT_PAGE
+    assert "<title>Qubit Agent" in W.ACTIVITY_PAGE
 
 
 def test_frontend_stays_bounded_single_design_system():

@@ -928,6 +928,27 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self._send(404, b"not found")
                 return
             self._json(item)
+        elif path == "/ops" or path == "/ops.html":
+            # Packet 8T-F: operations console — every registry capability
+            # plus explicit extras, each calling the same backend as the
+            # CLI and voice surfaces. No frontend-only state.
+            fp = self._frontend_file("ops.html")
+            if fp is not None:
+                self._file(fp, "text/html; charset=utf-8")
+            else:
+                self._send(404, b"ops page not found")
+        elif path == "/api/ops":
+            # Packet 8T-F: machine-readable operations catalog (Tier 1
+            # voice-registry ops + Tier 2 extras with honest interfaces).
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            try:
+                from . import dashboard_ops as OPS
+                self._json({"state": "OK", "ops": OPS.catalog()})
+            except Exception as exc:
+                self._json({"state": "degraded",
+                            "detail": redact_obj(str(exc))[:200]}, 500)
         elif path == "/api/approvals":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
@@ -940,21 +961,6 @@ class WebUIHandler(BaseHTTPRequestHandler):
                       "expires_at": a.expires_at}
                      for a in self.app.approvals.pending()]
             self._json({"items": items})
-        elif path == "/api/approvals/respond" and self.command == "POST":
-            if not self._api_token_ok():
-                self._send(401, b"unauthorized")
-                return
-            try:
-                length = int(self.headers.get("Content-Length", 0))
-                body = json.loads(self.rfile.read(length).decode() or "{}")
-                rec = self.app.approvals.respond(str(body.get("id")),
-                                                 str(body.get("decision")))
-                self._json({"id": rec.id, "state": rec.state,
-                            "decision": rec.decision})
-            except KeyError:
-                self._json({"error": "unknown approval id"}, 404)
-            except Exception as exc:
-                self._json({"error": redact_obj(str(exc))}, 400)
         elif path == "/api/lessons":
             # Packet 6A: learned preferences with stored provenance, plus the
             # review/staged items. Explanations come from the ledger, never
@@ -1707,6 +1713,64 @@ class WebUIHandler(BaseHTTPRequestHandler):
                             "detail": str(exc)[:200]})
             except Exception as exc:
                 self._json({"state": "failed", "detail": str(exc)[:200]})
+            return
+        if path in ("/api/ops/run", "/api/ops/confirm", "/api/ops/cancel",
+                     "/api/approvals/respond"):
+            # Packet 8T-F: operations console execution. Same backend fns,
+            # same confirmation journal, same emergency stop, same audit and
+            # redaction as the CLI (`voice say`) and microphone paths.
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            try:
+                from . import dashboard_ops as OPS
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length).decode() or "{}")
+                cfg = self.app.orch.cfg
+                if path == "/api/ops/run":
+                    args = body.get("args")
+                    out = OPS.run_op(cfg, str(body.get("id", "")),
+                                     dict(args) if isinstance(args, dict)
+                                     else {},
+                                     actor="dashboard:user",
+                                     session="dashboard")
+                elif path == "/api/ops/confirm":
+                    sensitive = body.get("sensitive")
+                    out = OPS.confirm_op(
+                        cfg, str(body.get("confirmation_id", "")),
+                        actor="dashboard:user", session="dashboard",
+                        sensitive=dict(sensitive)
+                        if isinstance(sensitive, dict) else None)
+                elif path == "/api/approvals/respond":
+                    # Approvals page: approve executes the staged backend
+                    # exactly once (same path as ops confirm + CLI
+                    # approvals respond); deny settles without executing.
+                    # The record's own session is honored so items staged
+                    # by voice, CLI, or dashboard all settle identically.
+                    cid = str(body.get("id") or
+                              body.get("confirmation_id") or "")
+                    decision = str(body.get("decision") or "")
+                    session = OPS.record_session(cfg, cid)
+                    if decision == "deny":
+                        out = OPS.cancel_op(cfg, cid or None,
+                                            actor="dashboard:user",
+                                            session=session)
+                    else:
+                        sensitive = body.get("sensitive")
+                        out = OPS.confirm_op(
+                            cfg, cid, actor="dashboard:user",
+                            session=session,
+                            sensitive=dict(sensitive)
+                            if isinstance(sensitive, dict) else None)
+                else:
+                    cid = body.get("confirmation_id") or None
+                    out = OPS.cancel_op(cfg, str(cid) if cid else None,
+                                        actor="dashboard:user",
+                                        session="dashboard")
+                self._json(out)
+            except Exception as exc:
+                self._json({"state": "failed",
+                            "detail": redact_obj(str(exc))[:200]}, 500)
             return
         if path == "/api/talk":
             if not self._api_token_ok():

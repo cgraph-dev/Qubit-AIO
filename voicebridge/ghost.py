@@ -275,6 +275,22 @@ _SCREENSHOT_SCHEMA = {"role": {"type": "str", "required": True, "max": 16,
                                "choices": list(BROWSER_ROLES)},
                       "target": {"type": "str", "required": False, "max": 200},
                       "clip": {"type": "str", "required": False, "max": 200}}
+# Supervised desktop-control schemas (8V via the Ghost broker; all bounded,
+# semantic targets only — never raw coordinates, never shell, never JS).
+_DESKTOP_SCREENSHOT_SCHEMA = {
+    "window": {"type": "str", "required": False, "max": 200},
+    "clip": {"type": "str", "required": False, "max": 200}}
+_NAMED_KEYS = ("Enter", "Tab", "Escape", "Backspace", "Delete",
+               "Up", "Down", "Left", "Right", "Home", "End",
+               "PageUp", "PageDown",
+               "F1", "F2", "F3", "F4", "F5", "F6",
+               "F7", "F8", "F9", "F10", "F11", "F12")
+_KEY_SCHEMA = {"target": {"type": "str", "required": True, "max": 200},
+               "key": {"type": "str", "required": True, "max": 16,
+                       "choices": list(_NAMED_KEYS)}}
+_CURSOR_SCHEMA = {"target": {"type": "str", "required": True, "max": 200}}
+_WINDOW_CLOSE_SCHEMA = {"window": {"type": "str", "required": True,
+                                   "max": 200}}
 _SHELL_SCHEMA = {"argv": {"type": "str", "required": True, "max": 2000}}
 
 # Comet research-only capability schemas (all bounded; research mode only).
@@ -380,6 +396,33 @@ def ghost_action_specs(shell: bool = False) -> Tuple[ActionSpec, ...]:
            "reads clipboard content; output is redacted and never persisted raw",
            RB_NONE, "no side effect; nothing to undo", ("role",),
            sensitivity="secret"),
+        _g(f"{GHOST_NS}.desktop.screenshot", "1.0.0", Tier.READ_ONLY,
+           "capture a clipped, redacted, hash-linked desktop screenshot",
+           ("desktop",), _DESKTOP_SCREENSHOT_SCHEMA,
+           "captures a bounded clipped desktop region; stored redacted +"
+           " hashed; X11/Wayland backend selected from the live session",
+           RB_NONE, "no side effect; nothing to undo", ("window", "clip"),
+           sensitivity="internal"),
+        _g(f"{GHOST_NS}.input.key", "1.0.0", Tier.MUTATING,
+           "explicitly permitted named key press on a semantic target",
+           ("web", "desktop"), _KEY_SCHEMA,
+           "sends one named key (allowlisted, no chords, no text) to the"
+           " exact semantic target (foreground input)",
+           RB_REVERSIBLE, "no reliable undo for a key press; verified receipt"
+                          " only",
+           ("target", "key")),
+        _g(f"{GHOST_NS}.input.cursor", "1.0.0", Tier.REVERSIBLE,
+           "move the cursor to a semantic target (no click, no coordinates)",
+           ("web", "desktop"), _CURSOR_SCHEMA,
+           "moves the cursor to the exact semantic target; clicks nothing",
+           RB_REVERSIBLE, "move the cursor back (best effort)",
+           ("target",)),
+        _g(f"{GHOST_NS}.window.close", "1.0.0", Tier.MUTATING,
+           "close a window by bounded identifier (confirmed, grant-bound)",
+           ("desktop",), _WINDOW_CLOSE_SCHEMA,
+           "closes the matching window; unsaved work may be lost",
+           RB_IMPOSSIBLE, "a closed window cannot be reliably restored",
+           ("window",)),
         # Comet research-only operations (broker-bound; research mode only).
         _g(f"{GHOST_NS}.comet.connect", "1.0.0", Tier.READ_ONLY,
            "connect the research-only Comet adapter (disabled by default)",
@@ -1645,6 +1688,9 @@ class GhostRunner(ActionRunner):
         spec = ghost_spec(receipt.action_id)
         if spec is not None and role:
             args = self._merge_role(spec, args, role)
+        # Re-execution uses the capability contract timeout (spec.timeout_s);
+        # per-call timeout overrides live on execute, not on retry, so a
+        # retry can never silently widen the original time bound.
         return super().retry(receipt_id, args=args, target=target,
                              scope=scope, account_scope=account_scope,
                              source=source, confirmation_id=confirmation_id,

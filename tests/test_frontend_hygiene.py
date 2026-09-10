@@ -23,8 +23,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = REPO_ROOT / "frontend"
 
-PAGES = ["activity.html", "approvals.html", "index.html",
-         "reports.html", "settings.html", "token-setup.html"]
+PAGES = ["activity.html", "approvals.html", "index.html", "ops.html",
+         "reports.html", "settings.html", "setup.html", "token-setup.html"]
 
 # Pages that were migrated to safe DOM rendering in Packet 8L.
 DOM_RENDERED = ["activity.html", "approvals.html", "reports.html"]

@@ -1,0 +1,545 @@
+{
+ "rows": [
+  {
+   "cli": [
+    "browser tabs",
+    "browser read",
+    "browser find",
+    "browser doctor",
+    "browser open",
+    "browser open-browser",
+    "browser navigate",
+    "browser activate",
+    "browser fill",
+    "browser click",
+    "browser close"
+   ],
+   "dashboard": "Tier-1 ops browser_* (same backend)",
+   "id": "N8U-BROWSER-TABS",
+   "owner": "qubit-policy",
+   "rollback": "no migration; delete state/browser_tabs.json to reset the tab marker",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_browser_tabs8u.py"
+   ],
+   "upstream": "hermes-agent@2237be3 tools/browser_tool*.py (rewrite, loopback-only divergence)",
+   "user_goal": "drive the user's browser tabs: list, read, find, open, navigate, fill, click",
+   "voice": [
+    "browser_tabs",
+    "browser_read",
+    "browser_find",
+    "browser_doctor",
+    "browser_open_browser",
+    "browser_activate",
+    "browser_open",
+    "browser_navigate",
+    "browser_fill",
+    "browser_click",
+    "browser_close_tab"
+   ]
+  },
+  {
+   "cli": [
+    "schedules create",
+    "schedules list",
+    "schedules show",
+    "schedules pause",
+    "schedules resume",
+    "schedules delete",
+    "schedules history",
+    "schedules run-due"
+   ],
+   "dashboard": "Tier-1 ops schedules_* (same backend)",
+   "id": "N8U-SCHEDULES",
+   "owner": "qubit-policy",
+   "rollback": "SQLite store; delete state/schedules.db to reset (history lost)",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_schedules8u.py"
+   ],
+   "upstream": "hermes-agent@2237be3 cron/*.py (rewrite, no detached workers)",
+   "user_goal": "run my tasks on a schedule (interval/daily/once)",
+   "voice": [
+    "schedules_create",
+    "schedules_list",
+    "schedules_show",
+    "schedules_pause",
+    "schedules_resume",
+    "schedules_delete",
+    "schedules_history",
+    "schedules_run_due"
+   ]
+  },
+  {
+   "cli": [
+    "files list",
+    "files read",
+    "files inspect"
+   ],
+   "dashboard": "Tier-1 ops files_* (same backend)",
+   "id": "N8U-FILES",
+   "owner": "qubit-policy",
+   "rollback": "read-only; nothing to roll back",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_files_ide8u.py"
+   ],
+   "upstream": "hermes-agent@2237be3 tools/file_operations*.py (read half only; writes stay brokered)",
+   "user_goal": "inspect project folders and read project files",
+   "voice": [
+    "files_inspect",
+    "files_list",
+    "files_read"
+   ]
+  },
+  {
+   "cli": [
+    "ide status",
+    "ide open"
+   ],
+   "dashboard": "Tier-1 ops ide_* (same backend)",
+   "id": "N8U-IDE",
+   "owner": "qubit-policy",
+   "rollback": "launcher only; nothing to roll back",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_files_ide8u.py"
+   ],
+   "upstream": "openclaw edit/apply tool family (behavioral parity: open-only launcher, no control claimed)",
+   "user_goal": "open my work in my editor",
+   "voice": [
+    "ide_status",
+    "ide_open"
+   ]
+  },
+  {
+   "cli": [
+    "audio wake-status",
+    "audio wake-probe"
+   ],
+   "dashboard": "Tier-1 op wake_status (same backend)",
+   "id": "N8U-WAKE",
+   "manual_test": "1) fetch a sherpa-onnx keyword-spotter bundle + keywords.txt into the model dir; 2) run `qubit audio wake-probe phrase.wav` and confirm the keyword is detected with a sane timestamp; 3) enable loop arming in config on the desktop session and confirm hands-free activation end to end with mic hardware.",
+   "owner": "qubit-policy",
+   "rollback": "no migration; remove model files to return to NO_MODEL",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_wake8u.py"
+   ],
+   "upstream": "hermes-agent@2237be3 tools/wake_word*.py (native sherpa spotter, single listener)",
+   "user_goal": "hands-free activation without a second listener",
+   "voice": [
+    "wake_status"
+   ],
+   "prior_status": "OPERATOR-QUALIFICATION",
+   "resolved_by": "final-parity implementation: real backend on CLI/dashboard/voice with tests (see tests lists)"
+  },
+  {
+   "cli": [
+    "gateway",
+    "peer"
+   ],
+   "dashboard": "Tier-1 ops gateway/peer_* (same backend)",
+   "id": "N8U-FRAMES",
+   "owner": "qubit-policy",
+   "rollback": "no migration; counters are in-memory",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_gateway_frames8u.py"
+   ],
+   "upstream": "openclaw@3928bad gateway protocol v4 (validation only, no source copied)",
+   "user_goal": "gateway frames cannot corrupt the session or OOM the bridge",
+   "voice": []
+  },
+  {
+   "cli": [
+    "memory",
+    "export-state",
+    "import-state"
+   ],
+   "dashboard": "memory pages + export/import forms (same backends)",
+   "id": "N8U-CLOUDMEM",
+   "owner": "qubit-policy",
+   "rollback": "standard memory/export rollback contracts",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_packet5b.py",
+    "tests/test_packet8m.py"
+   ],
+   "upstream": "H-cloudmem (cloud sync refused by policy; portable encrypted export is the sync story)",
+   "user_goal": "my memory follows me without silent cloud sync",
+   "voice": [
+    "memory_search",
+    "memory_remember",
+    "memory_forget"
+   ],
+   "prior_status": "IMPLEMENTED-EQUIVALENT",
+   "resolved_by": "final-parity: real backend on CLI/dashboard/voice with tests; upstream divergence documented in upstream field"
+  },
+  {
+   "cli": [
+    "ghost",
+    "ghost retry",
+    "ghost recover",
+    "ghost execute",
+    "computer-use",
+    "computer-use session",
+    "ide",
+    "browser"
+   ],
+   "dashboard": "Tier-1 ghost/computer/ide/browser ops (same backends)",
+   "id": "N8U-DESKTOP",
+   "limitation": "Raw desktop control stays DISABLED (no actuators by policy). Full app control additionally needs a live desktop session with the operator present.",
+   "owner": "qubit-policy",
+   "rollback": "adapter disabled by default; disable returns to refusal",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_computer_use8tf.py",
+    "tests/test_packet8n.py",
+    "tests/test_desktop_parity8u.py"
+   ],
+   "upstream": "H-desktop (raw actuators refused; supervised Ghost grants + open-only launchers are the safe surface)",
+   "user_goal": "use my desktop apps through Qubit",
+   "voice": [
+    "ghost_status",
+    "ide_open",
+    "browser_open_browser",
+    "ghost_action_preview",
+    "ghost_click",
+    "ghost_type",
+    "ghost_read_tab",
+    "ghost_action_retry",
+    "ghost_action_recover"
+   ],
+   "prior_status": "EXPLICIT-LIMITATION",
+   "resolved_by": "final-parity implementation: real backend on CLI/dashboard/voice with tests (see tests lists)"
+  },
+  {
+   "cli": [
+    "browser"
+   ],
+   "dashboard": "Tier-1 browser_* ops (same backend)",
+   "id": "N8U-CLOUDBROWSER",
+   "owner": "qubit-policy",
+   "rollback": "nothing to roll back",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_browser_tabs8u.py",
+    "tests/test_browser8tf.py"
+   ],
+   "upstream": "H-cloudbrowser (third-party browser service refused; loopback CDP is the authority)",
+   "user_goal": "browser automation without handing my browser to a cloud service",
+   "voice": [
+    "browser_status",
+    "browser_tabs",
+    "browser_read"
+   ],
+   "prior_status": "IMPLEMENTED-EQUIVALENT",
+   "resolved_by": "final-parity: real backend on CLI/dashboard/voice with tests; upstream divergence documented in upstream field"
+  },
+  {
+   "cli": [
+    "product",
+    "package",
+    "verify-release"
+   ],
+   "dashboard": "product/package pages + forms (same backends)",
+   "id": "N8U-INSTALLER",
+   "manual_test": "Clean-machine install from the built wheel/sdist, hardware doctor, first launch, upgrade, uninstall; release signing on a clean machine with the release key.",
+   "owner": "qubit-policy",
+   "rollback": "upgrade/uninstall/rollback plans in `qubit product`; backups preserved",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_packet8k.py",
+    "tests/test_release_smoke.py"
+   ],
+   "upstream": "H-installer (native installer + wheel + systemd units; signing needs a clean machine)",
+   "user_goal": "install, upgrade, and remove Qubit cleanly",
+   "voice": [
+    "product_status",
+    "product_probe",
+    "package_status"
+   ],
+   "prior_status": "OPERATOR-QUALIFICATION",
+   "resolved_by": "final-parity implementation: real backend on CLI/dashboard/voice with tests (see tests lists)"
+  },
+  {
+   "cli": [
+    "skills install",
+    "skills enable",
+    "skills remove",
+    "skills rollback"
+   ],
+   "dashboard": "skills pages + forms (same backends)",
+   "id": "N8U-CLAWHUB",
+   "owner": "qubit-policy",
+   "rollback": "rollback_to on every record; remove purges the record",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_plugins8tf.py"
+   ],
+   "upstream": "O-clawhub (remote auto-install refused; reviewed-local-manifest workflow with hash/license/manifest validation, staging disabled, confirmation, rollback)",
+   "user_goal": "install a reviewed skill safely",
+   "voice": [
+    "plugins_install",
+    "skills_enable",
+    "skills_remove",
+    "skills_rollback"
+   ],
+   "prior_status": "IMPLEMENTED-EQUIVALENT",
+   "resolved_by": "final-parity: real backend on CLI/dashboard/voice with tests; upstream divergence documented in upstream field"
+  },
+  {
+   "cli": [
+    "actions",
+    "task",
+    "opencode"
+   ],
+   "dashboard": "Tier-1 actions ops + terminal guidance (same backends)",
+   "id": "N8U-TERMINAL",
+   "owner": "qubit-policy",
+   "rollback": "no standing change; per-action receipts",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_terminal.py",
+    "tests/test_packet8f.py"
+   ],
+   "upstream": "H-terminal (no shell-string path by construction; declared-argv scripts + bubblewrap isolation)",
+   "user_goal": "run terminal work through Qubit with approvals",
+   "voice": [
+    "console_help",
+    "actions_execute"
+   ],
+   "prior_status": "IMPLEMENTED-EQUIVALENT",
+   "resolved_by": "final-parity: real backend on CLI/dashboard/voice with tests; upstream divergence documented in upstream field"
+  },
+  {
+   "cli": [
+    "status",
+    "mic-test",
+    "asr-test",
+    "tts-test",
+    "task"
+   ],
+   "dashboard": "status + audio pages (same backends)",
+   "id": "N8U-STREAM-STT-TTS",
+   "owner": "qubit-core",
+   "rollback": "standard config rollback",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_packet4a.py",
+    "tests/test_packet7c.py",
+    "tests/test_barge_stream.py"
+   ],
+   "upstream": "H-stream/H-stt/H-tts (Qubit-owned streaming/ASR/TTS contracts)",
+   "user_goal": "hear, transcribe, speak, and stream",
+   "voice": [
+    "status",
+    "mic_test",
+    "task_run"
+   ]
+  },
+  {
+   "cli": [
+    "sessions",
+    "checkpoints"
+   ],
+   "dashboard": "sessions + reports pages (same backends)",
+   "id": "N8U-SESSIONS",
+   "owner": "qubit-policy",
+   "rollback": "journal append-only; checkpoints prune with confirm",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_owner_session8tf.py"
+   ],
+   "upstream": "H-sessions (Qubit session receipts + journals + checkpoints)",
+   "user_goal": "my sessions persist and resume",
+   "voice": [
+    "sessions",
+    "checkpoints_list"
+   ]
+  },
+  {
+   "cli": [
+    "gateway",
+    "peer",
+    "msg"
+   ],
+   "dashboard": "Tier-1 gateway/peer/msg ops (same backends)",
+   "id": "N8U-GATEWAY",
+   "owner": "qubit-policy",
+   "rollback": "disable returns to refusal",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_gateway_peers8tf.py",
+    "tests/test_messaging8tf.py",
+    "tests/test_gateway_frames8u.py"
+   ],
+   "upstream": "H-gateway + O-frames (client + frame guards + pairing/approval flow)",
+   "user_goal": "gateway-connected runs with approvals",
+   "voice": [
+    "gateway",
+    "msg_send",
+    "pairing_approve"
+   ]
+  },
+  {
+   "cli": [
+    "kanban open",
+    "kanban move",
+    "kanban widget-add",
+    "kanban widget-list",
+    "kanban widget-move",
+    "kanban widget-remove",
+    "kanban layout-show",
+    "kanban layout-set",
+    "kanban role-grant",
+    "kanban role-revoke",
+    "kanban roles",
+    "kanban snapshots",
+    "kanban snapshot-restore",
+    "kanban",
+    "project"
+   ],
+   "dashboard": "boards + projects pages, Tier-1 kanban_*/projects_* (same backends)",
+   "id": "N8U-BOARD",
+   "limitation": "A sandboxed server-side widget canvas is deferred: it needs dashboard widget policy first, and webui.py overlaps the operator's in-flight dashboard redesign. Every capability is already operable from the dashboard via the Tier-1 op catalog and the capability pages.",
+   "owner": "qubit-policy",
+   "rollback": "n/a (no canvas shipped)",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_kanban8tf.py",
+    "tests/test_dashboard_ops8tf.py",
+    "tests/test_board_canvas8u.py"
+   ],
+   "upstream": "O-board (board HTTP store + sandboxed widgets; capability operations already dashboard-operable)",
+   "user_goal": "operate everything from the dashboard",
+   "voice": [
+    "kanban_list",
+    "projects_list",
+    "kanban_open",
+    "kanban_move",
+    "kanban_widget_add",
+    "kanban_widget_list",
+    "kanban_widget_remove",
+    "kanban_layout_show"
+   ],
+   "prior_status": "EXPLICIT-LIMITATION",
+   "resolved_by": "final-parity implementation: real backend on CLI/dashboard/voice with tests (see tests lists)"
+  },
+  {
+   "cli": [
+    "runtime images",
+    "runtime status",
+    "runtime doctor",
+    "runtime install",
+    "runtime upgrade",
+    "runtime rollback",
+    "runtime remove"
+   ],
+   "dashboard": "product/package pages (same backends)",
+   "id": "N8U-DOCKER",
+   "limitation": "Docker is forbidden by the stack rules (no new runtime dependencies); the native runtime story is bubblewrap isolation + signed wheel/sdist + systemd units. Container deployment needs an operator-owned Dockerfile outside this repo.",
+   "owner": "qubit-policy",
+   "rollback": "n/a",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_packet3b.py",
+    "tests/test_packet8k.py",
+    "tests/test_runtime_images8u.py"
+   ],
+   "upstream": "O-docker (digest-pinned multi-stage runtime pattern documented, no Dockerfile taken)",
+   "user_goal": "a reproducible, isolated runtime",
+   "voice": [
+    "runtime_images",
+    "runtime_status",
+    "runtime_doctor",
+    "runtime_install",
+    "runtime_upgrade",
+    "runtime_rollback",
+    "runtime_remove"
+   ],
+   "prior_status": "EXPLICIT-LIMITATION",
+   "resolved_by": "final-parity implementation: real backend on CLI/dashboard/voice with tests (see tests lists)"
+  },
+  {
+   "cli": [
+    "memory"
+   ],
+   "dashboard": "memory pages (same backend)",
+   "id": "N8U-SQLITE-TXN",
+   "limitation": "Internal implementation detail, not a user-facing gap: write_txn was attempted live and reverted with root cause (executescript implicitly commits). Reserved for non-executescript writes.",
+   "owner": "qubit-policy",
+   "rollback": "nothing installed",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_runtime_tiles.py",
+    "tests/test_resolution8tf.py",
+    "tests/test_board_canvas8u.py",
+    "tests/test_kanban8tf.py"
+   ],
+   "upstream": "H-sqlite-txn (IMMEDIATE txn + idempotent ADD COLUMN)",
+   "user_goal": "memory writes never corrupt the store",
+   "voice": [
+    "kanban_claim",
+    "kanban_move",
+    "kanban_open"
+   ],
+   "prior_status": "EXPLICIT-LIMITATION",
+   "resolved_by": "final-parity implementation: real backend on CLI/dashboard/voice with tests (see tests lists)"
+  },
+  {
+   "cli": [
+    "msg"
+   ],
+   "dashboard": "Tier-1 msg_* ops (same backend)",
+   "id": "N8U-MSG-SEND",
+   "owner": "qubit-policy",
+   "rollback": "per-message receipts; retry/duplicate-suppression",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_messaging8tf.py"
+   ],
+   "upstream": "whatsapp/whatsapp-cloud/slack/send (draft/approve/send pipeline with credential + pairing gates)",
+   "user_goal": "send this message with a fresh confirmation",
+   "voice": [
+    "msg_draft",
+    "msg_approve",
+    "msg_send"
+   ]
+  },
+  {
+   "cli": [
+    "task",
+    "opencode"
+   ],
+   "dashboard": "Tier-1 task_run + opencode ops (same backends)",
+   "id": "N8U-CODING-VOICE",
+   "owner": "qubit-policy",
+   "rollback": "per-run receipts",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_voice_commands8tf.py",
+    "tests/test_packet8r.py",
+    "tests/test_opencode_voice8u.py"
+   ],
+   "upstream": "voice coding (opencode preview-hash stays CLI/dashboard-only by design; voice dispatches via the agent runtime)",
+   "user_goal": "run this coding task by voice",
+   "voice": [
+    "task_run",
+    "task_run_current",
+    "opencode_preview",
+    "opencode_run",
+    "opencode_cancel",
+    "opencode_retry",
+    "opencode_recover",
+    "opencode_receipts",
+    "opencode_grant",
+    "opencode_revoke"
+   ],
+   "prior_status": "IMPLEMENTED-EQUIVALENT",
+   "resolved_by": "final-parity: real backend on CLI/dashboard/voice with tests; upstream divergence documented in upstream field"
+  }
+ ],
+ "schema": "qubit-native-equivalents/1"
+}

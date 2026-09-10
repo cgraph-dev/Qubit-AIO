@@ -68,13 +68,17 @@ idempotent, and typed:
 
 ```bash
 pip install qubit-voicebridge        # from the release artifact
-voicebridge product install          # typed prerequisite probe (dry-run, zero writes)
-voicebridge product install --apply  # stage config/resources + compat aliases
-voicebridge product first-run        # beginner-friendly status wizard (read-only)
-voicebridge product repair           # one diagnostic/repair command (read-only)
+qubit product install          # typed prerequisite probe (dry-run, zero writes)
+qubit product install --apply  # stage config/resources + compat aliases
+qubit product first-run        # beginner-friendly status wizard (read-only)
+qubit product repair           # one diagnostic/repair command (read-only)
 ```
 
-The desktop shortcut and `voicebridge webui --open` open the real local
+The canonical launcher is `qubit`. `voicebridge` remains as a
+compatibility alias (same commands, same backend); `python -m voicebridge`
+works when neither entry point is on `PATH`.
+
+The desktop shortcut and `qubit webui --open` open the real local
 dashboard when the bridge is running — they never start a second bridge or
 listener, and a token is never placed in a URL, argument, or file. Dashboard
 pairing is reported truthfully (`REQUIRES_PAIRING` / `PAIRED`), never as a
@@ -84,8 +88,8 @@ Existing installations on legacy install paths keep working
 and migrate with a reversible, backed-up flow:
 
 ```bash
-voicebridge product migration        # status (FRESH / LEGACY_ONLY / MIGRATED)
-voicebridge product migrate --apply  # backed-up migration + compat alias
+qubit product migration        # status (FRESH / LEGACY_ONLY / MIGRATED)
+qubit product migrate --apply  # backed-up migration + compat alias
 ```
 
 For a developer checkout the classic scripted installer remains available:
@@ -109,21 +113,21 @@ from `config/voice.example.yaml`.
 Optional keys for the cloud paths:
 
 ```bash
-echo 'DEEPSEEK_API_KEY=sk-...'    >> ~/.hermes/.env
-echo 'PERPLEXITY_API_KEY=pplx-...' >> ~/.hermes/.env
+echo 'DEEPSEEK_API_KEY=sk-...'    >> ~/.config/qubit-voicebridge/.env
+echo 'PERPLEXITY_API_KEY=pplx-...' >> ~/.config/qubit-voicebridge/.env
 ```
 
 ## Run
 
 ```bash
-voicebridge status        # gateway / ASR / TTS / voice-ID status
-voicebridge run           # hotkey push-to-talk loop (Ctrl held = talk)
+qubit status        # gateway / ASR / TTS / voice-ID status
+qubit run           # hotkey push-to-talk loop (Ctrl held = talk)
 ```
 
 First-run checklist:
 
 ```bash
-voicebridge enroll        # record 5s of YOUR voice — arms voice-ID
+qubit enroll        # record 5s of YOUR voice — arms voice-ID
 ```
 
 Auto-start (optional):
@@ -133,8 +137,8 @@ Auto-start (optional):
 systemctl --user status qubit-voicebridge
 ```
 
-Headless / SSH (no X11): `voicebridge run --no-hotkey` and press Enter to
-start/stop capture, or `voicebridge once` for a single utterance.
+Headless / SSH (no X11): `qubit run --no-hotkey` and press Enter to
+start/stop capture, or `qubit once` for a single utterance.
 
 ## Usage
 
@@ -297,7 +301,7 @@ Watch for `mic.utterance`, `asr.transcribe`, `routing.decision`,
   (down = easier to interrupt, up = stricter) and re-enroll with a clean
   5s clip.
 - **Microphone too quiet** — physical gain first, then `mic.gain` (8-16 for
-  quiet mics); check levels: `voicebridge mic-test`.
+  quiet mics); check levels: `qubit mic-test`.
 
 ## Design notes / why this stack
 
@@ -336,7 +340,7 @@ a reproducibility comparison. Quick hermetic smoke:
 
 ```bash
 python scripts/release_qualify.py --static --json   # no network
-voicebridge package certify                          # same, via the CLI
+qubit package certify                          # same, via the CLI
 python scripts/clean_venv_check.py --install         # opt-in clean-venv install
 ```
 
@@ -353,4 +357,4 @@ open-source project.
 This is a **school-only submission**: artifact signing and private-source
 distribution are NOT required and are reported honestly as NOT APPLICABLE — no
 signing key is generated or claimed, and the wheel is never claimed private
-(`voicebridge product boundary`).
+(`qubit product boundary`).

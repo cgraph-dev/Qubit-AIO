@@ -272,7 +272,7 @@ def refuse_pet_downloads() -> Dict[str, Any]:
             "explanation": "Qubit Agent cannot do this: installing gallery "
                            "pets would download unpinned third-party sprite "
                            "code; cosmetic customization lives in "
-                           "`voicebridge theme` presets and token tweaks.",
+                           "`qubit theme` presets and token tweaks.",
             "owner": "qubit-policy",
             "rollback": "nothing installed; nothing to roll back"}
 

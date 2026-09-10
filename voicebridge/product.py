@@ -1153,7 +1153,7 @@ def _pairing_status(paths: ProductPaths) -> Dict[str, Any]:
                           "a URL"}
     return {"state": "REQUIRES_PAIRING",
             "detail": "no dashboard token is configured; open the local "
-                      "dashboard (`voicebridge webui --open`) and pair in the "
+                      "dashboard (`qubit webui --open`) and pair in the "
                       "browser — the token is stored locally, never printed "
                       "and never placed in a URL"}
 
@@ -1839,11 +1839,11 @@ def service_owner(paths: Optional[ProductPaths] = None, *,
         if "voicebridge" in exec_line and "run" in exec_line:
             state = "PRESENT"
             state_detail = ("canonical unit installed with a matching "
-                            "ExecStart (voicebridge run)")
+                            "ExecStart (qubit run)")
         else:
             state = "MISMATCH"
             state_detail = (f"canonical unit ExecStart does not run "
-                            f"`voicebridge run`: {exec_line or '(empty)'}")
+                            f"`qubit run`: {exec_line or '(empty)'}")
     return {
         "state": state,
         "state_detail": state_detail,

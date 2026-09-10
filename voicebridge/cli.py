@@ -15,9 +15,24 @@ def _shared_power(cfg):
     return PW.power_policy(cfg)
 
 
+def _launcher_name() -> str:
+    """User-facing launcher name for help/usage banners.
+
+    Canonical name is ``qubit``; ``voicebridge`` is a compatibility alias
+    (same parser, same backend). Honors argv[0] so installed-console-script
+    help reads correctly under either name; anything else falls back to the
+    canonical name.
+    """
+    try:
+        base = Path(sys.argv[0]).name
+    except Exception:
+        return "qubit"
+    return base if base in ("qubit", "voicebridge") else "qubit"
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="voicebridge",
+        prog=_launcher_name(),
         description="Qubit Agent (Qubit VoiceBridge): local push-to-talk voice interface (ASR + intent + gateway + TTS).")
     common = argparse.ArgumentParser(add_help=False)
     # NOTE: these options also exist at the top level so `voicebridge --config X
@@ -49,8 +64,10 @@ def build_parser() -> argparse.ArgumentParser:
     add("once", help="record one utterance, process it, exit")
     add("mic-test", help="record 5s and report levels (diagnostic)")
     task = add("task", help="send a typed task through the pipeline (no mic)")
-    task.add_argument("text", nargs="+", help="task text, e.g. 'inspect the Stripe webhook flow'")
+    task.add_argument("text", nargs="*", help="task text, e.g. 'inspect the Stripe webhook flow'")
     task.add_argument("--model", default=None, help="model override (provider/model or tier)")
+    task.add_argument("--current", action="store_true",
+                      help="run the current kanban task (newest open/claimed/blocked) instead of text")
     asr = add("asr-test", help="transcribe a WAV file (diagnostic)")
     asr.add_argument("file", type=Path)
     tts = add("tts-test", help="synthesize text to WAV and play it (diagnostic)")
@@ -82,6 +99,22 @@ def build_parser() -> argparse.ArgumentParser:
     claw_sub = claw_p.add_subparsers(dest="claw_command")
     claw_sub.add_parser("status", parents=[common],
                         help="detect OpenClaw install state without changing it")
+    ap = add("approvals", help="Shared human-in-the-loop confirmations (same journal as voice + dashboard)")
+    ap_sub = ap.add_subparsers(dest="approvals_command")
+    ap_list = ap_sub.add_parser("list", parents=[common],
+                                help="list pending confirmations (read-only)")
+    ap_list.add_argument("--session", default="",
+                         help="only this session (default: all sessions)")
+    ap_show = ap_sub.add_parser("show", parents=[common],
+                                help="show one confirmation (argument names only, never values)")
+    ap_show.add_argument("confirmation_id", help="approval id")
+    ap_resp = ap_sub.add_parser("respond", parents=[common],
+                                help="approve (executes once) or deny a confirmation")
+    ap_resp.add_argument("confirmation_id", help="approval id")
+    ap_resp.add_argument("decision", choices=["approve", "deny"],
+                         help="approve executes the staged backend exactly once")
+    ap_resp.add_argument("--session", default="",
+                         help="require this session (default: the record's session)")
     add("verify-release", help="hermetic static release qualification (no build/install)")
     ck = add("checkpoints", help="named journal checkpoints: inspect and prune (read-only by default)")
     ck_sub = ck.add_subparsers(dest="checkpoints_command")
@@ -119,9 +152,9 @@ def build_parser() -> argparse.ArgumentParser:
     comp.add_argument("shell", nargs="?", default="bash",
                       choices=["bash", "zsh", "fish"],
                       help="shell dialect (default: bash)")
-    comp.add_argument("--cmd", default="voicebridge",
-                      choices=["voicebridge", "qubit-dev"],
-                      help="command to complete (default: voicebridge)")
+    comp.add_argument("--cmd", default="qubit",
+                      choices=["qubit", "voicebridge", "qubit-dev"],
+                      help="command to complete (default: qubit; voicebridge is a compat alias)")
     roundtrip = add("roundtrip", help="end-to-end test: synth speech -> ASR -> classify -> gateway -> summarize -> TTS file")
     roundtrip.add_argument("--text", default=None, help="sample utterance (default: Stripe webhook example)")
     roundtrip.add_argument("--model", default=None, help="model override for the agent run")
@@ -247,6 +280,12 @@ def build_parser() -> argparse.ArgumentParser:
                        help="live mic signal self-check (typed HEALTHY/SILENT/"
                             "DEGRADED/UNAVAILABLE); refused while the bridge "
                             "holds the microphone")
+    aud_sub.add_parser("wake-status", parents=[common],
+                       help="wake-word spotter readiness (read-only; never downloads)")
+    aud_probe = aud_sub.add_parser("wake-probe", parents=[common],
+                                   help="run keyword detection over a 16 kHz mono WAV file")
+    aud_probe.add_argument("wav", type=Path, help="absolute path to the WAV file")
+    aud_probe.add_argument("--threshold", type=float, default=0.25)
     prof = add("profile", help="provider/profile registry (brain/STT/TTS/voice/audio)")
     prof_sub = prof.add_subparsers(dest="profile_command")
     prof_list = prof_sub.add_parser("list", parents=[common],
@@ -398,6 +437,8 @@ def build_parser() -> argparse.ArgumentParser:
     pj_create.add_argument("--confirm", action="store_true")
     pj_list = pj_sub.add_parser("list", parents=[common], help="list workspaces")
     pj_list.add_argument("--archived", action="store_true", help="include archived")
+    pj_active = pj_sub.add_parser("active", parents=[common],
+                                  help="show the active workspace (read-only)")
     pj_show = pj_sub.add_parser("show", parents=[common], help="show one workspace")
     pj_show.add_argument("slug")
     pj_add = pj_sub.add_parser("add-folder", parents=[common],
@@ -476,6 +517,8 @@ def build_parser() -> argparse.ArgumentParser:
     kb_show = kb_sub.add_parser("show", parents=[common],
                                 help="show a task with comments + events")
     kb_show.add_argument("task_id", type=int)
+    kb_sub.add_parser("current", parents=[common],
+                      help="show the current task: newest open/claimed/blocked (read-only)")
     for _kb_mut, _kb_help in (
             ("claim", "claim a task (dry-run unless --confirm)"),
             ("assign", "set the assignee (dry-run unless --confirm)"),
@@ -516,6 +559,74 @@ def build_parser() -> argparse.ArgumentParser:
                                   help="restore a snapshot (dry-run unless --confirm)")
     kb_import.add_argument("snapshot", type=Path)
     kb_import.add_argument("--confirm", action="store_true")
+    kb_open = kb_sub.add_parser("open", parents=[common],
+                                help="render the whole board canvas: columns, widgets, layout, roles (read-only)")
+    kb_open.add_argument("--board", default="main")
+    kb_move = kb_sub.add_parser("move", parents=[common],
+                                help="move a task across boards/columns (dry-run unless --confirm)")
+    kb_move.add_argument("task_id", type=int)
+    kb_move.add_argument("--board", default="")
+    kb_move.add_argument("--status", default="",
+                         choices=["", "open", "claimed", "blocked", "done", "archived"])
+    kb_move.add_argument("--confirm", action="store_true")
+    kb_wa = kb_sub.add_parser("widget-add", parents=[common],
+                              help="add a sandboxed widget (dry-run unless --confirm)")
+    kb_wa.add_argument("--board", default="main")
+    kb_wa.add_argument("--kind", default="note",
+                       choices=["note", "tasks", "stats", "links"])
+    kb_wa.add_argument("--title", default="")
+    kb_wa.add_argument("--content", default="")
+    kb_wa.add_argument("--x", type=int, default=0)
+    kb_wa.add_argument("--y", type=int, default=0)
+    kb_wa.add_argument("--w", type=int, default=4)
+    kb_wa.add_argument("--h", type=int, default=3)
+    kb_wa.add_argument("--confirm", action="store_true")
+    kb_wl = kb_sub.add_parser("widget-list", parents=[common],
+                              help="list canvas widgets (read-only)")
+    kb_wl.add_argument("--board", default="main")
+    kb_wm = kb_sub.add_parser("widget-move", parents=[common],
+                              help="reposition/resize a widget (dry-run unless --confirm)")
+    kb_wm.add_argument("widget_id", type=int)
+    kb_wm.add_argument("--x", type=int, default=None)
+    kb_wm.add_argument("--y", type=int, default=None)
+    kb_wm.add_argument("--w", type=int, default=None)
+    kb_wm.add_argument("--h", type=int, default=None)
+    kb_wm.add_argument("--confirm", action="store_true")
+    kb_wr = kb_sub.add_parser("widget-remove", parents=[common],
+                              help="remove a widget (dry-run unless --confirm)")
+    kb_wr.add_argument("widget_id", type=int)
+    kb_wr.add_argument("--confirm", action="store_true")
+    kb_lshow = kb_sub.add_parser("layout-show", parents=[common],
+                                 help="show the board column layout (read-only)")
+    kb_lshow.add_argument("--board", default="main")
+    kb_lset = kb_sub.add_parser("layout-set", parents=[common],
+                                help="set board columns, e.g. --columns open,claimed,done (dry-run unless --confirm)")
+    kb_lset.add_argument("--board", default="main")
+    kb_lset.add_argument("--columns", default="")
+    kb_lset.add_argument("--confirm", action="store_true")
+    kb_rg = kb_sub.add_parser("role-grant", parents=[common],
+                              help="grant a board role to a delegate principal (dry-run unless --confirm)")
+    kb_rg.add_argument("--board", default="main")
+    kb_rg.add_argument("--principal", default="")
+    kb_rg.add_argument("--role", default="viewer",
+                       choices=["owner", "editor", "viewer"])
+    kb_rg.add_argument("--confirm", action="store_true")
+    kb_rr = kb_sub.add_parser("role-revoke", parents=[common],
+                              help="revoke a board role (dry-run unless --confirm)")
+    kb_rr.add_argument("--board", default="main")
+    kb_rr.add_argument("--principal", default="")
+    kb_rr.add_argument("--confirm", action="store_true")
+    kb_roles = kb_sub.add_parser("roles", parents=[common],
+                                 help="list board roles (read-only)")
+    kb_roles.add_argument("--board", default="main")
+    kb_snaps = kb_sub.add_parser("snapshots", parents=[common],
+                                 help="list canvas snapshots (read-only)")
+    kb_snaps.add_argument("--board", default="main")
+    kb_snaps.add_argument("--limit", type=int, default=50)
+    kb_snapr = kb_sub.add_parser("snapshot-restore", parents=[common],
+                                 help="restore a canvas snapshot (dry-run unless --confirm)")
+    kb_snapr.add_argument("snapshot_id", type=int)
+    kb_snapr.add_argument("--confirm", action="store_true")
     for _kb_del in ("swarm", "dispatch", "daemon", "watch",
                     "notify-subscribe", "notify-list", "notify-unsubscribe",
                     "heartbeat", "runs"):
@@ -538,13 +649,74 @@ def build_parser() -> argparse.ArgumentParser:
                       help="control policy record (read-only)")
     cu_sub.add_parser("install", parents=[common],
                       help="refused: unpinned driver binaries are never downloaded")
-    br = add("browser", help="Loopback browser state (read-only; profiles untouched)")
+    cu_sub.add_parser("session", parents=[common],
+                      help="typed graphical-session probe: x11 | wayland | both | none (read-only)")
+    rt = add("runtime", help="Pinned confined runtimes (Qubit container equivalent; no daemon, no pulls)")
+    rt_sub = rt.add_subparsers(dest="runtime_command")
+    rt_sub.add_parser("images", parents=[common],
+                      help="list the pinned runtime registry (read-only)")
+    rt_sub.add_parser("status", parents=[common],
+                      help="installed state per pinned image (read-only, re-verified)")
+    rt_sub.add_parser("doctor", parents=[common],
+                      help="resource/permission/hygiene diagnosis (read-only)")
+    for _rt_mut, _rt_help in (
+            ("install", "install a pinned runtime from staged artifacts (dry-run unless --confirm; never downloads)"),
+            ("upgrade", "re-verify + refresh a pinned runtime receipt (dry-run unless --confirm)"),
+            ("rollback", "restore the previous install receipt (dry-run unless --confirm)"),
+            ("remove", "remove an installed runtime (dry-run unless --confirm; audited)")):
+        _p = rt_sub.add_parser(_rt_mut, parents=[common], help=_rt_help)
+        _p.add_argument("name", help="pinned image name (see `qubit runtime images`)")
+        _p.add_argument("--confirm", action="store_true")
+    br = add("browser", help="Loopback browser tabs (read-only unless --confirm; profiles untouched)")
     br_sub = br.add_subparsers(dest="browser_command")
     br_sub.add_parser("status", parents=[common],
                       help="loopback CDP state (read-only probe)")
     br_close = br_sub.add_parser("close-profile", parents=[common],
                                  help="refused: real profiles are never mutated")
     br_close.add_argument("--profile", default="default")
+    br_sub.add_parser("tabs", parents=[common],
+                      help="list open page tabs (read-only)")
+    br_sub.add_parser("doctor", parents=[common],
+                      help="bridge health: endpoint, tabs, ledger, launch config (read-only)")
+    br_read = br_sub.add_parser("read", parents=[common],
+                                help="read the current tab: title, URL, bounded text (read-only)")
+    br_read.add_argument("--target", default="",
+                         help="tab id (default: Qubit-current tab)")
+    br_find = br_sub.add_parser("find", parents=[common],
+                                help="search the current tab text (read-only)")
+    br_find.add_argument("query", help="text to search (<=200 chars)")
+    br_find.add_argument("--target", default="")
+    br_act = br_sub.add_parser("activate", parents=[common],
+                               help="bring a tab to front (needs --confirm)")
+    br_act.add_argument("target", help="tab id")
+    br_act.add_argument("--confirm", action="store_true")
+    br_open = br_sub.add_parser("open", parents=[common],
+                                help="open a URL in a new tab (needs --confirm)")
+    br_open.add_argument("url", help="http(s) URL, no credentials")
+    br_open.add_argument("--confirm", action="store_true")
+    br_ob = br_sub.add_parser("open-browser", parents=[common],
+                              help="focus the browser on the current tab (needs --confirm)")
+    br_ob.add_argument("--confirm", action="store_true")
+    br_nav = br_sub.add_parser("navigate", parents=[common],
+                               help="navigate a tab to a URL (needs --confirm)")
+    br_nav.add_argument("target", help="tab id")
+    br_nav.add_argument("url", help="http(s) URL, no credentials")
+    br_nav.add_argument("--confirm", action="store_true")
+    br_fill = br_sub.add_parser("fill", parents=[common],
+                                help="type text into a form field (needs --confirm)")
+    br_fill.add_argument("target", help="tab id")
+    br_fill.add_argument("selector", help="CSS selector (<=256 chars)")
+    br_fill.add_argument("text", help="text to type (<=2000 chars)")
+    br_fill.add_argument("--confirm", action="store_true")
+    br_click = br_sub.add_parser("click", parents=[common],
+                                 help="click an element (needs --confirm)")
+    br_click.add_argument("target", help="tab id")
+    br_click.add_argument("selector", help="CSS selector (<=256 chars)")
+    br_click.add_argument("--confirm", action="store_true")
+    br_tclose = br_sub.add_parser("close", parents=[common],
+                                  help="close a tab (needs --confirm)")
+    br_tclose.add_argument("target", help="tab id")
+    br_tclose.add_argument("--confirm", action="store_true")
     acp = add("acp", help="Editor-integration checks (no ACP server shipped)")
     acp.add_argument("--accept-hooks", action="store_true",
                      help="refused: unseen hooks are never auto-approved")
@@ -964,6 +1136,18 @@ def build_parser() -> argparse.ArgumentParser:
                             choices=["", "claude-code", "codex"])
     ia_sub.add_parser("import", parents=[common],
                       help="refused: unreviewed state needs review first")
+    ls = add("lessons", help="Learned preferences with stored provenance (Packet 6A)")
+    ls_sub = ls.add_subparsers(dest="lessons_command")
+    ls_sub.add_parser("list", parents=[common],
+                      help="list lessons and pending reviews (read-only)")
+    ls_promote = ls_sub.add_parser("promote", parents=[common],
+                                   help="promote a reviewed lesson (needs --confirm)")
+    ls_promote.add_argument("lesson_id", help="lesson id")
+    ls_promote.add_argument("--confirm", action="store_true")
+    ls_remove = ls_sub.add_parser("remove", parents=[common],
+                                  help="tombstone a lesson (needs --confirm)")
+    ls_remove.add_argument("lesson_id", help="lesson id")
+    ls_remove.add_argument("--confirm", action="store_true")
     mem = add("memory", help="Packet 8M semantic memory (GENOME contract; disabled by default)")
     mem_sub = mem.add_subparsers(dest="memory_command")
     mem_status = mem_sub.add_parser("status", parents=[common],
@@ -1181,7 +1365,7 @@ def build_parser() -> argparse.ArgumentParser:
     ghost_prev.add_argument("--scope", default="")
     ghost_prev.add_argument("--role", default="")
     ghost_exec = ghost_sub.add_parser("execute", parents=[common],
-                                      help="gate+confirm+execute one Ghost capability (dry-run by default; --confirm = fresh confirmation)")
+                                      help="gate+confirm+execute one Ghost capability (dry-run by default; --confirm = fresh confirmation; role-bound actions need --target=https://approved-origin)")
     ghost_exec.add_argument("action_id")
     ghost_exec.add_argument("--args", default="{}")
     ghost_exec.add_argument("--target", default="")
@@ -1192,6 +1376,27 @@ def build_parser() -> argparse.ArgumentParser:
     ghost_exec.add_argument("--expected-hash", default="")
     ghost_exec.add_argument("--fixture", type=Path, default=None,
                             help="synthetic adapter outcomes JSON (explicit simulation; never live)")
+    ghost_exec.add_argument("--timeout", type=float, default=None,
+                            help="cap the spawn-isolated execution window for side-effecting actions, 1..600s (never extends the contract budget; read-only actions run inline with no killable timeout by design)")
+    ghost_retry = ghost_sub.add_parser("retry", parents=[common],
+                                       help="re-execute a failed Ghost action with the SAME args/target/scope (fresh confirmation if required)")
+    ghost_retry.add_argument("receipt_id")
+    ghost_retry.add_argument("--args", default="{}",
+                             help="exact original args as JSON (must match the receipt)")
+    ghost_retry.add_argument("--target", default="desktop")
+    ghost_retry.add_argument("--scope", default="")
+    ghost_retry.add_argument("--role", default="")
+    ghost_retry.add_argument("--confirmation", default=None)
+    ghost_retry.add_argument("--confirm", action="store_true")
+    ghost_retry.add_argument("--fixture", type=Path, default=None,
+                             help="synthetic adapter outcomes JSON (explicit simulation; never live)")
+    ghost_recov = ghost_sub.add_parser("recover", parents=[common],
+                                       help="compensating rollback for a reversible Ghost action (honest ROLLBACK_IMPOSSIBLE otherwise)")
+    ghost_recov.add_argument("receipt_id")
+    ghost_recov.add_argument("--confirmation", default=None)
+    ghost_recov.add_argument("--confirm", action="store_true")
+    ghost_recov.add_argument("--fixture", type=Path, default=None,
+                             help="synthetic adapter outcomes JSON (explicit simulation; never live)")
     ghost_can = ghost_sub.add_parser("cancel", parents=[common],
                                      help="cancel an in-flight Ghost action (idempotent)")
     ghost_can.add_argument("receipt_id")
@@ -1413,6 +1618,59 @@ def build_parser() -> argparse.ArgumentParser:
     exp_snap.add_argument("--out", type=Path, default=None)
 
     export = add("export-state", help="encrypt + export portable state (memory/lessons/reports/config/model)")
+    fi = add("files", help="Scoped project-folder inspection (read-only; project roots only)")
+    fi_sub = fi.add_subparsers(dest="files_command")
+    fi_list = fi_sub.add_parser("list", parents=[common],
+                                help="list a project folder (read-only)")
+    fi_list.add_argument("path", help="absolute path inside a project folder")
+    fi_list.add_argument("--depth", type=int, default=1)
+    fi_read = fi_sub.add_parser("read", parents=[common],
+                                help="read a project file, bounded + redacted (read-only)")
+    fi_read.add_argument("path", help="absolute path inside a project folder")
+    fi_read.add_argument("--max-chars", type=int, default=20000)
+    fi_inspect = fi_sub.add_parser("inspect", parents=[common],
+                                   help="inspect a folder or file (default: active project folder)")
+    fi_inspect.add_argument("path", nargs="?", default="",
+                            help="absolute path inside a project folder")
+    ie = add("ide", help="IDE launcher (open only; in-file work uses supervised coding)")
+    ie_sub = ie.add_subparsers(dest="ide_command")
+    ie_sub.add_parser("status", parents=[common],
+                      help="detected editors and default (read-only)")
+    ie_open = ie_sub.add_parser("open", parents=[common],
+                                help="open a workspace folder in the editor (needs --confirm)")
+    ie_open.add_argument("--editor", default="",
+                         help="code|cursor|zed|windsurf|subl|gedit|code-insiders (default: detected)")
+    ie_open.add_argument("--folder", default="",
+                         help="workspace folder (default: active project folder)")
+    ie_open.add_argument("--confirm", action="store_true")
+    sc = add("schedules", help="User scheduled jobs (SQLite store; execution via run-due)")
+    sc_sub = sc.add_subparsers(dest="schedules_command")
+    sc_create = sc_sub.add_parser("create", parents=[common],
+                                  help="schedule a task (needs --confirm)")
+    sc_create.add_argument("name", help="job name (<=80 chars)")
+    sc_create.add_argument("task_text", help="task to run (<=2000 chars)")
+    sc_create.add_argument("--when", required=True,
+                           help="'every N minutes|hours', 'daily HH[:MM][am|pm]', 'once in N minutes|hours'")
+    sc_create.add_argument("--confirm", action="store_true")
+    sc_list = sc_sub.add_parser("list", parents=[common],
+                                help="list scheduled jobs (read-only)")
+    sc_list.add_argument("--active-only", action="store_true")
+    sc_show = sc_sub.add_parser("show", parents=[common],
+                                help="show one job with recent runs (read-only)")
+    sc_show.add_argument("job_id", type=int)
+    for _sc_mut, _sc_help in (
+            ("pause", "pause a job (needs --confirm)"),
+            ("resume", "resume a job (needs --confirm)"),
+            ("delete", "delete a job, history retained (needs --confirm)")):
+        _p = sc_sub.add_parser(_sc_mut, parents=[common], help=_sc_help)
+        _p.add_argument("job_id", type=int)
+        _p.add_argument("--confirm", action="store_true")
+    sc_hist = sc_sub.add_parser("history", parents=[common],
+                                help="run history (read-only, retained after delete)")
+    sc_hist.add_argument("--job-id", type=int, default=0)
+    sc_hist.add_argument("--limit", type=int, default=30)
+    sc_sub.add_parser("run-due", parents=[common],
+                      help="execute due jobs now (bounded; pre-authorized at creation)")
     export.add_argument("--out", type=Path, default=None,
                         help="output file (default: <state_dir>/portable-<ts>.vbp)")
     export.add_argument("--passphrase", default=None,
@@ -1591,6 +1849,24 @@ def build_parser() -> argparse.ArgumentParser:
     oc_recs = oc_sub.add_parser("receipts", parents=[common],
                                 help="list recent opencode receipts")
     oc_recs.add_argument("--limit", type=int, default=30)
+    oc_retry = oc_sub.add_parser("retry", parents=[common],
+                                 help="re-execute a failed opencode run with the SAME task/project (fresh confirmation if required)")
+    oc_retry.add_argument("receipt_id")
+    oc_retry.add_argument("--project", default=".")
+    oc_retry.add_argument("--task", default="")
+    oc_retry.add_argument("--task-file", type=Path, default=None)
+    oc_retry.add_argument("--timeout", type=int, default=None)
+    oc_retry.add_argument("--confirmation", default=None)
+    oc_retry.add_argument("--confirm", action="store_true")
+    oc_retry.add_argument("--fixture", type=Path, default=None,
+                          help="synthetic outcomes JSON (explicit simulation; never live)")
+    oc_recov = oc_sub.add_parser("recover", parents=[common],
+                                 help="compensating rollback for a reversible opencode run (honest ROLLBACK_IMPOSSIBLE otherwise)")
+    oc_recov.add_argument("receipt_id")
+    oc_recov.add_argument("--confirmation", default=None)
+    oc_recov.add_argument("--confirm", action="store_true")
+    oc_recov.add_argument("--fixture", type=Path, default=None,
+                          help="synthetic outcomes JSON (explicit simulation; never live)")
     oc_sub.add_parser("enable", parents=[common],
                       help="owner opt-in: set the user enablement flag (config master switch still applies)")
     oc_sub.add_parser("disable", parents=[common], help="disable the adapter")
@@ -1599,6 +1875,29 @@ def build_parser() -> argparse.ArgumentParser:
     oc_sub.add_parser("reset", parents=[common],
                       help="clear enablement + emergency-stop latch (returns to disabled)")
     return p
+
+
+def _resolve_task_text(cfg, args):
+    """Resolve `task` text: explicit words, or `--current` (newest
+    actionable kanban task via KB.current_task — the same helper the
+    voice `task_run_current` entry uses). Returns (text, err_body, rc);
+    err_body is None on success."""
+    if getattr(args, "current", False):
+        if getattr(args, "text", []):
+            return "", {"state": "FAILED", "code": "BAD_ARGS",
+                        "detail": "--current takes no task text"}, 2
+        from . import kanban as _KB
+        cur = _KB.current_task(cfg)
+        if cur.get("state") != "OK" or not cur.get("task"):
+            return "", cur, 2
+        _t = cur["task"]
+        text = (str(_t.get("title", "")) + "\n" +
+                str(_t.get("body", ""))).strip()
+        return text, None, 0
+    if not getattr(args, "text", []):
+        return "", {"state": "FAILED", "code": "BAD_ARGS",
+                    "detail": "task text is required (or --current)"}, 2
+    return " ".join(args.text), None, 0
 
 
 def main(argv=None) -> int:
@@ -1628,6 +1927,8 @@ def main(argv=None) -> int:
         return _cmd_mcp_status(cfg)
     if command == "claw":
         return _cmd_claw_status(cfg)
+    if command == "approvals":
+        return _cmd_approvals(cfg, args)
     if command == "verify-release":
         return _cmd_verify_static()
     if command == "checkpoints":
@@ -1671,6 +1972,8 @@ def main(argv=None) -> int:
         return _cmd_project(cfg, args)
     if command == "kanban":
         return _cmd_kanban(cfg, args)
+    if command == "runtime":
+        return _cmd_runtime(cfg, args)
     if command == "computer-use":
         return _cmd_computer_use(cfg, args)
     if command == "browser":
@@ -1685,6 +1988,8 @@ def main(argv=None) -> int:
         return _cmd_proxy(cfg, args)
     if command == "import-agent":
         return _cmd_import_agent(cfg, args)
+    if command == "lessons":
+        return _cmd_lessons(cfg, args)
     if command == "hooks":
         return _cmd_hooks(cfg, args)
     if command == "sync":
@@ -1729,6 +2034,12 @@ def main(argv=None) -> int:
         return _cmd_device(cfg, args)
     if command == "monitor":
         return _cmd_monitor(cfg, args)
+    if command == "schedules":
+        return _cmd_schedules(cfg, args)
+    if command == "files":
+        return _cmd_files(cfg, args)
+    if command == "ide":
+        return _cmd_ide(cfg, args)
     if command == "frontier":
         return _cmd_frontier(cfg, args)
     if command == "opencode":
@@ -1750,7 +2061,15 @@ def main(argv=None) -> int:
             orch.mic_only = True
             orch.run()
         elif command == "task":
-            text = " ".join(args.text)
+            text, err_body, rc = _resolve_task_text(cfg, args)
+            if err_body is not None:
+                if err_body.get("state") == "EMPTY":
+                    import json as _json3
+                    print(_json3.dumps(err_body, indent=2, sort_keys=True))
+                else:
+                    print(f"ERROR: {err_body.get('detail', 'bad task args')}",
+                          file=sys.stderr)
+                return rc
             if args.model:
                 cfg.data.setdefault("openclaw", {})["model"] = args.model
             orch.process_text(text)
@@ -1942,6 +2261,142 @@ def _cmd_verify_static() -> int:
     out = verify_static()
     print(json.dumps(out, indent=2))
     return 0 if out.get("state") == "PASS" else 1
+
+
+def _cmd_lessons(cfg, args) -> int:
+    """Learned preferences with stored provenance (Packet 6A).
+
+    Same LearningLedger store the dashboard (/api/lessons/*) and voice
+    (lessons_*) use. Mutations need --confirm; removals tombstone with
+    provenance (never wholesale delete).
+    """
+    import json as _json
+
+    from .learning import LearningLedger
+    from .logging_setup import log_event as _log
+
+    sub = getattr(args, "lessons_command", None) or "list"
+    led = LearningLedger(cfg.state_dir())
+    if sub == "list":
+        print(_json.dumps({"lessons": led.lessons(),
+                           "reviews": led.reviews()}, indent=2))
+        return 0
+    lid = str(getattr(args, "lesson_id", "") or "").strip()
+    if not lid:
+        print("ERROR: lesson_id is required")
+        return 2
+    if not bool(getattr(args, "confirm", False)):
+        print(_json.dumps({"state": "denied", "code": "CONFIRMATION_REQUIRED",
+                           "detail": f"lessons {sub} {lid} needs --confirm"}))
+        return 3
+    if sub == "promote":
+        promoted = led.promote(lid)
+        if promoted is None:
+            print(_json.dumps({"state": "failed", "detail": "unknown lesson id"}))
+            return 2
+        _log("lessons.promote", actor="cli:user", lesson_id=lid[:16])
+        print(_json.dumps({"ok": True, "lesson_id": lid,
+                           "lesson": promoted}, indent=2))
+        return 0
+    if sub == "remove":
+        if not led.remove(lid):
+            print(_json.dumps({"state": "failed", "detail": "unknown lesson id"}))
+            return 2
+        _log("lessons.remove", actor="cli:user", lesson_id=lid[:16])
+        print(_json.dumps({"ok": True, "lesson_id": lid}, indent=2))
+        return 0
+    print(f"ERROR: unknown lessons command {sub!r}")
+    return 2
+
+
+def _cmd_approvals(cfg, args) -> int:
+    """Shared confirmation journal (same records voice + dashboard use).
+
+    Approve executes the staged backend exactly once through the identical
+    path as `voice confirm` / dashboard confirm (same session, same
+    emergency-stop, audit, redaction). Deny settles without executing.
+    Values are never printed: show/list expose argument names only.
+    """
+    import json as _json
+
+    from .approvals import ApprovalJournal
+    from .redaction import redact_text as _redact
+
+    journal = ApprovalJournal(Path(cfg.state_dir()) / "approvals.jsonl",
+                              default_ttl_s=120.0)
+    sub = getattr(args, "approvals_command", None) or "list"
+
+    def _public(rec):
+        meta = getattr(rec, "meta", {}) or {}
+        args_meta = meta.get("args", {}) if isinstance(
+            meta.get("args", {}), dict) else {}
+        return {"id": rec.id, "capability": rec.capability,
+                "summary": _redact(rec.summary or "")[:300],
+                "session": meta.get("session", "voice"),
+                "state": rec.state, "created_at": rec.created_at,
+                "expires_at": rec.expires_at,
+                "arg_names": sorted(str(k) for k in args_meta)}
+
+    if sub == "list":
+        items = [_public(a) for a in journal.pending()]
+        want = (getattr(args, "session", "") or "").strip()
+        if want:
+            items = [i for i in items if i["session"] == want]
+        print(_json.dumps({"pending": items, "count": len(items)}, indent=2))
+        return 0
+    cid = str(getattr(args, "confirmation_id", "") or "").strip()
+    if not cid:
+        print("ERROR: confirmation_id is required")
+        return 2
+    if sub == "show":
+        rec = journal.get(cid)
+        if rec is None:
+            print(_json.dumps({"state": "failed", "code": "NO_CONFIRMATION",
+                               "detail": "unknown confirmation id"}))
+            return 2
+        print(_json.dumps(_public(rec), indent=2))
+        return 0
+    if sub == "respond":
+        rec = journal.get(cid)
+        if rec is None or rec not in journal.pending():
+            print(_json.dumps({"state": "failed", "code": "NO_CONFIRMATION",
+                               "detail": "That confirmation is gone."}))
+            return 2
+        meta = getattr(rec, "meta", {}) or {}
+        from . import dashboard_ops as _OPS
+
+        session = _OPS.record_session(cfg, cid)
+        want = (getattr(args, "session", "") or "").strip()
+        if want and want != session:
+            print(_json.dumps({"state": "failed", "code": "SESSION_MISMATCH",
+                               "detail": "That confirmation belongs to "
+                                         "another session."}))
+            return 2
+        decision = getattr(args, "decision", "deny")
+        if decision == "deny":
+            journal.respond(cid, "deny")
+            print(_json.dumps({"state": "executed",
+                               "speech": "Denied.", "receipt": {"denied": cid}},
+                              indent=2))
+            return 0
+        capability = str(getattr(rec, "capability", "") or "")
+        if capability.startswith("dashboard."):
+            from . import dashboard_ops as OPS
+
+            out = OPS.confirm_op(cfg, cid, actor="cli:user", session=session)
+        else:
+            from . import voice_commands as VC
+
+            ctx = VC.make_ctx(cfg, actor="cli:user", session=session,
+                              source="cli")
+            outcome = VC.confirm_pending(ctx, cid)
+            out = {"state": outcome.kind, "speech": outcome.speech}
+            if outcome.receipt:
+                out["receipt"] = outcome.receipt
+        print(_json.dumps(out, indent=2, default=str))
+        return 0 if out.get("state") == "executed" else 2
+    print(f"ERROR: unknown approvals command {sub!r}")
+    return 2
 
 
 def _cmd_checkpoints(cfg, args) -> int:
@@ -2634,6 +3089,24 @@ def _cmd_audio(cfg, args) -> int:
                   f"peak={res.get('peak')}")
             print(f"  {res.get('hint', '')}")
         return 0 if res.get("state") == "HEALTHY" else 1
+    if cmd == "wake-status":
+        from . import wake as WK
+        out = WK.status(cfg)
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] == "READY" else 1
+    if cmd == "wake-probe":
+        from . import wake as WK
+        try:
+            out = WK.detect_file(cfg, str(args.wav),
+                                 threshold=args.threshold)
+        except WK.WakeError as exc:
+            print(_json.dumps({"state": "FAILED", "code": exc.code,
+                               "detail": WK.redact_spec(exc.detail)[:300],
+                               "owner": "qubit-policy"},
+                              indent=2))
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
     print(f"ERROR: unknown audio command {cmd!r}")
     return 2
 
@@ -2948,7 +3421,7 @@ def _cmd_skills(cfg, args) -> int:
 
 
 def _cmd_project(cfg, args) -> int:
-    """voicebridge project create|list|show|add-folder|remove-folder|rename|
+    """voicebridge project create|list|show|active|add-folder|remove-folder|rename|
     set-primary|use|archive|restore|bind-board|rollback.
 
     Named multi-folder workspaces on the canonical Qubit registry. Mutating
@@ -2961,16 +3434,18 @@ def _cmd_project(cfg, args) -> int:
     cmd = getattr(args, "project_command", None) or "list"
     confirm = bool(getattr(args, "confirm", False))
     try:
-        if cmd not in ("list", "show") and PJ.estop_engaged(cfg):
+        if cmd not in ("list", "show", "active") and PJ.estop_engaged(cfg):
             print(_json.dumps(PJ.refuse_estop(f"project {cmd}"), indent=2))
             return 3
-        if getattr(args, "dry_run", False) and cmd not in ("list", "show"):
+        if getattr(args, "dry_run", False) and cmd not in ("list", "show", "active"):
             print(_json.dumps({"state": "preview", "would": f"project {cmd}"},
                               indent=2))
             return 0
         if cmd == "list":
             out = PJ.list_projects(cfg, include_archived=bool(
                 getattr(args, "archived", False)))
+        elif cmd == "active":
+            out = PJ.active_project(cfg)
         elif cmd == "show":
             out = PJ.show(cfg, args.slug)
         elif cmd == "create":
@@ -3040,7 +3515,9 @@ def _cmd_kanban(cfg, args) -> int:
     confirm = bool(getattr(args, "confirm", False))
     _MUTATING = {"boards-create", "create", "claim", "assign", "reassign",
                  "reclaim", "comment", "complete", "edit", "block",
-                 "unblock", "archive", "import"}
+                 "unblock", "archive", "import", "move", "widget-add",
+                 "widget-move", "widget-remove", "layout-set",
+                 "role-grant", "role-revoke", "snapshot-restore"}
     try:
         if cmd in _MUTATING and KB.estop_engaged(cfg):
             print(_json.dumps(KB.refuse_estop(f"kanban {cmd}"), indent=2))
@@ -3068,6 +3545,8 @@ def _cmd_kanban(cfg, args) -> int:
                                 limit=args.limit)
         elif cmd == "show":
             out = KB.show(cfg, args.task_id)
+        elif cmd == "current":
+            out = KB.current_task(cfg)
         elif cmd == "claim":
             out = KB.claim(cfg, args.task_id, assignee=args.assignee,
                            requested_by="cli:user", confirmed=confirm)
@@ -3105,6 +3584,48 @@ def _cmd_kanban(cfg, args) -> int:
             out = KB.log(cfg, board=args.board, limit=args.limit)
         elif cmd == "export":
             out = KB.export(cfg)
+        elif cmd == "open":
+            out = KB.board_open(cfg, board=args.board)
+        elif cmd == "move":
+            out = KB.move_task(cfg, args.task_id,
+                               board=getattr(args, "board", "") or "",
+                               status=getattr(args, "status", "") or "",
+                               requested_by="cli:user", confirmed=confirm)
+        elif cmd == "widget-add":
+            out = KB.widget_add(cfg, args.board, args.kind, args.title,
+                                content=args.content, x=args.x, y=args.y,
+                                w=args.w, h=args.h,
+                                requested_by="cli:user", confirmed=confirm)
+        elif cmd == "widget-list":
+            out = KB.widget_list(cfg, board=args.board)
+        elif cmd == "widget-move":
+            out = KB.widget_move(cfg, args.widget_id, x=args.x, y=args.y,
+                                 w=args.w, h=args.h,
+                                 requested_by="cli:user", confirmed=confirm)
+        elif cmd == "widget-remove":
+            out = KB.widget_remove(cfg, args.widget_id,
+                                   requested_by="cli:user", confirmed=confirm)
+        elif cmd == "layout-show":
+            out = KB.layout_show(cfg, board=args.board)
+        elif cmd == "layout-set":
+            cols = [c.strip() for c in
+                    (getattr(args, "columns", "") or "").split(",") if c.strip()]
+            out = KB.layout_set(cfg, args.board, cols,
+                                requested_by="cli:user", confirmed=confirm)
+        elif cmd == "role-grant":
+            out = KB.role_grant(cfg, args.board, args.principal, args.role,
+                                requested_by="cli:user", confirmed=confirm)
+        elif cmd == "role-revoke":
+            out = KB.role_revoke(cfg, args.board, args.principal,
+                                 requested_by="cli:user", confirmed=confirm)
+        elif cmd == "roles":
+            out = KB.roles_list(cfg, board=args.board)
+        elif cmd == "snapshots":
+            out = KB.snapshot_list(cfg, board=args.board, limit=args.limit)
+        elif cmd == "snapshot-restore":
+            out = KB.snapshot_restore(cfg, args.snapshot_id,
+                                      requested_by="cli:user",
+                                      confirmed=confirm)
         elif cmd == "import":
             try:
                 snap = _json.loads(Path(args.snapshot).read_text(
@@ -3134,6 +3655,62 @@ def _cmd_kanban(cfg, args) -> int:
         return rc
 
 
+def _cmd_runtime(cfg, args) -> int:
+    """qubit runtime images|status|doctor|install|upgrade|rollback|remove.
+
+    The Qubit container/runtime equivalent: pinned confined runtimes with
+    digest verification, staged upgrades, receipt rollback, and audited
+    removal. Mutating ops preview under --dry-run, require --confirm, and
+    refuse while the emergency stop is latched. Nothing here downloads:
+    missing artifacts are a typed NEEDS_STAGING state.
+    """
+    import json as _json
+    from . import runtime_images as RI
+    cmd = getattr(args, "runtime_command", None) or "status"
+    confirm = bool(getattr(args, "confirm", False))
+    _MUTATING = {"install", "upgrade", "rollback", "remove"}
+    try:
+        if cmd in _MUTATING and RI.estop_engaged(cfg):
+            print(_json.dumps(RI.refuse_estop(f"runtime {cmd}"), indent=2))
+            return 3
+        if getattr(args, "dry_run", False) and cmd in _MUTATING:
+            print(_json.dumps({"state": "preview", "would": f"runtime {cmd}"},
+                              indent=2))
+            return 0
+        if cmd == "images":
+            out = RI.images()
+        elif cmd == "status":
+            out = RI.status(cfg)
+        elif cmd == "doctor":
+            out = RI.doctor(cfg)
+        elif cmd == "install":
+            out = RI.install(cfg, args.name, requested_by="cli:user",
+                             confirmed=confirm)
+        elif cmd == "upgrade":
+            out = RI.upgrade(cfg, args.name, requested_by="cli:user",
+                             confirmed=confirm)
+        elif cmd == "rollback":
+            out = RI.rollback(cfg, args.name, requested_by="cli:user",
+                              confirmed=confirm)
+        elif cmd == "remove":
+            out = RI.remove(cfg, args.name, requested_by="cli:user",
+                            confirmed=confirm)
+        else:
+            print(f"ERROR: unknown runtime command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except RI.RuntimeImageError as exc:
+        rc = 3 if exc.code == RI.CONFIRM_CODE else 2
+        print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                           "code": exc.code,
+                           "detail": RI.redact_spec(exc.detail)[:400],
+                           "owner": "qubit-policy",
+                           "rollback": "runtimes untouched; nothing to roll back"},
+                          indent=2))
+        return rc
+
+
 def _cmd_computer_use(cfg, args) -> int:
     """voicebridge computer-use status|doctor|permissions|install.
 
@@ -3149,6 +3726,8 @@ def _cmd_computer_use(cfg, args) -> int:
         out = CU.doctor()
     elif cmd == "permissions":
         out = CU.permissions()
+    elif cmd == "session":
+        out = CU.desktop_session()
     elif cmd == "install":
         print(_json.dumps(CU.refuse_install(), indent=2))
         return 2
@@ -3160,29 +3739,82 @@ def _cmd_computer_use(cfg, args) -> int:
 
 
 def _cmd_browser(cfg, args) -> int:
-    """voicebridge browser status|close-profile.
+    """qubit browser status|close-profile|tabs|doctor|read|find|
+    activate|open|navigate|fill|click|close.
 
-    Read-only loopback state; real-profile mutation is typed-refused.
+    Read-only loopback state by default; real-profile mutation is
+    typed-refused; tab mutations preview under top-level --dry-run and
+    require --confirm (refusing while the emergency stop is latched).
     """
     import json as _json
     from . import browser as BR
+    from . import browser_tabs as BT
     cmd = getattr(args, "browser_command", None) or "status"
-    if cmd == "status":
-        # Packet 8A import boundary: only cli.py (allowlisted) touches the
-        # communications package; browser.py renders the probe (pure).
-        from .communications.monitor import cdp_precondition
+    confirm = bool(getattr(args, "confirm", False))
+    _MUTATING = {"activate", "open", "open-browser", "navigate", "fill",
+                 "click", "close"}
+    try:
+        if cmd in _MUTATING and BT.estop_engaged(cfg):
+            print(_json.dumps(BT.refuse_estop(f"browser {cmd}"), indent=2))
+            return 3
+        if getattr(args, "dry_run", False) and cmd in _MUTATING:
+            print(_json.dumps({"state": "preview",
+                               "would": f"browser {cmd}"}, indent=2))
+            return 0
+        if cmd == "status":
+            # Packet 8A import boundary: only cli.py (allowlisted) touches the
+            # communications package; browser.py renders the probe (pure).
+            from .communications.monitor import cdp_precondition
 
-        out = BR.status(cdp_precondition(cfg))
-    elif cmd == "close-profile":
-        print(_json.dumps(
-            BR.refuse_close_profile(getattr(args, "profile", "") or ""),
-            indent=2))
-        return 2
-    else:
-        print(f"ERROR: unknown browser command {cmd!r}")
-        return 2
-    print(_json.dumps(out, indent=2, sort_keys=True))
-    return 0
+            out = BR.status(cdp_precondition(cfg))
+        elif cmd == "close-profile":
+            print(_json.dumps(
+                BR.refuse_close_profile(getattr(args, "profile", "") or ""),
+                indent=2))
+            return 2
+        elif cmd == "tabs":
+            out = BT.tabs(cfg)
+        elif cmd == "doctor":
+            out = BT.doctor(cfg)
+        elif cmd == "read":
+            out = BT.read(cfg, getattr(args, "target", "") or "")
+        elif cmd == "find":
+            out = BT.find(cfg, args.query, getattr(args, "target", "") or "")
+        elif cmd == "activate":
+            out = BT.activate(cfg, args.target, requested_by="cli:user",
+                              confirmed=confirm)
+        elif cmd == "open":
+            out = BT.open(cfg, args.url, requested_by="cli:user",
+                          confirmed=confirm)
+        elif cmd == "open-browser":
+            out = BT.open_browser(cfg, requested_by="cli:user",
+                                  confirmed=confirm)
+        elif cmd == "navigate":
+            out = BT.navigate(cfg, args.target, args.url,
+                              requested_by="cli:user", confirmed=confirm)
+        elif cmd == "fill":
+            out = BT.fill(cfg, args.target, args.selector, args.text,
+                          requested_by="cli:user", confirmed=confirm)
+        elif cmd == "click":
+            out = BT.click(cfg, args.target, args.selector,
+                           requested_by="cli:user", confirmed=confirm)
+        elif cmd == "close":
+            out = BT.close(cfg, args.target, requested_by="cli:user",
+                           confirmed=confirm)
+        else:
+            print(f"ERROR: unknown browser command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except BT.BrowserTabsError as exc:
+        rc = 3 if exc.code == BT.CONFIRM_CODE else 2
+        print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                           "code": exc.code,
+                           "detail": BT.redact_spec(exc.detail)[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "browser untouched; nothing to roll back"},
+                          indent=2))
+        return rc
 
 
 def _cmd_acp(cfg, args) -> int:
@@ -4552,7 +5184,7 @@ def _cmd_actions(cfg, args) -> int:
 
 def _cmd_ghost(cfg, args) -> int:
     """voicebridge ghost list/status/show/check/grant/revoke/preview/execute/
-    cancel/receipts/enable/disable/emergency-stop/reset.
+    cancel/retry/recover/receipts/enable/disable/emergency-stop/reset.
 
     Packet 8N optional supervised Ghost adapter. All capabilities are disabled
     by default; ``--fixture`` is the explicit synthetic-simulation path and
@@ -4623,6 +5255,12 @@ def _cmd_ghost(cfg, args) -> int:
                                  role=getattr(args, "role", "") or "")
         elif cmd == "execute":
             role = getattr(args, "role", "") or ""
+            timeout = getattr(args, "timeout", None)
+            if timeout is not None and not 1.0 <= float(timeout) <= 600.0:
+                print(_json.dumps({"state": "failed", "code": "GHOST_BAD_TIMEOUT",
+                                   "detail": "timeout must be 1..600 seconds"},
+                                  indent=2))
+                return 2
             if getattr(args, "dry_run", False):
                 out = runner.execute(args.action_id,
                                      args=_args_json(args.args),
@@ -4637,7 +5275,20 @@ def _cmd_ghost(cfg, args) -> int:
                     scope=getattr(args, "scope", "") or "",
                     source="user", confirmation_id=args.confirmation,
                     confirmed=args.confirm,
-                    expected_hash=args.expected_hash or "", role=role)
+                    expected_hash=args.expected_hash or "", role=role,
+                    timeout_s=timeout)
+        elif cmd == "retry":
+            out = runner.retry(
+                args.receipt_id, args=_args_json(args.args),
+                target=getattr(args, "target", "") or "desktop",
+                scope=getattr(args, "scope", "") or "",
+                source="user", confirmation_id=args.confirmation,
+                confirmed=args.confirm,
+                role=getattr(args, "role", "") or "")
+        elif cmd == "recover":
+            out = runner.recover(args.receipt_id, source="user",
+                                 confirmation_id=args.confirmation,
+                                 confirmed=args.confirm)
         elif cmd == "cancel":
             out = runner.cancel(args.receipt_id)
         elif cmd == "receipts":
@@ -4808,7 +5459,16 @@ def _offline_website_probe(url: str) -> dict:
 
 def _passphrase(args, env: str = "VOICE_BRIDGE_PASSPHRASE") -> str:
     import os as _os
-    pw = getattr(args, "passphrase", None) or _os.environ.get(env, "")
+    import sys as _sys
+
+    flag = getattr(args, "passphrase", None)
+    if flag:
+        # A command-line passphrase is visible in `ps` output and shell
+        # history: work, but steer the operator to the env var next time.
+        print(f"WARN: --passphrase exposes the secret in `ps`/history; "
+              f"prefer {env}=... (env) next time", file=_sys.stderr)
+        return flag
+    pw = _os.environ.get(env, "")
     if not pw:
         raise ValueError(f"passphrase required (--passphrase or {env})")
     return pw
@@ -5108,7 +5768,7 @@ def _cmd_import_state(cfg, args) -> int:
         except Dev.DeviceNotEnrolledError:
             if args.apply:
                 raise
-            print("WARN: device not enrolled — `voicebridge device enroll` "
+            print("WARN: device not enrolled — `qubit device enroll` "
                   "must run before an applied restore")
         print("restore plan:")
         for a in plan.actions:
@@ -5160,6 +5820,142 @@ def _cmd_device(cfg, args) -> int:
     return 2
 
 
+def _cmd_files(cfg, args) -> int:
+    """qubit files list|read|inspect — scoped project-folder inspection.
+
+    Read-only. Every path must resolve inside a project-registered
+    folder; escapes, specials, oversized/binary files, and secrets are
+    refused or redacted with typed codes.
+    """
+    import json as _json
+    from . import files as FI
+    cmd = getattr(args, "files_command", None) or "inspect"
+    try:
+        if cmd == "list":
+            out = FI.list_dir(cfg, args.path,
+                              depth=getattr(args, "depth", 1) or 1)
+        elif cmd == "read":
+            out = FI.read_file(cfg, args.path,
+                               max_chars=getattr(args, "max_chars",
+                                                 20000) or 20000)
+        elif cmd == "inspect":
+            out = FI.inspect(cfg, getattr(args, "path", "") or "")
+        else:
+            print(f"ERROR: unknown files command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except FI.FilesError as exc:
+        print(_json.dumps({"state": "FAILED", "code": exc.code,
+                           "detail": FI.redact_spec(exc.detail)[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "nothing read; nothing to roll back"},
+                          indent=2))
+        return 2
+
+
+def _cmd_ide(cfg, args) -> int:
+    """qubit ide status|open — editor detection and workspace launcher.
+
+    Opening is the whole capability (no editor control is claimed);
+    ``open`` previews under --dry-run, requires --confirm, and refuses
+    while the emergency stop is latched.
+    """
+    import json as _json
+    from . import ide as IDE
+    cmd = getattr(args, "ide_command", None) or "status"
+    confirm = bool(getattr(args, "confirm", False))
+    try:
+        if cmd == "open" and IDE.estop_engaged(cfg):
+            print(_json.dumps(IDE.refuse_estop("ide open"), indent=2))
+            return 3
+        if getattr(args, "dry_run", False) and cmd == "open":
+            print(_json.dumps({"state": "preview", "would": "ide open"},
+                              indent=2))
+            return 0
+        if cmd == "status":
+            out = IDE.status(cfg)
+        elif cmd == "open":
+            out = IDE.open_editor(cfg, getattr(args, "editor", "") or "",
+                                  getattr(args, "folder", "") or "",
+                                  requested_by="cli:user", confirmed=confirm)
+        else:
+            print(f"ERROR: unknown ide command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except IDE.IdeError as exc:
+        rc = 3 if exc.code == IDE.CONFIRM_CODE else 2
+        print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                           "code": exc.code,
+                           "detail": IDE.redact_spec(exc.detail)[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "nothing launched; nothing to roll back"},
+                          indent=2))
+        return rc
+
+
+def _cmd_schedules(cfg, args) -> int:
+    """qubit schedules create|list|show|pause|resume|delete|history|run-due.
+
+    User scheduled jobs on the canonical SQLite store. Mutating ops
+    preview under top-level --dry-run, require --confirm, and refuse
+    while the emergency stop is latched; run history survives deletion.
+    """
+    import json as _json
+    from . import schedules as SC
+    cmd = getattr(args, "schedules_command", None) or "list"
+    confirm = bool(getattr(args, "confirm", False))
+    _MUTATING = {"create", "pause", "resume", "delete"}
+    try:
+        if cmd in _MUTATING and SC.estop_engaged(cfg):
+            print(_json.dumps(SC.refuse_estop(f"schedules {cmd}"), indent=2))
+            return 3
+        if getattr(args, "dry_run", False) and cmd in _MUTATING:
+            print(_json.dumps({"state": "preview",
+                               "would": f"schedules {cmd}"}, indent=2))
+            return 0
+        if cmd == "create":
+            out = SC.create(cfg, args.name, args.task_text, args.when,
+                            requested_by="cli:user", confirmed=confirm)
+        elif cmd == "list":
+            out = SC.list_jobs(
+                cfg,
+                include_disabled=not bool(getattr(args, "active_only",
+                                                  False)))
+        elif cmd == "show":
+            out = SC.show(cfg, args.job_id)
+        elif cmd == "pause":
+            out = SC.pause(cfg, args.job_id, requested_by="cli:user",
+                           confirmed=confirm)
+        elif cmd == "resume":
+            out = SC.resume(cfg, args.job_id, requested_by="cli:user",
+                            confirmed=confirm)
+        elif cmd == "delete":
+            out = SC.delete(cfg, args.job_id, requested_by="cli:user",
+                            confirmed=confirm)
+        elif cmd == "history":
+            out = SC.history(cfg, job_id=getattr(args, "job_id", 0) or 0,
+                             limit=getattr(args, "limit", 30) or 30)
+        elif cmd == "run-due":
+            out = SC.run_due(cfg, requested_by="cli:user")
+        else:
+            print(f"ERROR: unknown schedules command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except SC.SchedulesError as exc:
+        rc = 3 if exc.code == SC.CONFIRM_CODE else 2
+        print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                           "code": exc.code,
+                           "detail": SC.redact_spec(exc.detail)[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "schedule store untouched; "
+                                       "nothing to roll back"},
+                          indent=2))
+        return rc
+
+
 def _cmd_monitor(cfg, args) -> int:
     import json as _json
     from .communications import monitor as M
@@ -5189,7 +5985,7 @@ def _cmd_monitor(cfg, args) -> int:
             print("\n# dry-run: nothing installed/enabled. To install AND "
                   "enable the timer (live activation), run exactly:\n#   "
                   "VOICE_BRIDGE_MONITOR_ENABLE=1 "
-                  "voicebridge monitor install --enable", file=sys.stderr)
+                  "qubit monitor install --enable", file=sys.stderr)
         return 0
     if cmd == "disable":
         print(_json.dumps(M.disable_monitor(), indent=2, sort_keys=True))
@@ -5432,6 +6228,17 @@ def _cmd_opencode(cfg, args) -> int:
                     expected_hash=args.expected_hash or "")
         elif cmd == "cancel":
             out = runner.cancel(args.receipt_id)
+        elif cmd == "retry":
+            out = runner.retry(
+                args.receipt_id, args=_task_args(),
+                target=getattr(args, "project", "") or ".",
+                scope="code", source="user",
+                confirmation_id=args.confirmation,
+                confirmed=args.confirm)
+        elif cmd == "recover":
+            out = runner.recover(args.receipt_id, source="user",
+                                 confirmation_id=args.confirmation,
+                                 confirmed=args.confirm)
         elif cmd == "receipts":
             out = runner.receipts(getattr(args, "limit", 30) or 30)
         elif cmd == "enable":
@@ -5482,7 +6289,7 @@ def _cmd_webui(cfg, args) -> int:
             print(_json.dumps({
                 "state": "UNAVAILABLE",
                 "detail": f"no dashboard at {url}; start the bridge first "
-                          f"(`voicebridge run` or the "
+                          f"(`qubit run` or the "
                           f"{P.PRODUCT_NAME}.service) — nothing was started",
                 "url": url,
                 "token_in_url": False,
@@ -5490,7 +6297,7 @@ def _cmd_webui(cfg, args) -> int:
             }, indent=2, sort_keys=True))
         else:
             print(f"dashboard: UNAVAILABLE — no dashboard at {url}")
-            print(f"start the bridge first: voicebridge run  (or the "
+            print(f"start the bridge first: qubit run  (or the "
                   f"{P.PRODUCT_NAME} user service); the shortcut never starts "
                   f"a second bridge")
         return 1

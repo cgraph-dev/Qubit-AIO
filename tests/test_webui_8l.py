@@ -17,7 +17,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-PAGES = ["/", "/activity", "/reports", "/settings", "/approvals", "/token-setup"]
+PAGES = ["/", "/activity", "/reports", "/ops", "/settings", "/approvals", "/token-setup"]
 
 
 def _start(tmp_path):
@@ -120,5 +120,43 @@ def test_api_remains_header_token_authenticated(tmp_path):
         status, _, body = _http(port, "GET", "/api/status")
         assert status == 200
         assert json.loads(body)["bridge"] == "up"
+    finally:
+        ui.stop()
+
+
+def test_every_frontend_api_path_hits_a_real_backend_route(tmp_path):
+    """No dashboard control points at a missing route (no frontend-only
+    controls): every /api/* path referenced by the shipped frontend must
+    resolve to an authenticated backend handler (401 without token), never
+    404 on both GET and POST."""
+    import re
+
+    ui, port = _start(tmp_path)
+    try:
+        paths = set()
+        for name in ("index.html", "activity.html", "approvals.html",
+                     "ops.html", "reports.html", "settings.html",
+                     "setup.html", "token-setup.html", "vb.js", "ui.js"):
+            text = (REPO_ROOT / "frontend" / name).read_text(encoding="utf-8")
+            for match in re.findall(r"/api/[A-Za-z0-9/_\-.]+", text):
+                paths.add(match.rstrip("/"))
+        assert len(paths) >= 40, f"inventory too small: {len(paths)}"
+        dynamic = {"/api/reports": "/api/reports/nope",
+                   "/api/result": "/api/result/nope",
+                   "/api/runs": "/api/runs/nope/cancel"}
+        checked = 0
+        for path in sorted(paths):
+            probe = dynamic.get(path, path)
+            if path in dynamic:
+                probe = dynamic[path]
+            status, _, _ = _http(port, "GET", probe, token="")
+            if status == 404:
+                status, _, _ = _http(port, "POST", probe, body={},
+                                     token="")
+            assert status != 404, f"{path}: frontend points at no route"
+            assert status in (200, 400, 401, 404, 405, 500), \
+                f"{path}: unexpected {status}"
+            checked += 1
+        assert checked == len(paths)
     finally:
         ui.stop()

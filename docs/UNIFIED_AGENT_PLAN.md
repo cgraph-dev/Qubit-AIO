@@ -6,6 +6,18 @@ Scope: local voice bridge, PC control, browser access, scheduled communications 
 
 This is the implementation contract for future agents. Complete one lettered packet at a time, verify it independently, and then continue. Do not implement a whole parent phase or the whole plan in one change.
 
+## 0A. Qubit foundation migration precedence
+
+When Packet 8T-F is active, the Hermes-derived Qubit foundation contract in
+`docs/QUBIT_UNIFIED_AGENT_PLAN.md`, `docs/AGENT_PROMPT_PACK.md`, and
+`docs/OPERATIONS_8T_F.md` takes precedence over older wording in this local
+Voice Bridge plan that describes OpenClaw or Hermes as merely external worker
+adapters. 8T-F is not complete when a Qubit-owned worker only imitates the
+Hermes protocol or when Hermes remains only in a temporary external install.
+The resulting Qubit tree must prove the pinned Hermes implementation and the
+required OpenClaw REUSE/ADAPT rows are actually integrated. This note does not
+change the scope of packets before 8T-F.
+
 ## 1. Non-negotiable goals
 
 The agent must:
@@ -1224,9 +1236,9 @@ history growth, and performance budgets. Add visual regressions for critical
 states and plain-language onboarding/recovery steps without exposing technical
 IDs in beginner mode.
 
-### Phase 8 capability-expansion packets (8M–8R)
+### Phase 8 capability-expansion and release packets (8M–8Z)
 
-Packets 8M–8R are an optional capability expansion after the release and
+Packets 8M–8Z are an optional capability expansion and release track after the release and
 qualification track above. They make Qubit a more capable local application,
 but they do not erase the existing broker, provenance, isolation, audit, or
 operator-control contracts. “Full capability” means every supported capability
@@ -1243,9 +1255,109 @@ Dependency order:
 8O ──> 8P verified skill memory and controlled evaluation
 8K-P + 8L + provider-governance review ──> 8Q frontier-provider gateway and routing
 8Q + 8F + 8K-P ──> 8R supervised OpenCode coding adapter
+8R ──> 8S Qubit VoiceBridge identity and release migration
+8S ──> 8T one-click setup, health, inventory, and lifecycle dashboard
+8T ──> 8U browser-first voice workspace
+8U ──> 8V desktop application control
+8U + 8V ──> 8W approved files and folders workspace
+8W + 8R ──> 8X IDE-native engineering workspace
+8U + 8V + 8W + 8X ──> 8Y unified task context and session continuity
+8Y + 8T ──> 8Z capability adapter lifecycle and local extension catalog
 ```
 
 The core installation must remain usable without either optional integration.
+
+#### Packets 8U–8Z — whole-computer capability expansion
+
+These packets close the gap between a voice bridge that can launch or qualify
+selected integrations and a Qubit assistant that can work across an approved
+browser, desktop application, file workspace, and IDE. They are planned work,
+not evidence that those capabilities already exist. Every packet is independent,
+must reuse the existing broker/policy/grant/audit/session contracts, and must
+remain disabled until explicitly enabled and independently verified.
+
+##### Packet 8U — browser-first voice workspace
+
+Add a low-latency browser workspace using the existing microphone, ASR, TTS,
+orchestrator, and capability broker. It may connect only to an existing,
+user-launched Chromium/CDP or approved in-page bridge over authenticated
+loopback. It should expose the current tab, selected text, bounded DOM and
+accessibility state, clipped screenshots, visible page state, tab navigation,
+back/forward, scroll, search, click, type, fill, and draft operations. Partial
+ASR, streamed response/TTS, barge-in, reconnect, and typed auth-required,
+CAPTCHA/2FA, selector-drift, unavailable, and degraded states are required.
+
+Per-origin and per-account grants must separate read/navigation/fill/draft from
+submit/send/publish/purchase/delete/account changes. Page, model, tool, and
+clipboard text is untrusted and cannot create or widen a grant. Do not clone
+profiles, import cookies, expose public CDP, launch a hidden browser, promise
+universal website control, or automate CAPTCHA/2FA; pause with a clear manual
+handoff. No second listener or browser authority is allowed.
+
+##### Packet 8V — desktop application control
+
+Add an opt-in desktop adapter for supported Linux sessions and declared apps,
+using accessibility/semantic APIs and portals where available. It must bind to
+the selected user/session/window and support bounded app roles such as launch,
+focus, menu/button/text/table/dialog interaction, selection, and readback.
+Coordinate-only or screenshot/OCR fallback must be visibly degraded, bounded,
+and confirmation-gated. Support X11/Wayland discovery, multi-session isolation,
+focus/cursor preservation, clipboard redaction, app crash/reconnect, and typed
+unsupported/permission-denied states. No global keylogger, hidden listener,
+arbitrary input injection, or unrestricted desktop executor is permitted.
+
+##### Packet 8W — approved files and folders workspace
+
+Add one brokered file workspace with explicitly approved roots, read/search/
+preview, write, copy/move/rename, archive/trash/restore, diff, snapshot, and
+undo contracts. Path traversal, unsafe symlinks, secret files, home-directory
+wildcards, device files, quotas, disk-full/read-only errors, concurrent writes,
+atomic persistence, and retention must be typed and tested. Deletes and broad
+changes require exact previews and fresh confirmation. Model-generated paths or
+repository instructions cannot expand roots or grant access. No whole-home
+default, direct shell fallback, hidden file watcher, or raw file content in logs.
+
+##### Packet 8X — IDE-native engineering workspace
+
+Add declared VS Code/JetBrains/editor integration for current workspace, open
+file, selection, diagnostics, tests, diffs, patch preview, and bounded test
+runs. OpenCode remains an optional supervised executor, not a second authority.
+Writes outside an approved disposable worktree require an exact diff/hash
+preview and confirmation. Never auto-commit, push, publish, install packages,
+change services, modify permissions, or inherit API keys, cookies, desktop
+sessions, or the full environment. Repository instructions and generated code
+are untrusted. Extension disconnect, malformed patch, cancellation, timeout,
+crash/reap, concurrent runs, and partial failure must be recoverable.
+
+##### Packet 8Y — unified task context and session continuity
+
+Unify one task/session identity across voice, dashboard, CLI, browser, desktop,
+files, and IDE. Provide an explicit context picker, source/provenance labels,
+bounded summaries, redaction and consent for sensitive sources, pause/resume/
+cancel/retry, progress, recovery, and durable receipts. Reuse the existing
+session, journal, memory, and audit authorities; do not create a second memory,
+router, scheduler, or audit store. Context switches must not leak data between
+accounts, apps, projects, or sessions, and no page/model text may authorize an
+action.
+
+##### Packet 8Z — capability adapter lifecycle and local catalog
+
+Add a versioned local adapter manifest and lifecycle surface for discover,
+install, validate, enable, disable, upgrade, downgrade, rollback, and remove.
+Each record must include source commit, license/notices, hash, dependencies,
+supported OS/session, scopes, risk tier, health, resource limits, and rollback.
+The dashboard and CLI must read the same backend state. Bad manifests, unknown
+licenses, stale hashes, dependency conflicts, corrupt state, interrupted or
+partial installs, and hidden listeners must fail closed. Start with a local
+catalog; do not add an uncontrolled marketplace or permit plugins to bypass
+the broker, grants, isolation, audit, or emergency stop.
+
+Whole-computer acceptance for 8U–8Z means supported capabilities work through
+the same policy path and have truthful disabled/available/enabled/live states,
+not unrestricted access to every website, application, folder, account, or
+credential. Routine low-risk work may use a narrow expiring owner grant;
+external sends, publishing, purchases, deletions, account changes, and project
+code changes still require fresh exact confirmation.
 Each integration runs out-of-process or behind a clearly owned adapter, is
 disabled until explicitly enabled, has a health/permission state, and can be
 removed without deleting existing memory, reports, browser profiles, audio
@@ -1544,6 +1656,122 @@ policy. Record the exact OpenCode source/version, license, dependencies, and
 local integration changes before implementation. Keep the adapter disabled by
 default and stop after handoff.
 
+#### Packet 8S — Qubit VoiceBridge identity and release migration
+
+Perform the final public-identity migration after 8R. The public product name
+is **Qubit VoiceBridge**, the canonical installed identity is
+`qubit-voicebridge`, and the canonical repository directory is
+`qubit-voicebridge`. The internal Python import package remains `voicebridge`.
+The existing `openclaw-voice-bridge` checkout and installed paths are legacy
+compatibility identities and must remain supported during migration.
+
+The physical repository-folder rename is part of this packet, but it must be
+performed safely: implementation may continue in the current checkout, while
+the rename is rehearsed and verified in a clean clone/release directory. Never
+move the active dirty checkout underneath a running agent or service.
+
+Packet 8S may begin only after Packet 8R has an independent VERIFIED result or
+all 8R closure repairs have been independently verified. A prior implementation
+handoff or green hermetic suite alone is not sufficient when the 8R verifier has
+reported a security or boundary failure.
+
+Inventory and update user-facing identity consistently across package metadata,
+CLI help, dashboard titles, installer output, systemd units, desktop shortcuts,
+release artifacts, documentation, examples, diagnostics, and support text.
+Use `openclaw-voice-bridge` only as an explicit legacy identity or migration
+source, never as a second live installation. New clones, release artifacts,
+installer output, and canonical service/config/state/data paths must use
+`qubit-voicebridge`.
+
+Provide a reversible, idempotent, atomic migration from legacy configuration,
+state, data, cache, logs, and service names to the canonical Qubit paths. A
+legacy installation must either migrate completely or fail closed; the runtime
+must never read one tree while writing another. Preserve a tested compatibility
+alias for existing installations where practical, and never overwrite a real
+legacy directory, follow an unsafe symlink, delete user data, or copy secrets
+into logs, URLs, shortcuts, reports, or release metadata.
+
+Test fresh install, canonical install, legacy-only install, mixed/split trees,
+partial migration, interrupted migration, read-only and disk-full failures,
+symlink/path traversal attempts, upgrade, downgrade/rollback, uninstall,
+repeated migration, service restart, desktop shortcut launch, and state/data
+preservation. Verify old configurations remain readable through the documented
+compatibility path and that only one effective config/state tree exists.
+
+Do not rename the `voicebridge` import package, change capability policy,
+browser/account/audio/model/timer behavior, add a listener, or alter Packet 8R
+execution boundaries. Do not add dependencies. Record every intentional legacy
+reference and update licensing/release provenance documentation. Commit only
+Packet 8S files and stop after the handoff.
+
+#### Packet 8T — one-click setup, installation health, and lifecycle dashboard
+
+Build a single authenticated, backend-authoritative setup and operations
+surface for Qubit VoiceBridge after Packet 8S. It must make installation and
+maintenance understandable to a beginner without hiding important decisions
+from an advanced operator. Existing CLI, service, configuration, model, audio,
+permission, release, and rollback contracts remain authoritative.
+
+Provide a staged one-click setup flow that detects the host platform, validates
+prerequisites, creates only standard per-user directories, installs or repairs
+declared components, configures the local model/runtime, selects and tests
+audio devices, installs optional desktop integration, and produces a resumable
+health result. Every step needs typed pending/running/success/degraded/blocked/
+failed states, bounded logs, dry-run, cancellation, and safe rollback. Network
+downloads, service changes, desktop integration, provider enablement, and data
+migration require explicit owner confirmation. Setup must never silently
+elevate privileges, start a service, overwrite user configuration, delete state,
+or copy secrets.
+
+Add an authenticated installation-health dashboard and matching CLI output. It
+must show actual installed version, package/source provenance, OS/session,
+declared versus detected dependencies, model files and hashes, resident local
+model status, provider/catalog status, safe credential-reference status, ASR,
+TTS, microphone, output sink, browser/CDP, timer, permissions, storage, and
+service state. API-key values, cookies, tokens, private paths, raw page text,
+and raw audio must never be returned. The backend calculates every state; the
+frontend renders it and never invents readiness or repair success.
+
+Provide safe controls for credential references, voice/audio and model/provider
+configuration, device tests, upgrade, rollback, missing-component repair,
+redacted diagnostics, and documentation. Use dry-run previews and exact
+confirmation for mutations. Preserve user data and tuned configuration by
+default, never silently restart or enable services, and make partial repair or
+rollback visible and resumable.
+
+Ten additional improvements included in this packet:
+
+1. Resumable first-run checklist with a clear next action and completion proof.
+2. Redacted “copy diagnostics” bundle with schema, timestamps, states, and
+   remediation hints but no secrets or private content.
+3. Component provenance/update view showing version, source, license, hash,
+   age, and whether an update is available.
+4. Model capability matrix covering local/cloud availability, context,
+   tool/structured-output support, resource needs, and truthful fallback.
+5. Configuration profiles with preview, diff, validation, safe reset, import,
+   export, and atomic rollback.
+6. Microphone/output wizard with device identity, format conversion, latency,
+   VAD checks, wrong-device guidance, and safe test tone/recording.
+7. Offline-first degraded mode with cached status and reconnect backoff that
+   distinguishes unavailable, disabled, misconfigured, and failed.
+8. Repair planner that orders missing prerequisites without repeating successful
+   work or creating duplicate services/listeners.
+9. Migration/backup center with dry-run, snapshot health, schema checks,
+   restore preview, retention, and separate data-deletion confirmation.
+10. Local audit/change timeline showing actor, change, time, confirmation,
+    reason, and rollback or recovery result.
+
+Test desktop and mobile onboarding, keyboard/screen-reader access, 320-pixel
+reflow, 200% zoom, forced colors, reduced motion, 44-pixel touch targets,
+offline/reconnect, session expiry, stale health data, concurrent setup runs,
+crash/resume, cancellation, read-only disks, disk-full, permission failures,
+missing models, bad hashes, unavailable providers, wrong audio devices,
+rollback, uninstall, and clean installation. Prove CLI/dashboard parity,
+backend ownership of every state, redacted diagnostics, bounded DOM/logs/
+resources, no duplicate route or listener, and no unapproved voice-hot-path
+change. Record provenance for reused components. Keep optional cloud, browser,
+timer, and tray features disabled unless explicitly enabled.
+
 #### Known preflight findings that these packets must close
 
 These are observed source/configuration risks, not optional polish:
@@ -1567,7 +1795,7 @@ These are observed source/configuration risks, not optional polish:
    fetch/JSON/error paths and some pages create dynamic `innerHTML`; migrate them
    to the shared authenticated, typed, safely-rendered UI layer.
 9. **Product identity split:** `scripts/install.sh` and the packaged service use
-   `qubit-voice-agent`, while `voicebridge/config.py`, existing user state,
+   `qubit-voicebridge`, while `voicebridge/config.py`, existing user state,
    diagnostics, and older units use `openclaw-voice-bridge`; a fresh install can
    write one tree while runtime reads another.
 10. **Installer dependency burden:** the current installer requires a source
@@ -1768,6 +1996,34 @@ Each lettered packet is independently implemented and verified. An implementatio
 | 8P | Add verified skill memory and controlled Praxis/Evolve-style evaluation |
 | 8Q | Add optional direct frontier-provider, OpenCode Zen, and OpenRouter routing with egress, cost, and capability controls |
 | 8R | Add an optional supervised OpenCode coding workflow with worktree, diff, process, and confirmation boundaries |
+| 8S | Migrate the public product identity to Qubit VoiceBridge, rename the canonical repository folder to `qubit-voicebridge`, and provide reversible legacy-path compatibility plus release/upgrade/rollback coverage |
+| 8T | Add one-click setup, backend-authoritative installation health, component/model/provider/audio inventory, safe credential-reference status, repair, upgrade/rollback controls, and mobile onboarding |
+| 8U | Add the browser-first voice workspace over approved user-launched Chromium/CDP or an authenticated in-page bridge, with bounded context, streaming, barge-in, and origin/account grants |
+| 8V | Add opt-in semantic desktop application control for declared Linux apps and sessions with X11/Wayland isolation, accessibility APIs, and degraded fallback states |
+| 8W | Add the approved-root brokered files/folders workspace with previews, diffs, snapshots, restore, quotas, symlink/path traversal defense, and typed recovery |
+| 8X | Add the bounded IDE-native workspace for context, diagnostics, tests, diffs, and supervised OpenCode patches in approved worktrees |
+| 8Y | Unify task/session context across voice, dashboard, CLI, browser, desktop, files, and IDE without adding a second memory, router, scheduler, or audit authority |
+| 8Z | Add the local provenance/licence-aware capability adapter catalog and lifecycle for validate, enable, disable, upgrade, rollback, and removal |
+
+#### Packet 8S closure addendum
+
+Packet 8S is not accepted while any runtime caller still treats
+`openclaw-voice-bridge` as its default writable tree. In particular,
+`voicebridge/config.py` and every caller of its default config/state/data
+constants must resolve the canonical XDG `qubit-voicebridge` paths, while
+legacy paths are read only through an explicit, validated compatibility
+alias. Empty `VOICE_BRIDGE_CONFIG` values must fail closed or fall back to the
+documented default; they must never resolve to the current directory.
+
+The physical repository-folder requirement is also separate from a staged
+copy/rename rehearsal. The packet is not VERIFIED until a clean clone or
+release directory named `qubit-voicebridge` builds, installs, launches, and
+resolves packaged resources, and the migration/rollback contract explicitly
+documents the safe operator step for an existing `openclaw-voice-bridge`
+checkout. Branding helpers must not claim that a physical folder migration
+occurred when they only rewrite files. Rollback must use the effective XDG
+path map rather than hardcoded legacy paths, reject unsafe symlinks, and
+report partial restore failures.
 
 If a packet still exceeds the 300-line/dependency review threshold, stop and ask the user to authorize a smaller packet split. An agent may not silently widen a packet.
 

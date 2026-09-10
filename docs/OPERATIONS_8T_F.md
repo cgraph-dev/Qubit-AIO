@@ -36,6 +36,12 @@ must be coherent and tested as Qubit.
 - Voice subsystem: **Qubit VoiceBridge**
 - Current canonical repository/install identity: `qubit-voicebridge` until a
   separately verified migration changes it
+- Canonical CLI launcher: `qubit` (`voicebridge` remains as a documented
+  compatibility alias: same parser, same backend; `python -m voicebridge`
+  when neither entry point is on `PATH`)
+- Shell completions: `qubit.{bash,zsh,fish}` canonical,
+  `voicebridge.{bash,zsh,fish}` compat alias (regenerate via
+  `scripts/gen_completions.py`; parity test fails on drift)
 - Internal Python import compatibility: `voicebridge`
 - `openclaw-voice-bridge`: legacy compatibility identity only
 
@@ -91,6 +97,20 @@ The foundation must prove, hermetically and then with authorized live checks:
 “Hey Qubit” and whole-computer browser context remain later packet features;
 8T-F integrates the foundation without implementing Packet 8U.
 
+Voice/CLI/dashboard parity (2026-09-09): the voice registry spans every
+CLI command family (`voicebridge.voice_commands.CLI_COVERAGE`, 64/64
+families; `qubit voice say` / dashboard `/api/ops` / microphone share one
+backend, journal, audit, redaction, and emergency stop). Families without
+a voice entry carry a tested reason in `VOICE_IMPOSSIBLE`: passphrase
+state bundles (dashboard form/CLI), nested-JSON envelopes
+(dashboard form/CLI), opencode coding runs (voice dispatches via the
+Hermes runtime instead — intentional, see
+`opencode.runner.request_coding_run`), standing permission/power grants
+(CLI terminal — voice authorizes single executions, never widens
+policy), structured curator proposals and profile manifests (CLI),
+desktop-session launches (browser/shortcut), and physical audio hardware
+(operator-only).
+
 ## 5. Migration and rollback
 
 Migration must preserve user configuration, state, memory, reports, models,
@@ -103,6 +123,27 @@ private page/file text.
 Rollback must restore the previous Qubit checkout and runtime without
 deleting user data. No `git reset --hard`, `git clean`, broad checkout, or
 destructive cleanup is permitted.
+
+Rollback safety note (2026-09-09 operations console): the `/ops` console is
+additive — one new module, three new API routes, one new page, new CLI
+`lessons` subcommand, and new voice-registry entries. No state schema
+changed: `dashboard.*` confirmation records share `approvals.jsonl` and are
+ignored by older code (which only settles `voice.*` records); passphrases
+are never persisted, so rollback leaves no secret residue. Restoring the
+previous checkout disables the console without migrating or deleting user
+data.
+
+Rollback safety note (2026-09-10 final parity): this change is additive —
+one new module (`voicebridge/runtime_images.py`), canvas tables added with
+`CREATE TABLE IF NOT EXISTS` to the existing kanban store, new CLI
+subcommands/groups (`runtime`, kanban canvas ops, ghost retry/recover,
+opencode retry/recover, computer-use session), new voice entries, and new
+dashboard Tier-1/Tier-2 ops. No existing state schema migrated: kanban
+canvas tables are created lazily and ignored by older code; runtime receipts
+live in a new `state/runtime_images.json` (0o600); ghost/opencode runners
+gain no new stores. Restoring the previous checkout disables the new
+surfaces without migrating or deleting user data. Rollback leaves no secret
+residue (passphrases never persisted; digests only).
 
 ## 6. Readiness gate
 

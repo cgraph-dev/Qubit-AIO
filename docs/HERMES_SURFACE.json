@@ -884,5 +884,9 @@
     "-w"
    ]
   }
- ]
+ ],
+ "pinned_commit": "2237be355906fbe6065ce1815711eee52b2d646e",
+ "pinned_tag": "v2026.9.7",
+ "source_repo": "https://github.com/NousResearch/hermes-agent",
+ "differential_note": "Executable dump covers 69 top-level commands. Pinned-source oracle hermes_cli/main.py _BUILTIN_SUBCOMMANDS lists 73 names; the 4-name gap is: help (argparse meta-command, not a capability), gui (alias of desktop, registered in subcommands/gui.py), learning + memory-graph (journey-family subcommands). All three real capabilities are classified in docs/PARITY_HERMES.json (rows serve/dashboard/desktop/gui and curator/journey/learning/memory-graph). Verified 2026-09-09 by static differential against /tmp/upstream-8tfv3/hermes-agent at the pinned commit."
 }

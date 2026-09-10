@@ -48,7 +48,7 @@ SYSTEM_COMMANDS: Dict[str, Dict[str, Any]] = {
                  "desc": "resume the interrupted task"},
     "closetask": {"patterns": [r"^\s*(close( the)? (current )?task|finish (the current )?task|close this|wrap (it|this) up|ok done|that'?s (all|enough)|done with this)\s*[.!]*$"],
                   "desc": "finish current task, then ask about the queue"},
-    "cancel":   {"patterns": [r"^\s*(cancel|abort|forget it|scrap (that|it)|never ?mind)\s*[.!]*$"], "desc": "cancel confirmation or task"},
+    "cancel":   {"patterns": [r"^\s*(cancel|abort|forget it|scrap (that|it)|cancel (that|it|this)|never ?mind)\s*[.!]*$"], "desc": "cancel confirmation or task"},
     "model":    {"patterns": [r"^\s*(use|switch (to|back (to)?)|set (the )?model (to)?)\s+(turbo|normal|slow|hard|pro|fast|deepseek|default)\b"],
                  "desc": "switch agent model tier for subsequent tasks"},
     "quit":     {"patterns": [r"^\s*(quit|exit|goodbye|good night|shut ?down)\s*[.!]*$"], "desc": "exit the bridge"},
@@ -59,8 +59,15 @@ CONFIRM_PATTERNS = [
     r"^\s*(y|ok|k|sure)\s*[.!]*$",
 ]
 CANCEL_PATTERNS = [
-    r"^\s*(no|nope|nah|cancel|abort|stop|don'?t|never ?mind|forget (it|that)|not now|skip|negative|no thanks|no way|wrong|reject)\s*[,.]?\s*(cancel|stop|don'?t|please)?\s*[.!]*$",
+    r"^\s*(no|nope|nah|cancel|abort|stop|don'?t|never ?mind|forget (it|that)|not now|skip|negative|no thanks|no way|wrong|reject)\s*[,.]?\s*(cancel|stop|don'?t|please|that|it|this)?\s*[.!]*$",
 ]
+
+# Leading direct address ("Qubit, ...", "Hey Qubit ...") is stripped
+# before confirm/cancel matching: ASR transcripts keep the wake word, and
+# anchored yes/no patterns otherwise miss "Qubit, confirm." /
+# "Qubit, cancel that." (the registry path strips it already).
+_WAKE_STRIP_RE = re.compile(r"^(?:hey\s+|ok\s+|okay\s+)?qubit[,.]?\s+",
+                            re.IGNORECASE)
 
 # Sticky routing — explicit user preference that survives turns (fixes the 'forgets Hermes/browser' bug)
 STICKY_PATTERNS = [
@@ -229,7 +236,7 @@ class Classifier:
         return None
 
     def _confirm_cancel(self, text: str) -> Optional[Intent]:
-        low = text.strip().lower()
+        low = _WAKE_STRIP_RE.sub("", text.strip()).lower()
         if self.confirmations.pending:
             for pat in CONFIRM_PATTERNS:
                 if re.match(pat, low):

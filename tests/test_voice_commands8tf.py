@@ -86,16 +86,49 @@ def test_no_secret_shaped_arguments():
 
 
 MUTATING_ACTIONS = {
-    "kanban": {"create", "claim", "complete", "comment"},
-    "projects": {"create", "use", "archive"},
-    "skills": {"enable", "disable"},
+    "browser_tabs": {"open_browser", "activate", "open", "navigate",
+                     "fill", "click", "close"},
+    "kanban": {"create", "claim", "complete", "comment", "init",
+               "boards_create", "assign", "reassign", "reclaim", "edit",
+               "block", "unblock", "archive"},
+    "projects": {"create", "use", "archive", "rename", "add_folder",
+                 "remove_folder", "set_primary", "restore", "rollback",
+                 "bind_board"},
+    "skills": {"enable", "disable", "remove", "rollback"},
     "checkpoints": {"create", "prune"},
-    "hooks": {"fire"},
-    "themes": {"set"},
+    "hooks": {"fire", "declare", "revoke", "remove"},
+    "webhook": {"add", "remove"},
+    "gateway": {"add", "remove"},
+    "themes": {"set", "tweak_set", "tweak_clear", "reset"},
     "memory": {"remember", "forget"},
     "pairing": {"create", "approve", "revoke"},
-    "msg": {"draft", "approve", "send"},
-    "peer": {"dm", "run"},
+    "msg": {"draft", "approve", "send", "account_add", "account_remove",
+            "retry", "draft_reply"},
+    "peer": {"dm", "run", "add", "remove"},
+    "brain": {"principal_add", "member_add", "member_remove", "profile_set",
+              "profile_forget", "profile_sweep", "account_add",
+              "account_remove", "vault_set", "vault_remove"},
+    "lessons": {"promote", "remove"},
+    "lsp": {"restart"},
+    "task_run": {"run"},
+    "actions": {"execute", "cancel"},
+    "ghost": {"grant", "revoke", "execute", "cancel", "enable", "disable",
+              "emergency-stop", "reset"},
+    "opencode": set(),
+    "verified": {"verdict", "pin", "unpin"},
+    "experiments": {"register_candidate", "start", "trial", "finish_trial",
+                    "signal", "abort", "snapshot", "promote"},
+    "product": {"install", "migrate", "rollback", "repair"},
+    "package": set(),
+    "webui": set(),
+    "frontier_chat": set(),
+    "frontier_show": set(),
+    "commands": set(),
+    "audio_hw": set(),
+    "loop": set(),
+    "device_enroll": {"enroll"},
+    "branding": {"migrate"},
+    "config_profiles": {"select", "reset", "upgrade", "remove", "rollback"},
     "vision_describe": set(),
     "plugins_install": set(),
     "worktree": set(),
@@ -112,7 +145,8 @@ def test_mutating_backends_need_confirmation():
         fixed_action = dict(entry.fixed).get("action")
         mutating = MUTATING_ACTIONS.get(entry.backend, set())
         if entry.backend in ("vision_describe", "plugins_install", "worktree",
-                             "monitor", "pause", "resume"):
+                             "monitor", "pause", "resume", "frontier_chat",
+                             "task_run"):
             assert entry.confirm, f"{entry.id}: heavy op must confirm"
         elif fixed_action in mutating:
             assert entry.confirm, f"{entry.id}: mutating action must confirm"
@@ -129,8 +163,11 @@ COMPLETE_EXAMPLES = {
     "security": "qubit, security status",
     "diagnostics": "qubit, show diagnostics",
     "backup_info": "qubit, how do i back up",
+    "export_state_voice": "qubit, export my state",
+    "import_state_voice": "qubit, import my state",
     "sessions": "qubit, list sessions",
     "capability": "qubit, is whatsapp available",
+    "capabilities_list": "qubit, show available capabilities",
     "checkpoints_list": "qubit, list checkpoints",
     "checkpoints_write": "qubit, create checkpoint deploy",
     "auth_status": "qubit, credential status",
@@ -151,9 +188,11 @@ COMPLETE_EXAMPLES = {
     "projects_create": "qubit, create project shop",
     "projects_use": "qubit, switch to project shop",
     "projects_archive": "qubit, archive project shop",
+    "projects_active": "qubit, open my active project",
     "kanban_boards": "qubit, list boards",
     "kanban_list": "qubit, list tasks",
     "kanban_show": "qubit, show task 5",
+    "kanban_current": "qubit, inspect the current task",
     "kanban_create": "qubit, create task buy milk",
     "kanban_claim": "qubit, claim task 5",
     "kanban_complete": "qubit, complete task 5",
@@ -162,6 +201,7 @@ COMPLETE_EXAMPLES = {
     "themes_set": "qubit, set theme light",
     "proxy": "qubit, proxy status",
     "import_inspect": "qubit, inspect foreign setup at /tmp/x",
+    "import_refusal": "qubit, import foreign setup",
     "hooks_list": "qubit, list hooks",
     "hooks_show": "qubit, show hook deploy",
     "hooks_fire": "qubit, fire hook deploy",
@@ -213,6 +253,212 @@ COMPLETE_EXAMPLES = {
     "update_status": "qubit, update status",
     "config_profiles": "qubit, list config profiles",
     "migrate_status": "qubit, migration status",
+    "brain_principal_add": "qubit, add brain principal maria",
+    "brain_member_add": "qubit, link brain member acme maria",
+    "brain_member_remove": "qubit, unlink brain member acme maria",
+    "brain_profile_set": "qubit, set brain field maria timezone",
+    "brain_profile_forget": "qubit, forget brain field maria",
+    "brain_profile_sweep": "qubit, sweep brain fields",
+    "brain_profile_export": "qubit, export brain profile maria",
+    "brain_account_add": "qubit, add brain account shop",
+    "brain_account_remove": "qubit, remove brain account shop",
+    "brain_vault_list": "qubit, list vault references",
+    "brain_vault_set": "qubit, record vault reference shop-key",
+    "brain_vault_remove": "qubit, remove vault reference shop-key",
+    "brain_onboard_plan": "qubit, brain setup plan",
+    "hooks_declare": "qubit, declare hook deploy",
+    "hooks_validate": "qubit, validate hook deploy",
+    "hooks_test": "qubit, hook test plan deploy",
+    "hooks_revoke": "qubit, revoke hook deploy",
+    "hooks_remove": "qubit, remove hook deploy",
+    "hooks_doctor": "qubit, hook health",
+    "webhook_add": "qubit, add webhook alerts",
+    "webhook_show": "qubit, show webhook alerts",
+    "webhook_remove": "qubit, remove webhook alerts",
+    "webhook_test": "qubit, webhook test plan alerts",
+    "gateway_show": "qubit, show gateway main",
+    "gateway_add": "qubit, add gateway main",
+    "gateway_remove": "qubit, remove gateway main",
+    "gateway_link": "qubit, link gateway main",
+    "peer_show": "qubit, show peer office",
+    "peer_add": "qubit, add peer office",
+    "peer_remove": "qubit, remove peer office",
+    "peer_link": "qubit, link peer office",
+    "msg_account_add": "qubit, add messaging account team",
+    "msg_account_show": "qubit, show messaging account team",
+    "msg_account_remove": "qubit, remove messaging account team",
+    "msg_list": "qubit, list outbox",
+    "msg_retry": "qubit, retry message",
+    "msg_draft_reply": "qubit, draft reply to team saying on my way",
+    "kanban_init": "qubit, init task board",
+    "kanban_boards_create": "qubit, create board home",
+    "kanban_assign": "qubit, assign task 3 to sam",
+    "kanban_reassign": "qubit, reassign task 3 to jo",
+    "kanban_reclaim": "qubit, reclaim task 3",
+    "kanban_edit": "qubit, edit task 3 buy oat milk",
+    "kanban_block": "qubit, block task 3",
+    "kanban_unblock": "qubit, unblock task 3",
+    "kanban_archive": "qubit, archive task 3",
+    "kanban_stats": "qubit, board stats",
+    "kanban_log": "qubit, board log",
+    "kanban_export": "qubit, export board",
+    "kanban_open": "qubit, open the board",
+    "kanban_move": "qubit, move this task 3",
+    "kanban_widget_add": "qubit, add board widget demo note",
+    "kanban_widget_list": "qubit, list board widgets",
+    "kanban_widget_remove": "qubit, remove board widget 2",
+    "kanban_layout_show": "qubit, show board layout",
+    "project_rename": "qubit, rename project shop",
+    "project_add_folder": "qubit, add project folder shop",
+    "project_remove_folder": "qubit, remove project folder shop",
+    "project_set_primary": "qubit, set primary folder shop",
+    "project_restore": "qubit, restore project shop",
+    "project_rollback": "qubit, rollback projects",
+    "project_bind_board": "qubit, bind board shop",
+    "skills_remove": "qubit, remove skill notes",
+    "skills_rollback": "qubit, rollback skill notes",
+    "themes_tweak_set": "qubit, tweak theme color accent",
+    "themes_tweak_clear": "qubit, clear theme tweak accent",
+    "themes_reset": "qubit, reset theme",
+    "computer_doctor": "qubit, desktop health",
+    "computer_permissions": "qubit, desktop permissions",
+    "computer_install_refusal": "qubit, install desktop driver",
+    "browser_close_refusal": "qubit, close browser profile",
+    "browser_doctor": "qubit, browser doctor",
+    "browser_tabs": "qubit, list open tabs",
+    "browser_read": "qubit, read the current tab",
+    "browser_find": "qubit, search this page invoices",
+    "browser_open_browser": "qubit, open the browser",
+    "browser_activate": "qubit, switch to tab inbox",
+    "browser_open": "qubit, open page https://example.com",
+    "browser_navigate": "qubit, navigate to https://example.com",
+    "browser_fill": "qubit, fill form email bob@example.com",
+    "browser_click": "qubit, click sign in",
+    "browser_close_tab": "qubit, close this tab",
+    "schedules_create": "qubit, schedule task check inbox every 30 minutes",
+    "schedules_list": "qubit, list schedules",
+    "schedules_show": "qubit, show schedule 2",
+    "schedules_pause": "qubit, pause schedule 2",
+    "schedules_resume": "qubit, resume schedule 2",
+    "schedules_delete": "qubit, delete schedule 2",
+    "schedules_history": "qubit, schedule history",
+    "schedules_run_due": "qubit, run due schedules",
+    "files_inspect": "qubit, inspect this project folder",
+    "files_list": "qubit, list project files",
+    "files_read": "qubit, read project file notes",
+    "ide_status": "qubit, which editor",
+    "ide_open": "qubit, open my ide",
+    "wake_status": "qubit, is wake word ready",
+    "proxy_start_refusal": "qubit, start proxy",
+    "proxy_providers": "qubit, proxy providers",
+    "acp_serve_refusal": "qubit, start acp server",
+    "acp_accept_hooks_refusal": "qubit, acp accept hooks",
+    "lsp_restart": "qubit, restart language servers",
+    "lsp_install_refusal": "qubit, install language server",
+    "lessons_list": "qubit, list lessons",
+    "lessons_promote": "qubit, promote lesson abc",
+    "lessons_remove": "qubit, remove lesson abc",
+    "power_status": "qubit, power status",
+    "websites_list": "qubit, list websites",
+    "websites_show": "qubit, show website example",
+    # --- task-mandated natural commands + 8F/8N/8P/8Q/product coverage
+    "task_run": "qubit, run the task summarize my notes",
+    "task_run_current": "qubit, run this task",
+    "actions_list": "qubit, list actions",
+    "actions_show": "qubit, show action demo",
+    "actions_check": "qubit, check action demo",
+    "actions_receipts": "qubit, action receipts",
+    "actions_receipt": "qubit, show action receipt abc123",
+    "actions_execute": "qubit, execute action demo",
+    "actions_cancel": "qubit, cancel action abc123",
+    "ghost_list": "qubit, list ghost capabilities",
+    "ghost_status": "qubit, ghost status",
+    "ghost_show": "qubit, show ghost capability demo",
+    "ghost_check": "qubit, check ghost capability demo",
+    "ghost_grant": "qubit, grant ghost session screenshots",
+    "ghost_revoke": "qubit, revoke ghost grant abc123",
+    "ghost_execute": "qubit, execute ghost action demo",
+    "ghost_cancel": "qubit, cancel ghost action abc123",
+    "ghost_receipts": "qubit, ghost receipts",
+    "ghost_enable": "qubit, enable ghost",
+    "ghost_disable": "qubit, disable ghost",
+    "ghost_estop": "qubit, stop ghost",
+    "ghost_reset": "qubit, reset ghost",
+    "ghost_action_preview": "qubit, preview ghost action ghost.desktop.discover",
+    "ghost_click": "qubit, click this button submit",
+    "ghost_type": "qubit, type into this field name hello",
+    "ghost_read_tab": "qubit, read the browser tab",
+    "ghost_action_retry": "qubit, retry ghost action demo",
+    "ghost_action_recover": "qubit, recover ghost action demo",
+    "runtime_images": "qubit, list runtime images",
+    "runtime_status": "qubit, runtime status",
+    "runtime_doctor": "qubit, diagnose runtimes",
+    "runtime_install": "qubit, install runtime hermes-runtime",
+    "runtime_upgrade": "qubit, upgrade runtime hermes-runtime",
+    "runtime_rollback": "qubit, roll back runtime hermes-runtime",
+    "runtime_remove": "qubit, remove runtime hermes-runtime",
+    "opencode_status": "qubit, opencode status",
+    "opencode_list": "qubit, list opencode capabilities",
+    "opencode_show": "qubit, show opencode capability demo",
+    "opencode_check": "qubit, check opencode capability demo",
+    "opencode_grant": "qubit, allow opencode run",
+    "opencode_revoke": "qubit, revoke opencode grant demo",
+    "opencode_preview": "qubit, preview coding task add tests",
+    "opencode_run": "qubit, run this opencode task add tests",
+    "opencode_cancel": "qubit, cancel coding run demo",
+    "opencode_retry": "qubit, retry coding run demo add tests",
+    "opencode_recover": "qubit, recover coding run demo",
+    "opencode_receipts": "qubit, list coding runs",
+    "verified_list": "qubit, list verified skills",
+    "verified_show": "qubit, show verified skill demo",
+    "verified_recall": "qubit, recall skills for pdf reports",
+    "verified_verdict": "qubit, verify skill demo verified",
+    "verified_pin": "qubit, pin skill demo",
+    "verified_unpin": "qubit, unpin skill demo",
+    "experiments_status": "qubit, experiment status",
+    "experiments_list": "qubit, list experiments",
+    "experiments_show": "qubit, show experiment exp1",
+    "experiments_evaluate": "qubit, evaluate experiment exp1",
+    "experiments_register": "qubit, register candidate challenger nightly",
+    "experiments_start": "qubit, start experiment cfg1 cfg2",
+    "experiments_trial": "qubit, start trial exp1 fast",
+    "experiments_finish": "qubit, finish trial tr1 completed",
+    "experiments_signal": "qubit, record signal tr1 explicit 0.8",
+    "experiments_abort": "qubit, abort experiment exp1",
+    "experiments_snapshot": "qubit, snapshot experiments",
+    "experiments_promote": "qubit, promote experiment exp1",
+    "product_status": "qubit, product status",
+    "product_probe": "qubit, probe install",
+    "product_first_run": "qubit, first run check",
+    "product_install": "qubit, install product",
+    "product_migrate": "qubit, migrate install",
+    "product_rollback": "qubit, roll back product",
+    "product_repair": "qubit, repair install",
+    "package_certify": "qubit, certify release",
+    "package_status": "qubit, package status",
+    "webui_status": "qubit, dashboard status",
+    "reports_list": "qubit, show my reports",
+    "frontier_chat": "qubit, ask frontier why is the sky blue",
+    "frontier_show": "qubit, show model local/qubit-brain4",
+    "commands_list": "qubit, what can you do",
+    "device_enroll": "qubit, enroll this device",
+    "branding_plan": "qubit, branding plan",
+    "branding_verify": "qubit, verify branding",
+    "branding_migrate": "qubit, apply migration",
+    "mic_test": "qubit, microphone test",
+    "asr_test": "qubit, transcription test",
+    "tts_test": "qubit, speech test",
+    "enroll_voice": "qubit, enroll my voice",
+    "verify_voice": "qubit, verify my voice",
+    "roundtrip_test": "qubit, test yourself",
+    "loop_start": "qubit, start listening",
+    "profile_show": "qubit, show config profile kind audio",
+    "profile_check": "qubit, check profile audio",
+    "profile_select": "qubit, select profile audio pro",
+    "profile_reset": "qubit, reset profile audio",
+    "profile_upgrade": "qubit, upgrade profile audio",
+    "profile_remove": "qubit, remove profile audio pro",
+    "profile_rollback": "qubit, roll back profile audio",
 }
 
 
@@ -483,3 +729,145 @@ def test_cli_voice_group(tmp_path, monkeypatch):
         assert CLI._cmd_voice(cfg, _A(cmd="cancel", session="cli")) == 2, \
             "nothing left to cancel"
     assert "voice" in CLI.build_parser().format_help()
+
+
+# ------------------------------------------- CLI family coverage proof
+def test_cli_families_all_mapped_with_voice_or_reason():
+    """Every CLI top-level command has a voice registry entry or a tested
+    voice-impossible reason (family.subaction granularity for exclusions)."""
+    import argparse
+
+    from voicebridge import voice_commands as VC
+    from voicebridge.cli import build_parser
+
+    names = set()
+    for action in build_parser()._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            names.update(action.choices.keys())
+    assert set(VC.CLI_COVERAGE) == names, \
+        sorted(set(names) ^ set(VC.CLI_COVERAGE))
+    for family, targets in VC.CLI_COVERAGE.items():
+        for target in targets:
+            assert target in VC.REGISTRY, (family, target)
+    for key, reason in VC.VOICE_IMPOSSIBLE.items():
+        assert reason and len(reason) > 20, key
+        family = key.split(".")[0]
+        assert family in VC.CLI_COVERAGE, key
+        if "." not in key:
+            assert VC.CLI_COVERAGE[family] == (), key
+
+
+def test_task_mandated_utterances_execute(tmp_path, monkeypatch):
+    """'list my projects' / 'show my sessions' execute; 'run the task'
+    stages a confirmation and degrades honestly without a provisioned
+    runtime (typed UNAVAILABLE, never fake success)."""
+    from voicebridge import voice_commands as VC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    ctx = _ctx(cfg)
+    for text in ("qubit, list my projects", "qubit, show my sessions"):
+        res = VC.resolve(text)
+        assert res.kind == VC.MATCH, (text, res.kind)
+        out = VC.execute(ctx, res)
+        assert out.kind == VC.EXECUTED, (text, out.kind, out.speech)
+        assert out.receipt, text
+    res = VC.resolve("qubit, run the task summarize my notes")
+    assert res.kind == VC.MATCH and res.entry.id == "task_run"
+    out = VC.execute(ctx, res)
+    assert out.kind == VC.NEEDS_CONFIRM, (out.kind, out.speech)
+    cid = out.confirmation_id
+    assert cid
+    # Confirming without a provisioned Hermes runtime is a typed
+    # unavailable state (RUNTIME_DISABLED), not success and not a crash.
+    out2 = VC.confirm_pending(ctx, cid)
+    assert out2.kind == VC.EXECUTED, (out2.kind, out2.speech)
+    task = out2.receipt["result"]["task"]
+    assert task["state"] == "UNAVAILABLE", task
+    assert task["code"] in ("RUNTIME_DISABLED", "HERMES_DISABLED",
+                            "EMERGENCY_STOP"), task
+
+
+def test_task_run_honors_estop_and_config(tmp_path, monkeypatch):
+    from voicebridge import voice_commands as VC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    ctx = _ctx(cfg)
+    # hermes.enabled=false short-circuits before any subprocess.
+    cfg.data.setdefault("hermes", {})["enabled"] = False
+    res = VC.resolve("qubit, run the task x")
+    out = VC.execute(ctx, res)
+    assert out.kind == VC.NEEDS_CONFIRM
+    out2 = VC.confirm_pending(ctx, out.confirmation_id)
+    assert out2.receipt["result"]["task"]["code"] == "HERMES_DISABLED"
+
+
+def test_new_read_backends_execute_hermetic(tmp_path, monkeypatch):
+    from voicebridge import voice_commands as VC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    ctx = _ctx(cfg)
+    for text in ("qubit, list actions", "qubit, list ghost capabilities",
+                 "qubit, ghost status", "qubit, opencode status",
+                 "qubit, list opencode capabilities",
+                 "qubit, list verified skills", "qubit, experiment status",
+                 "qubit, list experiments", "qubit, product status",
+                 "qubit, probe install", "qubit, package status",
+                 "qubit, dashboard status", "qubit, what can you do",
+                 "qubit, branding plan", "qubit, verify branding",
+                 "qubit, check profile audio", "qubit, list config profiles",
+                 "qubit, show model local/qubit-brain4"):
+        res = VC.resolve(text)
+        assert res.kind == VC.MATCH, (text, res.kind, res.speech)
+        out = VC.execute(ctx, res)
+        assert out.kind == VC.EXECUTED, (text, out.kind, out.speech)
+        assert out.receipt.get("result"), text
+
+
+def test_hardware_guidance_names_qubit_spelling(tmp_path, monkeypatch):
+    from voicebridge import voice_commands as VC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    ctx = _ctx(cfg)
+    for text in ("qubit, microphone test", "qubit, transcription test",
+                 "qubit, speech test", "qubit, enroll my voice",
+                 "qubit, verify my voice", "qubit, test yourself",
+                 "qubit, start listening"):
+        res = VC.resolve(text)
+        assert res.kind == VC.MATCH, (text, res.kind)
+        out = VC.execute(ctx, res)
+        assert out.kind == VC.EXECUTED, (text, out.kind)
+        speech = out.speech
+        assert "qubit" in speech and "voicebridge " not in speech, speech
+
+
+def test_commands_list_has_no_secrets(tmp_path, monkeypatch):
+    from voicebridge import voice_commands as VC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    ctx = _ctx(cfg)
+    res = VC.resolve("qubit, what can you do")
+    out = VC.execute(ctx, res)
+    assert out.kind == VC.EXECUTED
+    body = json.dumps(out.receipt)
+    assert len(out.receipt["result"]["commands"]) == len(VC.REGISTRY)
+    for bad in ("sk-", "pplx-", "api_key", "passphrase", "BEGIN "):
+        assert bad not in body, bad
+
+
+def test_opencode_voice_workflow_wired_disposable_only():
+    """Voice covers the disposable-worktree OpenCode workflow (preview, run,
+    cancel, status, retry, recover, receipts, grant, revoke) on the shared
+    request_coding_run entry; in-project writes stay CLI/dashboard-only
+    behind a preview hash (VOICE_IMPOSSIBLE documents the boundary)."""
+    from voicebridge import voice_commands as VC
+    from voicebridge.opencode import runner as _R
+
+    assert "INTENTIONALLY NOT WIRED" not in (
+        _R.request_coding_run.__doc__ or "")
+    run_ids = {e.id for e in VC.REGISTRY.values()
+               if e.backend == "opencode" and e.confirm}
+    assert {"opencode_run", "opencode_cancel", "opencode_retry",
+            "opencode_recover", "opencode_grant",
+            "opencode_revoke"} <= run_ids, run_ids
+    assert "opencode.execute" in VC.VOICE_IMPOSSIBLE  # hash flow boundary
+    assert "opencode_run" not in VC.VOICE_IMPOSSIBLE.values()

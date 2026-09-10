@@ -13,6 +13,10 @@ Reports that prove only a real Hermes subprocess, Hermes chat turns, or a
 Qubit supervisor are foundation evidence, not completion. They must not be
 used to claim that Qubit is a complete Hermes replacement.
 
+The step-by-step acceptance list is [8TF_COMPLETION_CHECKLIST.md](8TF_COMPLETION_CHECKLIST.md).
+The implementing agent must keep it current and may not mark a box without
+inspectable evidence.
+
 ## 1. Final architecture
 
 The required result is:
@@ -117,13 +121,18 @@ coding/agent operation, record one of `IMPLEMENTED`, `BLOCKED`, or `REJECTED`.
 
 `IMPLEMENTED` means the operation is callable through a Qubit command or
 interface, preserves the required Hermes behavior, produces Qubit receipts,
-and passes through the Qubit broker and policy path. `BLOCKED` or `REJECTED`
+and passes through the Qubit broker and policy path. For applicable
+user-facing operations, it must also have a real Qubit dashboard page,
+control, form, report, or action—not merely a status tile, count, or catalog
+entry. CLI, dashboard, and voice must use the same backend operation.
+`BLOCKED` or `REJECTED`
 requires a typed error, user-facing explanation, owner, and regression test.
 Silently omitting a command, exposing only `hermes chat`, or telling the user
 to invoke the upstream binary directly is a failure.
 
-Add parity tests that compare the pinned Hermes behavior with the Qubit
-surface, plus negative tests proving no Qubit command can bypass grants,
+Add parity tests that compare the pinned Hermes behavior with the Qubit CLI,
+dashboard, and voice surfaces, plus negative tests proving no Qubit command or
+dashboard action can bypass grants,
 confirmation, audit, redaction, resource ceilings, or emergency stop.
 
 ### Phase C — Integrate Qubit VoiceBridge
@@ -160,6 +169,27 @@ For every `REUSE` or `ADAPT` row:
 
 Do not integrate unreviewed ClawHub plugins, cloud memory, hidden listeners,
 unrestricted desktop control, or capabilities that violate the Qubit policy.
+
+### Phase D2 — Adapt the seven rejected Hermes features
+
+The current rejected rows are not accepted as the final product boundary.
+Implement Qubit-native equivalents for all seven, then update the parity
+matrix from `REJECTED` to `ADAPT`/`IMPLEMENTED` only after behavioral proof:
+
+| Hermes feature | Required Qubit-native result |
+| --- | --- |
+| safety bypass flags | Owner-authorized scoped sessions that retain emergency stop, audit, expiry, and high-impact confirmation; never an unprotected yolo mode |
+| proxy | Restricted, allowlisted proxy with target binding, secret isolation, resource limits, and audit |
+| pets/skin | Optional Qubit themes/cosmetics isolated from execution policy |
+| sync | Opt-in encrypted profile/vault sync with selective data classes and conflict/rollback handling |
+| computer-use | Bounded desktop adapter through the Qubit broker, not unrestricted control |
+| serve/dashboard/desktop/gui | Qubit-owned dashboard/UI functionality without a second listener or authority |
+| hooks | Signed or allowlisted event subscriptions executed through the broker |
+
+Do not copy unsafe upstream bypass behavior. Implement the user-facing
+functionality behind Qubit controls, document any unavoidable operator-only
+boundary, and add positive, negative, persistence, redaction, resource,
+rollback, and emergency-stop tests for each feature.
 
 ### Phase E — Complete Qubit rebrand
 
@@ -232,6 +262,8 @@ Packet 8U remains blocked until all are true:
 - Qubit VoiceBridge is integrated as the single voice path;
 - complete supported Hermes command/interface parity is implemented or
   explicitly typed as blocked/rejected with no silent omissions;
+- all seven formerly rejected features have Qubit-native implementations or
+  a separately verified, safety-grounded replacement;
 - required OpenClaw `REUSE`/`ADAPT` rows are integrated and tested;
 - user-facing rebrand and route/component organization are complete;
 - migration, packaging, rollback, and uninstall pass;

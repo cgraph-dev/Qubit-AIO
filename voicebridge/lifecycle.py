@@ -254,7 +254,7 @@ def checklist(cfg: Any, paths: Any = None, *, offline: bool = False) -> Dict[str
         steps.append({"id": "pairing",
                       "state": "READY" if pair_state == "PAIRED" else "PENDING",
                       "detail": "local dashboard token; never shown or in a URL",
-                      "next": "pair in the browser (`voicebridge webui --open`)"})
+                      "next": "pair in the browser (`qubit webui --open`)"})
         steps.append({"id": "desktop", "state": "PENDING",
                       "detail": "shortcut/tray hooks stay off until you approve",
                       "next": "approve desktop link during setup run"})

@@ -29,6 +29,13 @@ Task assignees are free-text labels (Hermes binds named execution
 profiles; Qubit has no profiles — documented divergence). Execution of a
 claimed task happens through the existing supervised run paths, never in
 this module.
+
+The O-board widget canvas (``board_open``, ``move_task``, ``widget_*``,
+``layout_*``, ``role_*``, ``snapshot_*`` below) is the visual surface
+around the same store: per-board column layout, sandboxed widgets
+(active markup stripped, never executed), per-board delegate roles,
+and auto-snapshots for rollback. Same confirm/estop/audit/redaction
+contracts; CLI, dashboard, and voice share every function.
 """
 from __future__ import annotations
 
@@ -69,20 +76,20 @@ _BOARD_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 DELEGATED = {
     "swarm": "bounded parallel reads + serialized writes through the Qubit "
              "broker (Packet 8 delegation); no worker swarm is started here",
-    "dispatch": "supervised runs via `voicebridge opencode` (Packet 8R); "
+    "dispatch": "supervised runs via `qubit opencode` (Packet 8R); "
                 "no dispatch queue runs here",
-    "daemon": "durable monitor jobs via `voicebridge monitor` (Packet 8D); "
+    "daemon": "durable monitor jobs via `qubit monitor` (Packet 8D); "
               "no background daemon runs here",
-    "watch": "monitor jobs + journal evidence via `voicebridge monitor` "
+    "watch": "monitor jobs + journal evidence via `qubit monitor` "
              "(Packet 8D); no watcher runs here",
     "notify-subscribe": "deduplicated notifications with quiet hours via "
-                        "`voicebridge monitor` (Packet 8D)",
-    "notify-list": "notification state via `voicebridge monitor` (Packet 8D)",
-    "notify-unsubscribe": "notification state via `voicebridge monitor` "
+                        "`qubit monitor` (Packet 8D)",
+    "notify-list": "notification state via `qubit monitor` (Packet 8D)",
+    "notify-unsubscribe": "notification state via `qubit monitor` "
                           "(Packet 8D)",
-    "heartbeat": "run liveness via `voicebridge opencode` run state "
+    "heartbeat": "run liveness via `qubit opencode` run state "
                  "(Packet 8R); no heartbeat loop runs here",
-    "runs": "run history via `voicebridge opencode` (Packet 8R)",
+    "runs": "run history via `qubit opencode` (Packet 8R)",
 }
 
 
@@ -416,6 +423,34 @@ def show(cfg: Any, task_id: int) -> Dict[str, Any]:
         return {"state": "OK", "task": task}
     finally:
         conn.close()
+
+
+def current_task(cfg: Any) -> Dict[str, Any]:
+    """Resolve "the current task": the newest actionable (open/claimed/
+    blocked) task across boards, with comments + events (read-only).
+
+    Shared by `qubit kanban current`, the voice `kanban_current` entry
+    (same backend as CLI/dashboard), and `task --current` resolution.
+    Empty boards / nothing actionable return a typed EMPTY state —
+    never a fabricated task."""
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        row = conn.execute(
+            "SELECT id FROM tasks WHERE status IN ('open','claimed','blocked')"
+            " ORDER BY id DESC LIMIT 1").fetchone()
+        if row is None:
+            return {"state": "EMPTY", "code": "NO_OPEN_TASKS",
+                    "detail": "no open, claimed, or blocked tasks; "
+                              "create one with `qubit kanban create`",
+                    "owner": "qubit-policy",
+                    "rollback": "board untouched; nothing to roll back"}
+        task_id = int(row["id"])
+    finally:
+        conn.close()
+    out = show(cfg, task_id)
+    out["current"] = True
+    return out
 
 
 def _transition(cfg: Any, task_id: int, to: str, *,
@@ -788,3 +823,628 @@ def refuse_estop(operation: str) -> Dict[str, Any]:
                            "is latched; reset it before changing kanban.",
             "owner": "qubit-policy",
             "rollback": "board untouched; nothing to roll back"}
+
+
+# --------------------------------------------- widget canvas (O-board canvas)
+#
+# The task board above is the Hermes-kanban task lifecycle. The OpenClaw
+# board/widget canvas is the visual surface around it: per-board column
+# layout, sandboxed widgets, per-board permission roles, and layout
+# snapshots for rollback. Same SQLite store, same confirm/estop/audit/
+# redaction contracts, same backend for CLI, dashboard, and voice.
+
+WIDGET_KINDS = ("note", "tasks", "stats", "links")
+WIDGET_TITLE_LEN = 200
+WIDGET_CONTENT_LEN = 4000
+WIDGET_MAX_PER_BOARD = 64
+LAYOUT_MAX_COLS = 6
+SNAPSHOTS_KEPT = 20
+DENIED_CODE = "KANBAN_DENIED"
+CANVAS_ROLES = ("owner", "editor", "viewer")
+_ROLE_RANK = {"viewer": 1, "editor": 2, "owner": 3}
+_DEFAULT_COLUMNS = ["open", "claimed", "blocked", "done"]
+
+# Active markup that can never persist in a widget: scripts, frames,
+# plug-ins, forms, inline handlers, and javascript: URLs. Matches are
+# stripped and counted; the output names the sanitized flag so the
+# dashboard can render the widget with plain text only.
+_ACTIVE_PATTERNS = (
+    re.compile(r"<\s*script\b.*?(?:<\s*/\s*script\s*>|$)", re.I | re.S),
+    re.compile(r"<\s*(iframe|object|embed|form|meta|link)\b[^>]*>", re.I),
+    re.compile(r"\son\w+\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\s>]+)", re.I),
+    re.compile(r"javascript\s*:", re.I),
+)
+
+
+def _migrate_canvas(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        "CREATE TABLE IF NOT EXISTS canvas_widgets("
+        " id INTEGER PRIMARY KEY AUTOINCREMENT, board TEXT NOT NULL,"
+        " kind TEXT NOT NULL, title TEXT NOT NULL DEFAULT '',"
+        " content TEXT NOT NULL DEFAULT '', x INTEGER NOT NULL DEFAULT 0,"
+        " y INTEGER NOT NULL DEFAULT 0, w INTEGER NOT NULL DEFAULT 4,"
+        " h INTEGER NOT NULL DEFAULT 3,"
+        " created_at REAL NOT NULL, updated_at REAL NOT NULL);"
+        "CREATE INDEX IF NOT EXISTS idx_widgets_board ON canvas_widgets(board);"
+        "CREATE TABLE IF NOT EXISTS canvas_layouts("
+        " board TEXT PRIMARY KEY, columns TEXT NOT NULL,"
+        " updated_at REAL NOT NULL);"
+        "CREATE TABLE IF NOT EXISTS board_roles("
+        " board TEXT NOT NULL, principal TEXT NOT NULL,"
+        " role TEXT NOT NULL, updated_at REAL NOT NULL,"
+        " PRIMARY KEY(board, principal));"
+        "CREATE TABLE IF NOT EXISTS canvas_snapshots("
+        " id INTEGER PRIMARY KEY AUTOINCREMENT, board TEXT NOT NULL,"
+        " payload TEXT NOT NULL, created_at REAL NOT NULL);"
+        "CREATE INDEX IF NOT EXISTS idx_snapshots_board"
+        " ON canvas_snapshots(board, id);")
+
+
+def sanitize_widget_content(text: str) -> Dict[str, Any]:
+    """Strip active markup from widget content (sandboxing).
+
+    Returns the cleaned text plus how many active fragments were removed.
+    Plain text, links as text, and task references survive; nothing
+    executable survives. Never raises on hostile input."""
+    clean = text or ""
+    removed = 0
+    for pat in _ACTIVE_PATTERNS:
+        clean, n = pat.subn("", clean)
+        removed += n
+    return {"content": clean, "removed": removed,
+            "sanitized": removed > 0}
+
+
+def _widget_dict(row: sqlite3.Row) -> Dict[str, Any]:
+    return {"id": row["id"], "board": row["board"], "kind": row["kind"],
+            "title": redact_spec(row["title"]),
+            "content": redact_spec(row["content"]),
+            "x": row["x"], "y": row["y"], "w": row["w"], "h": row["h"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"]}
+
+
+def _check_widget_kind(kind: str) -> str:
+    clean = (kind or "").strip().lower()
+    if clean not in WIDGET_KINDS:
+        raise KanbanError(BAD_INPUT_CODE,
+                          f"widget kind must be one of {WIDGET_KINDS}")
+    return clean
+
+
+def _check_grid(name: str, value: int, lo: int, hi: int) -> int:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        raise KanbanError(BAD_INPUT_CODE,
+                          f"widget {name} must be an integer") from None
+    if not lo <= number <= hi:
+        raise KanbanError(BAD_INPUT_CODE,
+                          f"widget {name} must be {lo}..{hi}")
+    return number
+
+
+def _check_columns(columns: List[str]) -> List[str]:
+    if not isinstance(columns, list) or not 1 <= len(columns) <= LAYOUT_MAX_COLS:
+        raise KanbanError(BAD_INPUT_CODE,
+                          f"layout needs 1..{LAYOUT_MAX_COLS} columns")
+    clean = []
+    for col in columns:
+        text = str(col or "").strip().lower()
+        if text not in STATUSES:
+            raise KanbanError(BAD_INPUT_CODE,
+                              f"layout column must be one of {STATUSES}")
+        if text not in clean:
+            clean.append(text)
+    return clean
+
+
+def _canvas_roles(conn: sqlite3.Connection, board: str) -> Dict[str, str]:
+    return {r["principal"]: r["role"] for r in conn.execute(
+        "SELECT principal, role FROM board_roles WHERE board=?", (board,))}
+
+
+def _require_canvas_role(conn: sqlite3.Connection, board: str,
+                         principal: str, need: str) -> None:
+    """Enforce per-board permission roles for delegate principals.
+
+    Boards without any role rows are unrestricted (legacy behavior — the
+    CLI, dashboard, and voice first-party surfaces already passed broker
+    auth, confirmation, and the emergency-stop gate). Once roles exist,
+    naming a principal outside the board's editor list for assignment or
+    canvas work is denied with a typed error; viewer principals may look
+    but never change state."""
+    roles = _canvas_roles(conn, board)
+    if not roles:
+        return
+    if not principal:
+        return
+    rank = _ROLE_RANK.get(roles.get(principal, ""), 0)
+    if rank < _ROLE_RANK[need]:
+        raise KanbanError(DENIED_CODE,
+                          f"principal {principal!r} has "
+                          f"{roles.get(principal, 'no')} access on board "
+                          f"{board!r}; {need} or owner required")
+
+
+def _snapshot_canvas(conn: sqlite3.Connection, board: str) -> int:
+    """Auto-snapshot widgets+layout+roles+task positions (rollback)."""
+    payload = json.dumps({
+        "schema": SCHEMA,
+        "board": board,
+        "widgets": [dict(r) for r in conn.execute(
+            "SELECT * FROM canvas_widgets WHERE board=?", (board,))],
+        "layouts": [dict(r) for r in conn.execute(
+            "SELECT * FROM canvas_layouts WHERE board=?", (board,))],
+        "roles": [dict(r) for r in conn.execute(
+            "SELECT * FROM board_roles WHERE board=?", (board,))],
+        "task_positions": [dict(r) for r in conn.execute(
+            "SELECT id, board, status, assignee FROM tasks WHERE board=?",
+            (board,))],
+        "taken_at": _now(),
+    })
+    cur = conn.execute("INSERT INTO canvas_snapshots(board, payload,"
+                       " created_at) VALUES(?,?,?)",
+                       (board, payload, _now()))
+    snap_id = cur.lastrowid
+    conn.execute("DELETE FROM canvas_snapshots WHERE board=? AND id NOT IN"
+                 " (SELECT id FROM canvas_snapshots WHERE board=?"
+                 " ORDER BY id DESC LIMIT ?)",
+                 (board, board, SNAPSHOTS_KEPT))
+    return snap_id
+
+
+def _canvas_guard(cfg: Any, operation: str, confirmed: bool) -> None:
+    if not confirmed:
+        raise KanbanError(CONFIRM_CODE,
+                          f"kanban {operation} requires explicit --confirm")
+    if estop_engaged(cfg):
+        raise KanbanError(ESTOP_CODE,
+                          "the emergency stop is latched; reset it before"
+                          " changing the board canvas")
+
+
+def board_open(cfg: Any, board: str = "main") -> Dict[str, Any]:
+    """Render the whole board canvas (read-only): tasks by column,
+    widgets, layout, and role roster. This is what "open the board"
+    speaks and what the dashboard canvas page shows."""
+    slug = _check_board_slug(board or "main")
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        _get_board(conn, slug)
+        layout_row = conn.execute("SELECT columns FROM canvas_layouts"
+                                  " WHERE board=?", (slug,)).fetchone()
+        columns = (json.loads(layout_row["columns"])
+                   if layout_row else list(_DEFAULT_COLUMNS))
+        by_column: Dict[str, List[Dict[str, Any]]] = {c: [] for c in columns}
+        for trow in conn.execute("SELECT * FROM tasks WHERE board=?"
+                                 " ORDER BY id DESC LIMIT 500", (slug,)):
+            task = _task_dict(trow)
+            by_column.setdefault(task["status"], []).append(task)
+        widgets = [_widget_dict(r) for r in conn.execute(
+            "SELECT * FROM canvas_widgets WHERE board=? ORDER BY y, x, id",
+            (slug,))]
+        roles = _canvas_roles(conn, slug)
+        counts = {s: len(by_column.get(s, [])) for s in STATUSES}
+        return {"state": "OK", "board": slug, "columns": columns,
+                "by_column": by_column, "counts": counts,
+                "widgets": widgets, "roles": roles,
+                "restricted": bool(roles),
+                "owner": "qubit-policy",
+                "rollback": "read-only; nothing changed"}
+    finally:
+        conn.close()
+
+
+def move_task(cfg: Any, task_id: int, *, board: str = "",
+              status: str = "", requested_by: str = "cli:user",
+              confirmed: bool = False) -> Dict[str, Any]:
+    """Move a task across boards and/or columns ("move this task").
+
+    Either destination may be omitted (move board only, or re-column
+    only). Archived tasks refuse; restricted boards refuse unlisted
+    assignees; every move auto-snapshots first for rollback."""
+    _canvas_guard(cfg, "move", confirmed)
+    if status and status not in STATUSES:
+        raise KanbanError(BAD_INPUT_CODE,
+                          f"status must be one of {STATUSES}")
+    if not board and not status:
+        raise KanbanError(BAD_INPUT_CODE,
+                          "move needs --board and/or --status")
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            row = _get_task(conn, int(task_id))
+            if row["status"] == "archived":
+                raise KanbanError(STATE_CODE,
+                                  f"task #{task_id} is archived")
+            dest_board = _check_board_slug(board) if board else row["board"]
+            _get_board(conn, dest_board)
+            dest_status = status or row["status"]
+            task = _task_dict(row)
+            if task.get("assignee"):
+                _require_canvas_role(conn, dest_board,
+                                     task["assignee"], "editor")
+            snap_id = _snapshot_canvas(conn, str(row["board"]))
+            if dest_board != row["board"]:
+                snap_id = _snapshot_canvas(conn, dest_board)
+            conn.execute("UPDATE tasks SET board=?, status=?, updated_at=?"
+                         " WHERE id=?",
+                         (dest_board, dest_status, _now(), row["id"]))
+            _event(conn, row["id"], "move",
+                   f"board={dest_board} status={dest_status}")
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except sqlite3.Error:
+                pass
+            raise
+        _audit("move", requested_by,
+               {"task_id": row["id"], "board": dest_board,
+                "status": dest_status})
+        out = _task_dict(_get_task(conn, row["id"]))
+        out["snapshot_id"] = snap_id
+        return {"state": "OK", "task": out,
+                "rollback": f"canvas snapshot #{snap_id}; "
+                            "`kanban snapshot-restore` reverts this move"}
+    finally:
+        conn.close()
+
+
+def widget_add(cfg: Any, board: str, kind: str, title: str, *,
+               content: str = "", x: int = 0, y: int = 0,
+               w: int = 4, h: int = 3,
+               requested_by: str = "cli:user",
+               confirmed: bool = False) -> Dict[str, Any]:
+    """Add a sandboxed widget to the board canvas (confirmed)."""
+    _canvas_guard(cfg, "widget-add", confirmed)
+    slug = _check_board_slug(board or "main")
+    clean_kind = _check_widget_kind(kind)
+    clean_title = _check_title(title)
+    if len(content or "") > WIDGET_CONTENT_LEN:
+        raise KanbanError(BAD_INPUT_CODE,
+                          f"content must be <={WIDGET_CONTENT_LEN} chars")
+    scrubbed = sanitize_widget_content(content or "")
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        _get_board(conn, slug)
+        if conn.execute("SELECT COUNT(*) c FROM canvas_widgets WHERE board=?",
+                        (slug,)).fetchone()["c"] >= WIDGET_MAX_PER_BOARD:
+            raise KanbanError(EXISTS_CODE,
+                              f"board {slug!r} widget limit reached"
+                              f" ({WIDGET_MAX_PER_BOARD})")
+        snap_id = _snapshot_canvas(conn, slug)
+        cur = conn.execute("INSERT INTO canvas_widgets(board, kind, title,"
+                           " content, x, y, w, h, created_at, updated_at)"
+                           " VALUES(?,?,?,?,?,?,?,?,?,?)",
+                           (slug, clean_kind, clean_title,
+                            scrubbed["content"],
+                            _check_grid("x", x, 0, 48),
+                            _check_grid("y", y, 0, 200),
+                            _check_grid("w", w, 1, 48),
+                            _check_grid("h", h, 1, 200),
+                            _now(), _now()))
+        conn.commit()
+        _audit("canvas.widget_add", requested_by,
+               {"board": slug, "widget_id": cur.lastrowid,
+                "sanitized": scrubbed["sanitized"]})
+        row = conn.execute("SELECT * FROM canvas_widgets WHERE id=?",
+                           (cur.lastrowid,)).fetchone()
+        out = _widget_dict(row)
+        out["sanitized"] = scrubbed["sanitized"]
+        out["removed_fragments"] = scrubbed["removed"]
+        out["snapshot_id"] = snap_id
+        return {"state": "OK", "widget": out,
+                "rollback": f"canvas snapshot #{snap_id}"}
+    finally:
+        conn.close()
+
+
+def widget_list(cfg: Any, board: str = "main") -> Dict[str, Any]:
+    """List canvas widgets newest-position-first (read-only)."""
+    slug = _check_board_slug(board or "main")
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        _get_board(conn, slug)
+        return {"state": "OK", "board": slug, "widgets": [
+            _widget_dict(r) for r in conn.execute(
+                "SELECT * FROM canvas_widgets WHERE board=?"
+                " ORDER BY y, x, id", (slug,))]}
+    finally:
+        conn.close()
+
+
+def widget_move(cfg: Any, widget_id: int, *, x: Optional[int] = None,
+                y: Optional[int] = None, w: Optional[int] = None,
+                h: Optional[int] = None, requested_by: str = "cli:user",
+                confirmed: bool = False) -> Dict[str, Any]:
+    """Reposition/resize a widget (confirmed; auto-snapshots)."""
+    _canvas_guard(cfg, "widget-move", confirmed)
+    if x is None and y is None and w is None and h is None:
+        raise KanbanError(BAD_INPUT_CODE,
+                          "widget-move needs at least one of --x --y --w --h")
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        row = conn.execute("SELECT * FROM canvas_widgets WHERE id=?",
+                           (int(widget_id),)).fetchone()
+        if row is None:
+            raise KanbanError(NOT_FOUND_CODE, f"no widget #{widget_id}")
+        snap_id = _snapshot_canvas(conn, row["board"])
+        sets, params = [], []
+        for name, val, lo, hi in (("x", x, 0, 48), ("y", y, 0, 200),
+                                  ("w", w, 1, 48), ("h", h, 1, 200)):
+            if val is not None:
+                sets.append(f"{name}=?")
+                params.append(_check_grid(name, val, lo, hi))
+        sets.append("updated_at=?")
+        params.extend([_now(), row["id"]])
+        conn.execute(f"UPDATE canvas_widgets SET {', '.join(sets)}"
+                     " WHERE id=?", params)
+        conn.commit()
+        _audit("canvas.widget_move", requested_by,
+               {"widget_id": row["id"], "board": row["board"]})
+        fresh = conn.execute("SELECT * FROM canvas_widgets WHERE id=?",
+                             (row["id"],)).fetchone()
+        out = _widget_dict(fresh)
+        out["snapshot_id"] = snap_id
+        return {"state": "OK", "widget": out,
+                "rollback": f"canvas snapshot #{snap_id}"}
+    finally:
+        conn.close()
+
+
+def widget_remove(cfg: Any, widget_id: int, *,
+                  requested_by: str = "cli:user",
+                  confirmed: bool = False) -> Dict[str, Any]:
+    """Remove a widget (confirmed; auto-snapshots first)."""
+    _canvas_guard(cfg, "widget-remove", confirmed)
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        row = conn.execute("SELECT * FROM canvas_widgets WHERE id=?",
+                           (int(widget_id),)).fetchone()
+        if row is None:
+            raise KanbanError(NOT_FOUND_CODE, f"no widget #{widget_id}")
+        snap_id = _snapshot_canvas(conn, row["board"])
+        conn.execute("DELETE FROM canvas_widgets WHERE id=?", (row["id"],))
+        conn.commit()
+        _audit("canvas.widget_remove", requested_by,
+               {"widget_id": row["id"], "board": row["board"]})
+        return {"state": "OK", "removed": row["id"], "board": row["board"],
+                "rollback": f"canvas snapshot #{snap_id}; "
+                            "`kanban snapshot-restore` brings it back"}
+    finally:
+        conn.close()
+
+
+def layout_show(cfg: Any, board: str = "main") -> Dict[str, Any]:
+    """Show the board column layout (read-only)."""
+    slug = _check_board_slug(board or "main")
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        _get_board(conn, slug)
+        row = conn.execute("SELECT columns FROM canvas_layouts WHERE board=?",
+                           (slug,)).fetchone()
+        columns = (json.loads(row["columns"]) if row
+                   else list(_DEFAULT_COLUMNS))
+        return {"state": "OK", "board": slug, "columns": columns,
+                "custom": bool(row)}
+    finally:
+        conn.close()
+
+
+def layout_set(cfg: Any, board: str, columns: List[str], *,
+               requested_by: str = "cli:user",
+               confirmed: bool = False) -> Dict[str, Any]:
+    """Set the board column layout (confirmed; auto-snapshots)."""
+    _canvas_guard(cfg, "layout-set", confirmed)
+    slug = _check_board_slug(board or "main")
+    clean = _check_columns(columns)
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        _get_board(conn, slug)
+        snap_id = _snapshot_canvas(conn, slug)
+        conn.execute("INSERT INTO canvas_layouts(board, columns, updated_at)"
+                     " VALUES(?,?,?) ON CONFLICT(board) DO UPDATE SET"
+                     " columns=excluded.columns,"
+                     " updated_at=excluded.updated_at",
+                     (slug, json.dumps(clean), _now()))
+        conn.commit()
+        _audit("canvas.layout_set", requested_by,
+               {"board": slug, "columns": clean})
+        return {"state": "OK", "board": slug, "columns": clean,
+                "snapshot_id": snap_id,
+                "rollback": f"canvas snapshot #{snap_id}"}
+    finally:
+        conn.close()
+
+
+def role_grant(cfg: Any, board: str, principal: str, role: str, *,
+               requested_by: str = "cli:user",
+               confirmed: bool = False) -> Dict[str, Any]:
+    """Grant a board role to a delegate principal (confirmed)."""
+    _canvas_guard(cfg, "role-grant", confirmed)
+    slug = _check_board_slug(board or "main")
+    who = (principal or "").strip()[:80]
+    if not who:
+        raise KanbanError(BAD_INPUT_CODE, "principal is required")
+    clean_role = (role or "").strip().lower()
+    if clean_role not in CANVAS_ROLES:
+        raise KanbanError(BAD_INPUT_CODE,
+                          f"role must be one of {CANVAS_ROLES}")
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        _get_board(conn, slug)
+        snap_id = _snapshot_canvas(conn, slug)
+        conn.execute("INSERT INTO board_roles(board, principal, role,"
+                     " updated_at) VALUES(?,?,?,?)"
+                     " ON CONFLICT(board, principal) DO UPDATE SET"
+                     " role=excluded.role, updated_at=excluded.updated_at",
+                     (slug, who, clean_role, _now()))
+        conn.commit()
+        _audit("canvas.role_grant", requested_by,
+               {"board": slug, "principal": who, "role": clean_role})
+        return {"state": "OK", "board": slug, "principal": who,
+                "role": clean_role, "restricted": True,
+                "snapshot_id": snap_id,
+                "rollback": f"canvas snapshot #{snap_id}"}
+    finally:
+        conn.close()
+
+
+def role_revoke(cfg: Any, board: str, principal: str, *,
+                requested_by: str = "cli:user",
+                confirmed: bool = False) -> Dict[str, Any]:
+    """Revoke a board role (confirmed; last role removal unrestricts)."""
+    _canvas_guard(cfg, "role-revoke", confirmed)
+    slug = _check_board_slug(board or "main")
+    who = (principal or "").strip()[:80]
+    if not who:
+        raise KanbanError(BAD_INPUT_CODE, "principal is required")
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        _get_board(conn, slug)
+        snap_id = _snapshot_canvas(conn, slug)
+        cur = conn.execute("DELETE FROM board_roles WHERE board=? AND"
+                           " principal=?", (slug, who))
+        conn.commit()
+        _audit("canvas.role_revoke", requested_by,
+               {"board": slug, "principal": who})
+        remaining = _canvas_roles(conn, slug)
+        return {"state": "OK", "board": slug, "principal": who,
+                "revoked": cur.rowcount > 0,
+                "restricted": bool(remaining),
+                "rollback": f"canvas snapshot #{snap_id}"}
+    finally:
+        conn.close()
+
+
+def roles_list(cfg: Any, board: str = "main") -> Dict[str, Any]:
+    """List board roles (read-only)."""
+    slug = _check_board_slug(board or "main")
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        _get_board(conn, slug)
+        roles = _canvas_roles(conn, slug)
+        return {"state": "OK", "board": slug, "roles": roles,
+                "restricted": bool(roles)}
+    finally:
+        conn.close()
+
+
+def snapshot_list(cfg: Any, board: str = "main",
+                  limit: int = LIST_DEFAULT) -> Dict[str, Any]:
+    """List canvas snapshots newest-first (read-only, bounded)."""
+    slug = _check_board_slug(board or "main")
+    limit = max(1, min(int(limit or LIST_DEFAULT), LIST_MAX))
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        _get_board(conn, slug)
+        return {"state": "OK", "board": slug, "snapshots": [
+            {"id": r["id"], "created_at": r["created_at"]}
+            for r in conn.execute("SELECT id, created_at FROM"
+                                  " canvas_snapshots WHERE board=?"
+                                  " ORDER BY id DESC LIMIT ?", (slug, limit))],
+                "limit": limit}
+    finally:
+        conn.close()
+
+
+def snapshot_restore(cfg: Any, snapshot_id: int, *,
+                     requested_by: str = "cli:user",
+                     confirmed: bool = False) -> Dict[str, Any]:
+    """Restore a canvas snapshot (confirmed; pre-restore backup kept).
+
+    Restores widgets, layout, roles, and task board/status positions
+    captured in the snapshot. Tasks created after the snapshot are left
+    in place (never deleted by a canvas rollback)."""
+    _canvas_guard(cfg, "snapshot-restore", confirmed)
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        row = conn.execute("SELECT * FROM canvas_snapshots WHERE id=?",
+                           (int(snapshot_id),)).fetchone()
+        if row is None:
+            raise KanbanError(NOT_FOUND_CODE, f"no snapshot #{snapshot_id}")
+        try:
+            snap = json.loads(row["payload"])
+        except ValueError as exc:
+            raise KanbanError(BAD_INPUT_CODE,
+                              f"snapshot #{snapshot_id} is unreadable") \
+                from exc
+        if snap.get("schema") != SCHEMA:
+            raise KanbanError(BAD_INPUT_CODE, "snapshot has unknown schema")
+        board = snap["board"]
+        _get_board(conn, board)
+        pre_id = _snapshot_canvas(conn, board)
+        conn.execute("DELETE FROM canvas_widgets WHERE board=?", (board,))
+        for w in snap.get("widgets", []):
+            conn.execute("INSERT INTO canvas_widgets(id, board, kind, title,"
+                         " content, x, y, w, h, created_at, updated_at)"
+                         " VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                         (w.get("id"), board, w.get("kind", "note"),
+                          w.get("title", ""), w.get("content", ""),
+                          w.get("x", 0), w.get("y", 0), w.get("w", 4),
+                          w.get("h", 3), w.get("created_at", _now()),
+                          _now()))
+        conn.execute("DELETE FROM canvas_layouts WHERE board=?", (board,))
+        for layout in snap.get("layouts", []):
+            conn.execute("INSERT INTO canvas_layouts(board, columns,"
+                         " updated_at) VALUES(?,?,?)",
+                         (board, layout.get("columns",
+                                            json.dumps(_DEFAULT_COLUMNS)),
+                          _now()))
+        conn.execute("DELETE FROM board_roles WHERE board=?", (board,))
+        for role in snap.get("roles", []):
+            conn.execute("INSERT INTO board_roles(board, principal, role,"
+                         " updated_at) VALUES(?,?,?,?)",
+                         (board, role.get("principal"),
+                          role.get("role", "viewer"), _now()))
+        moved = 0
+        for pos in snap.get("task_positions", []):
+            cur = conn.execute("SELECT id FROM tasks WHERE id=?",
+                               (pos.get("id"),)).fetchone()
+            if cur is None:
+                continue
+            conn.execute("UPDATE tasks SET board=?, status=?, updated_at=?"
+                         " WHERE id=?",
+                         (board, pos.get("status", "open"), _now(),
+                          pos.get("id")))
+            moved += 1
+        conn.commit()
+        _audit("canvas.snapshot_restore", requested_by,
+               {"board": board, "snapshot_id": row["id"],
+                "pre_restore_backup": pre_id})
+        return {"state": "OK", "board": board,
+                "restored_snapshot": row["id"], "tasks_repositioned": moved,
+                "pre_restore_backup": pre_id,
+                "rollback": f"canvas snapshot #{pre_id} restores the"
+                            " pre-restore canvas"}
+    finally:
+        conn.close()

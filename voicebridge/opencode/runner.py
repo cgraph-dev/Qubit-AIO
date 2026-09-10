@@ -173,7 +173,8 @@ class OpenCodeRunner(ActionRunner):
         raise OpenCodeError(f"unknown opencode capability {capability!r}")
 
     def revoke_grant(self, grant_id: str) -> Dict[str, Any]:
-        out = self.perms.revoke(grant_id, requested_by="cli:user")
+        out = self.perms.revoke(grant_id, requested_by="cli:user",
+                                confirmed=True)
         log_event("opencode.revoke", grant_id=grant_id)
         return {"state": ST_OK, "revoked": grant_id, "result": out}
 
@@ -238,11 +239,11 @@ def request_coding_run(runner: OpenCodeRunner, *, project: str,
     """One broker entry shared by every channel that may invoke OpenCode.
 
     Wired today: the authenticated CLI (full parity: grant/preview/prepare/
-    execute/cancel/receipts) and the authenticated dashboard (read-only
-    status/list/check parity on the same runner/broker). Voice and tray
-    execution are INTENTIONALLY NOT WIRED: voice coding requests continue
-    through the existing OpenClaw/Hermes dispatch, and no tray execution
-    surface exists. Any future voice/tray wiring must call this entry with
+    execute/cancel/receipts), the authenticated dashboard (Tier-1 voice
+    entries plus prepare/execute/retry/recover extras on the same runner),
+    and voice (disposable-worktree runs, previews, cancel, status, retry,
+    recover, receipts — in-project writes stay CLI/dashboard-only behind a
+    prior preview hash). Any future tray wiring must call this entry with
     the channel's source label — direct subprocess, shell, or MCP paths stay
     forbidden, and model/page/skill/tool text can never mint or carry
     confirmations (CONFIRMATION_SOURCE_FORBIDDEN).

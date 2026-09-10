@@ -66,7 +66,7 @@ def render(inv: Dict[str, Any], width: int = 80) -> List[str]:
                  f"pending approvals : {_cell((inv.get('approvals', {}) or {}).get('pending', '?'), 6)}"),
             line(f"capabilities   : {_cell(capabilities.get('total', '?'), 8)}  "
                  f"providers configured : {_cell(len(auth.get('providers', []) if isinstance(auth.get('providers'), list) else []), 6)}"),
-            line("dashboard and `voicebridge status` show the same backend."),
+            line("dashboard and `qubit status` show the same backend."),
         ]
         states = capabilities.get("states") if isinstance(capabilities, dict) else None
         if isinstance(states, dict) and states:
@@ -82,7 +82,7 @@ def refuse_no_tty() -> Dict[str, Any]:
     """Typed refusal outside a real terminal (piped/CI use)."""
     return {"state": "UNAVAILABLE", "code": NO_TTY_CODE,
             "detail": "no interactive terminal detected; use "
-                      "`voicebridge status` for the same backend as typed "
+                      "`qubit status` for the same backend as typed "
                       "output, or open the web dashboard for the visual "
                       "surface.",
             "owner": "qubit-policy",
@@ -146,7 +146,7 @@ def main(cfg: Any) -> Dict[str, Any]:
     except ImportError:
         out = refuse_no_tty()
         out.update(code=NO_CURSES_CODE,
-                   detail="curses is unavailable; use `voicebridge status` "
+                   detail="curses is unavailable; use `qubit status` "
                           "or the web dashboard instead.")
         return out
 
@@ -159,6 +159,6 @@ def main(cfg: Any) -> Dict[str, Any]:
         out = refuse_no_tty()
         out.update(code=NO_CURSES_CODE,
                    detail=f"terminal setup failed ({exc}); use "
-                          f"`voicebridge status` instead."[:160])
+                          f"`qubit status` instead."[:160])
         return out
     return {"state": "OK", "exit": reason}

@@ -115,7 +115,7 @@ def require_enrolled(cfg: Any) -> Dict[str, Any]:
     p = profile(cfg)
     if not p.get("enrolled"):
         raise DeviceNotEnrolledError(
-            "device not enrolled — run `voicebridge device enroll` (explicit)")
+            "device not enrolled — run `qubit device enroll` (explicit)")
     return p
 
 

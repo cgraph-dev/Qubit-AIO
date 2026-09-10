@@ -18,12 +18,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import time
 from pathlib import Path
 from typing import Optional
 
 CMD_HELP = """\
-qubit-dev — Qubit voice-bridge terminal (like hermes / openclaw)
+qubit-dev — Qubit Agent terminal for the voice bridge
 Usage:
   qubit-dev                  interactive REPL
   qubit-dev --attach         REPL with bridge attached (sync /talk)
@@ -43,6 +44,50 @@ Slash commands inside the REPL:
   /clear                     clear screen
   /quit  /exit                leave
 """
+
+# Keep the logo as plain Unicode text first.  This makes the terminal usable
+# over SSH, in logs, and with NO_COLOR; the ANSI treatment is applied only at
+# the presentation boundary below.  The glyphs are the Qubit artwork supplied
+# for the project CLI.
+QUBIT_LOGO = """\
+  ▄▄▄▄▄▄▄▄▄  ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄   ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+ ▀▀  ▄▄   ▀▀▄▄▄   ▒█▐▓  ██ ▀▄▄        ▀▀▄ ▀▄▄  ▄▄▀ ▌▌           ▐▐▌
+▐▓  ▒▄▀▄▒ ░██ ▐▒░▐▐▌▐▒  ██  ▐▓  ▒▄▄█▀  ██  ▐▓  ▒█  ▀▄▄▄▄▓  ▒▄▀▄▄▄▀
+▐▒ ░██ ▐█░▒██▐█░▒▄█ ▐░░░██  ▐▒ ░░▀▀░ ▄▄▀   ▐▒░ ██      ▐▒░ ██
+▐░░▒▒█▌▀▓▒▓██▌▌▒▒▄█▄▀█▒▒██  ▐▒░█▄█▀▄▀█▄▀▄  ▐░▒███      ▐░▒█▒█
+▐█▒▓▀▀▀██▓▀▀▄▒▓█▓█▀▀▒▓▓▓██  ▐░▒▒▄▄▀ ▌▐▓▌▐▌ ▐█▓▓██      ▐█▓▓██
+ ▀▄▄▄▄▄▄▄▄███▀▄▄▄▄▄█▄▄█▀▄▄▀▀▓▓▀▀▀▀▀▒▒██ ▀░▄█▄▄█▀▄  ▄▀░▄▄▄▄█▀▄
+         ▀▀▀                ▀▀▀▀▀▀▀▀▀▀▀▀   ▐█▄▀
+"""
+
+
+def _qubit_banner(*, color: bool = False) -> str:
+    """Render the interactive Qubit identity banner.
+
+    This is deliberately presentation-only: it has no config, network, audio,
+    broker, or model side effects.  ``NO_COLOR`` is honored by the caller and
+    the plain form is safe for redirected output and narrow terminals.
+    """
+    logo = QUBIT_LOGO.rstrip("\n")
+    subtitle = "QUBIT VOICE BRIDGE  //  LOCAL-FIRST AI TERMINAL"
+    rule = "─" * len(subtitle)
+    if color:
+        blue = "\033[38;5;39m"
+        white = "\033[38;5;255m"
+        dim = "\033[38;5;245m"
+        reset = "\033[0m"
+        logo = f"{blue}{logo}{reset}"
+        subtitle = f"{white}{subtitle}{reset}"
+        rule = f"{dim}{rule}{reset}"
+    return f"{logo}\n{subtitle}\n{rule}"
+
+
+def _show_qubit_banner() -> None:
+    """Print the banner only for an interactive human terminal."""
+    if not sys.stdout.isatty():
+        return
+    use_color = "NO_COLOR" not in os.environ and os.environ.get("TERM") != "dumb"
+    print(_qubit_banner(color=use_color))
 
 
 def _load_cfg(config_path: Optional[Path] = None):

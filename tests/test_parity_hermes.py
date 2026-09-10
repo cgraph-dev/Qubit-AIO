@@ -137,6 +137,15 @@ def test_completion_matches_parser(tmp_path):
                 f"voicebridge.{shell}").read_text()
         for name in names:
             assert name in text, f"{name} missing from {shell} completion"
+    # Canonical launcher completions carry the same command list (compat
+    # alias voicebridge stays byte-identical modulo the prog name).
+    import re as _re
+    for shell in ("bash", "zsh", "fish"):
+        text = (REPO_ROOT / "voicebridge" / "_data" / "completions" /
+                f"qubit.{shell}").read_text()
+        assert "Qubit Agent" in text, f"qubit.{shell}: missing Qubit header"
+        for name in names:
+            assert name in text, f"{name} missing from qubit {shell} completion"
     # Regeneration is deterministic: re-render into tmp and compare with
     # the committed files (the generator never writes the repo in tests).
     import shutil
@@ -148,11 +157,30 @@ def test_completion_matches_parser(tmp_path):
                        cwd=str(REPO_ROOT))
     assert r.returncode == 0, r.stderr[-1000:]
     live = REPO_ROOT / "voicebridge" / "_data" / "completions"
-    for shell in ("bash", "zsh", "fish"):
-        assert (live / f"voicebridge.{shell}").read_text() == \
-            (tmp / f"voicebridge.{shell}").read_text()
-        assert (live / f"qubit-dev.{shell}").read_text() == \
-            (tmp / f"qubit-dev.{shell}").read_text()
+    for prog in ("qubit", "voicebridge", "qubit-dev"):
+        for shell in ("bash", "zsh", "fish"):
+            assert (live / f"{prog}.{shell}").read_text() == \
+                (tmp / f"{prog}.{shell}").read_text()
+
+
+def test_canonical_launcher_is_qubit_with_compat_alias(monkeypatch):
+    """`qubit` is the canonical public launcher; `voicebridge` is the
+    documented compatibility alias (same parser, same backend)."""
+    import sys
+
+    from voicebridge.cli import _launcher_name, build_parser
+
+    text = (REPO_ROOT / "pyproject.toml").read_text()
+    assert 'qubit = "voicebridge.cli:main"' in text
+    assert 'voicebridge = "voicebridge.cli:main"' in text
+    monkeypatch.setattr(sys, "argv", ["qubit"])
+    assert _launcher_name() == "qubit"
+    assert build_parser().prog == "qubit"
+    monkeypatch.setattr(sys, "argv", ["/usr/local/bin/voicebridge"])
+    assert _launcher_name() == "voicebridge"
+    assert build_parser().prog == "voicebridge"
+    monkeypatch.setattr(sys, "argv", ["pytest"])
+    assert _launcher_name() == "qubit"
 
 
 def test_completion_command_serves_files():
@@ -160,6 +188,10 @@ def test_completion_command_serves_files():
     import io
     from contextlib import redirect_stdout
 
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        assert _cmd_completion("bash", "qubit") == 0
+    assert "complete -F" in buf.getvalue() and "qubit" in buf.getvalue()
     buf = io.StringIO()
     with redirect_stdout(buf):
         assert _cmd_completion("bash", "voicebridge") == 0

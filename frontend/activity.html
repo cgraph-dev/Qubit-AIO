@@ -41,7 +41,7 @@
       <h1><span class="brand-mark" aria-hidden="true">Q</span> Qubit VoiceBridge — Activity</h1>
       <div class="sub">Live timeline — what you said, how it was handled, and what was spoken back. Newest first.</div>
     </div>
-    <nav class="page-nav" aria-label="Primary"><a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit Agent</a><span class="nav-separator" aria-hidden="true"></span><a href="/">Talk</a><a href="/activity" aria-current="page">Activity</a><a href="/reports">Reports</a><a href="/settings">Settings</a><a class="nav-utility" href="/token-setup">Pair device</a></nav>
+    <nav class="page-nav" aria-label="Primary"><a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit Agent</a><span class="nav-separator" aria-hidden="true"></span><a href="/">Talk</a><a href="/activity" aria-current="page">Activity</a><a href="/reports">Reports</a><a href="/ops">Operations</a><a href="/settings">Settings</a><a href="/setup">Setup</a><a class="nav-utility" href="/token-setup">Pair device</a></nav>
   </header>
   <div class="legend">
     <b>Badges — what each means:</b><br>
@@ -74,7 +74,7 @@ function humanBadge(it){
   if (kind==='fail' || kind==='error' || route==='error') return ['failed','Failed'];
   if (kind==='user' || kind==='asked') return ['asked','You said'];
   if (kind==='raw_report' || kind==='report') return ['report','Report saved'];
-  if (kind==='routing' || kind==='decided') { const dest=(it.route||it.detail||'').toString().split(/\s+/)[0]; if(dest) return ['decided','Routed to '+dest]; return ['decided','Routed']; }
+  if (kind==='routing' || kind==='decided') { const dest=(it.route||it.detail||'').toString().split(/\s+/)[0]; if(dest) return ['decided','Routed to '+window.vbRouteLabel(dest)]; return ['decided','Routed']; }
   if (kind==='summary' || kind==='done' || kind==='answered') return ['answered','Answered'];
   if (kind==='status' || kind==='running' || kind==='interrupt' || kind==='hotkey') return ['running','Working…'];
   if (kind==='system') return ['system','System'];
@@ -87,7 +87,7 @@ function itemCard(it){
   const [hbKind, hbText] = humanBadge(it);
   const head = vbBuild('span', null, fmt(it.ts));
   head.appendChild(vbBuild('span', {class:'badge b-'+badgeClass(hbKind)}, hbText));
-  if (it.route) head.appendChild(vbBuild('span', {class:'route'}, '· '+it.route));
+  if (it.route) head.appendChild(vbBuild('span', {class:'route'}, '· '+window.vbRouteLabel(it.route)));
   if (it.conf!=null && it.conf!=='') head.appendChild(vbBuild('span', {class:'detail'}, '· conf '+it.conf));
   if (it.latency_s!=null) head.appendChild(vbBuild('span', {class:'detail'}, '· '+it.latency_s+'s'));
   const t = vbBuild('div', {class:'t'}, head);

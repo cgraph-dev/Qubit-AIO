@@ -11,8 +11,25 @@ It is separate from:
 - `SLM_FROM_SCRATCH_PLAN.md`, which covers the future Qubit learning model.
 
 This plan combines the useful capabilities of OpenClaw, Hermes, Atomic Agent,
-and Voice Bridge behind one Qubit interface. It does not assume that copying
-multiple repositories into one folder will produce a reliable product.
+and Voice Bridge behind one Qubit interface. Packet 8T-F specifically uses a
+fresh pinned Hermes checkout as the source foundation for the new Qubit tree;
+it is not satisfied by merely supervising an external Hermes installation.
+OpenClaw capabilities are integrated through the feature matrix and the full
+parity contract in `docs/QUBIT_FULL_PARITY_CONTRACT.md`, with provenance and
+license retained. “Selective” means selecting the smallest justified source
+units, not selecting only convenient features: every requested Hermes and
+OpenClaw capability must eventually have a real Qubit implementation, a
+tested Qubit compatibility boundary, or a clearly identified operator-only
+qualification gate. Copying an entire second agent repository without
+ownership boundaries is not acceptable.
+
+### Packet 8S identity decision
+
+The release identity migration uses **Qubit VoiceBridge** with the canonical
+installed and repository identity `qubit-voicebridge`. The existing
+`openclaw-voice-bridge` name remains a documented legacy compatibility
+identity during migration. The internal Python import package remains
+`voicebridge`; this product rename must not rename that import package.
 
 ### The goal
 
@@ -32,6 +49,75 @@ Qubit should provide one personal-agent experience that can:
 that the user has permitted. It does not mean unrestricted control of every
 website or program.
 
+### Required Hermes rebrand/parity decision
+
+The owner’s target is not a Qubit wrapper that merely starts Hermes chat. The
+8T-F foundation is incomplete until the supported Hermes user experience has
+been migrated into Qubit: every supported Hermes CLI command, command group,
+interactive workflow, configuration surface, session workflow,
+skill/task/schedule workflow, model/provider workflow, and coding/agent
+workflow must be either implemented behind a Qubit interface or explicitly
+blocked/rejected in the feature matrix with a technical, licensing, platform,
+or safety reason and a typed Qubit error.
+
+An external Hermes binary, a Qubit-only `chat` supervisor, a renamed banner,
+or a partial command subset is not full parity and cannot unblock the next
+packet. Direct upstream execution may be used only as an internal reference
+or verification oracle; it is not a supported user path because it bypasses
+Qubit policy. Legal attribution and technical provenance remain required, but
+they are not product branding.
+
+### Owner full-parity acceptance contract
+
+The owner’s final product requirement is **Qubit as a complete, voice-actionable
+Hermes + OpenClaw replacement**. This is stronger than the interim 8T-F
+foundation gate. The final release is not 1:1 merely because a command appears
+in a matrix, a capability tile reports `IMPLEMENTED`, or an upstream process
+can be launched.
+
+For every pinned Hermes and OpenClaw user-facing capability, Qubit must prove:
+
+1. equivalent CLI command, arguments, help, result, error, exit status, and
+   persistence behavior;
+2. equivalent authenticated dashboard workflow, including navigation, forms,
+   reports, loading, empty, error, degraded, confirmation, cancellation, and
+   recovery states;
+3. a natural Qubit voice command that reaches the same backend operation,
+   including argument extraction, confirmation, cancellation, expiry, replay
+   rejection, redacted receipts, and session isolation;
+4. the same Qubit broker, permission, audit, resource, redaction, and
+   emergency-stop path across all three surfaces; and
+5. differential, security, persistence, resource, clean-install, upgrade,
+   rollback, and failure evidence.
+
+Rows marked `BLOCKED`, `DEFERRED`, `REJECTED`, `CLI_ONLY`,
+`DASHBOARD_ONLY`, `VOICE_MISSING`, or `STATUS_ONLY` are not parity. They must
+be resolved before the final 1:1 release gate, or be explicitly classified as
+genuine operator-only tests that are code-complete and manually qualified.
+
+The current packet order remains valid: 8T-F establishes the Hermes-derived
+Qubit foundation, 8U–8AH add browser/desktop/files/IDE and other whole-computer
+capabilities, and the final parity gate runs only after those packets. No agent
+may claim that 8T-F alone is final Hermes + OpenClaw parity while those later
+capability packets remain incomplete.
+
+### Combined Hermes/OpenClaw dashboard rule
+
+The finished dashboard must combine the functional Hermes dashboard foundation
+with the adopted OpenClaw dashboard workflows. Hermes supplies the preserved
+command/session/task organization; OpenClaw contributes UI patterns only for
+capabilities that are genuinely integrated into Qubit. Qubit owns one final
+information architecture, one navigation system, one design system, and one
+backend operation path.
+
+Agents must not ship two dashboards, paste OpenClaw pages beside Hermes pages,
+or replace the Hermes workflow with a smaller custom shell. They must preserve
+all functional controls while applying Qubit typography, color, spacing,
+icons, responsive layout, accessibility, motion, onboarding, loading, empty,
+error, degraded, approval, and recovery design. Every visible control must
+call the same backend operation used by Qubit CLI and voice and must have
+end-to-end evidence.
+
 ## 1. Source strategy
 
 ### Upstream projects
@@ -45,9 +131,11 @@ step, stable-prefix/bounded-tail prompts for KV-cache reuse, parallel
 read-only calls, progressive skill loading, compact browser state, explicit
 task/trace failure categories, and a no-progress guard.
 
-The current Voice Bridge already connects to them as backends through its
-orchestrator, gateway integration, worker guard, local model path, memory, and
-permission broker.
+Earlier packets audited and bounded those projects as possible upstream
+sources; that audit is not itself integration. Before 8T-F is accepted, the
+current Qubit VoiceBridge remains a separate reference/rollback tree and no
+Hermes or OpenClaw capability may be described as integrated merely because a
+contract, label, stub, or external installation exists.
 
 ### Reuse rule
 
@@ -904,6 +992,204 @@ Q11 acceptance:
   consistent after repeated feature additions;
 - no daily feature process can bypass independent verification or the Qubit
   safety, provenance, resource, and rollback rules.
+
+### Post-8T whole-computer capability track (8U–8AH)
+
+The Qubit roadmap continues after identity, release, and setup work. The
+current product is not yet a universal desktop agent: existing browser, Ghost,
+OpenCode, file, and provider surfaces are bounded adapters with different
+availability states. The following packets make those capabilities coherent
+without creating unrestricted control or a second authority.
+
+#### Upstream reuse and delivery strategy
+
+Hermes and OpenClaw are approved upstream sources to audit and selectively
+adapt for the capability track. Before implementing a feature, pin the exact
+upstream commit, inspect its source and tests, verify its license/notices and
+dependency licenses, and map the smallest reusable units to Qubit contracts.
+Qubit must remain the product and policy authority: its broker, grants,
+confirmations, audit, emergency stop, voice/audio session, dashboard API,
+state, and release rules cannot be replaced by an upstream router or tool
+registry. Whole-repository copying and unreviewed plugin import are not
+acceptable substitutes for integration.
+
+Each capability packet has four execution outcomes:
+
+- **REUSE** — the pinned upstream implementation already satisfies the Qubit
+  contract; add provenance, integration, negative tests, and verification;
+- **ADAPT** — upstream behavior exists but needs Qubit policy, session, UI,
+  packaging, compatibility, or resource wrapping;
+- **MISSING** — implement only the smallest capability absent from both Qubit
+  and the audited upstream sources;
+- **REJECTED** — do not integrate behavior that is unsafe, duplicated,
+  incompatible, unlicensed, or unsupported on the target system.
+
+Therefore 8U–8AH are not a requirement to rebuild every feature. A packet may
+contain no new feature code when the upstream capability is already suitable;
+it still requires independent Qubit-path verification before being marked
+complete. Upstream feature presence is not proof of Qubit compatibility,
+permission enforcement, live availability, or production readiness.
+
+Work may be accelerated by parallel read-only research, provenance audits,
+fixture preparation, and isolated implementation branches. Dependent packets
+must still be merged and independently verified in order. A green test run in
+an isolated branch does not certify the merged product, and parallel agents
+must never share a dirty checkout or overwrite unrelated user work.
+
+```text
+8S identity/release -> 8T setup/health
+8T -> 8T-F Qubit/Hermes foundation migration
+8T-F -> 8U browser-first voice
+8U -> 8V desktop apps
+8U + 8V -> 8W files/folders
+8W + 8R -> 8X IDE workspace
+8U + 8V + 8W + 8X -> 8Y unified task context
+8Y + 8T -> 8Z adapter lifecycle/catalog
+8Z -> 8AA always-on presence/context
+8AA -> 8AB Firefox and multi-browser parity
+8AB -> 8AC adapter SDK/contract
+8AC -> 8AD website integration packs
+8AC -> 8AE desktop application integration packs
+8AE -> 8AF background/process/game coexistence
+8AD + 8AE + 8AF -> 8AG coverage and production qualification
+8AG -> 8AH unified Qubit dashboard
+```
+
+### Packet 8T-F — Qubit Agent foundation migration before 8U
+
+Packet 8T-F is a prerequisite for the whole-computer capability track. It
+starts from a fresh, pinned Hermes checkout and produces a new Hermes-derived
+Qubit source tree. It makes Qubit Agent the product identity, integrates the
+existing Qubit VoiceBridge as the only voice/audio session, and integrates all
+requested OpenClaw capabilities in the current foundation scope behind Qubit
+contracts. A supervisor-only wrapper around an unchanged Qubit tree is not an
+acceptable substitute.
+The current Qubit checkout remains preserved as a rollback/reference tree
+until the new foundation is independently verified. The canonical architecture
+and current status are recorded in [8TF_SOURCE_OF_TRUTH.md](8TF_SOURCE_OF_TRUTH.md).
+The execution sequence and hard gate are recorded in
+[8TF_COMPLETE_MIGRATION_PLAN.md](8TF_COMPLETE_MIGRATION_PLAN.md).
+
+The migration must not merge two competing agent cores, routers, memories,
+permission systems, browser authorities, voice listeners, TTS providers, or
+event loops. Qubit’s broker, grants, confirmations, audit, emergency stop,
+state, release, and privacy contracts remain authoritative. The source,
+license, dependency, and migration runbook is [OPERATIONS_8T_F.md].
+
+Required outcomes:
+
+- fresh official Hermes source is pinned, audited, and reproducible;
+- the resulting Qubit worktree actually contains or directly imports the
+  selected pinned Hermes implementation, with runtime identity and source
+  paths proven by tests;
+- product identity is Qubit Agent and voice subsystem identity is Qubit
+  VoiceBridge;
+- microphone, ASR, Piper/TTS, Right Ctrl, dashboard voice, cancellation, and
+  barge-in use one Qubit voice/session path;
+- Hermes duplicate voice/listener paths are disabled or routed through Qubit;
+- every requested OpenClaw capability in the current foundation scope is
+  adapted only through Qubit contracts;
+- every OpenClaw row marked REUSE or ADAPT is implemented in the new Qubit
+  tree; a blocked row is allowed only for a genuine operator-only gate with a
+  complete hermetic path, typed state, test evidence, and manual procedure;
+- dashboard, CLI, installer, config, state, notices, and documentation use
+  the canonical identity without losing legacy compatibility;
+- user-facing branding, visual design, typography, colors, route/component
+  organization, and navigation are Qubit-native, with upstream names limited
+  to legally required attribution and technical provenance;
+- clean install, upgrade, rollback, state migration, licensing, and package
+  checks pass before Packet 8U begins;
+- the final full-parity contract is tracked separately and cannot be declared
+  complete until the cumulative Hermes/OpenClaw CLI, dashboard, and voice gates
+  for 8T-F through 8AH pass.
+
+No 8U browser workspace, desktop-app, file, IDE, or new whole-computer
+capability may be implemented inside 8T-F. Packet 8U begins only after an
+independent 8T-F verification result.
+
+The following are explicit 8T-F rejection conditions: a Qubit worker that
+only imitates Hermes CLI/JSON behavior; a temporary Hermes installation that
+is not part of the resulting Qubit foundation; an unverifiable Hermes runtime
+identity; or a report that counts external-only OpenClaw features as
+integrated.
+
+The acceptance target is one authenticated session and policy path across
+voice, dashboard, CLI, browser, desktop apps, approved file roots, and IDEs.
+Browser activation must be available through an approved Comet/Chromium
+browser toggle or in-page bridge, while voice activation may use “Hey Qubit”
+or Right Ctrl; all
+of these controls must operate the same backend session and never create a
+second listener, voice provider, or permission authority.
+Each adapter must be disabled by default, scoped to a user/session/target,
+resource-bounded, auditable, revocable, and independently rollbackable. Page,
+model, tool, repository, and clipboard text is untrusted and cannot create or
+widen grants. Login, CAPTCHA, 2FA, recovery challenges, and other human
+identity proofs remain manual handoffs. Routine read/navigation/fill/draft
+work may use a narrow expiring owner grant; sending, publishing, purchasing,
+deleting, account changes, and project-code changes require fresh exact
+confirmation. The detailed implementation and verification prompts live in
+`docs/AGENT_PROMPT_PACK.md`.
+
+Required product outcomes:
+
+- 8U provides a generic browser-context bridge and voice interaction for the
+  active page, selected text, readable DOM/accessibility content, visible
+  state, tabs, and bounded screenshots through existing Chromium/CDP or an
+  approved in-page bridge. Ordinary webpage reading must not require a custom
+  adapter for every site. It must not clone cookies/profiles or create a
+  hidden browser listener.
+- 8V provides semantic control of declared desktop apps on supported
+  X11/Wayland sessions, with explicit degraded behavior when accessibility
+  APIs are unavailable and no global keylogger or arbitrary input injector.
+- 8W provides an approved-root file workspace with safe previews, diffs,
+  snapshots, restore, quotas, symlink/path traversal protection, and no
+  whole-home default.
+- 8X provides a bounded IDE workspace and supervised OpenCode integration,
+  with disposable worktrees, diff/hash confirmation, and no automatic
+  commit/push/publish/install/service or permission changes.
+- 8Y provides one bounded, provenance-labelled task context across interfaces
+  without a second memory, router, scheduler, or audit authority.
+- 8Z provides a local, provenance/licence-aware adapter catalog and lifecycle;
+  it is not an uncontrolled plugin marketplace.
+- 8AA provides explicit always-on mode with wake-word/PTT choice, visible
+  privacy state, bounded context refresh, mute/pause, and no raw-audio
+  retention by default. “Hey Qubit,” Right Ctrl, the dashboard, and the
+  browser toggle all arm/pause the same service and session.
+- 8AB provides separately qualified Firefox browser-context support with the
+  same generic read contract; Chromium and Firefox sessions, profiles,
+  accounts, origins, and grants remain isolated.
+- 8AC provides the reusable adapter contract and fixture harness. It does not
+  make unsupported websites or applications work automatically.
+- 8AD provides individually qualified website action packs for operations that
+  generic page reading cannot safely perform, such as unusual controls,
+  account workflows, uploads, sends, publishing, and marketplace actions.
+  Each site family has its own origins, selectors, capabilities, fixtures,
+  live canary, and rollback. A site pack is not required merely to summarize
+  an ordinary readable webpage.
+- 8AE provides individually qualified desktop-application packs using
+  semantic accessibility APIs where available, with honest degraded states.
+- 8AF provides bounded process/resource awareness and coexistence while users
+  run demanding software such as games; it does not add arbitrary process
+  control, keylogging, or silent screen capture.
+- 8AG provides a truthful coverage matrix and production qualification record;
+  it never generalizes one website or application result to all others.
+- 8AH provides one Qubit dashboard that consolidates chat, voice, browser,
+  desktop, files, IDE/OpenCode, sessions, tools, approvals, providers,
+  diagnostics, setup, upgrades, and audit without creating a second backend
+  authority. Hermes/OpenClaw UI patterns or code may be adapted only after
+  exact source, license, dependency, and provenance review.
+
+Generic webpage readability is not universal control: login walls, CAPTCHA,
+2FA, cross-origin restrictions, canvas-only content, unsupported browsers,
+dynamic controls, and site-specific mutations may remain unavailable or
+require a manual handoff. No packet may claim “full access” merely because a
+capability is detected or a frontend toggle exists. Whole-computer readiness requires independent packet
+verification plus operator-authorized live hardware, browser/session, desktop,
+and disposable-account canaries where applicable. “Every website and app” is
+an expanding set of separately qualified adapters, not one universal switch.
+Dashboard feature parity is also qualified against the actual backend; a
+frontend control is never proof that its capability is installed, enabled, or
+live.
 
 ## 7. Performance and reliability targets
 

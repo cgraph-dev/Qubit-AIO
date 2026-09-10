@@ -486,7 +486,10 @@ def test_report_generator_rich_format():
                 "## Appendix","### References / Sources","### Screenshots / Evidence",
                 "**Spoken Summary"):
         assert sec in md, f"missing section {sec}"
-    assert "**Agent:** hermes" in md and "**Route:** hermes" in md
+    assert "**Agent:** hermes" not in md and "**Route:** hermes" not in md, \
+        "user-facing reports use Qubit labels, never upstream names"
+    assert "**Agent:** Qubit agent" in md and "**Route:** Qubit agent" in md, \
+        "legacy hermes tokens map to Qubit labels"
     assert "**Status:** completed" in md, "should infer completed (0 failures)"
     assert len(spoken.split()) <= 40, "spoken summary >40 words"
     # spoken summary is the last line

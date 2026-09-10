@@ -266,9 +266,14 @@ def test_mobile_reflow_and_touch_targets(browser, ui_server):
         overflow = page.evaluate(
             "document.documentElement.scrollWidth - document.documentElement.clientWidth")
         assert overflow <= 0, f"horizontal overflow at 320px: {overflow}px"
-        for sel in [".page-nav a[aria-current='page']", "#ptt", "#textsend"]:
-            h = page.locator(sel).first.bounding_box()["height"]
-            assert h >= 44, f"{sel} too small at 320px: {h}px"
+        # The Talk route replaces .page-nav with the .command-rail by
+        # design (workspace-shell); the current-section indicator there
+        # is .rail-action-active. Same assertion intent: the operator can
+        # always tell where they are, at touch size.
+        for sel in [".rail-action-active", "#ptt", "#textsend"]:
+            box = page.locator(sel).first.bounding_box()
+            assert box is not None, f"{sel} not visible at 320px"
+            assert box["height"] >= 44, f"{sel} too small at 320px"
         assert not errors, errors
     finally:
         page.close()

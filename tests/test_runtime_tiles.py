@@ -197,13 +197,19 @@ def test_no_upstream_pip_imports_in_product():
 
 
 def test_no_second_memory_or_scheduler():
+    import re
     offenders = []
     for p in _product_sources():
         text = _code_text(p)
-        for mod in ("import schedule", "from apscheduler", "import celery",
+        # Word-boundary matching: the first-party `schedules` module
+        # (relative `from . import schedules`) is not the PyPI `schedule`
+        # package; absolute third-party imports stay banned.
+        for pat in (r"(?<![\w.])import schedule\b(?!s)",
+                    r"(?<![\w.])from schedule import",
+                    "from apscheduler", "import celery",
                     "from croniter", "watchdog.observers"):
-            if mod in text:
-                offenders.append(f"{p}:{mod}")
+            if re.search(pat, text):
+                offenders.append(f"{p}:{pat}")
     assert offenders == [], offenders
 
 

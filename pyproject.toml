@@ -34,6 +34,9 @@ kokoro = []                   # Kokoro TTS ships inside sherpa-onnx; model downl
 test = ["pytest>=8"]
 
 [project.scripts]
+# Canonical public launcher: `qubit` (all user docs reference this name).
+# `voicebridge` remains only as a compatibility alias (same parser/backend).
+qubit = "voicebridge.cli:main"
 voicebridge = "voicebridge.cli:main"
 qubit-dev = "voicebridge.terminal:main"
 

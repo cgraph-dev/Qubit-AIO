@@ -22,7 +22,7 @@ from __future__ import annotations
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 NO_DRIVER_CODE = "COMPUTER_USE_NO_DRIVER"
 
@@ -137,3 +137,48 @@ def refuse_install() -> Dict[str, Any]:
                            "confirmation.",
             "owner": "packet-8V",
             "rollback": "nothing installed; nothing to roll back"}
+
+
+def desktop_session(env: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    """Typed graphical-session identification (read-only probe).
+
+    Distinguishes X11, Wayland, both, and headless from environment +
+    socket evidence — never spawns a process, never touches the session.
+    The supervised Ghost desktop capabilities select their backend from
+    this result; ``none``/``headless`` is a typed refusal reason, never a
+    silent fallback to another display."""
+    import glob as _glob
+
+    source = dict(os.environ) if env is None else dict(env)
+    session_type = (source.get("XDG_SESSION_TYPE", "") or "").strip().lower()
+    wayland_display = (source.get("WAYLAND_DISPLAY", "") or "").strip()
+    x_display = (source.get("DISPLAY", "") or "").strip()
+    x11_sockets = sorted(_glob.glob("/tmp/.X11-unix/X[0-9]*"))
+    wayland_sockets: List[str] = []
+    runtime_dir = (source.get("XDG_RUNTIME_DIR", "") or "").strip()
+    if runtime_dir:
+        wayland_sockets = sorted(_glob.glob(runtime_dir + "/wayland-*"))
+    x11 = bool(x_display or x11_sockets)
+    wayland = bool(wayland_display or wayland_sockets
+                   or session_type == "wayland")
+    if x11 and wayland:
+        kind = "both"
+    elif wayland:
+        kind = "wayland"
+    elif x11:
+        kind = "x11"
+    else:
+        kind = "none"
+    return {"state": "OK", "schema": "qubit-desktop-session/1",
+            "session": kind,
+            "session_type": session_type or "unknown",
+            "x_display": x_display,
+            "wayland_display": wayland_display,
+            "x11_sockets": len(x11_sockets),
+            "wayland_sockets": len(wayland_sockets),
+            "headless": kind == "none",
+            "detail": ("no graphical session: desktop capabilities refuse"
+                       " with NO_DESKTOP until you log into one"
+                       if kind == "none" else
+                       f"{kind} graphical session detected; supervised"
+                       " desktop capabilities select this backend")}

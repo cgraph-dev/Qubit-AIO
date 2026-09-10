@@ -3,11 +3,15 @@
 > **Copy this structure for EVERY coding/agent task.** The orchestrator always keeps the FULL report and speaks only the last 40-word summary. Produce BOTH.
 
 **Task:** <one-line task title>
-**Agent:** <model / backend: openclaw | hermes> — session `<session_key>`
+**Agent:** <Qubit model / capability: Qubit gateway | Qubit agent | Qubit local> — session `<session_key>`
 **Date:** <YYYY-MM-DD HH:MM>
 **Project:** <repo or `~/Projects/...`>
 **Status:** completed | partial | blocked | failed
-**Elapsed:** <Xs>  •  **Route:** <openclaw|hermes|local-script>
+**Elapsed:** <Xs>  •  **Route:** <Qubit gateway | Qubit agent | Qubit local task>
+
+> Provenance note: user-facing reports use Qubit route labels. The exact
+> upstream engine, commit, and provider stay in the machine receipt and
+> audit record (developer/attribution records), never as the agent name.
 
 ## Spoken Summary (last paragraph — max 40 words, spoken aloud)
 > 1–3 sentences: what was done, key files, what the user must do next. This paragraph is extracted and spoken. No markdown, no bullets — plain direct language.

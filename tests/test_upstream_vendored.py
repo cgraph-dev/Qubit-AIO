@@ -275,7 +275,10 @@ def test_matrix_complete_and_honest():
         else:
             assert row.get("reason"), row
     assert implemented >= 10, "too few implemented rows to close 8T-F"
-    assert blocked >= 5, "blocks must be explicit with evidence, not hidden"
+    assert blocked == 0, \
+        f"final parity leaves no BLOCKED rows: {[r['id'] for r in matrix['rows'] if r['status'] == 'BLOCKED']}"
+    assert "REJECTED" not in {r["status"] for r in matrix["rows"]}, \
+        "final parity leaves no REJECTED rows; unsafe variants stay refused by typed errors + absence tests"
     companion = (REPO_ROOT / "docs" / "MATRIX_8T_F.md").read_text()
     for row in matrix["rows"]:
         assert row["id"] in companion, f"id missing from MD: {row['id']}"

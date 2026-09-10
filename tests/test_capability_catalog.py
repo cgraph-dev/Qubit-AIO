@@ -1,9 +1,10 @@
-"""Packet 8T-F — capability catalog: every row typed, owned, explained.
+"""Final parity — capability catalog: every row typed, owned, explained.
 
-Proves no capability is silently omitted: IMPLEMENTED rows route to real
-Qubit behavior, BLOCKED/REJECTED rows return typed codes with owner,
-rollback, and user explanation, and unknown names fail closed. CLI and
-dashboard read the same backend module.
+Proves no capability is silently omitted: every row is IMPLEMENTED and
+routes to real Qubit behavior (safe equivalents for formerly risky
+upstream behavior; the unsafe variants stay refused by typed errors +
+absence tests), and unknown names fail closed. CLI and dashboard read
+the same backend module.
 """
 from __future__ import annotations
 
@@ -40,14 +41,17 @@ def test_every_row_fully_evidenved():
 def test_check_semantics_per_state():
     ok = check("chat")
     assert ok["state"] == "IMPLEMENTED" and ok["code"] == "OK"
-    blocked = check("H-stream")
-    assert blocked["state"] == "BLOCKED"
-    assert blocked["code"].startswith("BLOCKED_")
-    assert "owner" in blocked and "rollback" in blocked
-    assert blocked["explanation"]
-    rejected = check("H-cloudmem")
-    assert rejected["state"] == "REJECTED"
-    assert rejected["code"].startswith("REJECTED_")
+    # Final parity: former BLOCKED/REJECTED rows resolve to safe Qubit
+    # equivalents (IMPLEMENTED with proof); the unsafe variants stay
+    # refused by typed errors + absence tests elsewhere.
+    stream = check("H-stream")
+    assert stream["state"] == "IMPLEMENTED"
+    assert stream["code"] == "OK"
+    assert "owner" in stream and "rollback" in stream
+    assert stream["explanation"]
+    cloudmem = check("H-cloudmem")
+    assert cloudmem["state"] == "IMPLEMENTED"
+    assert cloudmem["code"] == "OK"
     unknown = check("speak-to-mars")
     assert unknown["state"] == "UNKNOWN_CAPABILITY"
     assert unknown["code"] == "UNKNOWN_CAPABILITY"
@@ -64,7 +68,7 @@ def test_model_output_cannot_widen_via_catalog():
 def test_summary_counts_match_matrix():
     s = summary()
     assert s["total"] > 100 and len(list_names()) > 100
-    assert set(s["states"]) == {"IMPLEMENTED", "BLOCKED", "REJECTED"}
+    assert set(s["states"]) == {"IMPLEMENTED"}
 
 
 def test_cli_capability_command():
@@ -82,7 +86,7 @@ def test_cli_capability_command():
     assert json.loads(buf.getvalue())["total"] > 100
     buf = io.StringIO()
     with redirect_stdout(buf):
-        assert _cmd_capability("list", "", "BLOCKED") == 0
+        assert _cmd_capability("list", "", "IMPLEMENTED") == 0
     assert "H-stream" in buf.getvalue().split()
 
 
