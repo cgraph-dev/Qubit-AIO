@@ -4,6 +4,7 @@ complete -c qubit -n '__fish_use_subcommand' -f -a acp
 complete -c qubit -n '__fish_use_subcommand' -f -a actions
 complete -c qubit -n '__fish_use_subcommand' -f -a agent
 complete -c qubit -n '__fish_use_subcommand' -f -a approvals
+complete -c qubit -n '__fish_use_subcommand' -f -a ask
 complete -c qubit -n '__fish_use_subcommand' -f -a asr-test
 complete -c qubit -n '__fish_use_subcommand' -f -a audio
 complete -c qubit -n '__fish_use_subcommand' -f -a auth
@@ -16,6 +17,7 @@ complete -c qubit -n '__fish_use_subcommand' -f -a checkpoints
 complete -c qubit -n '__fish_use_subcommand' -f -a completion
 complete -c qubit -n '__fish_use_subcommand' -f -a computer-use
 complete -c qubit -n '__fish_use_subcommand' -f -a device
+complete -c qubit -n '__fish_use_subcommand' -f -a documents
 complete -c qubit -n '__fish_use_subcommand' -f -a enroll
 complete -c qubit -n '__fish_use_subcommand' -f -a experiments
 complete -c qubit -n '__fish_use_subcommand' -f -a export-state
@@ -53,18 +55,21 @@ complete -c qubit -n '__fish_use_subcommand' -f -a product
 complete -c qubit -n '__fish_use_subcommand' -f -a profile
 complete -c qubit -n '__fish_use_subcommand' -f -a project
 complete -c qubit -n '__fish_use_subcommand' -f -a proxy
+complete -c qubit -n '__fish_use_subcommand' -f -a recall
 complete -c qubit -n '__fish_use_subcommand' -f -a roundtrip
 complete -c qubit -n '__fish_use_subcommand' -f -a run
 complete -c qubit -n '__fish_use_subcommand' -f -a runtime
 complete -c qubit -n '__fish_use_subcommand' -f -a schedules
 complete -c qubit -n '__fish_use_subcommand' -f -a sessions
 complete -c qubit -n '__fish_use_subcommand' -f -a setup
+complete -c qubit -n '__fish_use_subcommand' -f -a shares
 complete -c qubit -n '__fish_use_subcommand' -f -a skills
 complete -c qubit -n '__fish_use_subcommand' -f -a status
 complete -c qubit -n '__fish_use_subcommand' -f -a sync
 complete -c qubit -n '__fish_use_subcommand' -f -a task
 complete -c qubit -n '__fish_use_subcommand' -f -a tasks
 complete -c qubit -n '__fish_use_subcommand' -f -a theme
+complete -c qubit -n '__fish_use_subcommand' -f -a transfers
 complete -c qubit -n '__fish_use_subcommand' -f -a tts-test
 complete -c qubit -n '__fish_use_subcommand' -f -a tui
 complete -c qubit -n '__fish_use_subcommand' -f -a verified-skills

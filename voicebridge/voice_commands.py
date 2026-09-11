@@ -2967,6 +2967,256 @@ def _b_acp_client(ctx, args):
             "detail": f"unknown ACP client action {action!r}"}
 
 
+def _ft_default_node(cfg: Any) -> str:
+    """First local (loopback) enrolled node id, else the first node, else "".
+
+    Voice never names a raw endpoint: file transfer only ever targets an
+    enrolled node, and Qubit only reads a confined node on the local host.
+    """
+    from . import file_transfer as FT
+    from . import node_host as NH
+
+    try:
+        recs = NH._load(cfg).get("nodes", {})
+    except Exception:
+        return ""
+    for node_id, rec in recs.items():
+        if isinstance(rec, dict) and FT._is_local(rec):
+            return str(node_id)
+    return str(next(iter(recs), "") or "")
+
+
+def _as_int(value: Any, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _b_file_transfer(ctx, args):
+    """Node-host file transfer (same module the CLI/dashboard use).
+
+    Reads (status/list/resume) execute directly. ``fetch`` and ``stream_plan``
+    are confirm-tier (the registry gate already ran, so ``confirmed=True``):
+    fetch returns a bounded chunk; stream_plan persists a digests-only plan.
+    Raw file bytes are never spoken (the guard entry documents that); the
+    summary reports size/digest only. Typed failures return redacted dicts.
+    """
+    from . import file_transfer as FT
+
+    cfg = ctx.cfg
+    action = str(args.get("action", "status") or "status")
+    node_id = str(args.get("node_id", "") or "") or _ft_default_node(cfg)
+    try:
+        if action == "status":
+            return {"file_transfer": FT.status(cfg)}
+        if action == "list":
+            return {"file_transfer": FT.list_directory(
+                cfg, node_id, str(args.get("path", "") or ""),
+                limit=_as_int(args.get("limit"), FT.MAX_LIST_ENTRIES))}
+        if action == "fetch":
+            return {"file_transfer": FT.fetch(
+                cfg, node_id, str(args.get("path", "") or ""),
+                offset=_as_int(args.get("offset"), 0),
+                max_bytes=_as_int(args.get("max_bytes"),
+                                  FT.DEFAULT_FETCH_BYTES),
+                confirmed=True)}
+        if action == "plan":
+            return {"file_transfer": FT.stream_plan(
+                cfg, node_id, str(args.get("path", "") or ""),
+                chunk_size=_as_int(args.get("chunk_size"),
+                                   FT.DEFAULT_CHUNK_BYTES))}
+        if action == "resume":
+            return {"file_transfer": FT.resume(
+                cfg, node_id, str(args.get("transfer_id", "") or ""),
+                offset=_as_int(args.get("offset"), 0))}
+    except FT.FileTransferError as exc:
+        return {"file_transfer": {
+            "state": "FAILED", "code": exc.code,
+            "detail": _redact(exc.detail)[:300], "owner": "qubit-policy",
+            "rollback": "nothing was read or transferred"}}
+    return {"file_transfer": {
+        "state": "FAILED", "code": FT.FILE_TRANSFER_BAD_INPUT,
+        "detail": f"unknown file transfer action {action!r}",
+        "owner": "qubit-policy",
+        "rollback": "nothing was read or transferred"}}
+
+
+def _as_optional_float(value: Any):
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_optional_int(value: Any):
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_optional_bool(value: Any):
+    if value in (None, ""):
+        return None
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in (
+        "on", "true", "yes", "enable", "enabled", "session", "scoped")
+
+
+def _b_active_memory(ctx, args):
+    """Active-recall memory layer (same module the CLI/dashboard use).
+
+    Reads (status/policy_get/recall/resolve) execute directly. ``policy_set``
+    and ``escalate`` are confirm-tier (the registry gate already ran, so
+    ``confirmed=True``). Typed gates (disabled/estop/corrupt/empty) pass
+    through as redacted dicts; the module never raises out for these paths.
+    """
+    from . import active_memory as AM
+
+    cfg = ctx.cfg
+    action = str(args.get("action", "status") or "status")
+    if action == "status":
+        return {"active_memory": AM.status(cfg)}
+    if action == "policy_get":
+        return {"active_memory": AM.policy_get(cfg)}
+    if action == "policy_set":
+        return {"active_memory": AM.policy_set(
+            cfg, enabled=_as_optional_bool(args.get("enabled")),
+            min_score=_as_optional_float(args.get("min_score")),
+            max_items=_as_optional_int(args.get("max_items")),
+            session_scoped=_as_optional_bool(args.get("session_scoped")),
+            confirmed=True)}
+    if action == "recall":
+        return {"active_memory": AM.recall(
+            cfg, str(args.get("query", "") or ""),
+            session=str(args.get("session", "") or ""),
+            limit=_as_optional_int(args.get("limit")))}
+    if action == "resolve":
+        return {"active_memory": AM.resolve(
+            cfg, str(args.get("query", "") or ""),
+            session=str(args.get("session", "") or ""))}
+    if action == "escalate":
+        return {"active_memory": AM.escalate(
+            cfg, _as_int(args.get("memory_id"), 0),
+            reason=str(args.get("reason", "") or ""), confirmed=True)}
+    return {"active_memory": {
+        "state": "FAILED", "code": AM.BAD_INPUT_CODE,
+        "detail": f"unknown active memory action {action!r}",
+        "results": [], "blocks": [], "refs": []}}
+
+
+def _b_doc_extract(ctx, args):
+    """Bounded document extraction (same module the CLI/dashboard use).
+
+    ``status``/``kinds`` are reads; ``extract`` is confirm-tier (the registry
+    gate already ran, so ``confirmed=True``). Typed ``DocExtractError`` codes
+    are returned as redacted dicts; extraction never fabricates text.
+    """
+    from . import doc_extract as DE
+
+    cfg = ctx.cfg
+    action = str(args.get("action", "status") or "status")
+    if action == "status":
+        return {"documents": DE.status(cfg)}
+    if action == "kinds":
+        return {"documents": DE.kinds(cfg)}
+    if action == "extract":
+        try:
+            return {"documents": DE.extract(
+                cfg, str(args.get("path", "") or ""),
+                max_chars=_as_int(args.get("max_chars"),
+                                  DE.DEFAULT_MAX_CHARS),
+                page=_as_optional_int(args.get("page")), confirmed=True)}
+        except DE.DocExtractError as exc:
+            return {"documents": {
+                "state": "FAILED", "code": exc.code,
+                "detail": _redact(exc.detail)[:300], "owner": "qubit-policy",
+                "rollback": "nothing was extracted"}}
+    return {"documents": {
+        "state": "FAILED", "code": DE.BAD_INPUT_CODE,
+        "detail": f"unknown documents action {action!r}",
+        "owner": "qubit-policy", "rollback": "nothing was extracted"}}
+
+
+def _b_question_prompt(ctx, args):
+    """Structured question prompts (same module the CLI/dashboard use).
+
+    ``status``/``pending`` are reads; ``ask`` is confirm-tier (the registry
+    gate already ran, so ``confirmed=True``) and builds a single free-text
+    question from the spoken text. Structured answer maps (nested JSON) cannot
+    be spoken: that op is a typed voice guard, never a bound payload.
+    """
+    from . import question_prompt as QP
+
+    cfg = ctx.cfg
+    action = str(args.get("action", "status") or "status")
+    try:
+        if action == "status":
+            return {"questions": QP.status(cfg)}
+        if action == "pending":
+            return {"questions": QP.pending(cfg)}
+        if action == "render":
+            return {"questions": {
+                "state": "OK", "schema": "qubit-question-render/1",
+                "text": QP.render(args.get("contract") or {})}}
+        if action == "ask":
+            text = str(args.get("question", "") or "").strip()
+            return {"questions": QP.ask(
+                cfg, [{"text": text, "kind": "text"}],
+                session=str(args.get("session", "") or ""), confirmed=True)}
+    except QP.QuestionError as exc:
+        return {"questions": {
+            "state": "FAILED", "code": exc.code,
+            "detail": _redact(exc.detail)[:300], "owner": "qubit-policy",
+            "rollback": "prompt store untouched"}}
+    return {"questions": {
+        "state": "FAILED", "code": QP.BAD_INPUT_CODE,
+        "detail": f"unknown question action {action!r}",
+        "owner": "qubit-policy", "rollback": "prompt store untouched"}}
+
+
+def _b_session_share(ctx, args):
+    """Qubit-safe session sharing (same module the CLI/dashboard use).
+
+    Reads (status/list/resolve) execute directly; ``publish``/``revoke``/
+    ``purge`` are confirm-tier (the registry gate already ran, so
+    ``confirmed=True``). Tokens are never rendered in list/status; a spoken
+    share-token resolve is impossible (guard entry documents that).
+    """
+    from . import session_share as SS
+
+    cfg = ctx.cfg
+    action = str(args.get("action", "status") or "status")
+    if action == "status":
+        return {"session_share": SS.status(cfg)}
+    if action == "list":
+        return {"session_share": SS.list_shares(cfg)}
+    if action == "publish":
+        return {"session_share": SS.publish(
+            cfg, str(args.get("session_id", "") or ""),
+            ttl_s=_as_optional_float(args.get("ttl_s")) or SS.DEFAULT_TTL_S,
+            confirmed=True)}
+    if action == "revoke":
+        return {"session_share": SS.revoke(
+            cfg, str(args.get("share_id", "") or ""), confirmed=True)}
+    if action == "resolve":
+        return {"session_share": SS.resolve(
+            cfg, str(args.get("share_id", "") or ""),
+            str(args.get("token", "") or ""))}
+    if action == "purge":
+        return {"session_share": SS.purge_expired(cfg)}
+    return {"session_share": {
+        "state": "FAILED", "code": SS.BAD_INPUT_CODE,
+        "detail": f"unknown session share action {action!r}",
+        "owner": "qubit-policy", "rollback": "share store untouched"}}
+
+
 _BACKENDS: Dict[str, Callable] = {
     "status": _b_status, "pause": _b_pause, "resume": _b_resume,
     "doctor": _b_doctor, "setup_check": _b_setup_check,
@@ -3017,6 +3267,9 @@ _BACKENDS: Dict[str, Callable] = {
     "media_gen": _b_media_gen, "local_models": _b_local_models,
     "plugin_runtime": _b_plugin_runtime, "channels": _b_channels,
     "acp_client": _b_acp_client,
+    "file_transfer": _b_file_transfer, "active_memory": _b_active_memory,
+    "doc_extract": _b_doc_extract, "question_prompt": _b_question_prompt,
+    "session_share": _b_session_share,
 }
 
 
@@ -5870,6 +6123,160 @@ _E("acp_client_receipts", "Harness receipts",
    help="Redacted ACP receipts (bounded tail).")
 
 
+# --- OpenClaw delta Wave 3 (D3/D4/D20/D21/D24): node-host file transfer,
+# active-recall memory, bounded document extraction, structured question
+# prompts, and Qubit-safe session sharing. Every entry executes the SAME
+# backend module function the CLI and dashboard call; raw-byte/secret/nested
+# ops get typed guards instead of binding the unsafe payload.
+
+_E("transfers_status", "File transfer status",
+   ("transfer status", "file transfer status", "node transfer status"),
+   "file_transfer", (),
+   fixed=(("action", "status"),),
+   examples=("qubit, transfer status",),
+   help="Node transport inventory; remote transport is UNAVAILABLE.")
+_E("transfers_list", "List node files",
+   ("list node files", "list transfer folder", "list node directory"),
+   "file_transfer", (),
+   args=(_R("path"),), fixed=(("action", "list"),), split="path",
+   examples=("qubit, list node files /tmp/work",),
+   help="Bounded, confined directory listing for a local node.")
+_E("transfers_fetch", "Fetch file chunk",
+   ("fetch file chunk", "download file chunk", "fetch node file"),
+   "file_transfer", (),
+   args=(_R("path"),), fixed=(("action", "fetch"),), confirm=True,
+   split="path",
+   examples=("qubit, fetch file chunk /tmp/work/notes.txt",),
+   help="Confirmed bounded chunk read; summary reports size/digest only.")
+_E("transfers_plan", "Plan file transfer",
+   ("plan file transfer", "plan file stream", "plan file download"),
+   "file_transfer", (),
+   args=(_R("path"),), fixed=(("action", "plan"),), confirm=True,
+   split="path",
+   examples=("qubit, plan file transfer /tmp/work/notes.txt",),
+   help="Confirmed resumable plan (digests only; no payload).")
+_E("transfers_resume", "Resume file transfer",
+   ("resume file transfer", "resume transfer"),
+   "file_transfer", (),
+   args=(_R("transfer_id"),), fixed=(("action", "resume"),),
+   examples=("qubit, resume file transfer xfer_abc",),
+   help="Validate a persisted plan and return the next chunk spec.")
+
+_E("recall_status", "Active recall status",
+   ("active recall status", "recall status", "active memory status"),
+   "active_memory", (),
+   fixed=(("action", "status"),),
+   examples=("qubit, active recall status",),
+   help="Policy/store health; never fabricates a count.")
+_E("recall_policy_get", "Show recall policy",
+   ("show recall policy", "active memory policy", "recall policy status"),
+   "active_memory", (),
+   fixed=(("action", "policy_get"),),
+   examples=("qubit, show recall policy",),
+   help="Persisted active-recall policy (redacted).")
+_E("recall_policy_set", "Set recall policy",
+   ("set recall policy", "turn active recall on", "turn active recall off",
+    "recall policy on", "recall policy off"),
+   "active_memory", (),
+   args=(_C("enabled", ("on", "off")),
+         _I("max_items", required=False),
+         _C("session_scoped", ("session", "global"), required=False)),
+   fixed=(("action", "policy_set"),), confirm=True,
+   examples=("qubit, turn active recall on",),
+   help="Confirmed bounded policy update (enable/disable, cap, scope).")
+_E("recall_query", "Active recall",
+   ("recall memories", "search active memory", "active memory recall"),
+   "active_memory", (),
+   args=(_R("query"),), fixed=(("action", "recall"),),
+   examples=("qubit, recall memories invoices",),
+   help="Policy-scoped, bounded, redacted recall results.")
+_E("recall_resolve", "Resolve recall context",
+   ("resolve recall context", "active recall context",
+    "resolve active memory"),
+   "active_memory", (),
+   args=(_R("query"),), fixed=(("action", "resolve"),),
+   examples=("qubit, resolve recall context invoices",),
+   help="Bounded prompt-context blocks from active recall.")
+_E("recall_escalate", "Escalate memory",
+   ("escalate memory", "promote memory"),
+   "active_memory", (),
+   args=(_I("memory_id"), _R("reason")), fixed=(("action", "escalate"),),
+   confirm=True, split="int-rest",
+   examples=("qubit, escalate memory 3 reason important",),
+   help="Confirmed one-step tier escalation toward core.")
+
+_E("documents_status", "Document tools status",
+   ("document status", "document tools status",
+    "document extraction status"),
+   "doc_extract", (),
+   fixed=(("action", "status"),),
+   examples=("qubit, document status",),
+   help="Supported kinds and optional PDF backend state.")
+_E("documents_kinds", "Document kinds",
+   ("list document kinds", "supported documents", "document kinds"),
+   "doc_extract", (),
+   fixed=(("action", "kinds"),),
+   examples=("qubit, list document kinds",),
+   help="Kinds supported for bounded extraction.")
+_E("documents_extract", "Extract document",
+   ("extract document", "read document", "extract pdf"),
+   "doc_extract", (),
+   args=(_R("path"),), fixed=(("action", "extract"),), confirm=True,
+   split="path",
+   examples=("qubit, extract document /tmp/work/notes.txt",),
+   help="Confirmed bounded, redacted extraction inside approved roots.")
+
+_E("questions_status", "Question prompt status",
+   ("question status", "question prompt status", "ask user status"),
+   "question_prompt", (),
+   fixed=(("action", "status"),),
+   examples=("qubit, question status",),
+   help="Pending count, kinds, TTL, and latch.")
+_E("questions_ask", "Ask a question",
+   ("ask a question", "ask me a question", "create a question prompt"),
+   "question_prompt", (),
+   args=(_R("question"),), fixed=(("action", "ask"),), confirm=True,
+   examples=("qubit, ask a question which branch",),
+   help="Confirmed single free-text question contract.")
+_E("questions_pending", "List pending questions",
+   ("list pending questions", "pending questions", "list question prompts"),
+   "question_prompt", (),
+   fixed=(("action", "pending"),),
+   examples=("qubit, list pending questions",),
+   help="Unanswered, unexpired prompt contracts.")
+
+_E("shares_status", "Session share status",
+   ("share status", "session share status", "sharing status"),
+   "session_share", (),
+   fixed=(("action", "status"),),
+   examples=("qubit, share status",),
+   help="Share-store health and counts (never tokens).")
+_E("shares_publish", "Publish session share",
+   ("publish session share", "share session", "publish a session share"),
+   "session_share", (),
+   args=(_R("session_id"),), fixed=(("action", "publish"),), confirm=True,
+   examples=("qubit, share session 12",),
+   help="Confirmed redacted transcript snapshot; token shown once.")
+_E("shares_list", "List session shares",
+   ("list session shares", "list shares", "show session shares"),
+   "session_share", (),
+   fixed=(("action", "list"),),
+   examples=("qubit, list session shares",),
+   help="Redacted share records; no tokens or hashes.")
+_E("shares_revoke", "Revoke session share",
+   ("revoke session share", "revoke share", "unshare session"),
+   "session_share", (),
+   args=(_R("share_id"),), fixed=(("action", "revoke"),), confirm=True,
+   examples=("qubit, revoke share shr_abc",),
+   help="Confirmed tombstone; record retained.")
+_E("shares_purge", "Purge expired shares",
+   ("purge expired shares", "clean up session shares", "purge shares"),
+   "session_share", (),
+   fixed=(("action", "purge"),), confirm=True,
+   examples=("qubit, purge expired shares",),
+   help="Confirmed removal of expired share records.")
+
+
 
 # ---------------------------------------------------------------- coverage
 # Chat-flag rows have no distinct voice command: voice IS the chat
@@ -6061,6 +6468,14 @@ CLI_COVERAGE = {
                      "local_models_sideload", "local_models_server",
                      "local_models_eject", "local_models_activate",
                      "local_models_quickstart"),
+    "transfers": ("transfers_status", "transfers_list", "transfers_fetch",
+                  "transfers_plan", "transfers_resume"),
+    "recall": ("recall_status", "recall_policy_get", "recall_policy_set",
+               "recall_query", "recall_resolve", "recall_escalate"),
+    "documents": ("documents_status", "documents_kinds", "documents_extract"),
+    "ask": ("questions_status", "questions_ask", "questions_pending"),
+    "shares": ("shares_status", "shares_publish", "shares_list",
+               "shares_revoke", "shares_purge"),
     "agent": (),
 }
 
@@ -6125,6 +6540,21 @@ VOICE_IMPOSSIBLE = {
     "channels.receive": "raw signed channel payloads: use the dashboard "
                         "channel ingress endpoint (POST /channels/<channel>) "
                         "or `qubit channels receive` in a terminal",
+    # raw file bytes are base64 payloads: the confirmed voice fetch reports
+    # only size/digest; the actual bytes stay on CLI/dashboard
+    "transfers.fetch": "raw file bytes (base64) cannot be spoken: the "
+                       "confirmed voice fetch reports size and digest only. "
+                       "Use `qubit transfers fetch` or the dashboard for "
+                       "the bytes",
+    # a multi-question answer map is nested JSON and cannot be spoken
+    "ask.answer": "structured answer maps (nested JSON) cannot be spoken: "
+                  "use `qubit ask answer <prompt_id> --answers-file <json>` "
+                  "or the dashboard question form",
+    # a share bearer token is a secret and must never be spoken
+    "shares.resolve": "a share bearer token is a secret and is never spoken: "
+                      "open the /share/<id> URL with the token, or use "
+                      "`qubit shares resolve <id> --token-file <path>` in a "
+                      "terminal",
     # the Qubit Agent runtime is a raw CLI passthrough (verbatim argv);
     # a spoken turn cannot name it unambiguously or safely
     "agent": "the Qubit Agent runtime is a raw CLI passthrough: run "
@@ -6229,6 +6659,23 @@ VOICE_GUARDS: Dict[str, Dict[str, Any]] = {
         "guidance": "structured diffs: use the dashboard file form or "
                     "`qubit files patch --patch-file` in a terminal",
         "code": "VOICE_NESTED_UNSUPPORTED",
+    },
+    "transfers_fetch_raw": {
+        "aliases": ("read raw file bytes", "speak raw file bytes",
+                    "show raw file bytes"),
+        "guidance": VOICE_IMPOSSIBLE["transfers.fetch"],
+        "code": "VOICE_BYTES_UNSUPPORTED",
+    },
+    "ask_answer": {
+        "aliases": ("answer with structured answers",
+                    "record structured answers"),
+        "guidance": VOICE_IMPOSSIBLE["ask.answer"],
+        "code": "VOICE_NESTED_UNSUPPORTED",
+    },
+    "shares_resolve": {
+        "aliases": ("open a shared session", "view a shared session"),
+        "guidance": VOICE_IMPOSSIBLE["shares.resolve"],
+        "code": "PASSPHRASE_NEVER_SPOKEN",
     },
 }
 

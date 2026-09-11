@@ -4,6 +4,7 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a acp
 complete -c voicebridge -n '__fish_use_subcommand' -f -a actions
 complete -c voicebridge -n '__fish_use_subcommand' -f -a agent
 complete -c voicebridge -n '__fish_use_subcommand' -f -a approvals
+complete -c voicebridge -n '__fish_use_subcommand' -f -a ask
 complete -c voicebridge -n '__fish_use_subcommand' -f -a asr-test
 complete -c voicebridge -n '__fish_use_subcommand' -f -a audio
 complete -c voicebridge -n '__fish_use_subcommand' -f -a auth
@@ -16,6 +17,7 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a checkpoints
 complete -c voicebridge -n '__fish_use_subcommand' -f -a completion
 complete -c voicebridge -n '__fish_use_subcommand' -f -a computer-use
 complete -c voicebridge -n '__fish_use_subcommand' -f -a device
+complete -c voicebridge -n '__fish_use_subcommand' -f -a documents
 complete -c voicebridge -n '__fish_use_subcommand' -f -a enroll
 complete -c voicebridge -n '__fish_use_subcommand' -f -a experiments
 complete -c voicebridge -n '__fish_use_subcommand' -f -a export-state
@@ -53,18 +55,21 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a product
 complete -c voicebridge -n '__fish_use_subcommand' -f -a profile
 complete -c voicebridge -n '__fish_use_subcommand' -f -a project
 complete -c voicebridge -n '__fish_use_subcommand' -f -a proxy
+complete -c voicebridge -n '__fish_use_subcommand' -f -a recall
 complete -c voicebridge -n '__fish_use_subcommand' -f -a roundtrip
 complete -c voicebridge -n '__fish_use_subcommand' -f -a run
 complete -c voicebridge -n '__fish_use_subcommand' -f -a runtime
 complete -c voicebridge -n '__fish_use_subcommand' -f -a schedules
 complete -c voicebridge -n '__fish_use_subcommand' -f -a sessions
 complete -c voicebridge -n '__fish_use_subcommand' -f -a setup
+complete -c voicebridge -n '__fish_use_subcommand' -f -a shares
 complete -c voicebridge -n '__fish_use_subcommand' -f -a skills
 complete -c voicebridge -n '__fish_use_subcommand' -f -a status
 complete -c voicebridge -n '__fish_use_subcommand' -f -a sync
 complete -c voicebridge -n '__fish_use_subcommand' -f -a task
 complete -c voicebridge -n '__fish_use_subcommand' -f -a tasks
 complete -c voicebridge -n '__fish_use_subcommand' -f -a theme
+complete -c voicebridge -n '__fish_use_subcommand' -f -a transfers
 complete -c voicebridge -n '__fish_use_subcommand' -f -a tts-test
 complete -c voicebridge -n '__fish_use_subcommand' -f -a tui
 complete -c voicebridge -n '__fish_use_subcommand' -f -a verified-skills

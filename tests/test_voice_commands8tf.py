@@ -145,6 +145,11 @@ MUTATING_ACTIONS = {
     "plugin_runtime": {"register", "invoke", "unregister"},
     "channels": {"configure", "unconfigure"},
     "acp_client": {"configure", "unconfigure", "handshake", "send"},
+    "file_transfer": {"fetch", "plan"},
+    "active_memory": {"policy_set", "escalate"},
+    "doc_extract": {"extract"},
+    "question_prompt": {"ask"},
+    "session_share": {"publish", "revoke", "purge"},
 }
 
 
@@ -565,6 +570,33 @@ COMPLETE_EXAMPLES = {
     "acp_client_handshake": "qubit, harness handshake claude-code",
     "acp_client_send": "qubit, send to harness claude-code hello",
     "acp_client_receipts": "qubit, harness receipts",
+    # --- Wave 3 OpenClaw deltas: file transfer / active recall / documents /
+    # question prompts / session sharing + their raw-byte/nested/secret guards
+    "transfers_status": "qubit, transfer status",
+    "transfers_list": "qubit, list node files /tmp/work",
+    "transfers_fetch": "qubit, fetch file chunk /tmp/work/notes.txt",
+    "transfers_plan": "qubit, plan file transfer /tmp/work/notes.txt",
+    "transfers_resume": "qubit, resume file transfer xfer_abc",
+    "recall_status": "qubit, active recall status",
+    "recall_policy_get": "qubit, show recall policy",
+    "recall_policy_set": "qubit, turn active recall on",
+    "recall_query": "qubit, recall memories invoices",
+    "recall_resolve": "qubit, resolve recall context invoices",
+    "recall_escalate": "qubit, escalate memory 3 reason important",
+    "documents_status": "qubit, document status",
+    "documents_kinds": "qubit, list document kinds",
+    "documents_extract": "qubit, extract document /tmp/work/notes.txt",
+    "questions_status": "qubit, question status",
+    "questions_ask": "qubit, ask a question which branch",
+    "questions_pending": "qubit, list pending questions",
+    "shares_status": "qubit, share status",
+    "shares_publish": "qubit, share session 12",
+    "shares_list": "qubit, list session shares",
+    "shares_revoke": "qubit, revoke share shr_abc",
+    "shares_purge": "qubit, purge expired shares",
+    "guard_transfers_fetch_raw": "qubit, read raw file bytes",
+    "guard_ask_answer": "qubit, answer with structured answers",
+    "guard_shares_resolve": "qubit, open a shared session",
 }
 
 

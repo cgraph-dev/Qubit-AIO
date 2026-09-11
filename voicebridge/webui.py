@@ -1113,6 +1113,32 @@ class WebUIHandler(BaseHTTPRequestHandler):
             return
         self._json(out, code)
 
+    # -- public read-only session share ----------------------------------
+    def _public_share(self, path: str) -> None:
+        """GET /share/<share_id>?token=... — public, token-scoped read-only
+        session transcript share.
+
+        Authentication is the share token in the query string, NEVER the
+        dashboard token. Unknown/expired/revoked/bad tokens fail closed with
+        a typed code; one share can never read another session.
+        """
+        raw = path
+        target = raw.split("?", 1)[0]
+        query: Dict[str, str] = {}
+        if "?" in raw:
+            import urllib.parse as _up
+            query = dict(_up.parse_qsl(raw.split("?", 1)[1],
+                                       keep_blank_values=True))
+        try:
+            from . import hermes_compat as HC
+            code, out = HC.dispatch(self.app.orch.cfg, "GET", target,
+                                    query, {})
+        except Exception as exc:
+            self._json({"ok": False, "code": "EXECUTOR_ERROR",
+                        "detail": redact_obj(str(exc))[:200]}, 500)
+            return
+        self._json(out, code)
+
     # -- signed inbound webhook ingress ----------------------------------
     def _webhook_ingress(self, path: str) -> None:
         """POST /hooks/<sub_id> (alias /hermes/hooks/<sub_id>).
@@ -1968,6 +1994,11 @@ class WebUIHandler(BaseHTTPRequestHandler):
             from . import lifecycle as LC
             self._json(LC.diagnostic_bundle(self.app.orch.cfg))
 
+        elif path.startswith("/share/"):
+            # Public read-only session share: auth is the share token in the
+            # query, never the dashboard token (owner directive: public share
+            # URL). Typed gates; no cross-session access.
+            self._public_share(path)
         elif path == "/hermes" or path.startswith("/hermes/"):
             # Vendored Hermes dashboard (amendment 2026-09-11): same-origin
             # /hermes/api/* compat backend + overlay plugins; the classic

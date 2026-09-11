@@ -2153,6 +2153,137 @@ def build_parser() -> argparse.ArgumentParser:
                       help="latch an immediate stop (reset required)")
     oc_sub.add_parser("reset", parents=[common],
                       help="clear enablement + emergency-stop latch (returns to disabled)")
+    tr = add("transfers", help="Node-host file transfer: confined list, "
+             "bounded confirmed fetch, resumable plan/resume (same backend "
+             "as voice/dashboard; local nodes only)")
+    tr_sub = tr.add_subparsers(dest="transfers_command")
+    tr_sub.add_parser("status", parents=[common],
+                      help="typed transfer inventory (read-only)")
+    tr_list = tr_sub.add_parser("list", parents=[common],
+                                help="bounded confined directory listing "
+                                     "(read-only)")
+    tr_list.add_argument("path", help="absolute path inside an approved root")
+    tr_list.add_argument("--node", default="", help="enrolled node id (default: first local)")
+    tr_list.add_argument("--limit", type=int, default=200)
+    tr_fetch = tr_sub.add_parser("fetch", parents=[common],
+                                 help="confirmed bounded chunk read "
+                                      "(base64 + SHA-256; --confirm)")
+    tr_fetch.add_argument("path")
+    tr_fetch.add_argument("--node", default="")
+    tr_fetch.add_argument("--offset", type=int, default=0)
+    tr_fetch.add_argument("--max-bytes", type=int, default=None)
+    tr_fetch.add_argument("--confirm", action="store_true")
+    tr_plan = tr_sub.add_parser("plan", parents=[common],
+                                help="confirmed resumable transfer plan "
+                                     "(digests only; --confirm)")
+    tr_plan.add_argument("path")
+    tr_plan.add_argument("--node", default="")
+    tr_plan.add_argument("--chunk-size", type=int, default=None)
+    tr_plan.add_argument("--confirm", action="store_true")
+    tr_resume = tr_sub.add_parser("resume", parents=[common],
+                                  help="next chunk spec for a persisted plan "
+                                       "(read-only)")
+    tr_resume.add_argument("transfer_id")
+    tr_resume.add_argument("--node", default="")
+    tr_resume.add_argument("--offset", type=int, default=0)
+    rc = add("recall", help="Active-recall memory: session policy, bounded "
+             "recall/resolve, confirmation-gated escalation "
+             "(same store as memory/CLI/voice)")
+    rc_sub = rc.add_subparsers(dest="recall_command")
+    rc_sub.add_parser("status", parents=[common],
+                      help="policy/store health (read-only)")
+    rc_sub.add_parser("policy-get", parents=[common],
+                      help="show the persisted active-recall policy (read-only)")
+    rc_pol = rc_sub.add_parser("policy-set", parents=[common],
+                               help="bounded policy update (needs --confirm)")
+    rc_pol.add_argument("--enable", action="store_true")
+    rc_pol.add_argument("--disable", action="store_true")
+    rc_pol.add_argument("--min-score", type=float, default=None)
+    rc_pol.add_argument("--max-items", type=int, default=None)
+    rc_pol.add_argument("--session-scoped", action="store_true")
+    rc_pol.add_argument("--global-scope", action="store_true")
+    rc_pol.add_argument("--confirm", action="store_true")
+    rc_q = rc_sub.add_parser("recall", parents=[common],
+                             help="policy-scoped, bounded, redacted recall "
+                                  "(read-only)")
+    rc_q.add_argument("query")
+    rc_q.add_argument("--session", default="")
+    rc_q.add_argument("--limit", type=int, default=None)
+    rc_res = rc_sub.add_parser("resolve", parents=[common],
+                               help="bounded prompt-context blocks (read-only)")
+    rc_res.add_argument("query")
+    rc_res.add_argument("--session", default="")
+    rc_esc = rc_sub.add_parser("escalate", parents=[common],
+                               help="escalate one memory toward core "
+                                    "(needs --confirm)")
+    rc_esc.add_argument("memory_id", type=int)
+    rc_esc.add_argument("--reason", required=True)
+    rc_esc.add_argument("--confirm", action="store_true")
+    dc = add("documents", help="Bounded PDF/transcript/text extraction inside "
+             "approved roots (same backend as voice/dashboard)")
+    dc_sub = dc.add_subparsers(dest="documents_command")
+    dc_sub.add_parser("status", parents=[common],
+                      help="supported kinds + optional PDF backend (read-only)")
+    dc_sub.add_parser("kinds", parents=[common],
+                      help="list supported document kinds (read-only)")
+    dc_ex = dc_sub.add_parser("extract", parents=[common],
+                              help="confirmed bounded extraction (--confirm)")
+    dc_ex.add_argument("path")
+    dc_ex.add_argument("--max-chars", type=int, default=None)
+    dc_ex.add_argument("--page", type=int, default=None,
+                       help="PDF page (1-based); PDFs only")
+    dc_ex.add_argument("--confirm", action="store_true")
+    ak = add("ask", help="Structured question prompts: status/ask/answer/"
+             "pending (same store as voice/dashboard)")
+    ak_sub = ak.add_subparsers(dest="ask_command")
+    ak_sub.add_parser("status", parents=[common],
+                      help="pending count, kinds, TTL, latch (read-only)")
+    ak_sub.add_parser("pending", parents=[common],
+                      help="unanswered, unexpired prompt contracts (read-only)")
+    ak_ask = ak_sub.add_parser("ask", parents=[common],
+                               help="create a single free-text question "
+                                    "(needs --confirm)")
+    ak_ask.add_argument("question")
+    ak_ask.add_argument("--session", default="")
+    ak_ask.add_argument("--confirm", action="store_true")
+    ak_ans = ak_sub.add_parser("answer", parents=[common],
+                               help="record answers for a pending prompt "
+                                    "(JSON map or list)")
+    ak_ans.add_argument("prompt_id")
+    ak_ans.add_argument("--answers", default="",
+                        help="JSON object {\"q1\": ...} or list of "
+                             "{id,value} objects")
+    ak_ans.add_argument("--answers-file", type=Path, default=None,
+                        help="read the answers JSON from this file")
+    sh = add("shares", help="Qubit-safe session shares: publish/list/revoke/"
+             "resolve/purge (locally served, token-scoped, revocable)")
+    sh_sub = sh.add_subparsers(dest="shares_command")
+    sh_sub.add_parser("status", parents=[common],
+                      help="share-store health and counts (read-only)")
+    sh_sub.add_parser("list", parents=[common],
+                      help="redacted share records, no tokens (read-only)")
+    sh_pub = sh_sub.add_parser("publish", parents=[common],
+                               help="snapshot a redacted session as a share "
+                                    "(needs --confirm; token shown once)")
+    sh_pub.add_argument("session_id")
+    sh_pub.add_argument("--ttl-s", type=float, default=None)
+    sh_pub.add_argument("--confirm", action="store_true")
+    sh_rev = sh_sub.add_parser("revoke", parents=[common],
+                               help="revoke a share, tombstone retained "
+                                    "(needs --confirm)")
+    sh_rev.add_argument("share_id")
+    sh_rev.add_argument("--confirm", action="store_true")
+    sh_res = sh_sub.add_parser("resolve", parents=[common],
+                               help="read-only view of a shared session "
+                                    "(token from a file)")
+    sh_res.add_argument("share_id")
+    sh_res.add_argument("--token", default="")
+    sh_res.add_argument("--token-file", type=Path, default=None,
+                        help="read the bearer token from this file (preferred)")
+    sh_purge = sh_sub.add_parser("purge", parents=[common],
+                                 help="drop expired share records "
+                                      "(needs --confirm)")
+    sh_purge.add_argument("--confirm", action="store_true")
     ag = add("agent", help="Qubit Agent runtime: agent loop, sessions, tools, skills, models, memory, tasks and CLI all execute from the Qubit source tree")
     ag.add_argument("agent_args", nargs=argparse.REMAINDER,
                     help="arguments passed verbatim to the Qubit Agent runtime "
@@ -2339,6 +2470,16 @@ def main(argv=None) -> int:
         return _cmd_media(cfg, args)
     if command == "local-models":
         return _cmd_local_models(cfg, args)
+    if command == "transfers":
+        return _cmd_transfers(cfg, args)
+    if command == "recall":
+        return _cmd_recall(cfg, args)
+    if command == "documents":
+        return _cmd_documents(cfg, args)
+    if command == "ask":
+        return _cmd_ask(cfg, args)
+    if command == "shares":
+        return _cmd_shares(cfg, args)
     if command == "files":
         return _cmd_files(cfg, args)
     if command == "git":
@@ -6715,6 +6856,280 @@ def _cmd_local_models(cfg, args) -> int:
             getattr(exc, "code", "LOCAL_MODEL_BAD_INPUT"),
             str(exc)), indent=2))
         return 2
+
+
+def _transfers_default_node(cfg) -> str:
+    """First local (loopback) enrolled node, else the first node, else ""."""
+    from . import file_transfer as FT
+    from . import node_host as NH
+
+    try:
+        recs = NH._load(cfg).get("nodes", {})
+    except Exception:
+        return ""
+    for node_id, rec in recs.items():
+        if isinstance(rec, dict) and FT._is_local(rec):
+            return str(node_id)
+    return str(next(iter(recs), "") or "")
+
+
+def _confirm_envelope(code: str, detail: str) -> Dict[str, Any]:
+    return {"state": "CONFIRM_REQUIRED", "code": code, "detail": detail,
+            "owner": "qubit-policy", "rollback": "nothing changed"}
+
+
+def _cmd_transfers(cfg, args) -> int:
+    """qubit transfers status|list|fetch|plan|resume.
+
+    Same backend module the voice/dashboard surfaces call. ``fetch`` and
+    ``plan`` require --confirm (bounded chunk read / digests-only plan); the
+    raw bytes are never emitted by voice (a typed guard documents that).
+    """
+    import json as _json
+    from . import file_transfer as FT
+    cmd = getattr(args, "transfers_command", None) or "status"
+    confirm = bool(getattr(args, "confirm", False))
+    node = str(getattr(args, "node", "") or "") or _transfers_default_node(cfg)
+    try:
+        if cmd == "status":
+            out = FT.status(cfg)
+        elif cmd == "list":
+            out = FT.list_directory(
+                cfg, node, args.path,
+                limit=(getattr(args, "limit", None) or FT.MAX_LIST_ENTRIES))
+        elif cmd == "fetch":
+            if not confirm:
+                print(_json.dumps(_confirm_envelope(
+                    FT.FILE_TRANSFER_CONFIRM_REQUIRED,
+                    "fetching file bytes requires --confirm"), indent=2))
+                return 3
+            out = FT.fetch(
+                cfg, node, args.path, offset=getattr(args, "offset", 0) or 0,
+                max_bytes=(getattr(args, "max_bytes", None)
+                           or FT.DEFAULT_FETCH_BYTES), confirmed=True)
+        elif cmd == "plan":
+            if not confirm:
+                print(_json.dumps(_confirm_envelope(
+                    FT.FILE_TRANSFER_CONFIRM_REQUIRED,
+                    "planning a file transfer requires --confirm"), indent=2))
+                return 3
+            out = FT.stream_plan(
+                cfg, node, args.path,
+                chunk_size=(getattr(args, "chunk_size", None)
+                            or FT.DEFAULT_CHUNK_BYTES))
+        elif cmd == "resume":
+            out = FT.resume(cfg, node, args.transfer_id,
+                            offset=getattr(args, "offset", 0) or 0)
+        else:
+            print(f"ERROR: unknown transfers command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except FT.FileTransferError as exc:
+        print(_json.dumps({
+            "state": "FAILED", "code": exc.code, "detail": exc.detail[:300],
+            "owner": "qubit-policy",
+            "rollback": "nothing was read or transferred"}, indent=2))
+        return 2
+
+
+def _cmd_recall(cfg, args) -> int:
+    """qubit recall status|policy-get|policy-set|recall|resolve|escalate.
+
+    Same module the voice/dashboard surfaces call. ``policy-set`` and
+    ``escalate`` require --confirm; reads never widen the configured cap.
+    """
+    import json as _json
+    from . import active_memory as AM
+    cmd = getattr(args, "recall_command", None) or "status"
+    confirm = bool(getattr(args, "confirm", False))
+    if cmd == "status":
+        out = AM.status(cfg)
+    elif cmd == "policy-get":
+        out = AM.policy_get(cfg)
+    elif cmd == "policy-set":
+        enabled = True if getattr(args, "enable", False) else (
+            False if getattr(args, "disable", False) else None)
+        scoped = True if getattr(args, "session_scoped", False) else (
+            False if getattr(args, "global_scope", False) else None)
+        out = AM.policy_set(cfg, enabled=enabled,
+                            min_score=getattr(args, "min_score", None),
+                            max_items=getattr(args, "max_items", None),
+                            session_scoped=scoped, confirmed=confirm)
+    elif cmd == "recall":
+        out = AM.recall(cfg, args.query, session=getattr(args, "session", "") or "",
+                        limit=getattr(args, "limit", None))
+    elif cmd == "resolve":
+        out = AM.resolve(cfg, args.query,
+                         session=getattr(args, "session", "") or "")
+    elif cmd == "escalate":
+        out = AM.escalate(cfg, args.memory_id, reason=args.reason,
+                          confirmed=confirm)
+    else:
+        print(f"ERROR: unknown recall command {cmd!r}")
+        return 2
+    print(_json.dumps(out, indent=2, sort_keys=True))
+    if str(out.get("code", "")).endswith("CONFIRM_REQUIRED"):
+        return 3
+    return 0
+
+
+def _cmd_documents(cfg, args) -> int:
+    """qubit documents status|kinds|extract.
+
+    Same module as voice/dashboard; extraction is confirmation-gated and
+    confined to approved roots, with typed failures (never fabricated text).
+    """
+    import json as _json
+    from . import doc_extract as DE
+    cmd = getattr(args, "documents_command", None) or "status"
+    confirm = bool(getattr(args, "confirm", False))
+    if cmd == "status":
+        out = DE.status(cfg)
+    elif cmd == "kinds":
+        out = DE.kinds(cfg)
+    elif cmd == "extract":
+        if not confirm:
+            print(_json.dumps(_confirm_envelope(
+                DE.CONFIRM_CODE, "document extraction requires --confirm"),
+                indent=2))
+            return 3
+        try:
+            out = DE.extract(
+                cfg, args.path,
+                max_chars=(getattr(args, "max_chars", None)
+                           or DE.DEFAULT_MAX_CHARS),
+                page=getattr(args, "page", None), confirmed=True)
+        except DE.DocExtractError as exc:
+            print(_json.dumps({
+                "state": "FAILED", "code": exc.code,
+                "detail": DE._redact(exc.detail)[:300],
+                "owner": "qubit-policy",
+                "rollback": "nothing was extracted"}, indent=2))
+            return 2
+    else:
+        print(f"ERROR: unknown documents command {cmd!r}")
+        return 2
+    print(_json.dumps(out, indent=2, sort_keys=True))
+    return 0
+
+
+def _cmd_ask(cfg, args) -> int:
+    """qubit ask status|ask|answer|pending.
+
+    Same module as voice/dashboard. ``ask`` requires --confirm; ``answer``
+    takes the structured answer map as JSON (file or inline), never as a
+    spoken value. Typed QUESTION_* failures are returned as JSON.
+    """
+    import json as _json
+    from . import question_prompt as QP
+    cmd = getattr(args, "ask_command", None) or "status"
+    confirm = bool(getattr(args, "confirm", False))
+    try:
+        if cmd == "status":
+            out = QP.status(cfg)
+        elif cmd == "pending":
+            out = QP.pending(cfg)
+        elif cmd == "ask":
+            if not confirm:
+                print(_json.dumps(_confirm_envelope(
+                    QP.CONFIRM_CODE, "asking requires --confirm"), indent=2))
+                return 3
+            out = QP.ask(cfg, [{"text": args.question, "kind": "text"}],
+                         session=getattr(args, "session", "") or "",
+                         confirmed=True)
+        elif cmd == "answer":
+            raw = None
+            path = getattr(args, "answers_file", None)
+            inline = getattr(args, "answers", "") or ""
+            if path is not None:
+                try:
+                    raw = Path(path).expanduser().read_text(encoding="utf-8")
+                except OSError as exc:
+                    print(_json.dumps({"state": "FAILED",
+                                       "code": QP.BAD_INPUT_CODE,
+                                       "detail": f"answers file unreadable: {exc}"},
+                                      indent=2))
+                    return 2
+            elif inline.strip():
+                raw = inline
+            if raw is None:
+                print(_json.dumps({"state": "FAILED", "code": QP.BAD_INPUT_CODE,
+                                   "detail": "--answers or --answers-file is "
+                                             "required"}, indent=2))
+                return 2
+            try:
+                answers = _json.loads(raw)
+            except ValueError as exc:
+                print(_json.dumps({"state": "FAILED", "code": QP.BAD_INPUT_CODE,
+                                   "detail": f"answers JSON invalid: {exc}"},
+                                  indent=2))
+                return 2
+            out = QP.answer(cfg, args.prompt_id, answers)
+        else:
+            print(f"ERROR: unknown ask command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except QP.QuestionError as exc:
+        print(_json.dumps({
+            "state": "FAILED", "code": exc.code,
+            "detail": QP._redact(exc.detail)[:300],
+            "owner": "qubit-policy", "rollback": "prompt store untouched"},
+            indent=2))
+        return 3 if exc.code == QP.CONFIRM_CODE else 2
+
+
+def _cmd_shares(cfg, args) -> int:
+    """qubit shares status|publish|list|revoke|resolve|purge.
+
+    Same module as voice/dashboard. ``publish``/``revoke``/``purge`` require
+    --confirm; ``resolve`` reads the bearer token from a file (or --token)
+    and never persists or prints it.
+    """
+    import json as _json
+    from . import session_share as SS
+    cmd = getattr(args, "shares_command", None) or "status"
+    confirm = bool(getattr(args, "confirm", False))
+    if cmd == "status":
+        out = SS.status(cfg)
+    elif cmd == "list":
+        out = SS.list_shares(cfg)
+    elif cmd == "publish":
+        out = SS.publish(cfg, args.session_id,
+                         ttl_s=(getattr(args, "ttl_s", None)
+                                or SS.DEFAULT_TTL_S),
+                         confirmed=confirm)
+    elif cmd == "revoke":
+        out = SS.revoke(cfg, args.share_id, confirmed=confirm)
+    elif cmd == "resolve":
+        token = getattr(args, "token", "") or ""
+        path = getattr(args, "token_file", None)
+        if not token and path is not None:
+            try:
+                token = Path(path).expanduser().read_text(
+                    encoding="utf-8").strip()
+            except OSError as exc:
+                print(_json.dumps({"state": "FAILED",
+                                   "code": SS.BAD_INPUT_CODE,
+                                   "detail": f"token file unreadable: {exc}"},
+                                  indent=2))
+                return 2
+        out = SS.resolve(cfg, args.share_id, token)
+    elif cmd == "purge":
+        if not confirm:
+            print(_json.dumps(_confirm_envelope(
+                SS.CONFIRM_CODE, "purging expired shares requires --confirm"),
+                indent=2))
+            return 3
+        out = SS.purge_expired(cfg)
+    else:
+        print(f"ERROR: unknown shares command {cmd!r}")
+        return 2
+    print(_json.dumps(out, indent=2, sort_keys=True))
+    if str(out.get("code", "")).endswith("CONFIRM_REQUIRED"):
+        return 3
+    return 0
 
 
 def _cmd_monitor(cfg, args) -> int:

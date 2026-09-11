@@ -2,7 +2,7 @@
 # scripts/gen_completions.py — do not hand-edit; regenerate instead.
 _voicebridge_complete() {
     local cur="{COMP_WORDS[COMP_CWORD]}"
-    local cmds="acp actions agent approvals asr-test audio auth brain branding browser capability channels checkpoints completion computer-use device enroll experiments export-state files flag-drill flags frontier gateway ghost git hooks ide import-agent import-state kanban lessons local-models lsp mcp media memory mic-test monitor msg node once opencode package pairing peer permissions plugins power product profile project proxy roundtrip run runtime schedules sessions setup skills status sync task tasks theme tts-test tui verified-skills verify verify-release vision voice webhook websites webui worker"
+    local cmds="acp actions agent approvals ask asr-test audio auth brain branding browser capability channels checkpoints completion computer-use device documents enroll experiments export-state files flag-drill flags frontier gateway ghost git hooks ide import-agent import-state kanban lessons local-models lsp mcp media memory mic-test monitor msg node once opencode package pairing peer permissions plugins power product profile project proxy recall roundtrip run runtime schedules sessions setup shares skills status sync task tasks theme transfers tts-test tui verified-skills verify verify-release vision voice webhook websites webui worker"
     if [ "$COMP_CWORD" -eq 1 ]; then
         COMPREPLY=($(compgen -W "$cmds" -- "$cur"))
     fi

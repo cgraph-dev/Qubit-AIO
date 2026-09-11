@@ -3018,7 +3018,9 @@ _r("GET", r"/api/sessions/search", "h_sessions_list")
 _r("GET", r"/api/sessions/(?P<id>[^/]+)/export", "h_session_show")
 _r("GET", r"/api/sessions/(?P<id>[^/]+)/latest-descendant", "h_session_show")
 _r("GET", r"/api/sessions/(?P<id>[^/]+)/messages", "h_session_messages")
-_r("GET", r"/api/sessions/(?P<id>[^/]+)", "h_session_show")
+# Negative lookahead keeps the dedicated /api/sessions/shares collection from
+# being captured as a session id by the generic show route below.
+_r("GET", r"/api/sessions/(?!shares$)(?P<id>[^/]+)", "h_session_show")
 _r("GET", r"/api/config", "h_config")
 _r("GET", r"/api/config/schema", "h_config")
 _r("GET", r"/api/config/defaults", "h_config")
@@ -3165,6 +3167,38 @@ _r("GET", r"/api/learning/node", "h_learning_node")
 _r("PUT", r"/api/learning/node", "h_learning_node_update")
 _r("DELETE", r"/api/learning/node", "h_learning_node_delete")
 _r("GET", r"/api/auth/providers", "h_auth_providers")
+
+# OpenClaw delta Wave 3 (D3/D4/D20/D21/D24): file transfer, active recall,
+# document extraction, question prompts, and session sharing. Specific paths
+# precede parameterized rows so re.fullmatch resolves deterministically.
+_r("GET", r"/api/transfers/status", "h_transfers_status")
+_r("GET", r"/api/transfers/list", "h_transfers_list")
+_r("POST", r"/api/transfers/fetch", "h_transfers_fetch")
+_r("POST", r"/api/transfers/plan", "h_transfers_plan")
+_r("GET", r"/api/transfers/resume", "h_transfers_resume")
+_r("GET", r"/api/recall/status", "h_recall_status")
+_r("GET", r"/api/recall/policy", "h_recall_policy_get")
+_r("POST", r"/api/recall/policy", "h_recall_policy_set")
+_r("GET", r"/api/recall/resolve", "h_recall_resolve")
+_r("GET", r"/api/recall", "h_recall_query")
+_r("POST", r"/api/recall/escalate", "h_recall_escalate")
+_r("GET", r"/api/documents/status", "h_documents_status")
+_r("GET", r"/api/documents/kinds", "h_documents_kinds")
+_r("POST", r"/api/documents/extract", "h_documents_extract")
+_r("GET", r"/api/ask/status", "h_ask_status")
+_r("GET", r"/api/ask/pending", "h_ask_pending")
+_r("POST", r"/api/ask/answer", "h_ask_answer")
+_r("POST", r"/api/ask", "h_ask_create")
+_r("GET", r"/api/shares/status", "h_session_share_status")
+_r("GET", r"/api/sessions/shares", "h_session_shares_list")
+_r("POST", r"/api/sessions/shares/purge", "h_session_shares_purge")
+_r("DELETE", r"/api/sessions/shares/(?P<share_id>[^/]+)",
+   "h_session_share_revoke")
+_r("POST", r"/api/sessions/(?P<session_id>[^/]+)/share",
+   "h_session_share_publish")
+# Public, locally-served share view: authenticated by the SHARE token in the
+# query (constant-time checked in the module), NOT the dashboard token.
+_r("GET", r"/share/(?P<share_id>[^/]+)", "h_share_resolve")
 
 GATED: List[Dict[str, Any]] = [
     ("GET", r"/api/pty", _NO_PTY), ("POST", r"/api/pty", _NO_PTY),
@@ -4099,6 +4133,315 @@ def toolset_config(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                active_provider=None)
 
 
+# ---------------------------------------------------------------------------
+# OpenClaw delta Wave 3 surfaces (D3/D4/D20/D21/D24): file transfer, active
+# recall, document extraction, question prompts, and session sharing. Every
+# handler dispatches the SAME module function the CLI/voice call.
+# ---------------------------------------------------------------------------
+_OK_STATES = ("OK", "EMPTY", "COMPLETE", "DEGRADED", "READY")
+_OK_CODES = ("", "OK", "COMPLETE", "EMPTY", "READY")
+
+
+def _surface(out: Any) -> Tuple[int, Dict[str, Any]]:
+    """Adapt a module result to the compat envelope + a typed HTTP status.
+
+    A ``*_CONFIRM_REQUIRED`` result is a 409 staged gate; denied/unavailable
+    typed states are 403; success states are 200. The raw module body (with
+    its typed ``code``/``owner``/``rollback``) is preserved verbatim.
+    """
+    if not isinstance(out, dict):
+        return _fail(Exception("module returned a non-object result"))
+    body = dict(out)
+    state = str(body.get("state", "") or "")
+    code = str(body.get("code", "") or "")
+    if code.upper().endswith("CONFIRM_REQUIRED") or state in (
+            "CONFIRM_REQUIRED", "CONFIRMATION_REQUIRED"):
+        body["ok"] = False
+        return 409, body
+    ok = (state in _OK_STATES and code in _OK_CODES) or state == "EMPTY"
+    body["ok"] = bool(ok)
+    body.setdefault("qubit_counterpart", "")
+    return (200 if ok else 403), body
+
+
+def _ft_default_node(cfg: Any) -> str:
+    """First local (loopback) enrolled node, else first node, else ""."""
+    from . import file_transfer as FT
+    from . import node_host as NH
+
+    try:
+        recs = NH._load(cfg).get("nodes", {})
+    except Exception:
+        return ""
+    for node_id, rec in recs.items():
+        if isinstance(rec, dict) and FT._is_local(rec):
+            return str(node_id)
+    return str(next(iter(recs), "") or "")
+
+
+def _qint(q: Dict[str, str], b: Dict[str, Any], *keys: str, default: int) -> int:
+    raw = _query_text(q, b, *keys)
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return default
+
+
+def h_transfers_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import file_transfer as FT
+    return _ok(**FT.status(cfg))
+
+
+def h_transfers_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import file_transfer as FT
+    node = _query_text(q, b, "node") or _ft_default_node(cfg)
+    return _surface(FT.list_directory(
+        cfg, node, _query_text(q, b, "path"),
+        limit=_qint(q, b, "limit", default=FT.MAX_LIST_ENTRIES)))
+
+
+def h_transfers_fetch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import file_transfer as FT
+    node = _query_text(q, b, "node") or _ft_default_node(cfg)
+    if not b.get("confirm"):
+        return _need_confirm("file transfer fetch")
+    return _surface(FT.fetch(
+        cfg, node, _query_text(q, b, "path"),
+        offset=_qint(q, b, "offset", default=0),
+        max_bytes=_qint(q, b, "max_bytes", "maxBytes",
+                        default=FT.DEFAULT_FETCH_BYTES), confirmed=True))
+
+
+def h_transfers_plan(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import file_transfer as FT
+    node = _query_text(q, b, "node") or _ft_default_node(cfg)
+    if not b.get("confirm"):
+        return _need_confirm("file transfer plan")
+    return _surface(FT.stream_plan(
+        cfg, node, _query_text(q, b, "path"),
+        chunk_size=_qint(q, b, "chunk_size", "chunkSize",
+                         default=FT.DEFAULT_CHUNK_BYTES)))
+
+
+def h_transfers_resume(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import file_transfer as FT
+    node = _query_text(q, b, "node") or _ft_default_node(cfg)
+    return _surface(FT.resume(
+        cfg, node, _query_text(q, b, "transfer_id", "id"),
+        offset=_qint(q, b, "offset", default=0)))
+
+
+def h_recall_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import active_memory as AM
+    return _ok(**AM.status(cfg))
+
+
+def h_recall_policy_get(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import active_memory as AM
+    return _ok(**AM.policy_get(cfg))
+
+
+def h_recall_policy_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import active_memory as AM
+    if not b.get("confirm"):
+        return _need_confirm("active-recall policy set")
+    enabled = b.get("enabled")
+    if isinstance(enabled, str):
+        enabled = enabled.strip().lower() in ("on", "true", "yes", "enable")
+    scoped = b.get("session_scoped")
+    if isinstance(scoped, str):
+        scoped = scoped.strip().lower() in ("session", "scoped", "true", "on")
+    return _surface(AM.policy_set(
+        cfg, enabled=enabled, min_score=b.get("min_score"),
+        max_items=b.get("max_items"), session_scoped=scoped, confirmed=True))
+
+
+def h_recall_query(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import active_memory as AM
+    return _surface(AM.recall(
+        cfg, _query_text(q, b, "query", "q"),
+        session=_query_text(q, b, "session"),
+        limit=b.get("limit")))
+
+
+def h_recall_resolve(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import active_memory as AM
+    return _surface(AM.resolve(
+        cfg, _query_text(q, b, "query", "q"),
+        session=_query_text(q, b, "session")))
+
+
+def h_recall_escalate(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import active_memory as AM
+    if not b.get("confirm"):
+        return _need_confirm("memory escalation")
+    return _surface(AM.escalate(
+        cfg, _qint(q, b, "memory_id", "id", default=0),
+        reason=_query_text(q, b, "reason"), confirmed=True))
+
+
+def h_documents_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import doc_extract as DE
+    return _ok(**DE.status(cfg))
+
+
+def h_documents_kinds(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import doc_extract as DE
+    return _ok(**DE.kinds(cfg))
+
+
+def h_documents_extract(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import doc_extract as DE
+    if not b.get("confirm"):
+        return _need_confirm("document extraction")
+    try:
+        out = DE.extract(
+            cfg, _query_text(q, b, "path"),
+            max_chars=_qint(q, b, "max_chars", "maxChars",
+                            default=DE.DEFAULT_MAX_CHARS),
+            page=(_qint(q, b, "page", default=0) or None), confirmed=True)
+    except DE.DocExtractError as exc:
+        return 400, {"ok": False, "state": "FAILED", "code": exc.code,
+                     "detail": _redact(exc.detail)[:300],
+                     "owner": "qubit-policy",
+                     "rollback": "nothing was extracted"}
+    return _surface(out)
+
+
+def h_ask_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import question_prompt as QP
+    return _ok(**QP.status(cfg))
+
+
+def h_ask_pending(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import question_prompt as QP
+    return _ok(**QP.pending(cfg))
+
+
+def h_ask_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import question_prompt as QP
+    if not b.get("confirm"):
+        return _need_confirm("question prompt create")
+    try:
+        out = QP.ask(cfg, [{"text": _query_text(q, b, "question", "text"),
+                            "kind": "text"}],
+                     session=_query_text(q, b, "session"), confirmed=True)
+    except QP.QuestionError as exc:
+        return 400, {"ok": False, "state": "FAILED", "code": exc.code,
+                     "detail": _redact(exc.detail)[:300],
+                     "owner": "qubit-policy",
+                     "rollback": "prompt store untouched"}
+    return _surface(out)
+
+
+def h_ask_answer(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import question_prompt as QP
+    answers = b.get("answers", b.get("responses"))
+    if answers is None:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "answers object/list is required"}
+    try:
+        out = QP.answer(cfg, p.get("prompt_id", b.get("prompt_id", "")), answers)
+    except QP.QuestionError as exc:
+        return 400, {"ok": False, "state": "FAILED", "code": exc.code,
+                     "detail": _redact(exc.detail)[:300],
+                     "owner": "qubit-policy",
+                     "rollback": "prompt store untouched"}
+    return _surface(out)
+
+
+def h_session_share_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import session_share as SS
+    return _surface(SS.status(cfg))
+
+
+def h_session_shares_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import session_share as SS
+    return _surface(SS.list_shares(cfg))
+
+
+def h_session_share_publish(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import session_share as SS
+    sid = p.get("session_id", "") or _query_text(q, b, "session_id")
+    ttl = b.get("ttl_s", q.get("ttl_s"))
+    try:
+        ttl = float(ttl) if ttl not in (None, "") else SS.DEFAULT_TTL_S
+    except (TypeError, ValueError):
+        ttl = SS.DEFAULT_TTL_S
+    return _surface(SS.publish(
+        cfg, sid, ttl_s=ttl, confirmed=bool(b.get("confirm")),
+        requested_by="dashboard:user"))
+
+
+def h_session_share_revoke(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import session_share as SS
+    sid = p.get("share_id", "") or _query_text(q, b, "share_id")
+    return _surface(SS.revoke(cfg, sid, confirmed=bool(b.get("confirm"))))
+
+
+def h_session_shares_purge(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import session_share as SS
+    if not b.get("confirm"):
+        return 409, {
+            "ok": False, "state": "CONFIRMATION_REQUIRED",
+            "code": SS.CONFIRM_CODE,
+            "detail": "session share purge requires explicit confirmation: "
+                      "re-POST with {\"confirm\": true}",
+            "qubit_counterpart": "CLI `qubit shares purge --confirm` + voice "
+                                 "yes",
+        }
+    return _surface(SS.purge_expired(cfg))
+
+
+def h_share_resolve(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /share/{share_id}: public token in the query, no dashboard token.
+
+    The share token is the bearer credential (constant-time checked inside the
+    module). A missing/expired/revoked/wrong token returns a typed gate and
+    NEVER another session's transcript.
+    """
+    from . import session_share as SS
+    sid = p.get("share_id", "") or ""
+    token = q.get("token") or b.get("token") or ""
+    out = SS.resolve(cfg, sid, token)
+    state = str(out.get("state", "") or "")
+    body = dict(out)
+    body.setdefault("qubit_counterpart", "open /share/<id> with the share token")
+    if state == "OK":
+        body["ok"] = True
+        return 200, body
+    body["ok"] = False
+    http = {
+        "NOT_FOUND": 404, "EXPIRED": 410, "REVOKED": 403, "DENIED": 403,
+        "ESTOP": 403, "FAILED": 400, "UNAVAILABLE": 503,
+    }.get(state, 403)
+    return http, body
+
+
 _EXTRA_HANDLERS: Dict[str, Handler] = {
     "cron_pause": lambda cfg, q, b, p: _cron_mutate("pause", cfg, p),
     "cron_resume": lambda cfg, q, b, p: _cron_mutate("resume", cfg, p),
@@ -4206,6 +4549,30 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "h_learning_node_update": h_learning_node_update,
     "h_learning_node_delete": h_learning_node_delete,
     "h_auth_providers": h_auth_providers,
+    "h_transfers_status": h_transfers_status,
+    "h_transfers_list": h_transfers_list,
+    "h_transfers_fetch": h_transfers_fetch,
+    "h_transfers_plan": h_transfers_plan,
+    "h_transfers_resume": h_transfers_resume,
+    "h_recall_status": h_recall_status,
+    "h_recall_policy_get": h_recall_policy_get,
+    "h_recall_policy_set": h_recall_policy_set,
+    "h_recall_query": h_recall_query,
+    "h_recall_resolve": h_recall_resolve,
+    "h_recall_escalate": h_recall_escalate,
+    "h_documents_status": h_documents_status,
+    "h_documents_kinds": h_documents_kinds,
+    "h_documents_extract": h_documents_extract,
+    "h_ask_status": h_ask_status,
+    "h_ask_pending": h_ask_pending,
+    "h_ask_create": h_ask_create,
+    "h_ask_answer": h_ask_answer,
+    "h_session_share_status": h_session_share_status,
+    "h_session_shares_list": h_session_shares_list,
+    "h_session_share_publish": h_session_share_publish,
+    "h_session_share_revoke": h_session_share_revoke,
+    "h_session_shares_purge": h_session_shares_purge,
+    "h_share_resolve": h_share_resolve,
 }
 
 HANDLERS: Dict[str, Handler] = {

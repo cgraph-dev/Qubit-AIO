@@ -19,6 +19,7 @@ No skips, no xfail.
 """
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import sys
@@ -82,6 +83,16 @@ NEW_READS = [
     ("GET", "/api/learning/graph", "h_learning_graph"),
     ("GET", "/api/learning/node", "h_learning_node"),
     ("GET", "/api/auth/providers", "h_auth_providers"),
+    # Wave 3 (D3/D4/D20/D21/D24): always-200 reads over the shared modules.
+    ("GET", "/api/transfers/status", "h_transfers_status"),
+    ("GET", "/api/recall/status", "h_recall_status"),
+    ("GET", "/api/recall/policy", "h_recall_policy_get"),
+    ("GET", "/api/documents/status", "h_documents_status"),
+    ("GET", "/api/documents/kinds", "h_documents_kinds"),
+    ("GET", "/api/ask/status", "h_ask_status"),
+    ("GET", "/api/ask/pending", "h_ask_pending"),
+    ("GET", "/api/shares/status", "h_session_share_status"),
+    ("GET", "/api/sessions/shares", "h_session_shares_list"),
 ]
 
 # (method, path, query, body, code, http) -- implemented handlers that return a
@@ -570,3 +581,118 @@ def test_audio_voice_config_is_references_only(tmp_path, monkeypatch):
         assert out[kind]["profile"], out
     assert out["voice"]["name"], out
     assert "mic" in out["audio"] and "output" in out["audio"], out
+
+
+# ---------------------------------------------- Wave 3 session-share routes
+def _seed_receipt(cfg, rid="rec-share"):
+    state = Path(cfg.state_dir())
+    state.mkdir(parents=True, exist_ok=True)
+    (state / "actions.json").write_text(json.dumps(
+        {"schema": 1,
+         "receipts": {rid: {"receipt_id": rid, "action_id": "act.send",
+                            "state": "OK", "code": "OK",
+                            "runtime": "qubit-broker", "created_at": 1.0,
+                            "detail": "invoice alpha sent"}},
+         "audit": []}))
+
+
+def test_session_share_routes_roundtrip_without_dashboard_token(
+        tmp_path, monkeypatch):
+    """GET /share/{id} is authenticated by the SHARE token alone (no dashboard
+    token), and publish/list/revoke/purge run the same session_share module."""
+    from voicebridge import hermes_compat as HC
+    from voicebridge import session_share as SS
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    _seed_receipt(cfg)
+
+    # publish requires confirmation and stages a 409, never a fabricated 200
+    code, out = HC.dispatch(cfg, "POST", "/api/sessions/rec-share/share",
+                            {}, {})
+    assert code == 409 and out["code"] == SS.CONFIRM_CODE, (code, out)
+    assert out["ok"] is False, out
+
+    code, out = HC.dispatch(cfg, "POST", "/api/sessions/rec-share/share",
+                            {}, {"confirm": True})
+    assert code == 200 and out["ok"] is True, (code, out)
+    share_id, token = out["share"]["id"], out["token"]
+    assert SS.resolve(cfg, share_id, token)["state"] == "OK"
+
+    # list never renders a token or hash
+    code, out = HC.dispatch(cfg, "GET", "/api/sessions/shares", {}, {})
+    assert code == 200 and out["count"] == 1, (code, out)
+    blob = json.dumps(out)
+    assert token not in blob and "token_hash" not in blob, out
+
+    # GET /share/{id} with ONLY the share token: no dashboard token involved
+    code, out = HC.dispatch(cfg, "GET", f"/share/{share_id}",
+                            {"token": token}, {})
+    assert code == 200 and out["ok"] is True, (code, out)
+    assert out["state"] == "OK" and out["transcript"]["session_id"] == \
+        "rec-share", out
+    assert token not in json.dumps(out), out
+
+    # a wrong/missing token is a typed denial that leaks no transcript
+    code, out = HC.dispatch(cfg, "GET", f"/share/{share_id}",
+                            {"token": "nope"}, {})
+    assert code == 403 and out["ok"] is False, (code, out)
+    assert out["code"] == SS.BAD_TOKEN_CODE, out
+    assert "transcript" not in out, out
+    code, out = HC.dispatch(cfg, "GET", f"/share/{share_id}", {}, {})
+    assert code == 400 and out["ok"] is False, (code, out)
+    assert out["code"] == SS.BAD_INPUT_CODE, out
+    assert "transcript" not in out, out
+
+    # an unknown share id is an honest 404, never a fabricated view
+    code, out = HC.dispatch(cfg, "GET", "/share/shr_missing",
+                            {"token": token}, {})
+    assert code == 404 and out["code"] == SS.NOT_FOUND_CODE, (code, out)
+
+    # revoke is confirm-gated, then the share is dead
+    code, out = HC.dispatch(cfg, "DELETE", f"/api/sessions/shares/{share_id}",
+                            {}, {})
+    assert code == 409 and out["code"] == SS.CONFIRM_CODE, (code, out)
+    code, out = HC.dispatch(cfg, "DELETE", f"/api/sessions/shares/{share_id}",
+                            {}, {"confirm": True})
+    assert code == 200 and out["state"] == "OK" and out["changed"] is True, out
+    code, out = HC.dispatch(cfg, "GET", f"/share/{share_id}",
+                            {"token": token}, {})
+    assert code == 403 and out["code"] == SS.REVOKED_CODE, (code, out)
+
+    # purge requires confirmation; with it, the tombstone is cleared
+    code, out = HC.dispatch(cfg, "POST", "/api/sessions/shares/purge",
+                            {}, {})
+    assert code == 409 and out["code"] == SS.CONFIRM_CODE, (code, out)
+    code, out = HC.dispatch(cfg, "POST", "/api/sessions/shares/purge",
+                            {}, {"confirm": True})
+    assert code == 200 and out["ok"] is True, (code, out)
+    assert out["purged"] == 0 and out["remaining"] == 1, out
+
+
+def test_wave3_routes_dispatch_typed_never_404(tmp_path, monkeypatch):
+    """The Wave 3 mutation routes answer typed gates (never 404/500)."""
+    from voicebridge import hermes_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    cases = [
+        ("POST", "/api/transfers/fetch", {}, {}),
+        ("POST", "/api/transfers/plan", {}, {}),
+        ("GET", "/api/transfers/list", {}, {}),
+        ("GET", "/api/transfers/resume", {}, {}),
+        ("GET", "/api/recall", {}, {}),
+        ("POST", "/api/recall/policy", {}, {"confirm": True}),
+        ("POST", "/api/recall/escalate", {}, {"confirm": True}),
+        ("GET", "/api/recall/resolve", {}, {}),
+        ("POST", "/api/documents/extract", {}, {}),
+        ("POST", "/api/ask", {}, {}),
+        ("POST", "/api/ask/answer", {}, {}),
+    ]
+    for method, path, q, b in cases:
+        route, _ = HC.match(method, path)
+        assert route is not None and route["disposition"] == "implemented", \
+            (method, path)
+        code, out = HC.dispatch(cfg, method, path, q, b)
+        assert code not in (404, 500), (method, path, code, out)
+        assert out.get("ok") is False, (method, path, out)
+        assert out.get("code"), (method, path, out)
+
