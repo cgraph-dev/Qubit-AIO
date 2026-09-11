@@ -9,21 +9,23 @@ postponement without evidence is not accepted. (The older
 `FEATURE_MATRIX_8U.json` rates upstream reusability for future 8U tickets
 — a different axis, not foundation integration.)
 
-## What actually executes pinned Hermes code
+## Qubit-native runtime (no pinned Hermes code executes)
 
-## What actually executes pinned Hermes code
+Normal Qubit execution contains no third-party product code. The former
+vendored Hermes modules were retired and replaced by independent Qubit
+implementations; the retirement record with former pin, license, and
+differential fixtures lives in `voicebridge/upstream/ATTRIBUTION.md`:
 
-1. `voicebridge/upstream/hermes_ansi_strip.py` — verbatim
-   `tools/ansi_strip.py`; runs on every `HermesBackend.run_task` return and
-   every `RealHermesRuntime.turn` reply (differential-tested vs the clone).
-2. `voicebridge/upstream/hermes_sqlite_util.py` — verbatim
-   `hermes_cli/sqlite_util.py`; `write_txn` was tried in the memory-store
-   migration and reverted with root cause (executescript implicit-commit);
-   differential-tested and reserved for non-executescript writes.
-3. Isolated Hermes v0.21.1 install (hash-verified copy of the pinned clone)
-   supervised by `RealHermesRuntime` for agent turns against local Ollama;
-   version/argv/session/timeout/cancel/redaction proven live
-   (`tests/test_real_hermes.py`). Operator installs untouched.
+1. `voicebridge/textutil.py` — Qubit-owned output sanitizing, wired into
+   every `voicebridge/agent.py` turn/session reply (differential-tested
+   vs the pinned oracle in `tests/test_textutil8u.py`).
+2. `voicebridge/sqlstore.py` — Qubit-owned SQLite helpers; the kanban
+   store keeps explicit-transaction discipline (`BEGIN IMMEDIATE` +
+   rollback, atomic-claim concurrency proven).
+3. Qubit-native agent turns/sessions (`voicebridge/agent.py`
+   `turn`/`run_session` over the local model with timeout, redaction,
+   and receipts); no external assistant process is launched or
+   supervised (`tests/test_agent8u.py`). Operator installs untouched.
 
 ## IMPLEMENTED rows (35 — no code-side BLOCKED/REJECTED rows remain)
 

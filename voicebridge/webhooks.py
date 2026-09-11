@@ -46,6 +46,7 @@ MAX_NONCES = 5000
 NONCE_TTL_S = 3600.0
 TS_TOLERANCE_S = 300.0
 MAX_FILE_BYTES = 1_000_000
+MAX_BODY_BYTES = 1_000_000
 MAX_LOG_LINES = 2000
 
 CONFIRM_CODE = "WEBHOOK_CONFIRM_REQUIRED"
@@ -58,10 +59,18 @@ BAD_SIGNATURE_CODE = "WEBHOOK_BAD_SIGNATURE"
 STALE_CODE = "WEBHOOK_STALE"
 REPLAY_CODE = "WEBHOOK_REPLAY"
 AUTH_CODE = "WEBHOOK_AUTH_MISSING"
+TOO_LARGE_CODE = "WEBHOOK_TOO_LARGE"
 CORRUPT_CODE = "WEBHOOK_STORE_CORRUPT"
 
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,63}$")
 _EVENT_RE = re.compile(r"^[a-z0-9][a-z0-9_.:-]{0,63}$")
+
+# Accepted inbound signature/timestamp/delivery-id header names (case
+# insensitive). The signature is hex HMAC-SHA256 over ``f"{timestamp}.{body}"``
+# and may carry a ``sha256=`` prefix (GitHub-style).
+SIGNATURE_HEADERS = ("X-Qubit-Signature", "X-Hub-Signature-256", "X-Signature")
+TIMESTAMP_HEADERS = ("X-Qubit-Timestamp", "X-Timestamp")
+DELIVERY_HEADERS = ("X-Qubit-Delivery", "X-Delivery-Id", "X-Request-Id")
 
 # HTTPS hosts Qubit will deliver webhook checks to without extra config.
 # Anything else needs an explicit config allowlist entry (documented in the
@@ -190,6 +199,7 @@ def _public(rec: Dict[str, Any]) -> Dict[str, Any]:
     return {"id": rec["id"], "url": _redact(rec.get("url", ""))[:160],
             "events": list(rec.get("events", [])),
             "secret": _redact_secret_kind(rec.get("secret_ref", "")),
+            "enabled": bool(rec.get("enabled", True)),
             "created_at": rec.get("created_at"),
             "updated_by": rec.get("updated_by")}
 
@@ -265,6 +275,40 @@ def remove(cfg: Any, sub_id: str, *, requested_by: str = "cli:user",
     return {"state": "OK", "removed": rec["id"]}
 
 
+def set_enabled(cfg: Any, enabled: bool, *, requested_by: str = "cli:user",
+                confirmed: bool = False) -> Dict[str, Any]:
+    """Toggle store-wide webhook delivery (confirmed, audited)."""
+    if not confirmed:
+        raise WebhookError(CONFIRM_CODE,
+                           "webhook enable toggle requires explicit --confirm")
+    state = _load(cfg)
+    state["enabled"] = bool(enabled)
+    _save(cfg, state)
+    _audit("set_enabled", requested_by, {"enabled": bool(enabled)})
+    return {"state": "OK", "enabled": bool(enabled)}
+
+
+def set_sub_enabled(cfg: Any, sub_id: str, enabled: bool, *,
+                    requested_by: str = "cli:user",
+                    confirmed: bool = False) -> Dict[str, Any]:
+    """Toggle one subscription (confirmed, audited)."""
+    if not confirmed:
+        raise WebhookError(CONFIRM_CODE,
+                           "webhook subscription toggle requires explicit "
+                           "--confirm")
+    state = _load(cfg)
+    rec = _get(state, sub_id)
+    rec["enabled"] = bool(enabled)
+    _save(cfg, state)
+    _audit("set_sub_enabled", requested_by,
+           {"id": rec["id"], "enabled": bool(enabled)})
+    return {"state": "OK", "id": rec["id"], "enabled": bool(enabled)}
+
+
+def is_enabled(cfg: Any) -> bool:
+    return bool(_load(cfg).get("enabled", True))
+
+
 def test_plan(cfg: Any, sub_id: str) -> Dict[str, Any]:
     """Dry-run delivery plan (no secret resolution, no network)."""
     state = _load(cfg)
@@ -326,8 +370,74 @@ def _receipt(cfg: Any, sub_id: str, verdict: str, detail: str) -> None:
         pass
 
 
+def _header(headers: Any, names: tuple) -> str:
+    """Case-insensitive header lookup (HTTPMessage or plain dict)."""
+    if headers is None:
+        return ""
+    getter = getattr(headers, "get", None)
+    if getter is not None:
+        for name in names:
+            try:
+                val = getter(name)
+            except Exception:
+                val = None
+            if val:
+                return str(val).strip()
+    try:
+        lower = {str(k).lower(): v for k, v in dict(headers).items()}
+    except Exception:
+        return ""
+    for name in names:
+        val = lower.get(name.lower())
+        if val:
+            return str(val).strip()
+    return ""
+
+
+def ingest(cfg: Any, sub_id: str, body_bytes: bytes, headers: Any, *,
+           sender: str = "", record_inbox: bool = False) -> Dict[str, Any]:
+    """Signed inbound HTTP webhook ingress.
+
+    Resolves the subscription by id, requires a signature (verified against
+    the subscription's ``env:``/``file:`` secret reference — a raw secret is
+    never accepted or logged), caps the body, enforces timestamp freshness and
+    the replay cache, and records a redacted receipt. Every refusal is a typed
+    :class:`WebhookError` code (unknown sub, bad/missing signature, stale,
+    replay, too large, bad input, auth missing).
+    """
+    state = _load(cfg)
+    rec = _get(state, sub_id)  # unknown subscription -> WEBHOOK_NOT_FOUND
+    body = body_bytes or b""
+    if len(body) > MAX_BODY_BYTES:
+        _receipt(cfg, rec["id"], "TOO_LARGE",
+                 f"{len(body)} bytes exceeds {MAX_BODY_BYTES} byte cap")
+        _audit("rejected", "webhook-ingress",
+               {"id": rec["id"], "reason": TOO_LARGE_CODE})
+        raise WebhookError(TOO_LARGE_CODE,
+                           f"payload exceeds {MAX_BODY_BYTES} byte cap")
+    signature = _header(headers, SIGNATURE_HEADERS)
+    if not signature:
+        _receipt(cfg, rec["id"], "AUTH_MISSING", "signature header missing")
+        _audit("rejected", "webhook-ingress",
+               {"id": rec["id"], "reason": BAD_SIGNATURE_CODE})
+        raise WebhookError(BAD_SIGNATURE_CODE, "missing signature header")
+    if signature.lower().startswith("sha256="):
+        signature = signature[len("sha256="):].strip()
+    ts_raw = _header(headers, TIMESTAMP_HEADERS)
+    try:
+        ts = float(ts_raw)
+    except (TypeError, ValueError):
+        _receipt(cfg, rec["id"], "STALE", "missing/unparseable timestamp header")
+        raise WebhookError(STALE_CODE,
+                           "missing or unparseable timestamp header") from None
+    delivery_id = _header(headers, DELIVERY_HEADERS)
+    return verify(cfg, rec["id"], body, signature, ts, sender=sender,
+                  delivery_id=delivery_id, record_inbox=record_inbox)
+
+
 def verify(cfg: Any, sub_id: str, payload: bytes, signature: str,
            timestamp: float, *, sender: str = "",
+           delivery_id: str = "",
            record_inbox: bool = False) -> Dict[str, Any]:
     """Verify an inbound delivery (HMAC, freshness, replay, auth).
 
@@ -358,8 +468,9 @@ def verify(cfg: Any, sub_id: str, payload: bytes, signature: str,
                            "signing secret unresolvable (check the env:/file: "
                            "reference)")
     body = payload or b""
-    if len(body) > 1_000_000:
-        raise WebhookError(BAD_INPUT_CODE, "payload exceeds 1MB cap")
+    if len(body) > MAX_BODY_BYTES:
+        raise WebhookError(TOO_LARGE_CODE,
+                           f"payload exceeds {MAX_BODY_BYTES} byte cap")
     expected = hmac.new(key.encode("utf-8"),
                         f"{ts}.".encode() + body,
                         hashlib.sha256).hexdigest()
@@ -368,7 +479,12 @@ def verify(cfg: Any, sub_id: str, payload: bytes, signature: str,
         raise WebhookError(BAD_SIGNATURE_CODE, "signature mismatch")
     nonce = hashlib.sha256(f"{rec['id']}:{ts}:{hashlib.sha256(body).hexdigest()}"
                            .encode()).hexdigest()
-    if _nonce_seen(cfg, nonce):
+    delivery_nonce = (hashlib.sha256(f"delivery:{delivery_id}".encode()).hexdigest()
+                      if delivery_id else "")
+    replayed = _nonce_seen(cfg, nonce)
+    if delivery_nonce and _nonce_seen(cfg, delivery_nonce):
+        replayed = True
+    if replayed:
         _receipt(cfg, rec["id"], "REPLAY", "nonce already seen")
         raise WebhookError(REPLAY_CODE, "duplicate delivery (replay)")
     _receipt(cfg, rec["id"], "VALID", f"{len(body)} bytes, event evidence only")

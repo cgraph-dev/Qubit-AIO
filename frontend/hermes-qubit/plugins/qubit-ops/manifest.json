@@ -1,0 +1,12 @@
+{
+  "name": "qubit-ops",
+  "label": "Operations",
+  "description": "Qubit operations console — every capability registry op with real arg forms, staged confirmations, receipts, and typed states (same dashboard_ops broker as CLI and voice). Qubit-owned addition on the Hermes baseline.",
+  "icon": "zap",
+  "version": "1.0.0",
+  "tab": {"path": "/operations", "position": "after:system"},
+  "entry": "qubit-ops.js",
+  "css": null,
+  "has_api": true,
+  "source": "qubit-overlay"
+}

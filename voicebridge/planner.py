@@ -41,6 +41,16 @@ PLANNER_TOOLS: Dict[str, Dict[str, Any]] = {
         "args": {},
         "summary": "pause YouTube playback",
     },
+    "web.fetch": {
+        "args": {"url": {"type": "string"}},
+        "required": ["url"],
+        "summary": "fetch a public web page (read-only, SSRF-guarded)",
+    },
+    "web.search": {
+        "args": {"query": {"type": "string"}},
+        "required": ["query"],
+        "summary": "search the web via the configured provider",
+    },
 }
 
 MIN_CONFIDENCE = 0.60

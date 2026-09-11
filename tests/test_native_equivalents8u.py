@@ -79,3 +79,29 @@ def test_matrix_test_files_exist():
     for r in _rows():
         for rel in r["tests"]:
             assert (REPO / rel).exists(), (r["id"], rel)
+
+
+def test_matrix_claims_route_to_real_backends_and_tests():
+    """OpenClaw audit §4.2: presence alone is not proof.
+
+    Every claimed voice id must resolve to a registered backend (so the
+    spoken surface actually dispatches), every documented voice example must
+    resolve to a real command (not UNKNOWN), and every cited test file must
+    contain real assertions rather than a bare existence claim.
+    """
+    from voicebridge import voice_commands as VC
+    from voicebridge.voice_commands import UNKNOWN, resolve
+
+    for r in _rows():
+        for entry_id in r["voice"]:
+            entry = VC.REGISTRY[entry_id]
+            assert entry.backend in VC._BACKENDS, (r["id"], entry_id)
+            assert isinstance(entry.examples, tuple), (r["id"], entry_id)
+            example = (entry.examples[0] if entry.examples
+                       else entry.aliases[0])
+            res = resolve(example)
+            assert res.kind != UNKNOWN, (r["id"], entry_id, example)
+            assert res.entry is not None, (r["id"], entry_id, example)
+        for rel in r["tests"]:
+            text = (REPO / rel).read_text(encoding="utf-8")
+            assert "assert " in text, (r["id"], rel, "no assertions")

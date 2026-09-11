@@ -829,16 +829,39 @@ def refuse_estop(operation: str) -> Dict[str, Any]:
 # snapshots for rollback. Same SQLite store, same confirm/estop/audit/
 # redaction contracts, same backend for CLI, dashboard, and voice.
 
-WIDGET_KINDS = ("note", "tasks", "stats", "links")
+WIDGET_KINDS = ("note", "text", "tasks", "stats", "links", "link",
+                "html", "svg")
+# Markup kinds are stored verbatim as INERT content: the backend never
+# renders or executes them; callers get an explicit trust marker and the
+# dashboard must render them inside a sandbox (or not at all). The other
+# kinds keep the existing active-markup stripping.
+WIDGET_MARKUP_KINDS = ("html", "svg")
 WIDGET_TITLE_LEN = 200
 WIDGET_CONTENT_LEN = 4000
+WIDGET_MARKUP_LEN = 8000
+WIDGET_URL_LEN = 2000
+WIDGET_TRUST_SANITIZED = "sanitized"
+WIDGET_TRUST_INERT = "inert"
 WIDGET_MAX_PER_BOARD = 64
+# Declared widget capability grants: a widget may only *declare* tokens
+# from this closed allow-list. They are recorded for review, never granted
+# at runtime, so declaring one cannot widen access.
+WIDGET_GRANT_TOKENS = ("note:read", "tasks:read", "stats:read",
+                       "links:read", "link:open")
+WIDGET_DECLARED_GRANTS_MAX = 16
 LAYOUT_MAX_COLS = 6
 SNAPSHOTS_KEPT = 20
 DENIED_CODE = "KANBAN_DENIED"
 CANVAS_ROLES = ("owner", "editor", "viewer")
 _ROLE_RANK = {"viewer": 1, "editor": 2, "owner": 3}
 _DEFAULT_COLUMNS = ["open", "claimed", "blocked", "done"]
+
+# Board tabs: ordered per-board surfaces; every board without explicit
+# tabs exposes a single virtual default tab so legacy boards keep working.
+MAX_TABS_PER_BOARD = 32
+TAB_NAME_LEN = 200
+DEFAULT_TAB_SLUG = "main"
+DEFAULT_TAB_NAME = "Main"
 
 # Active markup that can never persist in a widget: scripts, frames,
 # plug-ins, forms, inline handlers, and javascript: URLs. Matches are
@@ -873,7 +896,33 @@ def _migrate_canvas(conn: sqlite3.Connection) -> None:
         " id INTEGER PRIMARY KEY AUTOINCREMENT, board TEXT NOT NULL,"
         " payload TEXT NOT NULL, created_at REAL NOT NULL);"
         "CREATE INDEX IF NOT EXISTS idx_snapshots_board"
-        " ON canvas_snapshots(board, id);")
+        " ON canvas_snapshots(board, id);"
+        "CREATE TABLE IF NOT EXISTS board_tabs("
+        " id INTEGER PRIMARY KEY AUTOINCREMENT, board TEXT NOT NULL,"
+        " slug TEXT NOT NULL, name TEXT NOT NULL DEFAULT '',"
+        " position INTEGER NOT NULL DEFAULT 0,"
+        " created_at REAL NOT NULL, updated_at REAL NOT NULL,"
+        " UNIQUE(board, slug));"
+        "CREATE INDEX IF NOT EXISTS idx_tabs_board"
+        " ON board_tabs(board, position);"
+        "CREATE TABLE IF NOT EXISTS board_tab_roles("
+        " tab_id INTEGER NOT NULL, principal TEXT NOT NULL,"
+        " role TEXT NOT NULL, updated_at REAL NOT NULL,"
+        " PRIMARY KEY(tab_id, principal));")
+    _ensure_column(conn, "canvas_widgets", "tab", "TEXT")
+    _ensure_column(conn, "canvas_widgets", "grants",
+                   "TEXT NOT NULL DEFAULT '[]'")
+
+
+def _ensure_column(conn: sqlite3.Connection, table: str, name: str,
+                   decl: str) -> None:
+    """Additive-only column migration (no-op once the column exists).
+
+    Existing rows keep their stored data; nullable/defaulted columns mean
+    every legacy read keeps working unchanged."""
+    have = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+    if name not in have:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
 
 
 def sanitize_widget_content(text: str) -> Dict[str, Any]:
@@ -891,13 +940,44 @@ def sanitize_widget_content(text: str) -> Dict[str, Any]:
             "sanitized": removed > 0}
 
 
+def _row_keys(row: sqlite3.Row) -> set:
+    try:
+        return set(row.keys())
+    except AttributeError:
+        return set()
+
+
+def _parse_grants(raw: Any) -> List[str]:
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except (TypeError, ValueError):
+            return []
+    if not isinstance(raw, list):
+        return []
+    return [str(t) for t in raw if isinstance(t, str)]
+
+
 def _widget_dict(row: sqlite3.Row) -> Dict[str, Any]:
-    return {"id": row["id"], "board": row["board"], "kind": row["kind"],
-            "title": redact_spec(row["title"]),
-            "content": redact_spec(row["content"]),
-            "x": row["x"], "y": row["y"], "w": row["w"], "h": row["h"],
-            "created_at": row["created_at"],
-            "updated_at": row["updated_at"]}
+    keys = _row_keys(row)
+    kind = row["kind"]
+    tab = (row["tab"] if "tab" in keys else None) or DEFAULT_TAB_SLUG
+    grants = _parse_grants(row["grants"] if "grants" in keys else None)
+    inert = kind in WIDGET_MARKUP_KINDS
+    out = {"id": row["id"], "board": row["board"], "kind": kind,
+           "title": redact_spec(row["title"]),
+           "content": redact_spec(row["content"]),
+           "x": row["x"], "y": row["y"], "w": row["w"], "h": row["h"],
+           "tab": tab, "grants": grants,
+           "trust": WIDGET_TRUST_INERT if inert else WIDGET_TRUST_SANITIZED,
+           "inert": inert, "executable": False,
+           "created_at": row["created_at"],
+           "updated_at": row["updated_at"]}
+    if kind == "link":
+        out["url"] = redact_spec(row["content"])
+    return out
 
 
 def _check_widget_kind(kind: str) -> str:
@@ -905,6 +985,60 @@ def _check_widget_kind(kind: str) -> str:
     if clean not in WIDGET_KINDS:
         raise KanbanError(BAD_INPUT_CODE,
                           f"widget kind must be one of {WIDGET_KINDS}")
+    return clean
+
+
+def _widget_content_cap(kind: str) -> int:
+    if kind in WIDGET_MARKUP_KINDS:
+        return WIDGET_MARKUP_LEN
+    if kind == "link":
+        return WIDGET_URL_LEN
+    return WIDGET_CONTENT_LEN
+
+
+def _check_link_url(text: str) -> str:
+    """Validate a link reference WITHOUT fetching it (no SSRF surface).
+
+    http(s) only, with a host; stored verbatim as a reference and never
+    dereferenced by this module or the server."""
+    from urllib.parse import urlparse
+
+    raw = (text or "").strip()
+    if not raw:
+        raise KanbanError(BAD_INPUT_CODE, "link widget needs a url")
+    if len(raw) > WIDGET_URL_LEN:
+        raise KanbanError(BAD_INPUT_CODE,
+                          f"link url must be <={WIDGET_URL_LEN} chars")
+    parsed = urlparse(raw)
+    if parsed.scheme.lower() not in ("http", "https") or not parsed.netloc:
+        raise KanbanError(BAD_INPUT_CODE,
+                          "link url must be an absolute http(s):// reference"
+                          " (never fetched)")
+    return raw
+
+
+def _check_declared_grants(grants: Any) -> List[str]:
+    """Validate declared-only widget capability tokens (never granted)."""
+    if grants is None or grants == "":
+        return []
+    if isinstance(grants, str):
+        grants = [g for g in grants.replace(",", " ").split() if g]
+    if not isinstance(grants, (list, tuple)):
+        raise KanbanError(BAD_INPUT_CODE,
+                          "declared_grants must be a list of tokens")
+    if len(grants) > WIDGET_DECLARED_GRANTS_MAX:
+        raise KanbanError(BAD_INPUT_CODE,
+                          "declared_grants has too many tokens"
+                          f" (max {WIDGET_DECLARED_GRANTS_MAX})")
+    clean: List[str] = []
+    for token in grants:
+        text = str(token or "").strip().lower()
+        if text not in WIDGET_GRANT_TOKENS:
+            raise KanbanError(BAD_INPUT_CODE,
+                              f"unknown declared grant {text!r}; allowed: "
+                              f"{WIDGET_GRANT_TOKENS}")
+        if text not in clean:
+            clean.append(text)
     return clean
 
 
@@ -963,6 +1097,117 @@ def _require_canvas_role(conn: sqlite3.Connection, board: str,
                           f"{board!r}; {need} or owner required")
 
 
+# ------------------------------------------------------------------- tabs
+def _check_tab_slug(slug: str) -> str:
+    return _check_board_slug(slug)
+
+
+def _default_tab() -> Dict[str, Any]:
+    return {"id": None, "slug": DEFAULT_TAB_SLUG, "name": DEFAULT_TAB_NAME,
+            "position": 0, "default": True, "widget_count": 0}
+
+
+def _tab_dict(row: sqlite3.Row) -> Dict[str, Any]:
+    return {"id": row["id"], "slug": row["slug"],
+            "name": redact_spec(row["name"] or row["slug"]),
+            "position": row["position"],
+            "default": row["slug"] == DEFAULT_TAB_SLUG,
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"]}
+
+
+def _tabs(conn: sqlite3.Connection, board: str) -> List[sqlite3.Row]:
+    return conn.execute("SELECT * FROM board_tabs WHERE board=?"
+                        " ORDER BY position, id", (board,)).fetchall()
+
+
+def _get_tab(conn: sqlite3.Connection, board: str,
+             slug: str) -> sqlite3.Row:
+    clean = _check_tab_slug(slug)
+    row = conn.execute("SELECT * FROM board_tabs WHERE board=? AND slug=?",
+                       (board, clean)).fetchone()
+    if row is None:
+        raise KanbanError(NOT_FOUND_CODE,
+                          f"no tab {slug!r} on board {board!r}")
+    return row
+
+
+def _tab_widget_counts(conn: sqlite3.Connection,
+                       board: str) -> Dict[str, int]:
+    counts: Dict[str, int] = {}
+    for r in conn.execute(
+            "SELECT COALESCE(tab, ?) AS t, COUNT(*) AS c FROM canvas_widgets"
+            " WHERE board=? GROUP BY COALESCE(tab, ?)",
+            (DEFAULT_TAB_SLUG, board, DEFAULT_TAB_SLUG)):
+        counts[r["t"]] = r["c"]
+    return counts
+
+
+def _tabs_payload(conn: sqlite3.Connection, board: str) -> List[Dict[str, Any]]:
+    rows = _tabs(conn, board)
+    counts = _tab_widget_counts(conn, board)
+    if not rows:
+        out = _default_tab()
+        out["widget_count"] = counts.get(DEFAULT_TAB_SLUG, 0)
+        return [out]
+    payload = []
+    for row in rows:
+        item = _tab_dict(row)
+        item["widget_count"] = counts.get(row["slug"], 0)
+        payload.append(item)
+    return payload
+
+
+def _widget_tab_slug(conn: sqlite3.Connection, board: str,
+                     tab: str) -> Optional[str]:
+    """Resolve a widget's tab slug; the virtual default stores NULL."""
+    text = (tab or "").strip().lower()
+    if not text or text == DEFAULT_TAB_SLUG:
+        row = conn.execute("SELECT slug FROM board_tabs WHERE board=?"
+                           " AND slug=?", (board, DEFAULT_TAB_SLUG)).fetchone()
+        return row["slug"] if row else None
+    row = conn.execute("SELECT slug FROM board_tabs WHERE board=? AND slug=?",
+                       (board, text)).fetchone()
+    if row is None:
+        raise KanbanError(NOT_FOUND_CODE,
+                          f"no tab {tab!r} on board {board!r}")
+    return row["slug"]
+
+
+def _tab_roles(conn: sqlite3.Connection, tab_id: int) -> Dict[str, str]:
+    return {r["principal"]: r["role"] for r in conn.execute(
+        "SELECT principal, role FROM board_tab_roles WHERE tab_id=?",
+        (int(tab_id),))}
+
+
+def _require_tab_role(conn: sqlite3.Connection, board: str, tab_id: int,
+                      principal: str, need: str) -> None:
+    """Enforce a per-tab role without ever widening board access.
+
+    Tab grants are a *ceiling* applied on top of the board role: a tab
+    role can only lower a principal's rank (``min`` of board and tab),
+    and a tab grant to a principal with no board role grants nothing.
+    Unrestricted boards (no board role rows) ignore tab grants entirely,
+    preserving the legacy behavior."""
+    if not principal:
+        return
+    board_roles = _canvas_roles(conn, board)
+    if not board_roles:
+        return
+    board_rank = _ROLE_RANK.get(board_roles.get(principal, ""), 0)
+    tab_roles = _tab_roles(conn, tab_id) if tab_id else {}
+    effective = board_rank
+    if principal in tab_roles:
+        effective = min(board_rank,
+                        _ROLE_RANK.get(tab_roles[principal], 0))
+    if effective < _ROLE_RANK[need]:
+        raise KanbanError(DENIED_CODE,
+                          f"principal {principal!r} has no {need} grant on"
+                          f" tab {tab_id} (board role "
+                          f"{board_roles.get(principal, 'none')})")
+    return
+
+
 def _snapshot_canvas(conn: sqlite3.Connection, board: str) -> int:
     """Auto-snapshot widgets+layout+roles+task positions (rollback)."""
     payload = json.dumps({
@@ -974,6 +1219,11 @@ def _snapshot_canvas(conn: sqlite3.Connection, board: str) -> int:
             "SELECT * FROM canvas_layouts WHERE board=?", (board,))],
         "roles": [dict(r) for r in conn.execute(
             "SELECT * FROM board_roles WHERE board=?", (board,))],
+        "tabs": [dict(r) for r in conn.execute(
+            "SELECT * FROM board_tabs WHERE board=?", (board,))],
+        "tab_roles": [dict(r) for r in conn.execute(
+            "SELECT tr.* FROM board_tab_roles tr JOIN board_tabs t"
+            " ON t.id=tr.tab_id WHERE t.board=?", (board,))],
         "task_positions": [dict(r) for r in conn.execute(
             "SELECT id, board, status, assignee FROM tasks WHERE board=?",
             (board,))],
@@ -1023,10 +1273,11 @@ def board_open(cfg: Any, board: str = "main") -> Dict[str, Any]:
             "SELECT * FROM canvas_widgets WHERE board=? ORDER BY y, x, id",
             (slug,))]
         roles = _canvas_roles(conn, slug)
+        tabs = _tabs_payload(conn, slug)
         counts = {s: len(by_column.get(s, [])) for s in STATUSES}
         return {"state": "OK", "board": slug, "columns": columns,
                 "by_column": by_column, "counts": counts,
-                "widgets": widgets, "roles": roles,
+                "widgets": widgets, "roles": roles, "tabs": tabs,
                 "restricted": bool(roles),
                 "owner": "qubit-policy",
                 "rollback": "read-only; nothing changed"}
@@ -1093,25 +1344,57 @@ def move_task(cfg: Any, task_id: int, *, board: str = "",
         conn.close()
 
 
-def widget_add(cfg: Any, board: str, kind: str, title: str, *,
-               content: str = "", x: int = 0, y: int = 0,
+def widget_add(cfg: Any, board: str = "main", kind: str = "",
+               title: str = "", *,
+               content: str = "", content_kind: str = "",
+               tab: str = "", declared_grants: Optional[List[str]] = None,
+               x: int = 0, y: int = 0,
                w: int = 4, h: int = 3,
-               requested_by: str = "cli:user",
+               requested_by: str = "cli:user", principal: str = "",
                confirmed: bool = False) -> Dict[str, Any]:
-    """Add a sandboxed widget to the board canvas (confirmed)."""
+    """Add a sandboxed widget to the board canvas (confirmed).
+
+    ``kind`` (or its alias ``content_kind``) selects the content kind:
+    ``note``/``text`` are sanitized plain text; ``link`` stores an
+    http(s) URL as a reference only (never fetched, so no SSRF);
+    ``html``/``svg`` are stored verbatim as INERT content and returned
+    with an explicit ``trust: "inert"`` marker — the backend never
+    renders or executes them. ``declared_grants`` records review-only
+    capability tokens from a closed allow-list; they grant nothing."""
     _canvas_guard(cfg, "widget-add", confirmed)
     slug = _check_board_slug(board or "main")
-    clean_kind = _check_widget_kind(kind)
-    clean_title = _check_title(title)
-    if len(content or "") > WIDGET_CONTENT_LEN:
+    raw_kind = (content_kind or kind or "").strip().lower()
+    if kind and content_kind and \
+            kind.strip().lower() != content_kind.strip().lower():
         raise KanbanError(BAD_INPUT_CODE,
-                          f"content must be <={WIDGET_CONTENT_LEN} chars")
-    scrubbed = sanitize_widget_content(content or "")
+                          "widget kind and content_kind disagree")
+    clean_kind = _check_widget_kind(raw_kind)
+    clean_title = _check_title(title)
+    body = content or ""
+    cap = _widget_content_cap(clean_kind)
+    if len(body) > cap:
+        raise KanbanError(BAD_INPUT_CODE,
+                          f"content must be <={cap} chars for {clean_kind!r}")
+    if clean_kind == "link":
+        body = _check_link_url(body)
+        scrubbed = {"content": body, "removed": 0, "sanitized": False}
+    elif clean_kind in WIDGET_MARKUP_KINDS:
+        # Inert markup: persisted verbatim, never executed server-side.
+        scrubbed = {"content": body, "removed": 0, "sanitized": False}
+    else:
+        scrubbed = sanitize_widget_content(body)
+    grants = _check_declared_grants(declared_grants)
     conn = _connect(cfg)
     try:
         _migrate(conn)
         _migrate_canvas(conn)
         _get_board(conn, slug)
+        tab_slug = _widget_tab_slug(conn, slug, tab)
+        tab_id = None
+        if tab_slug is not None:
+            tab_id = _get_tab(conn, slug, tab_slug)["id"]
+        if principal and tab_id:
+            _require_tab_role(conn, slug, tab_id, principal, "editor")
         if conn.execute("SELECT COUNT(*) c FROM canvas_widgets WHERE board=?",
                         (slug,)).fetchone()["c"] >= WIDGET_MAX_PER_BOARD:
             raise KanbanError(EXISTS_CODE,
@@ -1119,18 +1402,22 @@ def widget_add(cfg: Any, board: str, kind: str, title: str, *,
                               f" ({WIDGET_MAX_PER_BOARD})")
         snap_id = _snapshot_canvas(conn, slug)
         cur = conn.execute("INSERT INTO canvas_widgets(board, kind, title,"
-                           " content, x, y, w, h, created_at, updated_at)"
-                           " VALUES(?,?,?,?,?,?,?,?,?,?)",
+                           " content, x, y, w, h, tab, grants, created_at,"
+                           " updated_at)"
+                           " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                            (slug, clean_kind, clean_title,
                             scrubbed["content"],
                             _check_grid("x", x, 0, 48),
                             _check_grid("y", y, 0, 200),
                             _check_grid("w", w, 1, 48),
                             _check_grid("h", h, 1, 200),
+                            tab_slug, json.dumps(grants),
                             _now(), _now()))
         conn.commit()
         _audit("canvas.widget_add", requested_by,
                {"board": slug, "widget_id": cur.lastrowid,
+                "kind": clean_kind, "tab": tab_slug or DEFAULT_TAB_SLUG,
+                "inert": clean_kind in WIDGET_MARKUP_KINDS,
                 "sanitized": scrubbed["sanitized"]})
         row = conn.execute("SELECT * FROM canvas_widgets WHERE id=?",
                            (cur.lastrowid,)).fetchone()
@@ -1144,18 +1431,32 @@ def widget_add(cfg: Any, board: str, kind: str, title: str, *,
         conn.close()
 
 
-def widget_list(cfg: Any, board: str = "main") -> Dict[str, Any]:
-    """List canvas widgets newest-position-first (read-only)."""
+def widget_list(cfg: Any, board: str = "main",
+                tab: str = "") -> Dict[str, Any]:
+    """List canvas widgets newest-position-first (read-only).
+
+    ``tab`` optionally filters to one tab (the virtual default when the
+    board has no explicit tabs)."""
     slug = _check_board_slug(board or "main")
     conn = _connect(cfg)
     try:
         _migrate(conn)
         _migrate_canvas(conn)
         _get_board(conn, slug)
-        return {"state": "OK", "board": slug, "widgets": [
-            _widget_dict(r) for r in conn.execute(
-                "SELECT * FROM canvas_widgets WHERE board=?"
-                " ORDER BY y, x, id", (slug,))]}
+        clauses, params = ["board=?"], [slug]
+        if tab:
+            tab_slug = _widget_tab_slug(conn, slug, tab)
+            if tab_slug is None:
+                clauses.append("(tab IS NULL OR tab=?)")
+                params.append(DEFAULT_TAB_SLUG)
+            else:
+                clauses.append("tab=?")
+                params.append(tab_slug)
+        rows = conn.execute(
+            "SELECT * FROM canvas_widgets WHERE " + " AND ".join(clauses)
+            + " ORDER BY y, x, id", params).fetchall()
+        return {"state": "OK", "board": slug, "tab": tab or "",
+                "widgets": [_widget_dict(r) for r in rows]}
     finally:
         conn.close()
 
@@ -1222,6 +1523,264 @@ def widget_remove(cfg: Any, widget_id: int, *,
         return {"state": "OK", "removed": row["id"], "board": row["board"],
                 "rollback": f"canvas snapshot #{snap_id}; "
                             "`kanban snapshot-restore` brings it back"}
+    finally:
+        conn.close()
+
+
+def tab_create(cfg: Any, board: str = "main", slug: str = "",
+               name: str = "", *, requested_by: str = "cli:user",
+               confirmed: bool = False) -> Dict[str, Any]:
+    """Create an ordered tab on a board (confirmed; auto-snapshots).
+
+    The virtual default tab (``main``) can be materialised explicitly;
+    otherwise it stays virtual and existing boards keep working."""
+    _canvas_guard(cfg, "tab-create", confirmed)
+    board_slug = _check_board_slug(board or "main")
+    tab_slug = _check_tab_slug(slug)
+    label = (name or tab_slug).strip()[:TAB_NAME_LEN] or tab_slug
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        _get_board(conn, board_slug)
+        if conn.execute("SELECT COUNT(*) c FROM board_tabs WHERE board=?",
+                        (board_slug,)).fetchone()["c"] >= MAX_TABS_PER_BOARD:
+            raise KanbanError(EXISTS_CODE,
+                              f"board {board_slug!r} tab limit reached"
+                              f" ({MAX_TABS_PER_BOARD})")
+        nxt = conn.execute("SELECT COALESCE(MAX(position), -1) + 1 AS p"
+                           " FROM board_tabs WHERE board=?",
+                           (board_slug,)).fetchone()["p"]
+        snap_id = _snapshot_canvas(conn, board_slug)
+        try:
+            cur = conn.execute(
+                "INSERT INTO board_tabs(board, slug, name, position,"
+                " created_at, updated_at) VALUES(?,?,?,?,?,?)",
+                (board_slug, tab_slug, label, int(nxt), _now(), _now()))
+        except sqlite3.IntegrityError:
+            raise KanbanError(EXISTS_CODE,
+                              f"tab {tab_slug!r} exists on {board_slug!r}") \
+                from None
+        conn.commit()
+        _audit("canvas.tab_create", requested_by,
+               {"board": board_slug, "tab": tab_slug,
+                "tab_id": cur.lastrowid})
+        return {"state": "OK", "board": board_slug, "tab": tab_slug,
+                "tab_id": cur.lastrowid, "snapshot_id": snap_id,
+                "rollback": f"canvas snapshot #{snap_id}"}
+    finally:
+        conn.close()
+
+
+def tab_list(cfg: Any, board: str = "main") -> Dict[str, Any]:
+    """List ordered board tabs (read-only).
+
+    A board without explicit tabs reports one virtual default tab so
+    legacy boards and their widgets remain addressable."""
+    board_slug = _check_board_slug(board or "main")
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        _get_board(conn, board_slug)
+        has_rows = bool(_tabs(conn, board_slug))
+        tabs = _tabs_payload(conn, board_slug)
+        return {"state": "OK", "board": board_slug, "tabs": tabs,
+                "virtual_default": not has_rows}
+    finally:
+        conn.close()
+
+
+def tab_rename(cfg: Any, board: str, tab: str, name: str, *,
+               requested_by: str = "cli:user",
+               confirmed: bool = False) -> Dict[str, Any]:
+    """Rename a tab's display label (slug stays stable; auto-snapshots)."""
+    _canvas_guard(cfg, "tab-rename", confirmed)
+    board_slug = _check_board_slug(board or "main")
+    clean_name = (name or "").strip()
+    if not clean_name or len(clean_name) > TAB_NAME_LEN:
+        raise KanbanError(BAD_INPUT_CODE,
+                          f"tab name must be 1..{TAB_NAME_LEN} chars")
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        _get_board(conn, board_slug)
+        row = _get_tab(conn, board_slug, tab)
+        snap_id = _snapshot_canvas(conn, board_slug)
+        conn.execute("UPDATE board_tabs SET name=?, updated_at=?"
+                     " WHERE id=?", (clean_name[:TAB_NAME_LEN], _now(),
+                                     row["id"]))
+        conn.commit()
+        _audit("canvas.tab_rename", requested_by,
+               {"board": board_slug, "tab": row["slug"],
+                "name": clean_name[:TAB_NAME_LEN]})
+        return {"state": "OK", "board": board_slug, "tab": row["slug"],
+                "name": redact_spec(clean_name[:TAB_NAME_LEN]),
+                "snapshot_id": snap_id,
+                "rollback": f"canvas snapshot #{snap_id}"}
+    finally:
+        conn.close()
+
+
+def tab_delete(cfg: Any, board: str, tab: str, *,
+               requested_by: str = "cli:user",
+               confirmed: bool = False) -> Dict[str, Any]:
+    """Delete a tab (confirmed; re-homes its widgets and auto-snapshots)."""
+    _canvas_guard(cfg, "tab-delete", confirmed)
+    board_slug = _check_board_slug(board or "main")
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        _get_board(conn, board_slug)
+        row = _get_tab(conn, board_slug, tab)
+        snap_id = _snapshot_canvas(conn, board_slug)
+        moved = conn.execute(
+            "UPDATE canvas_widgets SET tab=NULL, updated_at=?"
+            " WHERE board=? AND tab=?", (_now(), board_slug, row["slug"])).rowcount
+        conn.execute("DELETE FROM board_tab_roles WHERE tab_id=?",
+                     (row["id"],))
+        conn.execute("DELETE FROM board_tabs WHERE id=?", (row["id"],))
+        conn.commit()
+        _audit("canvas.tab_delete", requested_by,
+               {"board": board_slug, "tab": row["slug"],
+                "widgets_rehomed": moved})
+        return {"state": "OK", "board": board_slug, "removed": row["slug"],
+                "widgets_rehomed": moved, "snapshot_id": snap_id,
+                "rollback": f"canvas snapshot #{snap_id}; "
+                            "`kanban snapshot-restore` brings it back"}
+    finally:
+        conn.close()
+
+
+def tab_move(cfg: Any, board: str, tab: str, position: int, *,
+             requested_by: str = "cli:user",
+             confirmed: bool = False) -> Dict[str, Any]:
+    """Reorder a tab to a 0-based position (confirmed; auto-snapshots)."""
+    _canvas_guard(cfg, "tab-move", confirmed)
+    board_slug = _check_board_slug(board or "main")
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        _get_board(conn, board_slug)
+        row = _get_tab(conn, board_slug, tab)
+        order = [r["id"] for r in _tabs(conn, board_slug)]
+        order.remove(row["id"])
+        try:
+            pos = int(position)
+        except (TypeError, ValueError):
+            raise KanbanError(BAD_INPUT_CODE,
+                              "tab position must be an integer") from None
+        pos = max(0, min(pos, len(order)))
+        order.insert(pos, row["id"])
+        snap_id = _snapshot_canvas(conn, board_slug)
+        for index, tab_id in enumerate(order):
+            conn.execute("UPDATE board_tabs SET position=?, updated_at=?"
+                         " WHERE id=?", (index, _now(), tab_id))
+        conn.commit()
+        _audit("canvas.tab_move", requested_by,
+               {"board": board_slug, "tab": row["slug"], "position": pos})
+        return {"state": "OK", "board": board_slug, "tab": row["slug"],
+                "position": pos, "snapshot_id": snap_id,
+                "rollback": f"canvas snapshot #{snap_id}"}
+    finally:
+        conn.close()
+
+
+def tab_role_grant(cfg: Any, board: str, tab: str, principal: str,
+                   role: str, *, requested_by: str = "cli:user",
+                   confirmed: bool = False) -> Dict[str, Any]:
+    """Grant a tab-scoped role (confirmed; never widens board access).
+
+    A tab grant is a *ceiling* on top of the board role: it can only
+    lower a principal's effective rank, and it grants nothing to a
+    principal with no board role."""
+    _canvas_guard(cfg, "tab-role-grant", confirmed)
+    board_slug = _check_board_slug(board or "main")
+    who = (principal or "").strip()[:80]
+    if not who:
+        raise KanbanError(BAD_INPUT_CODE, "principal is required")
+    clean_role = (role or "").strip().lower()
+    if clean_role not in CANVAS_ROLES:
+        raise KanbanError(BAD_INPUT_CODE,
+                          f"role must be one of {CANVAS_ROLES}")
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        _get_board(conn, board_slug)
+        row = _get_tab(conn, board_slug, tab)
+        snap_id = _snapshot_canvas(conn, board_slug)
+        conn.execute("INSERT INTO board_tab_roles(tab_id, principal, role,"
+                     " updated_at) VALUES(?,?,?,?)"
+                     " ON CONFLICT(tab_id, principal) DO UPDATE SET"
+                     " role=excluded.role, updated_at=excluded.updated_at",
+                     (row["id"], who, clean_role, _now()))
+        conn.commit()
+        _audit("canvas.tab_role_grant", requested_by,
+               {"board": board_slug, "tab": row["slug"], "principal": who,
+                "role": clean_role})
+        board_roles = _canvas_roles(conn, board_slug)
+        if board_roles and who in board_roles:
+            effective = min(_ROLE_RANK.get(board_roles[who], 0),
+                            _ROLE_RANK.get(clean_role, 0))
+            effective_role = next((r for r, rank in _ROLE_RANK.items()
+                                   if rank == effective), "none")
+        else:
+            effective_role = "none"
+        return {"state": "OK", "board": board_slug, "tab": row["slug"],
+                "principal": who, "role": clean_role,
+                "board_restricted": bool(board_roles),
+                "effective_role": effective_role,
+                "snapshot_id": snap_id,
+                "rollback": f"canvas snapshot #{snap_id}"}
+    finally:
+        conn.close()
+
+
+def tab_role_revoke(cfg: Any, board: str, tab: str, principal: str, *,
+                    requested_by: str = "cli:user",
+                    confirmed: bool = False) -> Dict[str, Any]:
+    """Revoke a tab-scoped role (confirmed; auto-snapshots)."""
+    _canvas_guard(cfg, "tab-role-revoke", confirmed)
+    board_slug = _check_board_slug(board or "main")
+    who = (principal or "").strip()[:80]
+    if not who:
+        raise KanbanError(BAD_INPUT_CODE, "principal is required")
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        _get_board(conn, board_slug)
+        row = _get_tab(conn, board_slug, tab)
+        snap_id = _snapshot_canvas(conn, board_slug)
+        cur = conn.execute("DELETE FROM board_tab_roles WHERE tab_id=? AND"
+                           " principal=?", (row["id"], who))
+        conn.commit()
+        _audit("canvas.tab_role_revoke", requested_by,
+               {"board": board_slug, "tab": row["slug"], "principal": who})
+        return {"state": "OK", "board": board_slug, "tab": row["slug"],
+                "principal": who, "revoked": cur.rowcount > 0,
+                "snapshot_id": snap_id,
+                "rollback": f"canvas snapshot #{snap_id}"}
+    finally:
+        conn.close()
+
+
+def tab_roles_list(cfg: Any, board: str, tab: str) -> Dict[str, Any]:
+    """List tab-scoped roles (read-only)."""
+    board_slug = _check_board_slug(board or "main")
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        _get_board(conn, board_slug)
+        row = _get_tab(conn, board_slug, tab)
+        return {"state": "OK", "board": board_slug, "tab": row["slug"],
+                "roles": _tab_roles(conn, row["id"]),
+                "board_roles": _canvas_roles(conn, board_slug)}
     finally:
         conn.close()
 
@@ -1401,14 +1960,18 @@ def snapshot_restore(cfg: Any, snapshot_id: int, *,
         pre_id = _snapshot_canvas(conn, board)
         conn.execute("DELETE FROM canvas_widgets WHERE board=?", (board,))
         for w in snap.get("widgets", []):
+            raw_grants = w.get("grants", "[]")
+            if not isinstance(raw_grants, str):
+                raw_grants = json.dumps(raw_grants or [])
             conn.execute("INSERT INTO canvas_widgets(id, board, kind, title,"
-                         " content, x, y, w, h, created_at, updated_at)"
-                         " VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                         " content, x, y, w, h, tab, grants, created_at,"
+                         " updated_at)"
+                         " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                          (w.get("id"), board, w.get("kind", "note"),
                           w.get("title", ""), w.get("content", ""),
                           w.get("x", 0), w.get("y", 0), w.get("w", 4),
-                          w.get("h", 3), w.get("created_at", _now()),
-                          _now()))
+                          w.get("h", 3), w.get("tab"), raw_grants,
+                          w.get("created_at", _now()), _now()))
         conn.execute("DELETE FROM canvas_layouts WHERE board=?", (board,))
         for layout in snap.get("layouts", []):
             conn.execute("INSERT INTO canvas_layouts(board, columns,"
@@ -1422,6 +1985,22 @@ def snapshot_restore(cfg: Any, snapshot_id: int, *,
                          " updated_at) VALUES(?,?,?,?)",
                          (board, role.get("principal"),
                           role.get("role", "viewer"), _now()))
+        conn.execute(
+            "DELETE FROM board_tab_roles WHERE tab_id IN"
+            " (SELECT id FROM board_tabs WHERE board=?)", (board,))
+        conn.execute("DELETE FROM board_tabs WHERE board=?", (board,))
+        for tab in snap.get("tabs", []):
+            conn.execute("INSERT INTO board_tabs(id, board, slug, name,"
+                         " position, created_at, updated_at)"
+                         " VALUES(?,?,?,?,?,?,?)",
+                         (tab.get("id"), board, tab["slug"],
+                          tab.get("name", ""), tab.get("position", 0),
+                          tab.get("created_at", _now()), _now()))
+        for troupe in snap.get("tab_roles", []):
+            conn.execute("INSERT INTO board_tab_roles(tab_id, principal,"
+                         " role, updated_at) VALUES(?,?,?,?)",
+                         (troupe.get("tab_id"), troupe.get("principal"),
+                          troupe.get("role", "viewer"), _now()))
         moved = 0
         for pos in snap.get("task_positions", []):
             cur = conn.execute("SELECT id FROM tasks WHERE id=?",

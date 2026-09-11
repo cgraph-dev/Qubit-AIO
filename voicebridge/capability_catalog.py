@@ -21,13 +21,24 @@ def _load(name: str) -> Dict[str, Any]:
         return json.load(fh)
 
 
-_IMPLEMENTED_VERDICTS = {"IMPLEMENTED", "REUSE", "ADAPT", "MISSING"}
+_IMPLEMENTED_VERDICTS = {"IMPLEMENTED", "REUSE", "ADAPT"}
 
 
 def _state_of(row: Dict[str, Any]) -> str:
-    verdict = str(row.get("verdict", ""))
+    # Honesty rule (OpenClaw audit §4.1): a row's own explicit ``status``
+    # field is authoritative. ``verdict`` is only a fallback for rows that
+    # predate that field. In particular ``MISSING`` no longer silently means
+    # IMPLEMENTED: it resolves to NOT_UPSTREAM (a Qubit-owned capability with
+    # no upstream ancestry), so a future genuine gap row entered as MISSING
+    # cannot be reported as a completed inherited capability.
+    status = str(row.get("status", "")).strip().upper()
+    if status in ("IMPLEMENTED", "BLOCKED", "REJECTED"):
+        return status
+    verdict = str(row.get("verdict", "")).strip().upper()
     if verdict in _IMPLEMENTED_VERDICTS:
         return "IMPLEMENTED"
+    if verdict == "MISSING":
+        return "NOT_UPSTREAM"
     return verdict if verdict in ("BLOCKED", "REJECTED") else "UNKNOWN"
 
 
@@ -80,6 +91,15 @@ def check(name: str) -> Dict[str, Any]:
         return {**base, "state": "IMPLEMENTED", "code": "OK",
                 "explanation": str(row.get("qubit") or row.get("proof") or
                                    "Available through Qubit.")[:300],
+                "proof": str(row.get("proof", ""))[:300]}
+    if state == "NOT_UPSTREAM":
+        # Qubit-owned capability with no upstream ancestry. It is still a
+        # real, proved Qubit path; the distinct state prevents conflating
+        # "not inherited from upstream" with "upstream gap closed".
+        return {**base, "state": "NOT_UPSTREAM", "code": "NOT_UPSTREAM",
+                "explanation": str(row.get("user_explanation") or
+                                   row.get("proof") or
+                                   "Qubit-owned capability.")[:400],
                 "proof": str(row.get("proof", ""))[:300]}
     code = str(row.get("code", "") or
                ("BLOCKED_" + str(row.get("id", "unknown")).upper()

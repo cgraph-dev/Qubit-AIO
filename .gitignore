@@ -18,3 +18,8 @@ Modelfile.qubit4
 
 # Packet 8K release certification output (wheel/sdist + clean-HOME installs).
 /dist/
+
+# Vendored Hermes dashboard build artifacts (regenerable; see
+# frontend/hermes-qubit/README.md). Vendored SOURCES are committed.
+frontend/hermes-web/node_modules/
+frontend/hermes-dist/

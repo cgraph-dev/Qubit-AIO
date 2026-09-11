@@ -11,7 +11,23 @@ Scheduling authority: this module holds NO timer, thread, daemon, or
 autonomous loop — jobs run only when ``run_due`` is invoked explicitly
 (CLI/dashboard/voice) or by the operator's existing monitor/systemd
 timer. The monitor remains the sole autonomous scheduler; there is one
-scheduling authority, not two.
+scheduling authority, not two. ``autofire`` is the bounded, fail-closed
+entry point that existing restart-safe monitor loop calls once per tick;
+it adds no authority of its own and is a thin wrapper over ``run_due``.
+
+Delivery: a job may declare one or more delivery targets at creation time
+(``channel:<account>[:<recipient>]`` or ``webhook:<sub_id>``, comma
+separated). After a run completes, the bounded, redacted result is handed
+to the target(s) through the EXISTING transports — the messaging outbox
+(``messaging.draft``/``messaging.send``) for channels and a delegated
+webhook transport for subscriptions — so this module owns no transport of
+its own. Configuration is stored only (nothing is sent at create time,
+and the confirming user already authorized the target). Delivery is
+estop-aware, audited (references only), idempotent (one delivery row per
+run+target; the messaging idempotency key is keyed by the run), and
+fail-closed: a target with no credential/transport records a typed
+``UNAVAILABLE`` (never a fabricated ``SENT``). A delivery outcome lives
+in its own table and can never corrupt the run receipt or later jobs.
 
 Qubit implements cron jobs, a scheduler, executions, and a ledger
 (``cron/jobs.py``, ``cron/scheduler*.py``, ``cron/executions.py``,
@@ -42,6 +58,31 @@ MIN_INTERVAL_MIN = 5
 MAX_INTERVAL_MIN = 10080  # one week
 LIST_MAX = 100
 
+# The monitor's self-fire tick actor (audit attribution) and the hard cap on
+# jobs any single tick may claim, so a backlog can never monopolize a pass.
+MONITOR_ACTOR = "monitor:autofire"
+AUTOFIRE_LIMIT = 5
+
+# Delivery codes: a scheduled result is only ever reported SENT when a real
+# transport confirmed it. Missing credentials/adapters and a latched e-stop
+# are typed UNAVAILABLE, never a fabricated success.
+DELIVERY_SENT_CODE = "SCHEDULE_DELIVERY_SENT"
+DELIVERY_UNAVAILABLE_CODE = "SCHEDULE_DELIVERY_UNAVAILABLE"
+DELIVERY_FAILED_CODE = "SCHEDULE_DELIVERY_FAILED"
+DELIVERY_ESTOP_CODE = "SCHEDULE_DELIVERY_ESTOP"
+
+MAX_TARGETS = 5
+MAX_TARGET_LEN = 400
+MAX_DELIVERY_BODY = 1000
+MAX_DELIVERY_DETAIL = 200
+
+# Optional outbound webhook transport (delegated). Qubit ships no outbound
+# webhook POST authority; when no adapter is installed a webhook target is a
+# typed UNAVAILABLE. A future adapter can be injected here (or per call)
+# without this module growing a second transport. Signature:
+#   transport(cfg, subscription, payload) -> {"state": "OK"|...}
+_WEBHOOK_DELIVER: Optional[Callable[..., Dict[str, Any]]] = None
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS jobs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,7 +99,8 @@ CREATE TABLE IF NOT EXISTS jobs (
   updated_at REAL NOT NULL,
   last_run_at REAL NOT NULL DEFAULT 0,
   last_state TEXT NOT NULL DEFAULT '',
-  run_count INTEGER NOT NULL DEFAULT 0
+  run_count INTEGER NOT NULL DEFAULT 0,
+  deliver_to TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS runs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,6 +110,18 @@ CREATE TABLE IF NOT EXISTS runs (
   state TEXT NOT NULL DEFAULT 'RUNNING',
   code TEXT NOT NULL DEFAULT '',
   detail TEXT NOT NULL DEFAULT ''
+);
+-- One row per (run, target): the PRIMARY KEY is the idempotency guarantee,
+-- so a delivery attempt is recorded exactly once per run+target.
+CREATE TABLE IF NOT EXISTS deliveries (
+  run_id INTEGER NOT NULL,
+  job_id INTEGER NOT NULL,
+  target TEXT NOT NULL,
+  state TEXT NOT NULL DEFAULT 'PENDING',
+  code TEXT NOT NULL DEFAULT '',
+  detail TEXT NOT NULL DEFAULT '',
+  attempted_at REAL NOT NULL DEFAULT 0,
+  PRIMARY KEY (run_id, target)
 );
 """
 
@@ -85,6 +139,15 @@ def redact_spec(text: Any) -> str:
     try:
         from .redaction import redact_text as _redact
         return _redact(str(text or ""))[:300]
+    except Exception:
+        return "?"
+
+
+def _redact_bounded(text: Any, limit: int = MAX_DELIVERY_DETAIL) -> str:
+    """Redact then bound; used for any delivery payload/receipt text."""
+    try:
+        from .redaction import redact_text as _redact
+        return _redact(str(text or ""))[:max(1, int(limit))]
     except Exception:
         return "?"
 
@@ -129,6 +192,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
     if "updated_at" not in cols:
         conn.execute("ALTER TABLE jobs ADD COLUMN updated_at REAL "
                      "NOT NULL DEFAULT 0")
+    if "deliver_to" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN deliver_to TEXT "
+                     "NOT NULL DEFAULT ''")
 
 
 def _audit(op: str, actor: str, detail: Dict[str, Any]) -> None:
@@ -151,7 +217,8 @@ def _job_dict(row: sqlite3.Row) -> Dict[str, Any]:
             "updated_at": row["updated_at"],
             "last_run_at": row["last_run_at"],
             "last_state": row["last_state"],
-            "run_count": row["run_count"]}
+            "run_count": row["run_count"],
+            "deliver_to": row["deliver_to"]}
 
 
 def _check_name(name: str) -> str:
@@ -285,11 +352,102 @@ def _due(job: Dict[str, Any], now: float) -> bool:
     return False
 
 
+# --------------------------------------------------------- delivery config
+def _parse_target(raw: str) -> Dict[str, str]:
+    text = str(raw or "").strip()
+    if not text or len(text) > MAX_TARGET_LEN:
+        raise SchedulesError(BAD_INPUT_CODE,
+                             "delivery target must be 1..400 chars")
+    kind, _, rest = text.partition(":")
+    kind, rest = kind.strip().lower(), rest.strip()
+    if kind == "webhook":
+        if not rest:
+            raise SchedulesError(BAD_INPUT_CODE,
+                                 "webhook target needs a subscription id")
+        return {"kind": "webhook", "sub": rest}
+    if kind == "channel":
+        account, _, recipient = rest.partition(":")
+        account, recipient = account.strip(), recipient.strip()
+        if not account or not recipient:
+            raise SchedulesError(
+                BAD_INPUT_CODE,
+                "channel target is channel:<account>:<recipient>")
+        return {"kind": "channel", "account": account, "to": recipient}
+    raise SchedulesError(
+        BAD_INPUT_CODE,
+        f"unknown delivery target {text[:60]!r}: use "
+        "channel:<account>:<recipient> or webhook:<sub_id>")
+
+
+def _target_key(target: Dict[str, str]) -> str:
+    if target.get("kind") == "channel":
+        return f"channel:{target.get('account', '')}:{target.get('to', '')}"
+    return f"webhook:{target.get('sub', '')}"
+
+
+def parse_delivery_spec(deliver_to: Any) -> List[Dict[str, str]]:
+    """Parse a stored delivery spec into bounded target dicts."""
+    text = str(deliver_to or "").strip()
+    if not text:
+        return []
+    parts = [p for p in re.split(r"[,;]", text) if p.strip()]
+    if len(parts) > MAX_TARGETS:
+        raise SchedulesError(BAD_INPUT_CODE,
+                             f"at most {MAX_TARGETS} delivery targets")
+    return [_parse_target(p) for p in parts]
+
+
+def _check_targets(cfg: Any, targets: List[Dict[str, str]]) -> str:
+    """Config-time validation only: the referenced account/subscription must
+    exist. Transport/credential availability is deliberately not probed (the
+    confirming user stores config; an absent transport surfaces as a typed
+    UNAVAILABLE at run time, never a fake send). Returns the canonical spec."""
+    if not targets:
+        return ""
+    from . import messaging as M
+    from . import webhooks as W
+
+    for target in targets:
+        if target["kind"] == "channel":
+            try:
+                M.account_show(cfg, target["account"])
+            except M.MessagingError as exc:
+                raise SchedulesError(
+                    BAD_INPUT_CODE,
+                    f"delivery account {target['account']!r} unavailable "
+                    f"({exc.code})") from None
+            except Exception:
+                raise SchedulesError(
+                    BAD_INPUT_CODE,
+                    f"delivery account {target['account']!r} "
+                    "unavailable") from None
+        else:
+            try:
+                W.show(cfg, target["sub"])
+            except W.WebhookError as exc:
+                raise SchedulesError(
+                    BAD_INPUT_CODE,
+                    f"delivery subscription {target['sub']!r} unavailable "
+                    f"({exc.code})") from None
+            except Exception:
+                raise SchedulesError(
+                    BAD_INPUT_CODE,
+                    f"delivery subscription {target['sub']!r} "
+                    "unavailable") from None
+    return ",".join(_target_key(t) for t in targets)
+
+
 # ------------------------------------------------------------------ CRUD
 def create(cfg: Any, name: str, task_text: str, when: str, *,
-           requested_by: str = "cli:user",
+           deliver_to: str = "", requested_by: str = "cli:user",
            confirmed: bool = False) -> Dict[str, Any]:
-    """Stage a scheduled job (confirmation required: unattended work)."""
+    """Stage a scheduled job (confirmation required: unattended work).
+
+    ``deliver_to`` names zero or more delivery targets to receive the run's
+    bounded, redacted result: ``channel:<account>:<recipient>`` and/or
+    ``webhook:<sub_id>``, comma separated. Only configuration is stored here
+    (the reference must already exist); nothing is delivered at create time.
+    """
     if not confirmed:
         raise SchedulesError(CONFIRM_CODE,
                              "scheduling unattended work requires explicit "
@@ -297,23 +455,25 @@ def create(cfg: Any, name: str, task_text: str, when: str, *,
     clean_name = _check_name(name)
     clean_task = _check_task(task_text)
     spec = parse_when(when)
+    canonical = _check_targets(cfg, parse_delivery_spec(deliver_to))
     conn = _connect(cfg)
     try:
         _migrate(conn)
         cur = conn.execute(
             "INSERT INTO jobs (name, task_text, kind, interval_min, hour, "
-            "minute, at_ts, enabled, created_by, created_at, updated_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            "minute, at_ts, enabled, created_by, created_at, updated_at, "
+            "deliver_to) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             (clean_name, clean_task, spec["kind"],
              int(spec.get("interval_min", 0)), int(spec.get("hour", -1)),
              int(spec.get("minute", 0)), float(spec.get("at_ts", 0.0)),
-             1, requested_by, _now(), _now()))
+             1, requested_by, _now(), _now(), canonical))
         conn.commit()
         job_id = int(cur.lastrowid)
         row = conn.execute("SELECT * FROM jobs WHERE id=?",
                            (job_id,)).fetchone()
         _audit("create", requested_by,
-               {"job_id": str(job_id), "kind": spec["kind"]})
+               {"job_id": str(job_id), "kind": spec["kind"],
+                "deliver_to": canonical})
         return {"state": "OK", "job": _job_dict(row)}
     finally:
         conn.close()
@@ -442,6 +602,251 @@ def history(cfg: Any, job_id: int = 0, limit: int = 30) -> Dict[str, Any]:
         conn.close()
 
 
+# --------------------------------------------------------------- delivery
+def _delivery_body(job: Dict[str, Any], outcome: Dict[str, Any]) -> str:
+    """Bounded, redacted body for one run (references only in head)."""
+    head = (f"[schedule #{job.get('id')} {job.get('name', '')}] "
+            f"{outcome.get('state', '')}:")
+    detail = _redact_bounded(outcome.get("detail", ""), MAX_DELIVERY_BODY)
+    return _redact_bounded(f"{head} {detail}", MAX_DELIVERY_BODY)
+
+
+def _record_delivery(cfg: Any, conn: sqlite3.Connection, job: Dict[str, Any],
+                     run_id: int, target: str, state: str, code: str,
+                     detail: str, requested_by: str) -> Dict[str, Any]:
+    """Persist one delivery outcome (idempotent) + a bodyless audit event."""
+    clean = _redact_bounded(detail, MAX_DELIVERY_DETAIL)
+    conn.execute(
+        "INSERT OR IGNORE INTO deliveries "
+        "(run_id, job_id, target, state, code, detail, attempted_at) "
+        "VALUES (?,?,?,?,?,?,?)",
+        (run_id, job["id"], target, state, code[:80], clean, _now()))
+    conn.commit()
+    _audit("deliver", requested_by,
+           {"job_id": str(job["id"]), "run_id": str(run_id),
+            "target": target[:120], "state": state, "code": code[:80]})
+    return {"target": target, "state": state, "code": code[:80],
+            "detail": clean}
+
+
+def _msg_unavailable(M: Any) -> set:
+    return {M.NO_CREDENTIAL_CODE, M.UNAVAILABLE_CODE, M.NO_TRANSPORT_CODE,
+            M.NOT_PAIRED_CODE, M.ESTOP_CODE}
+
+
+def _find_outbox_msg(cfg: Any, key: str) -> str:
+    from . import messaging as M
+
+    try:
+        out = M.list_msgs(cfg)
+    except Exception:
+        return ""
+    for rec in out.get("messages", []):
+        if rec.get("idempotency_key") == key:
+            return str(rec.get("id", ""))
+    return ""
+
+
+def _deliver_channel(cfg: Any, conn: sqlite3.Connection, job: Dict[str, Any],
+                     run_id: int, target: Dict[str, str], body: str,
+                     tkey: str, requested_by: str) -> Dict[str, Any]:
+    """Deliver through the EXISTING messaging outbox (draft -> send)."""
+    from . import messaging as M
+
+    account = target["account"]
+    # Per-run idempotency: a crash/replay can never create a second send.
+    idem = f"schedule-{job['id']}-run-{run_id}"
+    try:
+        msg_id = M.draft(cfg, account, target.get("to", ""), body,
+                         idempotency_key=idem, requested_by=requested_by,
+                         confirmed=True)["message"]["id"]
+    except M.MessagingError as exc:
+        if exc.code == M.EXISTS_CODE:
+            msg_id = _find_outbox_msg(cfg, idem)
+            if not msg_id:
+                return _record_delivery(
+                    cfg, conn, job, run_id, tkey, "UNAVAILABLE",
+                    DELIVERY_UNAVAILABLE_CODE,
+                    "idempotency key held by an unknown message",
+                    requested_by)
+        else:
+            state = ("UNAVAILABLE" if exc.code in _msg_unavailable(M)
+                     else "FAILED")
+            code = (exc.code if state == "UNAVAILABLE"
+                    else DELIVERY_FAILED_CODE)
+            return _record_delivery(cfg, conn, job, run_id, tkey, state,
+                                    code, exc.detail, requested_by)
+    except Exception as exc:  # noqa: BLE001 — delivery never corrupts a run
+        return _record_delivery(cfg, conn, job, run_id, tkey, "FAILED",
+                                DELIVERY_FAILED_CODE, str(exc), requested_by)
+    try:
+        sent = M.send(cfg, msg_id, requested_by=requested_by, confirmed=True)
+    except M.MessagingError as exc:
+        state = ("UNAVAILABLE" if exc.code in _msg_unavailable(M)
+                 else "FAILED")
+        code = (exc.code if state == "UNAVAILABLE" else DELIVERY_FAILED_CODE)
+        return _record_delivery(cfg, conn, job, run_id, tkey, state, code,
+                                exc.detail, requested_by)
+    except Exception as exc:  # noqa: BLE001
+        return _record_delivery(cfg, conn, job, run_id, tkey, "FAILED",
+                                DELIVERY_FAILED_CODE, str(exc), requested_by)
+    confirmed = (isinstance(sent, dict)
+                 and sent.get("message", {}).get("state") == M.SENT)
+    if not confirmed:
+        return _record_delivery(cfg, conn, job, run_id, tkey, "FAILED",
+                                DELIVERY_FAILED_CODE,
+                                "transport did not confirm the send",
+                                requested_by)
+    return _record_delivery(cfg, conn, job, run_id, tkey, "SENT",
+                            DELIVERY_SENT_CODE,
+                            f"delivered via account {account}", requested_by)
+
+
+def _deliver_webhook(cfg: Any, conn: sqlite3.Connection, job: Dict[str, Any],
+                     run_id: int, target: Dict[str, str], body: str,
+                     tkey: str, requested_by: str) -> Dict[str, Any]:
+    """Deliver via a delegated webhook transport; typed UNAVAILABLE if the
+    store is disabled or no outbound adapter is installed (Qubit ships no
+    outbound webhook POST authority of its own)."""
+    from . import webhooks as W
+
+    sub = target["sub"]
+    try:
+        enabled = W.is_enabled(cfg)
+        sub_rec = W.show(cfg, sub)["subscription"]
+    except W.WebhookError as exc:
+        state = ("UNAVAILABLE" if exc.code in {W.ESTOP_CODE, W.AUTH_CODE,
+                 W.CORRUPT_CODE} else "FAILED")
+        code = exc.code if state == "UNAVAILABLE" else DELIVERY_FAILED_CODE
+        return _record_delivery(cfg, conn, job, run_id, tkey, state, code,
+                                exc.detail, requested_by)
+    except Exception as exc:  # noqa: BLE001
+        return _record_delivery(cfg, conn, job, run_id, tkey, "FAILED",
+                                DELIVERY_FAILED_CODE, str(exc), requested_by)
+    if not enabled:
+        return _record_delivery(cfg, conn, job, run_id, tkey, "UNAVAILABLE",
+                                DELIVERY_UNAVAILABLE_CODE,
+                                "webhook delivery is disabled", requested_by)
+    deliver = _WEBHOOK_DELIVER
+    if deliver is None:
+        return _record_delivery(
+            cfg, conn, job, run_id, tkey, "UNAVAILABLE",
+            DELIVERY_UNAVAILABLE_CODE,
+            "no outbound webhook transport adapter exists; subscription "
+            "resolved, nothing sent", requested_by)
+    payload = {"job_id": job["id"], "run_id": run_id,
+               "name": job.get("name", ""), "body": body, "target": sub}
+    try:
+        result = deliver(cfg, sub_rec, payload)
+    except Exception as exc:  # noqa: BLE001
+        return _record_delivery(cfg, conn, job, run_id, tkey, "FAILED",
+                                DELIVERY_FAILED_CODE, str(exc), requested_by)
+    state = str((result or {}).get("state", "")).upper()
+    if state in ("OK", "SENT"):
+        return _record_delivery(cfg, conn, job, run_id, tkey, "SENT",
+                                DELIVERY_SENT_CODE,
+                                f"delivered to webhook {sub}", requested_by)
+    if state == "UNAVAILABLE":
+        return _record_delivery(
+            cfg, conn, job, run_id, tkey, "UNAVAILABLE",
+            str((result or {}).get("code", DELIVERY_UNAVAILABLE_CODE)),
+            str((result or {}).get("detail",
+                                   "webhook transport unavailable")),
+            requested_by)
+    return _record_delivery(
+        cfg, conn, job, run_id, tkey, "FAILED", DELIVERY_FAILED_CODE,
+        str((result or {}).get("detail", "webhook transport failed")),
+        requested_by)
+
+
+def _deliver_one(cfg: Any, conn: sqlite3.Connection, job: Dict[str, Any],
+                 run_id: int, outcome: Dict[str, Any],
+                 target: Dict[str, str], estop: Callable[[], bool],
+                 requested_by: str) -> Dict[str, Any]:
+    tkey = _target_key(target)
+    existing = conn.execute(
+        "SELECT state, code FROM deliveries WHERE run_id=? AND target=?",
+        (run_id, tkey)).fetchone()
+    if existing is not None:
+        return {"target": tkey, "state": existing["state"],
+                "code": existing["code"], "duplicate": True}
+    if estop():
+        return _record_delivery(cfg, conn, job, run_id, tkey, "UNAVAILABLE",
+                                DELIVERY_ESTOP_CODE,
+                                "emergency stop latched; delivery skipped",
+                                requested_by)
+    body = _delivery_body(job, outcome)
+    if target["kind"] == "channel":
+        return _deliver_channel(cfg, conn, job, run_id, target, body, tkey,
+                                requested_by)
+    return _deliver_webhook(cfg, conn, job, run_id, target, body, tkey,
+                            requested_by)
+
+
+def _deliver_result(cfg: Any, conn: sqlite3.Connection, job: Dict[str, Any],
+                    run_id: int, outcome: Dict[str, Any],
+                    estop: Callable[[], bool], requested_by: str) -> Dict[str, Any]:
+    """Hand a finished run's redacted result to every configured target.
+
+    Never raises into the run loop: the durable run receipt is committed
+    before this runs, and each target gets an independent typed outcome.
+    """
+    try:
+        targets = parse_delivery_spec(job.get("deliver_to", ""))
+    except SchedulesError as exc:
+        return {"state": "UNAVAILABLE", "code": exc.code, "delivered": 0,
+                "targets": [{"target": "", "state": "UNAVAILABLE",
+                             "code": exc.code,
+                             "detail": redact_spec(exc.detail)}]}
+    if not targets:
+        return {"state": "NONE", "code": "", "delivered": 0, "targets": []}
+    per: List[Dict[str, Any]] = []
+    for target in targets:
+        try:
+            per.append(_deliver_one(cfg, conn, job, run_id, outcome, target,
+                                    estop, requested_by))
+        except Exception as exc:  # noqa: BLE001 — never corrupt a run
+            per.append({"target": _target_key(target), "state": "FAILED",
+                        "code": DELIVERY_FAILED_CODE,
+                        "detail": redact_spec(str(exc))})
+    states = [p["state"] for p in per]
+    sent = sum(1 for s in states if s == "SENT")
+    if sent == len(states):
+        overall = "SENT"
+    elif sent:
+        overall = "PARTIAL"
+    elif any(s == "UNAVAILABLE" for s in states):
+        overall = "UNAVAILABLE"
+    else:
+        overall = "FAILED"
+    return {"state": overall, "code": "", "delivered": sent, "targets": per}
+
+
+def delivery_history(cfg: Any, job_id: int = 0,
+                     limit: int = 30) -> Dict[str, Any]:
+    """Delivery receipts (bounded), retained independently of run history."""
+    limit = max(1, min(int(limit or 30), LIST_MAX))
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        if job_id:
+            rows = conn.execute(
+                "SELECT * FROM deliveries WHERE job_id=? "
+                "ORDER BY run_id DESC LIMIT ?",
+                (int(job_id), limit)).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM deliveries ORDER BY run_id DESC LIMIT ?",
+                (limit,)).fetchall()
+        return {"state": "OK", "deliveries": [
+            {"run_id": r["run_id"], "job_id": r["job_id"],
+             "target": r["target"], "state": r["state"], "code": r["code"],
+             "detail": r["detail"][:MAX_DELIVERY_DETAIL],
+             "attempted_at": r["attempted_at"]} for r in rows]}
+    finally:
+        conn.close()
+
+
 # --------------------------------------------------------------- execution
 def _default_executor(task_text: str, *, session: str,
                       estop_engaged: Callable[[], bool]) -> Dict[str, Any]:
@@ -532,8 +937,74 @@ def run_due(cfg: Any, *, requested_by: str = "cli:user",
             conn.commit()
             _audit("run", requested_by,
                    {"job_id": str(job["id"]), "state": state, "code": code})
+            # Delivery is downstream of a durable run receipt: it may fail,
+            # degrade, or be unavailable without touching the run outcome.
+            delivery = _deliver_result(cfg, conn, job, run_id, outcome, stop,
+                                       requested_by)
             results.append({"job_id": job["id"], "name": job["name"],
-                            "state": state, "code": code})
+                            "state": state, "code": code,
+                            "delivery": delivery})
         return {"state": "OK", "ran": len(results), "results": results}
     finally:
         conn.close()
+
+
+def autofire(cfg: Any, *, now: Optional[float] = None,
+             executor: Optional[Callable[..., Dict[str, Any]]] = None,
+             estop_engaged: Optional[Callable[[], bool]] = None,
+             limit: int = AUTOFIRE_LIMIT) -> Dict[str, Any]:
+    """Bounded, idempotent self-fire tick for the restart-safe monitor loop.
+
+    This is the ONE entry point an existing periodic monitor (systemd timer
+    or in-process loop) calls to let due jobs run themselves. It is a thin,
+    fail-closed wrapper over :func:`run_due` and adds no scheduling authority
+    of its own:
+
+    * it never starts a timer/thread — the caller's loop owns the cadence, so
+      there is still exactly one autonomous scheduler;
+    * the durable emergency-stop/global-disable latch is consulted FIRST and
+      refuses the whole tick (nothing is claimed, no due window is consumed),
+      so a latched estop neither runs work nor burns a job's next slot;
+    * the claim persists ``last_run_at`` with a compare-and-swap lease inside
+      ``run_due``, so a process restart or a concurrent/overlapping tick can
+      never double-fire a job;
+    * each fired job runs through the SAME executor, session naming, typed
+      result, per-job run receipt, and ``schedules.run`` audit event as a
+      manual ``run-due`` (attributed to ``monitor:autofire``);
+    * the tick is bounded to ``limit`` jobs and NEVER raises into the monitor
+      loop — a store/runtime failure is returned as a typed ``FAILED``
+      envelope.
+    """
+    from .plugins import estop_engaged as _engaged
+
+    stop = estop_engaged or (lambda: bool(_engaged(cfg)))
+    if stop():
+        denied = refuse_estop("autofire")
+        denied["ran"] = 0
+        denied["results"] = []
+        return denied
+
+    def _guarded(task_text: str, *, session: str,
+                 estop_engaged: Callable[[], bool]) -> Dict[str, Any]:
+        # Re-check the latch per job: a stop that latches mid-tick is honored
+        # before any further work, even with an injected executor.
+        if estop_engaged():
+            return {"state": "UNAVAILABLE", "code": "EMERGENCY_STOP",
+                    "detail": "emergency stop latched"}
+        target = executor or _default_executor
+        return target(task_text, session=session,
+                      estop_engaged=estop_engaged)
+
+    try:
+        out = run_due(cfg, requested_by=MONITOR_ACTOR, executor=_guarded,
+                      now=now, estop_engaged=stop, limit=limit)
+    except SchedulesError as exc:
+        return {"state": "FAILED", "code": exc.code,
+                "detail": redact_spec(exc.detail)[:300],
+                "ran": 0, "results": []}
+    except Exception as exc:  # noqa: BLE001 — never raise into the monitor
+        return {"state": "FAILED", "code": RUNTIME_CODE,
+                "detail": redact_spec(str(exc))[:300],
+                "ran": 0, "results": []}
+    out["actor"] = MONITOR_ACTOR
+    return out

@@ -29,7 +29,7 @@ FINISH: Every state explains what happened and what the operator can safely do n
   </header>
   <nav class="page-nav" aria-label="Primary">
     <a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit Agent</a>
-    <span class="nav-separator" aria-hidden="true"></span><a href="/" aria-current="page">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/sessions">Sessions</a><a href="/projects">Projects</a><a href="/models">Models</a><a href="/skills">Skills</a><a href="/tasks">Tasks</a><a href="/security">Security</a><a href="/devices">Devices</a><a href="/messages">Messages</a><a href="/memory">Memory</a><a href="/ops">Operations</a><a href="/approvals">Approvals</a><a href="/settings">Settings</a><a href="/setup">Setup</a><a href="/system">System</a><a class="nav-utility" href="/token-setup">Pair device</a>
+    <span class="nav-separator" aria-hidden="true"></span><a href="/" aria-current="page">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/sessions">Sessions</a><a href="/projects">Projects</a><a href="/models">Models</a><a href="/skills">Skills</a><a href="/tasks">Tasks</a><a href="/security">Security</a><a href="/devices">Devices</a><a href="/messages">Messages</a><a href="/memory">Memory</a><a href="/ops">Operations</a><a href="/approvals">Approvals</a><a href="/settings">Settings</a><a href="/setup">Setup</a><a href="/system">System</a><a href="/docs">Docs</a><a class="nav-utility" href="/token-setup">Pair device</a>
   </nav>
 
   <details class="help-panel">
@@ -82,7 +82,19 @@ FINISH: Every state explains what happened and what the operator can safely do n
           <input id="textin" type="text" placeholder="Try “summarize my active project”" autocomplete="off">
           <button id="textsend" class="ok" type="button"><span aria-hidden="true">↗</span> Run command</button>
         </div>
+        <div id="slashpop" role="listbox" aria-label="Voice command suggestions" style="display:none"></div>
       </div>
+
+      <div class="row talk-tools-row">
+        <label for="modelsel">Reasoning profile</label>
+        <select id="modelsel" aria-label="Reasoning profile"></select>
+        <span id="modelstate" class="muted" role="status"></span>
+        <button type="button" class="quiet-action" id="sessionbtn" aria-expanded="false" aria-controls="sessiondrawer">Recent sessions</button>
+      </div>
+      <section id="sessiondrawer" aria-label="Recent sessions" style="display:none">
+        <div class="row"><strong>Recent sessions</strong><span class="muted">action receipts, newest first</span><button type="button" class="quiet-action" id="newsession">New session</button></div>
+        <div id="sessionlist"></div>
+      </section>
 
       <section class="live-session" aria-labelledby="session-title">
         <div class="live-session-header"><div><h2 id="session-title">Command activity</h2><span class="section-meta">LIVE SESSION</span></div><span class="live-pulse"><span></span> streaming</span></div>
@@ -458,6 +470,124 @@ document.getElementById('textin').addEventListener('keydown', (e) => {
 });
 
 document.getElementById('interruptBtn').addEventListener('click', async (e)=>{ e.preventDefault(); try{ await vbApi('/api/interrupt', {method:'POST', body: JSON.stringify({mode:'interrupt'})}); addMsg('meta','· interrupt sent'); }catch(_){}});
+
+// ---- Talk adapters: sessions drawer, slash commands, profile select ----
+// All three call the same authenticated backends as CLI/voice (session
+// list, command catalog with examples, reasoning-profile registry).
+// Everything renders via textContent; confirmations settle on
+// /approvals or the event stream.
+async function opsRun(id, args) {
+  return vbApi('/api/ops/run', {method:'POST', body: JSON.stringify({id:id, args:args||{}})});
+}
+var talkSession = 'talk-' + Date.now().toString(36);
+var sessionOpen = false;
+document.getElementById('sessionbtn').addEventListener('click', async ()=>{
+  var drawer = document.getElementById('sessiondrawer');
+  sessionOpen = !sessionOpen;
+  drawer.style.display = sessionOpen ? '' : 'none';
+  document.getElementById('sessionbtn').setAttribute('aria-expanded', sessionOpen ? 'true' : 'false');
+  if (!sessionOpen) return;
+  var list = document.getElementById('sessionlist');
+  list.textContent = 'loading…';
+  try {
+    const res = await opsRun('sessions', {});
+    if (res.authRequired) { list.textContent = 'Not paired — open Pair device.'; return; }
+    const out = res.body || {};
+    const result = out.receipt && out.receipt.result ? out.receipt.result : out;
+    const items = result.sessions || [];
+    list.textContent = '';
+    if (!items.length) { list.textContent = (result.detail || 'No sessions yet.'); return; }
+    items.slice(0, 12).forEach(function (s) {
+      const row = document.createElement('div');
+      row.className = 'msg meta';
+      row.textContent = (s.created_at ? new Date(s.created_at*1000).toLocaleTimeString() + ' · ' : '') + (s.action_id || s.receipt_id || 'session') + ' · ' + (s.state || '') + (s.detail ? ' · ' + s.detail : '');
+      list.appendChild(row);
+    });
+  } catch (_) { list.textContent = 'Sessions unavailable.'; }
+});
+document.getElementById('newsession').addEventListener('click', ()=>{
+  talkSession = 'talk-' + Date.now().toString(36);
+  transcript.textContent = '';
+  addMsg('meta', '· new session started (' + talkSession + ')');
+});
+var slashCache = null;
+async function slashCommands() {
+  if (slashCache) return slashCache;
+  try {
+    const res = await opsRun('commands_list', {});
+    const out = res.body || {};
+    const result = out.receipt && out.receipt.result ? out.receipt.result : out;
+    slashCache = (result.commands || []).filter(c => c && c.id);
+  } catch (_) { slashCache = []; }
+  return slashCache;
+}
+document.getElementById('textin').addEventListener('input', async (e)=>{
+  const pop = document.getElementById('slashpop');
+  const v = e.target.value;
+  if (v.charAt(0) !== '/') { pop.style.display = 'none'; pop.textContent = ''; return; }
+  const q = v.slice(1).toLowerCase();
+  const cmds = (await slashCommands()).filter(c =>
+    !q || c.id.toLowerCase().indexOf(q) !== -1 ||
+    (c.aliases||[]).join(' ').toLowerCase().indexOf(q) !== -1).slice(0, 8);
+  pop.textContent = '';
+  if (!cmds.length) { pop.style.display = 'none'; return; }
+  cmds.forEach(function (c) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.setAttribute('role', 'option');
+    b.className = 'quiet-action';
+    b.textContent = '/' + c.id + (c.confirm ? ' (asks first)' : '');
+    b.title = c.help || c.title || c.id;
+    b.addEventListener('click', ()=>{
+      document.getElementById('textin').value = c.example ? String(c.example).replace(/^qubit,\s*/, '') : c.id.replace(/_/g, ' ');
+      pop.style.display = 'none'; pop.textContent = '';
+      document.getElementById('textin').focus();
+    });
+    pop.appendChild(b);
+  });
+  pop.style.display = '';
+});
+document.getElementById('textin').addEventListener('keydown', (e)=>{
+  if (e.key === 'Escape') { const pop = document.getElementById('slashpop'); pop.style.display = 'none'; pop.textContent = ''; }
+});
+async function loadProfiles() {
+  const sel = document.getElementById('modelsel'), st = document.getElementById('modelstate');
+  try {
+    const res = await opsRun('config_profiles', {kind: 'brain'});
+    if (res.authRequired) { st.textContent = 'pair to manage profiles'; return; }
+    const out = res.body || {};
+    const result = out.receipt && out.receipt.result ? out.receipt.result : out;
+    const profiles = (result.profiles || []).filter(p => (p.kind || 'brain') === 'brain');
+    sel.textContent = '';
+    if (!profiles.length) { st.textContent = (result.detail || 'no brain profiles'); return; }
+    profiles.forEach(function (p) {
+      const o = document.createElement('option');
+      o.value = p.id; o.textContent = p.id + (p.active ? ' (active)' : '');
+      if (p.active) o.selected = true;
+      sel.appendChild(o);
+    });
+    st.textContent = '';
+  } catch (_) { st.textContent = 'profiles unavailable'; }
+}
+document.getElementById('modelsel').addEventListener('change', async (e)=>{
+  const st = document.getElementById('modelstate');
+  const name = e.target.value;
+  if (!name) return;
+  st.textContent = 'requesting…';
+  try {
+    const res = await opsRun('profile_select', {kind: 'brain', profile: name});
+    const out = res.body || {};
+    if (out.state === 'needs-confirm' && out.confirmation_id) {
+      st.textContent = 'confirmation staged — approve on /approvals';
+      addMsg('meta', '· profile change waits for your approval (' + out.confirmation_id + ')');
+    } else if (out.state === 'executed') {
+      st.textContent = 'active';
+      addMsg('meta', '· reasoning profile: ' + name);
+    } else {
+      st.textContent = (out.code || out.state || 'failed') + (out.detail ? ' — ' + out.detail : '');
+    }
+  } catch (_) { st.textContent = 'request failed'; }
+});
+loadProfiles();
 setStatus('ready');
 // /api/status now goes through the shared vbApi() helper: it sends the
 // X-Api-Token header, shows the "Dashboard not paired" hint on 401, and never

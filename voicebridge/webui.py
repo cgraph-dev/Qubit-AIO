@@ -675,6 +675,120 @@ refresh();
 
 
 # --------------------------------------------------------------------------
+# Hermes-first route aliases (owner directive 2026-09-11)
+# --------------------------------------------------------------------------
+# Every normal public dashboard route renders the vendored Hermes React
+# shell. Qubit route names are compatibility aliases onto Hermes
+# workspaces; the legacy static Qubit pages are reachable only under
+# /classic/. This table is the single source of truth for that mapping.
+HERMES_ROUTE_ALIASES = {
+    # Hermes-native workspaces (Qubit compatibility names)
+    "/chat": "/hermes/chat",
+    "/sessions": "/hermes/sessions",
+    "/files": "/hermes/files",
+    "/models": "/hermes/models",
+    "/analytics": "/hermes/analytics",
+    "/logs": "/hermes/logs",
+    "/cron": "/hermes/cron",
+    "/skills": "/hermes/skills",
+    "/plugins": "/hermes/plugins",
+    "/mcp": "/hermes/mcp",
+    "/channels": "/hermes/channels",
+    "/webhooks": "/hermes/webhooks",
+    "/pairing": "/hermes/pairing",
+    "/profiles": "/hermes/profiles",
+    "/config": "/hermes/config",
+    "/env": "/hermes/env",
+    "/system": "/hermes/system",
+    "/docs": "/hermes/docs",
+    # Qubit page families -> Hermes shell workspaces / overlay pages
+    "/activity": "/hermes/logs",
+    "/reports": "/hermes/reports",
+    "/operations": "/hermes/operations",
+    "/ops": "/hermes/operations",
+    "/approvals": "/hermes/qubit-approvals",
+    "/settings": "/hermes/config",
+    "/setup": "/hermes/system",
+    "/projects": "/hermes/files",
+    "/tasks": "/hermes/cron",
+    "/devices": "/hermes/devices",
+    "/messages": "/hermes/channels",
+    "/memory": "/hermes/memory",
+    "/security": "/hermes/qubit-approvals",
+}
+
+
+def hermes_alias_target(path: str) -> Optional[str]:
+    """Return the Hermes target for a normal dashboard path, or None.
+
+    Accepts an optional trailing slash and/or ``.html`` suffix so the old
+    static URLs (/activity.html, /ops/) resolve to the shell instead of a
+    static file. ``/api/*`` paths are never aliased.
+    """
+    if path.startswith("/api/") or path.startswith("/hermes"):
+        return None
+    clean = path
+    if clean.endswith(".html") and clean != "/index.html":
+        clean = clean[: -len(".html")]
+    if len(clean) > 1:
+        clean = clean.rstrip("/")
+    if not clean:
+        clean = "/"
+    return HERMES_ROUTE_ALIASES.get(clean)
+
+
+# --------------------------------------------------------------------------
+# Hermes WebSocket refusal (audit 2026-09-11 §1D)
+# --------------------------------------------------------------------------
+# Qubit keeps a single event path (SSE + ops); the vendored Hermes
+# dashboard's WebSocket endpoints must never hang or raise a bare
+# connection error. An ``Upgrade: websocket`` request for one of these
+# paths gets an HTTP 426 + typed JSON envelope carrying the existing GATED
+# codes from ``voicebridge.hermes_compat`` (never a new dialect, never a
+# WS server). Keys are the API path with any ``/hermes`` prefix stripped,
+# so ``/hermes/api/*`` and any plain ``/api/*`` alias resolve alike.
+HERMES_WS_GATE_CODES: Dict[str, str] = {
+    "/api/pty": "PTY_NO_SHELL",
+    "/api/console": "PTY_NO_SHELL",
+    "/api/ws": "WS_SINGLE_PATH",
+    "/api/events": "WS_SINGLE_PATH",
+    "/api/pub": "WS_SINGLE_PATH",
+    "/api/audio/speak-stream": "WS_SINGLE_PATH",
+}
+
+HERMES_WS_GATE_DETAIL: Dict[str, str] = {
+    "PTY_NO_SHELL": (
+        "Qubit forbids raw shell/PTY spawn; the xterm mirror cannot attach. "
+        "Use Qubit Chat (streaming agent turns) or the TUI live board."),
+    "WS_SINGLE_PATH": (
+        "The Hermes WebSocket dialect is not served; Qubit keeps one event "
+        "path (SSE feed + ops). Chat uses Qubit Chat."),
+}
+
+HERMES_WS_GATE_COUNTERPART: Dict[str, str] = {
+    "PTY_NO_SHELL": "overlay Qubit Chat tab (POST /api/qubit/chat) + CLI `qubit tui`",
+    "WS_SINGLE_PATH": "GET /api/events/stream (SSE) + POST /api/qubit/chat",
+}
+
+HERMES_WS_OWNER = "qubit-policy"
+HERMES_WS_ROLLBACK = "nothing started; nothing to roll back"
+
+
+def hermes_ws_gate_code(path: str) -> Optional[str]:
+    """Return the GATED code for a WebSocket-upgrade API path, or None.
+
+    Pure path lookup (query string ignored); used by the request handler and
+    directly testable. Only the six upstream WS endpoints are listed.
+    """
+    clean = path.split("?")[0]
+    if clean.startswith("/hermes"):
+        clean = clean[len("/hermes"):]
+    if len(clean) > 1:
+        clean = clean.rstrip("/")
+    return HERMES_WS_GATE_CODES.get(clean)
+
+
+# --------------------------------------------------------------------------
 # HTTP server
 # --------------------------------------------------------------------------
 
@@ -727,6 +841,19 @@ class WebUIHandler(BaseHTTPRequestHandler):
             self._send(200, path.read_bytes(), ctype)
         except OSError:
             self._send(404, b"not found")
+
+    def _redirect(self, location: str) -> None:
+        try:
+            body = ("Redirecting to %s\n" % location).encode()
+            self.send_response(302)
+            self.send_header("Location", location)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass
 
     def _frontend_file(self, name: str) -> Optional[Path]:
         """Resolve a frontend file from the ACTIVE frontend dir, falling back
@@ -841,10 +968,335 @@ class WebUIHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: Any) -> None:  # silence noise
         pass
 
+    # -- Hermes-dashboard compat (owner amendment 2026-09-11) -----------
+    # Serves the byte-identical vendored Hermes dashboard build
+    # (frontend/hermes-dist/, built from frontend/hermes-web/) at /hermes/
+    # with the loopback session token + base path injected server-side
+    # (vendored index.html untouched). /hermes/api/* is served by
+    # voicebridge/hermes_compat.py on the same backend modules as CLI/voice.
+    def _hermes_token_ok(self) -> bool:
+        hermes_tok = self.headers.get("X-Hermes-Session-Token", "")
+        if hermes_tok:
+            qp = "token=" in self.path.split("?", 1)[-1]
+            ok, _reason = token_ok(self.app.api_token, hermes_tok, qp)
+            if not ok:
+                return False
+            if not self.app.api_token:
+                peer = self.client_address[0] if self.client_address else ""
+                if peer not in ("127.0.0.1", "::1", "localhost"):
+                    return False
+            return True
+        return self._api_token_ok()
+
+    def _hermes_dist(self) -> "Path":
+        # Resolve the built Hermes dashboard from package data first (a clean
+        # wheel install ships frontend/hermes-dist under voicebridge/_data/),
+        # then from the checkout. This is the single resolution point so an
+        # isolated install serves the real dashboard.
+        from . import resources as _resources
+        return _resources.resource_path("frontend/hermes-dist")
+
+    def _serve_hermes_index(self) -> None:
+        dist = self._hermes_dist()
+        fp = dist / "index.html"
+        if not fp.is_file():
+            self._send(404, b"hermes dashboard not built (see "
+                            b"frontend/hermes-qubit/README.md)")
+            return
+        try:
+            html = fp.read_text(encoding="utf-8")
+        except OSError:
+            self._send(404, b"hermes dashboard unreadable")
+            return
+        token = self.app.api_token or ""
+        safe = json.dumps(token)
+        inject = ('<script>window.__HERMES_SESSION_TOKEN__=%s;'
+                  'window.__HERMES_BASE_PATH__="/hermes";</script>' % safe)
+        if "</head>" in html:
+            html = html.replace("</head>", inject + "</head>", 1)
+        else:
+            html = inject + html
+        # Qubit rebrand (server-side template; vendored index.html untouched):
+        # product title carries the Qubit name. Upstream names remain in
+        # legal notices, attribution, provenance, and compat records.
+        import re as _re
+        html = _re.sub(r"<title>.*?</title>",
+                       "<title>Qubit Agent - Command Center</title>", html,
+                       count=1, flags=_re.S)
+        self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
+
+    def _serve_hermes_static(self, sub: str) -> None:
+        dist = self._hermes_dist()
+        rel = sub.lstrip("/").split("?")[0]
+        if not rel or ".." in rel.split("/"):
+            self._serve_hermes_index()
+            return
+        fp = dist / rel
+        if fp.is_dir():
+            fp = fp / "index.html"
+        if not fp.is_file():
+            # SPA deep link (/hermes/sessions/...) -> shell with injection.
+            self._serve_hermes_index()
+            return
+        low = fp.name.lower()
+        if low.endswith(".js"): ctype = "application/javascript"
+        elif low.endswith(".css"): ctype = "text/css"
+        elif low.endswith(".html"): ctype = "text/html; charset=utf-8"
+        elif low.endswith(".json"): ctype = "application/json"
+        elif low.endswith(".svg"): ctype = "image/svg+xml"
+        elif low.endswith(".png"): ctype = "image/png"
+        elif low.endswith(".ico"): ctype = "image/x-icon"
+        elif low.endswith(".woff2"): ctype = "font/woff2"
+        elif low.endswith(".woff"): ctype = "font/woff"
+        elif low.endswith(".map"): ctype = "application/json"
+        else: ctype = "application/octet-stream"
+        self._file(fp, ctype)
+
+    def _serve_hermes_plugin(self, sub: str) -> None:
+        from . import resources as _resources
+        plugdir = _resources.resource_path("frontend/hermes-qubit/plugins")
+        rel = sub.lstrip("/").split("?")[0]
+        parts = [p for p in rel.split("/") if p not in ("", ".")]
+        if not parts or ".." in parts or len(parts) > 3:
+            self._send(404, b"not found")
+            return
+        fp = plugdir.joinpath(*parts)
+        try:
+            resolved = fp.resolve()
+            if plugdir.resolve() not in resolved.parents:
+                self._send(404, b"not found")
+                return
+        except OSError:
+            self._send(404, b"not found")
+            return
+        if not resolved.is_file() or resolved.suffix not in (".js", ".json", ".css"):
+            self._send(404, b"not found")
+            return
+        ctype = {"js": "application/javascript", "json": "application/json",
+                 "css": "text/css"}[resolved.suffix.lstrip(".")]
+        self._file(resolved, ctype)
+
+    def _hermes_api(self, method: str) -> None:
+        if not self._hermes_token_ok():
+            self._send(401, b"unauthorized")
+            return
+        raw = self.path
+        sub = raw[len("/hermes"):]
+        api_path = sub.split("?")[0]
+        query: Dict[str, str] = {}
+        if "?" in raw:
+            import urllib.parse as _up
+            for k, v in _up.parse_qsl(raw.split("?", 1)[1], keep_blank_values=True):
+                query[k] = v
+        body: Dict[str, Any] = {}
+        if method in ("POST", "PUT", "PATCH"):
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+            except ValueError:
+                length = 0
+            if length:
+                try:
+                    raw_body = self.rfile.read(length).decode("utf-8", "replace")
+                    body = json.loads(raw_body) if raw_body.strip() else {}
+                except ValueError:
+                    self._send(400, b"bad json body")
+                    return
+                if not isinstance(body, dict):
+                    body = {"_list": body}
+        try:
+            from . import hermes_compat as HC
+            code, out = HC.dispatch(self.app.orch.cfg, method, api_path,
+                                    query, body)
+        except Exception as exc:
+            self._json({"ok": False, "code": "EXECUTOR_ERROR",
+                        "detail": redact_obj(str(exc))[:200]}, 500)
+            return
+        self._json(out, code)
+
+    # -- signed inbound webhook ingress ----------------------------------
+    def _webhook_ingress(self, path: str) -> None:
+        """POST /hooks/<sub_id> (alias /hermes/hooks/<sub_id>).
+
+        Authenticated by HMAC signature over the subscription's configured
+        ``env:``/``file:`` secret — NOT by the dashboard session token. An
+        unsigned or unknown request fails closed with a typed code. The body
+        is read bounded; secret values never leave the vault or appear in
+        receipts.
+        """
+        from . import webhooks as WH
+
+        prefix = ("/hermes/hooks/" if path.startswith("/hermes/hooks/")
+                  else "/hooks/")
+        sub_id = path[len(prefix):].strip("/")
+        if not sub_id or "/" in sub_id:
+            self._json({"state": "failed", "code": WH.BAD_INPUT_CODE,
+                        "detail": "subscription id required"}, 400)
+            return
+        try:
+            length = int(self.headers.get("Content-Length", 0) or 0)
+        except (TypeError, ValueError):
+            length = 0
+        if length < 0:
+            length = 0
+        if length > WH.MAX_BODY_BYTES:
+            self._json({"state": "failed", "code": WH.TOO_LARGE_CODE,
+                        "detail": f"body exceeds {WH.MAX_BODY_BYTES} byte cap"},
+                       413)
+            return
+        body = self.rfile.read(length) if length else b""
+        try:
+            out = WH.ingest(self.app.orch.cfg, sub_id, body, self.headers)
+            self._json(out, 200)
+        except WH.WebhookError as exc:
+            status = {
+                WH.NOT_FOUND_CODE: 404,
+                WH.BAD_SIGNATURE_CODE: 401,
+                WH.AUTH_CODE: 401,
+                WH.STALE_CODE: 401,
+                WH.REPLAY_CODE: 409,
+                WH.TOO_LARGE_CODE: 413,
+                WH.BAD_INPUT_CODE: 400,
+                WH.CORRUPT_CODE: 500,
+            }.get(exc.code, 400)
+            self._json({"state": "failed", "code": exc.code,
+                        "detail": redact_obj(exc.detail)[:200]}, status)
+
+    def _first_header(self, names):
+        for name in names:
+            try:
+                value = self.headers.get(name)
+            except Exception:
+                value = None
+            if value:
+                return value
+        return ""
+
+    def _channel_ingress(self, path: str) -> None:
+        """POST /channels/<channel_id> (alias /hermes/channels/<channel_id>).
+
+        Authenticated by the HMAC signature over the channel's configured
+        ``env:``/``file:`` secret — NOT by the dashboard session token. The
+        raw body is read bounded and handed to
+        ``channels_inbound.receive``; a fully verified delivery still
+        resolves to the typed ``CHANNEL_UNAVAILABLE`` gate (no listener
+        transport exists). Secret values never appear in responses.
+        """
+        from . import channels_inbound as CI
+
+        prefix = ("/hermes/channels/" if path.startswith("/hermes/channels/")
+                  else "/channels/")
+        channel_id = path[len(prefix):].strip("/")
+        if not channel_id or "/" in channel_id:
+            self._json({"state": "failed", "code": CI.BAD_INPUT_CODE,
+                        "detail": "channel id required"}, 400)
+            return
+        try:
+            length = int(self.headers.get("Content-Length", 0) or 0)
+        except (TypeError, ValueError):
+            length = 0
+        if length < 0:
+            length = 0
+        if length > CI.MAX_BODY_BYTES:
+            self._json({"state": "failed", "code": CI.TOO_LARGE_CODE,
+                        "detail": f"body exceeds {CI.MAX_BODY_BYTES} byte cap"},
+                       413)
+            return
+        body = self.rfile.read(length) if length else b""
+        signature = self._first_header(CI.SIGNATURE_HEADERS)
+        delivery_id = self._first_header(CI.DELIVERY_HEADERS)
+        timestamp = self._first_header(CI.TIMESTAMP_HEADERS)
+        try:
+            out = CI.receive(
+                self.app.orch.cfg, channel=channel_id, payload=body,
+                signature=signature, timestamp=timestamp or None,
+                delivery_id=delivery_id,
+                sender=self.headers.get("X-Qubit-Sender", "") or "",
+                event=self.headers.get("X-Qubit-Event", "") or "message")
+            self._json(out, 200)
+        except CI.ChannelError as exc:
+            status = {
+                CI.UNKNOWN_CODE: 404,
+                CI.NOT_FOUND_CODE: 404,
+                CI.BAD_SIGNATURE_CODE: 401,
+                CI.STALE_CODE: 401,
+                CI.NO_CREDENTIAL_CODE: 401,
+                CI.REPLAY_CODE: 409,
+                CI.ESTOP_CODE: 409,
+                CI.UNAVAILABLE_CODE: 409,
+                CI.TOO_LARGE_CODE: 413,
+                CI.BAD_INPUT_CODE: 400,
+                CI.EVENT_REFUSED_CODE: 400,
+                CI.CORRUPT_CODE: 500,
+            }.get(exc.code, 400)
+            self._json({"state": "failed", "code": exc.code,
+                        "detail": redact_obj(exc.detail)[:200]}, status)
+
+    def _refuse_hermes_ws(self) -> bool:
+        """Typed HTTP 426 refusal for a Hermes WebSocket upgrade (audit §1D).
+
+        Returns True when the request was an ``Upgrade: websocket`` for a
+        gated Hermes path and the typed envelope was written. No WS server is
+        started; the connection is closed cleanly. Auth is intentionally not
+        consulted: browser WebSocket clients cannot attach the session-token
+        header, and a policy refusal is not secret — requiring auth would
+        replace the typed answer with a bare 401.
+        """
+        if self.headers.get("Upgrade", "").strip().lower() != "websocket":
+            return False
+        api_path = self.path.split("?")[0]
+        if api_path.startswith("/hermes"):
+            api_path = api_path[len("/hermes"):]
+        if len(api_path) > 1:
+            api_path = api_path.rstrip("/")
+        code = HERMES_WS_GATE_CODES.get(api_path)
+        if not code:
+            return False
+        detail = HERMES_WS_GATE_DETAIL.get(code, "")
+        counterpart = HERMES_WS_GATE_COUNTERPART.get(code, "")
+        # One policy source: reuse the GATED row's detail/counterpart when the
+        # same GET path already carries this code (pty/console/ws).
+        try:
+            from . import hermes_compat as HC
+            route, _ = HC.match("GET", api_path)
+            if route and route.get("disposition") == "gated":
+                gate = route.get("gate") or {}
+                if gate.get("code") == code:
+                    detail = gate.get("detail") or detail
+                    counterpart = gate.get("counterpart") or counterpart
+        except Exception:
+            pass
+        self.close_connection = True
+        self._json({"ok": False, "state": "UNAVAILABLE", "code": code,
+                    "detail": detail, "owner": HERMES_WS_OWNER,
+                    "rollback": HERMES_WS_ROLLBACK, "ws": "single-sse",
+                    "qubit_counterpart": counterpart}, 426)
+        # Route through the handler's log hook (no-op here by design) and the
+        # audit journal. Only the path + code — never headers or query tokens.
+        self.log_message("hermes websocket refused: %s code=%s", api_path, code)
+        log_event("webui.hermes.ws_refused", path=api_path, code=code,
+                  state="UNAVAILABLE")
+        return True
+
     # -- routes ----------------------------------------------------------
     def do_GET(self) -> None:  # noqa: N802
+        if self._refuse_hermes_ws():
+            return
         path = self.path.split("?")[0]
         if path in ("/", "/index.html"):
+            # Hermes-first (owner directive): the Hermes React dashboard at
+            # /hermes/ is the active UI. The legacy static Qubit page is
+            # preserved under /classic/ only — root must never serve the
+            # old horizontal nav / Activity/Talk cards as the first screen.
+            self._redirect("/hermes/")
+            return
+        # Every normal public dashboard route renders the Hermes React
+        # shell; Qubit route names are compatibility aliases. Static pages
+        # are reachable only under the explicitly labelled /classic/.
+        _alias = hermes_alias_target(path)
+        if _alias is not None:
+            self._redirect(_alias)
+            return
+        elif path == "/classic/" or path == "/classic/index.html":
             fp = self._frontend_file("index.html")
             if fp is not None:
                 self._file(fp, "text/html; charset=utf-8")
@@ -852,6 +1304,17 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self._send(404, b"index not found")
             else:
                 self._html(CHAT_PAGE)
+        elif path.startswith("/classic/"):
+            # Explicit legacy fallback: /classic/<page> serves the old
+            # static page of that name. Nothing links here.
+            _name = path[len("/classic/"):].strip("/")
+            if not _name.endswith(".html"):
+                _name += ".html"
+            fp = self._frontend_file(_name)
+            if fp is not None:
+                self._file(fp, "text/html; charset=utf-8")
+            else:
+                self._send(404, b"classic page not found")
         elif path == "/token-setup" or path == "/token-setup.html":
             # No-auth BY DESIGN: storing a token grants nothing by itself; the
             # API still rejects every request lacking the correct header.
@@ -894,6 +1357,29 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self._file(fp, "text/html; charset=utf-8")
             else:
                 self._html(ACTIVITY_PAGE)
+        elif path == "/docs" or path == "/docs.html":
+            fp = self._frontend_file("docs.html")
+            if fp is not None:
+                self._file(fp, "text/html; charset=utf-8")
+            else:
+                self._send(404, b"docs page not found")
+        elif path == "/api/docs" or path.startswith("/api/docs/"):
+            if not self._api_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            doc_id = path[len("/api/docs"):].strip("/")
+            if not doc_id:
+                self._json(user_docs_index())
+                return
+            try:
+                self._json(user_doc(doc_id))
+            except KeyError:
+                self._send(404, b"unknown doc")
+            except FileNotFoundError:
+                self._json({"state": "UNAVAILABLE", "code": "DOCS_NOT_SHIPPED",
+                            "detail": "user guide is not in this install; "
+                                      "see the repository docs/"},
+                           503)
         elif path == "/api/status":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
@@ -1482,6 +1968,23 @@ class WebUIHandler(BaseHTTPRequestHandler):
             from . import lifecycle as LC
             self._json(LC.diagnostic_bundle(self.app.orch.cfg))
 
+        elif path == "/hermes" or path.startswith("/hermes/"):
+            # Vendored Hermes dashboard (amendment 2026-09-11): same-origin
+            # /hermes/api/* compat backend + overlay plugins; the classic
+            # Qubit pages above are untouched.
+            sub = path[len("/hermes"):]
+            if sub.startswith("/api/"):
+                if self.command == "GET":
+                    self._hermes_api("GET")
+                else:
+                    self._send(405, b"method not allowed")
+                return
+            if sub.startswith("/dashboard-plugins/"):
+                self._serve_hermes_plugin(
+                    sub[len("/dashboard-plugins/"):])
+                return
+            self._serve_hermes_static(sub)
+            return
         elif path.startswith("/static/"):
             name = path.split("/", 2)[-1]
             if name == "theme.css":
@@ -2436,11 +2939,101 @@ class WebUIHandler(BaseHTTPRequestHandler):
             except Exception as exc:
                 log_event("feedback.error", error=str(exc)[:160])
                 self._json({"error": str(exc)[:200]}, 500)
+        elif path.startswith("/hooks/") or path.startswith("/hermes/hooks/"):
+            # Signed inbound webhook delivery. Authentication is the HMAC
+            # signature, never the dashboard token; unsigned/unknown requests
+            # fail closed with a typed code.
+            self._webhook_ingress(path)
+        elif path.startswith("/channels/") \
+                or path.startswith("/hermes/channels/"):
+            # Signed inbound channel delivery (same kernel as webhooks).
+            # Authentication is the per-channel HMAC signature, never the
+            # dashboard token; unsigned/unknown requests fail closed typed.
+            self._channel_ingress(path)
+        elif path.startswith("/hermes/api/"):
+            # Vendored Hermes dashboard POST backend (compat, same modules
+            # as CLI/voice). Auth: X-Hermes-Session-Token or X-Api-Token.
+            self._hermes_api("POST")
+        else:
+            self._send(404, b"not found")
+
+    def do_PUT(self) -> None:  # noqa: N802
+        path = self.path.split("?")[0]
+        if path.startswith("/hermes/api/"):
+            self._hermes_api("PUT")
+        else:
+            self._send(404, b"not found")
+
+    def do_PATCH(self) -> None:  # noqa: N802
+        path = self.path.split("?")[0]
+        if path.startswith("/hermes/api/"):
+            self._hermes_api("PATCH")
+        else:
+            self._send(404, b"not found")
+
+    def do_DELETE(self) -> None:  # noqa: N802
+        path = self.path.split("?")[0]
+        if path.startswith("/hermes/api/"):
+            self._hermes_api("DELETE")
         else:
             self._send(404, b"not found")
 
 
 REPO_FRONTEND = resources.resource_path("frontend")
+
+
+# Curated user guide for the dashboard /docs page (Hermes DocsPage
+# equivalent). Allowlisted files only: user-facing, secret-scanned, no
+# machine-specific paths. Served from the installed package data when
+# present, else the repository docs/ checkout; absent in minimal
+# installs -> typed UNAVAILABLE (503), never a fabricated page.
+USER_DOCS = (
+    ("howto", "How to use Qubit", "HowTo.md"),
+    ("audio", "Audio setup", "AUDIO_SETUP.md"),
+    ("system", "VoiceBridge system", "VOICE_BRIDGE_SYSTEM.md"),
+    ("migration", "Migration guide", "QUBIT_MIGRATION.md"),
+)
+
+MAX_DOC_BYTES = 65536
+
+
+def _docs_dir() -> Optional[Path]:
+    installed = resources.package_data_root() / "docs"
+    try:
+        if (installed / "HowTo.md").is_file():
+            return installed
+    except OSError:
+        pass
+    repo = Path(__file__).resolve().parents[1] / "docs"
+    try:
+        if (repo / "HowTo.md").is_file():
+            return repo
+    except OSError:
+        pass
+    return None
+
+
+def user_docs_index() -> Dict[str, Any]:
+    docs = [{"id": doc_id, "title": title} for doc_id, title, _ in USER_DOCS]
+    here = _docs_dir()
+    return {"docs": docs,
+            "state": "OK" if here is not None else "UNAVAILABLE"}
+
+
+def user_doc(doc_id: str) -> Dict[str, Any]:
+    for want_id, title, filename in USER_DOCS:
+        if want_id == doc_id:
+            break
+    else:
+        raise KeyError(doc_id)
+    here = _docs_dir()
+    if here is None:
+        raise FileNotFoundError(doc_id)
+    text = (here / filename).read_text(encoding="utf-8",
+                                       errors="replace")[:MAX_DOC_BYTES + 1]
+    truncated = len(text) > MAX_DOC_BYTES
+    return {"id": want_id, "title": title,
+            "markdown": text[:MAX_DOC_BYTES], "truncated": truncated}
 
 
 def _frontend_version(frontend_dir: Path) -> str:

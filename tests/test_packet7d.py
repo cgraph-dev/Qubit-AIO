@@ -703,9 +703,19 @@ def test_api_branding_and_export_state(tmp_path, monkeypatch):
 def test_settings_page_served(tmp_path, monkeypatch):
     ui, _, _ = _make_ui(tmp_path, monkeypatch)
     try:
+        # Hermes-first: /settings aliases into the Hermes shell (Config).
+        import http.client
+        conn = http.client.HTTPConnection(
+            "127.0.0.1", ui._server.server_port, timeout=5)
+        conn.request("GET", "/settings")
+        resp = conn.getresponse()
+        resp.read()
+        assert resp.status == 302, resp.status
+        assert resp.getheader("Location") == "/hermes/config"
+        # The labelled /classic/ fallback still serves the static page.
         import urllib.request
         with urllib.request.urlopen(
-                f"http://127.0.0.1:{ui._server.server_port}/settings",
+                f"http://127.0.0.1:{ui._server.server_port}/classic/settings",
                 timeout=5) as r:
             html = r.read().decode()
         assert "Qubit VoiceBridge" in html

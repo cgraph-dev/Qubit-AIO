@@ -125,6 +125,12 @@ capabilities that are genuinely integrated into Qubit. Qubit owns one final
 information architecture, one navigation system, one design system, and one
 backend operation path.
 
+The owner-approved dashboard baseline is the exact pinned Hermes React/Vite
+frontend. Agents must vendor that source first, preserve unchanged files by
+hash, and record every Qubit integration, OpenClaw, safety, accessibility, and
+branding patch. The existing Python/static-JS pages are migration fallbacks,
+not the completed dashboard and must not be used to claim parity.
+
 Agents must not ship two dashboards, paste OpenClaw pages beside Hermes pages,
 or replace the Hermes workflow with a smaller custom shell. They must preserve
 all functional controls while applying Qubit typography, color, spacing,
@@ -132,6 +138,26 @@ icons, responsive layout, accessibility, motion, onboarding, loading, empty,
 error, degraded, approval, and recovery design. Every visible control must
 call the same backend operation used by Qubit CLI and voice and must have
 end-to-end evidence.
+
+### Final parity meaning
+
+The final Qubit release is complete only when the pinned Hermes and OpenClaw
+capability inventories are behaviorally compared and every supported operation
+is implemented through the same Qubit backend in all applicable surfaces:
+
+- `qubit` CLI with equivalent arguments, help, output, errors, exit status,
+  persistence, cancellation, and recovery;
+- the vendored Hermes-baseline dashboard with a real page/control/workflow;
+- Qubit VoiceBridge with natural commands, argument extraction, clarification,
+  typed responses, confirmation, cancellation, expiry/replay rejection,
+  redacted receipts, and session isolation.
+
+A voice explanation, capability count, dashboard tile, CLI-only path,
+dashboard-only path, dead control, or external upstream process is not an
+implementation. Unsafe or operator-dependent behaviors require a tested Qubit
+safe equivalent and a typed manual state; only the live operator action may
+remain manual. Rebranding is applied after functional parity as a documented
+overlay, never as a substitute for it.
 
 ## 1. Source strategy
 
@@ -170,6 +196,33 @@ For every reused file or substantial implementation:
 Open-source availability is permission to study and potentially reuse under the
 license; it is not permission to erase attribution, ignore dependencies, or
 claim upstream work as entirely original.
+
+### Latest upstream release and update policy
+
+The parity target is the latest stable Hermes release and latest stable
+OpenClaw release available at each Qubit release cut. Earlier pins are not a
+permanent ceiling. Every upstream update must be handled as a reproducible,
+audited parity change:
+
+1. discover the official stable release/tag;
+2. clone it read-only into a disposable directory;
+3. pin the exact commit, tag, date, URL, license, and source hashes;
+4. inventory every new command, page, API, backend feature, tool, plugin,
+   workflow, model/provider feature, and protocol surface;
+5. compare the inventory against the previous Qubit pin;
+6. integrate every compatible feature into the Qubit-owned Hermes foundation;
+7. provide CLI, dashboard, and VoiceBridge access where applicable;
+8. add regression, security, persistence, cancellation, rollback, packaging,
+   and degraded-state tests;
+9. rerun the complete parity and release gates; and
+10. append provenance and evidence without deleting historical records.
+
+Unpinned branches and unrecorded “latest” claims are forbidden. A feature may
+not be silently omitted. When direct exposure is unsafe, unavailable, or
+legally unsuitable, Qubit must provide a tested safe equivalent with an exact
+reason, owner, typed state, and rollback. Any new upstream release reopens
+parity verification and invalidates an earlier full-parity claim until the
+delta is reviewed and verified.
 
 ### Atomic Agent reuse boundary
 
@@ -1188,11 +1241,14 @@ Required product outcomes:
   control, keylogging, or silent screen capture.
 - 8AG provides a truthful coverage matrix and production qualification record;
   it never generalizes one website or application result to all others.
-- 8AH provides one Qubit dashboard that consolidates chat, voice, browser,
+- 8AH provides one Qubit dashboard based on the vendored pinned Hermes
+  frontend that consolidates chat, voice, browser,
   desktop, files, IDE/OpenCode, sessions, tools, approvals, providers,
   diagnostics, setup, upgrades, and audit without creating a second backend
-  authority. Hermes/OpenClaw UI patterns or code may be adapted only after
-  exact source, license, dependency, and provenance review.
+  authority. The Hermes source is copied first as the baseline; OpenClaw and
+  Qubit additions are explicit overlays with exact source, license, dependency,
+  and provenance records. Rebranding occurs only after functional parity is
+  proven.
 
 Generic webpage readability is not universal control: login walls, CAPTCHA,
 2FA, cross-origin restrictions, canvas-only content, unsupported browsers,

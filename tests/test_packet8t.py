@@ -615,8 +615,17 @@ def _production_service_state():
 def test_setup_page_served_without_token_leak(tmp_path):
     ui, port, _ = _dash_server(tmp_path)
     try:
-        status, body = _dash_http(port, "GET", "/setup", token="")
-        # Pages are public to loopback; the page itself must carry no secret.
+        # Hermes-first: /setup aliases into the Hermes shell (System).
+        import http.client
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        conn.request("GET", "/setup")
+        resp = conn.getresponse()
+        resp.read()
+        assert resp.status == 302, resp.status
+        assert resp.getheader("Location") == "/hermes/system"
+        # The labelled /classic/ fallback still serves the static setup page
+        # and carries no secret.
+        status, body = _dash_http(port, "GET", "/classic/setup", token="")
         assert status == 200
         html = body.decode("utf-8", "replace")
         assert 'id="checklist"' in html

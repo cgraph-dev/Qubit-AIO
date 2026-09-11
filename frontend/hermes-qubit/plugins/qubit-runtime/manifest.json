@@ -1,0 +1,12 @@
+{
+  "name": "qubit-runtime",
+  "label": "Runtime",
+  "description": "Pinned runtime inventory and status (same backend as qubit runtime CLI and voice). OpenClaw addition on the Hermes baseline.",
+  "icon": "cpu",
+  "version": "1.0.0",
+  "tab": {"path": "/qubit-runtime", "position": "after:system"},
+  "entry": "qubit-runtime.js",
+  "css": null,
+  "has_api": true,
+  "source": "qubit-overlay"
+}

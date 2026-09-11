@@ -393,11 +393,46 @@ Qubit previously shipped two verbatim files from NousResearch/hermes-agent
 These files have been REMOVED and replaced by independent Qubit
 implementations (`voicebridge/textutil.py`, `voicebridge/sqlstore.py`)
 with differential tests against the pinned oracle plus adversarial
-tests. No Hermes source remains in the product. The MIT attribution is
+tests. The MIT attribution is
 retained here and in `voicebridge/upstream/ATTRIBUTION.md` as the
 legally required provenance record for the retired vendoring.
 
 MIT License text requirement (retained provenance record):
+
+> Copyright (c) 2025 Nous Research
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy
+> of this software and associated documentation files (the "Software"), to deal
+> in the Software without restriction, including without limitation the rights
+> to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+> copies of the Software, and to permit persons to whom the Software is
+> furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all
+> copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+> IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+> FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+> AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+> LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+> OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+> SOFTWARE.
+
+## Hermes agent dashboard — vendored baseline (owner amendment 2026-09-11)
+
+`frontend/hermes-web/` (191 files from upstream `web/`) plus
+`frontend/hermes-shared/` (18 files from upstream `apps/shared`) is a
+byte-identical vendor of NousResearch/hermes-agent (MIT © 2025 Nous Research)
+at pinned commit `2237be355906fbe6065ce1815711eee52b2d646e` (tag `v2026.9.7`),
+authorized by `docs/QUBIT_OWNER_AMENDMENT_2026-09-11.md` and recorded in
+`docs/UPSTREAM_REUSE.md` (R35) with per-file hashes in
+`docs/HERMES_SOURCE_COMPARISON.json`. Qubit integration, branding, and OpenClaw
+additions live ONLY in `frontend/hermes-qubit/` (overlay) and
+`voicebridge/hermes_compat.py`; vendored files are never edited in place.
+`LICENSE` (Qubit school-project terms) does not apply to these paths.
+
+MIT License text requirement (vendored dashboard provenance record):
 
 > Copyright (c) 2025 Nous Research
 >

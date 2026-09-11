@@ -20,7 +20,9 @@ deliberate divergence are recorded in ``docs/UPSTREAM_REUSE.md``.
 """
 from __future__ import annotations
 
+import base64
 import json
+import math
 import os
 import urllib.parse
 from pathlib import Path
@@ -34,12 +36,17 @@ CONFIRM_CODE = "BROWSER_TABS_CONFIRM_REQUIRED"
 ESTOP_CODE = "BROWSER_TABS_ESTOP"
 NOT_FOUND_CODE = "BROWSER_TABS_NOT_FOUND"
 BAD_INPUT_CODE = "BROWSER_TABS_BAD_INPUT"
+UNAVAILABLE_CODE = "BROWSER_UNAVAILABLE"
+SCREENSHOT_TOO_LARGE_CODE = "BROWSER_SCREENSHOT_TOO_LARGE"
 MAX_TABS = 100
 MAX_TEXT_CHARS = 8000
 MAX_SNIPPETS = 3
 MAX_URL_LEN = 2048
 MAX_SELECTOR_LEN = 256
 MAX_FILL_LEN = 2000
+MAX_SCREENSHOT_BYTES = 2 * 1024 * 1024
+MAX_SCREENSHOT_DIM = 10000
+SCREENSHOT_TIMEOUT_S = 15.0
 
 
 class BrowserTabsError(Exception):
@@ -332,6 +339,132 @@ def find(cfg: Any, query: str, target: str = "") -> Dict[str, Any]:
         _audit("find", "qubit",
                {"target": body["target"], "count": str(body["count"])})
         return body
+    finally:
+        session.close()
+
+
+# ------------------------------------------------------------- screenshots
+def _check_clip(clip: Any) -> Optional[Dict[str, float]]:
+    """Validate an optional viewport clip ``(x, y, width, height)``.
+
+    ``None`` captures the visible viewport only (``captureBeyondViewport`` is
+    forced off); malformed geometry fails closed rather than reaching CDP.
+    """
+    if clip is None:
+        return None
+    try:
+        x, y, width, height = (float(value) for value in clip)
+    except (TypeError, ValueError):
+        raise BrowserTabsError(BAD_INPUT_CODE,
+                               "clip must be four numbers (x, y, w, h)")
+    if (not all(math.isfinite(value) for value in (x, y, width, height))
+            or x < 0 or y < 0 or width <= 0 or height <= 0):
+        raise BrowserTabsError(BAD_INPUT_CODE, "clip geometry is invalid")
+    if width > MAX_SCREENSHOT_DIM or height > MAX_SCREENSHOT_DIM:
+        raise BrowserTabsError(BAD_INPUT_CODE,
+                               f"clip exceeds {MAX_SCREENSHOT_DIM}px")
+    return {"x": x, "y": y, "width": width, "height": height, "scale": 1}
+
+
+def _bounded_cap(max_bytes: Any) -> int:
+    """Clamp a requested byte cap into ``(0, MAX_SCREENSHOT_BYTES]``."""
+    try:
+        cap = int(max_bytes)
+    except (TypeError, ValueError):
+        cap = MAX_SCREENSHOT_BYTES
+    if cap <= 0:
+        cap = MAX_SCREENSHOT_BYTES
+    return min(cap, MAX_SCREENSHOT_BYTES)
+
+
+def _screenshot_unavailable(detail: str) -> Dict[str, Any]:
+    return {"state": "UNAVAILABLE", "code": UNAVAILABLE_CODE,
+            "detail": (detail or "no loopback CDP endpoint")[:300],
+            "owner": "qubit-policy",
+            "rollback": "browser untouched; nothing to roll back"}
+
+
+def screenshot(cfg: Any, target: str = "", *, clip: Any = None,
+               fmt: str = "jpeg", quality: Optional[int] = 70,
+               max_bytes: int = MAX_SCREENSHOT_BYTES,
+               timeout: float = SCREENSHOT_TIMEOUT_S) -> Dict[str, Any]:
+    """Capture a bounded screenshot of an already-attached tab (read-only).
+
+    Reuses the existing loopback CDP session API and never launches, attaches,
+    or focuses a browser on its own: with no attached (loopback) CDP target the
+    call is inert and returns the typed ``BROWSER_UNAVAILABLE`` state instead of
+    raising. The decoded image is hard-capped at ``MAX_SCREENSHOT_BYTES``
+    (``max_bytes`` only lowers it) and the tab URL/title are redacted; captured
+    pixels are untrusted evidence. Any other CDP failure fails closed with a
+    typed :class:`BrowserTabsError`.
+    """
+    clean_fmt = str(fmt or "jpeg").lower()
+    if clean_fmt not in ("png", "jpeg"):
+        raise BrowserTabsError(BAD_INPUT_CODE, "format must be png or jpeg")
+    cap = _bounded_cap(max_bytes)
+    params: Dict[str, Any] = {"format": clean_fmt,
+                              "captureBeyondViewport": False}
+    clean_clip = _check_clip(clip)
+    if clean_clip is not None:
+        params["clip"] = clean_clip
+    if clean_fmt == "jpeg" and quality is not None:
+        try:
+            params["quality"] = max(0, min(100, int(quality)))
+        except (TypeError, ValueError):
+            params["quality"] = 70
+    try:
+        wait = max(0.1, min(float(timeout), SCREENSHOT_TIMEOUT_S))
+    except (TypeError, ValueError):
+        wait = SCREENSHOT_TIMEOUT_S
+    try:
+        page = _resolve_target(cfg, target)
+    except BrowserTabsError as exc:
+        if exc.code == cdp.UNAVAILABLE_CODE:
+            return _screenshot_unavailable(exc.detail)
+        raise
+    tid = str(page.get("id", ""))
+    try:
+        session = _target_session(page)
+    except BrowserTabsError as exc:
+        if exc.code == cdp.UNAVAILABLE_CODE:
+            return _screenshot_unavailable(exc.detail)
+        raise
+    try:
+        try:
+            result = session.call("Page.captureScreenshot", params,
+                                  timeout=wait)
+        except cdp.CdpError as exc:
+            if exc.code == cdp.UNAVAILABLE_CODE:
+                return _screenshot_unavailable(exc.detail)
+            raise BrowserTabsError(exc.code, exc.detail)
+        payload = result.get("data", "") if isinstance(result, dict) else ""
+        if not isinstance(payload, str) or not payload:
+            raise BrowserTabsError(cdp.PROTOCOL_CODE,
+                                   "CDP Page.captureScreenshot: no data")
+        try:
+            raw = base64.b64decode(payload, validate=True)
+        except Exception:
+            raise BrowserTabsError(
+                cdp.PROTOCOL_CODE,
+                "CDP Page.captureScreenshot: invalid base64")
+        if len(raw) > cap:
+            _audit("screenshot_too_large", "qubit",
+                   {"target": tid, "bytes": str(len(raw))})
+            return {"state": "denied", "code": SCREENSHOT_TOO_LARGE_CODE,
+                    "detail": f"capture {len(raw)} bytes exceeds cap {cap}",
+                    "max_bytes": cap, "owner": "qubit-policy",
+                    "rollback": "browser untouched; nothing to roll back"}
+        _remember(cfg, tid)
+        _audit("screenshot", "qubit",
+               {"target": tid, "bytes": str(len(raw))})
+        return {"state": "OK", "target": tid, "format": clean_fmt,
+                "bytes": len(raw), "max_bytes": cap,
+                "image_base64": payload,
+                "url": redact_spec(page.get("url", ""))[:300],
+                "title": redact_spec(page.get("title", ""))[:120],
+                "trust": "untrusted-page-image",
+                "authority": "loopback CDP read-only; "
+                             "personal profiles untouched"}
     finally:
         session.close()
 

@@ -17,6 +17,13 @@ These prompts do not authorize live account access, service restarts, timer
 enablement, model downloads, or live configuration edits unless the packet
 explicitly says so and the user authorizes it.
 
+Precedence clarification for the dashboard rebuild: older packet-specific
+instructions that prohibit React/Node or require a Python/static-JS dashboard
+do not apply to the owner-approved Hermes frontend vendoring work described in
+the dated amendment. The amendment and the dashboard rebuild requirement are
+the authority for that work. Do not use an older stack restriction as a reason
+to avoid copying and serving the pinned Hermes frontend source.
+
 ## Implementation Base Prompt
 
 ```text
@@ -44,13 +51,22 @@ services unless this packet and the user explicitly authorize it.
 
 For upstream work, inspect the exact pinned source and tests in section 4.1 of
 the plan, compare current upstream only for compatibility, update
-docs/UPSTREAM_REUSE.md before production code, preserve licenses, and copy or
-adapt only the smallest tested contract. Do not copy a framework or use a
-floating branch.
+docs/UPSTREAM_REUSE.md before production code, preserve licenses, and record
+every reused file, hash, patch, and reason. Do not use a floating branch.
 
-Use the existing Python/static-JS/systemd/Bubblewrap/Ollama/OpenClaw/Hermes
-stack. Do not add FastAPI, Uvicorn, React, Node, Docker, Kubernetes, another
-database, another queue, another model server, or an undeclared dependency.
+Dashboard exception approved by
+docs/QUBIT_OWNER_AMENDMENT_2026-09-11.md: the exact pinned Hermes frontend
+source is the required dashboard baseline and may be vendored with its
+React/Vite/Node build dependencies. Do not replace it with a Python/static-JS
+lookalike. Keep the vendored source and Qubit integration/rebrand patches
+separately auditable; preserve the Hermes license and attribution. This
+exception applies to the dashboard only. All non-dashboard runtime, broker,
+voice, security, and service packets retain the Qubit Python/static-JS/
+systemd/Bubblewrap/Ollama stack and must not add a second runtime authority.
+
+Outside the approved dashboard exception, do not add FastAPI, Uvicorn, React,
+Node, Docker, Kubernetes, another database, another queue, another model
+server, or an undeclared dependency.
 Model output is never permission. Never execute generated shell directly,
 expose secrets, bake private data into a model, or change per-call Ollama
 runner options outside the authorized model packet.
@@ -3191,15 +3207,19 @@ Requirement changes require explicit owner approval and a dated amendment.
 ### Dashboard rebuild requirement — do not call the Talk page 1:1
 
 ```text
-Read docs/QUBIT_DASHBOARD_REBUILD_PLAN.md and implement it together with the
+Read docs/QUBIT_OWNER_AMENDMENT_2026-09-11.md and
+docs/QUBIT_DASHBOARD_REBUILD_PLAN.md and implement them together with the
 native completion plan and checklist. Preserve the original Hermes dashboard
 pages, sidebar, navigation, controls, information architecture, density,
 terminal/chat workspace, forms, dialogs, reports, and workflows 1:1 first.
 The current Qubit Talk page is only a front door and must not be reported as a
 complete Hermes/OpenClaw dashboard.
 
-First inventory every CLI operation, voice entry, dashboard operation, matrix
-row, and pinned upstream workflow. Then implement real Qubit dashboard routes
+First vendor and hash-compare the exact pinned Hermes frontend source. The
+vendored Hermes React/Vite source is the structural and functional baseline;
+the existing static Qubit pages are not a substitute. Then inventory every CLI
+operation, voice entry, dashboard operation, matrix row, and pinned upstream
+workflow. Then implement real Qubit dashboard routes
 or workspaces for: chat/workspace, sessions, projects/files, models/providers,
 tools/skills/plugins, tasks/cron/runs, approvals/permissions/security,
 browser/desktop/IDE, messaging/channels/webhooks/pairing, memory/profiles,
@@ -3212,7 +3232,7 @@ resource, timeout, persistence, and recovery states. No status tile, count,
 static copied markup, dead button, mock success, direct shell, direct upstream
 HTTP/MCP path, second listener, or second broker counts as implementation.
 
-After preserving the Hermes surface, add all missing OpenClaw workflows and
+After preserving the Hermes source and workflows, add all missing OpenClaw workflows and
 then rebrand the combined product as one distinctive Qubit command console.
 Qubit may change colors, typography, icons, spacing, labels, responsive
 behavior, accessibility, reduced motion, keyboard shortcuts, command palette,
@@ -3221,10 +3241,79 @@ empty states. It must not remove, hide, collapse, or weaken any original
 Hermes page or workflow. The result must be a serious local agent workspace,
 not a centered demo card and not an incomplete custom replacement.
 
-Do not copy upstream logos, names, artwork, or distinctive branding. Keep legal
-notices and provenance outside normal product UI. Verify all routes with real
+Do not copy upstream logos, names, artwork, or distinctive branding. Source
+code vendoring is allowed by the owner amendment; legal notices and provenance
+must remain intact and outside normal product UI. Verify all routes with real
 backend tests, Playwright/UI tests, narrow-mobile screenshots, accessibility
 checks, security checks, and full warnings-as-errors gates. Repair every
 ordinary failure and do not claim 1:1 until the complete route and workflow
 inventory is proven.
+```
+
+### Final unified-agent requirement — Hermes + OpenClaw + VoiceBridge
+
+```text
+The finished Qubit product must contain every supported Hermes and OpenClaw
+capability in one Qubit agent. Compare the pinned sources and behavior
+1:1; do not stop at a capability count, route list, status tile, adapter name,
+or passing smoke test.
+
+For every command, command family, dashboard workflow, and adopted OpenClaw
+operation, prove the same Qubit backend operation is reachable through:
+
+- `qubit` CLI with equivalent arguments, help, output, errors, exit status,
+  persistence, cancellation, and recovery;
+- the vendored Hermes-baseline dashboard with a real page/control/workflow;
+- Qubit VoiceBridge with a natural command, argument extraction, clarification
+  when ambiguous, typed response, confirmation where required, cancellation,
+  expiry/replay rejection, redacted receipt, and session isolation.
+
+Voice descriptions, help text, inventory tiles, dashboard-only controls,
+CLI-only implementations, dead buttons, and external upstream processes do not
+count. Every implementation must use the one Qubit broker, permission,
+confirmation, audit, redaction, resource, cancellation, rollback, and
+emergency-stop path.
+
+Do not remove or silently narrow Hermes/OpenClaw behavior. If a behavior is
+unsafe, unavailable on this machine, or requires a live account, implement the
+Qubit-safe equivalent and prove it with typed states and tests. Only the live
+operator action may remain manual; the code path, CLI path, dashboard path,
+voice path, error state, and test must already exist.
+
+Do not rebrand early in a way that hides missing functionality. First make the
+Hermes source/workflows and OpenClaw additions work; then apply the complete
+Qubit rebrand as a documented overlay while retaining legal attribution and
+provenance. Do not claim 100%, complete, or 1:1 until independent verification
+proves source mapping, behavior, CLI/dashboard/voice parity, UI interactions,
+security, lifecycle, clean install, and all required tests.
+```
+
+### Latest upstream release parity requirement
+
+```text
+The parity target is the latest stable Hermes release and latest stable
+OpenClaw release available at the Qubit release-cut date, not merely the old
+revisions used by an earlier packet.
+
+For every release cut or upstream-update task:
+
+1. Discover the official latest stable Hermes and OpenClaw tags/releases.
+2. Clone them into disposable read-only directories.
+3. Pin exact commits and record tag, date, URL, license, and hashes.
+4. Inventory every new command, page, API, backend feature, tool, plugin,
+   workflow, model/provider feature, and protocol surface.
+5. Compare the new inventory with the previous Qubit inventory.
+6. Integrate every compatible feature into the Qubit-owned Hermes foundation.
+7. Add CLI, dashboard, and VoiceBridge coverage for every applicable feature.
+8. Add tests for new behavior, negative behavior, security, persistence,
+   cancellation, rollback, packaging, and degraded states.
+9. Re-run the complete parity, build, install, security, and UI gates.
+10. Update provenance and append-only evidence without deleting historical
+    release records.
+
+Never use an unpinned branch or claim “latest” without recording the exact
+revision. Never silently omit a new upstream feature. If a feature cannot be
+exposed safely or legally, implement a tested Qubit-safe equivalent and record
+the exact reason, owner, and rollback. A new upstream release reopens parity
+verification; it does not automatically inherit the previous VERIFIED result.
 ```

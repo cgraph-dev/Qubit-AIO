@@ -1,0 +1,3651 @@
+"""Hermes-dashboard compatibility backend (owner amendment 2026-09-11).
+
+Serves the vendored Hermes dashboard (``frontend/hermes-web/``, byte-identical
+at pinned hermes-agent@2237be3) from the Qubit backend. Every route calls the
+SAME Qubit operation modules as the CLI (``voicebridge/cli.py``) and voice
+(``voicebridge/voice_commands.py``): same stores, same permission broker, same
+confirmation journal, same audit/redaction, same emergency stop.
+
+Unsafe upstream actions (raw PTY spawn, file mkdir/upload-stream, secret
+reveal, credential pool, config-raw dump, debug-share state dump, gateway
+process supervision, remote hub fetch, external update/portal, OAuth token
+dance) stay behind Qubit policy and return typed unavailable/refused states
+(amendment point 9) — never fabricated success.
+
+Vendored frontend files are NEVER modified here; Qubit additions (brand
+theme, Qubit Chat, OpenClaw tabs) are served as plugin manifests + bundles
+from ``frontend/hermes-qubit/`` (overlay).
+"""
+from __future__ import annotations
+
+import json
+import re
+import time
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+# Overlay (theme + plugins) resolution: package data first (clean wheel
+# install), then the checkout. Keeps an isolated install self-contained.
+from . import resources as _resources  # noqa: E402
+OVERLAY_DIR = _resources.resource_path("frontend/hermes-qubit")
+
+Handler = Callable[..., Tuple[int, Dict[str, Any]]]
+
+
+def _redact(text: Any) -> str:
+    try:
+        from .redaction import redact_text
+        return redact_text(str(text))
+    except Exception:
+        return str(text)
+
+
+def _audit(op: str, actor: str, detail: Dict[str, Any]) -> None:
+    try:
+        from .logging_setup import log_event
+        log_event(f"hermes_compat.{op}",
+                  {"actor": actor, **{k: _redact(v)[:160] for k, v in detail.items()}})
+    except Exception:
+        pass
+
+
+def _estop(cfg: Any) -> bool:
+    try:
+        from .broker import estop_engaged
+        return bool(estop_engaged(cfg))
+    except Exception:
+        try:
+            from . import power as PW
+            return bool(PW.estop_engaged(cfg))
+        except Exception:
+            return False
+
+
+def _gate(code: str, detail: str, counterpart: str,
+          http: int = 403) -> Tuple[int, Dict[str, Any]]:
+    return http, {"ok": False, "state": "UNAVAILABLE", "code": code,
+                  "detail": detail, "qubit_counterpart": counterpart}
+
+
+def _ok(**fields: Any) -> Tuple[int, Dict[str, Any]]:
+    out = {"ok": True}
+    out.update(fields)
+    return 200, out
+
+
+def _staged(detail: str, confirmation_id: str,
+            extra: Optional[Dict[str, Any]] = None) -> Tuple[int, Dict[str, Any]]:
+    """Staged-confirmation response: HTTP 409, never 2xx.
+
+    The vendored Hermes UI treats any 2xx as executed success (the Skills
+    page flips its toggle and toasts success on resolve), so a staged
+    confirmation answered 202 would render fabricated success. 409 forces
+    the UI error path; the typed envelope plus the pending-approvals
+    banner (GET/POST /api/ops/approvals|confirm|cancel, same journal as
+    CLI/voice/classic) is the real completion path. One journal, one path.
+    """
+    out: Dict[str, Any] = {
+        "ok": False, "state": "NEEDS_CONFIRMATION",
+        "code": "CONFIRM_REQUIRED", "detail": detail,
+        "confirmation_id": confirmation_id,
+        "qubit_counterpart": "pending-approvals banner "
+                             "(POST /api/ops/confirm) + CLI "
+                             "`qubit approvals respond` + voice yes",
+    }
+    if extra:
+        out.update(extra)
+    return 409, out
+
+
+def _res(out: Dict[str, Any]) -> Any:
+    """Unwrap a dashboard_ops envelope to its structured result.
+
+    run_op returns voice-pipeline outcomes whose ``receipt`` nests the real
+    payload under ``result`` ({entry, session, result}); handlers adapt the
+    inner result to Hermes wire shapes, not the speech envelope.
+    """
+    rec = out.get("receipt")
+    if isinstance(rec, dict) and "result" in rec:
+        return rec["result"]
+    return rec
+
+
+def _fail(exc: Exception) -> Tuple[int, Dict[str, Any]]:
+    return 500, {"ok": False, "state": "FAILED", "code": "EXECUTOR_ERROR",
+                 "detail": _redact(str(exc))[:300]}
+
+
+# ---------------------------------------------------------------------------
+# Readers (shared Qubit modules — same functions CLI/voice call)
+# ---------------------------------------------------------------------------
+
+def h_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import runtime_inventory as RI
+    inv = RI.inventory(cfg) if hasattr(RI, "inventory") else {}
+    if not isinstance(inv, dict):
+        inv = {}
+    try:
+        from . import status as ST
+        core = ST.status(cfg) if hasattr(ST, "status") else {}
+    except Exception:
+        core = {}
+    if not isinstance(core, dict):
+        core = {}
+    model = ""
+    try:
+        from . import agent as AG
+        model = AG._model(cfg)
+    except Exception:
+        model = ""
+    try:
+        state_dir = str(Path(cfg.state_dir()))
+    except Exception:
+        state_dir = ""
+    try:
+        from . import distribution as D
+        version = str(getattr(D, "VERSION", "1.0.0"))
+    except Exception:
+        version = "1.0.0"
+    sessions_count = 0
+    try:
+        from .auth_status import recent_sessions as _rs
+        sessions_count = int(_rs(cfg, 100).get("count", 0))
+    except Exception:
+        sessions_count = 0
+    # StatusResponse wire shape (web/src/lib/api.ts): every required field
+    # present; gateway-process fields are honest negatives (single event path;
+    # supervision refused), Qubit values elsewhere.
+    return _ok(schema="qubit-hermes-status/1",
+               model=model, qubit=core,
+               active_sessions=sessions_count,
+               auth_required=False, auth_providers=[], auth_flows=[],
+               can_update_hermes=False,
+               config_path=state_dir, config_version=1, env_path=state_dir,
+               gateway_exit_reason=None, gateway_health_url=None,
+               gateway_pid=None, gateway_platforms={},
+               gateway_running=False, gateway_state="not-supervised",
+               gateway_updated_at=None,
+               hermes_home=state_dir, latest_config_version=1,
+               release_date="2026-09-11", version="qubit-" + version,
+               detail="Qubit single-authority backend; gateway process "
+                      "supervision is refused by policy (GATEWAY_NO_SUPERVISION)")
+
+
+def h_health(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Lightweight liveness (HealthResponse wire shape): ok/version/auth_required.
+
+    Backed by the real installation-health inventory
+    (``voicebridge.lifecycle.health_inventory``) — the same module
+    ``qubit setup health`` calls. A DEGRADED aggregate is reported verbatim;
+    liveness itself is never fabricated READY when the probe raises.
+    """
+    code, status_out = h_status(cfg, q, b, p)
+    if code != 200:
+        return code, status_out
+    state = "READY"
+    detail = "Qubit backend process is live"
+    try:
+        from .lifecycle import health_inventory
+        inv = health_inventory(cfg)
+        if isinstance(inv, dict) and inv.get("state"):
+            state = str(inv["state"])
+    except Exception as exc:
+        state = "DEGRADED"
+        detail = "installation-health inventory unavailable: " + \
+            _redact(str(exc))[:160]
+    return _ok(version=status_out.get("version", "qubit-1.0.0"),
+               auth_required=False, state=state, detail=detail)
+
+
+def h_auth_me(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    # AuthMeResponse wire shape: local loopback operator identity.
+    return _ok(user_id="local-operator", email="", display_name="Qubit Operator",
+               org_id="local", provider="loopback", expires_at=0,
+               authenticated=True, actor="dashboard:user", mode="loopback-token",
+               detail="loopback session-token auth; no OAuth dance")
+
+
+def h_events(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    try:
+        from .webui import WebUI  # noqa
+    except Exception:
+        pass
+    items: List[Dict[str, Any]] = []
+    try:
+        state_dir = Path(cfg.state_dir())
+        for name in ("webui_events.jsonl", "events.jsonl", "audit.jsonl"):
+            fp = state_dir / name
+            if not fp.exists():
+                continue
+            lines = fp.read_text(errors="replace").splitlines()[-100:]
+            for line in lines:
+                try:
+                    ev = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(ev, dict):
+                    items.append({k: _redact(v)[:300] if isinstance(v, str) else v
+                                  for k, v in ev.items()})
+            if items:
+                break
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(events=items[-int(q.get("limit", "100") or "100"):],
+               count=len(items))
+
+
+def h_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from .auth_status import recent_sessions, session_store
+    try:
+        limit = max(1, min(int(q.get("limit", "50") or "50"), 100))
+    except ValueError:
+        limit = 50
+    try:
+        offset = max(0, int(q.get("offset", "0") or "0"))
+    except ValueError:
+        offset = 0
+    query = str(q.get("q", q.get("query", "")) or "").strip()
+    if query:
+        res = session_store(cfg).search(query, limit + offset)
+        all_items = res.get("sessions", [])
+    else:
+        res = recent_sessions(cfg, limit + offset)
+        all_items = res.get("sessions", [])
+    # PaginatedSessions wire shape (web/src/lib/api.ts): sessions, total,
+    # limit, offset; SessionInfo rows carry source/model/title/message_count.
+    sessions = []
+    for r in all_items[offset:offset + limit]:
+        rid = str(r.get("receipt_id") or r.get("action_id") or r.get("id", ""))
+        sessions.append({
+            "id": rid,
+            "source": "qubit-receipts",
+            "model": None,
+            "title": (r.get("name") or (r.get("detail") or "")[:80] or rid) or None,
+            "name": r.get("name"),
+            "archived": bool(r.get("archived", False)),
+            "started_at": r.get("created_at") or 0,
+            "ended_at": None,
+            "last_active": r.get("created_at") or 0,
+            "is_active": False,
+            "message_count": 0,
+            "tool_call_count": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "preview": (r.get("detail") or "")[:200],
+            "state": r.get("state"),
+            "code": r.get("code"),
+            "receipt_id": r.get("receipt_id"),
+            "action_id": r.get("action_id"),
+        })
+    return _ok(sessions=sessions, total=len(all_items), limit=limit,
+               offset=offset, store_state=res.get("state", "OK"))
+
+
+def h_sessions_stats(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from .auth_status import recent_sessions
+    res = recent_sessions(cfg, 100)
+    items = res.get("sessions", [])
+    by_state: Dict[str, int] = {}
+    for r in items:
+        by_state[str(r.get("state", "?"))] += 1
+    total = len(items)
+    # SessionStoreStats wire shape (web/src/lib/api.ts): total, active_store,
+    # archived, messages, by_source. Receipts are append-only: archived=0.
+    return _ok(total=total, active_store=total, archived=0, messages=total,
+               by_source={"qubit-receipts": total}, by_state=by_state)
+
+
+def h_session_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from .auth_status import session_store
+    rid = p.get("id", "")
+    try:
+        res = session_store(cfg).show(rid)
+    except Exception as exc:
+        return _fail(exc)
+    if str(res.get("state")) != "OK" or not isinstance(res.get("session"), dict):
+        return 404, {"ok": False, "code": res.get("code", "NOT_FOUND"),
+                     "detail": res.get("detail", f"no session {rid!r}")}
+    r = res["session"]
+    detail = str(r.get("detail", "") or "")
+    try:
+        created = float(r.get("created_at", 0) or 0)
+    except (TypeError, ValueError):
+        created = 0.0
+    # SessionInfo wire shape (web/src/lib/api.ts).
+    return _ok(id=rid, source="qubit-receipts", model=None,
+               title=(r.get("name") or detail[:80] or rid) or None,
+               name=r.get("name"), archived=bool(r.get("archived", False)),
+               started_at=created, ended_at=None, last_active=created,
+               is_active=False, message_count=0, tool_call_count=0,
+               input_tokens=0, output_tokens=0,
+               preview=detail[:200] or None,
+               state=str(r.get("state", "") or ""))
+
+
+def h_session_patch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Rename / archive a session (shared SessionStore)."""
+    from .auth_status import session_store
+    rid = p.get("id", "")
+    store = session_store(cfg)
+    try:
+        if "name" in b:
+            res = store.rename(rid, str(b.get("name", "")))
+        elif b.get("archived") is not None:
+            res = (store.archive(rid) if b.get("archived")
+                   else store.resume(rid))
+        else:
+            return 400, {"ok": False, "code": "MALFORMED",
+                         "detail": "patch needs name or archived"}
+    except Exception as exc:
+        return _fail(exc)
+    ok = str(res.get("state")) == "OK"
+    return (200 if ok else 400), {"ok": ok, "state": res.get("state"),
+                                  "code": res.get("code"),
+                                  "detail": _redact(
+                                      res.get("detail", ""))[:200],
+                                  "session": res.get("session")}
+
+
+def h_session_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Delete a session tombstone; destructive and recoverable via resume."""
+    from .auth_status import session_store
+    rid = p.get("id", "")
+    confirm = bool(b.get("confirm", False))
+    try:
+        res = session_store(cfg).delete(rid, confirm=confirm)
+    except Exception as exc:
+        return _fail(exc)
+    if not confirm:
+        return 409, {"ok": False, "state": "CONFIRM_REQUIRED",
+                     "code": res.get("code", "CONFIRM_REQUIRED"),
+                     "detail": res.get("detail", ""),
+                     "qubit_counterpart": "re-DELETE with {\"confirm\": true}; "
+                                          "recover with POST resume"}
+    ok = str(res.get("state")) == "OK"
+    return (200 if ok else 400), {"ok": ok, "state": res.get("state"),
+                                  "code": res.get("code"),
+                                  "detail": _redact(
+                                      res.get("detail", ""))[:200],
+                                  "session": res.get("session")}
+
+
+def h_session_resume(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from .auth_status import session_store
+    try:
+        res = session_store(cfg).resume(p.get("id", ""))
+    except Exception as exc:
+        return _fail(exc)
+    ok = str(res.get("state")) == "OK"
+    return (200 if ok else 400), {"ok": ok, "state": res.get("state"),
+                                  "code": res.get("code"),
+                                  "detail": _redact(
+                                      res.get("detail", ""))[:200]}
+
+
+def h_session_messages(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    code, out = h_session_show(cfg, q, b, p)
+    if code != 200:
+        return code, out
+    rid = p.get("id", "")
+    # SessionMessagesResponse wire shape; receipts hold no chat transcript.
+    return _ok(session_id=rid,
+               messages=[{"role": "system",
+                          "content": _redact(json.dumps(out))[:2000],
+                          "timestamp": out.get("last_active", 0)}],
+               pagination={"limit": 500, "offset": 0, "order": "latest",
+                           "returned": 1},
+               detail="Qubit sessions are audit receipts, not chat transcripts; "
+                      "live conversation runs in Qubit Chat (agent.turn)")
+
+
+def h_config(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    out = OPS.run_op(cfg, "config_profiles", {}, actor="dashboard:user",
+                     session="dashboard")
+    if out.get("state") != "executed":
+        return 200, {"ok": False, "code": out.get("code", "FAILED"),
+                     "detail": _redact(out.get("speech", out.get("detail", "")))[:400]}
+    # getConfig/getDefaults/getSchema expect Record<string, unknown>.
+    return _ok(qubit_config_profiles=_res(out),
+               note="read-only inventory; writes stage through the Qubit "
+                    "operations console with confirmation")
+
+
+def h_egress_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Egress proxy status (EgressStatusResponse wire shape: ``text``).
+
+    Backed by ``voicebridge.proxy_status`` (the proxy inventory) plus the
+    frontier network policy (``voicebridge.providers.policy``). No forwarding
+    server runs, so the text is the real typed policy, never a fake "up".
+    """
+    from . import proxy_status as PS
+    try:
+        proxy = PS.status()
+    except Exception as exc:
+        return _fail(exc)
+    frontier: Dict[str, Any] = {}
+    try:
+        from .providers.policy import FrontierPolicy
+        pol = FrontierPolicy.from_config(cfg)
+        frontier = {"enabled": bool(pol.enabled), "route": pol.route,
+                    "allowlist_count": len(pol.allowlist),
+                    "privacy_tier": pol.privacy_tier}
+    except Exception:
+        frontier = {}
+    text = (f"proxy: {proxy.get('state', 'UNKNOWN')}; "
+            f"frontier: {'enabled' if frontier.get('enabled') else 'disabled'}; "
+            f"{proxy.get('policy', '')}")
+    return _ok(text=text, proxy=proxy, frontier=frontier)
+
+
+def _qubit_model(cfg: Any) -> Dict[str, Any]:
+    from . import agent as AG
+    from . import dashboard_ops as OPS
+    name = ""
+    try:
+        name = AG._model(cfg)
+    except Exception:
+        name = "qubit-brain4"
+    ctx = 4096
+    try:
+        out = OPS.run_op(cfg, "prompt_budget", {}, actor="dashboard:user",
+                         session="dashboard")
+        res = _res(out) or {}
+        ctx = int((res.get("prompt_budget", {}) or {}).get("num_ctx", 4096))
+    except Exception:
+        pass
+    return {"name": name or "qubit-brain4", "ctx": ctx}
+
+
+def h_model_info(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    m = _qubit_model(cfg)
+    # ModelInfoResponse wire shape.
+    return _ok(model=m["name"], provider="ollama-local",
+               auto_context_length=m["ctx"], config_context_length=m["ctx"],
+               effective_context_length=m["ctx"],
+               capabilities={"supports_tools": True, "supports_vision": False,
+                             "supports_reasoning": False,
+                             "context_window": m["ctx"],
+                             "max_output_tokens": 1024,
+                             "model_family": "qwen3-4b"})
+
+
+def h_model_options(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    m = _qubit_model(cfg)
+    out = OPS.run_op(cfg, "config_profiles", {}, actor="dashboard:user",
+                     session="dashboard")
+    res = _res(out) or {}
+    profiles = res.get("profiles", []) if isinstance(res, dict) else []
+    brains = [pr for pr in profiles
+              if isinstance(pr, dict) and pr.get("kind") == "brain"]
+    models = [str(pr.get("id", "")) for pr in brains if pr.get("id")]
+    # ModelOptionsResponse wire shape.
+    return _ok(model=m["name"], provider="ollama-local",
+               providers=[{
+                   "name": "local", "slug": "local",
+                   "models": models or [m["name"]],
+                   "total_models": len(models or [m["name"]]),
+                   "is_current": True, "is_user_defined": False,
+                   "source": "qubit-config-profiles",
+                   "authenticated": False}])
+
+
+def h_model_recommended_default(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Recommended default model (RecommendedDefaultResponse wire shape).
+
+    Resolved through the same Qubit model info path as ``h_model_info`` /
+    ``h_model_options`` (``agent._model`` + the config profiles brain). Qubit
+    ships a single local brain, so the recommendation is that resolved model; a
+    requested cloud provider slug is echoed honestly with an empty model since
+    no cloud curation exists — never a silently-picked paid default.
+    """
+    m = _qubit_model(cfg)
+    requested = str(q.get("provider", "") or "").strip().lower()
+    local_slugs = {"", "local", "ollama", "ollama-local", "qubit-local"}
+    if requested not in local_slugs:
+        return _ok(provider=requested, model="", free_tier=None,
+                   detail="Qubit routes through the local configured brain; "
+                          "no cloud provider curation is performed")
+    provider = "ollama-local"
+    return _ok(provider=provider, model=m["name"], free_tier=None,
+               detail="recommended default = configured Qubit brain profile")
+
+
+def h_model_auxiliary(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    m = _qubit_model(cfg)
+    # AuxiliaryModelsResponse wire shape; no aux pins exist.
+    return _ok(tasks=[], main={"provider": "ollama-local",
+                               "model": m["name"]})
+
+
+def h_model_moa(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    # MoaConfigResponse wire shape; MoA is superseded by the ordered-fallback
+    # gateway (8Q): no reference/aggregator fan-out exists to configure.
+    slot = {"provider": "", "model": "", "enabled": False}
+    return _ok(default_preset="none", active_preset="none", presets={},
+               reference_models=[], aggregator=slot,
+               reference_temperature=0.0, aggregator_temperature=0.0,
+               reference_timeout=None, degraded_reference_policy="loud",
+               enabled=False,
+               detail="MoA fan-out is not shipped; ordered provider fallback "
+                      "(8Q gateway) is the Qubit counterpart")
+
+
+def h_model_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    scope = str(b.get("scope", "main") or "main")
+    if scope != "main":
+        return 400, {"ok": False, "code": "AUX_PIN_REFUSED",
+                     "detail": "auxiliary task pins are not offered; the main "
+                               "profile owns routing"}
+    model = str(b.get("model") or "")
+    if not model:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "model assignment needs a model name"}
+    if b.get("confirm_expensive_model") or b.get("confirmed"):
+        # Upstream retry shape: the Models dialog re-POSTs with the flag
+        # after showing confirm_required. Settle the staged journal
+        # approval for the same model instead of staging a second one
+        # (one confirmation path, settle-once journal).
+        try:
+            from .approvals import ApprovalJournal
+            journal = ApprovalJournal(
+                Path(cfg.state_dir()) / "approvals.jsonl",
+                default_ttl_s=120.0)
+            cands = [a for a in journal.pending()
+                     if a.capability == "voice.profile_select"
+                     and (a.meta or {}).get("session") == "dashboard"
+                     and (a.meta or {}).get("args", {}).get("profile") == model]
+        except Exception:
+            cands = []
+        if cands:
+            from . import dashboard_ops as OPS
+            latest = max(cands, key=lambda a: a.created_at)
+            out = OPS.confirm_op(cfg, latest.id, actor="dashboard:user",
+                                 session="dashboard")
+            ok = out.get("state") == "executed"
+            return (200 if ok else 400), {
+                "ok": ok, "scope": "main", "provider": "ollama-local",
+                "model": model,
+                "detail": _redact(out.get("speech", out.get("detail", "")))[:400]}
+        # No staged approval (expired or restarted since): fall through and
+        # stage a fresh one below so the dialog has something to confirm.
+    out = OPS.run_op(cfg, "profile_select",
+                     {"kind": "brain", "profile": model},
+                     actor="dashboard:user", session="dashboard")
+    if out.get("confirmation_id"):
+        # ModelAssignmentResponse confirm flow (409, never 2xx: see _staged).
+        return _staged(_redact(out.get("speech", ""))[:300],
+                       out["confirmation_id"],
+                       {"confirm_required": True,
+                        "confirm_message": _redact(out.get("speech", ""))[:300]})
+    ok = out.get("state") == "executed"
+    # ModelAssignmentResponse wire shape.
+    return (200 if ok else 400), {
+        "ok": ok, "scope": "main", "provider": "ollama-local", "model": model,
+        "detail": _redact(out.get("speech", out.get("detail", "")))[:400]}
+
+
+def h_profiles(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    from .permissions import permissions_store
+    out = OPS.run_op(cfg, "config_profiles", {}, actor="dashboard:user",
+                     session="dashboard")
+    res = _res(out) or {}
+    profiles = res.get("profiles", []) if isinstance(res, dict) else []
+    try:
+        skill_count = len(permissions_store(cfg).skills())
+    except Exception:
+        skill_count = 0
+    default_id = ""
+    for pr in profiles:
+        if isinstance(pr, dict) and pr.get("default"):
+            default_id = str(pr.get("id", ""))
+            break
+    if not default_id and profiles:
+        default_id = str(profiles[0].get("id", ""))
+    persona = _persona_active(cfg)
+    if persona:
+        default_id = persona
+    kind = (p.get("kind") or "").strip()
+    if kind == "active":
+        # ActiveProfileInfo wire shape.
+        return _ok(active=default_id, current=default_id)
+    items = []
+    for pr in profiles:
+        if not isinstance(pr, dict):
+            continue
+        pid = str(pr.get("id", ""))
+        items.append({
+            "name": pid, "path": "", "is_default": pid == default_id,
+            "model": pid if pr.get("kind") == "brain" else None,
+            "provider": "ollama-local" if pr.get("kind") == "brain" else None,
+            "has_env": False, "skill_count": skill_count,
+            "gateway_running": False,
+            "description": str(pr.get("source", "") or "")[:200],
+            "description_auto": False,
+            "display_name": pid, "distribution_name": None,
+            "distribution_version": None, "distribution_source": None,
+            "has_alias": False,
+        })
+    # {profiles: ProfileInfo[]} wire shape.
+    return _ok(profiles=items)
+
+
+def h_profile_soul(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import brain as B
+    name = str(p.get("name", "") or "")
+    try:
+        res = B.profile_show(cfg, name)
+    except Exception as exc:
+        return _fail(exc)
+    if isinstance(res, dict) and res.get("ok") is False:
+        return 404, {"ok": False, "code": "NOT_FOUND",
+                     "detail": f"no profile {name!r}"}
+    text = ""
+    if isinstance(res, dict):
+        text = str(res.get("profile", res.get("soul", "")) or "")
+    return _ok(content=text, exists=bool(text))
+
+
+def h_profile_setup_command(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    name = str(p.get("name", "") or "")
+    return _ok(command=f"qubit profile_show --principal {name}")
+
+
+def h_skills(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+             p: Dict[str, str]) -> Tuple[int, Any]:
+    from .permissions import permissions_store
+    try:
+        store = permissions_store(cfg)
+        recs = store.skills()
+    except Exception as exc:
+        return _fail(exc)
+    # SkillInfo[] wire shape (web/src/lib/api.ts).
+    out = []
+    for rec in recs:
+        d = rec.to_dict() if hasattr(rec, "to_dict") else {}
+        man = d.get("manifest", {}) if isinstance(d, dict) else {}
+        out.append({
+            "name": str(d.get("skill_id", "")),
+            "description": str(man.get("description", "") or d.get("status", "")),
+            "category": str(man.get("category", "") or "qubit"),
+            "enabled": str(d.get("status", "")) == "enabled",
+        })
+    return 200, out
+
+
+def h_skill_content(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from .permissions import permissions_store
+    name = str(q.get("name", "") or "")
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "skill name required"}
+    try:
+        rec = permissions_store(cfg).skill(name)
+    except Exception as exc:
+        return _fail(exc)
+    if rec is None:
+        return 404, {"ok": False, "code": "NOT_FOUND",
+                     "detail": f"no skill {name!r}"}
+    d = rec.to_dict()
+    man = d.get("manifest", {})
+    content = str(man.get("instructions", "") or man.get("description", "") or "")
+    # SkillContent wire shape.
+    return _ok(name=name, content=content,
+               path=str(d.get("source_path", "") or ""))
+
+
+def h_skills_toggle(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    name = str(b.get("name") or b.get("skill") or "")
+    enable = bool(b.get("enabled", b.get("enable", True)))
+    out = OPS.run_op(cfg, "skills_enable" if enable else "skills_disable",
+                     {"skill_id": name} if name else {},
+                     actor="dashboard:user", session="dashboard")
+    if out.get("confirmation_id"):
+        return _staged(_redact(out.get("speech", ""))[:300],
+                       out["confirmation_id"])
+    ok = out.get("state") == "executed"
+    return (200 if ok else 400), {"ok": ok,
+                                  "detail": _redact(out.get("speech", out.get("detail", "")))[:400]}
+
+
+def h_toolsets(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Any]:
+    from . import dashboard_ops as OPS
+    out = OPS.run_op(cfg, "tools", {}, actor="dashboard:user", session="dashboard")
+    res = _res(out) or {}
+    tools = res.get("tools", res) if isinstance(res, dict) else {}
+    names = tools.get("names", []) if isinstance(tools, dict) else []
+    # ToolsetInfo[] wire shape; Qubit tools are broker capabilities, one
+    # entry per tool (platform "qubit").
+    return 200, [{
+        "name": n, "label": n, "description": "Qubit broker capability",
+        "platform": "qubit", "platform_label": "Qubit",
+        "enabled": True, "configured": True, "tools": [n],
+    } for n in names]
+
+
+def _cron_shape(j: Dict[str, Any]) -> Dict[str, Any]:
+    # CronJob wire shape (web/src/lib/api.ts); Qubit schedules are the store.
+    return {
+        "id": str(j.get("id", "")), "profile": None, "profile_name": None,
+        "hermes_home": None, "is_default_profile": True,
+        "name": j.get("name"), "prompt": j.get("task_text"),
+        "script": None, "skills": None,
+        "schedule": {"kind": str(j.get("kind", "")),
+                     "expr": str(j.get("interval_min") or j.get("at_ts") or ""),
+                     "display": str(j.get("kind", ""))},
+        "schedule_display": str(j.get("kind", "")),
+        "repeat": None, "enabled": bool(j.get("enabled", False)),
+        "state": str(j.get("last_state", "") or ""),
+        "deliver": j.get("deliver_to") or None,
+        "model": None, "provider": None, "base_url": None,
+        "no_agent": None, "context_from": None, "enabled_toolsets": None,
+        "workdir": None,
+        "last_run_at": j.get("last_run_at"), "next_run_at": None,
+        "last_status": j.get("last_state"), "last_error": None,
+        "last_delivery_error": j.get("last_delivery_error"),
+    }
+
+
+def h_cron_jobs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Any]:
+    from . import schedules as S
+    try:
+        res = S.list_jobs(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    jobs = res.get("jobs", res) if isinstance(res, dict) else res
+    return 200, [_cron_shape(j) for j in (jobs or [])]
+
+
+def h_cron_job_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import schedules as S
+    try:
+        res = S.show(cfg, int(p.get("id", "0")))
+    except Exception as exc:
+        return _fail(exc)
+    if isinstance(res, dict) and res.get("ok") is False:
+        return 404, {"ok": False, "code": res.get("code", "NOT_FOUND"),
+                     "detail": _redact(res.get("error", ""))[:200]}
+    job = res.get("job", res) if isinstance(res, dict) else {}
+    return 200, _cron_shape(job if isinstance(job, dict) else {})
+
+
+def h_cron_job_runs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Run history for one schedule ({"runs": CronRun[], "limit": int}).
+
+    Backed by ``voicebridge.schedules.history`` (the same SQLite run log
+    ``qubit schedules history`` reads). Schedule ids are numeric; a non-numeric
+    upstream job id honestly reports no runs instead of scanning every job.
+    """
+    from . import schedules as S
+    raw = str(p.get("id", "") or "")
+    try:
+        limit = max(1, min(int(q.get("limit", "20") or "20"), 100))
+    except ValueError:
+        limit = 20
+    try:
+        job_id = int(raw)
+    except ValueError:
+        job_id = 0
+    if not job_id:
+        return _ok(runs=[], limit=limit, count=0,
+                   detail=f"schedule {raw!r} has no numeric id; no runs")
+    try:
+        res = S.history(cfg, job_id, limit)
+    except Exception as exc:
+        return _fail(exc)
+    runs = res.get("runs", []) if isinstance(res, dict) else []
+    now = time.time()
+    shaped = []
+    for r in runs if isinstance(runs, list) else []:
+        started = r.get("started_at") or 0
+        finished = r.get("finished_at") or 0
+        shaped.append({
+            "id": r.get("id"), "job_id": r.get("job_id"),
+            "started_at": started, "ended_at": finished or None,
+            "finished_at": finished, "state": str(r.get("state", "") or ""),
+            "code": str(r.get("code", "") or ""),
+            "detail": str(r.get("detail", "") or ""),
+            "is_active": not finished and (now - started) < 300,
+            "archived": False,
+        })
+    return _ok(runs=shaped, limit=limit, count=len(shaped),
+               state=str(res.get("state", "OK") if isinstance(res, dict)
+                         else "OK"))
+
+
+def _cron_mutate(fn_name: str, cfg: Any, p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import schedules as S
+    try:
+        if fn_name == "run_due":
+            res = S.run_due(cfg, requested_by="dashboard:user")
+            return 200, {"ok": True, "result": res}
+        res = getattr(S, fn_name)(cfg, int(p.get("id", "0")),
+                                  requested_by="dashboard:user")
+    except Exception as exc:
+        return _fail(exc)
+    ok = not (isinstance(res, dict) and res.get("ok") is False)
+    return (200 if ok else 400), {"ok": ok, "result": res}
+
+
+def h_logs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    try:
+        limit = max(1, min(int(q.get("limit", q.get("lines", "100")) or "100"), 500))
+    except ValueError:
+        limit = 100
+    out = OPS.run_op(cfg, "logs", {"limit": limit},
+                     actor="dashboard:user", session="dashboard")
+    res = _res(out) or {}
+    rows = res.get("logs", []) if isinstance(res, dict) else []
+    lines = []
+    for r in rows if isinstance(rows, list) else []:
+        lines.append(r if isinstance(r, str) else _redact(json.dumps(r))[:500])
+    # LogsResponse wire shape (web/src/lib/api.ts).
+    try:
+        fname = str(Path(cfg.state_dir()) / "webui_events.jsonl")
+    except Exception:
+        fname = "webui_events.jsonl"
+    return _ok(file=fname, lines=lines)
+
+
+def h_system_stats(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    import os
+    import platform as _pl
+    try:
+        from . import distribution as D
+        qv = str(getattr(D, "VERSION", "1.0.0"))
+    except Exception:
+        qv = "1.0.0"
+    # SystemStats wire shape; hermes_version carries the Qubit product
+    # version (wire-compat label, honest value + provenance in detail).
+    return _ok(os=_pl.system(), os_release=_pl.release(),
+               os_version=_pl.version(), platform=_pl.system().lower(),
+               arch=_pl.machine(), hostname=_pl.node(),
+               python_version=_pl.python_version(),
+               python_impl=_pl.python_implementation(),
+               hermes_version="qubit-" + qv, cpu_count=os.cpu_count(),
+               psutil=False,
+               detail="Qubit single-authority host; no Hermes gateway process")
+
+
+def h_mcp(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    # {servers: McpServer[]} wire shape; Qubit inventories but never mounts,
+    # so the server list is honestly empty with the policy attached.
+    return _ok(servers=[],
+               mount_policy="no unauthenticated MCP mount; inventory only",
+               detail="inventory + mount policy; Qubit never mounts MCP servers")
+
+
+def h_mcp_catalog(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _ok(entries=[],
+               diagnostics=[{
+                   "name": "catalog",
+                   "level": "info",
+                   "message": "remote catalog fetch refused; install local "
+                              "reviewed manifests only"}])
+
+
+def h_pairing_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import pairing as P
+    try:
+        res = P.list_codes(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    codes = res.get("codes", []) if isinstance(res, dict) else []
+    pending, approved = [], []
+    for c in codes if isinstance(codes, list) else []:
+        if not isinstance(c, dict):
+            continue
+        user = {"platform": str(c.get("account", "") or "qubit"),
+                "user_id": str(c.get("code_id", c.get("id", ""))),
+                "user_name": str(c.get("label", "") or ""),
+                "request_id": str(c.get("code_id", "") or "")}
+        (approved if c.get("approved") else pending).append(user)
+    # PairingResponse wire shape.
+    return _ok(pending=pending, approved=approved)
+
+
+def h_pairing_mutate(fn_name: str, cfg: Any, b: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
+    from . import pairing as P
+    try:
+        if fn_name == "create":
+            res = P.create(cfg, str(b.get("label", "dashboard")),
+                           list(b.get("scopes", ["chat"])),
+                           account=str(b.get("account", "")))
+        elif fn_name == "approve":
+            res = P.approve(cfg, str(b.get("code", "")),
+                            requested_by="dashboard:user")
+        elif fn_name == "revoke":
+            res = P.revoke(cfg, str(b.get("code_id", b.get("id", ""))),
+                           requested_by="dashboard:user")
+        else:
+            res = {"ok": True, "cleared": True}
+    except Exception as exc:
+        return _fail(exc)
+    ok = not (isinstance(res, dict) and res.get("ok") is False)
+    return (200 if ok else 400), {"ok": ok, "result": res}
+
+
+def h_webhooks_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import webhooks as W
+    try:
+        res = W.list_subs(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    subs = res.get("subscriptions", []) if isinstance(res, dict) else []
+    routes = []
+    for s in subs if isinstance(subs, list) else []:
+        if not isinstance(s, dict):
+            continue
+        routes.append({
+            "name": str(s.get("sub_id", s.get("id", ""))),
+            "description": str(s.get("label", "") or ""),
+            "events": list(s.get("events", []) or []),
+            "deliver": "hmac-freshness-replay-store",
+            "deliver_only": True,
+            "prompt": "",
+            "skills": [],
+            "created_at": None,
+            "url": str(s.get("url", "")),
+            "secret_set": bool(s.get("secret_ref") or s.get("secret")),
+            "enabled": bool(s.get("enabled", True)),
+        })
+    # WebhooksResponse wire shape; secret values never leave the vault.
+    try:
+        store_enabled = W.is_enabled(cfg)
+    except Exception:
+        store_enabled = True
+    return _ok(enabled=store_enabled, base_url="", subscriptions=routes)
+
+
+def h_webhooks_mutate(fn_name: str, cfg: Any, b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import webhooks as W
+    try:
+        if fn_name == "add":
+            res = W.add(cfg, str(b.get("id", b.get("sub_id", ""))),
+                        str(b.get("url", "")), list(b.get("events", [])),
+                        str(b.get("secret_ref", "")))
+        elif fn_name == "remove":
+            res = W.remove(cfg, str(b.get("id", p.get("id", ""))),
+                           requested_by="dashboard:user")
+        elif fn_name == "test":
+            res = W.test_plan(cfg, str(b.get("id", p.get("id", ""))))
+        else:
+            res = W.show(cfg, str(p.get("id", "")))
+    except Exception as exc:
+        return _fail(exc)
+    ok = not (isinstance(res, dict) and res.get("ok") is False)
+    return (200 if ok else 400), {"ok": ok, "result": res}
+
+
+def h_platforms(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import messaging as M
+    try:
+        res = M.account_list(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    accounts = res.get("accounts", []) if isinstance(res, dict) else []
+    # Link-state -> wire state. Never report a fabricated "connected": an
+    # account with no credential is unconfigured, and a channel with no Qubit
+    # transport adapter is honestly unavailable (typed code attached).
+    link_map = {
+        "LINKED": ("connected", True, None, None),
+        "DEGRADED": ("degraded", True, "LINK_DEGRADED", None),
+        "NO_CREDENTIAL": ("unconfigured", False, "NO_CREDENTIAL",
+                          "credential reference unresolvable"),
+        "NO_ACCOUNT": ("unconfigured", False, "NO_ACCOUNT", None),
+        "UNAVAILABLE": ("unavailable", True, M.UNAVAILABLE_CODE,
+                        "no Qubit transport adapter for this channel"),
+    }
+    platforms = []
+    for a in accounts if isinstance(accounts, list) else []:
+        if not isinstance(a, dict):
+            continue
+        aid = str(a.get("account_id", a.get("id", "")))
+        provider = str(a.get("provider", ""))
+        try:
+            linked = M.link(cfg, aid)
+        except Exception:  # noqa: BLE001 — typed degraded, never fabricated
+            linked = {"state": "UNAVAILABLE", "code": M.UNAVAILABLE_CODE}
+        st, configured, code, msg = link_map.get(
+            str(linked.get("state", "")),
+            ("unavailable", False, linked.get("code") or M.UNAVAILABLE_CODE,
+             linked.get("detail")))
+        platforms.append({
+            "id": aid, "name": str(a.get("label", aid) or aid),
+            "description": f"{provider} account reference (vault-only credential)",
+            "docs_url": "", "enabled": bool(a.get("enabled", True)),
+            "configured": configured, "gateway_running": False,
+            "state": st,
+            "error_code": code,
+            "error_message": (str(msg)[:160] if msg else None),
+            "updated_at": None, "home_channel": None,
+            "whatsapp_setup": None, "env_vars": [],
+        })
+    return _ok(env_path="", gateway_start_command="", platforms=platforms)
+
+
+def h_memory(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    # MemoryStatus wire shape; the only provider is the local store.
+    return _ok(active="qubit-local",
+               providers=[{
+                   "name": "qubit-local",
+                   "description": "local-only SQLite/FTS5 MemoryStore "
+                                  "(core/working/recall/archive tiers)",
+                   "available": True, "configured": True, "status": "ready"}],
+               builtin_files={"memory": 0, "user": 0})
+
+
+def h_analytics(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    out = OPS.run_op(cfg, "insights", {}, actor="dashboard:user", session="dashboard")
+    res = _res(out) or {}
+    ins = res.get("insights", {}) if isinstance(res, dict) else {}
+    sessions = int(ins.get("recent_sessions", 0) or 0)
+    states = ins.get("states", {}) if isinstance(ins, dict) else {}
+    calls = sum(int(v) for v in states.values()) if isinstance(states, dict) else 0
+    totals = {"total_input": 0, "total_output": 0, "total_cache_read": 0,
+              "total_reasoning": 0, "total_estimated_cost": 0.0,
+              "total_actual_cost": 0.0, "total_sessions": sessions,
+              "total_api_calls": calls}
+    # AnalyticsResponse wire shape; the local runner has no token economy,
+    # so token/cost series are honest zeros (no fabricated billing).
+    if p.get("kind") == "models":
+        try:
+            days = max(1, min(int(q.get("days", "30") or "30"), 365))
+        except ValueError:
+            days = 30
+        return _ok(models=[], totals={**totals, "distinct_models": 0},
+                   period_days=days,
+                   detail="local runner: usage/cost records per provider call; "
+                          "no token-billing series")
+    return _ok(daily=[], by_model=[], totals=totals,
+               skills={"summary": {"total_skills": 0, "enabled": 0},
+                       "top_skills": []})
+
+
+def _files_root(cfg: Any) -> str:
+    try:
+        from . import projects as PJ
+        active = PJ.active(cfg) if hasattr(PJ, "active") else {}
+        if isinstance(active, dict):
+            for key in ("folder", "path", "root"):
+                if active.get(key):
+                    return str(active[key])
+    except Exception:
+        pass
+    return ""
+
+
+def h_files(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import files as FI
+    import base64
+    if q.get("path") or p.get("kind") == "read":
+        path = str(q.get("path", b.get("path", "")) or "")
+        try:
+            res = FI.read_file(cfg, path)
+        except Exception as exc:
+            code = getattr(exc, "code", "FILES_ERROR")
+            return 400, {"ok": False, "code": code,
+                         "detail": _redact(str(exc))[:300]}
+        text = res.get("text", res.get("content", "")) if isinstance(res, dict) else ""
+        data_url = ("data:text/plain;base64,"
+                    + base64.b64encode(str(text).encode("utf-8",
+                                                        "replace")).decode())
+        # ManagedFileReadResponse wire shape.
+        return _ok(name=Path(path).name, path=path,
+                   size=len(str(text).encode("utf-8", "replace")),
+                   mime_type="text/plain", data_url=data_url,
+                   root=_files_root(cfg) or None, locked_root=None,
+                   can_change_path=False)
+    folder = str(q.get("path", "") or "") or _files_root(cfg)
+    if not folder:
+        return _ok(root=None, path="", parent=None, locked_root=None,
+                   can_change_path=False, entries=[],
+                   detail="no active project folder; register one with "
+                          "`qubit project add-folder`")
+    try:
+        res = FI.list_dir(cfg, folder)
+    except Exception as exc:
+        code = getattr(exc, "code", "FILES_ERROR")
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    raw_entries = res.get("entries", []) if isinstance(res, dict) else []
+    entries = []
+    for en in raw_entries if isinstance(raw_entries, list) else []:
+        if not isinstance(en, dict):
+            continue
+        entries.append({
+            "name": str(en.get("name", "")),
+            "path": str(en.get("path", "")),
+            "is_directory": bool(en.get("is_dir", en.get("is_directory", False))),
+            "size": en.get("size"), "mtime": en.get("mtime", 0),
+            "mime_type": en.get("mime_type"),
+        })
+    # ManagedFilesResponse wire shape.
+    return _ok(root=folder, path=folder, parent=None, locked_root=folder,
+               can_change_path=False, entries=entries)
+
+
+def h_gateway(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    out = OPS.run_op(cfg, "gateway", {}, actor="dashboard:user", session="dashboard")
+    return _ok(gateway=_res(out), state=out.get("state"),
+               supervision="GATEWAY_NO_SUPERVISION: process start/stop/restart "
+                           "is refused; the operator supervises processes")
+
+
+def h_curator(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    out = OPS.run_op(cfg, "curator", {}, actor="dashboard:user", session="dashboard")
+    res = _res(out) or {}
+    cur = res.get("curator", {}) if isinstance(res, dict) else {}
+    # CuratorStatus wire shape; curation is on-demand (no daemon).
+    return _ok(enabled=True, paused=False, interval_hours=None,
+               last_run_at=None, min_idle_hours=None, stale_after_days=None,
+               archive_after_days=None, summary=cur)
+
+
+def h_env(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    out = OPS.run_op(cfg, "auth_status", {}, actor="dashboard:user", session="dashboard")
+    res = _res(out) or {}
+    # Record<string, EnvVarInfo> wire shape: references only, never values.
+    env: Dict[str, Any] = {}
+    providers = res.get("providers", []) if isinstance(res, dict) else []
+    for prov in providers if isinstance(providers, list) else []:
+        if not isinstance(prov, dict):
+            continue
+        name = str(prov.get("provider", ""))
+        if not name:
+            continue
+        env[f"{name.upper()}_KEY_REF"] = {
+            "is_set": bool(prov.get("configured", False)),
+            "redacted_value": None,
+            "description": f"{name} credential reference "
+                           f"({prov.get('key_ref', 'vault')})",
+            "url": None, "category": "providers",
+            "is_password": True, "tools": [], "advanced": False,
+            "channel_managed": False, "custom": False,
+        }
+    return 200, env
+
+
+def h_ops(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    name = p.get("name", "")
+    mapping = {
+        "doctor": ("doctor", {}), "dump": ("diagnostics", {}),
+        "backup": ("backup_info", {}),
+        "prompt-size": ("prompt_budget", {}), "security-audit": ("security", {}),
+        "import": ("import_inspect", {}),
+        "config-migrate": ("product_migrate", {}),
+        "kanban": ("kanban_list", {}), "boards": ("kanban_boards", {}),
+        "boards-create": ("kanban_boards_create", {}),
+        "cards-create": ("kanban_create", {}),
+        "cards-move": ("kanban_move", {}),
+        "cards-complete": ("kanban_complete", {}),
+        "gateways": ("gateway", {}),
+        "gateway-add": ("gateway_add", {}),
+        "gateway-show": ("gateway_show", {}),
+        "gateway-link": ("gateway_link", {}),
+        "gateway-remove": ("gateway_remove", {}),
+        "msg-accounts": ("msg_accounts", {}),
+        "msg-account-add": ("msg_account_add", {}),
+        "msg-account-show": ("msg_account_show", {}),
+        "msg-account-remove": ("msg_account_remove", {}),
+        "runtime": ("runtime_status", {}),
+    }
+    if name not in mapping:
+        return _gate("OPS_UNKNOWN", f"unknown ops endpoint {name!r}",
+                     "use the Qubit operations console (/ops) or CLI", 404)
+    op_id, args = mapping[name]
+    if b and name in ("checkpoints", "hooks", "import", "boards-create",
+                      "cards-create", "cards-move", "cards-complete",
+                      "kanban", "boards", "gateways",
+                      "gateway-add", "gateway-show", "gateway-link",
+                      "gateway-remove", "msg-accounts",
+                      "msg-account-add", "msg-account-show",
+                      "msg-account-remove"):
+        args = {k: v for k, v in b.items() if isinstance(v, (str, int, float, bool))}
+    if q and name in ("kanban", "boards", "gateways",
+                      "gateway-show", "gateway-link", "msg-accounts",
+                      "msg-account-show"):
+        # Filtered reads: ?board= / ?gateway_id= / ?account_id= (validated
+        # by run_op against the voice arg specs; unknown keys fail typed).
+        for k, v in q.items():
+            if isinstance(v, str) and v:
+                args[k] = v
+    out = OPS.run_op(cfg, op_id, args, actor="dashboard:user", session="dashboard")
+    ok = out.get("state") == "executed"
+    if out.get("confirmation_id") and not ok:
+        return _staged(_redact(out.get("speech", ""))[:300],
+                       out["confirmation_id"])
+    return (200 if ok else 400), {"ok": ok, "result": _res(out),
+                                  "state": out.get("state"), "code": out.get("code"),
+                                  "detail": _redact(out.get("speech", out.get("detail", "")))[:400]}
+
+
+def h_ops_catalog(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Machine-readable operations catalog (same registry as CLI/voice).
+
+    Backs the Hermes-shell operations console: every entry carries its
+    group, args schema, and confirmation flag so the React page can render
+    real forms and settle staged mutations on the shared journal.
+    """
+    from . import dashboard_ops as OPS
+    try:
+        ops = OPS.catalog()
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(ops=ops, count=len(ops))
+
+
+def _ops_result(out: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
+    ok = out.get("state") == "executed"
+    if out.get("confirmation_id") and not ok:
+        return _staged(_redact(out.get("speech", ""))[:300],
+                       out["confirmation_id"])
+    return (200 if ok else 400), {
+        "ok": ok, "result": _res(out), "state": out.get("state"),
+        "code": out.get("code"),
+        "detail": _redact(out.get("speech", out.get("detail", "")))[:400]}
+
+
+def h_ops_run(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Run any catalog operation on the shared broker (same path as CLI/voice).
+
+    Body: ``{"id": <op-id>, "args": {...}}``. Reads execute immediately;
+    confirmed mutations stage a single-use confirmation on the shared
+    journal and answer 409 (never a fabricated 2xx).
+    """
+    from . import dashboard_ops as OPS
+    op_id = str(b.get("id", "") or "").strip()
+    if not op_id:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "id required"}
+    raw_args = b.get("args")
+    if raw_args is None:
+        raw_args = {}
+    if not isinstance(raw_args, dict):
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "args must be an object"}
+    args = {k: v for k, v in raw_args.items()
+            if isinstance(v, (str, int, float, bool))}
+    try:
+        out = OPS.run_op(cfg, op_id, args, actor="dashboard:user",
+                         session="dashboard")
+    except Exception as exc:
+        return _fail(exc)
+    return _ops_result(out)
+
+
+def h_kanban_events(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    out = OPS.run_op(cfg, "kanban_log", {"limit": 50},
+                     actor="dashboard:user", session="dashboard")
+    return _ok(events=_res(out), state=out.get("state"))
+
+
+def h_approvals_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Pending confirmations on the SHARED journal (same records CLI
+    `qubit approvals`, voice yes/no, and the classic dashboard settle).
+    The pending-approvals banner polls this; confirm/cancel below settle
+    through the same OPS journal path — one permission/confirmation path.
+    """
+    from .approvals import ApprovalJournal
+    try:
+        journal = ApprovalJournal(Path(cfg.state_dir()) / "approvals.jsonl",
+                                  default_ttl_s=120.0)
+        items = [{"id": a.id, "capability": str(a.capability or ""),
+                  "summary": _redact(a.summary)[:300],
+                  "created_at": a.created_at, "expires_at": a.expires_at,
+                  "state": a.state}
+                 for a in journal.pending()]
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(approvals=items, count=len(items))
+
+
+def _confirm_payload(out: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
+    ok = out.get("state") == "executed"
+    return (200 if ok else 400), {
+        "ok": ok, "state": out.get("state"), "code": out.get("code"),
+        "detail": _redact(out.get("speech", out.get("detail", "")))[:400],
+        "receipt": out.get("receipt")}
+
+
+def h_ops_confirm(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    cid = str(b.get("confirmation_id", b.get("id", "")) or "")
+    if not cid:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "confirmation_id required"}
+    sensitive = b.get("sensitive")
+    out = OPS.confirm_op(
+        cfg, cid, actor="dashboard:user", session="dashboard",
+        sensitive=dict(sensitive) if isinstance(sensitive, dict) else None)
+    return _confirm_payload(out)
+
+
+def h_ops_cancel(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    cid = str(b.get("confirmation_id", b.get("id", "")) or "") or None
+    out = OPS.cancel_op(cfg, cid, actor="dashboard:user",
+                        session="dashboard")
+    return _confirm_payload(out)
+
+
+def h_chat_turn(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Qubit Chat (overlay): one native agent turn, same module as CLI/voice."""
+    from . import agent as AG
+    if _estop(cfg):
+        return 403, {"ok": False, "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; agent turn refused"}
+    text = str(b.get("text", "") or "")[:4000]
+    session = str(b.get("session", "dashboard-chat") or "dashboard-chat")[:80]
+    if not text.strip():
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "turn needs non-empty text"}
+    try:
+        res = AG.turn(cfg, text, session=session)
+    except AG.AgentDenied as exc:
+        _audit("chat_turn_denied", "dashboard:user", {"code": exc.code})
+        return 403, {"ok": False, "code": exc.code,
+                     "detail": _redact(exc.detail)[:300]}
+    except Exception as exc:
+        return _fail(exc)
+    _audit("chat_turn", "dashboard:user", {"session": session,
+                                           "ok": bool(res.get("ok"))})
+    return (200 if res.get("ok") else 502), res
+
+
+# ---------------------------------------------------------------------------
+# Packet 8U read surfaces: scoped Git / Files / Audio (audit §1 absent reads)
+#
+# Read-only compat routes backed by the SAME modules the CLI/voice call:
+# ``git_scope`` (status/log/diff/show), ``files`` (list/tree/stat/read), and
+# ``audio.settings`` (mic/output status + device inventory). Binary streams
+# and mutating verbs stay typed-gated; nothing is fabricated 2xx.
+# ---------------------------------------------------------------------------
+
+_FS_LANGUAGE_BY_EXT = {
+    ".c": "c", ".conf": "ini", ".cpp": "cpp", ".css": "css", ".csv": "csv",
+    ".go": "go", ".h": "c", ".hpp": "cpp", ".html": "html", ".java": "java",
+    ".js": "javascript", ".json": "json", ".jsx": "jsx", ".kt": "kotlin",
+    ".lua": "lua", ".md": "markdown", ".mjs": "javascript", ".py": "python",
+    ".rb": "ruby", ".rs": "rust", ".sh": "shell", ".sql": "sql",
+    ".svg": "xml", ".toml": "toml", ".ts": "typescript", ".tsx": "tsx",
+    ".txt": "text", ".xml": "xml", ".yaml": "yaml", ".yml": "yaml",
+    ".zsh": "shell",
+}
+_FS_MIME_BY_EXT = {
+    ".css": "text/css", ".csv": "text/csv", ".html": "text/html",
+    ".js": "application/javascript", ".json": "application/json",
+    ".md": "text/markdown", ".py": "text/x-python", ".sh": "text/x-shellscript",
+    ".ts": "application/typescript", ".xml": "application/xml",
+    ".yaml": "text/yaml", ".yml": "text/yaml",
+}
+
+
+def _active_folder(cfg: Any) -> str:
+    """First folder of the active Qubit project (the scoped read root)."""
+    try:
+        from . import projects as PJ
+        active = PJ.active_project(cfg)
+        if active.get("state") == "OK" and active.get("project"):
+            folders = active["project"].get("folders", []) or []
+            if folders:
+                return str(folders[0])
+    except Exception:
+        pass
+    return ""
+
+
+def _query_text(q: Dict[str, str], b: Dict[str, Any], *keys: str) -> str:
+    for src in (q, b):
+        if not isinstance(src, dict):
+            continue
+        for key in keys:
+            value = src.get(key)
+            if isinstance(value, str) and value:
+                return value
+    return ""
+
+
+def _git_query_root(q: Dict[str, str], b: Dict[str, Any]) -> str:
+    return _query_text(q, b, "root", "repo", "path")
+
+
+def _git_query_file(q: Dict[str, str], b: Dict[str, Any]) -> str:
+    return _query_text(q, b, "file", "file_path")
+
+
+def _git_error(exc: Exception) -> Tuple[int, Dict[str, Any]]:
+    from . import git_scope as GI
+    pub = GI.public_error(exc)
+    return 400, {"ok": False, "state": "FAILED", "code": pub["code"],
+                 "detail": pub["detail"],
+                 "qubit_counterpart": "CLI `qubit git status|log|diff|show`"}
+
+
+def _git_no_project(**extra: Any) -> Tuple[int, Dict[str, Any]]:
+    """Honest empty read when no active project root is registered."""
+    out: Dict[str, Any] = {
+        "schema": "qubit-hermes-git/1", "root": "", "git": None,
+        "state": "EMPTY", "code": "NO_ACTIVE_PROJECT",
+        "detail": "no active project folder; set one with "
+                  "`qubit project use <slug> --confirm`",
+    }
+    out.update(extra)
+    return _ok(**out)
+
+
+def _git_ready(cfg: Any, root: str) -> bool:
+    return bool(root) or bool(_active_folder(cfg))
+
+
+def h_git_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/status -> scoped read-only work-tree status."""
+    from . import git_scope as GI
+    root = _git_query_root(q, b)
+    if not _git_ready(cfg, root):
+        return _git_no_project(status="")
+    try:
+        res = GI.status(cfg, root, requested_by="dashboard:user")
+    except GI.GitError as exc:
+        return _git_error(exc)
+    return _ok(schema="qubit-hermes-git/1", root=res.get("root", ""),
+               status=res.get("status", ""),
+               truncated=bool(res.get("truncated", False)), git=res)
+
+
+def h_git_log(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/log -> bounded commit log."""
+    from . import git_scope as GI
+    try:
+        limit = max(1, min(int(q.get("limit", "10") or "10"), GI.MAX_LOG_COUNT))
+    except (TypeError, ValueError):
+        limit = 10
+    root = _git_query_root(q, b)
+    if not _git_ready(cfg, root):
+        return _git_no_project(entries=[])
+    try:
+        res = GI.log(cfg, root, limit, requested_by="dashboard:user")
+    except GI.GitError as exc:
+        return _git_error(exc)
+    return _ok(schema="qubit-hermes-git/1", root=res.get("root", ""),
+               entries=res.get("entries", []),
+               truncated=bool(res.get("truncated", False)), git=res)
+
+
+def h_git_diff(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/diff -> bounded unstaged diff (tree or one file)."""
+    from . import git_scope as GI
+    root = _git_query_root(q, b)
+    if not _git_ready(cfg, root):
+        return _git_no_project(path="", stat="", patch="")
+    try:
+        res = GI.diff(cfg, root, _git_query_file(q, b),
+                      requested_by="dashboard:user")
+    except GI.GitError as exc:
+        return _git_error(exc)
+    return _ok(schema="qubit-hermes-git/1", root=res.get("root", ""),
+               path=res.get("path", ""), stat=res.get("stat", ""),
+               patch=res.get("patch", ""),
+               truncated=bool(res.get("truncated", False)), git=res)
+
+
+def h_git_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/show -> one committed file version at HEAD/HEAD~N."""
+    from . import git_scope as GI
+    ref = str(q.get("ref", b.get("ref", "HEAD")) or "HEAD")
+    root = _git_query_root(q, b)
+    if not _git_ready(cfg, root):
+        return _git_no_project(ref=ref, path="", content="")
+    try:
+        res = GI.show(cfg, root, ref, _git_query_file(q, b),
+                      requested_by="dashboard:user")
+    except GI.GitError as exc:
+        return _git_error(exc)
+    return _ok(schema="qubit-hermes-git/1", root=res.get("root", ""),
+               ref=res.get("ref", ref), path=res.get("path", ""),
+               content=res.get("content", ""),
+               truncated=bool(res.get("truncated", False)), git=res)
+
+
+def h_git_file_diff(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/review/diff|file-diff -> working-tree-vs-HEAD diff."""
+    from . import git_scope as GI
+    root = _git_query_root(q, b)
+    if not _git_ready(cfg, root):
+        return _git_no_project(path="", diff="", stat="")
+    try:
+        res = GI.diff(cfg, root, _git_query_file(q, b),
+                      requested_by="dashboard:user")
+    except GI.GitError as exc:
+        return _git_error(exc)
+    return _ok(schema="qubit-hermes-git/1", root=res.get("root", ""),
+               path=res.get("path", ""), diff=res.get("patch", ""),
+               stat=res.get("stat", ""),
+               truncated=bool(res.get("truncated", False)), git=res)
+
+
+def _files_error(exc: Exception) -> Tuple[int, Dict[str, Any]]:
+    from . import files as FI
+    return 400, {"ok": False, "state": "FAILED",
+                 "code": getattr(exc, "code", FI.BAD_INPUT_CODE),
+                 "detail": _redact(str(exc))[:300],
+                 "qubit_counterpart":
+                     "CLI `qubit files list|read` (scoped project folders)"}
+
+
+def _fs_entries(res: Dict[str, Any]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for entry in (res.get("entries", []) if isinstance(res, dict) else []):
+        if not isinstance(entry, dict):
+            continue
+        out.append({"name": entry.get("name", ""),
+                    "path": entry.get("rel", ""),
+                    "isDirectory": bool(entry.get("dir", False)),
+                    "size": entry.get("size")})
+    return out
+
+
+def h_fs_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/fs/list -> project-root directory listing (read-only)."""
+    from . import files as FI
+    path = _query_text(q, b, "path") or _active_folder(cfg)
+    if not path:
+        return _ok(entries=[], folder=None, truncated=False,
+                   detail="no active project folder; register one with "
+                          "`qubit project add-folder`")
+    try:
+        res = FI.list_dir(cfg, path)
+    except FI.FilesError as exc:
+        return _files_error(exc)
+    return _ok(entries=_fs_entries(res), folder=res.get("folder", path),
+               truncated=bool(res.get("truncated", False)))
+
+
+def h_fs_tree(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/fs/tree -> bounded directory tree (depth 1..4)."""
+    from . import files as FI
+    path = _query_text(q, b, "path") or _active_folder(cfg)
+    try:
+        depth = max(1, min(int(q.get("depth", "2") or "2"), FI.MAX_DEPTH))
+    except (TypeError, ValueError):
+        depth = 2
+    if not path:
+        return _ok(entries=[], folder=None, depth=depth, truncated=False,
+                   detail="no active project folder; register one with "
+                          "`qubit project add-folder`")
+    try:
+        res = FI.list_dir(cfg, path, depth=depth)
+    except FI.FilesError as exc:
+        return _files_error(exc)
+    return _ok(entries=_fs_entries(res), folder=res.get("folder", path),
+               depth=depth, truncated=bool(res.get("truncated", False)))
+
+
+def h_fs_stat(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/fs/stat -> inspect a folder listing or file metadata."""
+    from . import files as FI
+    try:
+        res = FI.inspect(cfg, _query_text(q, b, "path"))
+    except FI.FilesError as exc:
+        return _files_error(exc)
+    return _ok(stat=res)
+
+
+def _fs_kind(path: str) -> Tuple[str, str]:
+    suffix = Path(str(path or "")).suffix.lower()
+    return (_FS_LANGUAGE_BY_EXT.get(suffix, "text"),
+            _FS_MIME_BY_EXT.get(suffix, "text/plain"))
+
+
+def h_fs_read_text(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/fs/read-text -> bounded, redacted text file read."""
+    from . import files as FI
+    path = _query_text(q, b, "path") or _active_folder(cfg)
+    if not path:
+        return 400, {"ok": False, "code": FI.BAD_INPUT_CODE,
+                     "detail": "a file path is required",
+                     "qubit_counterpart": "CLI `qubit files read <path>`"}
+    try:
+        res = FI.read_file(cfg, path)
+    except FI.FilesError as exc:
+        if getattr(exc, "code", "") == FI.BINARY_CODE:
+            language, mime = _fs_kind(path)
+            return _ok(binary=True, byteSize=0, language=language,
+                       mimeType=mime, path=str(path), text="",
+                       truncated=False,
+                       detail="binary file; content not shown")
+        return _files_error(exc)
+    target = str(res.get("file", path) or path)
+    language, mime = _fs_kind(target)
+    return _ok(binary=False, byteSize=int(res.get("size", 0) or 0),
+               language=language, mimeType=mime, path=target,
+               text=res.get("text", ""),
+               truncated=bool(res.get("clipped", False)))
+
+
+def h_fs_read_data_url(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/fs/read-data-url -> text file as a redacted data URL."""
+    from . import files as FI
+    import base64
+    path = _query_text(q, b, "path") or _active_folder(cfg)
+    if not path:
+        return 400, {"ok": False, "code": FI.BAD_INPUT_CODE,
+                     "detail": "a file path is required",
+                     "qubit_counterpart": "CLI `qubit files read <path>`"}
+    try:
+        res = FI.read_file(cfg, path)
+    except FI.FilesError as exc:
+        return _files_error(exc)
+    target = str(res.get("file", path) or path)
+    _language, mime = _fs_kind(target)
+    encoded = base64.b64encode(
+        str(res.get("text", "")).encode("utf-8", "replace")).decode("ascii")
+    return _ok(dataUrl=f"data:{mime};base64,{encoded}", path=target,
+               mimeType=mime)
+
+
+def _find_git_root(start: Path) -> Optional[Path]:
+    try:
+        directory = start if start.is_dir() else start.parent
+    except OSError:
+        return None
+    for _ in range(50):
+        try:
+            if (directory / ".git").exists():
+                return directory
+        except OSError:
+            return None
+        parent = directory.parent
+        if parent == directory:
+            return None
+        directory = parent
+    return None
+
+
+def h_fs_git_root(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/fs/git-root -> git root discovery inside an approved root."""
+    from . import git_scope as GI
+    path = _query_text(q, b, "path") or _active_folder(cfg)
+    if not path:
+        return _ok(root=None)
+    try:
+        resolved = GI.resolve_root(cfg, path)
+    except GI.GitError:
+        return _ok(root=None)
+    found = _find_git_root(Path(resolved))
+    return _ok(root=(str(found) if found else None))
+
+
+def _git_branch(cfg: Any, root: str) -> str:
+    from . import git_scope as GI
+    try:
+        res = GI.status(cfg, root, requested_by="dashboard:user")
+    except GI.GitError:
+        return ""
+    for line in str(res.get("status", "")).splitlines():
+        if line.startswith("# branch.head "):
+            head = line[len("# branch.head "):].strip()
+            return "" if head == "(detached)" else head
+    return ""
+
+
+def h_fs_default_cwd(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/fs/default-cwd -> active project folder + its branch."""
+    cwd = _active_folder(cfg)
+    if not cwd:
+        try:
+            cwd = str(Path.cwd())
+        except Exception:
+            cwd = ""
+    return _ok(cwd=cwd, branch=(_git_branch(cfg, cwd) if cwd else ""))
+
+
+def h_audio_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/audio/status -> real mic/output status (audio.settings)."""
+    from .audio import settings as AS
+    try:
+        st = AS.status(cfg)
+    except AS.AudioSettingsError as exc:
+        miss = {"state": "MISSING", "detail": _redact(str(exc))[:200]}
+        return _ok(mic=miss, output=dict(miss), schema="qubit-hermes-audio/1")
+    return _ok(schema="qubit-hermes-audio/1",
+               mic=st.get("mic", {}), output=st.get("output", {}))
+
+
+def _device_rows(devices: Any) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for dev in (devices if isinstance(devices, list) else []):
+        rows.append({"stable_id": getattr(dev, "stable_id", ""),
+                     "name": getattr(dev, "name", ""),
+                     "backend": getattr(dev, "backend", ""),
+                     "is_default": bool(getattr(dev, "is_default", False))})
+    return rows
+
+
+def h_audio_devices(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/audio/list|devices -> real device inventory (audio.settings)."""
+    from .audio import settings as AS
+    try:
+        devs = AS.list_devices()
+    except AS.AudioSettingsError as exc:
+        return _ok(inputs=[], outputs=[], state="MISSING",
+                   detail=_redact(str(exc))[:200])
+    return _ok(inputs=_device_rows(devs.get("inputs", [])),
+               outputs=_device_rows(devs.get("outputs", [])))
+
+
+# ---------------------------------------------------------------------------
+# Packet 8U closure: local models / custom endpoints / profiles / tools /
+# learning (audit §1A absent reads) + remaining wrong-verb gates (audit §1B).
+#
+# Reads execute the SAME Qubit modules the CLI uses (``local_models``,
+# ``providers.policy``, ``projects``, ``learning``, ``capability_catalog``,
+# ``computer_use``). Writes never fabricate success: local-model verbs reuse
+# the module's typed refusal, and pure policy boundaries are typed gates.
+# ---------------------------------------------------------------------------
+
+_LOCAL_MODEL_COUNTERPART = (
+    "CLI `qubit runtime status|install <image> --confirm` + supervised "
+    "opencode path (pinned, confined, audited)")
+
+_PROVIDER_ENDPOINT_COUNTERPART = (
+    "dashboard Settings (classic) + CLI config profiles")
+
+
+def h_local_models_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/local-models/status -> real local-runtime state."""
+    from . import local_models as LM
+    return _ok(**LM.status(cfg))
+
+
+def h_local_models_hardware(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/local-models/hardware -> real GPU/VRAM gauges."""
+    from . import local_models as LM
+    return _ok(**LM.hardware(cfg))
+
+
+def h_local_models_catalog(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/local-models/catalog -> configured/observed local models."""
+    from . import local_models as LM
+    return _ok(**LM.catalog(cfg))
+
+
+def h_local_models_jobs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/local-models/jobs -> typed-empty install job history."""
+    from . import local_models as LM
+    return _ok(**LM.jobs(cfg))
+
+
+def h_local_models_job_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/local-models/jobs/{id} -> one job or an honest miss."""
+    from . import local_models as LM
+    base = LM.jobs(cfg)
+    jobs = base.get("jobs", []) if isinstance(base, dict) else []
+    jobs = jobs if isinstance(jobs, list) else []
+    want = str(p.get("id", "") or "")
+    found = None
+    for job in jobs:
+        if isinstance(job, dict) and str(job.get("id", "")) == want:
+            found = job
+            break
+    return _ok(jobs=jobs, job=found, count=len(jobs),
+               state=base.get("state", "EMPTY"),
+               code=base.get("code"), detail=base.get("detail", ""),
+               rollback=base.get("rollback",
+                                 "read-only; nothing to roll back"))
+
+
+def _local_model_refusal(res: Any) -> Tuple[int, Dict[str, Any]]:
+    out: Dict[str, Any] = {"ok": False}
+    out.update(res if isinstance(res, dict) else {})
+    out.setdefault("state", "REFUSED")
+    out.setdefault("code", "LOCAL_MODEL_BROKERED")
+    out.setdefault("owner", "qubit-policy")
+    out.setdefault("guidance", _BROKERED_GUIDANCE_LOCAL)
+    out.setdefault("rollback", "nothing was downloaded, started, ejected, "
+                               "activated, or written; nothing to roll back")
+    out.setdefault("qubit_counterpart", _LOCAL_MODEL_COUNTERPART)
+    state = str(out.get("state", ""))
+    http = 200 if state in ("OK", "AVAILABLE") and not out.get("code") else 403
+    return http, out
+
+
+_BROKERED_GUIDANCE_LOCAL = (
+    "local-model runtime management is brokered in Qubit; use "
+    "`qubit runtime status` and `qubit runtime install <image> --confirm` "
+    "(pinned, confined, digest-verified), or the supervised opencode path. "
+    "No download is performed or queued by this surface")
+
+
+def h_local_models_runtime_install(cfg: Any, q: Dict[str, str],
+                                   b: Dict[str, Any],
+                                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    return _local_model_refusal(
+        LM.runtime_install(cfg, backend=b.get("backend"),
+                           requested_by="dashboard:user",
+                           confirmed=bool(b.get("confirm"))))
+
+
+def h_local_models_download(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    model = _query_text(q, b, "model", "model_id", "id")
+    return _local_model_refusal(
+        LM.download(cfg, model=model, requested_by="dashboard:user",
+                    confirmed=bool(b.get("confirm"))))
+
+
+def h_local_models_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    model = str(p.get("model_id", "") or "")
+    if not model:
+        return _local_model_refusal(
+            LM.public_error(LM.BAD_INPUT_CODE, "model_id is required"))
+    return _local_model_refusal(
+        LM.public_error(LM.BROKERED_CODE,
+                        f"removing local model {model!r} is brokered; nothing "
+                        "was deleted"))
+
+
+def h_local_models_quickstart(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    model = _query_text(q, b, "model") or None
+    return _local_model_refusal(
+        LM.quickstart(cfg, model=model, requested_by="dashboard:user",
+                      confirmed=bool(b.get("confirm"))))
+
+
+def h_local_models_server(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    action = _query_text(q, b, "action") or "start"
+    return _local_model_refusal(
+        LM.server(cfg, action, requested_by="dashboard:user",
+                  confirmed=bool(b.get("confirm"))))
+
+
+def h_local_models_eject(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    model = _query_text(q, b, "model", "model_id")
+    return _local_model_refusal(
+        LM.eject(cfg, model=model, requested_by="dashboard:user",
+                 confirmed=bool(b.get("confirm"))))
+
+
+def h_local_models_activate(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    model = _query_text(q, b, "model", "model_id")
+    return _local_model_refusal(
+        LM.activate(cfg, model=model, requested_by="dashboard:user",
+                    confirmed=bool(b.get("confirm"))))
+
+
+def h_local_models_sideload(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    path = _query_text(q, b, "path")
+    return _local_model_refusal(
+        LM.sideload(cfg, path=path, requested_by="dashboard:user",
+                    confirmed=bool(b.get("confirm"))))
+
+
+def h_local_models_search(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    return _local_model_refusal(
+        LM.public_error(LM.UNAVAILABLE_CODE,
+                        "remote local-model search is not performed; Qubit "
+                        "downloads nothing from a model hub"))
+
+
+def h_local_models_search_files(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return h_local_models_search(cfg, q, b, p)
+
+
+def h_local_models_download_browsed(cfg: Any, q: Dict[str, str],
+                                    b: Dict[str, Any],
+                                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    return _local_model_refusal(
+        LM.public_error(LM.BROKERED_CODE,
+                        "browsed model download is brokered; nothing was "
+                        "downloaded or queued"))
+
+
+def h_custom_endpoints(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/providers/custom-endpoints -> configured provider endpoints."""
+    from .providers.policy import FrontierPolicy
+    try:
+        policy = FrontierPolicy.from_config(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    endpoints: List[Dict[str, Any]] = []
+    providers = getattr(policy, "providers", {}) or {}
+    for provider_id, pcfg in providers.items():
+        if not isinstance(pcfg, dict):
+            continue
+        base = str(pcfg.get("base_url", pcfg.get("url", "")) or "")
+        models = pcfg.get("models")
+        models = models if isinstance(models, list) else []
+        endpoints.append({
+            "id": str(provider_id), "name": str(pcfg.get("name", provider_id)
+                                                or provider_id),
+            "base_url": _redact(base),
+            "model": str(pcfg.get("model", "") or ""),
+            "models": [str(m) for m in models],
+            "context_length": pcfg.get("context_length"),
+            "discover_models": bool(pcfg.get("discover_models", True)),
+            "has_api_key": bool(pcfg.get("key_ref") or pcfg.get("api_key")),
+            "api_key_preview": None,
+            "is_current": False, "source": "intent.frontier.providers",
+        })
+    return _ok(endpoints=endpoints,
+               current={"provider": str(getattr(policy, "route", "") or ""),
+                        "model": "", "base_url": ""})
+
+
+def h_profiles_sessions(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/profiles/sessions -> unified receipts list (one profile)."""
+    try:
+        limit = max(1, min(int(q.get("limit", "20") or "20"), 500))
+    except (TypeError, ValueError):
+        limit = 20
+    code, out = h_sessions_list(cfg, {"limit": str(limit)}, b, p)
+    if code != 200:
+        return code, out
+    total = int(out.get("total", 0) or 0)
+    return _ok(sessions=out.get("sessions", []), total=total,
+               profile_totals={"default": total}, limit=limit,
+               offset=int(out.get("offset", 0) or 0), errors=[])
+
+
+def h_profiles_sessions_sidebar(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/profiles/sessions/sidebar -> recents slice (real receipts)."""
+    try:
+        recents_limit = max(1, min(int(q.get("recents_limit", "20") or "20"),
+                                   500))
+    except (TypeError, ValueError):
+        recents_limit = 20
+    code, out = h_sessions_list(cfg, {"limit": str(recents_limit)}, b, p)
+    sessions = out.get("sessions", []) if code == 200 else []
+    return _ok(recents={"sessions": sessions, "profiles_truncated": {},
+                        "profiles_usage": {}},
+               cron={"sessions": []},
+               messaging={"sessions": [], "total": 0},
+               errors=[])
+
+
+def h_profiles_projects_tree(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/profiles/projects/tree -> real Qubit project folders."""
+    from . import projects as PJ
+    try:
+        res = PJ.list_projects(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    projects = []
+    for rec in res.get("projects", []) if isinstance(res, dict) else []:
+        if not isinstance(rec, dict):
+            continue
+        folders = rec.get("folders", []) or []
+        projects.append({
+            "id": str(rec.get("slug", "")),
+            "name": str(rec.get("name", "") or ""),
+            "path": str(folders[0]) if folders else None,
+            "isAuto": False, "repos": [], "sessionCount": 0,
+            "totalTokens": 0, "totalCostUsd": 0.0,
+            "lastActive": rec.get("updated_at"), "previewSessions": [],
+        })
+    active = res.get("active_slug") if isinstance(res, dict) else None
+    return _ok(projects=projects, active_id=active, scoped_session_ids=[],
+               errors=[])
+
+
+def h_profile_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/profiles -> staged principal create (never a 2xx)."""
+    name = str(b.get("name", "") or "").strip()
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "profile name required",
+                     "qubit_counterpart": "CLI `qubit brain principal-add`"}
+    return _staged(
+        f"profile {_redact(name)!r} creation stages through the Qubit "
+        "principal registry; create it with `qubit brain principal-add` and "
+        "confirm with a fresh approval", "")
+
+
+def h_terminal_backends(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/tools/terminal/backends -> real local backend inventory."""
+    from . import capability_catalog as CC
+    try:
+        local = CC.check("terminal")
+    except Exception:
+        local = {"state": "UNKNOWN", "explanation": ""}
+    ready = str(local.get("state", "")) in ("IMPLEMENTED", "NOT_UPSTREAM")
+    backends = [{
+        "name": "local", "label": "Qubit local (brokered sandbox)",
+        "description": str(local.get("explanation", "")
+                           or "Qubit local command execution")[:200],
+        "active": True, "status": "ready" if ready else "needs_setup",
+        "detail": "single Qubit sandbox backend; no remote terminal pool",
+    }]
+    return _ok(active="local", backends=backends)
+
+
+def h_computer_use_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/tools/computer-use/status -> real readiness probes."""
+    from . import computer_use as CU
+    try:
+        res = CU.status()
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(**res)
+
+
+def h_learning_graph(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/learning/graph -> lessons ledger as a graph."""
+    from . import learning as L
+    try:
+        lessons = L.LearningLedger(Path(cfg.state_dir())).lessons()
+    except Exception as exc:
+        return _fail(exc)
+    nodes: List[Dict[str, Any]] = []
+    edges: List[Dict[str, Any]] = []
+    seen_evidence: set = set()
+    for lesson in lessons if isinstance(lessons, list) else []:
+        if not isinstance(lesson, dict):
+            continue
+        lid = str(lesson.get("lesson_id", "") or "")
+        if not lid:
+            continue
+        nodes.append({"id": lid, "type": "lesson",
+                      "label": str(lesson.get("text", ""))[:80],
+                      "kind": lesson.get("kind"),
+                      "confidence": lesson.get("confidence"),
+                      "source": lesson.get("source")})
+        for ev in lesson.get("evidence_ids", []) or []:
+            ev = str(ev)
+            if ev and ev not in seen_evidence:
+                seen_evidence.add(ev)
+                nodes.append({"id": ev, "type": "evidence", "label": ev})
+            if ev:
+                edges.append({"source": ev, "target": lid, "kind": "supports"})
+        for other in lesson.get("conflict_with", []) or []:
+            edges.append({"source": lid, "target": str(other),
+                          "kind": "conflicts"})
+    lessons_n = sum(1 for n in nodes if n["type"] == "lesson")
+    evidence_n = sum(1 for n in nodes if n["type"] == "evidence")
+    return _ok(nodes=nodes, edges=edges,
+               stats={"lessons": lessons_n, "evidence": evidence_n,
+                      "nodes": len(nodes), "edges": len(edges)})
+
+
+def h_learning_node(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/learning/node -> one lesson's stored provenance."""
+    from . import learning as L
+    lid = str(q.get("id", b.get("id", "")) or "").strip()
+    if not lid:
+        return _ok(found=False, id="", node=None,
+                   detail="learning node id required",
+                   qubit_counterpart="CLI `qubit lessons show <id>`")
+    try:
+        detail = L.LearningLedger(Path(cfg.state_dir())).explain(lid)
+    except Exception as exc:
+        return _fail(exc)
+    if detail is None:
+        return _ok(found=False, id=lid, node=None,
+                   detail=f"no learning node {lid!r}",
+                   qubit_counterpart="CLI `qubit lessons` (same LearningLedger)")
+    return _ok(found=True, id=lid, node={"id": lid, **detail})
+
+
+def h_learning_node_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _staged(
+        "learning node edits stage through the Qubit lessons ledger with "
+        "confirmation; nothing was written", "")
+
+
+def h_learning_node_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _staged(
+        "learning node deletion stages through the Qubit lessons ledger with "
+        "confirmation; nothing was removed", "")
+
+
+def h_auth_providers(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/auth/providers -> empty provider list (loopback identity)."""
+    return _ok(providers=[],
+               detail="loopback session-token identity; no OAuth providers "
+                      "registered")
+
+
+# ---------------------------------------------------------------------------
+# Route table: (method, regex, handler, disposition)
+# disposition is implemented|gated; gated rows carry code+reason+counterpart.
+# ---------------------------------------------------------------------------
+
+Route = Tuple[str, str, str]
+
+ROUTES: List[Dict[str, Any]] = []
+
+def _r(method: str, pattern: str, handler: str, disp: str = "implemented",
+       gate: Optional[Dict[str, str]] = None) -> None:
+    ROUTES.append({"method": method, "pattern": pattern, "handler": handler,
+                   "disposition": disp, "gate": gate or {}})
+
+
+def _g(code: str, detail: str, counterpart: str) -> Dict[str, str]:
+    return {"code": code, "detail": detail, "counterpart": counterpart}
+
+
+_NO_PTY = _g("PTY_NO_SHELL",
+             "Qubit forbids raw shell/PTY spawn; the xterm mirror cannot attach. "
+             "Use Qubit Chat (streaming agent turns) or the TUI live board.",
+             "overlay Qubit Chat tab (POST /api/qubit/chat) + CLI `qubit tui`")
+_NO_WRITE = _g("WRITE_BROKERED",
+               "Direct file writes are refused; writes run only as brokered, "
+               "confirmed argv actions with audit receipts.",
+               "CLI `qubit opencode` / projects + dashboard /ops + approvals")
+_NO_SECRET = _g("SECRET_NEVER_SERVED",
+                "Secret values never leave the vault; only references are listed.",
+                "CLI `qubit auth status` (names only)")
+_NO_SUPERVISION = _g("GATEWAY_NO_SUPERVISION",
+                     "Qubit keeps a single event path; process supervision stays "
+                     "with the operator.",
+                     "operator systemd units + `qubit gateway` records")
+_NO_REMOTE = _g("BLOCKED_REMOTE_SOURCE",
+                "Remote fetch is refused; only local reviewed manifests install "
+                "with explicit confirmation.",
+                "CLI `qubit skills install <local-manifest>` + 7E validation")
+_NO_OAUTH = _g("OAUTH_MANUAL_HANDOFF",
+               "No live OAuth token dance is performed; enrollment is a manual "
+               "handoff in the user's own browser.",
+               "CLI `qubit auth login` (manual-handoff guided enrollment)")
+_NO_UPDATE = _g("UPDATE_OPERATOR_OWNED",
+                "In-place self-update from the dashboard is refused; upgrades are "
+                "versioned, staged, and reversible.",
+                "CLI `qubit product_*` / package + dashboard Setup page")
+_NO_GIT_READ = _g("GIT_READ_SCOPED",
+                  "Qubit git is a scoped read surface (status/log/diff/show); "
+                  "this review verb has no dedicated backend here.",
+                  "CLI `qubit git status|log|diff|show` + `qubit project`")
+_NO_GIT_WRITE = _g("GIT_WRITE_BROKERED",
+                   "Qubit git is read-only; staging, commits, pushes, "
+                   "worktrees, and branch switches run through the brokered "
+                   "opencode worktree flow with confirmation.",
+                   "CLI `qubit opencode` / `qubit project` + approvals")
+_NO_MEDIA = _g("MEDIA_NOT_SERVED",
+               "Gateway-local binary media data URLs are not served through "
+               "the JSON compat API; Qubit file reads return bounded, redacted "
+               "text only.",
+               "CLI `qubit files read` + Qubit Chat attachment vision")
+_NO_BINARY = _g("FILES_BINARY_STREAM",
+                "Binary file download/stream responses are not served through "
+                "the JSON compat dispatcher; managed files are read as bounded "
+                "text or data URLs.",
+                "GET /api/files/read + GET /api/fs/read-text")
+_NO_AUDIO_RELAY = _g("AUDIO_RELAY_ONLY",
+                     "Client-direct STT/TTS provider keys are never exported; "
+                     "voice audio relays through the local Qubit pipeline.",
+                     "classic /api/audio/status + Qubit Chat voice")
+_NO_AUDIO_EXTERNAL = _g("PROVIDER_EXTERNAL",
+                        "External voice catalogs (ElevenLabs) are not fetched; "
+                        "TTS runs through the local provider chain.",
+                        "local TTS providers (piper/edge/kokoro)")
+_NO_AUDIO_ACTION = _g("AUDIO_ACTION_LOCAL",
+                      "Audio synthesis/transcription runs only through the "
+                      "local voice pipeline, never as a raw compat action.",
+                      "Qubit Chat voice + CLI `qubit voice`")
+_NO_AUDIO_LEASE = _g("AUDIO_LEASE_DESKTOP",
+                     "TTS engine warm-up/release leases are desktop-only; the "
+                     "local pipeline manages model residency itself.",
+                     "Qubit voice pipeline (lazy model load)")
+_NO_AUDIO_STREAM = _g("AUDIO_STREAM_LOCAL",
+                      "Streaming PCM TTS is served by the local voice "
+                      "pipeline, not as a compat WebSocket.",
+                      "classic Qubit voice playback + Qubit Chat")
+_NO_NETWORK_PROBE = _g("NETWORK_PROBE_BLOCKED",
+                       "Live endpoint/credential probes open outbound sockets "
+                       "from the dashboard; Qubit verifies providers through "
+                       "the local governed gateway instead.",
+                       "CLI `qubit auth status` + Qubit provider gateway "
+                       "(audited, budgeted)")
+_GATE_PROVIDER_ENDPOINT = _g("PROVIDER_ENDPOINT_STAGED",
+                             "Custom provider endpoints are config writes; "
+                             "they stage through the Qubit settings console "
+                             "with confirmation and backup.",
+                             "dashboard Settings (classic) + CLI config "
+                             "profiles")
+_GATE_TERMINAL_BACKEND = _g("TERMINAL_BACKEND_STAGED",
+                            "Terminal backend selection is a config write; it "
+                            "stages with confirmation.",
+                            "CLI `qubit setup` + config profiles")
+_GATE_COMPUTER_USE = _g("COMPUTER_USE_GRANT_STAGED",
+                        "Desktop-control permission grants are macOS-only and "
+                        "owner-confirmed; Qubit never downloads unpinned "
+                        "drivers.",
+                        "CLI `qubit computer-use permissions` + Packet 8V "
+                        "accessibility APIs")
+_GATE_PROFILE_IMPORT = _g("PROFILE_IMPORT_REVIEW",
+                          "Profile archives enter quarantine for review; a "
+                          "reviewed archive imports via the Qubit principal "
+                          "registry, never straight from the dashboard.",
+                          "CLI `qubit import-state inspect` + `qubit brain "
+                          "principal-add`")
+_GATE_EXPORT = _g("EXPORT_BROKERED",
+                  "Profile export writes an archive to disk; it is brokered "
+                  "and confirmed through the Qubit export path.",
+                  "CLI `qubit export-state` + dashboard /ops (confirmed)")
+_GATE_DESKTOP_OVERLAY = _g("DESKTOP_OVERLAY_ONLY",
+                           "Desktop appearance overlays are a desktop-client "
+                           "feature; the Qubit dashboard ships one theme and "
+                           "serves no per-profile overlay.",
+                           "Qubit theme (GET /api/dashboard/themes)")
+_GATE_SESSIONS_RECEIPT = {
+    **_g("SESSIONS_RECEIPT_STORE",
+         "Qubit sessions are append-only audit receipts; owner back-fill is "
+         "not offered. Memory tombstones/corrections own forgetting.",
+         "CLI/voice memory_forget/correct (same stores)"),
+    "http": 501,
+}
+
+_r("GET", r"/api/status", "h_status")
+_r("GET", r"/api/health", "h_health")
+_r("GET", r"/api/auth/me", "h_auth_me")
+_r("GET", r"/api/events", "h_events")
+_r("GET", r"/api/sessions", "h_sessions_list")
+_r("GET", r"/api/sessions/stats", "h_sessions_stats")
+_r("GET", r"/api/sessions/search", "h_sessions_list")
+_r("GET", r"/api/sessions/(?P<id>[^/]+)/export", "h_session_show")
+_r("GET", r"/api/sessions/(?P<id>[^/]+)/latest-descendant", "h_session_show")
+_r("GET", r"/api/sessions/(?P<id>[^/]+)/messages", "h_session_messages")
+_r("GET", r"/api/sessions/(?P<id>[^/]+)", "h_session_show")
+_r("GET", r"/api/config", "h_config")
+_r("GET", r"/api/config/schema", "h_config")
+_r("GET", r"/api/config/defaults", "h_config")
+_r("GET", r"/api/egress/status", "h_egress_status")
+_r("GET", r"/api/model/info", "h_model_info")
+_r("GET", r"/api/model/recommended-default", "h_model_recommended_default")
+_r("GET", r"/api/model/options", "h_model_options")
+_r("GET", r"/api/model/moa", "h_model_moa")
+_r("PUT", r"/api/model/moa", "moa_put")
+_r("GET", r"/api/model/auxiliary", "h_model_auxiliary")
+_r("POST", r"/api/model/set", "h_model_set")
+_r("GET", r"/api/profiles", "h_profiles")
+_r("GET", r"/api/profiles/active", "h_profiles_active")
+_r("POST", r"/api/profiles/active", "profiles_active_set")
+_r("GET", r"/api/profiles/(?P<name>[^/]+)/setup-command", "h_profile_setup_command")
+_r("GET", r"/api/profiles/(?P<name>[^/]+)/soul", "h_profile_soul")
+_r("PUT", r"/api/profiles/(?P<name>[^/]+)/soul", "profile_soul_set")
+_r("PUT", r"/api/profiles/(?P<name>[^/]+)/description", "profile_desc")
+_r("POST", r"/api/profiles/(?P<name>[^/]+)/describe-auto", "profile_describe_auto")
+_r("PUT", r"/api/profiles/(?P<name>[^/]+)/model", "profile_model")
+_r("PATCH", r"/api/profiles/(?P<name>[^/]+)", "profile_rename")
+_r("DELETE", r"/api/profiles/(?P<name>[^/]+)", "profile_delete")
+_r("GET", r"/api/skills", "h_skills")
+_r("GET", r"/api/skills/content", "h_skill_content")
+_r("POST", r"/api/skills", "skill_create")
+_r("PUT", r"/api/skills/content", "skill_update")
+_r("PUT", r"/api/skills/toggle", "h_skills_toggle")
+_r("GET", r"/api/tools/toolsets", "h_toolsets")
+_r("GET", r"/api/cron/jobs", "h_cron_jobs")
+_r("POST", r"/api/cron/jobs", "cron_create")
+_r("PUT", r"/api/cron/jobs/(?P<id>[^/]+)", "cron_update")
+_r("DELETE", r"/api/cron/jobs/(?P<id>[^/]+)", "cron_delete")
+_r("GET", r"/api/cron/jobs/(?P<id>[^/]+)/runs", "h_cron_job_runs")
+_r("GET", r"/api/cron/jobs/(?P<id>[^/]+)", "h_cron_job_show")
+_r("POST", r"/api/cron/jobs/(?P<id>[^/]+)/pause", "cron_pause")
+_r("POST", r"/api/cron/jobs/(?P<id>[^/]+)/resume", "cron_resume")
+_r("POST", r"/api/cron/jobs/(?P<id>[^/]+)/trigger", "cron_trigger")
+_r("GET", r"/api/logs", "h_logs")
+_r("GET", r"/api/system/stats", "h_system_stats")
+_r("GET", r"/api/mcp", "h_mcp")
+_r("GET", r"/api/mcp/servers", "h_mcp")
+_r("POST", r"/api/mcp/servers", "mcp_create")
+_r("DELETE", r"/api/mcp/servers/(?P<id>[^/]+)", "mcp_delete")
+_r("GET", r"/api/mcp/catalog", "h_mcp_catalog")
+_r("GET", r"/api/pairing", "h_pairing_list")
+_r("POST", r"/api/pairing", "pairing_create")
+_r("POST", r"/api/pairing/approve", "pairing_approve")
+_r("POST", r"/api/pairing/revoke", "pairing_revoke")
+_r("POST", r"/api/pairing/clear-pending", "pairing_revoke")
+_r("GET", r"/api/webhooks", "h_webhooks_list")
+_r("POST", r"/api/webhooks", "webhooks_add")
+_r("POST", r"/api/webhooks/enable", "webhooks_enable")
+_r("PUT", r"/api/webhooks/(?P<id>[^/]+)/enabled", "webhooks_enabled")
+_r("DELETE", r"/api/webhooks/(?P<id>[^/]+)", "webhooks_delete")
+_r("GET", r"/api/webhooks/(?P<id>[^/]+)", "webhooks_show")
+_r("POST", r"/api/webhooks/(?P<id>[^/]+)", "webhooks_mutate")
+_r("GET", r"/api/messaging/platforms", "h_platforms")
+_r("PUT", r"/api/messaging/platforms/(?P<id>[^/]+)", "msg_update")
+_r("GET", r"/api/memory", "h_memory")
+_r("GET", r"/api/memory/provider", "h_memory")
+_r("GET", r"/api/analytics", "h_analytics")
+_r("GET", r"/api/analytics/usage", "h_analytics")
+_r("GET", r"/api/analytics/models", "h_analytics_models")
+_r("GET", r"/api/files", "h_files")
+_r("GET", r"/api/files/read", "h_files_read")
+_r("DELETE", r"/api/files", "files_delete")
+_r("GET", r"/api/gateway", "h_gateway")
+_r("GET", r"/api/curator", "h_curator")
+_r("GET", r"/api/env", "h_env")
+_r("GET", r"/api/ops/hooks", "h_hooks")
+_r("POST", r"/api/ops/hooks", "h_hooks_create")
+_r("GET", r"/api/ops/checkpoints", "h_ckpt")
+_r("GET", r"/api/ops", "h_ops_catalog")
+_r("GET", r"/api/ops/approvals", "h_approvals_list")
+_r("POST", r"/api/ops/run", "h_ops_run")
+_r("POST", r"/api/ops/confirm", "h_ops_confirm")
+_r("POST", r"/api/ops/cancel", "h_ops_cancel")
+_r("GET", r"/api/ops/(?P<name>[a-z-]+)", "h_ops")
+_r("POST", r"/api/ops/(?P<name>[a-z-]+)", "h_ops")
+_r("DELETE", r"/api/ops/hooks", "hooks_delete")
+_r("GET", r"/api/plugins/kanban/events", "h_kanban_events")
+_r("POST", r"/api/qubit/chat", "h_chat_turn")
+_r("GET", r"/api/dashboard/plugins", "h_plugins")
+_r("GET", r"/api/dashboard/themes", "h_themes")
+_r("PUT", r"/api/dashboard/theme", "h_theme_set")
+
+# Packet 8U read surfaces: scoped Git / Files / Audio (audit §1 absent reads)
+_r("GET", r"/api/git/status", "h_git_status")
+_r("GET", r"/api/git/log", "h_git_log")
+_r("GET", r"/api/git/diff", "h_git_diff")
+_r("GET", r"/api/git/show", "h_git_show")
+_r("GET", r"/api/git/review/diff", "h_git_file_diff")
+_r("GET", r"/api/git/file-diff", "h_git_file_diff")
+_r("GET", r"/api/fs/list", "h_fs_list")
+_r("GET", r"/api/fs/tree", "h_fs_tree")
+_r("GET", r"/api/fs/stat", "h_fs_stat")
+_r("GET", r"/api/fs/read", "h_fs_read_text")
+_r("GET", r"/api/fs/read-text", "h_fs_read_text")
+_r("GET", r"/api/fs/read-data-url", "h_fs_read_data_url")
+_r("GET", r"/api/fs/git-root", "h_fs_git_root")
+_r("GET", r"/api/fs/default-cwd", "h_fs_default_cwd")
+_r("GET", r"/api/audio/status", "h_audio_status")
+_r("GET", r"/api/audio/list", "h_audio_devices")
+_r("GET", r"/api/audio/devices", "h_audio_devices")
+
+# Packet 8U closure: local-models reads, custom endpoints, profile reads,
+# tools/learning reads, auth providers (audit §1A absent reads).
+_r("GET", r"/api/local-models/status", "h_local_models_status")
+_r("GET", r"/api/local-models/hardware", "h_local_models_hardware")
+_r("GET", r"/api/local-models/catalog", "h_local_models_catalog")
+_r("GET", r"/api/local-models/jobs/(?P<id>[^/]+)", "h_local_models_job_show")
+_r("GET", r"/api/local-models/jobs", "h_local_models_jobs")
+_r("POST", r"/api/local-models/runtime/install", "h_local_models_runtime_install")
+_r("POST", r"/api/local-models/download", "h_local_models_download")
+_r("DELETE", r"/api/local-models/models/(?P<model_id>[^/]+)",
+   "h_local_models_delete")
+_r("POST", r"/api/local-models/quickstart", "h_local_models_quickstart")
+_r("POST", r"/api/local-models/server", "h_local_models_server")
+_r("POST", r"/api/local-models/eject", "h_local_models_eject")
+_r("POST", r"/api/local-models/activate", "h_local_models_activate")
+_r("POST", r"/api/local-models/sideload", "h_local_models_sideload")
+_r("GET", r"/api/local-models/search/files", "h_local_models_search_files")
+_r("GET", r"/api/local-models/search", "h_local_models_search")
+_r("POST", r"/api/local-models/download-browsed",
+   "h_local_models_download_browsed")
+_r("GET", r"/api/providers/custom-endpoints", "h_custom_endpoints")
+_r("GET", r"/api/profiles/sessions/sidebar", "h_profiles_sessions_sidebar")
+_r("GET", r"/api/profiles/sessions", "h_profiles_sessions")
+_r("GET", r"/api/profiles/projects/tree", "h_profiles_projects_tree")
+_r("POST", r"/api/profiles", "h_profile_create")
+_r("GET", r"/api/tools/terminal/backends", "h_terminal_backends")
+_r("GET", r"/api/tools/computer-use/status", "h_computer_use_status")
+_r("GET", r"/api/learning/graph", "h_learning_graph")
+_r("GET", r"/api/learning/node", "h_learning_node")
+_r("PUT", r"/api/learning/node", "h_learning_node_update")
+_r("DELETE", r"/api/learning/node", "h_learning_node_delete")
+_r("GET", r"/api/auth/providers", "h_auth_providers")
+
+GATED: List[Dict[str, Any]] = [
+    ("GET", r"/api/pty", _NO_PTY), ("POST", r"/api/pty", _NO_PTY),
+    ("GET", r"/api/ws", _g("WS_SINGLE_PATH",
+                           "The Hermes tui_gateway WS dialect is not served; Qubit keeps "
+                           "one event path (SSE feed + ops). Chat uses Qubit Chat.",
+                           "GET /api/events (SSE) + POST /api/qubit/chat")),
+    ("POST", r"/api/auth/ws-ticket", _g("WS_SINGLE_PATH",
+                           "No WS tickets are minted; Qubit serves no WS gateway dialect. "
+                           "Loopback clients use the session token directly.",
+                           "GET /api/events (SSE) + POST /api/qubit/chat")),
+    ("GET", r"/api/console", _NO_PTY),
+    ("GET", r"/api/config/raw", _NO_SECRET),
+    ("PUT", r"/api/config/raw", _NO_SECRET),
+    ("GET", r"/api/env/reveal", _NO_SECRET),
+    ("POST", r"/api/env/reveal", _NO_SECRET),
+    ("GET", r"/api/credentials/pool.*", _NO_SECRET),
+    ("POST", r"/api/credentials/pool.*", _NO_SECRET),
+    ("PUT", r"/api/credentials/pool.*", _NO_SECRET),
+    ("DELETE", r"/api/credentials/pool.*", _NO_SECRET),
+    ("POST", r"/api/files/mkdir", _NO_WRITE),
+    ("POST", r"/api/files/upload-stream", _NO_WRITE),
+    ("POST", r"/api/chat/image-upload", _g("CHAT_IMAGE_OVERLAY",
+                                           "Built-in xterm chat image paste is superseded by "
+                                           "Qubit Chat attachments (vision_describe backend).",
+                                           "overlay Qubit Chat tab + `qubit vision describe`")),
+    ("POST", r"/api/gateway/start", _NO_SUPERVISION),
+    ("POST", r"/api/gateway/stop", _NO_SUPERVISION),
+    ("POST", r"/api/gateway/restart", _NO_SUPERVISION),
+    ("GET", r"/api/hermes/update.*", _NO_UPDATE),
+    ("POST", r"/api/hermes/update.*", _NO_UPDATE),
+    ("GET", r"/api/portal", _NO_UPDATE),
+    ("GET", r"/api/ssh/ownership", _g("SSH_OWNERSHIP_OPERATOR",
+        "Qubit owns the host shell surface; no remote SSH ownership nonce is "
+        "minted or served to the dashboard. Host control stays with the operator.",
+        "CLI `qubit setup health` + `qubit doctor` (local, operator-run)")),
+    ("GET", r"/api/providers/oauth.*", _NO_OAUTH),
+    ("POST", r"/api/providers/oauth.*", _NO_OAUTH),
+    ("GET", r"/api/mcp/oauth/flows", _NO_OAUTH),
+    ("GET", r"/api/mcp/oauth/flows/[^/]+", _NO_OAUTH),
+    ("PUT", r"/api/curator/paused", _g("CURATOR_ON_DEMAND",
+        "No background curator daemon runs; curation is on-demand and every "
+        "promotion is reviewed. There is nothing to pause.",
+        "lessons_list/promote + CLI `qubit lessons` (same LearningLedger)")),
+    ("POST", r"/api/curator/run", _g("CURATOR_ON_DEMAND",
+        "No background curator daemon runs; curation is on-demand and every "
+        "promotion is reviewed. Run an explicit summary pass instead.",
+        "GET /api/curator + CLI `qubit lessons` (same LearningLedger)")),
+    ("GET", r"/api/ops/backup/download", _g("BACKUP_PASSPHRASE",
+        "Backup bundles are passphrase-encrypted on creation and never stored "
+        "server-side; there is no archive to download. Create one with a "
+        "passphrase resupply at confirmation time.",
+        "dashboard /ops backup_create + CLI backup (passphrase resupply)")),
+    ("GET", r"/api/mcp/servers/[^/]+/auth", _NO_OAUTH),
+    ("POST", r"/api/mcp/servers/[^/]+/auth", _NO_OAUTH),
+    ("POST", r"/api/skills/hub/.*", _NO_REMOTE),
+    ("GET", r"/api/skills/hub/.*", _NO_REMOTE),
+    ("POST", r"/api/mcp/catalog/install", _NO_REMOTE),
+    ("POST", r"/api/dashboard/agent-plugins/.*", _NO_REMOTE),
+    ("GET", r"/api/dashboard/plugin-providers", _g("PLUGIN_PROVIDERS_QUBIT",
+        "Plugin providers resolve through the Qubit skill manifest registry.",
+        "GET /api/skills + CLI `qubit skills list`")),
+    ("POST", r"/api/cron/blueprints/instantiate.*", _g("BLUEPRINT_STAGED",
+        "Automation blueprints instantiate as staged-disabled schedules with confirmation.",
+        "schedules_create via /ops + CLI `qubit schedules`")),
+    ("GET", r"/api/cron/blueprints", "blueprints"),
+    ("GET", r"/api/cron/delivery-targets", "delivery"),
+    ("POST", r"/api/sessions/import", "sess_import"),
+    ("POST", r"/api/sessions/prune", "sess_prune"),
+    ("POST", r"/api/sessions/bulk-delete", "sess_bulk"),
+    ("DELETE", r"/api/sessions/(?P<id>[^/]+)", "h_session_delete"),
+    ("PATCH", r"/api/sessions/(?P<id>[^/]+)", "h_session_patch"),
+    ("POST", r"/api/sessions/(?P<id>[^/]+)/resume", "h_session_resume"),
+    ("GET", r"/api/sessions/empty.*", "sess_empty"),
+    ("GET", r"/api/memory/reset", "mem_reset"),
+    ("POST", r"/api/memory/reset", "mem_reset"),
+    ("GET", r"/api/memory/providers/.*", "mem_prov"),
+    ("GET", r"/api/messaging/.*/onboarding.*", _g("ONBOARDING_GUIDED",
+        "Channel onboarding runs as guided manual enrollment, not an automatic token flow.",
+        "CLI `qubit auth login` + msg account ops")),
+    ("DELETE", r"/api/messaging/.*/onboarding.*", _g("ONBOARDING_GUIDED",
+        "Channel onboarding runs as guided manual enrollment, not an automatic token flow.",
+        "CLI `qubit auth login` + msg account ops")),
+    ("POST", r"/api/messaging/.*/onboarding.*", _g("ONBOARDING_GUIDED",
+        "Channel onboarding runs as guided manual enrollment, not an automatic token flow.",
+        "CLI `qubit auth login` + msg account ops")),
+    ("POST", r"/api/messaging/platforms/[^/]+/test", "msg_test"),
+    ("POST", r"/api/mcp/servers/[^/]+/test", "mcp_test"),
+    ("POST", r"/api/mcp/servers/[^/]+/enabled", "mcp_enabled"),
+    ("PUT", r"/api/mcp/servers/[^/]+/enabled", "mcp_enabled"),
+    ("PUT", r"/api/mcp/servers", "mcp_create"),
+    ("GET", r"/api/tools/toolsets/[^/]+/models", "toolset_config"),
+    ("GET", r"/api/tools/toolsets/[^/]+/config", "toolset_config"),
+    ("PUT", r"/api/tools/toolsets/.*", "toolset_write"),
+    ("POST", r"/api/tools/toolsets/.*/post-setup", "toolset_write"),
+    ("PUT", r"/api/config", "config_save"),
+    ("POST", r"/api/dashboard/agent-plugins/install", "agent_install"),
+    ("POST", r"/api/dashboard/agent-plugins/(?P<id>[^/]+)/enable", "agent_enable"),
+    ("POST", r"/api/dashboard/agent-plugins/(?P<id>[^/]+)/disable", "agent_disable"),
+    ("POST", r"/api/dashboard/agent-plugins/(?P<id>[^/]+)/update", "agent_update"),
+    ("DELETE", r"/api/dashboard/agent-plugins/(?P<id>[^/]+)", "agent_remove"),
+    ("PUT", r"/api/dashboard/plugin-providers", "toolset_write"),
+    ("GET", r"/api/dashboard/plugins/hub", "plugins_hub"),
+    ("DELETE", r"/api/providers/oauth/(?P<id>[^/]+)", "oauth_delete"),
+    ("DELETE", r"/api/providers/oauth/sessions/(?P<id>[^/]+)", "oauth_delete"),
+    ("PUT", r"/api/env", "env_write"),
+    ("DELETE", r"/api/env", "env_write"),
+    ("PUT", r"/api/memory/provider", "mem_provider_set"),
+    ("GET", r"/api/memory/providers/(?P<id>[^/]+)/config", "mem_config"),
+    ("PUT", r"/api/memory/providers/(?P<id>[^/]+)/config", "mem_config_write"),
+    ("POST", r"/api/memory/providers/(?P<id>[^/]+)/setup", "mem_config_write"),
+    ("GET", r"/api/dashboard/plugins/rescan", "plugins_rescan"),
+    ("POST", r"/api/dashboard/plugins/[^/]+/visibility", "plugin_visibility"),
+    ("POST", r"/api/ops/debug-share", "debug_share"),
+    ("POST", r"/api/ops/import-upload", "import_upload"),
+    ("POST", r"/api/ops/checkpoints/prune", "ckpt_prune"),
+    ("GET", r"/api/ops/checkpoints.*", "ckpt"),
+    ("GET", r"/api/actions/.*", "actions_read"),
+    ("GET", r"/api/dashboard/font", "font"),
+    ("PUT", r"/api/dashboard/font", "font_set"),
+    # --- Packet 8U: Git writes + non-scoped review reads stay typed ---
+    ("GET", r"/api/git/gh-auth", _NO_GIT_READ),
+    ("GET", r"/api/git/worktrees", _NO_GIT_READ),
+    ("GET", r"/api/git/branches", _NO_GIT_READ),
+    ("GET", r"/api/git/base-branches", _NO_GIT_READ),
+    ("GET", r"/api/git/review/list", _NO_GIT_READ),
+    ("GET", r"/api/git/review/commit-context", _NO_GIT_READ),
+    ("GET", r"/api/git/review/rev-parse", _NO_GIT_READ),
+    ("GET", r"/api/git/review/ship-info", _NO_GIT_READ),
+    ("POST", r"/api/git/review/pr-list", _NO_GIT_WRITE),
+    ("POST", r"/api/git/review/stage", _NO_GIT_WRITE),
+    ("POST", r"/api/git/review/unstage", _NO_GIT_WRITE),
+    ("POST", r"/api/git/review/revert", _NO_GIT_WRITE),
+    ("POST", r"/api/git/review/commit", _NO_GIT_WRITE),
+    ("POST", r"/api/git/review/push", _NO_GIT_WRITE),
+    ("POST", r"/api/git/review/create-pr", _NO_GIT_WRITE),
+    ("POST", r"/api/git/worktree/add", _NO_GIT_WRITE),
+    ("POST", r"/api/git/worktree/remove", _NO_GIT_WRITE),
+    ("POST", r"/api/git/branch/switch", _NO_GIT_WRITE),
+    # --- Packet 8U: Files/FS binary + writes stay typed ---
+    ("GET", r"/api/media", _NO_MEDIA),
+    ("GET", r"/api/files/download", _NO_BINARY),
+    ("GET", r"/api/files/stream", _NO_BINARY),
+    ("GET", r"/api/fs/download", _NO_BINARY),
+    ("POST", r"/api/files/upload", _NO_WRITE),
+    ("POST", r"/api/fs/write-text", _NO_WRITE),
+    # --- Packet 8U: Audio actions + WS stay typed (reads are implemented) ---
+    ("GET", r"/api/audio/voice-config", _NO_AUDIO_RELAY),
+    ("GET", r"/api/audio/elevenlabs/voices", _NO_AUDIO_EXTERNAL),
+    ("POST", r"/api/audio/transcribe", _NO_AUDIO_ACTION),
+    ("POST", r"/api/audio/speak", _NO_AUDIO_ACTION),
+    ("POST", r"/api/audio/tts-lease", _NO_AUDIO_LEASE),
+    ("GET", r"/api/audio/speak-stream", _NO_AUDIO_STREAM),
+    ("POST", r"/api/audio/speak-stream", _NO_AUDIO_STREAM),
+    # --- Packet 8U closure: provider/profile/tool/learning writes + the
+    # remaining wrong-verb gates (audit §1B). Specific paths precede any
+    # parameterized row so re.fullmatch resolves deterministically.
+    ("POST", r"/api/providers/custom-endpoints", _GATE_PROVIDER_ENDPOINT),
+    ("POST", r"/api/providers/custom-endpoints/[^/]+/activate",
+     _GATE_PROVIDER_ENDPOINT),
+    ("DELETE", r"/api/providers/custom-endpoints/[^/]+",
+     _GATE_PROVIDER_ENDPOINT),
+    ("POST", r"/api/providers/custom-endpoints/validate", _NO_NETWORK_PROBE),
+    ("POST", r"/api/providers/validate", _NO_NETWORK_PROBE),
+    ("PUT", r"/api/tools/terminal/backend", _GATE_TERMINAL_BACKEND),
+    ("POST", r"/api/tools/computer-use/permissions/grant", _GATE_COMPUTER_USE),
+    ("POST", r"/api/profiles/import", _GATE_PROFILE_IMPORT),
+    ("POST", r"/api/profiles/[^/]+/open-terminal", _NO_PTY),
+    ("POST", r"/api/profiles/[^/]+/export", _GATE_EXPORT),
+    ("GET", r"/api/profiles/[^/]+/desktop-overlay", _GATE_DESKTOP_OVERLAY),
+    ("POST", r"/api/sessions/owner-backfill", _GATE_SESSIONS_RECEIPT),
+    ("POST", r"/api/memory/providers/[^/]+/oauth/start", _NO_OAUTH),
+    ("DELETE", r"/api/mcp/oauth/flows/[^/]+", _NO_OAUTH),
+    ("GET", r"/api/mcp/oauth/callback.*", _NO_OAUTH),
+]
+
+for _m, _p, _ginfo in GATED:
+    if isinstance(_ginfo, dict):
+        _r(_m, _p, "__gate__", "gated", _ginfo)
+    else:
+        _r(_m, _p, _ginfo, "implemented")
+
+
+def h_blueprints(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import schedules as S
+    try:
+        jobs = S.list_jobs(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    names = sorted({str(j.get("name", "")) for j in jobs.get("jobs", [])} if isinstance(jobs, dict) else [])
+    return _ok(blueprints=[{"name": n, "kind": "schedule-template",
+                            "instantiate": "POST /api/cron/blueprints/instantiate (staged, confirmed)"}
+                           for n in names])
+
+
+def h_delivery_targets(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import messaging as M
+    try:
+        res = M.account_list(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(delivery_targets=res)
+
+
+def h_sess_empty(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Real read: receipts whose detail is empty (no recorded activity)."""
+    from .auth_status import recent_sessions
+    res = recent_sessions(cfg, 100)
+    empty = [r for r in res.get("sessions", []) if not (r.get("detail") or "").strip()]
+    return _ok(count=len(empty),
+               sessions=[{"id": r.get("receipt_id") or r.get("action_id"),
+                          "created_at": r.get("created_at")} for r in empty])
+
+
+def h_sessions_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str], kind: str) -> Tuple[int, Dict[str, Any]]:
+    return _gate("SESSIONS_RECEIPT_STORE",
+                 "Qubit sessions are append-only audit receipts; bulk delete, prune, "
+                 "import, rename, and empty-store sweeps are not offered on receipts. "
+                 "Memory tombstones/corrections own forgetting.",
+                 "memory_forget/correct + CLI/voice (same stores)", 501)
+
+
+def h_mem_reset(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    if not b.get("confirm"):
+        return _staged("memory reset is destructive: re-POST with "
+                       "{\"confirm\": true} plus a fresh approval",
+                       "", {"code": "CONFIRM_REQUIRED"})
+    from . import dashboard_ops as OPS
+    out = OPS.run_op(cfg, "brain_profile_sweep",
+                     {"confirm": True}, actor="dashboard:user", session="dashboard")
+    return (200 if out.get("state") == "executed" else 400), out
+
+
+def h_mem_provider(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _ok(provider="qubit-local", tiers=["core", "working", "recall", "archive"],
+               detail="local-only SQLite/FTS5 MemoryStore; cloud sync refused by policy")
+
+
+def h_msg_test(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _ok(test="deferred",
+               detail="credential-gated last-mile probe; runs only with a vault "
+                      "credential reference present (MSG_NO_CREDENTIAL otherwise)")
+
+
+def h_mcp_test(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    # McpTestResult wire shape; mounts never happen so tools stay empty.
+    return _ok(ok=False, tools=[],
+               error="MCP_NO_MOUNT: Qubit inventories MCP servers but never "
+                     "mounts them")
+
+
+def h_mcp_enabled(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _gate("MCP_NO_MOUNT", "MCP servers stay disabled-until-enabled inventory; "
+                 "enabling a mount is refused.",
+                 "skills_enable for Qubit-native skills", 501)
+
+
+def h_toolset_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _gate("TOOLSET_STAGED",
+                 "Toolset config changes stage through permission profiles with "
+                 "confirmation, never direct REST writes.",
+                 "CLI `qubit permissions` + dashboard Settings (classic)")
+
+
+def h_profile_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    out = OPS.run_op(cfg, "brain_profile_set", {k: v for k, v in b.items()
+                                                if isinstance(v, (str, int, float, bool))},
+                     actor="dashboard:user", session="dashboard")
+    ok = out.get("state") == "executed"
+    if out.get("confirmation_id") and not ok:
+        return _staged(_redact(out.get("speech", ""))[:300],
+                       out["confirmation_id"])
+    return (200 if ok else 400), {"ok": ok, "result": _res(out),
+                                  "state": out.get("state")}
+
+
+def h_plugins_rescan(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    manifests = _overlay_manifests()
+    return _ok(rescanned=True, count=len(manifests), plugins=[m["name"] for m in manifests])
+
+
+def h_plugin_visibility(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _ok(name=p.get("id"), visible=bool(b.get("visible", True)),
+               detail="visibility is session-local; manifests remain installed")
+
+
+def h_debug_share(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    out = OPS.run_op(cfg, "diagnostics", {}, actor="dashboard:user", session="dashboard")
+    return _ok(bundle=_res(out),
+               detail="redacted diagnostic bundle (never secrets); no external share")
+
+
+def h_import_upload(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _gate("IMPORT_REVIEW_REQUIRED",
+                 "Uploads enter quarantine for review; reviewed artifacts install "
+                 "via skills install. Nothing executes on upload.",
+                 "CLI `qubit import-agent inspect`")
+
+
+def h_hooks(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import hooks as H
+    try:
+        res = H.list_hooks(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    recs = res.get("hooks", []) if isinstance(res, dict) else []
+    entries = []
+    for r in recs if isinstance(recs, list) else []:
+        if not isinstance(r, dict):
+            continue
+        entries.append({
+            "event": str(r.get("event", "")),
+            "matcher": str(r.get("name", "")),
+            "command": None,
+            "timeout": None,
+            "allowed": str(r.get("status", "")) == "active",
+            "approved_at": None,
+            "executable": False,
+        })
+    # HooksResponse wire shape; shells never execute (broker-audited
+    # delivery only), so command stays null by policy.
+    return _ok(hooks=entries, valid_events=["*"])
+
+
+def h_hooks_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import hooks as H
+    event = str(b.get("event", "") or "")
+    shell = str(b.get("command", b.get("shell", "")) or "")
+    name = str(b.get("name", "") or "")
+    if not event:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "hook event required"}
+    if not b.get("confirm", b.get("approved", False)):
+        return _need_confirm("hook declare (shell stored disabled, never runs)")
+    if not name:
+        name = re.sub(r"[^a-z0-9]+", "-", event.lower()).strip("-")[:40] or "hook"
+    try:
+        res = H.declare(cfg, name, event, shell,
+                        requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    hook = res.get("hook", {}) if isinstance(res, dict) else {}
+    return _ok(ok=True, event=str(hook.get("event", event)),
+               command="", approved=False)
+
+
+def h_ckpt(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    out = OPS.run_op(cfg, "checkpoints_list", {}, actor="dashboard:user",
+                     session="dashboard")
+    res = _res(out) or {}
+    recs = res.get("checkpoints", []) if isinstance(res, dict) else []
+    sessions = []
+    total = 0
+    for r in recs if isinstance(recs, list) else []:
+        if not isinstance(r, dict):
+            continue
+        size = int(r.get("bytes", r.get("size", 0)) or 0)
+        total += size
+        sessions.append({"session": str(r.get("name", r.get("session", ""))),
+                         "files": int(r.get("files", 0) or 0), "bytes": size})
+    # CheckpointsResponse wire shape.
+    return _ok(sessions=sessions, total_bytes=total)
+
+
+def h_ckpt_prune(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _gate("CHECKPOINT_CONFIRM_REQUIRED",
+                 "Checkpoint prune is metadata-destructive: confirm in the Qubit "
+                 "operations console with explicit scope.",
+                 "dashboard /ops checkpoints + CLI")
+
+
+def h_actions_read(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    out = OPS.run_op(cfg, "actions_list", {"limit": 50},
+                     actor="dashboard:user", session="dashboard")
+    return _ok(actions=_res(out), state=out.get("state"))
+
+
+def h_font(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+           p: Dict[str, str], setter: bool = False) -> Tuple[int, Dict[str, Any]]:
+    if setter:
+        return _ok(font=str(b.get("font", "system")),
+                    detail="font preference is session-local in this packet")
+    return _ok(font="system")
+
+
+def h_plugins(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Any]:
+    # Wire shape is a bare manifest array (api.getPlugins: PluginManifestResponse[]).
+    return 200, _overlay_manifests()
+
+
+def h_themes(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _ok(**themes_response(cfg))
+
+
+def h_theme_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    name = str(b.get("theme", "qubit") or "qubit")
+    if name != "qubit":
+        return _ok(ok=True, theme="qubit",
+                   detail=f"only the Qubit theme ships in this packet; "
+                          f"{name!r} is not installed (session keeps qubit)")
+    return _ok(ok=True, theme="qubit")
+
+
+def _need_confirm(action: str) -> Tuple[int, Dict[str, Any]]:
+    return _staged(f"{action} requires explicit confirmation: re-POST "
+                   "with {\"confirm\": true}", "")
+
+
+def _persona_path(cfg: Any) -> Path:
+    try:
+        return Path(cfg.state_dir()) / "hermes_persona.json"
+    except Exception:
+        return Path("/tmp") / "hermes_persona.json"
+
+
+def _persona_active(cfg: Any) -> str:
+    try:
+        raw = json.loads(_persona_path(cfg).read_text())
+        return str(raw.get("active", "") or "")
+    except (OSError, ValueError):
+        return ""
+
+
+def _persona_save(cfg: Any, name: str) -> None:
+    _persona_path(cfg).write_text(json.dumps({"active": name}))
+
+
+def _hidden_path(cfg: Any) -> Path:
+    try:
+        return Path(cfg.state_dir()) / "hermes_hidden.json"
+    except Exception:
+        return Path("/tmp") / "hermes_hidden.json"
+
+
+def _hidden_set(cfg: Any) -> set:
+    try:
+        raw = json.loads(_hidden_path(cfg).read_text())
+        return set(raw.get("hidden", []) or [])
+    except (OSError, ValueError):
+        return set()
+
+
+def _hidden_save(cfg: Any, hidden: set) -> None:
+    _hidden_path(cfg).write_text(json.dumps({"hidden": sorted(hidden)}))
+
+
+def h_profiles_active(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return h_profiles(cfg, q, b, {**p, "kind": "active"})
+
+
+def profiles_active_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    name = str(b.get("active", b.get("name", "")) or "")
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "active profile name required"}
+    try:
+        _persona_save(cfg, name)
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(ok=True, active=name)
+
+
+def _profile_field(cfg: Any, b: Dict[str, Any], p: Dict[str, str],
+                   key: str) -> Tuple[int, Dict[str, Any]]:
+    from . import brain as B
+    name = str(p.get("name", "") or "")
+    value = b.get("value", b.get("content", b.get("description", "")))
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "profile name required"}
+    if not b.get("confirm"):
+        return _need_confirm(f"profile {key} update")
+    try:
+        res = B.profile_set(cfg, name, key, str(value or ""),
+                            requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    return _ok(ok=True, field=res.get("field", {}))
+
+
+def profile_soul_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _profile_field(cfg, b, p, "soul")
+
+
+def profile_desc(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _profile_field(cfg, b, p, "description")
+
+
+def profile_model(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    code, out = _profile_field(cfg, b, p, "model")
+    if code != 200:
+        return code, out
+    return _ok(ok=True, provider="ollama-local",
+               model=str(b.get("model", b.get("value", ""))))
+
+
+def profile_describe_auto(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _gate("DESCRIBE_AUTO_MANUAL",
+                 "Model-generated profile copy is not offered; write the "
+                 "description explicitly so it stays reviewable.",
+                 "PUT /api/profiles/{name}/description with {\"confirm\": true}")
+
+
+def profile_rename(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _gate("PERSONA_IMMUTABLE_ID",
+                 "Persona identities are immutable once created (memory "
+                 "provenance keys on them); create a new principal instead.",
+                 "CLI `qubit brain principal-add` (same Brain store)", 501)
+
+
+def profile_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import brain as B
+    name = str(p.get("name", "") or "")
+    if not b.get("confirm"):
+        return _need_confirm("profile delete")
+    try:
+        res = B.profile_forget(cfg, name, requested_by="dashboard:user",
+                               confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    ok = not (isinstance(res, dict) and res.get("ok") is False)
+    return (200 if ok else 400), {"ok": ok}
+
+
+def cron_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import schedules as S
+    name = str(b.get("name", "") or "")
+    task_text = str(b.get("prompt", b.get("task_text", "")) or "")
+    when = str(b.get("when", "") or "")
+    if isinstance(b.get("schedule"), dict):
+        when = str(b["schedule"].get("expr", "") or when)
+    if not when and isinstance(b.get("repeat"), dict):
+        when = str(b["repeat"].get("expr", "") or "")
+    if not b.get("confirm"):
+        return _need_confirm("schedule create (unattended work)")
+    try:
+        res = S.create(cfg, name, task_text, when,
+                       requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    job = res.get("job", {}) if isinstance(res, dict) else {}
+    return 200, _cron_shape(job if isinstance(job, dict) else {})
+
+
+def cron_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _gate("CRON_UPDATE_STAGED",
+                 "In-place schedule edits are refused; pause + delete + "
+                 "recreate instead (delete retains run history).",
+                 "DELETE then POST /api/cron/jobs (same schedules store)")
+
+
+def cron_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import schedules as S
+    if not b.get("confirm"):
+        return _need_confirm("schedule delete")
+    try:
+        S.delete(cfg, int(p.get("id", "0")), requested_by="dashboard:user",
+                 confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    return _ok(ok=True)
+
+
+def skill_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _gate("SKILL_MANIFEST_REQUIRED",
+                 "Inline skill creation is refused; install a validated local "
+                 "manifest (source, revision, license, hash, capabilities, "
+                 "scopes, rollback) staged disabled instead.",
+                 "CLI `qubit skills install <manifest>` + 7E validation", 501)
+
+
+def skill_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _gate("SKILL_VERSIONED",
+                 "In-place skill edits are refused; versions are immutable. "
+                 "Remove and reinstall the new validated version (rollback "
+                 "restores the prior state).",
+                 "CLI `qubit skills remove/rollback/install`", 501)
+
+
+def moa_put(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _gate("MOA_SUPERSEDED",
+                 "MoA fan-out presets are not executed by Qubit; the ordered "
+                 "provider fallback gateway (8Q) is the counterpart.",
+                 "Models page provider/fallback display + 8Q gateway", 501)
+
+
+def mcp_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _gate("MCP_NO_MOUNT",
+                 "MCP servers are inventory-only; Qubit never mounts them.",
+                 "Qubit-native skills with manifests", 501)
+
+
+def mcp_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return 404, {"ok": False, "code": "MCP_NOT_MOUNTED",
+                 "detail": "no MCP server is mounted; nothing to delete"}
+
+
+def webhooks_enable(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import webhooks as W
+    if not b.get("confirm", True):
+        return _need_confirm("webhook delivery toggle")
+    try:
+        res = W.set_enabled(cfg, bool(b.get("enabled", True)),
+                            requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(ok=True, platform="webhook", enabled=bool(res.get("enabled")),
+               needs_restart=False)
+
+
+def webhooks_enabled(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import webhooks as W
+    if not b.get("confirm", True):
+        return _need_confirm("webhook subscription toggle")
+    try:
+        res = W.set_sub_enabled(cfg, str(p.get("id", "")),
+                                bool(b.get("enabled", True)),
+                                requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    return _ok(ok=True, name=str(res.get("id", "")),
+               enabled=bool(res.get("enabled")))
+
+
+def webhooks_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import webhooks as W
+    if not b.get("confirm"):
+        return _need_confirm("webhook delete")
+    try:
+        W.remove(cfg, str(p.get("id", "")), requested_by="dashboard:user",
+                 confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    return _ok(ok=True)
+
+
+def msg_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import messaging as M
+    if not b.get("confirm", True):
+        return _need_confirm("messaging account update")
+    try:
+        M.account_update(cfg, str(p.get("id", "")),
+                         label=str(b.get("label", b.get("name", "")) or ""),
+                         enabled=b.get("enabled") if "enabled" in b else None,
+                         requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    return _ok(ok=True, platform=str(p.get("id", "")))
+
+
+def h_analytics_models(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return h_analytics(cfg, q, b, {**p, "kind": "models"})
+
+
+def h_files_read(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return h_files(cfg, q, b, {**p, "kind": "read"})
+
+
+def files_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _gate("WRITE_BROKERED",
+                 "Direct file deletes are refused; deletes run only as "
+                 "brokered, confirmed argv actions with audit receipts.",
+                 "CLI `qubit opencode` + dashboard /ops + approvals")
+
+
+def hooks_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import hooks as H
+    name = str(b.get("name", "") or "")
+    if not name and (b.get("event") or b.get("command")):
+        try:
+            recs = H.list_hooks(cfg).get("hooks", [])
+            for r in recs if isinstance(recs, list) else []:
+                if not isinstance(r, dict):
+                    continue
+                if r.get("event") == b.get("event"):
+                    name = str(r.get("name", ""))
+                    break
+        except Exception:
+            name = ""
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "hook name (or matching event) required"}
+    if not b.get("confirm"):
+        return _need_confirm("hook delete")
+    try:
+        H.remove(cfg, name, requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    return _ok(ok=True)
+
+
+def _agent_row(skill_id: str, manifest: Dict[str, Any], status: str,
+               hidden: set) -> Dict[str, Any]:
+    return {
+        "name": skill_id,
+        "version": str(manifest.get("version", "0.0.0") or "0.0.0"),
+        "description": str(manifest.get("description", "") or ""),
+        "source": str(manifest.get("source", "qubit-local") or "qubit-local"),
+        "runtime_status": ("enabled" if status == "enabled" else
+                           "disabled" if status in ("staged", "disabled") else
+                           "inactive"),
+        "has_dashboard_manifest": False,
+        "dashboard_manifest": None,
+        "path": "",
+        "can_remove": True,
+        "can_update_git": False,
+        "auth_required": False,
+        "auth_command": "",
+        "user_hidden": skill_id in hidden,
+    }
+
+
+def plugins_hub(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from .permissions import permissions_store
+    try:
+        recs = permissions_store(cfg).skills()
+    except Exception as exc:
+        return _fail(exc)
+    hidden = _hidden_set(cfg)
+    rows = []
+    for rec in recs:
+        d = rec.to_dict() if hasattr(rec, "to_dict") else {}
+        man = d.get("manifest", {}) if isinstance(d, dict) else {}
+        if not isinstance(man, dict):
+            man = {}
+        rows.append(_agent_row(str(d.get("skill_id", "")), man,
+                               str(d.get("status", "")), hidden))
+    orphans = []
+    for m in _overlay_manifests():
+        orphans.append({
+            "name": m["name"], "label": m["label"],
+            "description": m["description"], "icon": m.get("icon", ""),
+            "version": m["version"], "tab": m["tab"], "entry": m["entry"],
+            "css": m.get("css"), "has_api": m.get("has_api", False),
+            "source": m.get("source", "qubit-overlay"),
+        })
+    return _ok(plugins=rows, orphan_dashboard_plugins=orphans,
+               providers={
+                   "memory_provider": "qubit-local",
+                   "memory_options": [{
+                       "name": "qubit-local",
+                       "description": "local-only SQLite/FTS5 store",
+                       "available": True, "configured": True,
+                       "status": "ready"}],
+                   "context_engine": "qubit-broker",
+                   "context_options": [{
+                       "name": "qubit-broker",
+                       "description": "single permission broker + audit"}]})
+
+
+def _agent_status(name: str, status: str, cfg: Any,
+                  b: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
+    from .permissions import permissions_store
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "plugin name required"}
+    if not b.get("confirm", True):
+        return _need_confirm(f"plugin {status}")
+    try:
+        permissions_store(cfg).set_skill_status(
+            name, status, requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    return _ok(ok=True, name=name)
+
+
+def agent_enable(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _agent_status(str(p.get("id", "")), "active", cfg, b)
+
+
+def agent_disable(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _agent_status(str(p.get("id", "")), "disabled", cfg, b)
+
+
+def agent_remove(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from .permissions import permissions_store
+    name = str(p.get("id", "") or "")
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "plugin name required"}
+    if not b.get("confirm"):
+        return _need_confirm("plugin remove")
+    try:
+        permissions_store(cfg).remove_skill(
+            name, requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    return _ok(ok=True, name=name)
+
+
+def agent_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _gate("SKILL_MANIFEST_REQUIRED",
+                 "Direct plugin installs are refused; install a validated "
+                 "local manifest staged disabled instead.",
+                 "CLI `qubit skills install <manifest>` + 7E validation")
+
+
+def agent_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _gate("SKILL_VERSIONED",
+                 "In-place plugin updates are refused; versions are immutable. "
+                 "Remove and reinstall the new validated version.",
+                 "CLI `qubit skills remove/rollback/install`")
+
+
+def oauth_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return 404, {"ok": False, "code": "OAUTH_MANUAL_HANDOFF",
+                 "detail": "no OAuth sessions are stored server-side; "
+                           "enrollment is a manual handoff in your own browser"}
+
+
+def env_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _gate("SECRET_WRITE_REFUSED",
+                 "The dashboard never writes secret values; keep values in "
+                 "the OS keyring/manager and record vault references instead.",
+                 "CLI `qubit auth login` (manual-handoff enrollment)")
+
+
+def mem_provider_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    active = str(b.get("active", b.get("provider", "")) or "")
+    if active and active != "qubit-local":
+        return 400, {"ok": False, "code": "MEMORY_LOCAL_ONLY",
+                     "detail": "qubit-local is the only memory provider; "
+                               "cloud sync is refused by policy"}
+    return _ok(ok=True, active="qubit-local")
+
+
+def mem_config(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    name = str(p.get("id", "") or "qubit-local")
+    if name != "qubit-local":
+        return 404, {"ok": False, "code": "NOT_FOUND",
+                     "detail": f"no memory provider {name!r}"}
+    return _ok(name="qubit-local", label="Qubit local memory", fields=[],
+               setup={"required": False,
+                      "detail": "no setup needed; local-only store"})
+
+
+def mem_config_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _gate("MEMORY_LOCAL_FIXED",
+                 "The local memory store has nothing to configure or set "
+                 "up; tiers, provenance, and retention are built in.",
+                 "Memory page search + CLI `qubit memory`")
+
+
+def config_save(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _gate("CONFIG_WRITE_STAGED",
+                 "Direct config writes are refused; changes stage through the "
+                 "Qubit Settings console or CLI with confirmation and backup.",
+                 "dashboard Settings (classic) + CLI config profiles", 501)
+
+
+def toolset_config(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _ok(name=str(p.get("id", "")), has_category=False, providers=[],
+               active_provider=None)
+
+
+_EXTRA_HANDLERS: Dict[str, Handler] = {
+    "cron_pause": lambda cfg, q, b, p: _cron_mutate("pause", cfg, p),
+    "cron_resume": lambda cfg, q, b, p: _cron_mutate("resume", cfg, p),
+    "cron_trigger": lambda cfg, q, b, p: _cron_mutate("run_due", cfg, p),
+    "pairing_create": lambda cfg, q, b, p: h_pairing_mutate("create", cfg, b),
+    "pairing_approve": lambda cfg, q, b, p: h_pairing_mutate("approve", cfg, b),
+    "pairing_revoke": lambda cfg, q, b, p: h_pairing_mutate("revoke", cfg, b),
+    "webhooks_add": lambda cfg, q, b, p: h_webhooks_mutate("add", cfg, b, p),
+    "webhooks_show": lambda cfg, q, b, p: h_webhooks_mutate("show", cfg, b, p),
+    "webhooks_mutate": lambda cfg, q, b, p: h_webhooks_mutate("remove", cfg, b, p),
+    "blueprints": h_blueprints,
+    "delivery": h_delivery_targets,
+    "sess_import": lambda cfg, q, b, p: h_sessions_write(cfg, q, b, p, "import"),
+    "sess_prune": lambda cfg, q, b, p: h_sessions_write(cfg, q, b, p, "prune"),
+    "sess_bulk": lambda cfg, q, b, p: h_sessions_write(cfg, q, b, p, "bulk"),
+    "sess_delete": lambda cfg, q, b, p: h_sessions_write(cfg, q, b, p, "delete"),
+    "sess_patch": lambda cfg, q, b, p: h_sessions_write(cfg, q, b, p, "patch"),
+    "h_session_patch": h_session_patch,
+    "h_session_delete": h_session_delete,
+    "h_session_resume": h_session_resume,
+    "sess_empty": lambda cfg, q, b, p: h_sess_empty(cfg, q, b, p),
+    "mem_reset": h_mem_reset,
+    "mem_prov": h_mem_provider,
+    "msg_test": h_msg_test,
+    "mcp_test": h_mcp_test,
+    "mcp_enabled": h_mcp_enabled,
+    "toolset_write": h_toolset_write,
+    "profile_write": h_profile_write,
+    "plugins_rescan": h_plugins_rescan,
+    "plugin_visibility": h_plugin_visibility,
+    "debug_share": h_debug_share,
+    "import_upload": h_import_upload,
+    "ckpt_prune": h_ckpt_prune,
+    "ckpt": h_ckpt,
+    "h_ckpt": h_ckpt,
+    "actions_read": h_actions_read,
+    "font": lambda cfg, q, b, p: h_font(cfg, q, b, p, False),
+    "font_set": lambda cfg, q, b, p: h_font(cfg, q, b, p, True),
+    "h_profiles_active": h_profiles_active,
+    "profiles_active_set": profiles_active_set,
+    "profile_soul_set": profile_soul_set,
+    "profile_desc": profile_desc,
+    "profile_model": profile_model,
+    "profile_describe_auto": profile_describe_auto,
+    "profile_rename": profile_rename,
+    "profile_delete": profile_delete,
+    "cron_create": cron_create,
+    "cron_update": cron_update,
+    "cron_delete": cron_delete,
+    "skill_create": skill_create,
+    "skill_update": skill_update,
+    "moa_put": moa_put,
+    "mcp_create": mcp_create,
+    "mcp_delete": mcp_delete,
+    "webhooks_enable": webhooks_enable,
+    "webhooks_enabled": webhooks_enabled,
+    "webhooks_delete": webhooks_delete,
+    "msg_update": msg_update,
+    "h_analytics_models": h_analytics_models,
+    "h_files_read": h_files_read,
+    "files_delete": files_delete,
+    "hooks_delete": hooks_delete,
+    "plugins_hub": plugins_hub,
+    "agent_enable": agent_enable,
+    "agent_disable": agent_disable,
+    "agent_remove": agent_remove,
+    "agent_install": agent_install,
+    "agent_update": agent_update,
+    "oauth_delete": oauth_delete,
+    "env_write": env_write,
+    "mem_provider_set": mem_provider_set,
+    "mem_config": mem_config,
+    "mem_config_write": mem_config_write,
+    "h_profile_setup_command": h_profile_setup_command,
+    "h_profile_soul": h_profile_soul,
+    "h_skill_content": h_skill_content,
+    "h_mcp_catalog": h_mcp_catalog,
+    "config_save": config_save,
+    "toolset_config": toolset_config,
+    "h_local_models_status": h_local_models_status,
+    "h_local_models_hardware": h_local_models_hardware,
+    "h_local_models_catalog": h_local_models_catalog,
+    "h_local_models_jobs": h_local_models_jobs,
+    "h_local_models_job_show": h_local_models_job_show,
+    "h_local_models_runtime_install": h_local_models_runtime_install,
+    "h_local_models_download": h_local_models_download,
+    "h_local_models_delete": h_local_models_delete,
+    "h_local_models_quickstart": h_local_models_quickstart,
+    "h_local_models_server": h_local_models_server,
+    "h_local_models_eject": h_local_models_eject,
+    "h_local_models_activate": h_local_models_activate,
+    "h_local_models_sideload": h_local_models_sideload,
+    "h_local_models_search": h_local_models_search,
+    "h_local_models_search_files": h_local_models_search_files,
+    "h_local_models_download_browsed": h_local_models_download_browsed,
+    "h_custom_endpoints": h_custom_endpoints,
+    "h_profiles_sessions": h_profiles_sessions,
+    "h_profiles_sessions_sidebar": h_profiles_sessions_sidebar,
+    "h_profiles_projects_tree": h_profiles_projects_tree,
+    "h_profile_create": h_profile_create,
+    "h_terminal_backends": h_terminal_backends,
+    "h_computer_use_status": h_computer_use_status,
+    "h_learning_graph": h_learning_graph,
+    "h_learning_node": h_learning_node,
+    "h_learning_node_update": h_learning_node_update,
+    "h_learning_node_delete": h_learning_node_delete,
+    "h_auth_providers": h_auth_providers,
+}
+
+HANDLERS: Dict[str, Handler] = {
+    "h_status": h_status, "h_auth_me": h_auth_me, "h_events": h_events,
+    "h_health": h_health, "h_egress_status": h_egress_status,
+    "h_sessions_list": h_sessions_list, "h_sessions_stats": h_sessions_stats,
+    "h_session_show": h_session_show, "h_session_messages": h_session_messages,
+    "h_config": h_config, "h_model_info": h_model_info,
+    "h_model_recommended_default": h_model_recommended_default,
+    "h_model_options": h_model_options, "h_model_moa": h_model_moa,
+    "h_model_auxiliary": h_model_auxiliary, "h_model_set": h_model_set,
+    "h_profiles": h_profiles, "h_skills": h_skills,
+    "h_skills_toggle": h_skills_toggle, "h_toolsets": h_toolsets,
+    "h_cron_jobs": h_cron_jobs, "h_cron_job_show": h_cron_job_show,
+    "h_cron_job_runs": h_cron_job_runs,
+    "h_logs": h_logs, "h_system_stats": h_system_stats, "h_mcp": h_mcp,
+    "h_pairing_list": h_pairing_list, "h_webhooks_list": h_webhooks_list,
+    "h_platforms": h_platforms, "h_memory": h_memory,
+    "h_analytics": h_analytics, "h_files": h_files, "h_gateway": h_gateway,
+    "h_curator": h_curator, "h_env": h_env, "h_ops": h_ops,
+    "h_ops_catalog": h_ops_catalog,
+    "h_ops_run": h_ops_run,
+    "h_kanban_events": h_kanban_events, "h_chat_turn": h_chat_turn,
+    "h_plugins": h_plugins, "h_themes": h_themes, "h_theme_set": h_theme_set,
+    "h_hooks": h_hooks, "h_hooks_create": h_hooks_create,
+    "h_approvals_list": h_approvals_list,
+    "h_ops_confirm": h_ops_confirm, "h_ops_cancel": h_ops_cancel,
+    "h_git_status": h_git_status, "h_git_log": h_git_log,
+    "h_git_diff": h_git_diff, "h_git_show": h_git_show,
+    "h_git_file_diff": h_git_file_diff,
+    "h_fs_list": h_fs_list, "h_fs_tree": h_fs_tree, "h_fs_stat": h_fs_stat,
+    "h_fs_read_text": h_fs_read_text,
+    "h_fs_read_data_url": h_fs_read_data_url,
+    "h_fs_git_root": h_fs_git_root, "h_fs_default_cwd": h_fs_default_cwd,
+    "h_audio_status": h_audio_status, "h_audio_devices": h_audio_devices,
+}
+HANDLERS.update(_EXTRA_HANDLERS)
+
+
+def _overlay_manifests() -> List[Dict[str, Any]]:
+    manifests: List[Dict[str, Any]] = []
+    plugdir = OVERLAY_DIR / "plugins"
+    if plugdir.exists():
+        for mf in sorted(plugdir.glob("*/manifest.json")):
+            try:
+                manifests.append(json.loads(mf.read_text()))
+            except (OSError, ValueError):
+                continue
+    return manifests
+
+
+def plugins_response() -> Dict[str, Any]:
+    return {"plugins": _overlay_manifests()}
+
+
+def themes_response(cfg: Any) -> Dict[str, Any]:
+    theme_path = OVERLAY_DIR / "qubit-theme.json"
+    try:
+        definition = json.loads(theme_path.read_text())
+    except (OSError, ValueError):
+        definition = {}
+    active = "qubit" if definition else "default"
+    themes = [{"name": "qubit", "label": "Qubit Command",
+               "description": "Qubit graphite/navy with signal-lime accents",
+               "definition": definition}] if definition else []
+    return {"active": active, "themes": themes}
+
+
+def match(method: str, path: str) -> Tuple[Optional[Dict[str, Any]], Dict[str, str]]:
+    for route in ROUTES:
+        if route["method"] != method:
+            continue
+        m = re.fullmatch(route["pattern"], path)
+        if m:
+            return route, {k: v for k, v in m.groupdict().items()}
+    return None, {}
+
+
+def dispatch(cfg: Any, method: str, path: str,
+             query: Optional[Dict[str, str]] = None,
+             body: Optional[Dict[str, Any]] = None,
+             actor: str = "dashboard:user") -> Tuple[int, Any]:
+    clean = path.split("?")[0]
+    if len(clean) > 1:
+        clean = clean.rstrip("/")
+    route, params = match(method, clean)
+    if route is None:
+        return 404, {"ok": False, "code": "NOT_FOUND",
+                     "detail": f"no compat route for {method} {path}"}
+    if route["disposition"] == "gated":
+        gate = route["gate"]
+        _audit("gated", actor, {"route": f"{method} {path}",
+                                "code": gate.get("code", "")})
+        return gate.get("http", 403), {"ok": False, "state": "UNAVAILABLE",
+                                       "code": gate.get("code"),
+                                       "detail": gate.get("detail"),
+                                       "qubit_counterpart": gate.get("counterpart")}
+    handler = HANDLERS.get(route["handler"])
+    if handler is None:
+        return 500, {"ok": False, "code": "NO_HANDLER",
+                     "detail": f"handler {route['handler']!r} missing"}
+    try:
+        code, out = handler(cfg, query or {}, body or {}, params)
+    except Exception as exc:
+        return _fail(exc)
+    _audit("served", actor, {"route": f"{method} {path}", "code": str(code)})
+    return code, out

@@ -5,9 +5,15 @@ live messaging transports. Qubit implements the complete code-side
 adapter; the live network is the last mile and stays credential-gated:
 
 * ``account-add`` — provider records (``whatsapp`` | ``whatsapp-cloud``
-  | ``slack``) with label, endpoint (provider allowlist enforced,
-  lookalike hosts refused), origin binding, and a vault-only key
-  reference (never a value). Explicit ``--confirm``.
+  | ``slack`` plus the OpenClaw-breadth channels ``discord`` | ``telegram``
+  | ``signal`` | ``matrix`` | ``msteams`` | ``imessage``) with label,
+  endpoint (provider allowlist enforced, lookalike hosts refused), origin
+  binding, and a vault-only key reference (never a value). Explicit
+  ``--confirm``. See :data:`PROVIDER_CAPS`: a channel with no Qubit
+  transport adapter is recorded honestly and reports a typed
+  ``UNAVAILABLE`` state (``MSG_TRANSPORT_UNAVAILABLE``), never a fake send.
+* ``provider-catalog`` — :func:`provider_catalog` typed read of the channel
+  set: which transports exist and which are unavailable, no credential read.
 * ``draft`` — stage an outbox message (recipient + body caps, preview
   redacted, idempotency key). Reversible, confirmed.
 * ``approve`` — mark approved (four-eyes separation from ``send``).
@@ -50,13 +56,92 @@ MAX_INBOX = 500
 MAX_TO_LEN = 160
 TRANSPORT_TIMEOUT_S = 15.0
 
-PROVIDERS = ("whatsapp", "whatsapp-cloud", "slack")
-
 # Fixed provider endpoints (no custom hosts without config allowlist).
 ENDPOINTS = {
     "whatsapp-cloud": "https://graph.facebook.com/v21.0/{phone_id}/messages",
     "slack": "https://slack.com/api/chat.postMessage",
 }
+
+# Honest capability matrix for every channel Qubit recognizes. ``transport``
+# names the Qubit-side delivery path: "https" providers have a real bounded
+# POST in :func:`_transport`; every other value is a channel Qubit can record
+# but cannot deliver on yet, so it must resolve to a typed ``UNAVAILABLE``
+# state (never a fabricated success). ``credential_kind`` names the reference
+# shape only -- values live behind ``env:``/``file:`` refs and are never
+# stored, logged, or returned.
+PROVIDER_CAPS: Dict[str, Dict[str, Any]] = {
+    "whatsapp": {
+        "label": "WhatsApp (paired device)",
+        "transport": "paired-session",
+        "available": False,
+        "credential_kind": "paired-session",
+        "detail": "classic WhatsApp delivery stays with the on-device session; "
+                  "Qubit authorizes via pairing but has no session transport",
+    },
+    "whatsapp-cloud": {
+        "label": "WhatsApp Cloud API",
+        "transport": "https",
+        "available": True,
+        "credential_kind": "bearer-token",
+        "endpoint": ENDPOINTS["whatsapp-cloud"],
+    },
+    "slack": {
+        "label": "Slack",
+        "transport": "https",
+        "available": True,
+        "credential_kind": "bot-token",
+        "endpoint": ENDPOINTS["slack"],
+    },
+    "discord": {
+        "label": "Discord",
+        "transport": "bot-gateway",
+        "available": False,
+        "credential_kind": "bot-token",
+        "detail": "no Discord gateway/REST adapter exists in Qubit; a bot "
+                  "token reference alone cannot deliver a message",
+    },
+    "telegram": {
+        "label": "Telegram",
+        "transport": "bot-api",
+        "available": False,
+        "credential_kind": "bot-token",
+        "detail": "no Telegram Bot API adapter exists in Qubit",
+    },
+    "signal": {
+        "label": "Signal",
+        "transport": "signal-cli",
+        "available": False,
+        "credential_kind": "linked-device",
+        "detail": "Signal needs a local signal-cli linked device; no adapter "
+                  "exists in Qubit",
+    },
+    "matrix": {
+        "label": "Matrix",
+        "transport": "client-server",
+        "available": False,
+        "credential_kind": "access-token",
+        "detail": "no Matrix client-server adapter exists in Qubit",
+    },
+    "msteams": {
+        "label": "Microsoft Teams",
+        "transport": "bot-framework",
+        "available": False,
+        "credential_kind": "bot-credentials",
+        "detail": "Teams needs an Azure Bot Framework registration; no "
+                  "adapter exists in Qubit",
+    },
+    "imessage": {
+        "label": "iMessage",
+        "transport": "local-bridge",
+        "available": False,
+        "credential_kind": "local-bridge",
+        "detail": "iMessage needs a macOS Messages bridge; no adapter exists "
+                  "in Qubit",
+    },
+}
+
+# Single source of truth for provider membership (order preserved).
+PROVIDERS = tuple(PROVIDER_CAPS)
 
 CONFIRM_CODE = "MSG_CONFIRM_REQUIRED"
 ESTOP_CODE = "MSG_ESTOP"
@@ -66,6 +151,7 @@ BAD_INPUT_CODE = "MSG_BAD_INPUT"
 NO_CREDENTIAL_CODE = "MSG_NO_CREDENTIAL"
 NOT_PAIRED_CODE = "MSG_NOT_PAIRED"
 NO_TRANSPORT_CODE = "MSG_NO_TRANSPORT"
+UNAVAILABLE_CODE = "MSG_TRANSPORT_UNAVAILABLE"
 UPSTREAM_CODE = "MSG_UPSTREAM"
 CORRUPT_CODE = "MSG_STORE_CORRUPT"
 
@@ -210,9 +296,13 @@ def account_add(cfg: Any, account_id: str, provider: str, label: str, *,
     state = _load_json(_accounts_path(cfg), _blank_accounts, "accounts")
     if clean_id in state["accounts"]:
         raise MessagingError(EXISTS_CODE, f"account {clean_id!r} exists")
+    caps = PROVIDER_CAPS.get(provider, {})
     rec = {"id": clean_id, "provider": provider, "label": clean_label,
            "endpoint": url, "origin": (origin or "").strip()[:160],
            "key_ref_kind": _secret_kind(ref),
+           "transport": caps.get("transport", "none"),
+           "transport_available": bool(caps.get("available", False)),
+           "capability_detail": caps.get("detail", ""),
            "fields": {k: str(v)[:80] for k, v in fields.items()
                       if k != "key_ref"},
            "created_at": _now(), "updated_by": requested_by,
@@ -298,8 +388,62 @@ def _get_account(cfg: Any, account_id: str) -> Dict[str, Any]:
     return rec
 
 
+def account_update(cfg: Any, account_id: str, *, label: str = "",
+                   enabled: Optional[bool] = None,
+                   requested_by: str = "dashboard:user",
+                   confirmed: bool = False) -> Dict[str, Any]:
+    """Update account metadata (label / enabled flag). Credential references
+    are never touched here. Requires explicit confirmation."""
+    if not confirmed:
+        raise MessagingError(CONFIRM_CODE,
+                             "account update requires explicit --confirm")
+    state = _load_json(_accounts_path(cfg), _blank_accounts, "accounts")
+    clean = _check_id(account_id)
+    rec = state["accounts"].get(clean)
+    if rec is None:
+        raise MessagingError(NOT_FOUND_CODE, f"no account {account_id!r}")
+    if label:
+        rec["label"] = _check_label(label)
+    if enabled is not None:
+        rec["enabled"] = bool(enabled)
+    rec.setdefault("enabled", True)
+    rec["updated_by"] = requested_by
+    _save_json(_accounts_path(cfg), state, "accounts")
+    _audit("account.update", requested_by,
+           {"account": clean, "label": rec.get("label", ""),
+            "enabled": bool(rec.get("enabled", True))})
+    return {"state": "OK", "account": {k: v for k, v in rec.items()
+                                       if not k.startswith("_key")}}
+
+
+def provider_catalog() -> Dict[str, Any]:
+    """Typed capability view of every known channel (no credential read).
+
+    A channel with no Qubit transport adapter reports ``state: UNAVAILABLE``
+    with a typed code -- an unconfigured channel is never reported as a
+    working one. Read-only projection over :data:`PROVIDER_CAPS`.
+    """
+    rows: List[Dict[str, Any]] = []
+    for pid, caps in PROVIDER_CAPS.items():
+        available = bool(caps.get("available", False))
+        rows.append({
+            "provider": pid,
+            "label": caps.get("label", pid),
+            "transport": caps.get("transport", "none"),
+            "credential_kind": caps.get("credential_kind", "unknown"),
+            "state": "AVAILABLE" if available else "UNAVAILABLE",
+            "code": "" if available else UNAVAILABLE_CODE,
+            "detail": caps.get("detail", ""),
+        })
+    return {"state": "OK", "providers": rows,
+            "available": [r["provider"] for r in rows
+                          if r["state"] == "AVAILABLE"],
+            "unavailable": [r["provider"] for r in rows
+                            if r["state"] == "UNAVAILABLE"]}
+
+
 def link(cfg: Any, account_id: str) -> Dict[str, Any]:
-    """Typed link state: credential presence + endpoint policy + history."""
+    """Typed link state: credential presence + transport + history."""
     from .providers.credentials import resolve_key
 
     try:
@@ -312,6 +456,14 @@ def link(cfg: Any, account_id: str) -> Dict[str, Any]:
         return {"state": "NO_CREDENTIAL", "account": rec["id"],
                 "detail": "credential reference unresolvable; enroll it "
                           "with `auth login --provider` first"}
+    caps = PROVIDER_CAPS.get(rec["provider"], {})
+    if rec["provider"] != "whatsapp" and not caps.get("available", False):
+        # Credential is present but Qubit has no transport adapter: report
+        # the honest typed state instead of a fabricated LINKED.
+        return {"state": "UNAVAILABLE", "code": UNAVAILABLE_CODE,
+                "account": rec["id"], "provider": rec["provider"],
+                "transport": caps.get("transport", "none"),
+                "detail": caps.get("detail", "no Qubit transport adapter")}
     last = rec.get("last_outcome", "NEVER_USED")
     state = "LINKED" if last in ("NEVER_USED", "SENT") else "DEGRADED"
     return {"state": state, "account": rec["id"], "provider": rec["provider"],
@@ -453,13 +605,20 @@ def _transport(account_provider: str, endpoint: str, fields: Dict[str, str],
                    "Authorization": f"Bearer {key}"}
         req = urllib.request.Request(endpoint, data=payload, headers=headers)
     else:
-        # Classic WhatsApp delivers through a paired on-device session
-        # (QR enrollment on the user's phone): pairing confers the
-        # authorization, but the session transport itself is manual-only.
-        raise MessagingError(NO_TRANSPORT_CODE,
-                             "classic WhatsApp needs its on-device session "
-                             "transport (manual-only); authorization is "
-                             "paired, delivery stays with the session")
+        if account_provider == "whatsapp":
+            # Classic WhatsApp delivers through a paired on-device session
+            # (QR enrollment on the user's phone): pairing confers the
+            # authorization, but the session transport itself is manual-only.
+            raise MessagingError(NO_TRANSPORT_CODE,
+                                 "classic WhatsApp needs its on-device session "
+                                 "transport (manual-only); authorization is "
+                                 "paired, delivery stays with the session")
+        caps = PROVIDER_CAPS.get(account_provider, {})
+        raise MessagingError(
+            UNAVAILABLE_CODE,
+            f"{caps.get('label', account_provider)} has no Qubit transport "
+            f"adapter ({caps.get('detail', 'transport unavailable')}); "
+            "nothing was sent")
     try:
         with urllib.request.urlopen(req,
                                     timeout=TRANSPORT_TIMEOUT_S) as resp:

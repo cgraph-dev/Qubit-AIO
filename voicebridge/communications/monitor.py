@@ -423,6 +423,16 @@ def run_hourly(cfg, *, platforms: Optional[List[str]] = None,
         return {"state": "denied", "code": "POWER_DISABLED",
                 "detail": "power-control unavailable; monitor scan refused",
                 "exit_code": 3}
+    # Autonomous scheduler parity (OpenClaw): fire due scheduled jobs through
+    # the one bounded, idempotent entry point. Dry-runs never execute. Placed
+    # before the monitor overlap lease so a long agent turn does not extend
+    # it; the run_due DB lease already prevents double-fire across ticks.
+    if not dry_run:
+        try:
+            from .. import schedules as _schedules
+            _schedules.autofire(cfg)
+        except Exception as exc:  # noqa: BLE001 — never fail the monitor pass
+            log_event("monitor.autofire.error", error=str(exc)[:200])
     # Packet 8I: the overlap lease MUST exceed the maximum oneshot runtime
     # (unit TimeoutStartSec) by a safety margin. A configured value below the
     # floor is clamped up and the effective value reported truthfully.

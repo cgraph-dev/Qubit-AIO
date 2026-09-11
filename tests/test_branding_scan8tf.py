@@ -45,6 +45,11 @@ def test_dashboard_routes_carry_no_upstream_identity():
     text = (REPO / "voicebridge" / "webui.py").read_text(encoding="utf-8")
     for match in re.finditer(r"""['\"]/((?:api/)?[A-Za-z0-9/_-]+)['\"]""", text):
         route = match.group(1).lower()
+        # The pinned Hermes shell mount (/hermes/) is an explicit
+        # compatibility path permitted by the owner amendment 2026-09-11;
+        # its internal route. No normal Qubit route may carry it otherwise.
+        if route == "hermes" or route.startswith("hermes/"):
+            continue
         assert "hermes" not in route and "openclaw" not in route, \
             f"upstream route identity: {match.group(0)!r}"
         assert not re.search(r"(^|/)claw($|/)", route), \

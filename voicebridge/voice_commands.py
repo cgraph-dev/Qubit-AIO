@@ -242,6 +242,7 @@ def _extract(entry: VoiceCommand,
     quoted = re.findall(r"'([^']+)'|\"([^\"]+)\"", rest)
     quoted_vals = [a or b for a, b in quoted]
     rest_bare = re.sub(r"'[^']+'|\"[^\"]+\"", " ", rest)
+    remainder_consumed = False
     for spec in entry.args:
         value: Any = None
         if spec.type == "choice":
@@ -256,9 +257,17 @@ def _extract(entry: VoiceCommand,
         elif spec.type == "remainder":
             candidate = rest.strip()
             value = candidate or None
+            remainder_consumed = True
         else:
             if quoted_vals:
                 value = quoted_vals.pop(0)
+            elif remainder_consumed:
+                # An optional trailing scalar after a remainder arg (e.g. an
+                # explicit board on "create task <title>") is NOT taken from
+                # the whole remainder: the remainder owns the free text and
+                # the scalar stays unset unless the caller passes it
+                # explicitly (dashboard/CLI) or quotes it (voice).
+                value = None
             else:
                 value = rest.strip() or None
         if value is None:
@@ -365,6 +374,25 @@ def resolve(text: str) -> Resolution:
 # widen grants and never touch the network except through the existing
 # brokered provider paths.
 
+def _voice_board_principal(args: Dict[str, Any]) -> Tuple[str, str]:
+    """Split a voice board/principal capture ("editor to sam" -> main/sam).
+
+    Board slugs are single lowercase tokens; a multi-word board capture
+    means the board was unspoken and the phrase is the principal. A
+    leading "<role> to|for " is stripped from the principal (the role
+    travels in its own choice arg). The confirmation echo still shows
+    the resolved pair before anything mutates.
+    """
+    board = str(args.get("board", "") or "main").strip()
+    principal = str(args.get("principal", "") or "").strip()
+    if " " in board:
+        board = "main"
+    principal = re.sub(r"^(owner|editor|viewer)\s+(to|for|from)\s+", "",
+                       principal, flags=re.I).strip()
+    principal = re.sub(r"^(to|for|from|of)\s+", "", principal,
+                       flags=re.I).strip()
+    return board or "main", principal
+
 def _b_status(ctx, args):
     from .runtime_inventory import runtime_inventory
 
@@ -428,6 +456,25 @@ def _b_diagnostics(ctx, args):
     return {"diagnostics": bundle}
 
 
+def _b_voice_unsupported(ctx, args):
+    """Typed refusal for a spoken attempt at a CLI/dashboard-only op.
+
+    This is real execution of the Qubit safety policy (audited, redacted),
+    not help text: the request never binds the secret/nested/preview-hash
+    data that makes the op unsafe to speak, and it names the exact safe
+    counterpart. Every op excluded from voice has one of these guards.
+    """
+    guidance = str(args.get("guidance", "") or "")
+    detail = str(args.get("detail", "") or "")
+    return {"state": "refused",
+            "code": str(args.get("code", "VOICE_UNSUPPORTED") or
+                        "VOICE_UNSUPPORTED"),
+            "op": str(args.get("op", "") or ""),
+            "guidance": guidance,
+            "detail": detail or
+                      ("I can't do that safely by voice. " + guidance).strip()}
+
+
 def _b_backup(ctx, args):
     if args.get("action") == "export_refused":
         return {"state": "refused", "code": "PASSPHRASE_NEVER_SPOKEN",
@@ -448,8 +495,24 @@ def _b_backup(ctx, args):
 
 
 def _b_sessions(ctx, args):
-    from .auth_status import recent_sessions
+    from .auth_status import recent_sessions, session_store
 
+    action = str(args.get("action", "list") or "list")
+    sid = str(args.get("session_id", "") or "")
+    if action in ("search", "show", "rename", "archive", "delete", "resume"):
+        store = session_store(ctx.cfg)
+        if action == "search":
+            return {"sessions": store.search(
+                str(args.get("query", "")), 20)}
+        if action == "show":
+            return {"session": store.show(sid)}
+        if action == "rename":
+            return {"session": store.rename(sid, str(args.get("name", "")))}
+        if action == "archive":
+            return {"session": store.archive(sid)}
+        if action == "delete":
+            return {"session": store.delete(sid, confirm=True)}
+        return {"session": store.resume(sid)}
     limit = args.get("limit", 5)
     try:
         limit = max(1, min(int(limit), 20))
@@ -705,7 +768,31 @@ def _b_kanban(ctx, args):
                              str(args.get("kind", "") or "note"),
                              str(args.get("title", "")),
                              content=str(args.get("content", "") or ""),
+                             tab=str(args.get("tab", "") or ""),
                              requested_by="voice:user", confirmed=True)
+    if action == "tab_list":
+        return {"tabs": KB.tab_list(ctx.cfg,
+                                    str(args.get("board", "") or "main"))}
+    if action == "tab_create":
+        return {"tab": KB.tab_create(
+            ctx.cfg, str(args.get("board", "") or "main"),
+            str(args.get("slug", "")), str(args.get("name", "")),
+            requested_by="voice:user", confirmed=True)}
+    if action == "tab_rename":
+        return {"tab": KB.tab_rename(
+            ctx.cfg, str(args.get("board", "") or "main"),
+            str(args.get("tab", "")), str(args.get("name", "")),
+            requested_by="voice:user", confirmed=True)}
+    if action == "tab_delete":
+        return {"tab": KB.tab_delete(
+            ctx.cfg, str(args.get("board", "") or "main"),
+            str(args.get("tab", "")),
+            requested_by="voice:user", confirmed=True)}
+    if action == "tab_move":
+        return {"tab": KB.tab_move(
+            ctx.cfg, str(args.get("board", "") or "main"),
+            str(args.get("tab", "")), int(args.get("position", 0) or 0),
+            requested_by="voice:user", confirmed=True)}
     if action == "widget_list":
         return KB.widget_list(ctx.cfg,
                               board=str(args.get("board", "") or "main"))
@@ -721,6 +808,32 @@ def _b_kanban(ctx, args):
                 if c.strip()]
         return KB.layout_set(ctx.cfg, str(args.get("board", "") or "main"),
                              cols, requested_by="voice:user", confirmed=True)
+    if action == "role_grant":
+        board, principal = _voice_board_principal(args)
+        return KB.role_grant(ctx.cfg, board, principal,
+                             str(args.get("role", "") or "viewer"),
+                             requested_by="voice:user", confirmed=True)
+    if action == "role_revoke":
+        board, principal = _voice_board_principal(args)
+        return KB.role_revoke(ctx.cfg, board, principal,
+                              requested_by="voice:user", confirmed=True)
+    if action == "widget_move":
+        wid = int(args.get("widget_id", 0))
+        nums = [int(n) for n in
+                re.findall(r"\b(\d{1,4})\b",
+                           str(args.get("geometry", "") or ""))]
+        rest = nums[1:] if nums and nums[0] == wid else nums
+        box = dict(zip(("x", "y", "w", "h"), rest[:4]))
+        return KB.widget_move(ctx.cfg, wid, requested_by="voice:user",
+                              confirmed=True, **box)
+    if action == "snapshot_restore":
+        return KB.snapshot_restore(ctx.cfg, int(args.get("snapshot_id", 0)),
+                                   requested_by="voice:user", confirmed=True)
+    if action == "delegated":
+        sub = str(args.get("subcommand", "") or "watch")
+        if sub not in KB.DELEGATED:
+            sub = "watch"
+        return KB.refuse_delegated(sub)
     raise ValueError(f"unknown kanban action {action!r}")
 
 
@@ -750,6 +863,8 @@ def _b_themes(ctx, args):
                               requested_by="voice:user", confirmed=True)
     if action == "reset":
         return TH.reset(ctx.cfg, requested_by="voice:user", confirmed=True)
+    if action == "pets":
+        return TH.refuse_pet_downloads()
     raise ValueError(f"unknown themes action {action!r}")
 
 
@@ -812,6 +927,9 @@ def _b_sync(ctx, args):
         return SY.list_offers(ctx.cfg)
     if action == "show":
         return SY.show(ctx.cfg, str(args.get("offer_id", "")))
+    if action == "revoke":
+        return SY.revoke(ctx.cfg, str(args.get("offer_id", "")),
+                         requested_by="voice:user", confirmed=True)
     raise ValueError(f"unknown sync action {action!r}")
 
 
@@ -881,6 +999,7 @@ def _b_msg(ctx, args):
         return MG.account_add(ctx.cfg, str(args.get("account_id", "")),
                               str(args.get("provider", "")),
                               str(args.get("label", "")),
+                              key_ref=str(args.get("key_ref", "") or ""),
                               requested_by="voice:user", confirmed=True)
     if action == "account_show":
         return MG.account_show(ctx.cfg, str(args.get("account_id", "")))
@@ -976,12 +1095,15 @@ def _b_gateway(ctx, args):
                               str(args.get("provider", "")),
                               str(args.get("account", "")),
                               str(args.get("channel", "")),
+                              key_ref=str(args.get("key_ref", "") or ""),
                               requested_by="voice:user", confirmed=True)
     if action == "remove":
         return GW.gateway_remove(ctx.cfg, str(args.get("gateway_id", "")),
                                  requested_by="voice:user", confirmed=True)
     if action == "link":
         return GW.gateway_link(ctx.cfg, str(args.get("gateway_id", "")))
+    if action == "supervision":
+        return GW.refuse_supervision(str(args.get("target", "") or "run"))
     raise ValueError(f"unknown gateway action {action!r}")
 
 
@@ -1241,6 +1363,16 @@ def _b_files(ctx, args):
 
     action = args.get("action", "inspect")
     path = str(args.get("path", "") or "")
+    if action == "rollback":
+        from . import file_patch as FP
+        return {"file_patch": FP.rollback(
+            ctx.cfg, str(args.get("target", "") or ""),
+            requested_by="voice:user", confirmed=True)}
+    if action == "patch":
+        return {"file_patch": {
+            "state": "refused", "code": "VOICE_NESTED_UNSUPPORTED",
+            "detail": "structured diffs are refused by voice; use "
+                      "`qubit files patch --patch-file` or the dashboard"}}
     if action == "list":
         if not path:
             path = _files_default_folder(ctx.cfg)
@@ -1250,6 +1382,35 @@ def _b_files(ctx, args):
             raise ValueError("which file? say the file name")
         return {"file": FI.read_file(ctx.cfg, path)}
     return {"inspected": FI.inspect(ctx.cfg, path)}
+
+
+def _b_git(ctx, args):
+    """Scoped read-only git inspection (same git_scope module the CLI
+    and dashboard use). Status/log/diff/show execute directly (reads);
+    anything else is a typed refusal — there are no write verbs."""
+    from . import git_scope as GI
+
+    action = str(args.get("action", "status"))
+    root = str(args.get("root", "") or "")
+    try:
+        if action == "status":
+            return {"git": GI.status(ctx.cfg, root,
+                                     requested_by="voice:user")}
+        if action == "log":
+            return {"git": GI.log(ctx.cfg, root,
+                                  args.get("limit", 5),
+                                  requested_by="voice:user")}
+        if action == "diff":
+            return {"git": GI.diff(ctx.cfg, root,
+                                   str(args.get("path", "") or ""),
+                                   requested_by="voice:user")}
+        if action == "show":
+            return {"git": GI.show(ctx.cfg, root, "HEAD",
+                                   str(args.get("path", "") or ""),
+                                   requested_by="voice:user")}
+        return {"refused": GI.refuse_write(action)}
+    except GI.GitError as exc:
+        return GI.public_error(exc)
 
 
 def _files_default_folder(cfg: Any) -> str:
@@ -1423,6 +1584,15 @@ def _b_tabs(ctx, args):
         # Voice reads the Qubit-current tab (switch first with the
         # activate entry); the CLI keeps an explicit --target.
         return {"tab": BT.read(ctx.cfg, "")}
+    if action == "screenshot":
+        shot = BT.screenshot(ctx.cfg, "")
+        if isinstance(shot, dict) and "image_base64" in shot:
+            # Never place image bytes in a spoken/receipt path: the voice
+            # surface returns metadata only; the dashboard/CLI fetches pixels.
+            shot = {k: v for k, v in shot.items() if k != "image_base64"}
+            shot["image_omitted"] = ("voice receipt carries metadata only; "
+                                     "use the dashboard/CLI for the image")
+        return {"screenshot": shot}
     if action == "find":
         return {"found": BT.find(ctx.cfg, str(args.get("query", "")),
                                  "")}
@@ -1494,6 +1664,12 @@ def _b_power_status(ctx, args):
 def _b_websites(ctx, args):
     from . import websites as WS
 
+    action = str(args.get("action", "list") or "list")
+    if action in ("fetch", "search"):
+        from . import web_tool as WT
+        if action == "fetch":
+            return {"web": WT.fetch(ctx.cfg, str(args.get("url", "") or ""))}
+        return {"web": WT.search(ctx.cfg, str(args.get("query", "") or ""))}
     store = WS.website_integrations_store(ctx.cfg)
     try:
         items = list(store.integrations())
@@ -1542,6 +1718,22 @@ def _b_computer(ctx, args):
 def _b_plugins_install(ctx, args):
     import json as _json
 
+    if str(args.get("action", "install")) == "remote":
+        from . import plugins as PL
+
+        spec = str(args.get("identifier", ""))
+        try:
+            verdict = PL.classify_install_source(spec)
+        except Exception:
+            verdict = {"kind": "remote", "identifier": spec}
+        if verdict.get("kind") == "remote":
+            return PL.refuse_remote(str(verdict.get("identifier", spec)))
+        return {"state": "FAILED", "code": "NOT_REMOTE_PLUGIN",
+                "detail": "that looks like a local path: use `qubit skills "
+                          "install <manifest>` or say 'install plugin from "
+                          "manifest'",
+                "owner": "qubit-policy",
+                "rollback": "nothing installed or enabled"}
     from .permissions import SkillManifest, permissions_store
 
     manifest = Path(str(args.get("manifest", ""))).expanduser()
@@ -2362,7 +2554,8 @@ def _b_commands(ctx, args):
     carry secret-shaped args by test)."""
     return {"commands": [
         {"id": e.id, "title": e.title, "aliases": list(e.aliases)[:6],
-         "confirm": bool(e.confirm), "help": e.help}
+         "confirm": bool(e.confirm), "help": e.help,
+         "example": (e.examples[0] if e.examples else "")}
         for e in sorted(REGISTRY.values(), key=lambda e: e.id)]}
 
 
@@ -2426,12 +2619,361 @@ def _b_branding(ctx, args):
     raise ValueError(f"unknown branding action {action!r}")
 
 
+def _b_node_host(ctx, args):
+    """Paired node host (same module the CLI/dashboard use).
+
+    Reads execute directly. ``enroll``/``revoke`` are confirm-tier (the
+    registry gate already ran, so they pass confirmed=True and the
+    canonical human principal). ``dispatch`` passes through to the module,
+    which only executes local-safe reads and returns typed refusals for
+    every remote/unsafe capability (never a shell). Typed failures are
+    returned as redacted dicts; the backend never raises out."""
+    from . import node_host as NH
+
+    cfg = ctx.cfg
+    action = str(args.get("action", "status") or "status")
+    try:
+        if action == "status":
+            return {"node_host": NH.status(cfg)}
+        if action == "list":
+            return {"node_host": NH.list_nodes(cfg)}
+        if action == "show":
+            return {"node_host": NH.show(
+                cfg, str(args.get("node_id", "") or ""))}
+        if action == "capabilities":
+            return {"node_host": NH.capabilities(
+                cfg, str(args.get("node_id", "") or ""))}
+        if action == "enroll":
+            caps = args.get("capabilities")
+            if caps is None:
+                caps = args.get("capability")
+            return {"node_host": NH.enroll(
+                cfg, name=str(args.get("name", "") or ""),
+                endpoint=str(args.get("endpoint", "") or ""),
+                capabilities=caps, confirmed=True, source="voice",
+                requested_by="voice:user")}
+        if action == "revoke":
+            return {"node_host": NH.revoke(
+                cfg, str(args.get("node_id", "") or ""), confirmed=True,
+                source="voice", requested_by="voice:user")}
+        if action == "dispatch":
+            return {"node_host": NH.dispatch(
+                cfg, str(args.get("node_id", "") or ""),
+                str(args.get("capability", "") or ""), args=None,
+                confirmed=True, requested_by="voice:user")}
+    except NH.NodeHostError as exc:
+        return {"node_host": {
+            "state": "FAILED", "code": exc.code,
+            "detail": _redact(exc.detail)[:300], "owner": "qubit-policy",
+            "rollback": "node registry untouched; nothing dispatched"}}
+    return {"node_host": {
+        "state": "FAILED", "code": NH.NODE_BAD_INPUT,
+        "detail": f"unknown node host action {action!r}",
+        "owner": "qubit-policy",
+        "rollback": "node registry untouched; nothing dispatched"}}
+
+
+def _b_task_ledger(ctx, args):
+    """Unified background-task ledger (read-only read model).
+
+    ``list``/``show``/``timeline`` accept an optional source filter. Bad
+    caller input is returned as a typed redacted dict; the backend never
+    raises out."""
+    from . import task_ledger as TL
+
+    cfg = ctx.cfg
+    action = str(args.get("action", "status") or "status")
+    source = args.get("source") or None
+    try:
+        if action == "status":
+            return {"task_ledger": TL.status(cfg)}
+        if action == "list":
+            limit = args.get("limit")
+            return {"task_ledger": TL.list_tasks(
+                cfg, source=source, state=(args.get("state") or None),
+                limit=(limit if limit not in (None, "") else 50))}
+        if action == "show":
+            return {"task_ledger": TL.show(
+                cfg, str(args.get("task_id", "") or ""), source=source)}
+        if action == "timeline":
+            return {"task_ledger": TL.timeline(
+                cfg, str(args.get("task_id", "") or ""), source=source)}
+    except TL.TaskLedgerError as exc:
+        return {"task_ledger": {
+            "state": "FAILED", "code": exc.code,
+            "detail": _redact(exc.detail)[:300], "owner": "qubit-policy",
+            "rollback": "read-only; nothing to roll back"}}
+    return {"task_ledger": {
+        "state": "FAILED", "code": TL.TASK_BAD_INPUT,
+        "detail": f"unknown task ledger action {action!r}",
+        "owner": "qubit-policy",
+        "rollback": "read-only; nothing to roll back"}}
+
+
+def _b_media_gen(ctx, args):
+    """Media generation registry/gate (same module the CLI/dashboard use).
+
+    ``generate`` is confirm-tier (the registry gate already ran): the
+    module still enforces e-stop, bounds and the credential/transport
+    gate, raising typed errors that are returned here as redacted dicts."""
+    from . import media_gen as MG
+
+    cfg = ctx.cfg
+    action = str(args.get("action", "status") or "status")
+    try:
+        if action == "status":
+            return {"media_gen": MG.status(cfg)}
+        if action == "catalog":
+            return {"media_gen": MG.catalog(cfg)}
+        if action == "generate":
+            provider = str(args.get("provider", "") or "").strip() or None
+            return {"media_gen": MG.generate(
+                cfg, kind=str(args.get("kind", "") or ""),
+                provider=provider, prompt=str(args.get("prompt", "") or ""),
+                options=None, confirmed=True, source="voice")}
+    except MG.MediaGenError as exc:
+        return {"media_gen": {
+            "state": "FAILED", "code": exc.code,
+            "detail": _redact(exc.detail)[:300], "owner": "qubit-policy",
+            "rollback": "nothing generated; no provider request attempted"}}
+    return {"media_gen": {
+        "state": "FAILED", "code": MG.BAD_INPUT_CODE,
+        "detail": f"unknown media action {action!r}",
+        "owner": "qubit-policy",
+        "rollback": "nothing generated; no provider request attempted"}}
+
+
+def _b_local_models(ctx, args):
+    """Local-model inventory and brokered write gates (same module CLI uses).
+
+    Reads derive from real Qubit state. Every write verb is an immediate
+    typed gate/refusal: this surface never downloads, starts, ejects,
+    activates or writes anything."""
+    from . import local_models as LM
+
+    cfg = ctx.cfg
+    action = str(args.get("action", "status") or "status")
+    confirmed = bool(args.get("confirmed", False))
+    try:
+        if action == "status":
+            return {"local_models": LM.status(cfg)}
+        if action == "hardware":
+            return {"local_models": LM.hardware(cfg)}
+        if action == "catalog":
+            return {"local_models": LM.catalog(cfg)}
+        if action == "jobs":
+            return {"local_models": LM.jobs(cfg)}
+        if action == "runtime_install":
+            return {"local_models": LM.runtime_install(
+                cfg, backend=(str(args.get("backend", "") or "") or None),
+                requested_by="voice:user", confirmed=confirmed)}
+        if action == "download":
+            return {"local_models": LM.download(
+                cfg, model=str(args.get("model", "") or ""),
+                requested_by="voice:user", confirmed=confirmed)}
+        if action == "sideload":
+            return {"local_models": LM.sideload(
+                cfg, path=str(args.get("path", "") or ""),
+                requested_by="voice:user", confirmed=confirmed)}
+        if action == "server":
+            return {"local_models": LM.server(
+                cfg, str(args.get("server_action", "start") or "start"),
+                requested_by="voice:user", confirmed=confirmed)}
+        if action == "eject":
+            return {"local_models": LM.eject(
+                cfg, model=str(args.get("model", "") or ""),
+                requested_by="voice:user", confirmed=confirmed)}
+        if action == "activate":
+            return {"local_models": LM.activate(
+                cfg, model=str(args.get("model", "") or ""),
+                requested_by="voice:user", confirmed=confirmed)}
+        if action == "quickstart":
+            model = str(args.get("model", "") or "").strip() or None
+            return {"local_models": LM.quickstart(
+                cfg, model=model, requested_by="voice:user",
+                confirmed=confirmed)}
+    except Exception as exc:  # typed gate only; never raise out
+        return {"local_models": LM.public_error(
+            getattr(exc, "code", "LOCAL_MODEL_BAD_INPUT"),
+            str(exc))}
+    return {"local_models": LM.public_error(
+        "LOCAL_MODEL_BAD_INPUT", f"unknown local models action {action!r}")}
+
+
+def channels_doctor(cfg: Any) -> Dict[str, Any]:
+    """Compose the inbound-channel health report from the shared backend.
+
+    ``channels_inbound`` exposes ``status``/``catalog``/``accounts`` but no
+    dedicated ``doctor``; this derives the same typed view the sibling
+    plugin/ACP doctors provide (store health, listener state, latch) using
+    only the module's public functions.
+    """
+    from . import channels_inbound as CI
+
+    st = CI.status(cfg)
+    cat = CI.catalog(cfg)
+    acct = CI.accounts(cfg)
+    return {"state": "OK", "schema": CI.SCHEMA, "store_ok": True,
+            "channels": st.get("channels", 0),
+            "configured": st.get("configured", 0), "connected": 0,
+            "listener": st.get("listener", "NONE"),
+            "accounts": len(acct.get("accounts", [])),
+            "available": cat.get("available", []),
+            "estop": st.get("estop", False), "warnings": []}
+
+
+def _b_plugin_runtime(ctx, args):
+    """In-process plugin host registry (same module CLI/dashboard call).
+
+    Reads derive from the real registry. register/invoke/unregister are
+    confirm-tier and exercise the SAME in-process host contract the CLI
+    calls; absent a host handler ``invoke`` resolves to the typed
+    ``PLUGIN_RUNTIME_UNAVAILABLE`` gate, never a fabricated success.
+    """
+    import json as _json
+
+    from . import plugin_runtime as PR
+
+    action = str(args.get("action", "status") or "status")
+    try:
+        if action == "status":
+            return {"plugins_runtime": PR.status(ctx.cfg)}
+        if action == "list":
+            return {"plugins_runtime": PR.list_plugins(ctx.cfg)}
+        if action == "show":
+            return {"plugins_runtime": PR.get_plugin(
+                ctx.cfg, str(args.get("plugin_id", "") or ""))}
+        if action == "doctor":
+            return {"plugins_runtime": PR.doctor(ctx.cfg)}
+        if action == "register":
+            manifest_path = Path(
+                str(args.get("manifest", "") or "")).expanduser()
+            try:
+                manifest = _json.loads(
+                    manifest_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                raise PR.PluginRuntimeError(
+                    PR.INVALID_MANIFEST_CODE,
+                    f"manifest unreadable: {exc}") from exc
+            return {"registered": PR.register(
+                ctx.cfg, manifest=manifest, confirmed=True,
+                requested_by="voice:user")}
+        if action == "invoke":
+            text = str(args.get("text", "") or "")
+            payload = {"text": text} if text else {}
+            return {"invoked": PR.invoke(
+                ctx.cfg, str(args.get("plugin_id", "") or ""),
+                args=payload, confirmed=True, requested_by="voice:user")}
+        if action == "unregister":
+            return {"unregistered": PR.unregister(
+                ctx.cfg, str(args.get("plugin_id", "") or ""),
+                confirmed=True, requested_by="voice:user")}
+    except PR.PluginRuntimeError as exc:
+        return {"state": "FAILED", "code": exc.code,
+                "detail": exc.detail[:300], "owner": "qubit-policy",
+                "rollback": "registry untouched; nothing executed"}
+    return {"state": "FAILED", "code": PR.BAD_INPUT_CODE,
+            "detail": f"unknown plugin runtime action {action!r}"}
+
+
+def _b_channels(ctx, args):
+    """Inbound channel framework (same module CLI/dashboard ingress call).
+
+    Reads derive from the real credential-reference-derived state. The raw
+    signed ``receive`` payload cannot be spoken: that action resolves to a
+    typed ``VOICE_BYTES_UNSUPPORTED`` refusal and never binds bytes.
+    """
+    from . import channels_inbound as CI
+
+    action = str(args.get("action", "status") or "status")
+    try:
+        if action == "status":
+            return {"channels": CI.status(ctx.cfg)}
+        if action == "catalog":
+            return {"channels": CI.catalog(ctx.cfg)}
+        if action == "accounts":
+            return {"channels": CI.accounts(ctx.cfg)}
+        if action == "doctor":
+            return {"channels": channels_doctor(ctx.cfg)}
+        if action == "configure":
+            events = args.get("events")
+            if isinstance(events, str):
+                events = [e.strip() for e in events.split(",") if e.strip()]
+            return {"configured": CI.configure(
+                ctx.cfg, str(args.get("channel", "") or ""),
+                secret_ref=str(args.get("secret_ref", "") or ""),
+                events=events, confirmed=True, requested_by="voice:user")}
+        if action == "unconfigure":
+            return {"unconfigured": CI.unconfigure(
+                ctx.cfg, str(args.get("channel", "") or ""),
+                confirmed=True, requested_by="voice:user")}
+        if action == "receive":
+            return _b_voice_unsupported(ctx, {
+                "op": "channels_receive",
+                "code": "VOICE_BYTES_UNSUPPORTED",
+                "guidance": VOICE_IMPOSSIBLE["channels.receive"],
+                "detail": ("I can't take a raw signed channel payload by "
+                           "voice: the bytes must arrive over the dashboard "
+                           "ingress endpoint or `qubit channels receive` in "
+                           "a terminal.")})
+    except CI.ChannelError as exc:
+        return {"state": "FAILED", "code": exc.code,
+                "detail": exc.detail[:300], "owner": "qubit-policy",
+                "rollback": "channel registry untouched; nothing dispatched"}
+    return {"state": "FAILED", "code": CI.BAD_INPUT_CODE,
+            "detail": f"unknown channels action {action!r}"}
+
+
+def _b_acp_client(ctx, args):
+    """ACP external harness client (same module the CLI/dashboard call).
+
+    PATH presence only; Qubit never executes a harness. ``handshake`` shapes
+    the real ``initialize`` request or returns the typed
+    ``ACP_HARNESS_UNAVAILABLE`` gate; ``send`` always resolves to the typed
+    ``ACP_REFUSED`` gate.
+    """
+    from . import acp_client as AC
+
+    action = str(args.get("action", "status") or "status")
+    try:
+        if action == "status":
+            return {"acp_client": AC.status(ctx.cfg)}
+        if action == "catalog":
+            return {"acp_client": AC.catalog(ctx.cfg)}
+        if action == "receipts":
+            return {"acp_client": AC.receipts(
+                ctx.cfg, harness=str(args.get("harness", "") or ""))}
+        if action == "configure":
+            return {"configured": AC.configure(
+                ctx.cfg, str(args.get("harness", "") or ""),
+                credential_ref=str(args.get("credential_ref", "") or ""),
+                confirmed=True, requested_by="voice:user")}
+        if action == "unconfigure":
+            return {"unconfigured": AC.unconfigure(
+                ctx.cfg, str(args.get("harness", "") or ""),
+                confirmed=True, requested_by="voice:user")}
+        if action == "handshake":
+            return {"handshake": AC.handshake(
+                ctx.cfg, str(args.get("harness", "") or ""), confirmed=True)}
+        if action == "send":
+            return {"send": AC.send(
+                ctx.cfg, str(args.get("harness", "") or ""),
+                prompt=str(args.get("prompt", "") or ""), confirmed=True)}
+    except AC.AcpError as exc:
+        return {"state": "FAILED", "code": exc.code,
+                "detail": exc.detail[:300], "owner": "qubit-policy",
+                "rollback": "no harness configured or executed"}
+    return {"state": "FAILED", "code": AC.BAD_INPUT_CODE,
+            "detail": f"unknown ACP client action {action!r}"}
+
+
 _BACKENDS: Dict[str, Callable] = {
     "status": _b_status, "pause": _b_pause, "resume": _b_resume,
     "doctor": _b_doctor, "setup_check": _b_setup_check,
     "setup_run_preview": _b_setup_run_preview,
     "verify_release": _b_verify_release, "security": _b_security,
     "diagnostics": _b_diagnostics, "backup": _b_backup,
+    "voice_unsupported": _b_voice_unsupported,
     "sessions": _b_sessions, "capability": _b_capability,
     "checkpoints": _b_checkpoints, "auth_status": _b_auth_status,
     "auth_login": _b_auth_login, "auth_verify": _b_auth_verify,
@@ -2457,9 +2999,11 @@ _BACKENDS: Dict[str, Callable] = {
     "acp": _b_acp, "lsp": _b_lsp, "browser": _b_browser,
     "browser_tabs": _b_tabs,
     "computer": _b_computer, "plugins_install": _b_plugins_install,
+    "plugins_remote": _b_plugins_install,
     "lessons": _b_lessons, "power_status": _b_power_status,
     "websites": _b_websites, "task_run": _b_task_run,
     "schedules": _b_schedules, "files": _b_files, "ide": _b_ide,
+    "git": _b_git,
     "actions": _b_actions, "ghost": _b_ghost, "opencode": _b_opencode,
     "verified": _b_verified, "experiments": _b_experiments,
     "product": _b_product, "package": _b_package, "webui": _b_webui,
@@ -2469,6 +3013,10 @@ _BACKENDS: Dict[str, Callable] = {
     "audio_hw": _b_audio_hw, "loop": _b_loop,
     "wake": _b_wake,
     "device_enroll": _b_device_enroll, "branding": _b_branding,
+    "node_host": _b_node_host, "task_ledger": _b_task_ledger,
+    "media_gen": _b_media_gen, "local_models": _b_local_models,
+    "plugin_runtime": _b_plugin_runtime, "channels": _b_channels,
+    "acp_client": _b_acp_client,
 }
 
 
@@ -2504,6 +3052,15 @@ def _sum_status(result):
 
 
 def _sum_sessions(result):
+    one = result.get("session")
+    if isinstance(one, dict):
+        state = str(one.get("state", ""))
+        if state != "OK":
+            return f"Session operation failed: {one.get('code', state)}."
+        row = one.get("session", {}) if isinstance(one.get("session"), dict) \
+            else {}
+        sid = str(row.get("receipt_id", row.get("id", "")) or "")
+        return f"Session updated: {sid[:12]}."
     sessions = result.get("sessions", {})
     items = sessions.get("sessions", [])
     if not items:
@@ -2787,6 +3344,42 @@ def _sum_runtime(result):
     return f"{name}: {result.get('state', 'done')}. {result.get('rollback', '')}".strip()
 
 
+def _sum_screenshot(result):
+    body = result.get("screenshot", {}) if isinstance(result, dict) else {}
+    state = str(body.get("state", "?"))
+    if state == "UNAVAILABLE":
+        return f"Browser unavailable: {body.get('code', 'BROWSER_UNAVAILABLE')}."
+    if state != "OK":
+        return f"Screenshot refused: {body.get('code', state)}."
+    return (f"Screenshot captured: {body.get('bytes', 0)} bytes "
+            f"({body.get('format', 'image')}); the image stays on the "
+            "dashboard/CLI, only this summary is spoken.")
+
+
+def _sum_file_patch(result):
+    body = result.get("file_patch", {}) if isinstance(result, dict) else {}
+    state = str(body.get("state", "?"))
+    if state == "OK":
+        return (f"Patch {body.get('action', 'applied')}: "
+                f"{body.get('target', 'file')}.")
+    if state == "NO_CHANGE":
+        return "Nothing to roll back."
+    return f"File patch refused: {body.get('code', state)}."
+
+
+def _sum_web(result):
+    body = result.get("web", {}) if isinstance(result, dict) else {}
+    state = str(body.get("state", "?"))
+    if state == "UNAVAILABLE":
+        return f"Web tool unavailable: {body.get('code', 'WEB_UNAVAILABLE')}."
+    if state != "OK":
+        return f"Web request refused: {body.get('code', state)}."
+    if "results" in body:
+        return f"{len(body.get('results', []))} web results."
+    title = str(body.get("title", "") or "")[:120]
+    return f"Fetched {title or body.get('url', 'page')}."
+
+
 _SUMMARIES = {
     "generic": _generic_summary,
     "status": _sum_status,
@@ -2805,6 +3398,9 @@ _SUMMARIES = {
     "reports": _sum_reports,
     "tabread": _sum_tabread,
     "tabs_action": _sum_tabs_action,
+    "screenshot": _sum_screenshot,
+    "file_patch": _sum_file_patch,
+    "web": _sum_web,
     "schedules": _sum_schedules,
     "files": _sum_files,
     "ide": _sum_ide,
@@ -2925,6 +3521,42 @@ _E("sessions", "Recent sessions",
    "sessions", ("sessions", "--resume/--continue"),
    summary="sessions", examples=("qubit, show my sessions",),
    help="Session receipts and journals.")
+_E("sessions_search", "Search sessions",
+   ("search sessions", "find session", "search my sessions"),
+   "sessions", ("sessions",), args=(_R("query"),),
+   fixed=(("action", "search"),), summary="sessions",
+   examples=("qubit, search sessions invoice",),
+   help="Search session names and receipts.")
+_E("session_show", "Show a session",
+   ("show session", "inspect session"),
+   "sessions", ("sessions",), args=(_S("session_id", True),),
+   fixed=(("action", "show"),), summary="sessions",
+   examples=("qubit, show session 12",),
+   help="Inspect one session receipt.")
+_E("session_rename", "Rename a session",
+   ("rename session", "name session"),
+   "sessions", ("sessions",), args=(_S("session_id", True), _S("name", True)),
+   fixed=(("action", "rename"),), summary="sessions",
+   examples=("qubit, rename session 12 to invoices",),
+   help="Set a session display name.")
+_E("session_archive", "Archive a session",
+   ("archive session",),
+   "sessions", ("sessions",), args=(_S("session_id", True),),
+   fixed=(("action", "archive"),), confirm=True, summary="sessions",
+   examples=("qubit, archive session 12",),
+   help="Archive a session (confirmed; resume clears it).")
+_E("session_delete", "Delete a session",
+   ("delete session", "forget session"),
+   "sessions", ("sessions",), args=(_S("session_id", True),),
+   fixed=(("action", "delete"),), confirm=True, summary="sessions",
+   examples=("qubit, delete session 12",),
+   help="Delete a session tombstone (confirmed; recoverable via resume).")
+_E("session_resume", "Resume a session",
+   ("resume session", "restore session"),
+   "sessions", ("sessions",), args=(_S("session_id", True),),
+   fixed=(("action", "resume"),), confirm=True, summary="sessions",
+   examples=("qubit, resume session 12",),
+   help="Restore a deleted or archived session (confirmed).")
 _E("capability", "Capability check",
    ("check capability", "rx:is (.+) available", "can you"),
    "capability", ("tools",), args=(_R("name"),),
@@ -3085,10 +3717,10 @@ _E("kanban_current", "Inspect the current task",
    help="Newest actionable task, or a typed empty state.")
 _E("kanban_create", "Create task",
    ("create task", "new task", "add task"),
-   "kanban", ("kanban",), args=(_R("title"),),
+   "kanban", ("kanban",), args=(_R("title"), _S("board")),
    fixed=(("action", "create"),), confirm=True, summary="kanban_task",
    examples=("qubit, create task buy milk",),
-   help="Create a task (confirmed).")
+   help="Create a task (confirmed; board defaults to main).")
 _E("kanban_claim", "Claim task",
    ("claim task", "take task", "assign me task"),
    "kanban", ("kanban",), args=(_I("task_id"),),
@@ -3161,6 +3793,12 @@ _E("sync_list", "Sync offers",
    fixed=(("action", "list"),),
    examples=("qubit, sync status",),
    help="Outbox offers.")
+_E("sync_revoke_voice", "Revoke sync offer",
+   ("revoke sync offer", "cancel sync offer", "withdraw sync offer"),
+   "sync", ("sync",), args=(_R("offer_id"),),
+   fixed=(("action", "revoke"),), confirm=True,
+   examples=("qubit, revoke sync offer",),
+   help="Tombstone a sync offer and delete its bundle (confirmed).")
 _E("vision_status", "Vision status",
    ("vision status", "is vision ready", "can you see"),
    "vision_status", ("--image",),
@@ -3427,6 +4065,15 @@ _E("browser_read", "Read the current tab",
    summary="tabread",
    examples=("qubit, read the current tab",),
    help="Title, URL, bounded text (untrusted evidence).")
+_E("browser_screenshot", "Screenshot the current tab",
+   ("take a screenshot", "screenshot this page", "capture the page",
+    "take a screenshot of this page", "capture this tab"),
+   "browser_tabs", ("browser",),
+   fixed=(("action", "screenshot"),),
+   summary="screenshot",
+   examples=("qubit, take a screenshot",),
+   help="Bounded screenshot metadata (pixels stay on the dashboard/CLI; "
+        "captured image is untrusted evidence).")
 _E("browser_find", "Search this page",
    ("search this page", "find on this page", "search the page",
     "find in page"),
@@ -3501,6 +4148,13 @@ _E("plugins_install", "Install plugin",
    confirm=True, split="path",
    examples=("qubit, install plugin from manifest",),
    help="Stage a reviewed manifest disabled (confirmed).")
+_E("plugins_remote_refusal", "Install remote plugin",
+   ("install remote plugin", "plugin from github", "plugin from url",
+    "install plugin from git"),
+   "plugins_remote", ("plugins-install",), args=(_R("identifier"),),
+   fixed=(("action", "remote"),),
+   examples=("qubit, install remote plugin",),
+   help="Typed refusal: remote identifiers are never fetched.")
 _E("curator", "Learning summary",
    ("learning summary", "what did you learn", "curator status",
     "skill lessons", "lessons learned"),
@@ -3678,10 +4332,12 @@ _E("gateway_show", "Show gateway",
 _E("gateway_add", "Add gateway",
    ("add gateway", "register gateway"),
    "gateway", ("gateway", "gateway-manage",),
-   args=(_R("gateway_id"), _R("provider"), _R("account"), _R("channel")),
+   args=(_R("gateway_id"), _R("provider"), _R("account"), _R("channel"),
+         _S("key_ref")),
    fixed=(("action", "add"),), confirm=True,
    examples=("qubit, add gateway main",),
-   help="Record an account-bound gateway (confirmed).")
+   help="Record an account-bound gateway (confirmed; key_ref is an "
+        "env:VAR/file:PATH reference, never a secret value).")
 _E("gateway_remove", "Remove gateway",
    ("remove gateway", "delete gateway"),
    "gateway", ("gateway", "gateway-manage",), args=(_R("gateway_id"),),
@@ -3691,9 +4347,16 @@ _E("gateway_remove", "Remove gateway",
 _E("gateway_link", "Link gateway",
    ("link gateway", "check gateway link"),
    "gateway", ("gateway", "gateway-manage",), args=(_R("gateway_id"),),
-   fixed=(("action", "link"),),
-   examples=("qubit, link gateway main",),
+   fixed=(("action", "link"),),   examples=("qubit, link gateway main",),
    help="Typed gateway link state.")
+_E("gateway_supervision_refusal", "Supervise gateway process",
+   ("supervise gateway", "start gateway server", "restart gateway service",
+    "run gateway process"),
+   "gateway", ("gateway", "gateway-manage",),
+   args=(_C("target", ("run", "start", "stop", "restart", "install")),),
+   fixed=(("action", "supervision"),),
+   examples=("qubit, restart gateway service",),
+   help="Typed refusal: operators supervise gateway processes.")
 _E("peer_show", "Show peer",
    ("show peer", "describe peer"),
    "peer", ("pairing/webhook/peer",), args=(_R("peer_id"),),
@@ -3723,10 +4386,11 @@ _E("msg_account_add", "Add messaging account",
    ("add messaging account", "connect whatsapp", "connect slack",
     "register message account"),
    "msg", ("whatsapp/whatsapp-cloud/slack/send",),
-   args=(_R("account_id"), _R("provider"), _R("label")),
+   args=(_R("account_id"), _R("provider"), _R("label"), _S("key_ref")),
    fixed=(("action", "account_add"),), confirm=True,
    examples=("qubit, add messaging account team",),
-   help="Record a provider account (confirmed; keys stay vaulted).")
+   help="Record a provider account (confirmed; keys stay vaulted — "
+        "key_ref is an env:VAR/file:PATH reference, never a value).")
 _E("msg_account_show", "Show messaging account",
    ("show messaging account", "describe message account"),
    "msg", ("whatsapp/whatsapp-cloud/slack/send",),
@@ -3795,6 +4459,55 @@ _E("kanban_edit", "Edit task",
    fixed=(("action", "edit"),), confirm=True,
    examples=("qubit, edit task 3",),
    help="Edit a task title (confirmed).")
+_E("kanban_role_grant_voice", "Grant board role",
+   ("grant board role", "give board access", "share board with"),
+   "kanban", ("kanban",),
+   args=(_S("board"), _R("principal"),
+         _C("role", ("owner", "editor", "viewer"))),
+   fixed=(("action", "role_grant"),), confirm=True,
+   examples=("qubit, grant board role editor to sam",),
+   help="Grant a board role to a delegate (confirmed).")
+_E("kanban_role_revoke_voice", "Revoke board role",
+   ("revoke board role", "remove board access", "unshare board with"),
+   "kanban", ("kanban",), args=(_S("board"), _R("principal")),
+   fixed=(("action", "role_revoke"),), confirm=True,
+   examples=("qubit, revoke board role from sam",),
+   help="Revoke a delegate's board role (confirmed).")
+_E("kanban_widget_move_voice", "Move canvas widget",
+   ("move widget", "reposition widget", "resize widget"),
+   "kanban", ("kanban",),
+   args=(_I("widget_id"), _R("geometry", required=False)),
+   fixed=(("action", "widget_move"),), confirm=True, split="int-rest",
+   examples=("qubit, move widget 4 to 100 200",),
+   help="Reposition/resize a canvas widget (confirmed).")
+_E("kanban_snapshot_restore_voice", "Restore canvas snapshot",
+   ("restore canvas snapshot", "restore board snapshot",
+    "roll back canvas"),
+   "kanban", ("kanban",), args=(_I("snapshot_id"),),
+   fixed=(("action", "snapshot_restore"),), confirm=True,
+   examples=("qubit, restore canvas snapshot 7",),
+   help="Restore widgets, layout, roles, and positions (confirmed).")
+_E("kanban_swarm", "Swarm board",
+   ("swarm board", "swarm the board"),
+   "kanban", ("kanban",),
+   fixed=(("action", "delegated"), ("subcommand", "swarm")),
+   examples=("qubit, swarm board",),
+   help="Typed refusal: parallel work goes through the Qubit broker.")
+_E("kanban_watch", "Watch board",
+   ("watch board", "watch the board"),
+   "kanban", ("kanban",),
+   fixed=(("action", "delegated"), ("subcommand", "watch")),
+   examples=("qubit, watch board",),
+   help="Typed refusal: watchers run as monitor jobs.")
+_E("kanban_dispatch", "Dispatch board",
+   ("dispatch board", "board daemon", "board background task"),
+   "kanban", ("kanban",),
+   args=(_C("subcommand", ("dispatch", "daemon", "heartbeat", "runs",
+                           "notify-subscribe", "notify-list",
+                           "notify-unsubscribe"), required=False),),
+   fixed=(("action", "delegated"), ("subcommand", "dispatch")),
+   examples=("qubit, dispatch board",),
+   help="Typed refusal: execution ops delegate to supervised runs.")
 _E("kanban_block", "Block task",
    ("block task", "mark task blocked"),
    "kanban", ("kanban",), args=(_I("task_id"),),
@@ -3847,10 +4560,41 @@ _E("kanban_move", "Move this task",
 _E("kanban_widget_add", "Add board widget",
    ("add board widget", "add widget", "new widget", "add board note"),
    "kanban", ("kanban",),
-   args=(_R("title"), _S("board"), _S("kind"), _S("content")),
+   args=(_R("title"), _S("board"), _S("kind"), _S("content"), _S("tab")),
    fixed=(("action", "widget_add"),), confirm=True,
    examples=("qubit, add board widget shopping notes",),
    help="Add a sandboxed widget (confirmed; active markup stripped).")
+_E("kanban_tab_list", "List board tabs",
+   ("list board tabs", "show board tabs", "board tabs"),
+   "kanban", ("kanban",), args=(_S("board"),),
+   fixed=(("action", "tab_list"),),
+   examples=("qubit, list board tabs",),
+   help="Ordered tabs (a legacy board reports one virtual default).")
+_E("kanban_tab_create", "Create board tab",
+   ("create board tab", "new board tab", "add board tab"),
+   "kanban", ("kanban",), args=(_S("name"), _S("board"), _S("slug")),
+   fixed=(("action", "tab_create"),), confirm=True,
+   examples=("qubit, create board tab invoices",),
+   help="Create an ordered tab (confirmed).")
+_E("kanban_tab_rename", "Rename board tab",
+   ("rename board tab",),
+   "kanban", ("kanban",),
+   args=(_S("tab", True), _S("name", True), _S("board")),
+   fixed=(("action", "tab_rename"),), confirm=True,
+   examples=("qubit, rename board tab main to overview",),
+   help="Rename a tab label (confirmed).")
+_E("kanban_tab_delete", "Delete board tab",
+   ("delete board tab", "remove board tab"),
+   "kanban", ("kanban",), args=(_S("tab", True), _S("board")),
+   fixed=(("action", "tab_delete"),), confirm=True,
+   examples=("qubit, delete board tab archive",),
+   help="Delete a tab, re-homing widgets (confirmed).")
+_E("kanban_tab_move", "Reorder board tab",
+   ("move board tab", "reorder board tab"),
+   "kanban", ("kanban",), args=(_S("tab", True), _I("position"), _S("board")),
+   fixed=(("action", "tab_move"),), confirm=True,
+   examples=("qubit, move board tab archive to position 2",),
+   help="Move a tab to a 0-based position (confirmed).")
 _E("kanban_widget_list", "List board widgets",
    ("list board widgets", "show widgets", "board widgets"),
    "kanban", ("kanban",), args=(_S("board"),),
@@ -3984,6 +4728,11 @@ _E("themes_reset", "Reset theme",
    "themes", ("pets/skin",), fixed=(("action", "reset"),), confirm=True,
    examples=("qubit, reset theme",),
    help="Restore the default preset (confirmed).")
+_E("pets_downloads_refusal", "Download gallery pet",
+   ("download pet", "pet gallery", "install pet", "get a pet"),
+   "themes", ("pets/skin",), fixed=(("action", "pets"),),
+   examples=("qubit, pet gallery",),
+   help="Typed refusal: gallery downloads never fetched; presets apply.")
 _E("computer_doctor", "Desktop health",
    ("desktop health", "computer doctor", "check desktop access"),
    "computer", ("computer-use",), fixed=(("action", "doctor"),),
@@ -4070,6 +4819,19 @@ _E("websites_show", "Show website",
    fixed=(("action", "show"),),
    examples=("qubit, show website",),
    help="One integration record.")
+_E("web_fetch", "Fetch a web page",
+   ("fetch a web page", "fetch the page", "open the web page",
+    "read a web page"),
+   "websites", ("websites",), args=(_R("url"),),
+   fixed=(("action", "fetch"),), summary="web",
+   examples=("qubit, fetch a web page https://example.com",),
+   help="Read-only, SSRF-guarded bounded fetch.")
+_E("web_search", "Search the web",
+   ("search the web", "web search", "look something up online"),
+   "websites", ("websites",), args=(_R("query"),),
+   fixed=(("action", "search"),), summary="web",
+   examples=("qubit, search the web for rust async",),
+   help="Configured provider search; typed unavailable when none.")
 
 
 # ------------------------------------------- task-mandated natural commands
@@ -4161,6 +4923,13 @@ _E("files_inspect", "Inspect this project folder",
    args=(_S("path"),), fixed=(("action", "inspect"),), summary="files",
    examples=("qubit, inspect this project folder",),
    help="Active project folder, or a typed empty state.")
+_E("file_patch_rollback", "Roll back a file patch",
+   ("roll back the patch", "undo the patch", "rollback file patch",
+    "revert the file patch"),
+   "files", ("files",), args=(_S("target", True),),
+   fixed=(("action", "rollback"),), confirm=True, summary="file_patch",
+   examples=("qubit, roll back the patch on /srv/project/app.py",),
+   help="Restore the prior content of the last applied patch (confirmed).")
 _E("files_list", "List project files",
    ("list project files", "show project files", "list files here"),
    "files", ("files",),
@@ -4174,6 +4943,31 @@ _E("files_read", "Read project file",
    summary="files",
    examples=("qubit, read project file notes",),
    help="Bounded redacted read inside project roots.")
+_E("git_status", "Git status",
+   ("git status", "working tree status", "what changed", "uncommitted changes"),
+   "git", ("git",),
+   fixed=(("action", "status"),),
+   examples=("qubit, git status",),
+   help="Porcelain status of the active project repo (read-only).")
+_E("git_log", "Recent commits",
+   ("recent commits", "git log", "commit history", "show commits"),
+   "git", ("git",),
+   fixed=(("action", "log"),),
+   examples=("qubit, recent commits",),
+   help="Bounded commit log of the active project repo (read-only).")
+_E("git_diff", "Show uncommitted diff",
+   ("show diff", "git diff", "uncommitted diff", "show changes"),
+   "git", ("git",),
+   args=(_S("path"),), fixed=(("action", "diff"),),
+   examples=("qubit, show diff",),
+   help="Bounded unstaged diff, optionally one file (read-only).")
+_E("git_show", "Show committed file",
+   ("show committed file", "git show file", "file at head",
+    "last committed version"),
+   "git", ("git",),
+   args=(_R("path"),), fixed=(("action", "show"),), split="path",
+   examples=("qubit, show committed file notes",),
+   help="One committed file version from HEAD (read-only).")
 _E("ide_status", "Editor status",
    ("editor status", "which editor", "ide status", "what editor",
     "is my editor ready"),
@@ -4267,7 +5061,7 @@ _E("ghost_action_preview", "Preview Ghost action",
    "ghost", ("ghost",),
    args=(_R("action_id"), _S("target"), _S("text"), _S("role")),
    fixed=(("action", "preview"),),
-   examples=("qubit, preview ghost action"),
+   examples=("qubit, preview ghost action",),
    summary="ghost",
    help="No-side-effect preview with exact args.")
 _E("ghost_click", "Click this button",
@@ -4276,7 +5070,7 @@ _E("ghost_click", "Click this button",
    "ghost", ("ghost",),
    args=(_R("target"), _S("role"), _S("scope")),
    fixed=(("action", "click"),), confirm=True,
-   examples=("qubit, click this button"),
+   examples=("qubit, click this button",),
    summary="ghost",
    help="Click the exact semantic target (confirmed, grant-bound).")
 _E("ghost_type", "Fill this form",
@@ -4293,7 +5087,7 @@ _E("ghost_read_tab", "Read the browser tab",
     "what is in the tab", "list browser tabs"),
    "ghost", ("ghost",), args=(_S("role"), _S("scope")),
    fixed=(("action", "read_tab"),),
-   examples=("qubit, read the browser tab"),
+   examples=("qubit, read the browser tab",),
    summary="ghost",
    help="Read-only tab inventory for one browser role (grant-gated).")
 _E("ghost_action_retry", "Retry Ghost action",
@@ -4302,14 +5096,14 @@ _E("ghost_action_retry", "Retry Ghost action",
    args=(_R("receipt_id"), _S("target"), _S("text"), _S("role"),
          _S("scope")),
    fixed=(("action", "retry"),), confirm=True,
-   examples=("qubit, retry ghost action"),
+   examples=("qubit, retry ghost action",),
    summary="ghost",
    help="Re-execute with the SAME args/target/scope (confirmed).")
 _E("ghost_action_recover", "Recover Ghost action",
    ("recover ghost action", "undo ghost action", "roll back ghost"),
    "ghost", ("ghost",), args=(_R("receipt_id"),),
    fixed=(("action", "recover"),), confirm=True,
-   examples=("qubit, recover ghost action"),
+   examples=("qubit, recover ghost action",),
    summary="ghost",
    help="Compensating rollback, honest when impossible (confirmed).")
 _E("ghost_revoke", "Revoke Ghost grant",
@@ -4749,6 +5543,332 @@ _E("profile_rollback", "Roll back profile",
    fixed=(("action", "rollback"),), confirm=True,
    examples=("qubit, roll back profile",),
    help="Roll back a profile change (confirmed).")
+# ------------------------------------------------------------------ node host
+_E("node_host_status", "Paired node host status",
+   ("node host status", "paired node status", "node host"),
+   "node_host", (),
+   fixed=(("action", "status"),),
+   examples=("qubit, node host status",),
+   help="Enrolled node count, host state, and supported capabilities.")
+_E("node_host_list", "List paired nodes",
+   ("list nodes", "list paired nodes", "show paired nodes"),
+   "node_host", (),
+   fixed=(("action", "list"),),
+   examples=("qubit, list nodes",),
+   help="Enrolled node records (secrets redacted).")
+_E("node_host_show", "Show paired node",
+   ("show node", "show paired node", "node details"),
+   "node_host", (),
+   args=(_R("node_id"),),
+   fixed=(("action", "show"),),
+   examples=("qubit, show node node_abc123",),
+   help="One enrolled node record (secrets redacted).")
+_E("node_host_capabilities", "Node capabilities",
+   ("node capabilities", "show node capabilities",
+    "what can this node do"),
+   "node_host", (),
+   args=(_R("node_id"),),
+   fixed=(("action", "capabilities"),),
+   examples=("qubit, node capabilities node_abc123",),
+   help="Declared capabilities with honest typed availability.")
+_E("node_host_enroll", "Enroll paired node",
+   ("enroll node", "register node", "pair a node", "add paired node"),
+   "node_host", (),
+   args=(_R("name"), _R("endpoint")),
+   fixed=(("action", "enroll"),), confirm=True, split="first-rest",
+   examples=("qubit, enroll node desk http://127.0.0.1:8443/",),
+   help="Record a paired node endpoint (confirmed; no listener opened).")
+_E("node_host_revoke", "Revoke paired node",
+   ("revoke node", "remove paired node", "unpair node"),
+   "node_host", (),
+   args=(_R("node_id"),),
+   fixed=(("action", "revoke"),), confirm=True,
+   examples=("qubit, revoke node node_abc123",),
+   help="Confirmation-gated removal of an enrolled node.")
+_E("node_host_dispatch", "Dispatch node capability",
+   ("dispatch node capability", "run node capability",
+    "call node capability"),
+   "node_host", (),
+   args=(_R("node_id"), _R("capability")),
+   fixed=(("action", "dispatch"),), split="first-rest",
+   examples=("qubit, dispatch node capability node_abc123 device.inventory",),
+   help="Route a capability; only local-safe reads execute, everything "
+        "else is the module's typed refusal (never a shell).")
+# ------------------------------------------------------------- task ledger
+_E("task_ledger_status", "Task ledger status",
+   ("task ledger status", "background task status", "task ledger"),
+   "task_ledger", (),
+   fixed=(("action", "status"),),
+   examples=("qubit, task ledger status",),
+   help="Ledger counts by source and canonical state.")
+_E("task_ledger_list", "List background tasks",
+   ("list background tasks", "list ledger tasks", "show task ledger"),
+   "task_ledger", (),
+   args=(_S("source"), _S("state"), _I("limit", required=False)),
+   fixed=(("action", "list"),),
+   examples=("qubit, list background tasks",),
+   help="Merged normalized tasks across the real stores, newest-first.")
+_E("task_ledger_show", "Show background task",
+   ("show ledger task", "show background task", "task ledger show"),
+   "task_ledger", (),
+   args=(_R("task_id"), _S("source")),
+   fixed=(("action", "show"),),
+   examples=("qubit, show background task kanban:1",),
+   help="One normalized task plus its redacted raw source record.")
+_E("task_ledger_timeline", "Task timeline",
+   ("task timeline", "ledger timeline", "show task timeline"),
+   "task_ledger", (),
+   args=(_R("task_id"), _S("source")),
+   fixed=(("action", "timeline"),),
+   examples=("qubit, task timeline kanban:1",),
+   help="Ordered real events correlated to one task (never fabricated).")
+# -------------------------------------------------------------- media gen
+_E("media_gen_status", "Media generation status",
+   ("media status", "media generation status", "image generation status"),
+   "media_gen", (),
+   fixed=(("action", "status"),),
+   examples=("qubit, media status",),
+   help="Provider/kind readiness derived from credential references.")
+_E("media_gen_catalog", "Media provider catalog",
+   ("media catalog", "list media providers", "media providers"),
+   "media_gen", (),
+   fixed=(("action", "catalog"),),
+   examples=("qubit, media catalog",),
+   help="Flat honest {kind, provider, state, reason} rows.")
+_E("media_gen_generate", "Generate media",
+   ("generate image", "generate music", "generate video",
+    "generate speech", "create an image"),
+   "media_gen", (),
+   args=(_C("kind", ("image", "music", "video", "speech")),
+         _R("prompt"), _S("provider")),
+   fixed=(("action", "generate"),), confirm=True,
+   examples=("qubit, generate image a red fox",),
+   help="Validate, gate and (only with a real transport) generate; "
+        "costly kinds require confirmation.")
+# ------------------------------------------------------------ local models
+_E("local_models_status", "Local models status",
+   ("local models status", "local model status", "local llm status"),
+   "local_models", (),
+   fixed=(("action", "status"),),
+   examples=("qubit, local models status",),
+   help="Local runtime state, honestly derived from real Qubit state.")
+_E("local_models_hardware", "Local model hardware",
+   ("local model hardware", "gpu hardware status", "local hardware status"),
+   "local_models", (),
+   fixed=(("action", "hardware"),),
+   examples=("qubit, local model hardware",),
+   help="GPU / VRAM / accelerator inventory from the real gauges.")
+_E("local_models_catalog", "Local model catalog",
+   ("local model catalog", "list local models", "local models"),
+   "local_models", (),
+   fixed=(("action", "catalog"),),
+   examples=("qubit, local model catalog",),
+   help="Known/installed local models from real config + runtime state.")
+_E("local_models_jobs", "Local model jobs",
+   ("local model jobs", "model install jobs", "local download jobs"),
+   "local_models", (),
+   fixed=(("action", "jobs"),),
+   examples=("qubit, local model jobs",),
+   help="Install/download job history (typed EMPTY; no such store).")
+_E("local_models_runtime_install", "Install local runtime",
+   ("install local runtime", "install model runtime"),
+   "local_models", (),
+   args=(_S("backend"),),
+   fixed=(("action", "runtime_install"),),
+   examples=("qubit, install local runtime",),
+   help="Typed gate: pinned-runtime install is brokered; no download.")
+_E("local_models_download", "Download local model",
+   ("download local model", "download a local model"),
+   "local_models", (),
+   args=(_R("model"),),
+   fixed=(("action", "download"),),
+   examples=("qubit, download local model qubit-brain4",),
+   help="Typed gate: model download is brokered; nothing is fetched.")
+_E("local_models_sideload", "Sideload local model",
+   ("sideload local model", "register local gguf", "load local gguf"),
+   "local_models", (),
+   args=(_R("path"),),
+   fixed=(("action", "sideload"),),
+   examples=("qubit, sideload local model /tmp/model.gguf",),
+   help="Typed gate: registering an on-disk GGUF is brokered.")
+_E("local_models_server", "Local model server",
+   ("start local model server", "stop local model server",
+    "local model server"),
+   "local_models", (),
+   args=(_C("server_action", ("start", "stop")),),
+   fixed=(("action", "server"),),
+   examples=("qubit, start local model server",),
+   help="Typed gate: local server start/stop is brokered; nothing runs.")
+_E("local_models_eject", "Eject local model",
+   ("eject local model", "unload local model"),
+   "local_models", (),
+   args=(_R("model"),),
+   fixed=(("action", "eject"),),
+   examples=("qubit, eject local model qubit-brain4",),
+   help="Typed gate: ejecting a resident model is brokered.")
+_E("local_models_activate", "Activate local model",
+   ("activate local model", "set local model default", "use local model"),
+   "local_models", (),
+   args=(_R("model"),),
+   fixed=(("action", "activate"),),
+   examples=("qubit, activate local model qubit-brain4",),
+   help="Typed gate: making a model the default is a brokered write.")
+_E("local_models_quickstart", "Local model quickstart",
+   ("local model quickstart", "set up local model",
+    "quickstart local model"),
+   "local_models", (),
+   args=(_S("model"),),
+   fixed=(("action", "quickstart"),),
+   examples=("qubit, local model quickstart",),
+   help="Typed gate: one-click runtime+model setup is brokered.")
+
+
+# --- OpenClaw backends: plugin host / inbound channels / ACP harness client
+# (Packet 8U). Every operation executes the SAME backend module function the
+# CLI and dashboard call; raw-byte receive is a typed refusal guard.
+from .acp_client import HARNESSES as _AC_HARNESSES  # noqa: E402
+from .channels_inbound import CHANNELS as _CI_CHANNELS  # noqa: E402
+
+_E("plugins_status", "Plugin runtime status",
+   ("plugin runtime status", "plugin host status", "plugins status",
+    "plugin status"),
+   "plugin_runtime", ("plugins-install",),
+   fixed=(("action", "status"),),
+   examples=("qubit, plugin runtime status",),
+   help="In-process host state; external provider runtime is unavailable.")
+_E("plugins_list", "List plugins",
+   ("list plugins", "plugin list", "show plugins", "list installed plugins"),
+   "plugin_runtime", ("plugins-install",),
+   fixed=(("action", "list"),),
+   examples=("qubit, list plugins",),
+   help="Registered manifests + built-ins (redacted).")
+_E("plugins_show", "Show plugin",
+   ("show plugin", "inspect plugin", "plugin details"),
+   "plugin_runtime", ("plugins-install",),
+   args=(_R("plugin_id"),), fixed=(("action", "show"),),
+   examples=("qubit, show plugin builtin.echo",),
+   help="One plugin record (redacted).")
+_E("plugins_register", "Register plugin manifest",
+   ("register plugin", "register plugin manifest", "record plugin manifest"),
+   "plugin_runtime", ("plugins-install",),
+   args=(_R("manifest"),), fixed=(("action", "register"),), confirm=True,
+   split="path",
+   examples=("qubit, register plugin manifest /tmp/acme.json",),
+   help="Record a validated manifest (metadata only; confirmed).")
+_E("plugins_invoke", "Invoke plugin",
+   ("invoke plugin", "run plugin", "execute plugin"),
+   "plugin_runtime", ("plugins-install",),
+   args=(_R("plugin_id"), _S("text")), fixed=(("action", "invoke"),),
+   confirm=True, split="first-rest",
+   examples=("qubit, invoke plugin builtin.echo hello",),
+   help="In-process handlers only; confirmed, never code from a manifest.")
+_E("plugins_unregister", "Unregister plugin",
+   ("unregister plugin", "deregister plugin", "remove plugin registration"),
+   "plugin_runtime", ("plugins-install",),
+   args=(_R("plugin_id"),), fixed=(("action", "unregister"),), confirm=True,
+   examples=("qubit, unregister plugin acme.tool",),
+   help="Remove a registered manifest (built-ins refused; confirmed).")
+_E("plugins_doctor", "Plugin runtime health",
+   ("plugin doctor", "plugin health", "plugin runtime health"),
+   "plugin_runtime", ("plugins-install",),
+   fixed=(("action", "doctor"),),
+   examples=("qubit, plugin doctor",),
+   help="Store health, handlers, and the emergency-stop latch.")
+_E("channels_status", "Inbound channel status",
+   ("channels status", "channel inbound status", "inbound channel status"),
+   "channels", (),
+   fixed=(("action", "status"),),
+   examples=("qubit, channels status",),
+   help="Listener NONE; connected is never fabricated.")
+_E("channels_catalog", "Channel catalog",
+   ("list channels", "channel catalog", "list inbound channels",
+    "channels catalog"),
+   "channels", (),
+   fixed=(("action", "catalog"),),
+   examples=("qubit, list channels",),
+   help="Every known channel with an honest typed state.")
+_E("channels_accounts", "Configured channels",
+   ("list configured channels", "channel accounts", "configured channels",
+    "channels accounts"),
+   "channels", (),
+   fixed=(("action", "accounts"),),
+   examples=("qubit, list configured channels",),
+   help="Configured references only (never values).")
+_E("channels_configure", "Configure inbound channel",
+   ("configure channel", "add inbound channel", "set up channel"),
+   "channels", (),
+   args=(_C("channel", tuple(_CI_CHANNELS)), _R("secret_ref")),
+   fixed=(("action", "configure"),), confirm=True, split="first-rest",
+   examples=("qubit, configure channel discord env:q8u_secret",),
+   help="Record an env:/file: reference (never a value; confirmed).")
+_E("channels_unconfigure", "Unconfigure inbound channel",
+   ("unconfigure channel", "remove inbound channel"),
+   "channels", (),
+   args=(_C("channel", tuple(_CI_CHANNELS)),),
+   fixed=(("action", "unconfigure"),), confirm=True,
+   examples=("qubit, unconfigure channel discord",),
+   help="Remove a configured channel reference (confirmed).")
+_E("channels_receive_refusal", "Receive channel payload (refusal)",
+   ("receive channel payload", "ingest channel delivery",
+    "receive an inbound channel payload"),
+   "channels", (),
+   fixed=(("action", "receive"),),
+   summary="guidance",
+   examples=("qubit, receive an inbound channel payload",),
+   help="Typed VOICE_BYTES_UNSUPPORTED: raw payloads cannot be spoken.")
+_E("channels_doctor", "Inbound channel health",
+   ("channels doctor", "channel health", "inbound channel health"),
+   "channels", (),
+   fixed=(("action", "doctor"),),
+   examples=("qubit, channels doctor",),
+   help="Store/listener/latch diagnostics (read-only).")
+_E("acp_client_status", "Harness client status",
+   ("harness status", "acp client status", "agent harness status"),
+   "acp_client", (),
+   fixed=(("action", "status"),),
+   examples=("qubit, harness status",),
+   help="Configured/present harnesses; no live sessions ever claimed.")
+_E("acp_client_catalog", "Harness catalog",
+   ("list harnesses", "harness catalog", "list agent harnesses"),
+   "acp_client", (),
+   fixed=(("action", "catalog"),),
+   examples=("qubit, list harnesses",),
+   help="PATH presence + configured state (honest).")
+_E("acp_client_configure", "Configure harness",
+   ("configure harness", "register harness credential"),
+   "acp_client", (),
+   args=(_C("harness", tuple(_AC_HARNESSES)), _S("credential_ref")),
+   fixed=(("action", "configure"),), confirm=True, split="first-rest",
+   examples=("qubit, configure harness claude-code env:acp_key",),
+   help="Record a credential reference (never a value; confirmed).")
+_E("acp_client_unconfigure", "Unconfigure harness",
+   ("unconfigure harness", "remove harness credential"),
+   "acp_client", (),
+   args=(_C("harness", tuple(_AC_HARNESSES)),),
+   fixed=(("action", "unconfigure"),), confirm=True,
+   examples=("qubit, unconfigure harness claude-code",),
+   help="Remove a configured harness (confirmed).")
+_E("acp_client_handshake", "Harness handshake",
+   ("harness handshake", "acp handshake", "initialize harness"),
+   "acp_client", (),
+   args=(_C("harness", tuple(_AC_HARNESSES)),),
+   fixed=(("action", "handshake"),), confirm=True,
+   examples=("qubit, harness handshake claude-code",),
+   help="Shape ACP initialize; typed unavailable, never executed.")
+_E("acp_client_send", "Send to harness",
+   ("send to harness", "acp send", "prompt harness"),
+   "acp_client", (),
+   args=(_C("harness", tuple(_AC_HARNESSES)), _R("prompt")),
+   fixed=(("action", "send"),), confirm=True, split="first-rest",
+   examples=("qubit, send to harness claude-code hello",),
+   help="Typed ACP_REFUSED: Qubit never executes a harness.")
+_E("acp_client_receipts", "Harness receipts",
+   ("harness receipts", "acp receipts", "harness log"),
+   "acp_client", (),
+   args=(_S("harness"),), fixed=(("action", "receipts"),),
+   examples=("qubit, harness receipts",),
+   help="Redacted ACP receipts (bounded tail).")
+
 
 
 # ---------------------------------------------------------------- coverage
@@ -4815,7 +5935,9 @@ CLI_COVERAGE = {
     "schedules": ("schedules_create", "schedules_list", "schedules_show",
                   "schedules_pause", "schedules_resume", "schedules_delete",
                   "schedules_history", "schedules_run_due"),
-    "files": ("files_inspect", "files_list", "files_read"),
+    "files": ("files_inspect", "files_list", "files_read",
+              "file_patch_rollback"),
+    "git": ("git_status", "git_log", "git_diff", "git_show"),
     "ide": ("ide_status", "ide_open"),
     "voice": ("commands_list",),
     "completion": ("completions",),
@@ -4826,7 +5948,9 @@ CLI_COVERAGE = {
     "approvals": ("approvals",),
     "verify-release": ("verify_release",),
     "checkpoints": ("checkpoints_list", "checkpoints_write"),
-    "sessions": ("sessions",),
+    "sessions": ("sessions", "sessions_search", "session_show",
+                 "session_rename", "session_archive", "session_delete",
+                 "session_resume"),
     "capability": ("capability", "capabilities_list"),
     "roundtrip": ("roundtrip_test",),
     "enroll": ("enroll_voice",),
@@ -4851,37 +5975,52 @@ CLI_COVERAGE = {
     "permissions": ("permissions",),
     "skills": ("skills_list", "skills_show", "skills_enable",
                "skills_disable", "skills_remove", "skills_rollback",
+               "plugins_install", "plugins_remote_refusal",
                "verified_list", "verified_show", "verified_recall",
                "verified_verdict", "verified_pin", "verified_unpin"),
     "verified-skills": ("verified_list", "verified_show",
                         "verified_recall", "verified_verdict",
                         "verified_pin", "verified_unpin"),
     "project": ("projects_list", "projects_show", "projects_active"),
-    "kanban": ("kanban_list", "kanban_show", "kanban_current"),
+    "kanban": ("kanban_list", "kanban_show", "kanban_current",
+               "kanban_role_grant_voice", "kanban_role_revoke_voice",
+               "kanban_widget_move_voice", "kanban_snapshot_restore_voice",
+               "kanban_tab_list", "kanban_tab_create", "kanban_tab_rename",
+               "kanban_tab_delete", "kanban_tab_move", "kanban_widget_add",
+               "kanban_swarm", "kanban_watch", "kanban_dispatch"),
     "computer-use": ("computer_status",),
     "browser": ("browser_status", "browser_doctor", "browser_tabs",
-                "browser_read", "browser_find", "browser_open_browser",
+                "browser_read", "browser_find", "browser_screenshot",
+                "browser_open_browser",
                 "browser_activate", "browser_open", "browser_navigate",
                 "browser_fill", "browser_click", "browser_close_tab"),
-    "acp": ("acp",),
+    "acp": ("acp", "acp_client_status", "acp_client_catalog",
+            "acp_client_configure", "acp_client_unconfigure",
+            "acp_client_handshake", "acp_client_send", "acp_client_receipts"),
     "lsp": ("lsp",),
-    "theme": ("themes",),
+    "plugins": ("plugins_status", "plugins_list", "plugins_show",
+                "plugins_register", "plugins_invoke", "plugins_unregister",
+                "plugins_doctor"),
+    "channels": ("channels_status", "channels_catalog", "channels_accounts",
+                 "channels_configure", "channels_unconfigure",
+                 "channels_receive_refusal", "channels_doctor"),
+    "theme": ("themes", "pets_downloads_refusal"),
     "proxy": ("proxy",),
     "hooks": ("hooks_list",),
-    "sync": ("sync_list",),
+    "sync": ("sync_list", "sync_revoke_voice"),
     "pairing": ("pairing_list", "pairing_create", "pairing_approve",
                 "pairing_revoke"),
     "webhook": ("webhooks",),
     "msg": ("msg_accounts",),
     "brain": ("brain",),
-    "gateway": ("gateway",),
+    "gateway": ("gateway", "gateway_supervision_refusal"),
     "peer": ("peer_list", "peer_dm", "peer_run"),
     "tui": ("tui_help",),
     "vision": ("vision_status",),
     "import-agent": ("import_inspect",),
     "lessons": ("lessons_list", "lessons_promote", "lessons_remove"),
     "memory": ("memory_search",),
-    "websites": ("websites_list", "websites_show"),
+    "websites": ("websites_list", "websites_show", "web_fetch", "web_search"),
     "actions": ("actions_list", "actions_show", "actions_check",
                 "actions_receipts", "actions_receipt", "actions_execute",
                 "actions_cancel"),
@@ -4910,6 +6049,19 @@ CLI_COVERAGE = {
     "runtime": ("runtime_images", "runtime_status", "runtime_doctor",
                 "runtime_install", "runtime_upgrade", "runtime_rollback",
                 "runtime_remove"),
+    "node": ("node_host_status", "node_host_list", "node_host_show",
+             "node_host_capabilities", "node_host_enroll", "node_host_revoke",
+             "node_host_dispatch"),
+    "tasks": ("task_ledger_status", "task_ledger_list", "task_ledger_show",
+              "task_ledger_timeline"),
+    "media": ("media_gen_status", "media_gen_catalog", "media_gen_generate"),
+    "local-models": ("local_models_status", "local_models_hardware",
+                     "local_models_catalog", "local_models_jobs",
+                     "local_models_runtime_install", "local_models_download",
+                     "local_models_sideload", "local_models_server",
+                     "local_models_eject", "local_models_activate",
+                     "local_models_quickstart"),
+    "agent": (),
 }
 
 # CLI families with no voice entry: explicit tested reason + where to run
@@ -4969,7 +6121,136 @@ VOICE_IMPOSSIBLE = {
                   "dashboard URL shown by `dashboard status` yourself",
     "product.shortcut": "desktop integration: use `qubit product "
                         "shortcut --apply` in a desktop terminal",
+    # raw byte payloads cannot be spoken (HMAC-verified channel ingress only)
+    "channels.receive": "raw signed channel payloads: use the dashboard "
+                        "channel ingress endpoint (POST /channels/<channel>) "
+                        "or `qubit channels receive` in a terminal",
+    # the Qubit Agent runtime is a raw CLI passthrough (verbatim argv);
+    # a spoken turn cannot name it unambiguously or safely
+    "agent": "the Qubit Agent runtime is a raw CLI passthrough: run "
+             "`qubit agent <args...>` in a terminal",
 }
+
+
+# Voice guards: every op excluded from voice execution (passphrase-sealed,
+# nested structured data, preview-hash binding, raw bytes) still has a REAL
+# spoken surface: a typed, audited refusal that names the exact CLI/dashboard
+# counterpart. This replaces silence/UNKNOWN with a tested policy outcome and
+# never binds the unsafe payload. Keys are dashboard_ops op ids.
+VOICE_GUARDS: Dict[str, Dict[str, Any]] = {
+    "actions_prepare": {
+        "aliases": ("prepare a structured action",
+                    "prepare an action envelope"),
+        "guidance": VOICE_IMPOSSIBLE["actions.prepare"],
+        "code": "VOICE_NESTED_UNSUPPORTED",
+    },
+    "actions_preview": {
+        "aliases": ("preview a structured action",
+                    "preview an action envelope"),
+        "guidance": VOICE_IMPOSSIBLE["actions.preview"],
+        "code": "VOICE_NESTED_UNSUPPORTED",
+    },
+    "actions_retry": {
+        "aliases": ("retry a structured action",),
+        "guidance": VOICE_IMPOSSIBLE["actions.retry"],
+        "code": "VOICE_NESTED_UNSUPPORTED",
+    },
+    "actions_recover": {
+        "aliases": ("recover a structured action",),
+        "guidance": VOICE_IMPOSSIBLE["actions.recover"],
+        "code": "VOICE_NESTED_UNSUPPORTED",
+    },
+    "ghost_preview": {
+        "aliases": ("preview a ghost action",),
+        "guidance": VOICE_IMPOSSIBLE["ghost.preview"],
+        "code": "VOICE_NESTED_UNSUPPORTED",
+    },
+    "backup_create": {
+        "aliases": ("create an encrypted backup",
+                    "make an encrypted backup"),
+        "guidance": "passphrase-sealed bundles: use the dashboard password "
+                    "form or `qubit export-state` in a terminal",
+        "code": "PASSPHRASE_NEVER_SPOKEN",
+    },
+    "backup_restore": {
+        "aliases": ("restore an encrypted backup",
+                    "restore an encrypted bundle"),
+        "guidance": "passphrase-sealed bundles: use the dashboard password "
+                    "form or `qubit import-state <bundle>` in a terminal",
+        "code": "PASSPHRASE_NEVER_SPOKEN",
+    },
+    "brain_onboard_apply": {
+        "aliases": ("apply brain onboarding answers",
+                    "apply onboarding answers"),
+        "guidance": "structured onboarding answers: use the dashboard "
+                    "onboarding form or `qubit brain onboard`",
+        "code": "VOICE_NESTED_UNSUPPORTED",
+    },
+    "kanban_import": {
+        "aliases": ("import a kanban snapshot",
+                    "import a board snapshot"),
+        "guidance": "structured snapshots: use the dashboard boards form or "
+                    "`qubit kanban import` in a terminal",
+        "code": "VOICE_NESTED_UNSUPPORTED",
+    },
+    "opencode_prepare": {
+        "aliases": ("prepare an in-project coding change",
+                    "prepare an in-project coding workflow"),
+        "guidance": VOICE_IMPOSSIBLE["opencode.prepare"],
+        "code": "VOICE_PREVIEW_HASH_ONLY",
+    },
+    "opencode_run_confirmed": {
+        "aliases": ("run a confirmed in-project coding change",
+                    "apply a confirmed coding change"),
+        "guidance": VOICE_IMPOSSIBLE["opencode.execute"],
+        "code": "VOICE_PREVIEW_HASH_ONLY",
+    },
+    "sync_offer": {
+        "aliases": ("offer a sync bundle", "create a sync offer"),
+        "guidance": "passphrase-sealed sync bundles: use the dashboard sync "
+                    "form or `qubit sync offer` in a terminal",
+        "code": "PASSPHRASE_NEVER_SPOKEN",
+    },
+    "sync_accept": {
+        "aliases": ("accept a sync bundle", "accept a sync offer"),
+        "guidance": "passphrase-sealed sync bundles: use the dashboard sync "
+                    "form or `qubit sync accept` in a terminal",
+        "code": "PASSPHRASE_NEVER_SPOKEN",
+    },
+    "webhook_verify": {
+        "aliases": ("verify a webhook signature",
+                    "verify a webhook payload"),
+        "guidance": "raw byte payloads: use the dashboard webhooks form or "
+                    "`qubit webhook verify` in a terminal",
+        "code": "VOICE_BYTES_UNSUPPORTED",
+    },
+    "file_patch": {
+        "aliases": ("apply a file patch", "apply a unified diff"),
+        "guidance": "structured diffs: use the dashboard file form or "
+                    "`qubit files patch --patch-file` in a terminal",
+        "code": "VOICE_NESTED_UNSUPPORTED",
+    },
+}
+
+
+def _register_voice_guards() -> None:
+    for op_id, spec in VOICE_GUARDS.items():
+        _E(
+            f"guard_{op_id}",
+            f"{op_id.replace('_', ' ').title()} (voice guard)",
+            tuple(spec["aliases"]),
+            "voice_unsupported",
+            ("voice-guard",),
+            fixed=(("op", op_id), ("guidance", spec["guidance"]),
+                   ("code", spec["code"])),
+            summary="guidance",
+            examples=(f"qubit, {spec['aliases'][0]}",),
+            help="Typed refusal with guidance: this op is CLI/dashboard-only "
+                 "for safety; the spoken attempt never binds the unsafe data.",
+        )
+
+
+_register_voice_guards()
 
 
 # ---------------------------------------------------------------- execution
@@ -5042,8 +6323,24 @@ def execute(ctx, resolution: Resolution) -> Outcome:
                            "Emergency stop is latched. Reset it first.", {})
         journal = _journal(ctx.cfg)
         _prune_session_pending(ctx, journal)
+        # Credential references (or worse, a pasted raw value) must never
+        # reach staged summaries, speech, or the journal wording: backend
+        # outputs carry the kind only, and summaries follow the same rule.
         shown = ", ".join(f"{k} {_redact(str(v))[:40]}" for k, v in
-                          sorted(merged.items()) if k != "action")[:160]
+                          sorted(merged.items())
+                          if k not in ("action", "key_ref"))[:160]
+        # Fail fast on reference-shaped args: a raw pasted secret must be
+        # refused BEFORE anything is staged or journaled (no receipt, no
+        # wording, no meta.args carrying the value).
+        if entry.id in ("gateway_add", "msg_account_add"):
+            ref = str(merged.get("key_ref", "") or "")
+            if not (ref.startswith("env:") or ref.startswith("file:")):
+                _audit("rejected", ctx.actor,
+                       {"entry": entry.id, "reason": "key_ref_not_reference",
+                        "session": ctx.session})
+                return Outcome(FAILED, entry,
+                               "key_ref must be an env:VAR or file:PATH "
+                               "reference, never a secret value.", {})
         wording = _speak(f"{entry.title}: say yes to confirm. " + shown)
         try:
             approval = journal.create(f"voice.{entry.id}", wording,

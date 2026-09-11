@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Qubit VoiceBridge — Docs</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; font: 14px/1.6 system-ui, sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+  .wrap { max-width:860px; margin:0 auto; padding:16px; }
+  header { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px; }
+  h1 { font-size:18px; margin:0; }
+  a { color:var(--primary); text-decoration:none; }
+  .sub { font-size:12px; color:var(--muted); }
+  #doclist { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; }
+  #doclist button { padding:6px 12px; background:var(--surface-raised); border:1px solid var(--line-strong); color:var(--text); border-radius:6px; cursor:pointer; font-size:12px; }
+  #doclist button[aria-current="true"] { border-color:var(--primary); color:var(--primary-strong); }
+  #docbody { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
+  #docbody h2 { font-size:16px; margin:14px 0 6px; }
+  #docbody h3 { font-size:14px; margin:12px 0 4px; }
+  #docbody p { margin:6px 0; }
+  #docbody ul { margin:6px 0; padding-left:22px; }
+  #docbody li { margin:2px 0; }
+  #docbody code { background:var(--surface-soft); padding:1px 5px; border-radius:4px; font-size:12px; }
+  #docbody pre { background:var(--surface-soft); padding:10px; border-radius:8px; overflow:auto; font-size:12px; white-space:pre-wrap; word-break:break-word; }
+  #docbody pre code { background:none; padding:0; }
+  .err { color:var(--danger); font-size:12px; }
+  .muted { color:var(--muted); font-size:12px; }
+</style><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/theme.css"></head><body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<main class="wrap" id="main-content" tabindex="-1">
+  <header>
+    <div>
+      <h1><span class="brand-mark" aria-hidden="true">Q</span> Qubit VoiceBridge — Docs</h1>
+      <div class="sub">Curated user guide, served by the bridge. Same-origin links only; raw HTML in source files is never interpreted.</div>
+    </div>
+    <nav class="page-nav" aria-label="Primary"><a class="nav-brand" href="/"><span class="brand-mark" aria-hidden="true">Q</span>Qubit Agent</a><span class="nav-separator" aria-hidden="true"></span><a href="/">Talk</a><a href="/activity">Activity</a><a href="/reports">Reports</a><a href="/sessions">Sessions</a><a href="/projects">Projects</a><a href="/models">Models</a><a href="/skills">Skills</a><a href="/tasks">Tasks</a><a href="/security">Security</a><a href="/devices">Devices</a><a href="/messages">Messages</a><a href="/memory">Memory</a><a href="/ops">Operations</a><a href="/approvals">Approvals</a><a href="/settings">Settings</a><a href="/setup">Setup</a><a href="/system">System</a><a href="/docs" aria-current="page">Docs</a><a class="nav-utility" href="/token-setup">Pair device</a></nav>
+  </header>
+  <div id="doclist" role="tablist" aria-label="User guide documents"></div>
+  <div id="state" class="muted" role="status">loading…</div>
+  <article id="docbody" aria-live="polite"></article>
+</main>
+<script src="/static/vb.js"></script>
+<script src="/static/ui.js"></script>
+<script>
+// Safe markdown subset renderer: headings, lists, fenced code, paragraphs,
+// and inline `code` / **bold** / [text](http(s)-or-/path). Everything is
+// built with textContent (no innerHTML); raw HTML in source files renders
+// as inert text. Links allow only http(s) and same-origin paths.
+function allowHref(href) {
+  if (/^\/(?!\/)/.test(href)) return href;
+  if (/^https?:\/\//i.test(href)) return href;
+  return null;
+}
+function inlineRich(parent, text) {
+  var re = /(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g;
+  var last = 0, m;
+  function push(t) { if (t) parent.appendChild(document.createTextNode(t)); }
+  while ((m = re.exec(text)) !== null) {
+    push(text.slice(last, m.index));
+    var tok = m[0];
+    if (tok.charAt(0) === '`') {
+      parent.appendChild(vbBuild('code', null, tok.slice(1, -1)));
+    } else if (tok.slice(0, 2) === '**') {
+      parent.appendChild(vbBuild('strong', null, tok.slice(2, -2)));
+    } else {
+      var close = tok.indexOf('](');
+      var label = tok.slice(1, close), href = tok.slice(close + 2, -1);
+      var safe = allowHref(href.trim());
+      if (safe) parent.appendChild(vbBuild('a', {href: safe}, label));
+      else push(label);
+    }
+    last = m.index + tok.length;
+  }
+  push(text.slice(last));
+}
+function renderDoc(body, markdown) {
+  vbClear(body);
+  var lines = String(markdown || '').replace(/\r\n?/g, '\n').split('\n');
+  var inCode = false, codeBuf = [], list = null;
+  function flushCode() {
+    if (codeBuf.length) {
+      var pre = vbBuild('pre', null, vbBuild('code', null, codeBuf.join('\n')));
+      body.appendChild(pre); codeBuf = [];
+    }
+  }
+  function flushList() { list = null; }
+  lines.forEach(function (line) {
+    var fence = line.match(/^```(\w*)\s*$/);
+    if (fence) { if (inCode) { flushCode(); inCode = false; } else { flushList(); inCode = true; } return; }
+    if (inCode) { codeBuf.push(line); return; }
+    var h = line.match(/^(#{1,3})\s+(.*)$/);
+    if (h) { flushList(); body.appendChild(vbBuild(h[1].length === 1 ? 'h2' : 'h3', null, h[2])); return; }
+    var li = line.match(/^\s*[-*]\s+(.*)$/);
+    if (li) {
+      if (!list) { list = vbBuild('ul', null); body.appendChild(list); }
+      var item = vbBuild('li', null); inlineRich(item, li[1]); list.appendChild(item); return;
+    }
+    if (!line.trim()) { flushList(); return; }
+    flushList();
+    var p = vbBuild('p', null); inlineRich(p, line); body.appendChild(p);
+  });
+  flushCode();
+  if (!body.hasChildNodes()) body.appendChild(vbBuild('p', {class: 'muted'}, 'Empty document.'));
+}
+async function loadDoc(id, title) {
+  var state = document.getElementById('state'), body = document.getElementById('docbody');
+  state.textContent = 'loading ' + title + '…';
+  var res = await vbApi('/api/docs/' + encodeURIComponent(id));
+  if (res.authRequired) { state.textContent = 'Not paired — open Pair device and save your token.'; return; }
+  if (!res.ok || !res.body || typeof res.body.markdown !== 'string') {
+    state.textContent = '';
+    body.textContent = '';
+    body.appendChild(vbBuild('p', {class: 'err'}, (res.body && res.body.detail) || 'Document unavailable.'));
+    return;
+  }
+  state.textContent = res.body.truncated ? 'showing first 64 KiB' : '';
+  renderDoc(body, res.body.markdown);
+  document.querySelectorAll('#doclist button').forEach(function (b) {
+    if (b.dataset.id === id) b.setAttribute('aria-current', 'true');
+    else b.removeAttribute('aria-current');
+  });
+}
+async function init() {
+  var state = document.getElementById('state'), list = document.getElementById('doclist');
+  var res = await vbApi('/api/docs');
+  if (res.authRequired) { state.textContent = 'Not paired — open Pair device and save your token.'; return; }
+  var docs = (res.body && res.body.docs) || [];
+  if (!docs.length) { state.textContent = res.body && res.body.state === 'UNAVAILABLE' ? 'User guide is not in this install; see the repository docs/.' : 'No documents.'; return; }
+  docs.forEach(function (d, i) {
+    var b = vbBuild('button', {type: 'button', role: 'tab', 'data-id': d.id}, d.title);
+    b.addEventListener('click', function () { loadDoc(d.id, d.title); });
+    list.appendChild(b);
+    if (i === 0) loadDoc(d.id, d.title);
+  });
+}
+init();
+</script>
+</body></html>

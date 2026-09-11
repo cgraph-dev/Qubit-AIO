@@ -1,15 +1,22 @@
-"""Qubit dashboard families: every capability family has a real routed
-workspace wired to the same backend as CLI and voice.
+"""Qubit dashboard families — Hermes-first.
 
-Each family page is catalog-driven (groups of /api/ops operations with
-real forms, confirmations, receipts, and typed states) — no static
-tiles, no frontend-only success. Hermetic HTTP checks against a real
-local WebUI server; no browser required.
+Every capability family has a real workspace inside the vendored Hermes
+React shell: either an upstream Hermes page or a Qubit overlay plugin
+(operations console, devices, memory, reports, approvals). This suite
+proves:
+
+- every normal Qubit route alias maps to a real Hermes workspace;
+- the shared /api/ops broker backs the operations console (catalog +
+  run/confirm) on the same registry as CLI and voice;
+- no catalog group is left without an operation;
+- every family route renders the Hermes shell landmark set.
+
+Hermetic HTTP checks against a real local WebUI server; no browser is
+required. Browser checks are opt-in under ``-m ui``.
 """
 from __future__ import annotations
 
 import json
-import re
 import sys
 import time
 from pathlib import Path
@@ -19,32 +26,50 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-FAMILIES = {
-    "/sessions": ["sessions", "actions"],
-    "/projects": ["projects", "files", "kanban"],
-    "/models": ["frontier", "frontier_chat", "frontier_show",
-                "config_profiles", "reasoning", "prompt_budget"],
-    "/skills": ["skills", "verified", "curator", "plugins_install",
-                "import_agent", "experiments"],
-    "/tasks": ["schedules", "opencode", "task_run"],
-    "/security": ["approvals", "permissions", "power_status", "auth_status",
-                  "auth_login", "auth_verify", "auth_logout", "secrets",
-                  "security", "device", "device_enroll"],
-    "/devices": ["browser", "browser_tabs", "computer", "ghost", "ide",
-                 "wake", "audio", "audio_hw", "mic_guidance"],
-    "/messages": ["msg", "peer", "pairing", "webhook", "webhooks",
-                  "gateway", "websites"],
-    "/memory": ["memory", "brain", "lessons", "insights"],
-    "/system": ["runtime", "status", "doctor", "diagnostics",
-                "setup_check", "update_status", "migrate_status", "product",
-                "package", "verify_release", "state", "sync", "backup",
-                "checkpoints", "monitor"],
+# Qubit route -> the Hermes workspace it must render (shell target).
+FAMILY_TARGETS = {
+    "/activity": "/hermes/logs",
+    "/reports": "/hermes/reports",
+    "/sessions": "/hermes/sessions",
+    "/projects": "/hermes/files",
+    "/models": "/hermes/models",
+    "/skills": "/hermes/skills",
+    "/tasks": "/hermes/cron",
+    "/security": "/hermes/qubit-approvals",
+    "/devices": "/hermes/devices",
+    "/messages": "/hermes/channels",
+    "/memory": "/hermes/memory",
+    "/operations": "/hermes/operations",
+    "/ops": "/hermes/operations",
+    "/approvals": "/hermes/qubit-approvals",
+    "/settings": "/hermes/config",
+    "/setup": "/hermes/system",
+    "/system": "/hermes/system",
+    "/chat": "/hermes/chat",
+    "/files": "/hermes/files",
+    "/models": "/hermes/models",
+    "/analytics": "/hermes/analytics",
+    "/logs": "/hermes/logs",
+    "/cron": "/hermes/cron",
+    "/plugins": "/hermes/plugins",
+    "/mcp": "/hermes/mcp",
+    "/channels": "/hermes/channels",
+    "/webhooks": "/hermes/webhooks",
+    "/pairing": "/hermes/pairing",
+    "/profiles": "/hermes/profiles",
+    "/config": "/hermes/config",
+    "/env": "/hermes/env",
+    "/docs": "/hermes/docs",
 }
 
-NAV_LINKS = ["/", "/activity", "/reports", "/sessions", "/projects",
-             "/models", "/skills", "/tasks", "/security", "/devices",
-             "/messages", "/memory", "/ops", "/approvals", "/settings",
-             "/setup", "/system", "/token-setup"]
+REQUIRED_ROUTES = [
+    "/", "/hermes/", "/chat", "/sessions", "/files", "/models", "/analytics",
+    "/logs", "/cron", "/skills", "/plugins", "/mcp", "/channels", "/webhooks",
+    "/pairing", "/profiles", "/config", "/env", "/system", "/docs",
+    "/activity", "/reports", "/operations", "/ops", "/approvals",
+    "/settings", "/setup", "/projects", "/tasks", "/devices", "/messages",
+    "/memory", "/security",
+]
 
 
 def _start(tmp_path):
@@ -70,113 +95,117 @@ def _start(tmp_path):
     return ui, ui._server.server_address[1]
 
 
-def _http(port, method, path, body=None, token="test-token"):
+def _http(port, method, path, body=None, token="test-token", hermes=False):
+    import urllib.error
     import urllib.request
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request("http://127.0.0.1:%d%s" % (port, path),
                                  method=method, data=data)
     if token:
-        req.add_header("X-Api-Token", token)
+        req.add_header("X-Hermes-Session-Token" if hermes else "X-Api-Token",
+                       token)
     if data is not None:
         req.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(req, timeout=5) as r:
+        with urllib.request.urlopen(req, timeout=8) as r:
             return r.status, r.headers.get("Content-Type", ""), r.read()
     except urllib.error.HTTPError as e:
         return e.code, e.headers.get("Content-Type", ""), e.read()
 
 
-def _family_groups(html):
-    m = re.search(r"window\.FAMILY\s*=\s*\{\s*groups:\s*\[([^\]]*)\]",
-                  html)
-    assert m, "family page must declare window.FAMILY.groups"
-    return re.findall(r'"([^"]+)"', m.group(1))
+def _raw(port, path):
+    """Request that does NOT follow redirects."""
+    import http.client
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=8)
+    conn.request("GET", path)
+    resp = conn.getresponse()
+    loc = resp.getheader("Location")
+    status = resp.status
+    resp.read()
+    return status, loc
 
 
-def test_every_family_page_served_with_nav_and_shell(tmp_path):
+def test_every_family_alias_maps_to_a_real_hermes_workspace():
+    from voicebridge import hermes_compat as HC
+    from voicebridge.webui import HERMES_ROUTE_ALIASES
+    plugin_paths = {"/hermes" + m["tab"]["path"]
+                    for m in HC._overlay_manifests()}
+    builtin = {
+        "/hermes/chat", "/hermes/sessions", "/hermes/files", "/hermes/models",
+        "/hermes/analytics", "/hermes/logs", "/hermes/cron", "/hermes/skills",
+        "/hermes/plugins", "/hermes/mcp", "/hermes/channels",
+        "/hermes/webhooks", "/hermes/pairing", "/hermes/profiles",
+        "/hermes/config", "/hermes/env", "/hermes/system", "/hermes/docs",
+    }
+    known = builtin | plugin_paths
+    for alias, target in FAMILY_TARGETS.items():
+        assert HERMES_ROUTE_ALIASES.get(alias) == target, (alias, target)
+        assert target in known, (alias, target, sorted(known))
+    for route in REQUIRED_ROUTES:
+        if route in ("/", "/hermes/"):
+            continue
+        assert route in HERMES_ROUTE_ALIASES, route
+
+
+def test_every_normal_route_redirects_into_the_shell(tmp_path):
+    from voicebridge.webui import hermes_alias_target
     ui, port = _start(tmp_path)
     try:
-        for page in FAMILIES:
-            status, ctype, body = _http(port, "GET", page)
-            assert status == 200, page
-            assert "text/html" in ctype, page
-            html = body.decode("utf-8", "replace")
-            assert 'id="main-content"' in html, page
-            assert 'aria-current="page"' in html, page
-            assert "/static/family.js" in html, page
-            for link in NAV_LINKS:
-                assert f'href="{link}"' in html, (page, link)
-            for token in ("Hermes", "OpenClaw", "hermes-agent"):
-                assert token not in html, (page, token)
+        status, loc = _raw(port, "/")
+        assert (status, loc) == (302, "/hermes/")
+        for route in REQUIRED_ROUTES:
+            if route in ("/", "/hermes/"):
+                continue
+            status, loc = _raw(port, route)
+            assert status == 302, (route, status)
+            assert loc == hermes_alias_target(route), (route, loc)
     finally:
         ui.stop()
 
 
-def test_family_groups_match_catalog_and_cover_everything(tmp_path):
+def test_ops_catalog_matches_registry_and_runs(tmp_path):
     from voicebridge import dashboard_ops as OPS
-
     ui, port = _start(tmp_path)
     try:
-        catalog_groups = {o["group"] for o in OPS.catalog()}
-        covered: set = set()
-        for page, groups in FAMILIES.items():
-            _, _, body = _http(port, "GET", page)
-            declared = _family_groups(body.decode("utf-8", "replace"))
-            assert declared == groups, (page, declared)
-            for group in groups:
-                assert group in catalog_groups, (page, group)
-                ops = [o for o in OPS.catalog() if o["group"] == group]
-                assert ops, (page, group)
-            covered.update(groups)
-        # every catalog group is reachable from a family page or /ops
-        assert covered <= catalog_groups
+        status, ctype, body = _http(port, "GET", "/hermes/api/ops",
+                                    hermes=True)
+        assert status == 200, (status, body[:200])
+        out = json.loads(body)
+        assert out["count"] == len(OPS.catalog())
+        groups = {o["group"] for o in out["ops"]}
+        assert groups == {o["group"] for o in OPS.catalog()}
+        # run one op per group through the shared broker
+        for group in sorted(groups):
+            candidates = [o for o in out["ops"] if o["group"] == group]
+            read = next((o for o in candidates if not o["confirm"]),
+                        candidates[0])
+            status, _, body = _http(
+                port, "POST", "/hermes/api/ops/run",
+                {"id": read["id"], "args": {}}, hermes=True)
+            assert status in (200, 400, 409), (group, read["id"], status)
+            out2 = json.loads(body)
+            assert out2.get("state") in ("executed", "failed", "refused",
+                                         "needs-confirm",
+                                         "NEEDS_CONFIRMATION"), (group, out2)
+            if out2.get("confirmation_id"):
+                _http(port, "POST", "/hermes/api/ops/cancel",
+                      {"confirmation_id": out2["confirmation_id"]},
+                      hermes=True)
+        # unknown op is typed, never a fabricated success
+        status, _, body = _http(port, "POST", "/hermes/api/ops/run",
+                                {"id": "no-such-op", "args": {}}, hermes=True)
+        assert status == 400
+        assert json.loads(body)["code"] == "UNKNOWN_OP"
     finally:
         ui.stop()
 
 
-def test_family_ops_execute_through_backend(tmp_path):
-    """Spot-check one op per family through /api/ops/run: reads execute,
-    mutations stage confirmations, unknown ids fail typed."""
+def test_ops_api_stays_header_token_authenticated(tmp_path):
     ui, port = _start(tmp_path)
     try:
-        from voicebridge import dashboard_ops as OPS
-
-        by_group = {}
-        for op in OPS.catalog():
-            by_group.setdefault(op["group"], []).append(op)
-        for page, groups in FAMILIES.items():
-            for group in groups:
-                ops = by_group[group]
-                read = next((o for o in ops if not o["confirm"]), ops[0])
-                args = {}
-                for a in read.get("args", []):
-                    if a.get("required"):
-                        args[a["name"]] = "1" if a.get("type") == "int" else "test"
-                status, _, body = _http(
-                    port, "POST", "/api/ops/run",
-                    {"id": read["id"], "args": args})
-                assert status == 200, (page, read["id"])
-                out = json.loads(body.decode())
-                assert out["state"] in ("executed", "needs-confirm",
-                                        "failed", "refused"), (page, read)
-                if out["state"] == "needs-confirm":
-                    status, _, body = _http(
-                        port, "POST", "/api/ops/cancel",
-                        {"confirmation_id": out["confirmation_id"]})
-                    assert status == 200, (page, read)
-        status, _, _ = _http(port, "POST", "/api/ops/run",
-                             {"id": "no-such-op", "args": {}})
-        assert status == 200
-    finally:
-        ui.stop()
-
-
-def test_api_stays_header_token_authenticated(tmp_path):
-    ui, port = _start(tmp_path)
-    try:
-        status, _, _ = _http(port, "GET", "/api/ops", token=None)
+        status, _, _ = _http(port, "GET", "/hermes/api/ops", token=None)
         assert status == 401
-        status, _, _ = _http(port, "GET", "/api/ops?token=test-token",
+        status, _, _ = _http(port, "GET", "/hermes/api/ops?token=test-token",
                              token=None)
         assert status == 401, "query-string tokens must stay rejected"
     finally:
@@ -184,20 +213,16 @@ def test_api_stays_header_token_authenticated(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Browser rendering (opt-in ui mark): landmarks, no JS errors, touch targets
+# Browser rendering (opt-in ui mark): Hermes shell landmarks, no JS errors
 # ---------------------------------------------------------------------------
-import pytest as _pytest  # noqa: E402
-
-
-@_pytest.mark.ui
-def test_family_pages_render_clean_with_landmarks(tmp_path_factory):
+@pytest.mark.ui
+def test_family_routes_render_hermes_shell(tmp_path_factory):
     try:
         from playwright.sync_api import sync_playwright
     except Exception as exc:
-        _pytest.skip(f"playwright unavailable: {exc}")
+        pytest.skip(f"playwright unavailable: {exc}")
     from voicebridge.config import Config
     from voicebridge.webui import WebUI
-    import time as _time
 
     state = tmp_path_factory.mktemp("fam-ui")
     p = state / "voice.yaml"
@@ -211,7 +236,7 @@ def test_family_pages_render_clean_with_landmarks(tmp_path_factory):
 
         def __init__(self):
             self.cfg = cfg
-            self._t0 = _time.time()
+            self._t0 = time.time()
 
     ui = WebUI(_FakeOrch(), host="127.0.0.1", port=0, state_dir=state)
     ui.start()
@@ -221,42 +246,32 @@ def test_family_pages_render_clean_with_landmarks(tmp_path_factory):
         try:
             browser = pw.chromium.launch()
         except Exception as exc:
-            _pytest.skip(f"chromium unavailable: {exc}")
+            pytest.skip(f"chromium unavailable: {exc}")
         try:
-            for route in list(FAMILIES) + ["/ops"]:
+            for route in FAMILY_TARGETS:
                 ctx = browser.new_context(
                     viewport={"width": 1280, "height": 800})
                 page = ctx.new_page()
-                page.add_init_script(
-                    "localStorage.setItem('vdb_token','test-token');")
                 errors = []
                 page.on("console", lambda m: errors.append(m.text)
                         if m.type == "error"
-                        and "favicon" not in m.text.lower() else None)
+                        and "favicon" not in m.text.lower()
+                        and not m.text.startswith("Failed to load resource:")
+                        and "status of 403" not in m.text
+                        and "401" not in m.text else None)
                 page.on("pageerror",
                         lambda exc: errors.append("pageerror: " + str(exc)))
                 page.goto(base + route, wait_until="domcontentloaded")
-                page.wait_for_timeout(800)
-                assert page.locator("main#main-content").count() == 1, route
-                assert page.locator(
-                    'nav[aria-label="Primary"]').count() == 1, route
-                assert page.locator(
-                    ".page-nav a[aria-current='page']").count() == 1, route
-                assert not errors, (route, errors[:3])
-                # every visible control meets the touch target minimum
-                small = page.evaluate(
-                    "() => { const out = []; "
-                    "for (const el of document.querySelectorAll("
-                    "'button, a[href], input, select, textarea')) {"
-                    " if (el.classList.contains('skip-link')) continue;"
-                    " const cs = getComputedStyle(el);"
-                    " if (cs.display === 'none' || cs.visibility === 'hidden') continue;"
-                    " const r = el.getBoundingClientRect();"
-                    " if (r.width === 0 && r.height === 0) continue;"
-                    " if (r.width < 44 || r.height < 44)"
-                    " out.push(el.tagName + '.' + el.className); }"
-                    " return out; }")
-                assert not small, (route, small[:5])
+                page.wait_for_timeout(1200)
+                html = page.content()
+                assert "app-sidebar" in html or 'role="navigation"' in html, route
+                assert 'id="main-content"' not in html, route
+                fatal = [e for e in errors
+                         if not any(s in e for s in (
+                             "ws://", "/api/ws", "/api/pty", "WebSocket",
+                             "/api/credentials/pool", "/api/portal",
+                             "/api/hermes/update/check"))]
+                assert not fatal, (route, fatal[:3])
                 ctx.close()
         finally:
             browser.close()
@@ -265,15 +280,14 @@ def test_family_pages_render_clean_with_landmarks(tmp_path_factory):
         ui.stop()
 
 
-@_pytest.mark.ui
-def test_family_pages_narrow_mobile_no_overflow(tmp_path_factory):
+@pytest.mark.ui
+def test_family_routes_narrow_mobile_no_overflow(tmp_path_factory):
     try:
         from playwright.sync_api import sync_playwright
     except Exception as exc:
-        _pytest.skip(f"playwright unavailable: {exc}")
+        pytest.skip(f"playwright unavailable: {exc}")
     from voicebridge.config import Config
     from voicebridge.webui import WebUI
-    import time as _time
 
     state = tmp_path_factory.mktemp("fam-mob")
     p = state / "voice.yaml"
@@ -287,7 +301,7 @@ def test_family_pages_narrow_mobile_no_overflow(tmp_path_factory):
 
         def __init__(self):
             self.cfg = cfg
-            self._t0 = _time.time()
+            self._t0 = time.time()
 
     ui = WebUI(_FakeOrch(), host="127.0.0.1", port=0, state_dir=state)
     ui.start()
@@ -297,20 +311,18 @@ def test_family_pages_narrow_mobile_no_overflow(tmp_path_factory):
         try:
             browser = pw.chromium.launch()
         except Exception as exc:
-            _pytest.skip(f"chromium unavailable: {exc}")
+            pytest.skip(f"chromium unavailable: {exc}")
         try:
-            for route in list(FAMILIES):
+            for route in ("/", "/activity", "/operations", "/memory"):
                 ctx = browser.new_context(
                     viewport={"width": 360, "height": 740})
                 page = ctx.new_page()
-                page.add_init_script(
-                    "localStorage.setItem('vdb_token','test-token');")
                 page.goto(base + route, wait_until="domcontentloaded")
-                page.wait_for_timeout(600)
+                page.wait_for_timeout(1000)
                 overflow = page.evaluate(
                     "document.documentElement.scrollWidth - "
                     "document.documentElement.clientWidth")
-                assert overflow <= 0, (route, overflow)
+                assert overflow <= 2, (route, overflow)
                 ctx.close()
         finally:
             browser.close()

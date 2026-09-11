@@ -39,6 +39,13 @@ each needs its own review before any use (see UPSTREAM_REUSE R29/R30).
 
 ## 2b. Real Hermes execution (close-out)
 
+> SUPERSEDED 2026-09-10: the supervision stack described below was
+> retired and replaced by the Qubit-native agent runtime
+> (`voicebridge/agent.py`; no external assistant process). See
+> `docs/MIGRATION_JOURNAL_8TF.md` (tail) and
+> `voicebridge/upstream/ATTRIBUTION.md`. This section is retained as
+> the historical record of the close-out turn.
+
 No vendoring-only claim: Qubit BOTH vendors pinned modules (in-tree,
 §3) AND executes the pinned implementation from Qubit-owned space.
 This turn adds, beyond the prior supervisor + vendoring:

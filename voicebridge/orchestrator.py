@@ -2632,6 +2632,16 @@ class VoiceOrchestrator:
         worker guard (same policy path as every other channel). Unknown
         tools fail closed; the guard's decision (deny/confirm) applies."""
         name = str(tool or "")
+        if name.startswith("web."):
+            # Read-only, SSRF-guarded, estop-aware web tools. The module
+            # enforces its own bounded policy (scheme allowlist, private/
+            # metadata IP block, redirect re-validation, size/time caps,
+            # redaction) and returns typed errors; no shell, no second
+            # listener, no writes.
+            from . import web_tool as _wt
+            import json as _json
+            return _json.dumps(_wt.run(self.cfg, name, dict(args or {})),
+                               default=str)
         if name.startswith("local."):
             name = name[len("local."):]
         from .local import actions as _la

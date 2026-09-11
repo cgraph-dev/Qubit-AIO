@@ -323,7 +323,12 @@ def test_frontend_has_no_voice_selector():
 
 
 def test_served_dashboard_has_no_voice_selector(tmp_path: Path) -> None:
-    """The SERVED / page (over HTTP) must not expose the voice selector."""
+    """The SERVED classic page (over HTTP) must not expose the voice selector.
+
+    Hermes-first architecture: / redirects to the Hermes dashboard at
+    /hermes/; the legacy static UI lives under /classic/ only, where the
+    no-voice-selector safety contract still holds verbatim."""
+    import http.client
     import urllib.request
     from voicebridge.webui import WebUI
     orch = _FakeOrch()
@@ -331,12 +336,19 @@ def test_served_dashboard_has_no_voice_selector(tmp_path: Path) -> None:
     ui.start()
     try:
         port = ui._server.server_address[1]
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        conn.request("GET", "/")
+        resp = conn.getresponse()
+        assert resp.status == 302, resp.status
+        assert resp.getheader("Location") == "/hermes/", \
+            resp.getheader("Location")
+        resp.read()
         html = urllib.request.urlopen(
-            f"http://127.0.0.1:{port}/", timeout=10).read().decode()
+            f"http://127.0.0.1:{port}/classic/", timeout=10).read().decode()
     finally:
         ui.stop()
     for needle in VOICE_SELECTOR_FORBIDDEN:
-        assert needle not in html, f"served / page still has {needle!r}"
+        assert needle not in html, f"served classic page still has {needle!r}"
     assert 'id="voice-info"' in html
     assert "Voice is controlled by bridge settings." in html
 
@@ -387,8 +399,9 @@ def test_web_ptt_keeps_same_backend_tts_contract(tmp_path: Path) -> None:
 
 
 def test_served_dashboard_http_content_is_rate_aware(tmp_path: Path) -> None:
-    """Verify the SERVED / page (over HTTP, not only the source file) contains
-    the rate-aware audio contract."""
+    """Verify the SERVED classic page (over HTTP, not only the source file)
+    contains the rate-aware audio contract (/classic/ under Hermes-first;
+    / redirects to /hermes/)."""
     import urllib.request
     from voicebridge.webui import WebUI
     orch = _FakeOrch()
@@ -397,7 +410,7 @@ def test_served_dashboard_http_content_is_rate_aware(tmp_path: Path) -> None:
     try:
         port = ui._server.server_address[1]
         html = urllib.request.urlopen(
-            f"http://127.0.0.1:{port}/", timeout=10).read().decode()
+            f"http://127.0.0.1:{port}/classic/", timeout=10).read().decode()
     finally:
         ui.stop()
     assert "<!doctype html" in html.lower()

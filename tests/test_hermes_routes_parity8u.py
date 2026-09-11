@@ -1,0 +1,346 @@
+"""Packet 8U closure: local models / providers / profiles / tools / learning.
+
+Closes the remaining audit §1A absent reads and §1B wrong-verb gaps so the
+vendored Hermes dashboard always receives a real Qubit backend or a typed gate
+-- never a bare 404. Every read dispatches the SAME module the CLI/voice use
+(``local_models``, ``providers.policy``, ``projects``, ``learning``,
+``capability_catalog``, ``computer_use``); every write/unsafe verb is a typed
+refusal and never fabricates success.
+
+Assertions:
+(a) every added route resolves (``HC.match``) and dispatches to a real read or
+    its exact typed code -- never 404/500;
+(b) the previously-unmapped wrong-verb rows now answer the intended typed gate;
+(c) representative reads equal the direct backend call (files list, git status,
+    local-models status, schedules runs);
+(d) typed gates never touch the filesystem or the network.
+
+No skips, no xfail.
+"""
+from __future__ import annotations
+
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+
+_LOCAL_CFG = ("intent:\n  local_llm:\n    enabled: false\n")
+
+
+def _cfg(tmp_path, monkeypatch):
+    from voicebridge import config as C
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "c"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "s"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "d"))
+    p = tmp_path / "voice.yaml"
+    p.write_text("logging:\n  jsonl: false\n" + _LOCAL_CFG)
+    return C.Config.load(p)
+
+
+def _repo(tmp_path, name="work"):
+    assert shutil.which("git"), "git is required for the scoped git reads"
+    root = tmp_path / name
+    root.mkdir(exist_ok=True)
+    env = {"GIT_CONFIG_NOSYSTEM": "1", "HOME": str(tmp_path),
+           "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+    subprocess.run(["git", "init", "-q", str(root)], check=True, env=env)
+    (root / "notes.md").write_text("hello\n")
+    subprocess.run(["git", "-C", str(root), "add", "."], check=True, env=env)
+    subprocess.run(["git", "-C", str(root), "commit", "-qm", "init"],
+                   check=True, env=env)
+    return root, env
+
+
+def _project(cfg, folder):
+    from voicebridge import projects as PJ
+
+    created = PJ.create(cfg, "Work", [str(folder)], requested_by="t",
+                        confirmed=True, use=True)
+    assert created.get("state") == "OK", created
+    return created
+
+
+# (method, path, handler) -- implemented reads backed by real Qubit modules.
+NEW_READS = [
+    ("GET", "/api/local-models/status", "h_local_models_status"),
+    ("GET", "/api/local-models/hardware", "h_local_models_hardware"),
+    ("GET", "/api/local-models/catalog", "h_local_models_catalog"),
+    ("GET", "/api/local-models/jobs", "h_local_models_jobs"),
+    ("GET", "/api/local-models/jobs/j1", "h_local_models_job_show"),
+    ("GET", "/api/providers/custom-endpoints", "h_custom_endpoints"),
+    ("GET", "/api/profiles/sessions", "h_profiles_sessions"),
+    ("GET", "/api/profiles/sessions/sidebar", "h_profiles_sessions_sidebar"),
+    ("GET", "/api/profiles/projects/tree", "h_profiles_projects_tree"),
+    ("GET", "/api/tools/terminal/backends", "h_terminal_backends"),
+    ("GET", "/api/tools/computer-use/status", "h_computer_use_status"),
+    ("GET", "/api/learning/graph", "h_learning_graph"),
+    ("GET", "/api/learning/node", "h_learning_node"),
+    ("GET", "/api/auth/providers", "h_auth_providers"),
+]
+
+# (method, path, query, body, code, http) -- implemented handlers that return a
+# typed refusal (local-model verbs reuse local_models; staged mutations 409).
+NEW_REFUSALS = [
+    ("POST", "/api/local-models/runtime/install", {}, {"confirm": True},
+     "LOCAL_MODEL_BROKERED", 403),
+    ("POST", "/api/local-models/download", {},
+     {"model": "qubit-brain4", "confirm": True}, "LOCAL_MODEL_BROKERED", 403),
+    ("DELETE", "/api/local-models/models/qubit-brain4", {}, {},
+     "LOCAL_MODEL_BROKERED", 403),
+    ("POST", "/api/local-models/quickstart", {}, {"confirm": True},
+     "LOCAL_MODEL_BROKERED", 403),
+    ("POST", "/api/local-models/server", {}, {"confirm": True},
+     "LOCAL_MODEL_UNAVAILABLE", 403),
+    ("POST", "/api/local-models/eject", {},
+     {"model": "qubit-brain4", "confirm": True}, "LOCAL_MODEL_UNAVAILABLE", 403),
+    ("POST", "/api/local-models/activate", {},
+     {"model": "qubit-brain4", "confirm": True}, "LOCAL_MODEL_UNAVAILABLE", 403),
+    ("POST", "/api/local-models/sideload", {},
+     {"path": "/tmp/x.gguf", "confirm": True}, "LOCAL_MODEL_BROKERED", 403),
+    ("GET", "/api/local-models/search", {}, {}, "LOCAL_MODEL_UNAVAILABLE", 403),
+    ("GET", "/api/local-models/search/files", {}, {},
+     "LOCAL_MODEL_UNAVAILABLE", 403),
+    ("POST", "/api/local-models/download-browsed", {}, {"confirm": True},
+     "LOCAL_MODEL_BROKERED", 403),
+    ("POST", "/api/profiles", {}, {"name": "Work"},
+     "CONFIRM_REQUIRED", 409),
+    ("PUT", "/api/learning/node", {}, {"id": "x", "content": "y"},
+     "CONFIRM_REQUIRED", 409),
+    ("DELETE", "/api/learning/node", {}, {"id": "x"},
+     "CONFIRM_REQUIRED", 409),
+]
+
+# (method, path, code, http) -- declarative typed policy gates.
+NEW_GATES = [
+    ("POST", "/api/providers/custom-endpoints",
+     "PROVIDER_ENDPOINT_STAGED", 403),
+    ("POST", "/api/providers/custom-endpoints/aa/activate",
+     "PROVIDER_ENDPOINT_STAGED", 403),
+    ("DELETE", "/api/providers/custom-endpoints/aa",
+     "PROVIDER_ENDPOINT_STAGED", 403),
+    ("POST", "/api/providers/custom-endpoints/validate",
+     "NETWORK_PROBE_BLOCKED", 403),
+    ("POST", "/api/providers/validate", "NETWORK_PROBE_BLOCKED", 403),
+    ("PUT", "/api/tools/terminal/backend", "TERMINAL_BACKEND_STAGED", 403),
+    ("POST", "/api/tools/computer-use/permissions/grant",
+     "COMPUTER_USE_GRANT_STAGED", 403),
+    ("POST", "/api/profiles/import", "PROFILE_IMPORT_REVIEW", 403),
+    ("POST", "/api/profiles/aa/open-terminal", "PTY_NO_SHELL", 403),
+    ("POST", "/api/profiles/aa/export", "EXPORT_BROKERED", 403),
+    ("GET", "/api/profiles/aa/desktop-overlay", "DESKTOP_OVERLAY_ONLY", 403),
+    ("POST", "/api/sessions/owner-backfill", "SESSIONS_RECEIPT_STORE", 501),
+    ("POST", "/api/memory/providers/aa/oauth/start",
+     "OAUTH_MANUAL_HANDOFF", 403),
+    ("DELETE", "/api/mcp/oauth/flows/f1", "OAUTH_MANUAL_HANDOFF", 403),
+    ("GET", "/api/mcp/oauth/callback/aa/bb", "OAUTH_MANUAL_HANDOFF", 403),
+]
+
+# (method, path, code, http) -- audit §1B wrong-verb rows that used to 404 and
+# now answer the intended typed refusal (or MCP_NO_MOUNT on the implemented
+# inventory handlers).
+WRONG_VERB = [
+    ("PUT", "/api/config/raw", "SECRET_NEVER_SERVED", 403),
+    ("POST", "/api/env/reveal", "SECRET_NEVER_SERVED", 403),
+    ("POST", "/api/credentials/pool", "SECRET_NEVER_SERVED", 403),
+    ("DELETE", "/api/credentials/pool/openai/0", "SECRET_NEVER_SERVED", 403),
+    ("POST", "/api/mcp/servers/aa/auth", "OAUTH_MANUAL_HANDOFF", 403),
+    ("PUT", "/api/mcp/servers/aa/enabled", "MCP_NO_MOUNT", 501),
+    ("PUT", "/api/mcp/servers", "MCP_NO_MOUNT", 501),
+]
+
+
+# ------------------------------------------------------------------ resolution
+def test_new_routes_match_expected_disposition():
+    from voicebridge import hermes_compat as HC
+
+    for method, path, handler in NEW_READS:
+        route, _ = HC.match(method, path)
+        assert route is not None, (method, path)
+        assert route["disposition"] == "implemented", (method, path, route)
+        assert route["handler"] == handler, (method, path, route["handler"])
+
+    for method, path, _q, _b, _code, _http in NEW_REFUSALS:
+        route, _ = HC.match(method, path)
+        assert route is not None, (method, path)
+        assert route["disposition"] == "implemented", (method, path, route)
+
+    for method, path, code, _http in NEW_GATES:
+        route, _ = HC.match(method, path)
+        assert route is not None, (method, path)
+        assert route["disposition"] == "gated", (method, path, route)
+        assert route["gate"]["code"] == code, (method, path, route["gate"])
+        assert route["gate"]["counterpart"], (method, path, route["gate"])
+
+
+# ------------------------------------------------------------------- dispatch
+def test_new_reads_dispatch_real_200(tmp_path, monkeypatch):
+    from voicebridge import hermes_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    for method, path, _handler in NEW_READS:
+        code, out = HC.dispatch(cfg, method, path,
+                                {"id": "deadbeef"}, {})
+        assert code == 200, (method, path, code, str(out)[:200])
+        assert isinstance(out, dict) and out.get("ok") is True, (path, out)
+
+
+def test_new_refusals_dispatch_exact_typed_code(tmp_path, monkeypatch):
+    from voicebridge import hermes_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    for method, path, q, b, code_want, http in NEW_REFUSALS:
+        code, out = HC.dispatch(cfg, method, path, q, b)
+        assert code not in (404, 500), (method, path, code, str(out)[:200])
+        assert code == http, (method, path, code, str(out)[:200])
+        assert out.get("ok") is False, (method, path, out)
+        assert out.get("code") == code_want, (method, path, out)
+        assert out.get("qubit_counterpart"), (method, path, out)
+
+
+def test_new_gates_dispatch_exact_typed_code(tmp_path, monkeypatch):
+    from voicebridge import hermes_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    for method, path, code_want, http in NEW_GATES:
+        code, out = HC.dispatch(cfg, method, path, {}, {})
+        assert code not in (404, 500), (method, path, code, str(out)[:200])
+        assert code == http, (method, path, code, str(out)[:200])
+        assert out.get("ok") is False, (method, path, out)
+        assert out.get("state") == "UNAVAILABLE", (method, path, out)
+        assert out.get("code") == code_want, (method, path, out)
+        assert out.get("qubit_counterpart"), (method, path, out)
+
+
+# --------------------------------------------------------- wrong-verb closure
+def test_wrong_verb_rows_now_typed_not_404(tmp_path, monkeypatch):
+    from voicebridge import hermes_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    for method, path, code_want, http in WRONG_VERB:
+        route, _ = HC.match(method, path)
+        assert route is not None, (method, path)
+        code, out = HC.dispatch(cfg, method, path, {}, {})
+        assert code not in (404, 500), (method, path, code, str(out)[:200])
+        assert code == http, (method, path, code, str(out)[:200])
+        assert out.get("ok") is False, (method, path, out)
+        assert out.get("code") == code_want, (method, path, out)
+
+    code, out = HC.dispatch(cfg, "GET", "/api/auth/providers", {}, {})
+    assert code == 200, (code, out)
+    assert out.get("providers") == [], out
+
+
+# ----------------------------------------- representative reads == backend
+def test_files_list_read_equals_backend(tmp_path, monkeypatch):
+    from voicebridge import hermes_compat as HC
+    from voicebridge import files as FI
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    root = tmp_path / "proj"
+    root.mkdir(exist_ok=True)
+    (root / "a.txt").write_text("hi\n")
+    (root / "sub").mkdir(exist_ok=True)
+    _project(cfg, root)
+
+    direct = FI.list_dir(cfg, str(root))
+    code, out = HC.dispatch(cfg, "GET", "/api/fs/list", {}, {})
+    assert code == 200 and out["ok"] is True, (code, out)
+    assert {e["name"] for e in out["entries"]} == \
+        {e["name"] for e in direct["entries"]}, (out, direct)
+
+
+def test_git_status_read_equals_backend(tmp_path, monkeypatch):
+    from voicebridge import hermes_compat as HC
+    from voicebridge import git_scope as GI
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    root, _ = _repo(tmp_path)
+    _project(cfg, root)
+
+    direct = GI.status(cfg, str(root), requested_by="dashboard:user")
+    code, out = HC.dispatch(cfg, "GET", "/api/git/status", {}, {})
+    assert code == 200 and out["ok"] is True, (code, out)
+    assert out["root"] == direct["root"], (out, direct)
+    assert out["status"] == direct["status"], (out, direct)
+
+
+def test_local_models_status_read_equals_backend(tmp_path, monkeypatch):
+    from voicebridge import hermes_compat as HC
+    from voicebridge import local_models as LM
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    direct = LM.status(cfg)
+    code, out = HC.dispatch(cfg, "GET", "/api/local-models/status", {}, {})
+    assert code == 200 and out["ok"] is True, (code, out)
+    for key, value in direct.items():
+        assert out[key] == value, (key, out.get(key), value)
+
+
+def test_schedules_runs_read_equals_backend(tmp_path, monkeypatch):
+    from voicebridge import hermes_compat as HC
+    from voicebridge import schedules as S
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    created = S.create(cfg, "reads-equal", "summarize notes",
+                       "once in 10 minutes", requested_by="t", confirmed=True)
+    job_id = int(created["job"]["id"])
+    fired = S.run_due(
+        cfg, requested_by="t",
+        executor=lambda *_a, **_k: {"state": "OK", "code": "OK",
+                                    "detail": "done"},
+        now=time.time() + 3600, estop_engaged=lambda: False)
+    assert fired["ran"] == 1, fired
+    direct = S.history(cfg, job_id, 20)
+
+    code, out = HC.dispatch(cfg, "GET", f"/api/cron/jobs/{job_id}/runs", {}, {})
+    assert code == 200 and out["ok"] is True, (code, out)
+    assert out["count"] == len(direct.get("runs", [])), (out, direct)
+
+
+# ------------------------------------------------- gates: no fs / no network
+class _NetworkBlocked(BaseException):
+    """Raised on any attempted socket connect (BaseException so broad
+    ``except Exception`` handlers cannot swallow the proof)."""
+
+
+def test_gates_never_touch_filesystem_or_network(tmp_path, monkeypatch):
+    from voicebridge import hermes_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    cfg.state_dir()
+
+    def _block_connect(self, address, *a, **k):
+        raise _NetworkBlocked("gate attempted network connect: %r" % (address,))
+
+    def _block_urlopen(*a, **k):
+        raise _NetworkBlocked("gate attempted urlopen")
+
+    monkeypatch.setattr("socket.socket.connect", _block_connect)
+    monkeypatch.setattr("urllib.request.urlopen", _block_urlopen)
+    monkeypatch.setattr(HC, "_audit", lambda *a, **k: None)
+
+    class _CleanPower:
+        def load(self):
+            return {"emergency_stop": False, "global_disable": False}
+
+    monkeypatch.setattr("voicebridge.power.power_control_store",
+                        lambda cfg: _CleanPower())
+
+    def _snapshot(root):
+        return {str(p.relative_to(root)) for p in root.rglob("*")}
+
+    before = _snapshot(tmp_path)
+    for method, path, _code, _http in NEW_GATES:
+        code, out = HC.dispatch(cfg, method, path, {}, {})
+        assert code not in (404, 500), (method, path, code, out)
+    for method, path, q, b, _code, _http in NEW_REFUSALS:
+        code, out = HC.dispatch(cfg, method, path, q, b)
+        assert code not in (404, 500), (method, path, code, out)
+    after = _snapshot(tmp_path)
+    assert after == before, (sorted(after - before), sorted(before - after))

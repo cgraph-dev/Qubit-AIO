@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import sys
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -162,15 +163,23 @@ READ_OPS = {
 
 
 def _scrub(value):
-    """Drop clock/volatile fields so two consecutive backend calls compare."""
+    """Drop clock/volatile fields so two consecutive backend calls compare.
+
+    Live resource gauges (the free_vram_mib field and free-VRAM text
+    inside human-readable detail strings) shift between any two calls;
+    only those volatile values are normalized — every other key, code,
+    state, and ceiling still compares exactly.
+    """
     if isinstance(value, dict):
         return {k: _scrub(v) for k, v in value.items()
                 if not (k in ("generated_at", "timestamp", "created_at",
                               "updated_at", "duration_ms", "elapsed_ms",
-                              "elapsed_s", "latency_ms")
+                              "elapsed_s", "latency_ms", "free_vram_mib")
                         or k.endswith(("_at", "_ms", "_ns", "_elapsed")))}
     if isinstance(value, list):
         return [_scrub(v) for v in value]
+    if isinstance(value, str):
+        return re.sub(r"free VRAM \d+ MiB", "free VRAM N MiB", value)
     return value
 
 
@@ -454,12 +463,15 @@ def _http(port, method, path, body=None, token="test-token"):
 def test_ops_http_end_to_end(tmp_path):
     ui, port = _start_server(tmp_path)
     try:
-        status, ctype, body = _http(port, "GET", "/ops")
-        assert status == 200, status
-        assert "text/html" in ctype
-        html = body.decode()
-        assert 'id="main-content"' in html
-        assert "/api/ops" in html
+        # Hermes-first: /ops is a compatibility alias into the Hermes shell
+        # (its operations console), never the retired static page.
+        import http.client
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        conn.request("GET", "/ops")
+        resp = conn.getresponse()
+        resp.read()
+        assert resp.status == 302, resp.status
+        assert resp.getheader("Location") == "/hermes/operations"
         # Catalog requires auth.
         status, _, _ = _http(port, "GET", "/api/ops", token=None)
         assert status == 401, status

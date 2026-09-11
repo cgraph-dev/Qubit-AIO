@@ -1743,11 +1743,12 @@ def test_dashboard_serves_repo_frontend_and_pages(tmp_path):
             with urllib.request.urlopen(req) as r:
                 return r.status, r.read().decode()
 
-        for page in ("/", "/settings", "/token-setup", "/activity", "/reports",
+        for page in ("/classic/", "/classic/settings", "/token-setup",
+                     "/classic/activity", "/classic/reports",
                      "/static/vb.js", "/static/VERSION"):
             st, html = body(page)
             assert st == 200, page
-            if page == "/settings":
+            if page == "/classic/settings":
                 assert "Websites" in html        # current Packet 8E UI
             if page == "/token-setup":
                 assert "Pair this device" in html
@@ -1780,7 +1781,7 @@ def test_dashboard_stale_external_falls_back_to_repo(tmp_path):
             with urllib.request.urlopen(req) as r:
                 return r.status, r.read().decode()
 
-        st, settings_html = body("/settings")
+        st, settings_html = body("/classic/settings")
         assert st == 200
         assert "Websites" in settings_html          # repo (current) UI served
         assert "OLD UI" not in settings_html
@@ -1813,7 +1814,7 @@ def test_dashboard_current_external_frontend_served(tmp_path):
             with urllib.request.urlopen(req) as r:
                 return r.status, r.read().decode()
 
-        st, settings_html = body("/settings")
+        st, settings_html = body("/classic/settings")
         assert st == 200 and "EXTERNAL THEME SETTINGS" in settings_html
         st, js = body("/api/status", {"X-Api-Token": "t"})
         d = _json.loads(js)

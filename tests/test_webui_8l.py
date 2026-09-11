@@ -17,7 +17,10 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-PAGES = ["/", "/activity", "/reports", "/ops", "/settings", "/approvals", "/token-setup"]
+PAGES = ["/classic/", "/activity", "/reports", "/ops", "/settings", "/approvals",
+         "/token-setup", "/docs", "/sessions", "/projects", "/models",
+         "/skills", "/tasks", "/security", "/devices", "/messages",
+         "/memory", "/system", "/setup"]
 
 
 def _start(tmp_path):
@@ -59,20 +62,69 @@ def _http(port, method, path, body=None, token="test-token"):
         return e.code, e.headers.get("Content-Type", ""), e.read()
 
 
-def test_every_dashboard_page_is_served_from_shared_frontend(tmp_path):
+def _http_status_location(port, path):
+    """Raw request that does NOT follow redirects."""
+    import http.client
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    conn.request("GET", path)
+    resp = conn.getresponse()
+    loc = resp.getheader("Location")
+    resp.read()
+    return resp.status, loc
+
+
+def test_every_normal_route_renders_the_hermes_shell(tmp_path):
+    """Hermes-first: every normal dashboard route redirects into the
+    Hermes React shell; only /classic/ and /token-setup serve static HTML."""
+    from voicebridge.webui import hermes_alias_target
     ui, port = _start(tmp_path)
     try:
+        # root is the active Hermes dashboard, never the legacy static page
+        status, loc = _http_status_location(port, "/")
+        assert (status, loc) == (302, "/hermes/"), (status, loc)
         for page in PAGES:
+            if page in ("/classic/", "/token-setup"):
+                continue
+            target = hermes_alias_target(page)
+            assert target is not None, page
+            assert target.startswith("/hermes/"), (page, target)
+            status, loc = _http_status_location(port, page)
+            assert (status, loc) == (302, target), (page, status, loc)
+    finally:
+        ui.stop()
+
+
+def test_classic_fallback_serves_static_pages(tmp_path):
+    """The labelled /classic/ fallback still serves the old static pages."""
+    ui, port = _start(tmp_path)
+    try:
+        for page in ("/classic/", "/classic/activity", "/classic/ops",
+                     "/classic/settings", "/token-setup"):
             status, ctype, body = _http(port, "GET", page)
             assert status == 200, page
             assert "text/html" in ctype, page
             html = body.decode("utf-8", "replace")
             assert 'id="main-content"' in html, page
             assert 'class="skip-link"' in html, page
-            assert '/static/app.css' in html, page
-            assert '/static/vb.js' in html, page
-            if page != "/token-setup":
-                assert '/static/ui.js' in html, page
+    finally:
+        ui.stop()
+
+
+def test_normal_routes_never_serve_static_qubit_html(tmp_path):
+    """No normal route returns the legacy static markup (even via redirect,
+    the final body is the Hermes shell, not the old horizontal nav)."""
+    from voicebridge.webui import hermes_alias_target
+    ui, port = _start(tmp_path)
+    try:
+        for page in [p for p in PAGES if hermes_alias_target(p)]:
+            status, _, body = _http(port, "GET", page)  # follows redirect
+            if status == 404:
+                # hermes-dist not built in this checkout; the alias target
+                # is still asserted above.
+                continue
+            assert status == 200, page
+            html = body.decode("utf-8", "replace")
+            assert "Qubit VoiceBridge — Workspace" not in html, page
     finally:
         ui.stop()
 
@@ -88,19 +140,6 @@ def test_static_assets_are_served_with_correct_mime(tmp_path):
             assert status == 200, path
             assert ctype in got, (path, got)
             assert len(body) > 0, path
-    finally:
-        ui.stop()
-
-
-def test_migrated_pages_serve_no_raw_dynamic_html(tmp_path):
-    ui, port = _start(tmp_path)
-    try:
-        for page in ["/activity", "/approvals", "/reports"]:
-            status, _, body = _http(port, "GET", page)
-            assert status == 200
-            html = body.decode("utf-8", "replace")
-            assert ".innerHTML =" not in html, page
-            assert "fetch(" not in html, page
     finally:
         ui.stop()
 
@@ -136,7 +175,11 @@ def test_every_frontend_api_path_hits_a_real_backend_route(tmp_path):
         paths = set()
         for name in ("index.html", "activity.html", "approvals.html",
                      "ops.html", "reports.html", "settings.html",
-                     "setup.html", "token-setup.html", "vb.js", "ui.js"):
+                     "setup.html", "token-setup.html", "docs.html",
+                     "sessions.html", "projects.html", "models.html",
+                     "skills.html", "tasks.html", "security.html",
+                     "devices.html", "messages.html", "memory.html",
+                     "system.html", "vb.js", "ui.js", "family.js"):
             text = (REPO_ROOT / "frontend" / name).read_text(encoding="utf-8")
             for match in re.findall(r"/api/[A-Za-z0-9/_\-.]+", text):
                 paths.add(match.rstrip("/"))

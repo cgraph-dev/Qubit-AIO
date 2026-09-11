@@ -1,0 +1,1594 @@
+{
+ "source": {
+  "repo": "https://github.com/NousResearch/hermes-agent",
+  "revision": "2237be355906fbe6065ce1815711eee52b2d646e",
+  "tag": "v2026.9.7",
+  "license": "MIT (Nous Research)",
+  "oracle": "/tmp/pinned-upstream/hermes-agent/web/src",
+  "verified_rev": "2237be355906fbe6065ce1815711eee52b2d646e"
+ },
+ "adaptation_rule": "React/TS cannot execute in Qubit's Python/static-JS stack (no React/Node runtime per project constraints); every file maps to a static-JS adapter, shared backend op, tested policy refusal, or documented omission.",
+ "routes": {
+  "/chat": {
+   "qubit": "/",
+   "disposition": "adapted",
+   "note": "Talk workspace: streaming transcript, PTT voice, text turns, approvals via stream; Hermes xterm PTY spawn refused (shell policy) \u2014 transcript streaming is the equivalent."
+  },
+  "/sessions": {
+   "qubit": "/sessions",
+   "disposition": "adapted",
+   "note": "sessions op (receipt sessions) + actions receipts; Hermes rename/export/import/prune/search/stats map to memory + task stores per PARITY_HERMES sessions row."
+  },
+  "/files": {
+   "qubit": "/projects",
+   "disposition": "adapted",
+   "note": "files_inspect/list/read (project-root confined); Hermes mkdir/upload-stream refused (write policy, no bypass)."
+  },
+  "/analytics": {
+   "qubit": "/activity+/reports+/memory",
+   "disposition": "partial",
+   "note": "insights/activity/reports/logs journal-derived views; token-billing charts omitted (local runner has no token economy; owner: local-runner)."
+  },
+  "/models": {
+   "qubit": "/models",
+   "disposition": "adapted",
+   "note": "frontier/config_profiles/reasoning/prompt_budget + capability/mcp/proxy groups."
+  },
+  "/logs": {
+   "qubit": "/system+/activity",
+   "disposition": "adapted",
+   "note": "logs op + live event feed."
+  },
+  "/cron": {
+   "qubit": "/tasks",
+   "disposition": "adapted",
+   "note": "schedules_* ops + opencode/task_run; blueprints map to task-templates + schedules_create."
+  },
+  "/skills": {
+   "qubit": "/skills",
+   "disposition": "adapted",
+   "note": "skills_*/verified/curator/plugins_install/hooks; hub fetch refused (reviewed-only, tested)."
+  },
+  "/plugins": {
+   "qubit": "/skills",
+   "disposition": "adapted",
+   "note": "reviewed-install flow."
+  },
+  "/mcp": {
+   "qubit": "/models",
+   "disposition": "adapted",
+   "note": "mcp inventory; server mount/execution refused (direct-MCP bypass policy)."
+  },
+  "/channels": {
+   "qubit": "/messages",
+   "disposition": "adapted",
+   "note": "msg_* inbox/draft/send/approve."
+  },
+  "/webhooks": {
+   "qubit": "/messages",
+   "disposition": "adapted",
+   "note": "webhook list/show/add/remove/test + verify extra."
+  },
+  "/pairing": {
+   "qubit": "/messages+/token-setup",
+   "disposition": "adapted",
+   "note": "pairing list/create/approve/revoke + device ceremony."
+  },
+  "/profiles": {
+   "qubit": "/memory",
+   "disposition": "adapted",
+   "note": "brain_* profiles/ Vaults."
+  },
+  "/profiles/new": {
+   "qubit": "/memory",
+   "disposition": "adapted",
+   "note": "brain_onboard_plan + onboard_apply form."
+  },
+  "/config": {
+   "qubit": "/settings",
+   "disposition": "adapted",
+   "note": "profiles/models/audio/permissions/power/export/rollback; raw-config dump refused (secret policy)."
+  },
+  "/env": {
+   "qubit": "/security",
+   "disposition": "adapted",
+   "note": "key-reference status only; value reveal refused (secret policy)."
+  },
+  "/system": {
+   "qubit": "/system",
+   "disposition": "adapted",
+   "note": "runtime/doctor/product/package/verify/backup/sync/etc.; gateway process control refused (single event path)."
+  },
+  "/docs": {
+   "qubit": "/docs",
+   "disposition": "adapted",
+   "note": "Qubit docs index + safe render."
+  }
+ },
+ "endpoints": {
+  "/api/actions/": {
+   "qubit": "actions",
+   "disposition": "adapted"
+  },
+  "/api/analytics": {
+   "qubit": "insights/activity/reports",
+   "disposition": "partial:no-token-charts"
+  },
+  "/api/auth/me": {
+   "qubit": "auth_status",
+   "disposition": "adapted"
+  },
+  "/api/auth/providers": {
+   "qubit": "auth_login",
+   "disposition": "adapted:key-refs"
+  },
+  "/api/auth/ws-ticket": {
+   "qubit": "pairing",
+   "disposition": "adapted:ticket-model"
+  },
+  "/api/chat/image-upload": {
+   "qubit": "vision_describe",
+   "disposition": "adapted:bounded"
+  },
+  "/api/config": {
+   "qubit": "settings/product",
+   "disposition": "adapted"
+  },
+  "/api/config/raw": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:CONFIG_RAW (secret policy)"
+  },
+  "/api/config/schema": {
+   "qubit": "settings",
+   "disposition": "adapted:forms"
+  },
+  "/api/config/defaults": {
+   "qubit": "setup_check/product",
+   "disposition": "adapted"
+  },
+  "/api/console": {
+   "qubit": "\u2014",
+   "disposition": "OMITTED:PTY (browser PTY spawn refused; transcript+TUI equivalent)"
+  },
+  "/api/credentials/pool": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:CREDENTIAL_POOL (credential export forbidden)"
+  },
+  "/api/cron/blueprints": {
+   "qubit": "schedules+task-templates",
+   "disposition": "adapted"
+  },
+  "/api/cron/delivery-targets": {
+   "qubit": "monitor",
+   "disposition": "adapted:quiet-hours"
+  },
+  "/api/cron/jobs": {
+   "qubit": "schedules",
+   "disposition": "adapted"
+  },
+  "/api/curator": {
+   "qubit": "curator/verified",
+   "disposition": "adapted"
+  },
+  "/api/dashboard/agent": {
+   "qubit": "worker/agent",
+   "disposition": "adapted"
+  },
+  "/api/dashboard/font": {
+   "qubit": "themes",
+   "disposition": "adapted"
+  },
+  "/api/dashboard/theme": {
+   "qubit": "themes",
+   "disposition": "adapted"
+  },
+  "/api/dashboard/plugin": {
+   "qubit": "plugins_install/skills",
+   "disposition": "adapted:reviewed"
+  },
+  "/api/dashboard/plugins": {
+   "qubit": "skills/verified",
+   "disposition": "adapted:list"
+  },
+  "/api/dashboard/plugins/hub": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:REMOTE_PLUGIN (reviewed-only, tested)"
+  },
+  "/api/dashboard/agent-plugins/install": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:REMOTE_PLUGIN (reviewed-only, tested)"
+  },
+  "/api/dashboard/plugin-providers": {
+   "qubit": "plugins_install",
+   "disposition": "adapted:reviewed"
+  },
+  "/api/env": {
+   "qubit": "secrets/auth_status",
+   "disposition": "adapted:key-refs"
+  },
+  "/api/env/reveal": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:ENV_REVEAL (secret policy)"
+  },
+  "/api/events": {
+   "qubit": "events/stream",
+   "disposition": "adapted:SSE journal"
+  },
+  "/api/ws": {
+   "qubit": "events/stream",
+   "disposition": "adapted:single authority"
+  },
+  "/api/pub": {
+   "qubit": "events/stream",
+   "disposition": "adapted:single authority"
+  },
+  "/api/files": {
+   "qubit": "files",
+   "disposition": "adapted:read-only"
+  },
+  "/api/files/mkdir": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:FILE_WRITE (write policy)"
+  },
+  "/api/files/upload-stream": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:FILE_WRITE (write policy)"
+  },
+  "/api/gateway": {
+   "qubit": "gateway",
+   "disposition": "adapted:records"
+  },
+  "/api/gateway/start": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:GATEWAY_SUPERVISION (single event path, tested)"
+  },
+  "/api/gateway/stop": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:GATEWAY_SUPERVISION (single event path, tested)"
+  },
+  "/api/gateway/restart": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:GATEWAY_SUPERVISION (single event path, tested)"
+  },
+  "/api/hermes/update": {
+   "qubit": "product/update_status",
+   "disposition": "adapted"
+  },
+  "/api/logs": {
+   "qubit": "logs",
+   "disposition": "adapted"
+  },
+  "/api/mcp": {
+   "qubit": "mcp",
+   "disposition": "adapted:inventory"
+  },
+  "/api/mcp/catalog/install": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:REMOTE_MCP (never mounts/fetches)"
+  },
+  "/api/mcp/oauth/flows": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:REMOTE_MCP (never mounts/fetches)"
+  },
+  "/api/mcp/servers": {
+   "qubit": "mcp",
+   "disposition": "adapted:inventory"
+  },
+  "/api/memory": {
+   "qubit": "memory/brain",
+   "disposition": "adapted"
+  },
+  "/api/memory/reset": {
+   "qubit": "memory_forget/brain_profile_sweep",
+   "disposition": "adapted:scoped"
+  },
+  "/api/messaging/platforms": {
+   "qubit": "msg",
+   "disposition": "adapted"
+  },
+  "/api/messaging/telegram/onboarding": {
+   "qubit": "pairing/device",
+   "disposition": "adapted:refs"
+  },
+  "/api/messaging/whatsapp/onboarding": {
+   "qubit": "pairing/device",
+   "disposition": "adapted:refs"
+  },
+  "/api/model/": {
+   "qubit": "config_profiles/frontier",
+   "disposition": "adapted"
+  },
+  "/api/ops/backup": {
+   "qubit": "backup/export_state",
+   "disposition": "adapted:form-passphrase"
+  },
+  "/api/ops/checkpoints": {
+   "qubit": "checkpoints",
+   "disposition": "adapted"
+  },
+  "/api/ops/config-migrate": {
+   "qubit": "product_migrate",
+   "disposition": "adapted"
+  },
+  "/api/ops/debug-share": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:DEBUG_SHARE (exfiltration policy)"
+  },
+  "/api/ops/doctor": {
+   "qubit": "doctor",
+   "disposition": "adapted"
+  },
+  "/api/ops/dump": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:STATE_DUMP (secret policy)"
+  },
+  "/api/ops/hooks": {
+   "qubit": "hooks",
+   "disposition": "adapted"
+  },
+  "/api/ops/import": {
+   "qubit": "import_state",
+   "disposition": "adapted:form-passphrase"
+  },
+  "/api/ops/import-upload": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:FILE_WRITE (server-side bundles only)"
+  },
+  "/api/ops/prompt-size": {
+   "qubit": "prompt_budget",
+   "disposition": "adapted"
+  },
+  "/api/ops/security-audit": {
+   "qubit": "security/verify_release",
+   "disposition": "adapted"
+  },
+  "/api/pairing": {
+   "qubit": "pairing",
+   "disposition": "adapted"
+  },
+  "/api/plugins/kanban/events": {
+   "qubit": "kanban",
+   "disposition": "adapted:board+journal"
+  },
+  "/api/portal": {
+   "qubit": "\u2014",
+   "disposition": "OMITTED:EXTERNAL_PORTAL (external account console; guidance only)"
+  },
+  "/api/profiles": {
+   "qubit": "brain/config_profiles",
+   "disposition": "adapted"
+  },
+  "/api/providers/oauth": {
+   "qubit": "auth_login",
+   "disposition": "adapted:key-refs,live-dance-provider-side"
+  },
+  "/api/pty": {
+   "qubit": "\u2014",
+   "disposition": "OMITTED:PTY (browser PTY spawn refused; transcript+TUI equivalent)"
+  },
+  "/api/sessions": {
+   "qubit": "sessions/memory",
+   "disposition": "adapted:receipts+stores"
+  },
+  "/api/skills": {
+   "qubit": "skills",
+   "disposition": "adapted"
+  },
+  "/api/skills/hub": {
+   "qubit": "\u2014",
+   "disposition": "REFUSED:REMOTE_PLUGIN (reviewed-only, tested)"
+  },
+  "/api/skills/toggle": {
+   "qubit": "skills_enable/disable",
+   "disposition": "adapted"
+  },
+  "/api/status": {
+   "qubit": "status",
+   "disposition": "adapted"
+  },
+  "/api/system/stats": {
+   "qubit": "runtime/status",
+   "disposition": "adapted"
+  },
+  "/api/tools/toolsets": {
+   "qubit": "permissions/capability",
+   "disposition": "adapted:grants"
+  },
+  "/api/webhooks": {
+   "qubit": "webhook",
+   "disposition": "adapted"
+  }
+ },
+ "files": [
+  {
+   "path": "web/src/App.tsx",
+   "bytes": 44130,
+   "sha256": "5f72d97b2f3c952118df3920fa6075e9c349dc58d16f9cc00df0dbc9839d3b0e",
+   "kind": "shell",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/AuthWidget.tsx",
+   "bytes": 5258,
+   "sha256": "4d0ad8e7ca4caf9d98b8a258a11018d6a16303c58bcb775b2c6cf6fc248073fa",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/AutoField.tsx",
+   "bytes": 6348,
+   "sha256": "3c84d78ef3cc352b05fad806b4eaa1a06f1006760541ad45aa2e90d16926a992",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/AutomationBlueprints.tsx",
+   "bytes": 7232,
+   "sha256": "adaabe68e88020e918b804067b3fda155d95c74ab8a3362f3c662580c959df18",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/ChatSessionList.tsx",
+   "bytes": 9285,
+   "sha256": "5c37d2bbdc97abc2a3e2f0cb145ff6216575fc67a1d5e214617ac50f3af2b9d6",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/ChatSidebar.test.tsx",
+   "bytes": 14342,
+   "sha256": "0db3644058d7c75d5632efd849f348f825e2046441f7241ade8677e3c5d467ab",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/components/ChatSidebar.tsx",
+   "bytes": 20448,
+   "sha256": "a4c2f511b68a89e17950719fd6ecdab0d660764aac9e1b071cc9ad9f64809b8a",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/ConfirmDialog.tsx",
+   "bytes": 3326,
+   "sha256": "13cf8290e4d0f49db0aabcee6ad56e966ef600022674a0c47a6e7a0e5ab89382",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/DeleteConfirmDialog.tsx",
+   "bytes": 841,
+   "sha256": "88892093ef3ec42f905ce359665c0482aef85eb220f2210a7c1255ca190ae593",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/HermesConsoleModal.tsx",
+   "bytes": 15975,
+   "sha256": "776f58d89d2e2bbd50f2dc950f61dffc416b5e1f4be25f30871102f1bdb8cb81",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/LanguageSwitcher.tsx",
+   "bytes": 6323,
+   "sha256": "8078c4987adc2e83f2a3462901f9942fa3ba6f9e5bc710d863b2b56e077e5127",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/Markdown.tsx",
+   "bytes": 10850,
+   "sha256": "09e4546ae2bfaadd3c9cbfcb2c74b207f5e50e3b6d768bbe7d8cbb13383ee20c",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/MemoryPressureBanner.test.tsx",
+   "bytes": 14372,
+   "sha256": "276f1ff539f68e4ab16c3dd3e5dc56431f2de70b45a72710176242976faaa4be",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/components/MemoryPressureBanner.tsx",
+   "bytes": 7836,
+   "sha256": "f16829fc87ce8d2600c8c33386edfafe69c6e84e03657196cd742f7f01657983",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/ModelInfoCard.tsx",
+   "bytes": 4169,
+   "sha256": "ae26834005695bfa0064ef46d549ec15856c0e774388dcf146d2fd6a338f9f39",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/ModelPickerDialog.tsx",
+   "bytes": 21780,
+   "sha256": "0166cf84e6d22b1d809dbe358b9eed5753e7d03feb7c1eebbc40dc8ea4870f09",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/ModelReloadConfirm.tsx",
+   "bytes": 1403,
+   "sha256": "ad10b9f064ff04b801fa4f9eef1ce58a8dbb4d7100ce387b0b4dd165ebdf92a1",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/OAuthLoginModal.test.tsx",
+   "bytes": 6181,
+   "sha256": "03b64175602b9a8a9079c21068ee92ba892de5230f19e4943be1a74f7160a199",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/components/OAuthLoginModal.tsx",
+   "bytes": 15586,
+   "sha256": "306b925b08b69550b67c09c5fe9701aa4fa54f40ea3c2013aa50fb251c013358",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/OAuthProvidersCard.tsx",
+   "bytes": 10560,
+   "sha256": "cc1b40d5a5d4aeb3a089c77e742783a6839eb8ee462a3eb2161b6b062ed2d6b6",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/PlatformsCard.tsx",
+   "bytes": 3858,
+   "sha256": "5913da0dceab75fd817b85f840dc3ed1ad70a5f00a14ef3beef6e54214e264e4",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/ProfileScopeBanner.tsx",
+   "bytes": 985,
+   "sha256": "59318cf3a7797436cdd3d17fa65996041db8fae4856ac0346c7d6542a6458af2",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/ProfileSwitcher.tsx",
+   "bytes": 2689,
+   "sha256": "41e7041948abaeb7ab726a2e10519a16fb1840995eb98394f3cf63dbfc890319",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/ReasoningPicker.tsx",
+   "bytes": 4514,
+   "sha256": "3b25e94a09b4e6196f959366cb2c0b3af6dc52c65d8d4b04a8c9f2a82e116b17",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/ScheduleBuilder.tsx",
+   "bytes": 9535,
+   "sha256": "958fb7cf80fa30099284bfeffba263bc85e4373e5034ceaae5a559a1c0d6ba10",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/SidebarFooter.tsx",
+   "bytes": 1195,
+   "sha256": "c070c3c534b7b51bef52b1de94cdeca1d6a2e1e8b357016af8115993e29ad306",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/SidebarStatusStrip.tsx",
+   "bytes": 2405,
+   "sha256": "0dd142f12b5b9d4d7d5339a6be46cb52825e2be02f81ecc718493393ebd5522d",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/SkillEditorDialog.tsx",
+   "bytes": 7085,
+   "sha256": "fe6084909ab16cb8e7e143a1af41ab111e83438287eaa5da5e4ecab5fbd54e0e",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/SlashPopover.tsx",
+   "bytes": 5014,
+   "sha256": "1ed4751afe109dd7faea36f4d418f1cc74766b3b913a9333aa39a65fbe6dd885",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/ThemeSwitcher.tsx",
+   "bytes": 12013,
+   "sha256": "4c5181bb0a89bbf0336ecb9dff4d96736f273607a966ea78eb8704327a939d9e",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/components/ToolsetConfigDrawer.tsx",
+   "bytes": 18067,
+   "sha256": "6abf43e63eca2dc183cded7eb1f09afb63769311f5912be52d1c71c3294b1db6",
+   "kind": "component",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/contexts/PageHeaderProvider.tsx",
+   "bytes": 4659,
+   "sha256": "8a1809e7c89fd12a50b6af8869b8cc8e0f5ae72a8501cae4425091d4ca5863c2",
+   "kind": "context",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/contexts/ProfileProvider.tsx",
+   "bytes": 5058,
+   "sha256": "86e0d90ebea43deec5c803d3ca78cd082a02249d99bca756af41c23409f197a8",
+   "kind": "context",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/contexts/SystemActions.tsx",
+   "bytes": 3837,
+   "sha256": "9a40a898f6545d9db58ce7e3fee089023ea29c6a671065a39421046d2e46f52f",
+   "kind": "context",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/contexts/page-header-context.ts",
+   "bytes": 340,
+   "sha256": "dbac74bed0434ffc7a14d058d2e471b4e5d1402c7041ddf781a6c22261c8e165",
+   "kind": "context",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/contexts/profile-context.ts",
+   "bytes": 560,
+   "sha256": "c9a616ee41e6207c9a6b1aea298de87ee98c953a6b74b5f554a8fb2d69157692",
+   "kind": "context",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/contexts/system-actions-context.ts",
+   "bytes": 516,
+   "sha256": "9005331d44083da62e71942d9576688b5f99b161ab912820ea518bc324f0875e",
+   "kind": "context",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/contexts/usePageHeader.ts",
+   "bytes": 341,
+   "sha256": "4cd26c2b220ddd7dd23c853c75a321dfb770f9d025829a53a43b190c5be3d8f7",
+   "kind": "context",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/contexts/useProfileScope.ts",
+   "bytes": 173,
+   "sha256": "0ad44c462a91713f02b758e06325ab2c476a626ffead05272b513017493e5d00",
+   "kind": "context",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/contexts/useSystemActions.ts",
+   "bytes": 369,
+   "sha256": "66c7293e7d27c474fb9ffe094983e09b513d0f7696c87ec1c89c1434055c5cd5",
+   "kind": "context",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/hooks/useModalBehavior.ts",
+   "bytes": 1100,
+   "sha256": "bb018af8fb2f8f7e25a967d062e79647ba3e77d906afc09b60f97d73305d74f4",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/hooks/useSidebarStatus.ts",
+   "bytes": 674,
+   "sha256": "dfc8c6bcff796cc06a22877a46de30bd73ff7f5638717632665eca16949f2fa7",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/i18n/af.ts",
+   "bytes": 30133,
+   "sha256": "acfb4ae554327d35010e8d255209c151f4e3efef1e27eb2187fb6e62e21e6397",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/ar.ts",
+   "bytes": 33287,
+   "sha256": "7c88de5e5cb35fc661cd2e609e1ae9786a111cd321d20e19fa512af5b3a3b282",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/context.tsx",
+   "bytes": 3572,
+   "sha256": "cef177add9ca0f567e2ff0639c97a640b0b2ea2524623e941c2b0f501aab6228",
+   "kind": "i18n",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/i18n/de.ts",
+   "bytes": 32037,
+   "sha256": "2ab2afe3270eb92ed7b7c5eb0886f92ef7406489d345991659895032a4c8b22b",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/define-locale.ts",
+   "bytes": 1519,
+   "sha256": "27e06404fd0b4eaf7d9f35b79db17af62be428c5e94ae7efb4c7fd5e87682fc1",
+   "kind": "i18n",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/i18n/en.ts",
+   "bytes": 33275,
+   "sha256": "82ffe1cfe23cfdaf1b15fb6e043090ce4f30e24e71115b7a9c2066d0c49a5f40",
+   "kind": "i18n",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/i18n/es.ts",
+   "bytes": 31696,
+   "sha256": "afcfec650bfa5f45ef3b483a3d895af335f340b348c7004febbc0547a9fd8bba",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/fr.ts",
+   "bytes": 32583,
+   "sha256": "178d4909dd59cffb9fb0ef73358201eebbeb4e4a8bb6c70e18eceae8c07bf9fe",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/ga.ts",
+   "bytes": 32466,
+   "sha256": "40c417b8f5f2501a7ea3327c64947cfecbcd1559477b9b90353b3ad3cf618cb3",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/hu.ts",
+   "bytes": 32922,
+   "sha256": "3555b41649df15ab0adc4ca8454193046b2e575d9a5a88f420b82207fc038eeb",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/index.ts",
+   "bytes": 117,
+   "sha256": "bc8a217831c6f66d36a8925ea612414f9d5f4c882c64287e5e604041b5dbfd6b",
+   "kind": "i18n",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/i18n/it.ts",
+   "bytes": 31449,
+   "sha256": "276e9fb741a3bf79ab5545d73afd584024d3e855f2c745baee87b719866d64ac",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/ja.ts",
+   "bytes": 36538,
+   "sha256": "6bc01e590b1af4ce2fe268c0085decbd9aa2b06b6e698bd43359faeaf869d023",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/ko.ts",
+   "bytes": 32725,
+   "sha256": "3fd8cf1fef086a4bab972b407d0b96628aba5eb2cf55ed7b28c1dd21dcdca75f",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/pt.ts",
+   "bytes": 31639,
+   "sha256": "c009197a4a88dc77b19286a6751790378ab5b8f50f3e55cd88748358b416ee74",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/ru.ts",
+   "bytes": 43258,
+   "sha256": "3dc86a29bdfd77c8aae1119db5187007333ecb946a14cfbf1a64d39fb4e391a0",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/tr.ts",
+   "bytes": 31294,
+   "sha256": "a63db5030b48b2b5c9fa6cf951f2de83a0d3ec66b2cd83d9585f7dbcdff39796",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/types.ts",
+   "bytes": 21250,
+   "sha256": "734affe3b52308bc89b970d4597ca4d3d74e598def99db9e6a64e359e97914c2",
+   "kind": "i18n",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/i18n/uk.ts",
+   "bytes": 42614,
+   "sha256": "a22136f03d37eac4499df724e5acada2f242ffc5ee79b48a000eebf3a94e3813",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/zh-hant.ts",
+   "bytes": 29023,
+   "sha256": "78506a0d97eaf1e2af618a04bac6f81f0492a25c06b4813c62382a3f73377f5e",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/i18n/zh.ts",
+   "bytes": 28480,
+   "sha256": "bf11533fcbf17f460cc72906ce477a9300f82eb32ad4cf910ff29a532c86a80c",
+   "kind": "i18n",
+   "disposition": "OMITTED:I18N (23 non-English locales; English-first UI, owner decision)"
+  },
+  {
+   "path": "web/src/index.css",
+   "bytes": 9234,
+   "sha256": "0f65b06e327494f599d59d57cd0633387a0f0bef11be2917a70cc2ffde60690b",
+   "kind": "shell",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/api.test.ts",
+   "bytes": 6570,
+   "sha256": "a5c23be1b619241f30448590e5f951f385b0c22413d5b46829e6099e8f31935d",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/api.ts",
+   "bytes": 86394,
+   "sha256": "59bb6ab61d5fee205f3c0b3a410383d621f6e76cbfa9a6db24ce55014118f9b9",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/chat-activation.test.ts",
+   "bytes": 1042,
+   "sha256": "2abd0118e6079e82b2b2377e94abb657f5a72d28de610f0d4f75e2fde30c4717",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/chat-activation.ts",
+   "bytes": 866,
+   "sha256": "92235b55a0de50d48dbfdff03d8d7ba59a0cf889cfa6e0aea7b5ecf7335f8c8d",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/chat-sidebar-session-params.test.ts",
+   "bytes": 1124,
+   "sha256": "02862cc8de208acf92f648941f4b647479cd87e374be9e1a61440e645d049e31",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/chat-title.test.ts",
+   "bytes": 1232,
+   "sha256": "68c309502ef38cdaf016be57ae924b6c2048892870b8d09cae1a2e79ce532100",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/chat-title.ts",
+   "bytes": 446,
+   "sha256": "a2538a723f717f8ce5d1e08baf4b66a4b3ca5aed74f03f476b569cb9ac490f81",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/chatImagePaste.test.ts",
+   "bytes": 2962,
+   "sha256": "8f4f31ec0c05d86c6527eaf996b49a577cdf24d380b2a0b1e7e279f98c9e8464",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/chatImagePaste.ts",
+   "bytes": 4878,
+   "sha256": "03b78a59532685dbada06068b4dd034429749a843923276f5398a922e6812db3",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/clipboard-usage.test.ts",
+   "bytes": 2249,
+   "sha256": "256b643b3f9af72c494057e1d5db6603ebdd65a2ac480646b547e4f14724d5a4",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/clipboard.test.ts",
+   "bytes": 3557,
+   "sha256": "c4941304ff7feba393bf6b07b194f422bce916c7ef97f42ad196a363a1063212",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/clipboard.ts",
+   "bytes": 1452,
+   "sha256": "c765130d3494db25abed0bd4ee032715a4abb68490970f821e92f1158c9e49f8",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/cron-job.test.ts",
+   "bytes": 5621,
+   "sha256": "b53fb3a3bb2bfecceffcc89804e025416104cdb28fa4d9efa502d0f10571c882",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/cron-job.ts",
+   "bytes": 5428,
+   "sha256": "ed77676ba7daeec01572f682cbfd9bc529bc7b86dfb186ed30f09cb8b3fd2d0e",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/cron-trigger-controller.test.ts",
+   "bytes": 4192,
+   "sha256": "9b1c5e94ec180a31b3b356d04ee99f7682b70f77914e2b4a47acf1607363022e",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/dashboard-auth-reload.test.ts",
+   "bytes": 2003,
+   "sha256": "16b26d81e0bd5e26ea57e0706f202a32ce11a2db6e7e4bbace32540940aa3574",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/dashboard-auth-reload.ts",
+   "bytes": 1737,
+   "sha256": "39a2ec1d34f416f75a4dcb853d6e7ba1fd97aa688482d5a2ba0585351cce9944",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/dashboard-flags.ts",
+   "bytes": 906,
+   "sha256": "3ea7399273b663afd94419ada45f97749d203327c8b31362148211427457b2b4",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/dashboard-modal-shell.test.ts",
+   "bytes": 852,
+   "sha256": "d7f5167ee02b76ee5ed7f5fcc8926489d02c4a933113f9ae4bb9b517673a7d42",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/dashboard-modal-shell.ts",
+   "bytes": 1116,
+   "sha256": "1eb68b3363a51259feec112ae9234ac756862460b2e481af5e2751d6b0682221",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/env-state.test.ts",
+   "bytes": 1208,
+   "sha256": "544eb9eb366f08e7a35726f17ee8cd66c96ac69c5829a8a7112681a3ef295def",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/env-state.ts",
+   "bytes": 526,
+   "sha256": "4fce475d7b06bbc3fde2f154d82e09f8cb08e4c327d25a826019e0015de28ba8",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/events-reconnect.test.ts",
+   "bytes": 4181,
+   "sha256": "a1746fe74dadd858d24322b80b7fe12b8af71cd052258bbdae623f8e6891508c",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/events-reconnect.ts",
+   "bytes": 3149,
+   "sha256": "86023749ab37d5bb1dcee8fb06fa0e649814f5e8a435229631b33bdf271be16b",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/format.ts",
+   "bytes": 373,
+   "sha256": "440ef0c314785cefb39f89e5b010788bad3c7bf7e69708c70b5b82979e4cd4be",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/fuzzy.ts",
+   "bytes": 5364,
+   "sha256": "e6a34adc8257000698874dc2cd81f359003d692efb99680d7f7beb92ae35b8e3",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/gatewayClient.test.ts",
+   "bytes": 2415,
+   "sha256": "b86db1264ee80f746dff70c709b24e7bc41ba3823b0f1774c6a8a5c3c5755bcc",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/gatewayClient.ts",
+   "bytes": 2127,
+   "sha256": "0117fbccf3e4955ae918782cfc11bf4b5320690f50985c0abc1d3fcd63326b64",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/keyboard-inset.test.ts",
+   "bytes": 2739,
+   "sha256": "820f31641a14b02ad234a693554074d01fd4ee8ed802d3210e245c1f0b8ff808",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/keyboard-inset.ts",
+   "bytes": 3012,
+   "sha256": "d8242d3a6e28a5748a0311841f3df5350ec92050cdbbff42e2e7fa399ff9e6e0",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/log-classify.test.ts",
+   "bytes": 2000,
+   "sha256": "e45af1654d91fbff9e034fb54565a527148e0cd08a2d436a26f51d0fc69d6fe6",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/log-classify.ts",
+   "bytes": 1346,
+   "sha256": "f6c2e04410e4c9f375707f6e86b5f24835d757dc5e97f4ae03469015df5dffdf",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/mcp-dashboard-oauth.test.ts",
+   "bytes": 4642,
+   "sha256": "151c342dbc15495d3b9e34511cb614c0bbc3afbf895cc101b987b180277c4828",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/mcp-dashboard-oauth.ts",
+   "bytes": 2076,
+   "sha256": "79d87c35c6ef4badca9d3073ab61daf2a83a43cd3187f3420e2018f3d73201f8",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/mcp-server-create.test.ts",
+   "bytes": 2565,
+   "sha256": "4bac9494334195623a7da91523ef54676824b6c541c4b693bd8587dec0fb732c",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/mcp-server-create.ts",
+   "bytes": 2042,
+   "sha256": "8f63a659ab8db648abad7accee1131351b66ec5b1afa3226ab8ef4973486b1a0",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/model-picker-filter.test.ts",
+   "bytes": 1626,
+   "sha256": "6d8e8cc0f7620f53925b1221a91a2da6323f9d965994666dbc63ab5733b6b0ec",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/model-picker-filter.ts",
+   "bytes": 872,
+   "sha256": "bb9ffa1035c352a296b364b3f3d10f87978622d11c79c8b847fc2cceacbd5d97",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/model-search-text.ts",
+   "bytes": 1027,
+   "sha256": "9c3061f0087a94a4606c17eb11eee958e63220281c9fed03830b89c142af25fd",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/nested.ts",
+   "bytes": 802,
+   "sha256": "6c26becede8a2db3e9ef8ac7200a755ba72f714f04619954dc7b1f65693c7216",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/pty-composition.test.ts",
+   "bytes": 3953,
+   "sha256": "f0f27bb6bfb87fb97775f5404fc4d4598ad80a357fa60dec288baf2bcb54ffa2",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/pty-composition.ts",
+   "bytes": 1780,
+   "sha256": "e8a2a54df7694a845218ef05d2b1f379c9b2ec1bc2cdfbef255335ee3e3d864c",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/pty-focus.test.ts",
+   "bytes": 1123,
+   "sha256": "5e2b281615db561747ccae7f3eb0c5697f31432e6081105a192eab78755d99b9",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/pty-focus.ts",
+   "bytes": 743,
+   "sha256": "d9149140160ae6ab8723992129e2d4e959ce36874cbb30ead8bd11cbf90be66c",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/pty-keyboard-shortcuts.test.ts",
+   "bytes": 2383,
+   "sha256": "62e6b560d466aae8bb0a921e1f692931774503954e508cae38dc7a3ae8346da4",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/pty-keyboard-shortcuts.ts",
+   "bytes": 1468,
+   "sha256": "55bfd9f0496f2655d1cc04c7baa529a0e5d26973450ca416d327ed6337318821",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/pty-mobile-input.test.ts",
+   "bytes": 4026,
+   "sha256": "54a9dded9e6306ee2191e4da2f44feda3bd55026ff50c77e2a4da7ee736d3d27",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/pty-mobile-input.ts",
+   "bytes": 4267,
+   "sha256": "d996c7fc7aabaae0c805c18e843d1c5e4bc56d107d786609343ac3349f2c2474",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/pty-reconnect.test.ts",
+   "bytes": 3539,
+   "sha256": "d249a2f8dd06bdce795553868907acf5b301a4898bf3b4af91953c75215f73f2",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/pty-reconnect.ts",
+   "bytes": 3336,
+   "sha256": "702f496572898b144cebb80dacfff707f898b2086f063ba825d53f2dbe020c4c",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/pty-resume-loading.test.ts",
+   "bytes": 3300,
+   "sha256": "f857ffddc0e81fb48e015d9f7f42d766811c2fdbdf9db6fd3fa11f0d700f938f",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/pty-resume-loading.ts",
+   "bytes": 1319,
+   "sha256": "73fb2a6e31987a163ec2341a19a050df89a32198639d53e7c8b0df48f1cf5e9b",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/pty-resume-sanitizer.test.ts",
+   "bytes": 7863,
+   "sha256": "f7d2950781e3837d52abc47c47027500931ff3a9a0e3f99311f344b591635028",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/pty-resume-sanitizer.ts",
+   "bytes": 5587,
+   "sha256": "095e10f5419efec3fefca62ec71d2c4e933e3edc80af4edc5b095ba5db94b10b",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/pty-scroll.test.ts",
+   "bytes": 3100,
+   "sha256": "7de43e47c742fb5a17eac7dbaadb18cc3492e6245954676d39ce400aabb9bad7",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/pty-scroll.ts",
+   "bytes": 3028,
+   "sha256": "64d4c0c4f8891895592f86ec186969d8eaf419446bb38ffca0c1d5fee04ae319",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/reasoning-effort.test.ts",
+   "bytes": 1583,
+   "sha256": "591f94e6158c3561bba79a55fdec2c7198c1351e3800570fe492e44a17b5a6e8",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/reasoning-effort.ts",
+   "bytes": 1277,
+   "sha256": "84e5b38ef9138daea0653a61430da414641521fcf1f90c4cb144f77e677bb96f",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/resolve-page-title.test.ts",
+   "bytes": 1882,
+   "sha256": "e470f55523267a4e2f3e62f97d7b4c1bb8855b69b6457412c582c407b3f05799",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/resolve-page-title.ts",
+   "bytes": 1552,
+   "sha256": "10b554fdb60ecd52605a7b078851fcf28e86c518b7fc6c275f1deaff1507d7a7",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/schedule.test.ts",
+   "bytes": 3634,
+   "sha256": "89cc819b9e665177a70d71aca204ddb607918cb76278c1fefb6c12204ccebf06",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/schedule.ts",
+   "bytes": 15932,
+   "sha256": "f7f3a6365eedff722d79cf4333a475f4a11ca376a758858e52bb7c6abb1f51ae",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/session-import.test.ts",
+   "bytes": 1468,
+   "sha256": "43021212e55974cda0b591d8850f757772ec67b7964ec2b25088ca1e9e0945d7",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/session-import.ts",
+   "bytes": 1505,
+   "sha256": "d2d7f23d04e19ed2fb11f122a76dc9ebdcd56a7bac2b4186698dbd74f68d6b7e",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/session-prune.test.ts",
+   "bytes": 578,
+   "sha256": "135a6096d80c2b9f5efa8553aec20d660d5571aea58cb01e4e51a2ceb3c0fa3e",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/session-prune.ts",
+   "bytes": 429,
+   "sha256": "3ceb7d173b0152fa0594d302366589d3cdada9602b02c78b1061c4e621ef75f4",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/session-refresh.test.ts",
+   "bytes": 762,
+   "sha256": "55ec2beba15e6169749e363d4e03b3a34780cffe93e009ad809c3266f646b359",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/lib/session-refresh.ts",
+   "bytes": 1001,
+   "sha256": "b691fa246edbb01a2b0785c891c33a5ea6961d88065ad357aad74b021e28c050",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/slashExec.ts",
+   "bytes": 4616,
+   "sha256": "5f47aded05a6faed9a03e3a9d805cde13f41b5c7017c722aaa5da2e3a8cbebca",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/lib/utils.ts",
+   "bytes": 1466,
+   "sha256": "4e13dd449bd4aa30829e93d9f44b9dcc4b64cf31f836efc9756132c58d70b4e7",
+   "kind": "lib",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/main.tsx",
+   "bytes": 825,
+   "sha256": "4a4ca8d3ec4506e169f9c7991876ee68d5036a741ba5a7f31eab86f1067c50a1",
+   "kind": "shell",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/pages/AnalyticsPage.tsx",
+   "bytes": 22052,
+   "sha256": "b52abfe58b7b58556f837c0f3ecedf6f327160c8a9e76cae2de1a60e3b073b64",
+   "kind": "page",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/pages/ChannelsPage.tsx",
+   "bytes": 53007,
+   "sha256": "d51af1ff281eb69b053b4ab2901c6b6f923f2265214d1f241038096351a85bb1",
+   "kind": "page",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/pages/ChatPage.test.tsx",
+   "bytes": 12675,
+   "sha256": "d62ce3b214ac2eaaf7f66a92f97aafe4c5f5b5bb019d1a3b1171f9587ead51a3",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/pages/ChatPage.tsx",
+   "bytes": 81074,
+   "sha256": "e0195bc46b650594803fefe896fa8fffa64c44848db4a1c074ffd72125113fea",
+   "kind": "page",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/pages/ConfigPage.tsx",
+   "bytes": 22702,
+   "sha256": "aa61c2de5e9b903b97718a111c53286832439606df628d12329da6fe841ac367",
+   "kind": "page",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/pages/CronPage.tsx",
+   "bytes": 41557,
+   "sha256": "dfdc719993f3d823908c66739f6fa9f83fd307b50d90013b941ee9d0d2972dab",
+   "kind": "page",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/pages/DocsPage.tsx",
+   "bytes": 2307,
+   "sha256": "99a72b939db339c0749678cf3ef2262d2fbd634ee162314a663cc05e7b77a13e",
+   "kind": "page",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/pages/EnvPage.tsx",
+   "bytes": 35102,
+   "sha256": "b8aad15b638c009486b20a398f71dcadb7cf42e7b3b2143538c19b5cdda8bf97",
+   "kind": "page",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/pages/FilesPage.tsx",
+   "bytes": 18005,
+   "sha256": "1b844d04eae25194514889a4fd53b7b6dda0b56fda551b0c374d1f040c6b6d15",
+   "kind": "page",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/pages/LogsPage.tsx",
+   "bytes": 7943,
+   "sha256": "3cc1186530f6bf9eba8b0c3c074f59e3b5570d14b12ad14b8e08bc6a86ea28bd",
+   "kind": "page",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/pages/McpPage.tsx",
+   "bytes": 32736,
+   "sha256": "c21108ca49ba80024a8714e25a91f00ebb97e3342dfa457d5f15d9040b3a2b1a",
+   "kind": "page",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/pages/ModelsPage.tsx",
+   "bytes": 49365,
+   "sha256": "78733577fe04e4608872b7e2061b5332b35062a1709624763a9c1b32c7a52ad2",
+   "kind": "page",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/pages/PairingPage.tsx",
+   "bytes": 8893,
+   "sha256": "57ffb2aa70884bb7a036dce8b4c6e857a77493cc863b5c5dc591eb016a1408a3",
+   "kind": "page",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/pages/PluginsPage.tsx",
+   "bytes": 40421,
+   "sha256": "72c8f2448648cda43313329039070a4778edc4b929ae5b64767b67cbcf75c894",
+   "kind": "page",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/pages/ProfileBuilderPage.tsx",
+   "bytes": 32421,
+   "sha256": "821fb1c3b60c5df9d8c00d3f82fdc8546ca19df8d88cbb80ef4d811849319b7f",
+   "kind": "page",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/pages/ProfilesPage.tsx",
+   "bytes": 49473,
+   "sha256": "a3fc373b77d6b247d85e72bfb7e91b8807cfd176f5fa1588ab25741d3707735e",
+   "kind": "page",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/pages/SessionsPage.test.tsx",
+   "bytes": 6504,
+   "sha256": "af94f9a48da896869a39c3ed926be6bd6cf73cb74e4f8b85d1507248f3ed6212",
+   "kind": "test",
+   "disposition": "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
+  },
+  {
+   "path": "web/src/pages/SessionsPage.tsx",
+   "bytes": 76060,
+   "sha256": "a919556cc0848f0fe7ca14ab33d253071615753c6711a74b06bf0bdab10105ff",
+   "kind": "page",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/pages/SkillsPage.tsx",
+   "bytes": 56308,
+   "sha256": "0dea99c29201b20c3d9eaf53bff90a3d3f41f34bab98e41adf8369bc1989a102",
+   "kind": "page",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/pages/SystemPage.tsx",
+   "bytes": 60992,
+   "sha256": "01b9bdc6adecf2406e5156c17da4f132e7b4c70133f00a9fa2c968b8e36a630b",
+   "kind": "page",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/pages/WebhooksPage.tsx",
+   "bytes": 21701,
+   "sha256": "5375f8eeb05de315c6f0d41572c57e14ff680fb87605fc3d644ad5ba3ebca2a6",
+   "kind": "page",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/plugins/PluginPage.tsx",
+   "bytes": 1756,
+   "sha256": "e6cd2271067a519a3ab6b2715254d48b9ac8da078035d01b6f66ab18389df7c1",
+   "kind": "other",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/plugins/index.ts",
+   "bytes": 430,
+   "sha256": "f393530f9a2f7113f80d802b0ff0e71d46935d527108cd7550b6983bf16bf10d",
+   "kind": "other",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/plugins/registry.test.ts",
+   "bytes": 2185,
+   "sha256": "072251420857f7bf0b2e5e6696f99cc2993db64d7c8d84698ea97c906bbc811c",
+   "kind": "other",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/plugins/registry.ts",
+   "bytes": 6502,
+   "sha256": "f37ca0ab497efe1c8588f32afe677865b999c19393d71002ecfc004d30a7f990",
+   "kind": "other",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/plugins/sdk.d.ts",
+   "bytes": 8085,
+   "sha256": "092b483dc1000d2de504b46d93faba88b2ea45d87a75a74265b41846a99c7417",
+   "kind": "other",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/plugins/slots.ts",
+   "bytes": 7046,
+   "sha256": "c65b4d964f69271bb4b4c728c9fc115411e3071d1dee19e7bfa4569b51f6d92b",
+   "kind": "other",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/plugins/types.ts",
+   "bytes": 1141,
+   "sha256": "be44d4d046e335ee34a696cc13177a78807cf25f67f2347c7fcaab9085640942",
+   "kind": "other",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/plugins/usePlugins.test.ts",
+   "bytes": 4087,
+   "sha256": "453b4631586c474a5598706eb7d5f6fa4c029bd5239bd1838d8c04217ac01950",
+   "kind": "other",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/plugins/usePlugins.ts",
+   "bytes": 7119,
+   "sha256": "9e5eb67012f67a2e21b5684160c86c504dbbf91c90753b0aff2611420c0f0f52",
+   "kind": "other",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/themes/context.tsx",
+   "bytes": 22204,
+   "sha256": "b545d59691a0dce5e507cb8b62dec2c90bc60a47332c797f89fb76e456defe3f",
+   "kind": "context",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/themes/fonts.ts",
+   "bytes": 5957,
+   "sha256": "c1a0358c6049e9881087d9f1c58d122cb238a0cf7c3c5332969bec595f81cb26",
+   "kind": "context",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/themes/index.ts",
+   "bytes": 379,
+   "sha256": "6410c711e788cc6958571619673d5d46012e95fbefd90a4256478a4f6ca78b9f",
+   "kind": "context",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/themes/presets.ts",
+   "bytes": 7215,
+   "sha256": "9fe5354d4f0c72bc462e61767fc1c757e1a55caea95301dedd43b7dc904f2231",
+   "kind": "context",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  },
+  {
+   "path": "web/src/themes/types.ts",
+   "bytes": 8274,
+   "sha256": "f67972703821f875c5338f219614d1bfb9770d2244595ebc2f6e3ce8037c348c",
+   "kind": "context",
+   "disposition": "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+  }
+ ]
+}

@@ -50,7 +50,9 @@ def test_planner_schema_is_locked_and_minimal():
     assert PLANNER_SCHEMA["additionalProperties"] is False
     # smallest schemas: no argument bloat
     for name, spec in PLANNER_TOOLS.items():
-        assert name.startswith("local."), "shortlist is whitelisted-only"
+        # whitelisted-only: local.* host actions plus the read-only, SSRF-
+        # guarded web.* tools (web_tool). Anything else is not plannable.
+        assert name.startswith(("local.", "web.")), "shortlist is whitelisted-only"
         assert len(spec["args"]) <= 1
 
 

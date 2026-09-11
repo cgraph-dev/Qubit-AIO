@@ -274,6 +274,64 @@ def _read_capped(path: Path, max_bytes: int = 1 << 20) -> str:
         return ""
 
 
+def _is_skipped(rel: str, skip: set) -> bool:
+    """Segment-aware skip: a path is skipped when it equals a skip entry
+    (possibly a multi-segment prefix) or contains a skipped directory as a
+    path segment. This keeps nested trees (e.g. vendored
+    ``frontend/hermes-web/node_modules``) out of the shipped-code scans."""
+    if rel in skip:
+        return True
+    parts = rel.split("/")
+    for s in skip:
+        s = s.rstrip("/")
+        if not s:
+            continue
+        if "/" in s:
+            if rel == s or rel.startswith(s + "/"):
+                return True
+        elif s in parts:
+            return True
+    return False
+
+
+# Pinned upstream fork vendored into the product (Qubit-owned Hermes runtime,
+# see docs/QUBIT_OWNER_AMENDMENT_2026-09-11_HERMES_RUNTIME.md). Every file is
+# byte-identical to the pinned upstream and carries per-file provenance in
+# docs/QUBIT_HERMES_VENDOR_MANIFEST.json. Upstream test fixtures legitimately
+# contain secret-shaped strings and absolute example paths, so the Qubit
+# secret/machine-path gates never scan it; the fork's own provenance gate
+# (tests/test_hermes_runtime_vendor8u.py) covers it instead.
+_VENDORED_UPSTREAM = {"qubit_hermes"}
+
+
+def _iter_tree(root: Path, pattern: str, skip: set):
+    """Yield files matching ``pattern`` while pruning skipped directories.
+
+    ``Path.rglob`` enumerates the whole tree (the vendored ``qubit_hermes/``
+    fork is ~12k files) before filtering, which made the static release scan
+    slow enough to time out the dashboard. Pruning at the directory level
+    keeps the shipped-code scans fast without changing what they skip."""
+    import fnmatch
+    import os
+
+    root_s = str(root)
+    for dirpath, dirnames, filenames in os.walk(root_s):
+        rel_dir = os.path.relpath(dirpath, root_s).replace(os.sep, "/")
+        if rel_dir == ".":
+            rel_dir = ""
+        dirnames[:] = [
+            d for d in dirnames
+            if not _is_skipped(f"{rel_dir}/{d}" if rel_dir else d, skip)
+        ]
+        for fn in filenames:
+            if not fnmatch.fnmatch(fn, pattern):
+                continue
+            rel = f"{rel_dir}/{fn}" if rel_dir else fn
+            if _is_skipped(rel, skip):
+                continue
+            yield Path(dirpath) / fn
+
+
 def secret_scan(root: Path, *, include_py: bool = True,
                 include_yaml: bool = True, include_docs: bool = False,
                 exclude_tests: bool = True
@@ -283,7 +341,7 @@ def secret_scan(root: Path, *, include_py: bool = True,
     browser state, and (by default) test fixtures, which intentionally carry
     FAKE secrets. Reads are size-capped."""
     results: Dict[str, List[str]] = {}
-    skip = _private_paths()
+    skip = _private_paths() | _VENDORED_UPSTREAM
     if exclude_tests:
         skip.add("tests")
     # voicebridge/evaluation/ is the documented private eval corpus (plan
@@ -295,10 +353,9 @@ def secret_scan(root: Path, *, include_py: bool = True,
         patterns += ["*.yaml", "*.yml", "*.service", "*.timer", "*.json",
                      "*.toml", "*.sh", "*.env", ".env*"]
     for pattern in patterns:
-        for p in sorted(root.rglob(pattern)):
+        for p in sorted(_iter_tree(root, pattern, skip)):
             rel = p.relative_to(root).as_posix()
-            if not p.is_file() or rel in skip or any(
-                    rel.startswith(s) for s in skip):
+            if not p.is_file() or _is_skipped(rel, skip):
                 continue
             is_py = rel.endswith(".py")
             is_cfg = Path(p).suffix.lower() in _CONFIG_EXT
@@ -316,13 +373,14 @@ def machine_path_scan(root: Path) -> Dict[str, List[str]]:
     complete."""
     core: Dict[str, List[str]] = {}
     personal: Dict[str, List[str]] = {}
-    skip = _private_paths() | {"frontend/", "docs/", "benchmarks/", "tests/"}
+    skip = (_private_paths() | _VENDORED_UPSTREAM
+            | {"frontend/", "docs/", "benchmarks/", "tests/"})
     for pattern in ("*.py", "*.sh", "*.service", "*.timer", "*.yaml"):
-        for p in sorted(root.rglob(pattern)):
+        for p in sorted(_iter_tree(root, pattern, skip)):
             if not p.is_file():
                 continue
             rel = p.relative_to(root).as_posix()
-            if rel in skip or any(rel.startswith(s) for s in skip):
+            if _is_skipped(rel, skip):
                 continue
             hits = scan_text_machine_paths(_read_capped(p))
             if not hits:
@@ -447,7 +505,11 @@ def import_scan_installed(base: Path, declared: set[str],
     guarded = guarded if guarded is not None else OPTIONAL_GUARDED
     declared = {_normalize_import(d) for d in declared}
     import ast
-    local = {"voicebridge", "scripts", "browser_auto"}
+    local = {"voicebridge", "scripts", "browser_auto",
+             # Qubit-owned vendored Hermes fork (qubit_hermes/): a local
+             # source tree, not a PyPI distribution. See the owner amendment
+             # docs/QUBIT_OWNER_AMENDMENT_2026-09-11_HERMES_RUNTIME.md.
+             "hermes_cli"}
     failures: List[str] = []
     for py in _walk_py_files(base):
         rel = py.relative_to(base).as_posix()

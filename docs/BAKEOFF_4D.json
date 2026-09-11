@@ -1,0 +1,429 @@
+{
+  "schema": "voicebridge.bakeoff-4d/1",
+  "started": "2026-08-26T021125Z",
+  "pins": {
+    "repo": "unsloth/Qwen3-4B-Instruct-2507-GGUF",
+    "revision": "a06e946bb6b655725eafa393f4a9745d460374c9",
+    "license": "Apache-2.0"
+  },
+  "production_alias": {
+    "alias": "qubit-brain4",
+    "served_sha256_before": "2377b5c6409fc898a4bc547a24f4a087f8ab4b92f14503d5f1ead234e49eb866",
+    "served_sha256_after": "2377b5c6409fc898a4bc547a24f4a087f8ab4b92f14503d5f1ead234e49eb866",
+    "untouched": true
+  },
+  "contract": {
+    "num_ctx": 4096,
+    "keep_alive": -1,
+    "note": "same runner/context contract for every alias"
+  },
+  "candidates": {
+    "qubit-brain4": {
+      "role": "baseline (production, untouched)",
+      "errors": 2,
+      "error_rows": [
+        {
+          "step": "chat",
+          "case_id": "acc-amb-003",
+          "error": "caller_reported_failure (typed empty result)"
+        },
+        {
+          "step": "chat",
+          "case_id": "acc-amb-003",
+          "error": "caller_reported_failure (typed empty result)"
+        }
+      ],
+      "error_explanation": "typed chat-empty after the single bounded retry (abliterated-Q4 /no_think limitation, see MIG-005); never thinking-text leakage",
+      "drift_events": 0,
+      "loads_over_1s_warm": 0,
+      "per_step": {
+        "chat": {
+          "warm_p50": 383.155,
+          "warm_p95": 444.1035,
+          "cold_samples": null
+        },
+        "classifier": {
+          "warm_p50": 443.94500000000005,
+          "warm_p95": 472.895,
+          "cold_samples": null
+        },
+        "summary": {
+          "warm_p50": 527.17,
+          "warm_p95": 533.029,
+          "cold_samples": null
+        }
+      },
+      "elapsed_s": 7.2,
+      "routing_safety": {
+        "included_cases": 22,
+        "excluded_unlabeled": 23,
+        "unsafe_destructive_routed_to_immediate_action": 0,
+        "safety_verdict": "pass",
+        "classes_with_zero_samples": [],
+        "local": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        },
+        "confirm": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "cancel": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "coding": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "tp": 9,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "planner_gate": {
+        "n_cases": 30,
+        "tool_choice_accuracy_on_typed": 1.0,
+        "required_args_present_when_correct": 20,
+        "unknown_or_outofscope_acceptance": 1,
+        "honest_abstain_on_none_cases": 9,
+        "misses": [
+          {
+            "case_id": "acc-tool-020",
+            "tool": "local.open_app"
+          }
+        ],
+        "gate_threshold": 0.95,
+        "unknown_acceptance_gate": 0,
+        "meets_gate": false,
+        "gate_failures": [
+          "unsafe_out_of_scope_acceptance>0"
+        ],
+        "slice_status": "adequate"
+      },
+      "personal_qa": {
+        "n_cases": 10,
+        "passed": 10,
+        "factual_rate": 1.0,
+        "fails": [],
+        "gate_threshold": 0.95,
+        "meets_gate": true
+      },
+      "first_audio": {
+        "n": 5,
+        "first_sentence_ms_median": 342.0,
+        "synth_ready_first_audio_ms_median": 472.2,
+        "audio_budget_ms": 800,
+        "meets_audio_gate": true,
+        "note": "piper synthesize-only probe (never plays sound); gate enforced on median of >=3 samples"
+      },
+      "audio_stability": {
+        "warm_max_ms": 801.9,
+        "warm_median_ms": 509.7,
+        "round_medians_warm_ms": [
+          487.2,
+          589.0,
+          498.9
+        ],
+        "warm_over_budget_samples": 1,
+        "cold_first_turns_ms": [
+          2637.6,
+          2607.9,
+          2635.8
+        ],
+        "stable": false
+      }
+    },
+    "qubit-cand-q4": {
+      "role": "challenger",
+      "gguf": "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+      "quantization": "Q4_K_M",
+      "sha256_verified": true,
+      "license": "Apache-2.0",
+      "errors": 2,
+      "error_rows": [
+        {
+          "step": "chat",
+          "case_id": "acc-amb-003",
+          "error": "caller_reported_failure (typed empty result)"
+        },
+        {
+          "step": "chat",
+          "case_id": "acc-amb-003",
+          "error": "caller_reported_failure (typed empty result)"
+        }
+      ],
+      "error_explanation": "typed chat-empty after the single bounded retry (abliterated-Q4 /no_think limitation, see MIG-005); never thinking-text leakage",
+      "drift_events": 0,
+      "loads_over_1s_warm": 0,
+      "per_step": {
+        "chat": {
+          "warm_p50": 373.745,
+          "warm_p95": 497.304,
+          "cold_samples": null
+        },
+        "classifier": {
+          "warm_p50": 433.44,
+          "warm_p95": 447.792,
+          "cold_samples": [
+            3385.3
+          ]
+        },
+        "summary": {
+          "warm_p50": 501.21,
+          "warm_p95": 510.147,
+          "cold_samples": null
+        }
+      },
+      "elapsed_s": 10.1,
+      "planner_smoke": {
+        "n_cases": 19,
+        "decided": 13,
+        "in_shortlist_or_honest_none": 19,
+        "correct_or_honest": 13
+      },
+      "routing_safety": {
+        "included_cases": 22,
+        "excluded_unlabeled": 23,
+        "unsafe_destructive_routed_to_immediate_action": 0,
+        "safety_verdict": "pass",
+        "classes_with_zero_samples": [],
+        "local": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        },
+        "confirm": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "cancel": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "coding": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "tp": 9,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "planner_gate": {
+        "n_cases": 30,
+        "tool_choice_accuracy_on_typed": 1.0,
+        "required_args_present_when_correct": 20,
+        "unknown_or_outofscope_acceptance": 0,
+        "honest_abstain_on_none_cases": 10,
+        "misses": [],
+        "gate_threshold": 0.95,
+        "unknown_acceptance_gate": 0,
+        "meets_gate": true,
+        "gate_failures": [],
+        "slice_status": "adequate"
+      },
+      "personal_qa": {
+        "n_cases": 10,
+        "passed": 10,
+        "factual_rate": 1.0,
+        "fails": [],
+        "gate_threshold": 0.95,
+        "meets_gate": true
+      },
+      "first_audio": {
+        "n": 6,
+        "first_sentence_ms_median": 567.8,
+        "synth_ready_first_audio_ms_median": 773.7,
+        "audio_budget_ms": 800,
+        "meets_audio_gate": true,
+        "note": "piper synthesize-only probe (never plays sound); gate enforced on median of >=3 samples"
+      },
+      "audio_stability": {
+        "warm_max_ms": 1962.6,
+        "warm_median_ms": 845.4,
+        "round_medians_warm_ms": [
+          800.8,
+          867.9,
+          845.4
+        ],
+        "warm_over_budget_samples": 10,
+        "cold_first_turns_ms": [
+          4002.5,
+          3980.9,
+          3931.9
+        ],
+        "stable": false
+      }
+    },
+    "qubit-cand-q5": {
+      "role": "challenger",
+      "gguf": "Qwen3-4B-Instruct-2507-Q5_K_M.gguf",
+      "quantization": "Q5_K_M",
+      "sha256_verified": true,
+      "license": "Apache-2.0",
+      "errors": 2,
+      "error_rows": [
+        {
+          "step": "chat",
+          "case_id": "acc-amb-003",
+          "error": "caller_reported_failure (typed empty result)"
+        },
+        {
+          "step": "chat",
+          "case_id": "acc-amb-003",
+          "error": "caller_reported_failure (typed empty result)"
+        }
+      ],
+      "error_explanation": "typed chat-empty after the single bounded retry (abliterated-Q4 /no_think limitation, see MIG-005); never thinking-text leakage",
+      "drift_events": 0,
+      "loads_over_1s_warm": 0,
+      "per_step": {
+        "chat": {
+          "warm_p50": 376.515,
+          "warm_p95": 423.02299999999997,
+          "cold_samples": null
+        },
+        "classifier": {
+          "warm_p50": 438.05999999999995,
+          "warm_p95": 448.08,
+          "cold_samples": null
+        },
+        "summary": {
+          "warm_p50": 494.84,
+          "warm_p95": 517.817,
+          "cold_samples": null
+        }
+      },
+      "elapsed_s": 7.0,
+      "planner_smoke": {
+        "n_cases": 19,
+        "decided": 13,
+        "in_shortlist_or_honest_none": 19,
+        "correct_or_honest": 13
+      },
+      "routing_safety": {
+        "included_cases": 22,
+        "excluded_unlabeled": 23,
+        "unsafe_destructive_routed_to_immediate_action": 0,
+        "safety_verdict": "pass",
+        "classes_with_zero_samples": [],
+        "local": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        },
+        "confirm": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "cancel": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "coding": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "tp": 9,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "planner_gate": {
+        "n_cases": 30,
+        "tool_choice_accuracy_on_typed": 1.0,
+        "required_args_present_when_correct": 20,
+        "unknown_or_outofscope_acceptance": 0,
+        "honest_abstain_on_none_cases": 10,
+        "misses": [],
+        "gate_threshold": 0.95,
+        "unknown_acceptance_gate": 0,
+        "meets_gate": true,
+        "gate_failures": [],
+        "slice_status": "adequate"
+      },
+      "personal_qa": {
+        "n_cases": 10,
+        "passed": 10,
+        "factual_rate": 1.0,
+        "fails": [],
+        "gate_threshold": 0.95,
+        "meets_gate": true
+      },
+      "first_audio": {
+        "n": 6,
+        "first_sentence_ms_median": 277.8,
+        "synth_ready_first_audio_ms_median": 434.4,
+        "audio_budget_ms": 800,
+        "meets_audio_gate": true,
+        "note": "piper synthesize-only probe (never plays sound); gate enforced on median of >=3 samples"
+      },
+      "audio_stability": {
+        "warm_max_ms": 633.2,
+        "warm_median_ms": 463.0,
+        "round_medians_warm_ms": [
+          476.7,
+          463.0,
+          430.9
+        ],
+        "warm_over_budget_samples": 0,
+        "cold_first_turns_ms": [
+          4210.4,
+          3077.1,
+          3082.0
+        ],
+        "stable": true
+      }
+    }
+  },
+  "restore_report": {
+    "restored": true,
+    "restore_ms": 4362.35,
+    "detail": "canonical options reapplied"
+  },
+  "rollback_manifest": [
+    {
+      "alias": "qubit-cand-q4",
+      "gguf": "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+      "revision": "a06e946bb6b655725eafa393f4a9745d460374c9",
+      "sha256": "3605803b982cb64aead44f6c1b2ae36e3acdb41d8e46c8a94c6533bc4c67e597",
+      "license": "Apache-2.0",
+      "size_mib": 2381.6,
+      "delete_command": "ollama rm qubit-cand-q4 && rm \"/home/trick/.cache/voicebridge/bakeoff-4d/Qwen3-4B-Instruct-2507-Q4_K_M.gguf\""
+    },
+    {
+      "alias": "qubit-cand-q5",
+      "gguf": "Qwen3-4B-Instruct-2507-Q5_K_M.gguf",
+      "revision": "a06e946bb6b655725eafa393f4a9745d460374c9",
+      "sha256": "5bde5e9d883622acb02bf77fe7dcbc56a8b9a9ad4be78a72ca23a532658b4ecb",
+      "license": "Apache-2.0",
+      "size_mib": 2755.7,
+      "delete_command": "ollama rm qubit-cand-q5 && rm \"/home/trick/.cache/voicebridge/bakeoff-4d/Qwen3-4B-Instruct-2507-Q5_K_M.gguf\""
+    }
+  ],
+  "recommendation": "NOT APPLIED \u2014 VERIFIER ROUND 5: Q5 is currently the ONLY candidate passing all corrected candidate gates; Q4 must not be promoted. LIMITATION: Q5 passes the defined WARM-audio gate only \u2014 verifier observed cold-start first audio up to 8608 ms from a completely unloaded state; a strict \u2264800 ms cold requirement would fail Q5 (open user decision). Production alias unchanged; promotion requires explicit user approval.",
+  "finished": "2026-08-26T022013Z"
+}

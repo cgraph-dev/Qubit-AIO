@@ -1,0 +1,12 @@
+{
+  "name": "qubit-gateway",
+  "label": "Gateway",
+  "description": "Gateway records and link states (same backend as qubit gateway CLI). OpenClaw addition on the Hermes baseline.",
+  "icon": "network",
+  "version": "1.1.0",
+  "tab": {"path": "/qubit-gateway", "position": "after:mcp"},
+  "entry": "qubit-gateway.js",
+  "css": null,
+  "has_api": true,
+  "source": "qubit-overlay"
+}

@@ -42,7 +42,10 @@ MISSING, DEGRADED, WARN, FAIL = "MISSING", "DEGRADED", "WARN", "FAIL"
 # gracefully, so their absence is a warning, not a fresh-install failure.
 OPTIONAL_GUARDED = {"psutil", "onnx", "prompt_toolkit", "websocket",
                     "pystray"}
-LOCAL_TOP = {"voicebridge", "scripts", "browser_auto"}
+LOCAL_TOP = {"voicebridge", "scripts", "browser_auto",
+             # Qubit-owned vendored Hermes fork (qubit_hermes/): local source,
+             # not a PyPI distribution.
+             "hermes_cli"}
 
 
 # Distribution-name -> import-name corrections (pip name differs from module).

@@ -39,7 +39,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-SENSITIVE_ARGS = ("passphrase", "password", "secret", "token", "api_key")
+SENSITIVE_ARGS = ("passphrase", "password", "secret", "token", "api_key",
+                  "key_ref")
 
 INTERFACES_ALL = ("cli", "dashboard", "voice")
 INTERFACES_NO_VOICE_PASSPHRASE = ("cli", "dashboard")
@@ -172,6 +173,9 @@ def catalog() -> List[Dict[str, Any]]:
             "scope": ["dashboard"],
             "interfaces": list(spec.interfaces),
             "interface_reason": spec.interface_reason,
+            "voice_guard": (f"guard_{op_id}"
+                            if op_id in getattr(VC, "VOICE_GUARDS", {})
+                            else ""),
             "parity": list(spec.parity or ()),
         })
     return items

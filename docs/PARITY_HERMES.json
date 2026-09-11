@@ -6,8 +6,8 @@
   {
    "cmd": "chat",
    "verdict": "IMPLEMENTED",
-   "qubit": "voice/talk intake, CLI text, RealHermesRuntime.turn",
-   "proof": "tests/test_real_hermes.py, 8H suites",
+   "qubit": "voice/talk intake, CLI text, Qubit-native agent.turn/run_session (voicebridge/agent.py)",
+   "proof": "tests/test_agent8u.py, 8H suites",
    "owner": "qubit-core",
    "rollback": "standard Qubit rollback contracts apply"
   },

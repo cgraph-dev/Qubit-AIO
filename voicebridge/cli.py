@@ -31,6 +31,10 @@ def _launcher_name() -> str:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    # Provider choices come from the single messaging capability registry so a
+    # newly registered channel is selectable without a second list drifting.
+    from .messaging import PROVIDERS as _MSG_PROVIDERS
+    _msg_provider_choices = list(_MSG_PROVIDERS)
     p = argparse.ArgumentParser(
         prog=_launcher_name(),
         description="Qubit Agent (Qubit VoiceBridge): local push-to-talk voice interface (ASR + intent + gateway + TTS).")
@@ -133,12 +137,35 @@ def build_parser() -> argparse.ArgumentParser:
     ck_prune.add_argument("name", help="checkpoint name")
     ck_prune.add_argument("--confirm", action="store_true",
                           help="explicit owner approval")
-    sess = add("sessions", help="recent Qubit action sessions from receipts (redacted)")
+    sess = add("sessions", help="Qubit action sessions: list/search/show + lifecycle (rename/archive/delete/resume)")
     sess_sub = sess.add_subparsers(dest="sessions_command")
     sess_list = sess_sub.add_parser("list", parents=[common],
                                     help="list recent sessions (read-only)")
     sess_list.add_argument("--limit", type=int, default=20,
                            help="max sessions (default: 20, max: 100)")
+    sess_search = sess_sub.add_parser("search", parents=[common],
+                                      help="search sessions by redacted text (read-only)")
+    sess_search.add_argument("query", help="substring query")
+    sess_search.add_argument("--limit", type=int, default=20,
+                             help="max matches (default: 20)")
+    sess_show = sess_sub.add_parser("show", parents=[common],
+                                    help="show one session (redacted, read-only)")
+    sess_show.add_argument("session_id", help="receipt/action id")
+    sess_rename = sess_sub.add_parser("rename", parents=[common],
+                                      help="set a session display name (idempotent, audited)")
+    sess_rename.add_argument("session_id")
+    sess_rename.add_argument("name")
+    sess_archive = sess_sub.add_parser("archive", parents=[common],
+                                       help="archive a session (idempotent, recoverable)")
+    sess_archive.add_argument("session_id")
+    sess_delete = sess_sub.add_parser("delete", parents=[common],
+                                      help="delete a session (destructive; needs --confirm; resume restores)")
+    sess_delete.add_argument("session_id")
+    sess_delete.add_argument("--confirm", action="store_true",
+                             help="explicit owner approval")
+    sess_resume = sess_sub.add_parser("resume", parents=[common],
+                                      help="resume/restore an archived or deleted session")
+    sess_resume.add_argument("session_id")
     cap = add("capability", help="capability catalog: typed state for any Qubit capability (read-only)")
     cap.add_argument("action", nargs="?", default="summary",
                      choices=["check", "list", "summary"],
@@ -687,6 +714,15 @@ def build_parser() -> argparse.ArgumentParser:
                                 help="read the current tab: title, URL, bounded text (read-only)")
     br_read.add_argument("--target", default="",
                          help="tab id (default: Qubit-current tab)")
+    br_shot = br_sub.add_parser(
+        "screenshot", parents=[common],
+        help="bounded screenshot of the current tab (read-only)")
+    br_shot.add_argument("--target", default="")
+    br_shot.add_argument("--clip", default="",
+                         help="x,y,w,h crop (optional)")
+    br_shot.add_argument("--format", dest="fmt", default="jpeg",
+                         choices=("jpeg", "png"))
+    br_shot.add_argument("--max-bytes", type=int, default=0)
     br_find = br_sub.add_parser("find", parents=[common],
                                 help="search the current tab text (read-only)")
     br_find.add_argument("query", help="text to search (<=200 chars)")
@@ -722,7 +758,7 @@ def build_parser() -> argparse.ArgumentParser:
                                   help="close a tab (needs --confirm)")
     br_tclose.add_argument("target", help="tab id")
     br_tclose.add_argument("--confirm", action="store_true")
-    acp = add("acp", help="Editor-integration checks (no ACP server shipped)")
+    acp = add("acp", help="Editor-integration checks + ACP external harness client (no ACP server shipped)")
     acp.add_argument("--accept-hooks", action="store_true",
                      help="refused: unseen hooks are never auto-approved")
     acp.add_argument("--check", action="store_true",
@@ -737,6 +773,90 @@ def build_parser() -> argparse.ArgumentParser:
                      help="report the ACP server state")
     acp.add_argument("--yes", "-y", action="store_true",
                      help="accepted and ignored (no prompts exist)")
+    acp_sub = acp.add_subparsers(dest="acp_command")
+    acp_sub.add_parser("status", parents=[common],
+                       help="external harness client state (read-only)")
+    acp_sub.add_parser("catalog", parents=[common],
+                       help="PATH presence + configured harnesses (read-only)")
+    acp_hs = acp_sub.add_parser("handshake", parents=[common],
+                                help="shape ACP initialize (needs --confirm; never executes)")
+    acp_hs.add_argument("harness")
+    acp_hs.add_argument("--confirm", action="store_true")
+    acp_send = acp_sub.add_parser("send", parents=[common],
+                                  help="shape session/prompt; always typed-refused")
+    acp_send.add_argument("harness")
+    acp_send.add_argument("prompt", nargs="+")
+    acp_send.add_argument("--confirm", action="store_true")
+    acp_recv = acp_sub.add_parser("receipts", parents=[common],
+                                  help="redacted ACP receipts (bounded tail)")
+    acp_recv.add_argument("--harness", default="")
+    acp_conf = acp_sub.add_parser("configure", parents=[common],
+                                  help="record a harness credential reference (needs --confirm)")
+    acp_conf.add_argument("harness")
+    acp_conf.add_argument("--credential-ref", default="",
+                          help="env:VAR or file:PATH (never a value)")
+    acp_conf.add_argument("--confirm", action="store_true")
+    acp_unconf = acp_sub.add_parser("unconfigure", parents=[common],
+                                    help="remove a configured harness (needs --confirm)")
+    acp_unconf.add_argument("harness")
+    acp_unconf.add_argument("--confirm", action="store_true")
+    pl = add("plugins", help="Plugin runtime registry (manifests are metadata; in-process handlers only)")
+    pl_sub = pl.add_subparsers(dest="plugins_command")
+    pl_sub.add_parser("status", parents=[common],
+                      help="typed plugin runtime state (read-only)")
+    pl_sub.add_parser("list", parents=[common],
+                      help="list registered plugins + built-ins (read-only)")
+    pl_show = pl_sub.add_parser("show", parents=[common],
+                                help="show one plugin record (redacted)")
+    pl_show.add_argument("plugin_id")
+    pl_reg = pl_sub.add_parser("register", parents=[common],
+                               help="record a validated manifest (needs --confirm; never executes)")
+    pl_reg.add_argument("manifest", help="path to a JSON manifest")
+    pl_reg.add_argument("--confirm", action="store_true")
+    pl_inv = pl_sub.add_parser("invoke", parents=[common],
+                               help="invoke an in-process handler (needs --confirm)")
+    pl_inv.add_argument("plugin_id")
+    pl_inv.add_argument("--text", default="",
+                        help="built-in echo text (in-process handlers only)")
+    pl_inv.add_argument("--confirm", action="store_true")
+    pl_unreg = pl_sub.add_parser("unregister", parents=[common],
+                                 help="remove a registered plugin (needs --confirm)")
+    pl_unreg.add_argument("plugin_id")
+    pl_unreg.add_argument("--confirm", action="store_true")
+    pl_sub.add_parser("doctor", parents=[common],
+                      help="store/handlers/latch health (read-only)")
+    ch = add("channels", help="Inbound channel framework (references only; no listener starts)")
+    ch_sub = ch.add_subparsers(dest="channels_command")
+    ch_sub.add_parser("status", parents=[common],
+                      help="typed inbound state; connected is never faked")
+    ch_sub.add_parser("catalog", parents=[common],
+                      help="every known channel with an honest typed state")
+    ch_sub.add_parser("accounts", parents=[common],
+                      help="configured references only (never values)")
+    ch_conf = ch_sub.add_parser("configure", parents=[common],
+                                help="record an env:/file: reference (needs --confirm)")
+    ch_conf.add_argument("channel")
+    ch_conf.add_argument("secret_ref", help="env:VAR or file:PATH (never a value)")
+    ch_conf.add_argument("--events", default="",
+                         help="comma-separated event allowlist (default: message)")
+    ch_conf.add_argument("--confirm", action="store_true")
+    ch_unconf = ch_sub.add_parser("unconfigure", parents=[common],
+                                  help="remove a configured channel (needs --confirm)")
+    ch_unconf.add_argument("channel")
+    ch_unconf.add_argument("--confirm", action="store_true")
+    ch_recv = ch_sub.add_parser("receive", parents=[common],
+                                help="validate a signed raw delivery (HMAC; no listener)")
+    ch_recv.add_argument("channel")
+    ch_recv.add_argument("payload_file", type=Path,
+                         help="file containing the raw request body")
+    ch_recv.add_argument("--signature", default="",
+                         help="HMAC-SHA256 signature (sha256=... accepted)")
+    ch_recv.add_argument("--timestamp", type=float, default=None)
+    ch_recv.add_argument("--delivery-id", default="")
+    ch_recv.add_argument("--sender", default="")
+    ch_recv.add_argument("--event", default="message")
+    ch_sub.add_parser("doctor", parents=[common],
+                      help="store/listener/latch diagnostics (read-only)")
     lsp = add("lsp", help="Language-server inventory (binaries never downloaded)")
     lsp_sub = lsp.add_subparsers(dest="lsp_command")
     lsp_sub.add_parser("status", parents=[common],
@@ -893,7 +1013,7 @@ def build_parser() -> argparse.ArgumentParser:
                                 help="record a provider account (dry-run unless --confirm)")
     mg_acct.add_argument("account_id")
     mg_acct.add_argument("--provider", required=True,
-                         choices=["whatsapp", "whatsapp-cloud", "slack"])
+                         choices=_msg_provider_choices)
     mg_acct.add_argument("--label", required=True)
     mg_acct.add_argument("--key-ref", required=True,
                          help="credential as env:VAR or file:PATH (never a value)")
@@ -1057,7 +1177,7 @@ def build_parser() -> argparse.ArgumentParser:
                                help="record a gateway (dry-run unless --confirm)")
     gw_add.add_argument("gateway_id")
     gw_add.add_argument("--provider", required=True,
-                        choices=["whatsapp", "whatsapp-cloud", "slack"])
+                        choices=_msg_provider_choices)
     gw_add.add_argument("--account", required=True)
     gw_add.add_argument("--channel", required=True,
                         choices=["webhook", "polling", "websocket"])
@@ -1213,6 +1333,12 @@ def build_parser() -> argparse.ArgumentParser:
     ws_show = ws_sub.add_parser("show", parents=[common, ws_human],
                                 help="show one record + effective permissions")
     ws_show.add_argument("id_or_url")
+    ws_fetch = ws_sub.add_parser("fetch", parents=[common, ws_human],
+                                 help="read-only SSRF-guarded fetch of a public URL")
+    ws_fetch.add_argument("url")
+    ws_search = ws_sub.add_parser("search", parents=[common, ws_human],
+                                  help="web search via the configured provider (typed unavailable if none)")
+    ws_search.add_argument("query")
     ws_ins = ws_sub.add_parser("inspect", parents=[common, ws_human],
                                help="run bounded read-only discovery")
     ws_ins.add_argument("id_or_url")
@@ -1637,6 +1763,47 @@ def build_parser() -> argparse.ArgumentParser:
                                    help="inspect a folder or file (default: active project folder)")
     fi_inspect.add_argument("path", nargs="?", default="",
                             help="absolute path inside a project folder")
+    fi_patch = fi_sub.add_parser(
+        "patch", parents=[common],
+        help="apply a unified diff inside a project folder (confirmed, brokered, reversible)")
+    fi_patch.add_argument("target",
+                          help="absolute file path inside a project folder")
+    fi_pgrp = fi_patch.add_mutually_exclusive_group(required=True)
+    fi_pgrp.add_argument("--patch", default="", help="unified diff text")
+    fi_pgrp.add_argument("--patch-file", default="",
+                         help="read the unified diff from this file")
+    fi_patch.add_argument("--confirm", action="store_true")
+    fi_rollback = fi_sub.add_parser(
+        "rollback", parents=[common],
+        help="roll back the last applied patch (confirmed, brokered)")
+    fi_rollback.add_argument("target",
+                             help="absolute file path inside a project folder")
+    fi_rollback.add_argument("--backup", default="")
+    fi_rollback.add_argument("--confirm", action="store_true")
+    gi = add("git", help="Scoped read-only git inspection (status/log/diff/show; no writes, no network)")
+    gi_sub = gi.add_subparsers(dest="git_command")
+    gi_status = gi_sub.add_parser("status", parents=[common],
+                                  help="porcelain work-tree status (read-only)")
+    gi_status.add_argument("--root", default="",
+                           help="absolute project folder (default: active project folder)")
+    gi_log = gi_sub.add_parser("log", parents=[common],
+                               help="bounded commit log (read-only)")
+    gi_log.add_argument("--root", default="",
+                        help="absolute project folder (default: active project folder)")
+    gi_log.add_argument("--limit", type=int, default=10)
+    gi_diff = gi_sub.add_parser("diff", parents=[common],
+                                help="bounded unstaged diff (read-only)")
+    gi_diff.add_argument("--root", default="",
+                         help="absolute project folder (default: active project folder)")
+    gi_diff.add_argument("--path", default="",
+                         help="repo-relative file path (default: whole tree)")
+    gi_show = gi_sub.add_parser("show", parents=[common],
+                                help="show a committed file version (read-only)")
+    gi_show.add_argument("path", help="repo-relative file path")
+    gi_show.add_argument("--root", default="",
+                         help="absolute project folder (default: active project folder)")
+    gi_show.add_argument("--ref", default="HEAD",
+                         help="HEAD or HEAD~N (default: HEAD)")
     ie = add("ide", help="IDE launcher (open only; in-file work uses supervised coding)")
     ie_sub = ie.add_subparsers(dest="ide_command")
     ie_sub.add_parser("status", parents=[common],
@@ -1656,6 +1823,9 @@ def build_parser() -> argparse.ArgumentParser:
     sc_create.add_argument("task_text", help="task to run (<=2000 chars)")
     sc_create.add_argument("--when", required=True,
                            help="'every N minutes|hours', 'daily HH[:MM][am|pm]', 'once in N minutes|hours'")
+    sc_create.add_argument("--deliver-to", default="",
+                           help="delivery targets: channel:<account>:<recipient> "
+                                "and/or webhook:<sub_id>, comma separated")
     sc_create.add_argument("--confirm", action="store_true")
     sc_list = sc_sub.add_parser("list", parents=[common],
                                 help="list scheduled jobs (read-only)")
@@ -1674,8 +1844,112 @@ def build_parser() -> argparse.ArgumentParser:
                                 help="run history (read-only, retained after delete)")
     sc_hist.add_argument("--job-id", type=int, default=0)
     sc_hist.add_argument("--limit", type=int, default=30)
+    sc_deliv = sc_sub.add_parser("deliveries", parents=[common],
+                                 help="delivery history (read-only)")
+    sc_deliv.add_argument("--job-id", type=int, default=0)
+    sc_deliv.add_argument("--limit", type=int, default=30)
     sc_sub.add_parser("run-due", parents=[common],
                       help="execute due jobs now (bounded; pre-authorized at creation)")
+    nd = add("node", help="Paired node host: inventory + capability dispatch "
+             "(read-only except confirmed enroll/revoke)")
+    nd_sub = nd.add_subparsers(dest="node_command")
+    nd_sub.add_parser("status", parents=[common],
+                      help="node host inventory summary (read-only)")
+    nd_sub.add_parser("list", parents=[common],
+                      help="list enrolled nodes (read-only)")
+    nd_show = nd_sub.add_parser("show", parents=[common],
+                                help="show one enrolled node (read-only)")
+    nd_show.add_argument("node_id")
+    nd_caps = nd_sub.add_parser("capabilities", parents=[common],
+                                help="declared capabilities with typed availability")
+    nd_caps.add_argument("node_id")
+    nd_reg = nd_sub.add_parser("register", parents=[common],
+                               help="enroll a paired node (needs --confirm; no listener opened)")
+    nd_reg.add_argument("--name", required=True)
+    nd_reg.add_argument("--endpoint", required=True)
+    nd_reg.add_argument("--capability", action="append", default=[],
+                        help="declared capability (repeatable)")
+    nd_reg.add_argument("--confirm", action="store_true")
+    nd_rev = nd_sub.add_parser("revoke", parents=[common],
+                               help="revoke an enrolled node (needs --confirm)")
+    nd_rev.add_argument("node_id")
+    nd_rev.add_argument("--confirm", action="store_true")
+    nd_disp = nd_sub.add_parser("dispatch", parents=[common],
+                                help="dispatch one capability (local-safe reads only)")
+    nd_disp.add_argument("node_id")
+    nd_disp.add_argument("capability")
+    tk = add("tasks", help="Unified background-task ledger (read-only read model)")
+    tk_sub = tk.add_subparsers(dest="tasks_command")
+    tk_sub.add_parser("status", parents=[common],
+                      help="ledger counts by source and state (read-only)")
+    tk_list = tk_sub.add_parser("list", parents=[common],
+                                help="merged tasks, newest-first (read-only)")
+    tk_list.add_argument("--source", default="",
+                         help="opencode|schedules|kanban (default: all)")
+    tk_list.add_argument("--state", default="",
+                         help="canonical state filter (running|ok|failed|blocked|pending|unknown)")
+    tk_list.add_argument("--limit", type=int, default=50)
+    tk_show = tk_sub.add_parser("show", parents=[common],
+                                help="one normalized task + raw source record (read-only)")
+    tk_show.add_argument("task_id")
+    tk_show.add_argument("--source", default="")
+    tk_tl = tk_sub.add_parser("timeline", parents=[common],
+                              help="ordered real events for one task (read-only)")
+    tk_tl.add_argument("task_id")
+    tk_tl.add_argument("--source", default="")
+    md = add("media", help="Media generation: provider catalog + gated generate")
+    md_sub = md.add_subparsers(dest="media_command")
+    md_sub.add_parser("status", parents=[common],
+                      help="provider/kind readiness (read-only)")
+    md_sub.add_parser("catalog", parents=[common],
+                      help="flat honest provider/kind rows (read-only)")
+    md_gen = md_sub.add_parser("generate", parents=[common],
+                               help="generate media (costly kinds need --confirm)")
+    md_gen.add_argument("--kind", required=True,
+                        choices=["image", "music", "video", "speech"])
+    md_gen.add_argument("--provider", default="")
+    md_gen.add_argument("--prompt", required=True)
+    md_gen.add_argument("--confirm", action="store_true")
+    lm = add("local-models", help="Local model inventory + brokered write "
+             "gates (nothing is downloaded, started, or written)")
+    lm_sub = lm.add_subparsers(dest="local_models_command")
+    lm_sub.add_parser("status", parents=[common],
+                      help="local runtime state (read-only)")
+    lm_sub.add_parser("hardware", parents=[common],
+                      help="GPU/VRAM gauges (read-only)")
+    lm_sub.add_parser("catalog", parents=[common],
+                      help="known/installed local models (read-only)")
+    lm_sub.add_parser("jobs", parents=[common],
+                      help="install/download job history (typed EMPTY)")
+    lm_ri = lm_sub.add_parser("runtime-install", parents=[common],
+                              help="typed gate: pinned-runtime install is brokered")
+    lm_ri.add_argument("--backend", default="")
+    lm_ri.add_argument("--confirm", action="store_true")
+    lm_dl = lm_sub.add_parser("download", parents=[common],
+                              help="typed gate: model download is brokered")
+    lm_dl.add_argument("model")
+    lm_dl.add_argument("--confirm", action="store_true")
+    lm_sl = lm_sub.add_parser("sideload", parents=[common],
+                              help="typed gate: on-disk GGUF registration is brokered")
+    lm_sl.add_argument("path")
+    lm_sl.add_argument("--confirm", action="store_true")
+    lm_sv = lm_sub.add_parser("server", parents=[common],
+                              help="typed gate: local server start/stop is brokered")
+    lm_sv.add_argument("server_action", nargs="?", default="start",
+                       choices=["start", "stop"])
+    lm_sv.add_argument("--confirm", action="store_true")
+    lm_ej = lm_sub.add_parser("eject", parents=[common],
+                              help="typed gate: ejecting a resident model is brokered")
+    lm_ej.add_argument("model")
+    lm_ej.add_argument("--confirm", action="store_true")
+    lm_ac = lm_sub.add_parser("activate", parents=[common],
+                              help="typed gate: making a model default is a brokered write")
+    lm_ac.add_argument("model")
+    lm_ac.add_argument("--confirm", action="store_true")
+    lm_qs = lm_sub.add_parser("quickstart", parents=[common],
+                              help="typed gate: one-click runtime+model setup is brokered")
+    lm_qs.add_argument("--model", default=None)
+    lm_qs.add_argument("--confirm", action="store_true")
     export.add_argument("--out", type=Path, default=None,
                         help="output file (default: <state_dir>/portable-<ts>.vbp)")
     export.add_argument("--passphrase", default=None,
@@ -1879,6 +2153,10 @@ def build_parser() -> argparse.ArgumentParser:
                       help="latch an immediate stop (reset required)")
     oc_sub.add_parser("reset", parents=[common],
                       help="clear enablement + emergency-stop latch (returns to disabled)")
+    ag = add("agent", help="Qubit Agent runtime: agent loop, sessions, tools, skills, models, memory, tasks and CLI all execute from the Qubit source tree")
+    ag.add_argument("agent_args", nargs=argparse.REMAINDER,
+                    help="arguments passed verbatim to the Qubit Agent runtime "
+                         "(e.g. 'status', 'sessions list', 'gateway --help')")
     return p
 
 
@@ -1906,6 +2184,15 @@ def _resolve_task_text(cfg, args):
 
 
 def main(argv=None) -> int:
+    raw = list(sys.argv[1:] if argv is None else argv)
+    # Passthrough to the vendored Qubit Agent runtime must not be re-parsed by
+    # Qubit's argparse (leading --help/--version/--flags would be swallowed).
+    # `qubit agent <args…>` dispatches verbatim. `hermes` stays as an
+    # undeclared migration alias (never advertised in help/completions) so old
+    # scripts keep working without carrying upstream identity in the product.
+    if raw and raw[0] in ("agent", "hermes"):
+        from . import hermes_runtime
+        return hermes_runtime.run(raw[1:])
     args = build_parser().parse_args(argv)
     command = args.command or "run"
 
@@ -1939,8 +2226,7 @@ def main(argv=None) -> int:
     if command == "checkpoints":
         return _cmd_checkpoints(cfg, args)
     if command == "sessions":
-        return _cmd_sessions_list(cfg, args.limit
-                                  if hasattr(args, "limit") else 20)
+        return _cmd_sessions(cfg, args)
     if command == "capability":
         return _cmd_capability(args.action, args.name, args.state)
     if command == "completion":
@@ -1987,6 +2273,10 @@ def main(argv=None) -> int:
         return _cmd_acp(cfg, args)
     if command == "lsp":
         return _cmd_lsp(cfg, args)
+    if command == "plugins":
+        return _cmd_plugins(cfg, args)
+    if command == "channels":
+        return _cmd_channels(cfg, args)
     if command == "theme":
         return _cmd_theme(cfg, args)
     if command == "proxy":
@@ -2041,8 +2331,18 @@ def main(argv=None) -> int:
         return _cmd_monitor(cfg, args)
     if command == "schedules":
         return _cmd_schedules(cfg, args)
+    if command == "node":
+        return _cmd_node(cfg, args)
+    if command == "tasks":
+        return _cmd_tasks(cfg, args)
+    if command == "media":
+        return _cmd_media(cfg, args)
+    if command == "local-models":
+        return _cmd_local_models(cfg, args)
     if command == "files":
         return _cmd_files(cfg, args)
+    if command == "git":
+        return _cmd_git(cfg, args)
     if command == "ide":
         return _cmd_ide(cfg, args)
     if command == "frontier":
@@ -2053,6 +2353,8 @@ def main(argv=None) -> int:
         return _cmd_webui(cfg, args)
     if command == "setup":
         return _cmd_setup(cfg, args)
+    if command == "agent":
+        return _cmd_hermes(args)
 
     from .orchestrator import VoiceOrchestrator
     orch = VoiceOrchestrator(cfg, no_hotkey=args.no_hotkey, dry_run=args.dry_run)
@@ -2238,6 +2540,47 @@ def _cmd_sessions_list(cfg, limit: int = 20) -> int:
 
     print(json.dumps(recent_sessions(cfg, limit), indent=2))
     return 0
+
+
+def _cmd_sessions(cfg, args) -> int:
+    """Session list/search/show + lifecycle (rename/archive/delete/resume).
+
+    The same ``auth_status.SessionStore`` the dashboard and voice read through
+    ``recent_sessions`` backs every operation here: receipts stay append-only,
+    mutations are metadata tombstones, delete needs explicit --confirm and is
+    recoverable via resume, and every mutation is redacted + audited.
+    """
+    from .auth_status import SessionStore, recent_sessions
+
+    sub = getattr(args, "sessions_command", None) or "list"
+    if sub == "list":
+        out = recent_sessions(cfg, int(getattr(args, "limit", 20) or 20))
+    else:
+        store = SessionStore(cfg.state_dir())
+        sid = str(getattr(args, "session_id", "") or "")
+        if sub == "search":
+            out = store.search(str(getattr(args, "query", "") or ""),
+                               limit=int(getattr(args, "limit", 20) or 20))
+        elif sub == "show":
+            out = store.show(sid)
+        elif sub == "rename":
+            out = store.rename(sid, str(getattr(args, "name", "") or ""))
+        elif sub == "archive":
+            out = store.archive(sid)
+        elif sub == "delete":
+            out = store.delete(sid, confirm=bool(getattr(args, "confirm", False)))
+        elif sub == "resume":
+            out = store.resume(sid)
+        else:
+            out = {"schema": "qubit-sessions/1", "state": "FAILED",
+                   "code": "UNKNOWN_SUBCOMMAND", "detail": sub}
+    print(json.dumps(out, indent=2))
+    state = str(out.get("state", ""))
+    if state == "OK":
+        return 0
+    if state in ("NOT_FOUND", "UNAVAILABLE", "FAILED"):
+        return 2
+    return 3
 
 
 def _cmd_mcp_status(cfg) -> int:
@@ -3781,6 +4124,14 @@ def _cmd_browser(cfg, args) -> int:
             out = BT.doctor(cfg)
         elif cmd == "read":
             out = BT.read(cfg, getattr(args, "target", "") or "")
+        elif cmd == "screenshot":
+            clip = getattr(args, "clip", "") or ""
+            clip_args = ([int(v) for v in clip.split(",")] if clip else None)
+            out = BT.screenshot(
+                cfg, getattr(args, "target", "") or "",
+                clip=clip_args, fmt=getattr(args, "fmt", "jpeg"),
+                max_bytes=(getattr(args, "max_bytes", 0)
+                           or BT.MAX_SCREENSHOT_BYTES))
         elif cmd == "find":
             out = BT.find(cfg, args.query, getattr(args, "target", "") or "")
         elif cmd == "activate":
@@ -3821,12 +4172,47 @@ def _cmd_browser(cfg, args) -> int:
 
 
 def _cmd_acp(cfg, args) -> int:
-    """voicebridge acp --check|--setup|--version (no server shipped).
-
-    Bare `acp` would serve a second agent authority and is typed-refused;
-    --accept-hooks is typed-rejected (policy bypass).
-    """
+    """voicebridge acp --check|--setup|--version (no server shipped), plus the
+    external harness client subcommands status|catalog|handshake|send|
+    receipts|configure|unconfigure (same backend as voice/dashboard)."""
     import json as _json
+    cmd = getattr(args, "acp_command", None)
+    if cmd:
+        from . import acp_client as AC
+        confirm = bool(getattr(args, "confirm", False))
+        try:
+            if cmd == "status":
+                out = AC.status(cfg)
+            elif cmd == "catalog":
+                out = AC.catalog(cfg)
+            elif cmd == "receipts":
+                out = AC.receipts(cfg, harness=getattr(args, "harness", "") or "")
+            elif cmd == "handshake":
+                out = AC.handshake(cfg, args.harness, confirmed=confirm)
+            elif cmd == "send":
+                out = AC.send(cfg, args.harness, prompt=" ".join(args.prompt),
+                              confirmed=confirm)
+            elif cmd == "configure":
+                out = AC.configure(
+                    cfg, args.harness,
+                    credential_ref=getattr(args, "credential_ref", "") or "",
+                    requested_by="cli:user", confirmed=confirm)
+            elif cmd == "unconfigure":
+                out = AC.unconfigure(cfg, args.harness, requested_by="cli:user",
+                                     confirmed=confirm)
+            else:
+                print(f"ERROR: unknown acp command {cmd!r}")
+                return 2
+            print(_json.dumps(out, indent=2, sort_keys=True))
+            return 0
+        except AC.AcpError as exc:
+            rc = 3 if exc.code == AC.CONFIRM_CODE else 2
+            print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                               "code": exc.code, "detail": exc.detail[:300],
+                               "owner": "qubit-policy",
+                               "rollback": "no harness configured or executed"},
+                              indent=2))
+            return rc
     from . import acp_lsp as AL
     if getattr(args, "accept_hooks", False):
         print(_json.dumps(AL.acp_refuse_accept_hooks(), indent=2))
@@ -3848,6 +4234,137 @@ def _cmd_acp(cfg, args) -> int:
         return 0
     print(_json.dumps(AL.acp_refuse_serve(), indent=2))
     return 2
+
+
+def _channels_doctor(cfg):
+    """Inbound-channel health composed from the shared backend's public
+    functions (channels_inbound exposes status/catalog/accounts)."""
+    from . import channels_inbound as CI
+
+    st = CI.status(cfg)
+    cat = CI.catalog(cfg)
+    acct = CI.accounts(cfg)
+    return {"state": "OK", "schema": CI.SCHEMA, "store_ok": True,
+            "channels": st.get("channels", 0),
+            "configured": st.get("configured", 0), "connected": 0,
+            "listener": st.get("listener", "NONE"),
+            "accounts": len(acct.get("accounts", [])),
+            "available": cat.get("available", []),
+            "estop": st.get("estop", False), "warnings": []}
+
+
+def _cmd_plugins(cfg, args) -> int:
+    """voicebridge plugins status|list|show|register|invoke|unregister|doctor.
+
+    The registry records validated manifests only; nothing is imported or
+    executed. Mutating ops require --confirm and refuse while the emergency
+    stop is latched (the module enforces both).
+    """
+    import json as _json
+    from . import plugin_runtime as PR
+    cmd = getattr(args, "plugins_command", None) or "status"
+    confirm = bool(getattr(args, "confirm", False))
+    try:
+        if cmd == "status":
+            out = PR.status(cfg)
+        elif cmd == "list":
+            out = PR.list_plugins(cfg)
+        elif cmd == "show":
+            out = PR.get_plugin(cfg, args.plugin_id)
+        elif cmd == "doctor":
+            out = PR.doctor(cfg)
+        elif cmd == "register":
+            path = Path(args.manifest).expanduser()
+            try:
+                manifest = _json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                raise PR.PluginRuntimeError(
+                    PR.INVALID_MANIFEST_CODE,
+                    f"manifest unreadable: {exc}") from exc
+            out = PR.register(cfg, manifest=manifest, requested_by="cli:user",
+                              confirmed=confirm)
+        elif cmd == "invoke":
+            text = getattr(args, "text", "") or ""
+            out = PR.invoke(cfg, args.plugin_id,
+                            args={"text": text} if text else {},
+                            requested_by="cli:user", confirmed=confirm)
+        elif cmd == "unregister":
+            out = PR.unregister(cfg, args.plugin_id, requested_by="cli:user",
+                                confirmed=confirm)
+        else:
+            print(f"ERROR: unknown plugins command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except PR.PluginRuntimeError as exc:
+        rc = 3 if exc.code == PR.CONFIRM_CODE else 2
+        print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                           "code": exc.code, "detail": exc.detail[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "registry untouched; nothing executed"},
+                          indent=2))
+        return rc
+
+
+def _cmd_channels(cfg, args) -> int:
+    """voicebridge channels status|catalog|accounts|configure|unconfigure|
+    receive|doctor.
+
+    The registry records credential *references* only (never values); no
+    listener is started and ``connected`` is never fabricated. Configure/
+    unconfigure require --confirm. ``receive`` validates a signed raw body
+    against the same kernel the dashboard ingress uses.
+    """
+    import json as _json
+    from . import channels_inbound as CI
+    cmd = getattr(args, "channels_command", None) or "status"
+    confirm = bool(getattr(args, "confirm", False))
+    try:
+        if cmd == "status":
+            out = CI.status(cfg)
+        elif cmd == "catalog":
+            out = CI.catalog(cfg)
+        elif cmd == "accounts":
+            out = CI.accounts(cfg)
+        elif cmd == "doctor":
+            out = _channels_doctor(cfg)
+        elif cmd == "configure":
+            events = [e.strip() for e in
+                      str(getattr(args, "events", "") or "").split(",")
+                      if e.strip()]
+            out = CI.configure(cfg, args.channel, secret_ref=args.secret_ref,
+                               events=events or None, requested_by="cli:user",
+                               confirmed=confirm)
+        elif cmd == "unconfigure":
+            out = CI.unconfigure(cfg, args.channel, requested_by="cli:user",
+                                 confirmed=confirm)
+        elif cmd == "receive":
+            payload = Path(args.payload_file).read_bytes()
+            out = CI.receive(
+                cfg, channel=args.channel, payload=payload,
+                signature=getattr(args, "signature", "") or "",
+                timestamp=getattr(args, "timestamp", None),
+                delivery_id=getattr(args, "delivery_id", "") or "",
+                sender=getattr(args, "sender", "") or "",
+                event=getattr(args, "event", "message") or "message")
+        else:
+            print(f"ERROR: unknown channels command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except CI.ChannelError as exc:
+        rc = 3 if exc.code == CI.CONFIRM_CODE else 2
+        print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                           "code": exc.code, "detail": exc.detail[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "channel registry untouched; nothing "
+                                       "dispatched"},
+                          indent=2))
+        return rc
+    except OSError as exc:
+        print(_json.dumps({"state": "FAILED", "code": "CHANNEL_PAYLOAD_UNREADABLE",
+                           "detail": str(exc)[:200]}, indent=2))
+        return 2
 
 
 def _cmd_lsp(cfg, args) -> int:
@@ -4827,6 +5344,18 @@ def _cmd_websites(cfg, args) -> int:
                "probe": result.to_dict()}
         _print_website_out(args, cmd, out)
         return 0
+
+    if cmd in ("fetch", "search"):
+        from . import web_tool as WT
+        try:
+            out = (WT.fetch(cfg, args.url) if cmd == "fetch"
+                   else WT.search(cfg, args.query))
+        except WT.WebToolError as exc:
+            redact = getattr(WT, "redact_spec", str)
+            out = {"state": "denied", "code": getattr(exc, "code", "WEB_ERROR"),
+                   "detail": redact(getattr(exc, "detail", str(exc)))[:300]}
+        _print_website_out(args, cmd, out)
+        return 0 if out.get("state") == "OK" else 2
 
     store = W.website_integrations_store(cfg)
     perms = P.permissions_store(cfg)
@@ -5832,6 +6361,7 @@ def _cmd_files(cfg, args) -> int:
     """
     import json as _json
     from . import files as FI
+    from . import file_patch as FP
     cmd = getattr(args, "files_command", None) or "inspect"
     try:
         if cmd == "list":
@@ -5841,6 +6371,19 @@ def _cmd_files(cfg, args) -> int:
             out = FI.read_file(cfg, args.path,
                                max_chars=getattr(args, "max_chars",
                                                  20000) or 20000)
+        elif cmd == "patch":
+            text = getattr(args, "patch", "") or ""
+            pf = getattr(args, "patch_file", "") or ""
+            if pf:
+                text = Path(pf).read_text(encoding="utf-8", errors="replace")
+            out = FP.apply_patch(
+                cfg, args.target, text, requested_by="cli:user",
+                confirmed=bool(getattr(args, "confirm", False)))
+        elif cmd == "rollback":
+            out = FP.rollback(
+                cfg, args.target, backup=getattr(args, "backup", "") or None,
+                requested_by="cli:user",
+                confirmed=bool(getattr(args, "confirm", False)))
         elif cmd == "inspect":
             out = FI.inspect(cfg, getattr(args, "path", "") or "")
         else:
@@ -5848,12 +6391,45 @@ def _cmd_files(cfg, args) -> int:
             return 2
         print(_json.dumps(out, indent=2, sort_keys=True))
         return 0
-    except FI.FilesError as exc:
+    except (FI.FilesError, FP.FilePatchError) as exc:
         print(_json.dumps({"state": "FAILED", "code": exc.code,
-                           "detail": FI.redact_spec(exc.detail)[:300],
+                           "detail": (FI.redact_spec(exc.detail)
+                                      if isinstance(exc, FI.FilesError)
+                                      else FP.redact_spec(exc.detail))[:300],
                            "owner": "qubit-policy",
-                           "rollback": "nothing read; nothing to roll back"},
+                           "rollback": "nothing written on refusal; a prior "
+                                       "patch is reversible with files rollback"},
                           indent=2))
+        return 2
+
+
+def _cmd_git(cfg, args) -> int:
+    """qubit git status|log|diff|show — scoped read-only inspection.
+
+    Same backend the dashboard and voice surfaces call. Mutating and
+    network verbs do not exist here (typed refusal, never a shell).
+    """
+    import json as _json
+    from . import git_scope as GI
+    cmd = getattr(args, "git_command", None) or "status"
+    root = getattr(args, "root", "") or ""
+    try:
+        if cmd == "status":
+            out = GI.status(cfg, root)
+        elif cmd == "log":
+            out = GI.log(cfg, root, getattr(args, "limit", 10) or 10)
+        elif cmd == "diff":
+            out = GI.diff(cfg, root, getattr(args, "path", "") or "")
+        elif cmd == "show":
+            out = GI.show(cfg, root, getattr(args, "ref", "HEAD") or "HEAD",
+                          args.path)
+        else:
+            print(f"ERROR: unknown git command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except GI.GitError as exc:
+        print(_json.dumps(GI.public_error(exc), indent=2))
         return 2
 
 
@@ -5920,6 +6496,7 @@ def _cmd_schedules(cfg, args) -> int:
             return 0
         if cmd == "create":
             out = SC.create(cfg, args.name, args.task_text, args.when,
+                            deliver_to=getattr(args, "deliver_to", "") or "",
                             requested_by="cli:user", confirmed=confirm)
         elif cmd == "list":
             out = SC.list_jobs(
@@ -5940,6 +6517,10 @@ def _cmd_schedules(cfg, args) -> int:
         elif cmd == "history":
             out = SC.history(cfg, job_id=getattr(args, "job_id", 0) or 0,
                              limit=getattr(args, "limit", 30) or 30)
+        elif cmd == "deliveries":
+            out = SC.delivery_history(
+                cfg, job_id=getattr(args, "job_id", 0) or 0,
+                limit=getattr(args, "limit", 30) or 30)
         elif cmd == "run-due":
             out = SC.run_due(cfg, requested_by="cli:user")
         else:
@@ -5955,8 +6536,185 @@ def _cmd_schedules(cfg, args) -> int:
                            "owner": "qubit-policy",
                            "rollback": "schedule store untouched; "
                                        "nothing to roll back"},
-                          indent=2))
+                           indent=2))
         return rc
+
+
+def _cmd_node(cfg, args) -> int:
+    """qubit node status|list|show|capabilities|register|revoke|dispatch.
+
+    Reads are read-only. ``register``/``revoke`` preview under --dry-run,
+    require --confirm, and refuse while the emergency stop is latched; the
+    backend never opens a listener and never dispatches remote/unsafe
+    capabilities (typed refusals)."""
+    import json as _json
+    from . import node_host as NH
+    cmd = getattr(args, "node_command", None) or "status"
+    confirm = bool(getattr(args, "confirm", False))
+    _MUTATING = {"register", "revoke"}
+    try:
+        if cmd in _MUTATING and NH.estop_engaged(cfg):
+            print(_json.dumps(NH.refuse_estop(f"node {cmd}"), indent=2))
+            return 3
+        if getattr(args, "dry_run", False) and cmd in _MUTATING:
+            print(_json.dumps({"state": "preview",
+                               "would": f"node {cmd}"}, indent=2))
+            return 0
+        if cmd == "status":
+            out = NH.status(cfg)
+        elif cmd == "list":
+            out = NH.list_nodes(cfg)
+        elif cmd == "show":
+            out = NH.show(cfg, args.node_id)
+        elif cmd == "capabilities":
+            out = NH.capabilities(cfg, args.node_id)
+        elif cmd == "register":
+            out = NH.enroll(cfg, name=args.name, endpoint=args.endpoint,
+                            capabilities=args.capability,
+                            requested_by="cli:user", confirmed=confirm)
+        elif cmd == "revoke":
+            out = NH.revoke(cfg, args.node_id, requested_by="cli:user",
+                            confirmed=confirm)
+        elif cmd == "dispatch":
+            out = NH.dispatch(cfg, args.node_id, args.capability,
+                              requested_by="cli:user", confirmed=confirm)
+        else:
+            print(f"ERROR: unknown node command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except NH.NodeHostError as exc:
+        print(_json.dumps({
+            "state": "FAILED", "code": exc.code,
+            "detail": NH._redact(exc.detail)[:300], "owner": "qubit-policy",
+            "rollback": "node registry untouched; nothing dispatched"},
+            indent=2))
+        return 2
+
+
+def _cmd_tasks(cfg, args) -> int:
+    """qubit tasks status|list|show|timeline — unified background-task ledger.
+
+    Read-only; merges the real OpenCode receipt, schedules, and kanban
+    stores. An unreadable store is a typed DEGRADED result, never a
+    fabricated row."""
+    import json as _json
+    from . import task_ledger as TL
+    cmd = getattr(args, "tasks_command", None) or "status"
+    source = getattr(args, "source", "") or None
+    try:
+        if cmd == "status":
+            out = TL.status(cfg)
+        elif cmd == "list":
+            out = TL.list_tasks(cfg, source=source,
+                                state=(getattr(args, "state", "") or None),
+                                limit=getattr(args, "limit", 50) or 50)
+        elif cmd == "show":
+            out = TL.show(cfg, args.task_id, source=source)
+        elif cmd == "timeline":
+            out = TL.timeline(cfg, args.task_id, source=source)
+        else:
+            print(f"ERROR: unknown tasks command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except TL.TaskLedgerError as exc:
+        print(_json.dumps({
+            "state": "FAILED", "code": exc.code,
+            "detail": TL._redact(exc.detail)[:300], "owner": "qubit-policy",
+            "rollback": "read-only; nothing to roll back"}, indent=2))
+        return 2
+
+
+def _cmd_media(cfg, args) -> int:
+    """qubit media status|catalog|generate — provider-backed media.
+
+    ``generate`` previews under --dry-run, requires --confirm for costly
+    kinds, and returns the module's typed refusal when no credential
+    reference or transport adapter exists (never a fabricated artifact)."""
+    import json as _json
+    from . import media_gen as MG
+    cmd = getattr(args, "media_command", None) or "status"
+    try:
+        if cmd == "status":
+            out = MG.status(cfg)
+        elif cmd == "catalog":
+            out = MG.catalog(cfg)
+        elif cmd == "generate":
+            if getattr(args, "dry_run", False):
+                print(_json.dumps({"state": "preview", "would": "media generate",
+                                   "kind": args.kind}, indent=2))
+                return 0
+            out = MG.generate(cfg, kind=args.kind,
+                              provider=(args.provider or None),
+                              prompt=args.prompt, source="cli",
+                              confirmed=bool(getattr(args, "confirm", False)))
+        else:
+            print(f"ERROR: unknown media command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except MG.MediaGenError as exc:
+        rc = 3 if exc.code == MG.CONFIRM_CODE else 2
+        print(_json.dumps({
+            "state": "denied" if rc == 3 else "FAILED", "code": exc.code,
+            "detail": MG._redact(exc.detail)[:300], "owner": "qubit-policy",
+            "rollback": "nothing generated; no provider request attempted"},
+            indent=2))
+        return rc
+
+
+def _cmd_local_models(cfg, args) -> int:
+    """qubit local-models status|hardware|catalog|jobs + brokered write gates.
+
+    Reads derive from real Qubit state. Every write verb is a typed gate:
+    this surface never downloads, starts, ejects, activates, or writes
+    anything (all provisioning is brokered through `qubit runtime`)."""
+    import json as _json
+    from . import local_models as LM
+    cmd = getattr(args, "local_models_command", None) or "status"
+    confirm = bool(getattr(args, "confirm", False))
+    try:
+        if cmd == "status":
+            out = LM.status(cfg)
+        elif cmd == "hardware":
+            out = LM.hardware(cfg)
+        elif cmd == "catalog":
+            out = LM.catalog(cfg)
+        elif cmd == "jobs":
+            out = LM.jobs(cfg)
+        elif cmd == "runtime-install":
+            out = LM.runtime_install(cfg, backend=(args.backend or None),
+                                     requested_by="cli:user",
+                                     confirmed=confirm)
+        elif cmd == "download":
+            out = LM.download(cfg, model=args.model, requested_by="cli:user",
+                              confirmed=confirm)
+        elif cmd == "sideload":
+            out = LM.sideload(cfg, path=args.path, requested_by="cli:user",
+                              confirmed=confirm)
+        elif cmd == "server":
+            out = LM.server(cfg, args.server_action, requested_by="cli:user",
+                            confirmed=confirm)
+        elif cmd == "eject":
+            out = LM.eject(cfg, model=args.model, requested_by="cli:user",
+                           confirmed=confirm)
+        elif cmd == "activate":
+            out = LM.activate(cfg, model=args.model, requested_by="cli:user",
+                              confirmed=confirm)
+        elif cmd == "quickstart":
+            out = LM.quickstart(cfg, model=(args.model or None),
+                                requested_by="cli:user", confirmed=confirm)
+        else:
+            print(f"ERROR: unknown local-models command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except Exception as exc:
+        print(_json.dumps(LM.public_error(
+            getattr(exc, "code", "LOCAL_MODEL_BAD_INPUT"),
+            str(exc)), indent=2))
+        return 2
 
 
 def _cmd_monitor(cfg, args) -> int:
@@ -6267,6 +7025,15 @@ def _cmd_opencode(cfg, args) -> int:
         print(_json.dumps({"state": "failed", "detail": str(exc)[:200]},
                           indent=2))
         return 2
+
+
+def _cmd_hermes(args) -> int:
+    """Dispatch verbatim to the vendored Qubit-owned Hermes runtime.
+
+    The runtime executes in-process from ``qubit_hermes/`` (no external Hermes
+    install); see voicebridge/hermes_runtime.py and the owner amendment."""
+    from . import hermes_runtime
+    return hermes_runtime.run(getattr(args, "agent_args", []) or [])
 
 
 def _cmd_webui(cfg, args) -> int:
