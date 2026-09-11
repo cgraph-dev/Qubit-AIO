@@ -1103,6 +1103,25 @@ class WebUIHandler(BaseHTTPRequestHandler):
                     return
                 if not isinstance(body, dict):
                     body = {"_list": body}
+        # Cutover stage 1 (docs/QUBIT_HERMES_CUTOVER_MIGRATION.md): when the
+        # owner enables webui.hermes_backend, safe reads are served by the
+        # vendored Hermes backend in-process (single listener, no second
+        # server); Qubit-gated surfaces and all writes stay on the Qubit
+        # permissions/confirmation/audit path. 404/405 fall back to compat.
+        if method in ("GET", "HEAD") and self._hermes_backend_enabled():
+            try:
+                from . import hermes_asgi as HA
+                if HA.safe_to_proxy(method, api_path):
+                    code, hdrs, rbody = HA.call(
+                        method, api_path, query=query,
+                        headers={"accept": "application/json"})
+                    if code not in (404, 405):
+                        ctype = hdrs.get("content-type", "application/json")
+                        self._send(code, rbody, ctype)
+                        return
+            except Exception as exc:
+                log_event("webui.hermes_backend.fallback",
+                          error=str(exc)[:160])
         try:
             from . import hermes_compat as HC
             code, out = HC.dispatch(self.app.orch.cfg, method, api_path,
@@ -1112,6 +1131,16 @@ class WebUIHandler(BaseHTTPRequestHandler):
                         "detail": redact_obj(str(exc))[:200]}, 500)
             return
         self._json(out, code)
+
+    def _hermes_backend_enabled(self) -> bool:
+        """Cutover flag: serve safe dashboard reads from the vendored Hermes
+        backend. Stage 1 default is off so compatibility behavior is unchanged
+        until the documented migration flips it (Stage 2)."""
+        try:
+            return bool(self.app.orch.cfg.get("webui", "hermes_backend",
+                                              default=False))
+        except Exception:
+            return False
 
     # -- public read-only session share ----------------------------------
     def _public_share(self, path: str) -> None:
