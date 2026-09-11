@@ -63,9 +63,15 @@ def _estop(cfg: Any) -> bool:
 
 
 def _gate(code: str, detail: str, counterpart: str,
-          http: int = 403) -> Tuple[int, Dict[str, Any]]:
-    return http, {"ok": False, "state": "UNAVAILABLE", "code": code,
-                  "detail": detail, "qubit_counterpart": counterpart}
+          http: int = 403, owner: str = "qubit-policy",
+          rollback: str = "nothing changed; nothing to roll back",
+          **extra: Any) -> Tuple[int, Dict[str, Any]]:
+    out: Dict[str, Any] = {"ok": False, "state": "UNAVAILABLE", "code": code,
+                           "detail": detail, "qubit_counterpart": counterpart,
+                           "owner": owner, "rollback": rollback}
+    if extra:
+        out.update(extra)
+    return http, out
 
 
 def _ok(**fields: Any) -> Tuple[int, Dict[str, Any]]:
@@ -1591,6 +1597,366 @@ def h_git_file_diff(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                truncated=bool(res.get("truncated", False)), git=res)
 
 
+# ---------------------------------------------------------------------------
+# Git review reads (audit §1 git.py reads): branches / worktrees / review list /
+# commit context / rev-parse. All execute ``git`` ONLY through git_scope's
+# existing fixed-argv, root-confined ``_run`` (no shell, no new subprocess path,
+# no network). Mutating verbs and the credentialed ``gh`` surfaces stay gated.
+# ---------------------------------------------------------------------------
+
+_REV_PARSE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/@~^{}:+-]{0,199}$")
+
+
+def _git_line(root: Path, argv: List[str]) -> str:
+    from . import git_scope as GI
+    try:
+        text, _trunc = GI._run(root, argv)
+    except GI.GitError:
+        return ""
+    return text.splitlines()[0].strip() if text.strip() else ""
+
+
+def _git_origin_head(root: Path) -> str:
+    return _git_line(root,
+                     ["symbolic-ref", "--quiet", "--short",
+                      "refs/remotes/origin/HEAD"])
+
+
+def _git_origin_head_abbrev(root: Path) -> str:
+    return _git_line(root, ["rev-parse", "--abbrev-ref", "origin/HEAD"])
+
+
+def _git_ref_exists(root: Path, ref: str) -> bool:
+    from . import git_scope as GI
+    try:
+        GI._run(root, ["rev-parse", "--verify", "--quiet", ref])
+        return True
+    except GI.GitError:
+        return False
+
+
+def _git_default_branch(root: Path) -> str:
+    head = _git_origin_head_abbrev(root)
+    if head and head != "origin/HEAD":
+        return head.split("/", 1)[-1]
+    for ref in ("refs/heads/main", "refs/heads/master",
+                "refs/remotes/origin/main", "refs/remotes/origin/master"):
+        if _git_ref_exists(root, ref):
+            return ref.split("/")[-1]
+    return ""
+
+
+def _git_ref_names(root: Path, *patterns: str) -> List[str]:
+    from . import git_scope as GI
+    try:
+        text, _trunc = GI._run(
+            root, ["for-each-ref", "--format=%(refname:short)",
+                   "--sort=-committerdate", *patterns])
+    except GI.GitError:
+        return []
+    return [line.strip() for line in text.splitlines() if line.strip()]
+
+
+def _git_worktree_rows(root: Path) -> List[Dict[str, Any]]:
+    from . import git_scope as GI
+    try:
+        text, _trunc = GI._run(root, ["worktree", "list", "--porcelain"])
+    except GI.GitError:
+        return []
+    trees: List[Dict[str, Any]] = []
+    for line in text.splitlines():
+        if line.startswith("worktree "):
+            trees.append({"path": line[9:].strip(), "branch": None,
+                          "isMain": not trees, "detached": False,
+                          "locked": False})
+        elif not trees:
+            continue
+        elif line.startswith("branch "):
+            trees[-1]["branch"] = line[7:].strip().replace(
+                "refs/heads/", "", 1)
+        elif line == "detached":
+            trees[-1]["detached"] = True
+        elif line.startswith("locked"):
+            trees[-1]["locked"] = True
+    return trees
+
+
+def _resolve_rename_path(raw: str) -> str:
+    path = str(raw or "").strip()
+    if " => " not in path:
+        return path
+    head, _, tail = path.partition("{")
+    if tail and "}" in tail:
+        inner, _, suffix = tail.partition("}")
+        _, _, to = inner.partition(" => ")
+        return f"{head}{to}{suffix}".replace("//", "/")
+    return path.split(" => ")[-1].strip()
+
+
+def _git_numstat(root: Path, *args: str) -> Dict[str, Tuple[int, int]]:
+    from . import git_scope as GI
+    try:
+        text, _trunc = GI._run(root, ["diff", "--numstat", *args])
+    except GI.GitError:
+        return {}
+    counts: Dict[str, Tuple[int, int]] = {}
+    for line in text.splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 3:
+            added = 0 if parts[0] == "-" else int(parts[0] or 0)
+            removed = 0 if parts[1] == "-" else int(parts[1] or 0)
+            counts[_resolve_rename_path(parts[2])] = (added, removed)
+    return counts
+
+
+def _git_untracked_insertions(root: Path, rel: str) -> int:
+    try:
+        base = Path(root).resolve()
+        target = (base / rel).resolve()
+        target.relative_to(base)
+        if not target.is_file() or target.stat().st_size > 2_000_000:
+            return 0
+        data = target.read_bytes()
+        if b"\0" in data:
+            return 0
+        lines = data.count(b"\n")
+        return lines + 1 if data and not data.endswith(b"\n") else lines
+    except (OSError, ValueError):
+        return 0
+
+
+def _git_status_raw(root: Path) -> str:
+    from . import git_scope as GI
+    try:
+        text, _trunc = GI._run(root, ["status", "--porcelain=v2", "-z"])
+    except GI.GitError:
+        return ""
+    return text
+
+
+def _porcelain_entries(raw: str):
+    records = iter(raw.split("\0"))
+    for rec in records:
+        if not rec:
+            continue
+        tag = rec[0]
+        if tag == "?":
+            yield "?", "??", rec[2:]
+        elif tag == "u":
+            parts = rec.split(" ")
+            yield "u", parts[1] if len(parts) > 1 else ".", parts[-1]
+        elif tag in ("1", "2"):
+            parts = rec.split(" ")
+            xy = parts[1] if len(parts) > 1 else ".."
+            path = (rec.split(" ", 8)[-1] if tag == "1"
+                    else rec.split(" ", 9)[-1])
+            if tag == "2":
+                next(records, None)
+            yield tag, xy, _resolve_rename_path(path)
+
+
+def _git_status_letter(tag: str, xy: str) -> str:
+    if tag in ("?", "u"):
+        return tag.upper()
+    code = xy[0] if xy[0] != "." else (xy[1] if len(xy) > 1 else ".")
+    return (code if code != "." else "M").upper()
+
+
+def _git_branch_base(root: Path) -> str:
+    from . import git_scope as GI
+    head = _git_origin_head_abbrev(root)
+    candidates = ([head] if head else []) + [
+        "origin/main", "origin/master", "main", "master"]
+    for ref in candidates:
+        try:
+            text, _trunc = GI._run(root, ["merge-base", "HEAD", ref])
+        except GI.GitError:
+            continue
+        line = text.splitlines()[0].strip() if text.strip() else ""
+        if line:
+            return line
+    return ""
+
+
+def _git_resolved_root(cfg: Any, q: Dict[str, str],
+                       b: Dict[str, Any]):
+    """(resolved_root, error_response) for a scoped repo read."""
+    from . import git_scope as GI
+    root = _git_query_root(q, b)
+    if not _git_ready(cfg, root):
+        return None, None
+    try:
+        resolved = GI.resolve_root(cfg, root)
+        GI._check_repo(resolved)
+    except GI.GitError as exc:
+        return None, _git_error(exc)
+    return resolved, None
+
+
+def _review_files(root: Path, files: List[Dict[str, Any]], base: Optional[str],
+                  scope: str) -> Tuple[int, Dict[str, Any]]:
+    files.sort(key=lambda f: f["path"])
+    for f in files:
+        if f["status"] == "?" and f["added"] == 0 and f["removed"] == 0:
+            f["added"] = _git_untracked_insertions(root, f["path"])
+    return _ok(schema="qubit-hermes-git/1", root=str(root), files=files,
+               base=base, scope=scope)
+
+
+def h_git_worktrees(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/worktrees -> scoped ``git worktree list`` (read-only)."""
+    resolved, err = _git_resolved_root(cfg, q, b)
+    if resolved is None:
+        return err or _git_no_project(worktrees=[])
+    return _ok(schema="qubit-hermes-git/1", root=str(resolved),
+               worktrees=_git_worktree_rows(resolved))
+
+
+def h_git_branches(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/branches -> local + remote-tracking branch picker rows."""
+    resolved, err = _git_resolved_root(cfg, q, b)
+    if resolved is None:
+        return err or _git_no_project(branches=[])
+    locals_ = _git_ref_names(resolved, "refs/heads")
+    if not locals_:
+        return _ok(schema="qubit-hermes-git/1", root=str(resolved),
+                   branches=[])
+    path_by_branch = {t["branch"]: t["path"]
+                      for t in _git_worktree_rows(resolved) if t.get("branch")}
+    trunk = _git_default_branch(resolved)
+    local_set = set(locals_)
+    remotes = [name for name in _git_ref_names(resolved, "refs/remotes")
+               if not name.endswith("/HEAD")
+               and name.split("/", 1)[-1] not in local_set]
+    branches = [
+        {"name": name, "checkedOut": name in path_by_branch,
+         "isDefault": bool(trunk and name == trunk), "isRemote": False,
+         "worktreePath": path_by_branch.get(name)} for name in locals_]
+    branches += [
+        {"name": name, "checkedOut": False, "isDefault": False,
+         "isRemote": True, "worktreePath": None} for name in remotes]
+    return _ok(schema="qubit-hermes-git/1", root=str(resolved),
+               branches=branches)
+
+
+def h_git_base_branches(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/base-branches -> base-branch picker rows (trunk flagged)."""
+    resolved, err = _git_resolved_root(cfg, q, b)
+    if resolved is None:
+        return err or _git_no_project(branches=[])
+    names = _git_ref_names(resolved, "refs/heads", "refs/remotes")
+    default = _git_origin_head(resolved) or _git_default_branch(resolved)
+    branches = [{"name": name, "isRemote": name.startswith("origin/"),
+                 "isDefault": bool(default and name == default)}
+                for name in names]
+    return _ok(schema="qubit-hermes-git/1", root=str(resolved),
+               branches=branches)
+
+
+def h_git_review_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/review/list -> changed files for a review scope."""
+    from . import git_scope as GI
+    scope = str(q.get("scope", b.get("scope", "uncommitted"))
+                or "uncommitted")
+    base_ref = _query_text(q, b, "base")
+    resolved, err = _git_resolved_root(cfg, q, b)
+    if resolved is None:
+        return err or _git_no_project(files=[], base=None, scope=scope)
+    if scope in ("branch", "lastTurn"):
+        base = _git_branch_base(resolved) if scope == "branch" else base_ref
+        if scope == "lastTurn" and base and (
+                base.startswith("-") or not _REV_PARSE_RE.match(base)):
+            return _git_error(GI.GitError(GI.INPUT_CODE, "bad base ref"))
+        if not base:
+            return _ok(schema="qubit-hermes-git/1", root=str(resolved),
+                       files=[], base=None, scope=scope)
+        rng = f"{base}...HEAD" if scope == "branch" else base
+        counts = _git_numstat(resolved, rng)
+        files = [{"path": path, "added": a, "removed": r,
+                  "status": "M", "staged": False}
+                 for path, (a, r) in counts.items()]
+        if scope == "lastTurn":
+            seen = {f["path"] for f in files}
+            for tag, _xy, path in _porcelain_entries(
+                    _git_status_raw(resolved)):
+                if tag == "?" and path not in seen:
+                    files.append({"path": path, "added": 0, "removed": 0,
+                                  "status": "?", "staged": False})
+        return _review_files(resolved, files, base, scope)
+    raw = _git_status_raw(resolved)
+    staged = _git_numstat(resolved, "--cached")
+    unstaged = _git_numstat(resolved)
+    files = []
+    for tag, xy, path in _porcelain_entries(raw):
+        sa, sr = staged.get(path, (0, 0))
+        ua, ur = unstaged.get(path, (0, 0))
+        files.append({
+            "path": path, "added": sa + ua, "removed": sr + ur,
+            "status": _git_status_letter(tag, xy),
+            "staged": tag in ("1", "2") and xy[0] not in (".", "?")})
+    return _review_files(resolved, files, None, scope)
+
+
+def h_git_review_commit_context(cfg: Any, q: Dict[str, str],
+                                b: Dict[str, Any],
+                                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/review/commit-context -> staged/worktree diff + recents."""
+    from . import git_scope as GI
+    resolved, err = _git_resolved_root(cfg, q, b)
+    if resolved is None:
+        return err or _git_no_project(diff="", recent="")
+    raw = _git_status_raw(resolved)
+    entries = list(_porcelain_entries(raw))
+    staged = any(tag in ("1", "2") and xy[0] not in (".", "?")
+                 for tag, xy, _path in entries)
+    try:
+        diff, _trunc = GI._run(
+            resolved, ["diff", "--cached"] if staged else ["diff", "HEAD"])
+    except GI.GitError:
+        diff = ""
+    maxchars = 20000
+    if len(diff) > maxchars:
+        omitted = len(diff) - maxchars
+        diff = diff[:maxchars] + \
+            f"\n# diff truncated: {omitted} chars omitted\n"
+    untracked = [path for tag, _xy, path in entries if tag == "?"]
+    if untracked:
+        visible = untracked[:50]
+        diff += "\n# New (untracked) files:\n" + \
+            "".join(f"#   {path}\n" for path in visible)
+        if len(untracked) > len(visible):
+            diff += f"#   ... {len(untracked) - len(visible)} more omitted\n"
+    recent = _git_line(resolved,
+                       ["log", "-n", "10", "--pretty=format:%s"])
+    return _ok(schema="qubit-hermes-git/1", root=str(resolved),
+               diff=diff or "", recent=recent)
+
+
+def h_git_review_rev_parse(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/review/rev-parse -> resolved object name for one ref."""
+    from . import git_scope as GI
+    ref = str(q.get("ref", b.get("ref", "HEAD")) or "HEAD").strip()
+    resolved, err = _git_resolved_root(cfg, q, b)
+    if resolved is None:
+        return err or _git_no_project(ref=ref, sha=None)
+    if not _REV_PARSE_RE.match(ref) or ref.startswith("-"):
+        return _git_error(GI.GitError(GI.INPUT_CODE, "bad ref"))
+    try:
+        text, _trunc = GI._run(
+            resolved, ["rev-parse", "--verify", "--quiet", ref])
+    except GI.GitError:
+        return _ok(schema="qubit-hermes-git/1", root=str(resolved), ref=ref,
+                   sha=None)
+    sha = text.splitlines()[0].strip() if text.strip() else None
+    return _ok(schema="qubit-hermes-git/1", root=str(resolved), ref=ref,
+               sha=sha)
+
+
 def _files_error(exc: Exception) -> Tuple[int, Dict[str, Any]]:
     from . import files as FI
     return 400, {"ok": False, "state": "FAILED",
@@ -1808,6 +2174,272 @@ def h_audio_devices(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                    detail=_redact(str(exc))[:200])
     return _ok(inputs=_device_rows(devs.get("inputs", [])),
                outputs=_device_rows(devs.get("outputs", [])))
+
+
+# ---------------------------------------------------------------------------
+# Audio HTTP actions (audit §1A audio.py reads): voice-config (profile refs),
+# transcribe (local ASR over a bounded upload), speak (local TTS -> data URL).
+# Streaming/WS, external catalogs, and desktop leases stay typed-gated.
+# ---------------------------------------------------------------------------
+
+_AUDIO_MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+_AUDIO_MIME_EXT = {
+    "audio/aac": ".aac", "audio/flac": ".flac", "audio/m4a": ".m4a",
+    "audio/mp3": ".mp3", "audio/mp4": ".mp4", "audio/mpeg": ".mp3",
+    "audio/ogg": ".ogg", "audio/wav": ".wav", "audio/wave": ".wav",
+    "audio/webm": ".webm", "audio/x-m4a": ".m4a", "audio/x-wav": ".wav",
+    "video/webm": ".webm",
+}
+
+
+def _asr_from_cfg(cfg: Any):
+    """Build the configured ASR provider (same selection as the orchestrator)."""
+    from .asr.sherpa import SherpaASR
+    from .asr.whisper import FasterWhisperASR
+    try:
+        asr_cfg = cfg.section("asr")
+    except Exception:
+        asr_cfg = {}
+    provider = asr_cfg.get("provider", "sherpa")
+    if provider == "personaplex":
+        provider = "sherpa"
+    model_dir = cfg.model_dir()
+    if provider == "sherpa":
+        return SherpaASR(engine=asr_cfg.get("engine", "moonshine"),
+                         model_dir=model_dir,
+                         provider=asr_cfg.get("provider_ep", "cpu"),
+                         num_threads=int(asr_cfg.get("num_threads", 4)),
+                         language=asr_cfg.get("language"),
+                         hotwords=asr_cfg.get("hotwords", ""),
+                         hotwords_score=float(
+                             asr_cfg.get("hotwords_score", 1.5)))
+    return FasterWhisperASR(model=asr_cfg.get("model", "base"),
+                            device=asr_cfg.get("device", "auto"),
+                            compute_type=asr_cfg.get("compute_type",
+                                                     "float16"),
+                            language=asr_cfg.get("language"),
+                            beam_size=asr_cfg.get("beam_size", 1),
+                            model_dir=model_dir)
+
+
+def _tts_from_cfg(cfg: Any):
+    """Build the configured TTS provider (same selection as the orchestrator)."""
+    from .tts.piper import PiperTTS
+    provider = cfg.get("tts", "provider", default="piper")
+    if provider == "edge":
+        from .tts.edge import EdgeTTS
+        edge = EdgeTTS(
+            voice=cfg.get("tts", "edge", "voice",
+                          default="en-US-JennyNeural"),
+            rate=cfg.get("tts", "edge", "rate", default="+0%"))
+        if edge.available():
+            return edge
+    if provider == "hybrid":
+        from .tts.hybrid import HybridTTS
+        h = cfg.get("tts", "hybrid", default={})
+        h = h if isinstance(h, dict) else {}
+        return HybridTTS(
+            model_dir=cfg.model_dir(),
+            piper_voice=h.get("piper_voice",
+                              cfg.get("tts", "voice",
+                                      default="en_US-amy-medium")),
+            openai_voice=h.get("openai_voice", "nova"),
+            openai_model=h.get("openai_model", "gpt-4o-mini-tts"),
+            key_env=cfg.get("tts", "openai", "key_env",
+                            default="~/.config/qubit-voicebridge/.env"),
+            instructions=cfg.get("tts", "openai", "instructions", default=""),
+            threshold_words=int(h.get("threshold_words", 18)))
+    if provider == "openai":
+        from .tts.openai_tts import OpenAITTS
+        tts = OpenAITTS(
+            voice=cfg.get("tts", "openai", "voice", default="nova"),
+            model=cfg.get("tts", "openai", "model",
+                          default="gpt-4o-mini-tts"),
+            key_env=cfg.get("tts", "openai", "key_env",
+                            default="~/.config/qubit-voicebridge/.env"),
+            instructions=cfg.get("tts", "openai", "instructions", default=""))
+        if tts.available():
+            return tts
+    if provider == "kokoro":
+        from .tts.kokoro import KokoroTTS
+        tts = KokoroTTS(model_dir=cfg.model_dir(),
+                        voice_sid=int(cfg.get("tts", "kokoro", "voice_sid",
+                                              default=0)))
+        if tts.available():
+            return tts
+    return PiperTTS(model_dir=cfg.model_dir(),
+                    voice=cfg.get("tts", "voice", default="en_US-amy-medium"))
+
+
+def h_audio_voice_config(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/audio/voice-config -> active STT/TTS profile + audio refs.
+
+    Resolves the active profile per component from ``voicebridge.profiles`` and
+    the live mic/output contract from ``voicebridge.audio.settings``. Qubit
+    providers run host-side, so every provider resolves to ``mode: relay`` and
+    NO provider key or credential is ever exported (references only).
+    """
+    from . import profiles as PR
+    from .audio import settings as AS
+    try:
+        current = PR.current_profiles(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    try:
+        status = AS.status(cfg)
+    except AS.AudioSettingsError as exc:
+        miss = {"state": "MISSING", "detail": _redact(str(exc))[:200]}
+        status = {"mic": dict(miss), "output": dict(miss)}
+
+    def _relay(entry: Dict[str, Any], kind: str) -> Dict[str, Any]:
+        value = entry.get("value")
+        provider = value if isinstance(value, (str, int, float)) else ""
+        return {
+            "mode": "relay", "kind": kind,
+            "profile": str(entry.get("id", "") or ""),
+            "state": str(entry.get("state", "") or ""),
+            "provider": str(provider or ""),
+            "detail": "Qubit runs this provider host-side; the client keeps "
+                      "the local audio relay and no provider key is exported",
+        }
+
+    voice = current.get("voice", {}) or {}
+    return _ok(schema="qubit-hermes-audio/1", mode="relay",
+               stt=_relay(current.get("stt", {}), "stt"),
+               tts=_relay(current.get("tts", {}), "tts"),
+               voice={"profile": str(voice.get("id", "") or ""),
+                      "name": str(voice.get("value", "") or "")},
+               audio=status,
+               detail="STT/TTS resolve to host-side Qubit providers; no "
+                      "provider credential is served")
+
+
+def h_audio_transcribe(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/audio/transcribe -> local ASR over a bounded data URL body.
+
+    Strict caps: audio/* (or video/webm), valid base64, non-empty, <= 25 MiB;
+    the temp file is always removed. A missing model is a typed
+    ``AUDIO_ASR_UNAVAILABLE`` refusal, never a fabricated transcript.
+    """
+    import base64
+    import binascii
+    import os
+    import tempfile
+    from .asr.base import ASRUnavailable
+    counterpart = "Qubit Chat voice (local mic capture) + CLI `qubit asr-test`"
+    data_url = str(b.get("data_url", b.get("dataUrl", "")) or "").strip()
+    if not data_url:
+        return _gate("AUDIO_PAYLOAD_REQUIRED",
+                     "transcription needs a base64 audio data URL",
+                     counterpart, 400)
+    if not data_url.startswith("data:") or "," not in data_url:
+        return _gate("AUDIO_BAD_PAYLOAD", "invalid audio payload",
+                     counterpart, 400)
+    header, encoded = data_url.split(",", 1)
+    if ";base64" not in header:
+        return _gate("AUDIO_BAD_PAYLOAD",
+                     "audio payload must be base64 encoded", counterpart, 400)
+    mime = str(b.get("mime_type", b.get("mimeType", ""))
+               or header[5:].split(";", 1)[0] or "audio/webm").strip()
+    norm = mime.split(";", 1)[0].lower()
+    if not (norm.startswith("audio/") or norm == "video/webm"):
+        return _gate("AUDIO_BAD_PAYLOAD",
+                     "payload must be an audio recording", counterpart, 400)
+    # Cap the ENCODED length before decoding so an oversized body cannot force
+    # a huge base64 allocation (25 MiB decoded ~= 33.4 MiB encoded).
+    if len(encoded) > (_AUDIO_MAX_UPLOAD_BYTES // 3) * 4 + 8:
+        return _gate("AUDIO_TOO_LARGE", "audio recording is too large",
+                     counterpart, 413)
+    try:
+        audio_bytes = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError):
+        return _gate("AUDIO_BAD_PAYLOAD",
+                     "audio payload is not valid base64", counterpart, 400)
+    if not audio_bytes:
+        return _gate("AUDIO_BAD_PAYLOAD", "audio recording is empty",
+                     counterpart, 400)
+    if len(audio_bytes) > _AUDIO_MAX_UPLOAD_BYTES:
+        return _gate("AUDIO_TOO_LARGE", "audio recording is too large",
+                     counterpart, 413)
+    temp_path = ""
+    try:
+        suffix = _AUDIO_MIME_EXT.get(norm, ".webm")
+        with tempfile.NamedTemporaryFile(
+                prefix="qubit-hermes-voice-", suffix=suffix,
+                delete=False) as tmp:
+            tmp.write(audio_bytes)
+            temp_path = tmp.name
+        asr = _asr_from_cfg(cfg)
+        asr.load()
+        transcript = asr.transcribe(temp_path)
+        if getattr(transcript, "empty", False):
+            return _ok(transcript="", provider=transcript.provider,
+                       detail="no speech detected")
+        return _ok(transcript=str(transcript.text),
+                   provider=transcript.provider,
+                   language=transcript.language,
+                   confidence=transcript.confidence,
+                   duration_s=transcript.duration_s)
+    except ASRUnavailable as exc:
+        return _gate("AUDIO_ASR_UNAVAILABLE",
+                     "local ASR model is unavailable: "
+                     + _redact(str(exc))[:160],
+                     "install the configured sherpa/whisper model + CLI "
+                     "`qubit asr-test`")
+    except Exception as exc:
+        return _fail(exc)
+    finally:
+        if temp_path:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+
+
+def h_audio_speak(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/audio/speak -> local TTS rendered as a base64 data URL.
+
+    Runs the SAME provider chain the orchestrator selects. An unavailable
+    provider is a typed ``AUDIO_TTS_UNAVAILABLE`` refusal; the temp file is
+    always removed and no on-disk path is returned.
+    """
+    import base64
+    import os
+    import tempfile
+    from .tts.base import TTSUnavailable
+    counterpart = "Qubit Chat voice + CLI `qubit tts-test`"
+    text = str(b.get("text", "") or "").strip()
+    if not text:
+        return _gate("AUDIO_TEXT_REQUIRED", "text is required",
+                     counterpart, 400)
+    out = Path(tempfile.gettempdir()) / (
+        f"qubit-hermes-tts-{os.getpid()}-{abs(hash(text)) % 10 ** 8}.wav")
+    try:
+        tts = _tts_from_cfg(cfg)
+        tts.load()
+        tts.synthesize(text[:4000], out)
+        data = out.read_bytes()
+        mime = ("audio/wav" if out.suffix.lower() == ".wav"
+                else "audio/mpeg")
+        encoded = base64.b64encode(data).decode("ascii")
+        return _ok(data_url=f"data:{mime};base64,{encoded}", mime_type=mime,
+                   provider=str(getattr(tts, "name", "") or ""))
+    except TTSUnavailable as exc:
+        return _gate("AUDIO_TTS_UNAVAILABLE",
+                     "local TTS provider is unavailable: "
+                     + _redact(str(exc))[:160],
+                     "install the configured piper voice + CLI `qubit tts-test`")
+    except Exception as exc:
+        return _fail(exc)
+    finally:
+        try:
+            if out.exists():
+                out.unlink()
+        except OSError:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -2231,8 +2863,11 @@ def _r(method: str, pattern: str, handler: str, disp: str = "implemented",
                    "disposition": disp, "gate": gate or {}})
 
 
-def _g(code: str, detail: str, counterpart: str) -> Dict[str, str]:
-    return {"code": code, "detail": detail, "counterpart": counterpart}
+def _g(code: str, detail: str, counterpart: str,
+       owner: str = "qubit-policy",
+       rollback: str = "read-only; nothing to roll back") -> Dict[str, str]:
+    return {"code": code, "detail": detail, "counterpart": counterpart,
+            "owner": owner, "rollback": rollback}
 
 
 _NO_PTY = _g("PTY_NO_SHELL",
@@ -2266,6 +2901,33 @@ _NO_GIT_READ = _g("GIT_READ_SCOPED",
                   "Qubit git is a scoped read surface (status/log/diff/show); "
                   "this review verb has no dedicated backend here.",
                   "CLI `qubit git status|log|diff|show` + `qubit project`")
+_NO_GH_AUTH = _g("GH_AUTH_OPERATOR",
+                 "GitHub CLI auth status is never probed from the dashboard: "
+                 "`gh auth status` shells out to a credentialed CLI and can "
+                 "hang on a prompt. Qubit performs no network auth probe and "
+                 "serves no token.",
+                 "operator-run `gh auth status` + CLI `qubit auth status` "
+                 "(names only)")
+_NO_GIT_SHIP = _g("GIT_SHIP_GH_EXTERNAL",
+                  "PR ship info needs the GitHub CLI (credentialed network); "
+                  "Qubit never shells out to `gh` from the dashboard. Shipping "
+                  "runs through the operator's own authenticated gh session.",
+                  "operator `gh pr view` + CLI `qubit opencode` worktree flow")
+_NO_CRON_FIRE = _g("CRON_FIRE_EXTERNAL",
+                   "Managed-cron fire is an external NAS→agent webhook and is "
+                   "not exposed through the dashboard; Qubit schedules run on "
+                   "an estop-checked, audited tick.",
+                   "CLI `qubit schedules run-due` + dashboard /ops "
+                   "schedules_run_due",
+                   owner="qubit-policy",
+                   rollback="nothing fired; nothing to roll back")
+_NO_PROFILE_PR = _g("GH_PR_EXTERNAL",
+                    "Session PR association needs the GitHub CLI (credentialed "
+                    "network); Qubit never shells out to `gh` from the "
+                    "dashboard and serves no PR cache.",
+                    "operator `gh pr list/view` + CLI `qubit sessions`",
+                    owner="qubit-policy",
+                    rollback="read-only; nothing to roll back")
 _NO_GIT_WRITE = _g("GIT_WRITE_BROKERED",
                    "Qubit git is read-only; staging, commits, pushes, "
                    "worktrees, and branch switches run through the brokered "
@@ -2450,6 +3112,12 @@ _r("GET", r"/api/git/diff", "h_git_diff")
 _r("GET", r"/api/git/show", "h_git_show")
 _r("GET", r"/api/git/review/diff", "h_git_file_diff")
 _r("GET", r"/api/git/file-diff", "h_git_file_diff")
+_r("GET", r"/api/git/worktrees", "h_git_worktrees")
+_r("GET", r"/api/git/branches", "h_git_branches")
+_r("GET", r"/api/git/base-branches", "h_git_base_branches")
+_r("GET", r"/api/git/review/list", "h_git_review_list")
+_r("GET", r"/api/git/review/commit-context", "h_git_review_commit_context")
+_r("GET", r"/api/git/review/rev-parse", "h_git_review_rev_parse")
 _r("GET", r"/api/fs/list", "h_fs_list")
 _r("GET", r"/api/fs/tree", "h_fs_tree")
 _r("GET", r"/api/fs/stat", "h_fs_stat")
@@ -2461,6 +3129,9 @@ _r("GET", r"/api/fs/default-cwd", "h_fs_default_cwd")
 _r("GET", r"/api/audio/status", "h_audio_status")
 _r("GET", r"/api/audio/list", "h_audio_devices")
 _r("GET", r"/api/audio/devices", "h_audio_devices")
+_r("GET", r"/api/audio/voice-config", "h_audio_voice_config")
+_r("POST", r"/api/audio/transcribe", "h_audio_transcribe")
+_r("POST", r"/api/audio/speak", "h_audio_speak")
 
 # Packet 8U closure: local-models reads, custom endpoints, profile reads,
 # tools/learning reads, auth providers (audit §1A absent reads).
@@ -2614,15 +3285,9 @@ GATED: List[Dict[str, Any]] = [
     ("GET", r"/api/actions/.*", "actions_read"),
     ("GET", r"/api/dashboard/font", "font"),
     ("PUT", r"/api/dashboard/font", "font_set"),
-    # --- Packet 8U: Git writes + non-scoped review reads stay typed ---
-    ("GET", r"/api/git/gh-auth", _NO_GIT_READ),
-    ("GET", r"/api/git/worktrees", _NO_GIT_READ),
-    ("GET", r"/api/git/branches", _NO_GIT_READ),
-    ("GET", r"/api/git/base-branches", _NO_GIT_READ),
-    ("GET", r"/api/git/review/list", _NO_GIT_READ),
-    ("GET", r"/api/git/review/commit-context", _NO_GIT_READ),
-    ("GET", r"/api/git/review/rev-parse", _NO_GIT_READ),
-    ("GET", r"/api/git/review/ship-info", _NO_GIT_READ),
+    # --- Packet 8U: Git writes + credentialed gh surfaces stay typed ---
+    ("GET", r"/api/git/gh-auth", _NO_GH_AUTH),
+    ("GET", r"/api/git/review/ship-info", _NO_GIT_SHIP),
     ("POST", r"/api/git/review/pr-list", _NO_GIT_WRITE),
     ("POST", r"/api/git/review/stage", _NO_GIT_WRITE),
     ("POST", r"/api/git/review/unstage", _NO_GIT_WRITE),
@@ -2640,11 +3305,8 @@ GATED: List[Dict[str, Any]] = [
     ("GET", r"/api/fs/download", _NO_BINARY),
     ("POST", r"/api/files/upload", _NO_WRITE),
     ("POST", r"/api/fs/write-text", _NO_WRITE),
-    # --- Packet 8U: Audio actions + WS stay typed (reads are implemented) ---
-    ("GET", r"/api/audio/voice-config", _NO_AUDIO_RELAY),
+    # --- Packet 8U: external catalog / desktop lease / WS stay typed ---
     ("GET", r"/api/audio/elevenlabs/voices", _NO_AUDIO_EXTERNAL),
-    ("POST", r"/api/audio/transcribe", _NO_AUDIO_ACTION),
-    ("POST", r"/api/audio/speak", _NO_AUDIO_ACTION),
     ("POST", r"/api/audio/tts-lease", _NO_AUDIO_LEASE),
     ("GET", r"/api/audio/speak-stream", _NO_AUDIO_STREAM),
     ("POST", r"/api/audio/speak-stream", _NO_AUDIO_STREAM),
@@ -2665,6 +3327,8 @@ GATED: List[Dict[str, Any]] = [
     ("POST", r"/api/profiles/[^/]+/export", _GATE_EXPORT),
     ("GET", r"/api/profiles/[^/]+/desktop-overlay", _GATE_DESKTOP_OVERLAY),
     ("POST", r"/api/sessions/owner-backfill", _GATE_SESSIONS_RECEIPT),
+    ("POST", r"/api/cron/fire", _NO_CRON_FIRE),
+    ("POST", r"/api/profiles/sessions/pull-requests", _NO_PROFILE_PR),
     ("POST", r"/api/memory/providers/[^/]+/oauth/start", _NO_OAUTH),
     ("DELETE", r"/api/mcp/oauth/flows/[^/]+", _NO_OAUTH),
     ("GET", r"/api/mcp/oauth/callback.*", _NO_OAUTH),
@@ -3572,11 +4236,19 @@ HANDLERS: Dict[str, Handler] = {
     "h_git_status": h_git_status, "h_git_log": h_git_log,
     "h_git_diff": h_git_diff, "h_git_show": h_git_show,
     "h_git_file_diff": h_git_file_diff,
+    "h_git_worktrees": h_git_worktrees, "h_git_branches": h_git_branches,
+    "h_git_base_branches": h_git_base_branches,
+    "h_git_review_list": h_git_review_list,
+    "h_git_review_commit_context": h_git_review_commit_context,
+    "h_git_review_rev_parse": h_git_review_rev_parse,
     "h_fs_list": h_fs_list, "h_fs_tree": h_fs_tree, "h_fs_stat": h_fs_stat,
     "h_fs_read_text": h_fs_read_text,
     "h_fs_read_data_url": h_fs_read_data_url,
     "h_fs_git_root": h_fs_git_root, "h_fs_default_cwd": h_fs_default_cwd,
     "h_audio_status": h_audio_status, "h_audio_devices": h_audio_devices,
+    "h_audio_voice_config": h_audio_voice_config,
+    "h_audio_transcribe": h_audio_transcribe,
+    "h_audio_speak": h_audio_speak,
 }
 HANDLERS.update(_EXTRA_HANDLERS)
 
@@ -3638,7 +4310,9 @@ def dispatch(cfg: Any, method: str, path: str,
         return gate.get("http", 403), {"ok": False, "state": "UNAVAILABLE",
                                        "code": gate.get("code"),
                                        "detail": gate.get("detail"),
-                                       "qubit_counterpart": gate.get("counterpart")}
+                                       "qubit_counterpart": gate.get("counterpart"),
+                                       "owner": gate.get("owner"),
+                                       "rollback": gate.get("rollback")}
     handler = HANDLERS.get(route["handler"])
     if handler is None:
         return 500, {"ok": False, "code": "NO_HANDLER",

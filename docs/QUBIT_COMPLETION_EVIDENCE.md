@@ -750,3 +750,41 @@ frozen contract).
   tests/test_hermes_runtime_vendor8u.py voicebridge/_data/completions`
   (several of these also carry earlier-wave edits; inspect before reverting).
 - `systemctl --user restart qubit-voicebridge.service`.
+
+## 20. Hermes route closure + OpenClaw v2026.9.4 delta (2026-09-11, second committed wave)
+
+### 20.1 Hermes route parity closure
+- `voicebridge/hermes_compat.py`: real read handlers via `git_scope._run`
+  (fixed argv, no shell, root-confined) for `GET /api/git/{worktrees,branches,
+  base-branches}` and `GET /api/git/review/{list,commit-context,rev-parse}`;
+  real HTTP audio handlers for `POST /api/audio/transcribe` (data-URL/base64
+  validation, 25 MiB encoded+decoded caps, temp-file lifecycle, typed
+  `AUDIO_ASR_UNAVAILABLE`), `POST /api/audio/speak` (`AUDIO_TTS_UNAVAILABLE`
+  when no TTS), `GET /api/audio/voice-config` (references only).
+- New typed gates with code+detail+counterpart+owner+rollback:
+  `GH_AUTH_OPERATOR`, `GIT_SHIP_GH_EXTERNAL`, `AUDIO_LEASE_DESKTOP`,
+  `PROVIDER_EXTERNAL`, `CRON_FIRE_EXTERNAL`, `GH_PR_EXTERNAL`; all git writes
+  stay `GIT_WRITE_BROKERED`.
+- `docs/NATIVE_EQUIVALENTS_8U.json/.md`: +2 rows (`N8U-AUDIO-HTTP`,
+  `N8U-GIT-REVIEW`), no rows deleted, no status flipped without a proving test.
+- `tests/test_hermes_readsurfaces8u.py` updated to assert the new real behavior
+  (the old file asserted the gated dispositions); `test_hermes_routes_parity8u.py`
+  extended (125 focused tests passed).
+
+### 20.2 OpenClaw v2026.9.4 delta audit (read-only)
+- `docs/AUDIT_OPENCLAW_V2026_9_4_DELTA.md`: pin `3a9d69db…` (v2026.9.4, MIT),
+  method + reproduction commands, 32 delta rows across plugins/channels/tools/
+  automation/sessions/protocols/CLI, each cross-mapped to a Qubit backend and
+  proving test. Tally: COVERED 3, PARTIAL 17, MISSING 12, GATED 0. Structural
+  finding: only one genuinely new extension (`team-reports`); gateway protocol
+  is unchanged (still v4). 70 citations spot-verified, 0 failures.
+- Honest note recorded: no behavior runs; statuses are module/test-presence
+  based. Top missing items ranked in the doc.
+
+### 20.3 Verification (real)
+- Full hermetic: **3221 passed, 3 skipped, 48 deselected, 0 failed** (13m44s).
+- UI (`-m ui`): **11 passed**. Installed-dashboard gate: **PASS** (ops=429) with
+  installed Hermes runtime gate **PASS**.
+- `compileall` clean; `git diff --check` clean.
+- Verdict: still INCOMPLETE (active dashboard fronted by `hermes_compat`; the
+  v2026.9.4 MISSING/PARTIAL deltas; final product rebrand).

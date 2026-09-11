@@ -341,6 +341,54 @@
   },
   {
    "cli": [
+    "asr-test",
+    "tts-test",
+    "mic-test"
+   ],
+   "dashboard": "GET /api/audio/voice-config + /api/audio/status|list|devices; POST /api/audio/transcribe|speak (same voicebridge asr/tts backends)",
+   "id": "N8U-AUDIO-HTTP",
+   "owner": "qubit-core",
+   "rollback": "transcribe/speak are stateless; upload and synthesized temp files are always removed; nothing to roll back",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_hermes_routes_parity8u.py",
+    "tests/test_hermes_readsurfaces8u.py"
+   ],
+   "upstream": "hermes-agent@2237be3 hermes_cli/web_routers/audio.py (HTTP half only; no client-direct keys, no external catalog, no speak-stream WS)",
+   "user_goal": "transcribe an uploaded recording and speak a reply through the local Qubit voice stack",
+   "voice": [
+    "status",
+    "mic_test",
+    "task_run"
+   ]
+  },
+  {
+   "cli": [
+    "git status",
+    "git log",
+    "git diff",
+    "git show"
+   ],
+   "dashboard": "GET /api/git/status|log|diff|show|worktrees|branches|base-branches|review/list|review/diff|file-diff|review/commit-context|review/rev-parse (same git_scope backend)",
+   "id": "N8U-GIT-REVIEW",
+   "owner": "qubit-policy",
+   "rollback": "read-only; nothing to roll back",
+   "status": "IMPLEMENTED",
+   "tests": [
+    "tests/test_git_scope8u.py",
+    "tests/test_hermes_routes_parity8u.py"
+   ],
+   "upstream": "hermes-agent@2237be3 hermes_cli/web_git.py (read half only; writes and the credentialed gh surfaces stay brokered/gated)",
+   "user_goal": "review repository changes from the dashboard (branches, worktrees, diffs, commit context)",
+   "voice": [
+    "git_status",
+    "git_log",
+    "git_diff",
+    "git_show"
+   ]
+  },
+  {
+   "cli": [
     "sessions",
     "checkpoints"
    ],

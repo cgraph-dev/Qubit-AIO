@@ -139,6 +139,14 @@ NEW_GATES = [
      "OAUTH_MANUAL_HANDOFF", 403),
     ("DELETE", "/api/mcp/oauth/flows/f1", "OAUTH_MANUAL_HANDOFF", 403),
     ("GET", "/api/mcp/oauth/callback/aa/bb", "OAUTH_MANUAL_HANDOFF", 403),
+    # Credentialed/desktop/WS surfaces that stay gated even after the
+    # git-review + audio HTTP reads become real.
+    ("GET", "/api/git/gh-auth", "GH_AUTH_OPERATOR", 403),
+    ("GET", "/api/git/review/ship-info", "GIT_SHIP_GH_EXTERNAL", 403),
+    ("POST", "/api/audio/tts-lease", "AUDIO_LEASE_DESKTOP", 403),
+    ("GET", "/api/audio/elevenlabs/voices", "PROVIDER_EXTERNAL", 403),
+    ("POST", "/api/cron/fire", "CRON_FIRE_EXTERNAL", 403),
+    ("POST", "/api/profiles/sessions/pull-requests", "GH_PR_EXTERNAL", 403),
 ]
 
 # (method, path, code, http) -- audit §1B wrong-verb rows that used to 404 and
@@ -215,6 +223,8 @@ def test_new_gates_dispatch_exact_typed_code(tmp_path, monkeypatch):
         assert out.get("state") == "UNAVAILABLE", (method, path, out)
         assert out.get("code") == code_want, (method, path, out)
         assert out.get("qubit_counterpart"), (method, path, out)
+        assert out.get("owner"), (method, path, out)
+        assert out.get("rollback"), (method, path, out)
 
 
 # --------------------------------------------------------- wrong-verb closure
@@ -344,3 +354,219 @@ def test_gates_never_touch_filesystem_or_network(tmp_path, monkeypatch):
         assert code not in (404, 500), (method, path, code, out)
     after = _snapshot(tmp_path)
     assert after == before, (sorted(after - before), sorted(before - after))
+
+
+# --------------------------------------------- git review reads (real backend)
+def test_git_review_reads_are_real_scoped_backends(tmp_path, monkeypatch):
+    """Branches/worktrees/review list/commit-context/rev-parse read the real
+    scoped repo through git_scope's fixed-argv confinement (no shell/network)."""
+    from voicebridge import hermes_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    root, _ = _repo(tmp_path)
+    _project(cfg, root)
+    (root / "notes.md").write_text("hello changed\n")
+    (root / "new.txt").write_text("brand new\n")
+
+    code, out = HC.dispatch(cfg, "GET", "/api/git/worktrees", {}, {})
+    assert code == 200 and out["ok"] is True, (code, out)
+    assert out["worktrees"] and out["worktrees"][0]["isMain"] is True, out
+    assert out["worktrees"][0]["path"] == str(root), out
+
+    code, out = HC.dispatch(cfg, "GET", "/api/git/branches", {}, {})
+    assert code == 200 and out["ok"] is True, (code, out)
+    assert any(b["name"] in ("master", "main") and b["isDefault"]
+               for b in out["branches"]), out
+
+    code, out = HC.dispatch(cfg, "GET", "/api/git/base-branches", {}, {})
+    assert code == 200 and out["ok"] is True, (code, out)
+    assert any(b["isDefault"] for b in out["branches"]), out
+
+    code, out = HC.dispatch(cfg, "GET", "/api/git/review/list", {}, {})
+    assert code == 200 and out["ok"] is True, (code, out)
+    paths = {f["path"] for f in out["files"]}
+    assert {"notes.md", "new.txt"} <= paths, out
+    row = [f for f in out["files"] if f["path"] == "notes.md"][0]
+    assert row["added"] == 1 and row["removed"] == 1, row
+    assert row["status"] == "M", row
+    new_row = [f for f in out["files"] if f["path"] == "new.txt"][0]
+    assert new_row["status"] == "?" and new_row["added"] == 1, new_row
+
+    code, out = HC.dispatch(cfg, "GET", "/api/git/review/commit-context", {}, {})
+    assert code == 200 and out["ok"] is True, (code, out)
+    assert "hello changed" in out["diff"], out
+    assert "new.txt" in out["diff"], out
+    assert "init" in out["recent"], out
+
+    code, out = HC.dispatch(cfg, "GET", "/api/git/review/rev-parse", {}, {})
+    assert code == 200 and out["ok"] is True, (code, out)
+    assert out["sha"] and len(out["sha"]) == 40, out
+
+    code, out = HC.dispatch(cfg, "GET", "/api/fs/git-root", {}, {})
+    assert code == 200 and out["ok"] is True, (code, out)
+
+
+def test_git_review_reads_typed_on_bad_root(tmp_path, monkeypatch):
+    """A path outside the approved roots is a typed 400, never a 500."""
+    from voicebridge import hermes_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    root, _ = _repo(tmp_path)
+    _project(cfg, root)
+    other = tmp_path / "elsewhere"
+    other.mkdir()
+    for path in ("/api/git/worktrees", "/api/git/branches",
+                 "/api/git/review/list", "/api/git/review/rev-parse"):
+        code, out = HC.dispatch(cfg, "GET", path, {"root": str(other)}, {})
+        assert code not in (200, 404, 500), (path, code, out)
+        assert out["ok"] is False and out["code"], (path, out)
+        assert out["qubit_counterpart"], (path, out)
+
+
+def test_git_review_reads_reject_option_injection(tmp_path, monkeypatch):
+    """A ref/base that looks like a git option is a typed 400 (no argv leak);
+    a syntactically valid but missing ref is an honest null sha."""
+    from voicebridge import hermes_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    root, _ = _repo(tmp_path)
+    _project(cfg, root)
+
+    code, out = HC.dispatch(cfg, "GET", "/api/git/review/rev-parse",
+                            {"ref": "--upload-pack=touch"}, {})
+    assert code == 400 and out["ok"] is False, (code, out)
+
+    code, out = HC.dispatch(cfg, "GET", "/api/git/review/list",
+                            {"scope": "lastTurn", "base": "--output=/tmp/x"}, {})
+    assert code == 400 and out["ok"] is False, (code, out)
+
+    code, out = HC.dispatch(cfg, "GET", "/api/git/review/rev-parse",
+                            {"ref": "deadbeef"}, {})
+    assert code == 200 and out["ok"] is True, (code, out)
+    assert out["sha"] is None, out
+
+
+# ------------------------------------------- audio HTTP actions (real backend)
+def test_audio_transcribe_runs_local_asr_with_temp_lifecycle(
+        tmp_path, monkeypatch):
+    from voicebridge import hermes_compat as HC
+    from voicebridge.asr.base import ASRUnavailable, Transcript
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    captured = {}
+
+    class _StubASR:
+        def load(self):
+            captured["loaded"] = True
+
+        def transcribe(self, path):
+            captured["path"] = str(path)
+            captured["bytes"] = Path(path).read_bytes()
+            return Transcript(text="hello from asr", provider="stub")
+
+    monkeypatch.setattr(HC, "_asr_from_cfg", lambda cfg: _StubASR())
+    import base64
+    payload = base64.b64encode(b"RIFFfake-audio").decode()
+    code, out = HC.dispatch(
+        cfg, "POST", "/api/audio/transcribe", {},
+        {"data_url": f"data:audio/wav;base64,{payload}"})
+    assert code == 200 and out["ok"] is True, (code, out)
+    assert out["transcript"] == "hello from asr", out
+    assert out["provider"] == "stub", out
+    assert captured["loaded"] is True
+    assert captured["bytes"] == b"RIFFfake-audio", captured
+    assert not Path(captured["path"]).exists(), "temp upload must be removed"
+
+    class _NoASR:
+        def load(self):
+            raise ASRUnavailable("no model on disk")
+
+    monkeypatch.setattr(HC, "_asr_from_cfg", lambda cfg: _NoASR())
+    code, out = HC.dispatch(
+        cfg, "POST", "/api/audio/transcribe", {},
+        {"data_url": f"data:audio/wav;base64,{payload}"})
+    assert code == 403, (code, out)
+    assert out["code"] == "AUDIO_ASR_UNAVAILABLE", out
+    assert out.get("owner") and out.get("rollback"), out
+
+
+def test_audio_transcribe_caps_payload(tmp_path, monkeypatch):
+    from voicebridge import hermes_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    called = {"n": 0}
+
+    class _StubASR:
+        def load(self):
+            called["n"] += 1
+
+        def transcribe(self, path):
+            called["n"] += 1
+
+    monkeypatch.setattr(HC, "_asr_from_cfg", lambda cfg: _StubASR())
+
+    code, out = HC.dispatch(cfg, "POST", "/api/audio/transcribe", {}, {})
+    assert (code, out.get("code")) == (400, "AUDIO_PAYLOAD_REQUIRED"), (code, out)
+    code, out = HC.dispatch(cfg, "POST", "/api/audio/transcribe", {},
+                            {"data_url": "not-a-data-url"})
+    assert (code, out.get("code")) == (400, "AUDIO_BAD_PAYLOAD"), (code, out)
+    code, out = HC.dispatch(cfg, "POST", "/api/audio/transcribe", {},
+                            {"data_url": "data:text/plain;base64,AAAA"})
+    assert (code, out.get("code")) == (400, "AUDIO_BAD_PAYLOAD"), (code, out)
+    assert called["n"] == 0, "ASR must not run for a rejected payload"
+    assert out.get("owner") and out.get("rollback"), out
+
+
+def test_audio_speak_runs_local_tts_as_data_url(tmp_path, monkeypatch):
+    from voicebridge import hermes_compat as HC
+    from voicebridge.tts.base import TTSUnavailable
+
+    cfg = _cfg(tmp_path, monkeypatch)
+
+    class _StubTTS:
+        name = "stub-tts"
+
+        def load(self):
+            pass
+
+        def synthesize(self, text, out_path):
+            Path(out_path).write_bytes(b"WAVDATA")
+            return Path(out_path)
+
+    monkeypatch.setattr(HC, "_tts_from_cfg", lambda cfg: _StubTTS())
+    code, out = HC.dispatch(cfg, "POST", "/api/audio/speak", {}, {"text": "hi"})
+    assert code == 200 and out["ok"] is True, (code, out)
+    assert out["data_url"].startswith("data:audio/wav;base64,"), out
+    assert out["provider"] == "stub-tts", out
+    import base64
+    assert base64.b64decode(out["data_url"].split(",", 1)[1]) == b"WAVDATA"
+
+    class _NoTTS:
+        name = "no-tts"
+
+        def load(self):
+            raise TTSUnavailable("voice not installed")
+
+    monkeypatch.setattr(HC, "_tts_from_cfg", lambda cfg: _NoTTS())
+    code, out = HC.dispatch(cfg, "POST", "/api/audio/speak", {}, {"text": "hi"})
+    assert code == 403, (code, out)
+    assert out["code"] == "AUDIO_TTS_UNAVAILABLE", out
+    assert out.get("owner") and out.get("rollback"), out
+
+    code, out = HC.dispatch(cfg, "POST", "/api/audio/speak", {}, {})
+    assert (code, out.get("code")) == (400, "AUDIO_TEXT_REQUIRED"), (code, out)
+
+
+def test_audio_voice_config_is_references_only(tmp_path, monkeypatch):
+    from voicebridge import hermes_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, out = HC.dispatch(cfg, "GET", "/api/audio/voice-config", {}, {})
+    assert code == 200 and out["ok"] is True, (code, out)
+    assert out["schema"] == "qubit-hermes-audio/1", out
+    for kind in ("stt", "tts"):
+        assert out[kind]["mode"] == "relay", out
+        assert out[kind]["provider"], out
+        assert out[kind]["profile"], out
+    assert out["voice"]["name"], out
+    assert "mic" in out["audio"] and "output" in out["audio"], out

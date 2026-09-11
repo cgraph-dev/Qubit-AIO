@@ -74,6 +74,12 @@ IMPLEMENTED = [
     ("GET", "/api/git/show", "h_git_show"),
     ("GET", "/api/git/review/diff", "h_git_file_diff"),
     ("GET", "/api/git/file-diff", "h_git_file_diff"),
+    ("GET", "/api/git/worktrees", "h_git_worktrees"),
+    ("GET", "/api/git/branches", "h_git_branches"),
+    ("GET", "/api/git/base-branches", "h_git_base_branches"),
+    ("GET", "/api/git/review/list", "h_git_review_list"),
+    ("GET", "/api/git/review/commit-context", "h_git_review_commit_context"),
+    ("GET", "/api/git/review/rev-parse", "h_git_review_rev_parse"),
     ("GET", "/api/fs/list", "h_fs_list"),
     ("GET", "/api/fs/tree", "h_fs_tree"),
     ("GET", "/api/fs/stat", "h_fs_stat"),
@@ -85,18 +91,21 @@ IMPLEMENTED = [
     ("GET", "/api/audio/status", "h_audio_status"),
     ("GET", "/api/audio/list", "h_audio_devices"),
     ("GET", "/api/audio/devices", "h_audio_devices"),
+    ("GET", "/api/audio/voice-config", "h_audio_voice_config"),
 ]
 
-# (method, path, code) -- typed gates (no real backend / writes / binary / WS).
+# (method, path) -- implemented HTTP audio actions with a real local backend:
+# a valid upload/speak request reaches the model; in a hermetic env the model
+# is absent, so the handler answers a TYPED refusal (never 404/500/fabrication).
+AUDIO_ACTIONS = [
+    ("POST", "/api/audio/transcribe"),
+    ("POST", "/api/audio/speak"),
+]
+
+# (method, path, code) -- typed gates (writes / binary / credentialed / WS).
 GATED = [
-    ("GET", "/api/git/gh-auth", "GIT_READ_SCOPED"),
-    ("GET", "/api/git/worktrees", "GIT_READ_SCOPED"),
-    ("GET", "/api/git/branches", "GIT_READ_SCOPED"),
-    ("GET", "/api/git/base-branches", "GIT_READ_SCOPED"),
-    ("GET", "/api/git/review/list", "GIT_READ_SCOPED"),
-    ("GET", "/api/git/review/commit-context", "GIT_READ_SCOPED"),
-    ("GET", "/api/git/review/rev-parse", "GIT_READ_SCOPED"),
-    ("GET", "/api/git/review/ship-info", "GIT_READ_SCOPED"),
+    ("GET", "/api/git/gh-auth", "GH_AUTH_OPERATOR"),
+    ("GET", "/api/git/review/ship-info", "GIT_SHIP_GH_EXTERNAL"),
     ("POST", "/api/git/review/pr-list", "GIT_WRITE_BROKERED"),
     ("POST", "/api/git/review/stage", "GIT_WRITE_BROKERED"),
     ("POST", "/api/git/review/unstage", "GIT_WRITE_BROKERED"),
@@ -113,10 +122,7 @@ GATED = [
     ("GET", "/api/fs/download", "FILES_BINARY_STREAM"),
     ("POST", "/api/files/upload", "WRITE_BROKERED"),
     ("POST", "/api/fs/write-text", "WRITE_BROKERED"),
-    ("GET", "/api/audio/voice-config", "AUDIO_RELAY_ONLY"),
     ("GET", "/api/audio/elevenlabs/voices", "PROVIDER_EXTERNAL"),
-    ("POST", "/api/audio/transcribe", "AUDIO_ACTION_LOCAL"),
-    ("POST", "/api/audio/speak", "AUDIO_ACTION_LOCAL"),
     ("POST", "/api/audio/tts-lease", "AUDIO_LEASE_DESKTOP"),
     ("GET", "/api/audio/speak-stream", "AUDIO_STREAM_LOCAL"),
     ("POST", "/api/audio/speak-stream", "AUDIO_STREAM_LOCAL"),
@@ -143,6 +149,12 @@ def test_new_read_routes_resolve_to_handlers():
         assert route is not None, (method, path)
         assert route["disposition"] == "implemented", (method, path, route)
         assert route["handler"] == handler, (method, path, route["handler"])
+
+    for method, path in AUDIO_ACTIONS:
+        route, _ = HC.match(method, path)
+        assert route is not None, (method, path)
+        assert route["disposition"] == "implemented", (method, path, route)
+        assert route["handler"], (method, path, route)
 
 
 def test_gated_routes_resolve_to_typed_gates():
@@ -177,6 +189,30 @@ def test_all_new_routes_dispatch_200_or_typed_never_404_500(
         assert code not in (404, 500), (method, path, code, str(out)[:200])
         assert code != 200, (method, path, out)
 
+    for method, path in AUDIO_ACTIONS:
+        code, out = HC.dispatch(cfg, method, path, {}, {})
+        assert code not in (404, 500), (method, path, code, str(out)[:200])
+        assert out.get("ok") is False, (method, path, out)
+
+
+def test_audio_action_routes_are_real_handlers_with_owner_rollback(
+        tmp_path, monkeypatch):
+    """transcribe/speak are implemented handlers; without a model they answer
+    a typed refusal carrying code + owner + rollback (never a fabricated 2xx)."""
+    from voicebridge import hermes_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    for method, path in AUDIO_ACTIONS:
+        route, _ = HC.match(method, path)
+        assert route is not None and route["disposition"] == "implemented", \
+            (method, path, route)
+        code, out = HC.dispatch(cfg, method, path, {}, {})
+        assert code not in (404, 500), (method, path, code, out)
+        assert out.get("ok") is False, (method, path, out)
+        assert out.get("code"), (method, path, out)
+        assert out.get("owner"), (method, path, out)
+        assert out.get("rollback"), (method, path, out)
+
 
 def test_new_routes_never_500_without_project(tmp_path, monkeypatch):
     """With no active project, reads are honest (200 empty or typed 400)."""
@@ -190,7 +226,8 @@ def test_new_routes_never_500_without_project(tmp_path, monkeypatch):
 
 def test_gated_routes_carry_code_counterpart_unavailable(
         tmp_path, monkeypatch):
-    """Gated rows answer the typed envelope: code + counterpart + UNAVAILABLE."""
+    """Gated rows answer the typed envelope: code + counterpart + owner +
+    rollback + UNAVAILABLE (audit-mandated gate fields)."""
     from voicebridge import hermes_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
@@ -201,6 +238,8 @@ def test_gated_routes_carry_code_counterpart_unavailable(
         assert out["state"] == "UNAVAILABLE", (method, path, out)
         assert out["code"] == code, (method, path, out)
         assert out["qubit_counterpart"], (method, path, out)
+        assert out.get("owner"), (method, path, out)
+        assert out.get("rollback"), (method, path, out)
 
 
 # --------------------------------------------------------------- git shapes

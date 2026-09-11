@@ -167,6 +167,30 @@ Voice: `status`, `mic_test`, `task_run`.
 
 Tests: `tests/test_packet4a.py`, `tests/test_packet7c.py`, `tests/test_barge_stream.py`. Owner: qubit-core. Rollback: standard config rollback.
 
+## N8U-AUDIO-HTTP — IMPLEMENTED
+
+User goal: transcribe an uploaded recording and speak a reply through the local Qubit voice stack
+
+Upstream: hermes-agent@2237be3 hermes_cli/web_routers/audio.py (HTTP half only; no client-direct keys, no external catalog, no speak-stream WS)
+
+Qubit: CLI `asr-test`, `tts-test`, `mic-test`; dashboard HTTP compatibility routes `GET /api/audio/voice-config`, `POST /api/audio/transcribe`, `POST /api/audio/speak` (same `voicebridge.asr` / `voicebridge.tts` backends; strict 25 MiB cap, temp-file lifecycle, active-profile references only). ElevenLabs voices and the desktop TTS lease stay typed-gated.
+
+Voice: `status`, `mic_test`, `task_run`.
+
+Tests: `tests/test_hermes_routes_parity8u.py`, `tests/test_hermes_readsurfaces8u.py`. Owner: qubit-core. Rollback: transcribe/speak are stateless; upload and synthesized temp files are always removed.
+
+## N8U-GIT-REVIEW — IMPLEMENTED
+
+User goal: review repository changes from the dashboard (branches, worktrees, diffs, commit context)
+
+Upstream: hermes-agent@2237be3 hermes_cli/web_git.py (read half only; writes and the credentialed `gh` surfaces stay brokered/gated)
+
+Qubit: CLI `git status`, `git log`, `git diff`, `git show`; dashboard `GET /api/git/status|log|diff|show|worktrees|branches|base-branches|review/list|review/diff|file-diff|review/commit-context|review/rev-parse`, all through `voicebridge.git_scope` (fixed argv, no shell, project-root confined, bounded, redacted). Mutating verbs are `GIT_WRITE_BROKERED`; `gh-auth` and `review/ship-info` are typed gates (no credentialed network probe).
+
+Voice: `git_status`, `git_log`, `git_diff`, `git_show`.
+
+Tests: `tests/test_git_scope8u.py`, `tests/test_hermes_routes_parity8u.py`. Owner: qubit-policy. Rollback: read-only; nothing to roll back.
+
 ## N8U-SESSIONS — IMPLEMENTED
 
 User goal: my sessions persist and resume
