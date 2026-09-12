@@ -629,6 +629,12 @@ class PermissionPolicy:
             except Exception as exc:
                 return self._deny(capability, DENY_MALFORMED, source, scopes, args,
                                   detail=f"validator: {exc}")
+        if spec.scopes and not scopes:
+            # A scoped capability requires the caller to declare its scopes;
+            # an empty scope set must not silently bypass scope enforcement.
+            return self._deny(capability, DENY_OUT_OF_SCOPE, source, scopes, args,
+                              detail=f"capability requires declared scopes: "
+                                     f"{sorted(spec.scopes)}")
         if scopes and not set(scopes) <= set(spec.scopes):
             return self._deny(capability, DENY_OUT_OF_SCOPE, source, scopes, args,
                               detail="undeclared scopes: "
@@ -679,6 +685,8 @@ class PermissionPolicy:
             if not g.is_active(now):
                 continue
             if g.capability != capability:
+                continue
+            if g.scopes and not scopes:
                 continue
             if scopes and not set(scopes) <= set(g.scopes):
                 continue

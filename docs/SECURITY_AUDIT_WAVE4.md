@@ -20,11 +20,11 @@ this file and `tests/test_security_parity_wave4.py` (23 adversarial tests).
 | Gap | Concern | Status | Fix / owner |
 | --- | --- | --- | --- |
 | **G1** | CLI fork `--confirm` routes bypassed policy/audit/e-stop | **FIXED** | `cli_hermes_forward.guard_confirm` + `dispatch_guard.WorkerGuard.authorize` |
-| **G2** | Receipts served unredacted | **STILL OPEN (out of scope)** | `voice_commands.py`, `dashboard_ops.py` — recorded §4 |
+| **G2** | Receipts served unredacted | **OPEN (design constraint)** | A receipt-level redaction was attempted in `voice_commands.execute/confirm_pending` but reverted: it breaks the frozen CLI/dashboard/voice backend-parity tests (`test_capability_wiring8u`, `test_voice_coverage_wave4`) that compare the receipt payload to the direct backend dict. Redaction must move to the transport/JSON serialization boundary (webui response / audit writer), not the receipt object. Tracked here, not silently waived. |
 | **G3** | Second adapter-private e-stop latches | **FIXED** | `opencode/runner.py`, `ghost.py` delegate to the shared `PowerControl` |
-| **G4** | Permission scopes opt-in (empty scopes skip binding) | **STILL OPEN (out of scope)** | `permissions.py` — recorded §4 |
+| **G4** | Permission scopes opt-in (empty scopes skip binding) | **FIXED (orchestrator)** | `voicebridge/permissions.py::PermissionPolicy.decide` now denies a scoped capability with an empty scope set, and `_matching_grant` refuses a scoped grant when the caller declares no scopes. |
 | **G5** | Plugin/OpenClaw boolean `confirmed` vs shared journal | **FIXED** | `plugin_runtime._authorize_mutation` over the durable `ApprovalJournal` |
-| **G6** | Residual fail-open in `hermes_compat._estop` | **STILL OPEN (out of scope)** | `hermes_compat.py:68` — recorded §4 |
+| **G6** | Residual fail-open in `hermes_compat._estop` | **FIXED (orchestrator)** | `voicebridge/hermes_compat.py::_estop` returns `True` (latched) when the single e-stop authority cannot be read. |
 
 ## 2. Fixes (owned files)
 
