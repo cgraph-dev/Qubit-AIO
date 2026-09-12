@@ -26,12 +26,16 @@
   }
 
   /* Docs page notice: the built-in Docs tab embeds the upstream docs site
-   * (third-party reference content). Point operators at Qubit docs. */
+   * (third-party reference content). The Qubit operator guide lives in the
+   * checkout (`docs/`) and the CLI (`qubit --help`); we deliberately do NOT
+   * link to /docs here — the notice is rendered on /docs, so that link would
+   * be a dead (self-referential) control. */
   function DocsNotice() {
     return e("div", {role: "note", style: {margin: 12, padding: 10,
       border: "1px solid", borderRadius: 8, fontSize: 13}},
       e("strong", null, "Qubit docs: "),
       e("span", null, "the frame below is the upstream reference site. "),
-      e("a", {href: "/docs"}, "Open the Qubit operator guide"));
+      e("span", null, "For Qubit-specific operation, run `qubit --help` or " +
+        "read the docs/ directory in the Qubit checkout."));
   }
 })();

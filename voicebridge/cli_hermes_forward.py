@@ -20,6 +20,7 @@ Design rules:
 """
 from __future__ import annotations
 
+import threading
 from typing import NamedTuple, Optional
 
 # (qubit family, qubit subcommand) -> Hermes argv prefix. Every entry is a
@@ -133,6 +134,98 @@ class FamilyRoute(NamedTuple):
 _QUBIT_GLOBALS = frozenset({"--config", "--no-hotkey", "--dry-run", "--mute"})
 _FAMILY_GLOBALS = frozenset({"--config", "--no-hotkey", "--mute", "--confirm"})
 
+# ---------------------------------------------------------------------------
+# Shared dispatch authority for confirmed fork mutations (Wave 4, gap G1).
+#
+# ``--confirm`` used to be a boolean presence check that forwarded straight to
+# the fork with no PolicyEngine Decision, no e-stop probe, and no audit. A
+# confirmed mutation now flows through the SAME dispatch guard (single-use,
+# expiring, target-bound confirmation + shared PolicyEngine) the worker paths
+# use, after the ONE durable emergency-stop latch is probed. There is no
+# unrestricted bypass: an unavailable guard or read failure refuses.
+# ---------------------------------------------------------------------------
+FORK_CAPABILITY = "fork.forward"
+FORK_SCOPE = "fork"
+_FORK_ENGINE = None
+_FORK_ENGINE_LOCK = threading.Lock()
+
+
+def _get_fork_engine():
+    """The shared engine for fork mutations (one registry/store, built once)."""
+    global _FORK_ENGINE
+    with _FORK_ENGINE_LOCK:
+        if _FORK_ENGINE is None:
+            from .capabilities import (CapabilityRegistry, CapabilitySpec,
+                                       ConfirmationStore, PolicyEngine, Tier)
+            reg = CapabilityRegistry()
+            reg.register(CapabilitySpec(
+                name=FORK_CAPABILITY, version="1.0.0", tier=Tier.MUTATING,
+                summary="forward a mutating fork subcommand",
+                scopes=(FORK_SCOPE,), timeout_s=900.0))
+            _FORK_ENGINE = PolicyEngine(
+                registry=reg,
+                confirmations=ConfirmationStore(default_ttl_s=120.0))
+    return _FORK_ENGINE
+
+
+def _fork_cfg():
+    try:
+        from .config import Config
+
+        return Config.load()
+    except Exception:
+        return None
+
+
+def guard_confirm(argv: list, family: str, sub: str,
+                  cfg=None) -> Optional[FamilyRoute]:
+    """Authorize one ``--confirm`` fork mutation through the shared contract.
+
+    Returns ``None`` when the route may forward, or a typed ``refused`` route.
+    Fail-closed at every step: the single durable emergency-stop latch is
+    probed first, then the shared :class:`WorkerGuard` issues and consumes a
+    short-lived single-use confirmation (issuer ``user``) and records the
+    PolicyEngine Decision. A read error, an unavailable guard, or any policy
+    denial refuses — never forwards.
+    """
+    from .logging_setup import log_event
+
+    argv = list(argv or [])
+    label = f"qubit {family} {sub}".strip()
+    resolved_cfg = cfg if cfg is not None else _fork_cfg()
+    if resolved_cfg is None:
+        return FamilyRoute(
+            "refused", [], code="FORK_GUARD_UNAVAILABLE",
+            detail=f"{label}: shared policy state is unavailable; refused")
+    from .broker import estop_engaged
+
+    try:
+        latched = bool(estop_engaged(resolved_cfg))
+    except Exception:
+        latched = True                       # probe failure is fail-closed
+    if latched:
+        log_event("cli.fork.estop", family=family, sub=sub)
+        return FamilyRoute(
+            "refused", [], code="EMERGENCY_STOP",
+            detail=f"{label}: emergency stop is latched")
+    from .dispatch_guard import DispatchBlocked, WorkerGuard
+    from .redaction import redact_obj
+
+    try:
+        guard = WorkerGuard(resolved_cfg, engine=_get_fork_engine())
+        guard.authorize(FORK_CAPABILITY, {"argv": redact_obj(argv)},
+                        source="user", correlation_id=f"fork:{family}:{sub}")
+    except DispatchBlocked as exc:
+        return FamilyRoute(
+            "refused", [], code=exc.code,
+            detail=f"{label}: {exc.detail or exc.code}")
+    except Exception:
+        return FamilyRoute(
+            "refused", [], code="FORK_GUARD_UNAVAILABLE",
+            detail=f"{label}: shared dispatch guard unavailable; refused")
+    log_event("cli.fork.confirmed", family=family, sub=sub)
+    return None
+
 
 def _strip_qubit_globals(argv: list) -> list:
     """Drop Qubit-only global flags (and ``--config``'s value) from ``argv``."""
@@ -199,13 +292,13 @@ def _strip_family_globals(argv: list) -> list:
     return out
 
 
-def route_family(argv: list) -> Optional[FamilyRoute]:
+def route_family(argv: list, cfg=None) -> Optional[FamilyRoute]:
     """Resolve a whole-family ``qubit <family> [...]`` call, or ``None``.
 
     Read-only subcommands/help forward to the fork verbatim; mutating
     subcommands become ``needs-confirm`` without Qubit's ``--confirm`` and
-    forward (with the flag stripped) when it is present; everything else is a
-    typed refusal.
+    forward (with the flag stripped) when it is present AND the shared
+    dispatch guard authorizes it; everything else is a typed refusal.
     """
     raw = list(argv or [])
     if not raw or raw[0] not in FAMILY_FORWARD:
@@ -246,6 +339,9 @@ def route_family(argv: list) -> Optional[FamilyRoute]:
             return FamilyRoute(
                 "needs-confirm", [fork_family, *args], code="CONFIRM_REQUIRED",
                 detail=f"{label} requires --confirm (explicit human authorization)")
+        denied = guard_confirm(raw, family, sub, cfg)
+        if denied is not None:
+            return denied
         return FamilyRoute("forward", [fork_family, *args])
     return FamilyRoute(
         "refused", [], code="FORK_SUB_UNCLASSIFIED",
@@ -253,11 +349,13 @@ def route_family(argv: list) -> Optional[FamilyRoute]:
                 "fork subcommand is never exposed as an unrestricted bypass"))
 
 
-def confirm_pair(argv: list) -> Optional[FamilyRoute]:
+def confirm_pair(argv: list, cfg=None) -> Optional[FamilyRoute]:
     """Resolve a ``CONFIRM_TABLE`` pair, or ``None``.
 
     Without Qubit's ``--confirm`` the fork is never invoked; the caller gets a
     typed ``needs-confirm`` envelope carrying the exact argv that would run.
+    With it, the shared dispatch guard (single-use confirmation + e-stop +
+    policy audit) must authorize before the pair forwards.
     """
     raw = list(argv or [])
     if len(raw) < 2:
@@ -271,18 +369,21 @@ def confirm_pair(argv: list) -> Optional[FamilyRoute]:
         return FamilyRoute(
             "needs-confirm", [*mapped, *args], code="CONFIRM_REQUIRED",
             detail=f"{label} requires --confirm (explicit human authorization)")
+    denied = guard_confirm(raw, raw[0], raw[1], cfg)
+    if denied is not None:
+        return denied
     return FamilyRoute("forward", [*mapped, *args])
 
 
-def route(argv: list) -> Optional[FamilyRoute]:
+def route(argv: list, cfg=None) -> Optional[FamilyRoute]:
     """Resolve any fork-backed read-only/confirm-gated Qubit CLI call.
 
     Returns ``None`` when the Qubit parser owns the call.
     """
-    resolved = route_family(argv)
+    resolved = route_family(argv, cfg=cfg)
     if resolved is not None:
         return resolved
-    resolved = confirm_pair(argv)
+    resolved = confirm_pair(argv, cfg=cfg)
     if resolved is not None:
         return resolved
     mapped = translate(argv)

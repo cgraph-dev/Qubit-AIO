@@ -90,8 +90,8 @@
       e("p", {style: S.sub},
         "Truthful availability for browser, desktop, IDE, vision, and pinned ",
         "runtimes — same backend as CLI `qubit runtime` / device ops and voice."),
-      err ? e("div", {role: "alert", style: {color: "#e5484d"}},
-        err) : null,
+      err ? e("div", {role: "alert", "data-state": "degraded",
+        style: {color: "#e5484d"}}, err) : null,
       e("div", {style: S.card},
         e("strong", null, "Pinned runtimes"),
         images.length ? images.map(function (img, i) {
@@ -100,10 +100,13 @@
             e("span", {style: S.badge}, img.state || "?") ,
             " pin " + (img.pin || "?") +
             (img.observed && img.observed.effective ? " · effective" : ""));
-        }) : e("div", {style: {opacity: 0.7, fontSize: 13, marginTop: 4}},
+        }) : e("div", {"data-state": runtime ? "empty" : "loading",
+          "aria-busy": runtime ? "false" : "true",
+          style: {opacity: 0.7, fontSize: 13, marginTop: 4}},
           runtime ? "No runtimes staged." : "Loading runtime inventory…")),
       e("h2", {style: {fontSize: 15, marginTop: 18}}, "Device operations"),
-      !ops ? e("p", null, "Loading device operations…") :
+      !ops ? e("p", {"data-state": "loading", "aria-busy": "true"},
+          "Loading device operations…") :
         ops.map(function (op) {
           var r = results[op.id];
           return e("div", {key: op.id, style: S.card},

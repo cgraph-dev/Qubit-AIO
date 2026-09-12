@@ -1215,3 +1215,46 @@ Tests: `tests/test_packet8m.py` (focused) + affected 5B/5C/portable regressions.
 Rollback: `git revert` of the 8M commit; `memory disable`; remove
 `semantic.json`/journal; the store remains fully functional without the columns.
 The hotkey fix is purely in-process and reversible by restarting the service.
+
+## MIG-025 — Wave 4 packaging/lifecycle rehearsal: migration/upgrade/rollback/uninstall evidence (2026-09-13)
+
+Status: **IMPLEMENTED** — no new runtime schema/state migration and no user
+config, service, timer, model, browser, or audio change. Adds a hermetic
+lifecycle rehearsal script, tests, and an audit record. Every lifecycle command
+runs inside a throwaway `/tmp` tree with a throwaway HOME/XDG root; the
+operator's real HOME/config/state and the live service are never touched.
+
+Decision:
+- **New `scripts/migration_rehearsal.sh`** drives the REAL lifecycle commands
+  on a synthetic legacy state bundle: `qubit product migrate --apply
+  --backup-dir`, `qubit product upgrade`, `qubit package upgrade`,
+  `qubit product migrate-rollback --apply`, and `qubit package uninstall`. It
+  proves byte-for-byte preservation of config/state/data (including
+  credential-named files, which the migration safety backup intentionally
+  excludes), canonical trees + compat aliases after migration, no mutation
+  during the upgrade plan, full canonical-removal + legacy restoration on
+  rollback, and a confirmation-gated read-only uninstall plan. Typed exit
+  codes: 0 PASS, 2 FAIL, 4 DEGRADED (tooling), 8 BLOCKED (workspace).
+- **No new store/config schema migration is introduced by this packet.** The
+  state-schema migrations remain MIG-024 (memory store v2/v3) and earlier; this
+  packet adds verification tooling only. The migration exercised is the
+  documented legacy → canonical path migration (`docs/QUBIT_MIGRATION.md`).
+- **New `tests/test_lifecycle_wave4.py`** — package-data completeness (wheel +
+  sdist), no developer-home path in any lifecycle surface, migration
+  idempotence/rollback + credential preservation, uninstall-preserves-state
+  (plan is read-only), service templates, and the rehearsal script's `bash -n`
+  plus a green end-to-end run.
+- **New `docs/LIFECYCLE_AUDIT_WAVE4.md`** — exact commands and observed results
+  for wheel/sdist build, isolated clean-venv install + dashboard/runtime
+  startup, and the migration/upgrade/rollback/uninstall rehearsal, with any
+  residual operator-only step typed.
+
+Tests: `tests/test_lifecycle_wave4.py`; focused regression set
+`tests/test_packaging_wave3.py`, `tests/test_hermes_package8u.py`,
+`tests/test_hermes_package_runtime8u.py`, `tests/test_packet7c*.py`,
+`tests/test_release_gates8u.py`.
+
+Rollback: delete `scripts/migration_rehearsal.sh`,
+`tests/test_lifecycle_wave4.py`, `docs/LIFECYCLE_AUDIT_WAVE4.md`, and this
+entry. No user config, state, or service is altered by any command in this
+packet; the rehearsal's throwaway `/tmp` tree is removed by its own trap.

@@ -346,8 +346,10 @@
         "Kanban boards on the canonical store — same backend as `qubit kanban` CLI and voice. ",
         "Tables, tabs, and widgets run on the Tier-1 ops broker; mutations confirm ",
         "through the shared journal (inline below, or the shell banner)."),
-      err ? e("div", {role: "alert", style: {color: "#e5484d"}}, err) : null,
+      err ? e("div", {role: "alert", "data-state": "degraded",
+        style: {color: "#e5484d"}}, err) : null,
       pending ? e("div", {role: "region", "aria-label": "Pending board confirmation",
+        "data-state": "pending",
         style: {marginTop: 8, padding: "8px 12px", border: "1px solid #b7791f",
           borderRadius: 8, fontSize: 13}},
         e("strong", null, "Confirm " + pending.what + ": "),
@@ -380,7 +382,8 @@
       e("h3", {style: {marginTop: 18}},
         "Tabs" + (selBoard ? " on " + selBoard : "") + " (" + tabList.length + ")"),
       !tabList.length
-        ? e("p", {style: {opacity: 0.6}}, "No tabs (create a board first).")
+        ? e("p", {"data-state": "empty", style: {opacity: 0.6}},
+            "No tabs (create a board first).")
         : e("div", {role: "tablist", "aria-label": "Board tabs",
             style: {display: "flex", gap: 6, flexWrap: "wrap"}},
             tabList.map(function (t) {
@@ -446,7 +449,8 @@
         e(C.Button || "button", {"aria-label": "Add card", disabled: busy,
           onClick: addCard}, "Add card")),
       !list.length
-        ? e("p", {style: {opacity: 0.6}}, "No cards here yet.")
+        ? e("p", {"data-state": "empty", style: {opacity: 0.6}},
+            "No cards here yet.")
         : e("ul", null, list.map(function (c) {
             var id = c.id;
             return e("li", {key: id, style: {marginBottom: 8}},
@@ -510,7 +514,7 @@
             background: "#0c1118", color: "inherit", border: "1px solid #2a3443",
             borderRadius: 6, fontFamily: "inherit"}})),
       !visible.length
-        ? e("p", {style: {opacity: 0.6}},
+        ? e("p", {"data-state": "empty", style: {opacity: 0.6}},
             "No widgets on this tab yet.")
         : e("ul", {style: {listStyle: "none", padding: 0}},
             visible.map(function (w) {

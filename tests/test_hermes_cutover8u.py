@@ -202,3 +202,109 @@ def test_flag_on_serves_fork_reads_and_gates_sensitive(tmp_path):
     assert json.loads(out["raw_body"]).get("code") != "OK"
     # Write is never proxied (compat path).
     assert out["post_status"] in (200, 400, 404, 405, 409, 501)
+
+
+# ------------------------------------------------ stage 3 write policy
+def _wcfg(tmp_path, extra: str = "") -> object:
+    from voicebridge.config import Config
+
+    state = tmp_path / "state"
+    state.mkdir(exist_ok=True)
+    p = tmp_path / "voice.yaml"
+    p.write_text(f"logging:\n  jsonl_path: '{state}'\n{extra}")
+    return Config.load(p), state
+
+
+def test_write_policy_is_fail_closed_and_never_bypasses_a_gate(
+        tmp_path, monkeypatch):
+    """Stage 3 policy: default empty allowlist, typed gates and e-stop win."""
+    from voicebridge import hermes_asgi as HA
+
+    cfg, _state = _wcfg(tmp_path)
+
+    # Nothing is a cutover write until the operator allowlists it.
+    monkeypatch.setattr(HA, "WRITE_PROXY_ALLOWLIST", set())
+    assert HA.write_policy(cfg, "POST", "/api/sessions/import") == (False, None)
+    assert HA.safe_write_to_proxy("POST", "/api/sessions/import") is False
+
+    # Allowlisted, but a Qubit-typed gate still refuses; the fork is never used.
+    monkeypatch.setattr(HA, "WRITE_PROXY_ALLOWLIST",
+                        {("POST", "/api/sessions/import")})
+    allowed, refusal = HA.write_policy(cfg, "POST", "/api/sessions/import")
+    assert allowed is False and refusal is not None, (allowed, refusal)
+    assert refusal[0] == 501 and \
+        refusal[1]["code"] == "SESSIONS_RECEIPT_STORE", refusal
+    assert HA.safe_write_to_proxy("POST", "/api/sessions/import") is False
+
+    # The one Qubit emergency stop refuses an allowlisted write.
+    monkeypatch.setattr(HA, "WRITE_PROXY_ALLOWLIST",
+                        {("POST", "/api/ops/doctor")})
+    monkeypatch.setattr("voicebridge.broker.estop_engaged",
+                        lambda _c=None: True)
+    allowed, refusal = HA.write_policy(cfg, "POST", "/api/ops/doctor")
+    assert allowed is False and refusal is not None
+    assert refusal[0] == 423 and refusal[1]["code"] == "ESTOP_ENGAGED", refusal
+
+
+def test_webui_write_middleware_proxies_only_allowlisted_writes(
+        tmp_path, monkeypatch):
+    """Flag on + allowlist -> the Qubit middleware clears and the fork runs."""
+    import urllib.request
+    import urllib.error
+
+    from voicebridge import hermes_asgi as HA
+    from voicebridge.webui import WebUI
+
+    cfg, state = _wcfg(tmp_path, "webui:\n  token: test-token\n"
+                                 "  hermes_backend: true\n"
+                                 "  hermes_writes: true\n")
+
+    calls = []
+
+    def _fake_call(method, path, **kw):
+        calls.append((method, path))
+        return 200, {"content-type": "application/json"}, \
+            b'{"ok": true, "proxied_by_fork": true}'
+
+    monkeypatch.setattr(HA, "call", _fake_call)
+    monkeypatch.setattr(HA, "known_route", lambda _p: True)
+    monkeypatch.setattr(HA, "WRITE_PROXY_ALLOWLIST",
+                        {("POST", "/api/cron/jobs"),
+                         ("POST", "/api/sessions/import")})
+
+    class _FakeOrch:
+        _route = "local"
+        _web_active = 0
+        task = type("T", (), {"active": False})()
+
+        def __init__(self):
+            self.cfg = cfg
+            self._t0 = time.time()
+
+    ui = WebUI(_FakeOrch(), host="127.0.0.1", port=0, state_dir=state)
+    ui.start()
+    port = ui._server.server_address[1]
+
+    def _post(path):
+        data = json.dumps({"confirm": True}).encode()
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{port}{path}", method="POST", data=data)
+        req.add_header("X-Hermes-Session-Token", "test-token")
+        req.add_header("Content-Type", "application/json")
+        try:
+            r = urllib.request.urlopen(req, timeout=15)
+            return r.status, json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            return e.code, json.loads(e.read())
+
+    try:
+        # Allowlisted, policy-cleared: the fork (fake) serves the write.
+        st, out = _post("/hermes/api/cron/jobs")
+        assert st == 200 and out.get("proxied_by_fork") is True, (st, out)
+        assert calls == [("POST", "/api/cron/jobs")], calls
+        # Allowlisted but Qubit-gated: the typed gate wins; no fork call.
+        st, out = _post("/hermes/api/sessions/import")
+        assert st == 501 and out.get("code") == "SESSIONS_RECEIPT_STORE", out
+        assert calls == [("POST", "/api/cron/jobs")], calls
+    finally:
+        ui.stop()

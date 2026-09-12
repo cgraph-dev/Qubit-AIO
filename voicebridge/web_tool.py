@@ -71,9 +71,11 @@ TLS_CODE = "WEB_TLS_ERROR"
 SEARCH_UNAVAILABLE_CODE = "WEB_SEARCH_UNAVAILABLE"
 SEARCH_PROVIDER_CODE = "WEB_SEARCH_PROVIDER_ERROR"
 X_SEARCH_UNAVAILABLE_CODE = "WEB_X_SEARCH_UNAVAILABLE"
+READABILITY_EMPTY_CODE = "WEB_READABILITY_EMPTY"
 
 UNAVAILABLE = "UNAVAILABLE"
 OK = "OK"
+READABILITY_SCHEMA = "qubit-web-readability/1"
 
 # ------------------------------------------------------------------- bounds
 MAX_URL_LEN = 2048
@@ -87,6 +89,8 @@ DEFAULT_SEARCH_LIMIT = 5
 MAX_SEARCH_LIMIT = 20
 MAX_SEARCH_RESULT_URL = 1024
 MAX_SEARCH_SNIPPET = 600
+DEFAULT_MAX_READABLE_CHARS = 20000
+MAX_MAX_READABLE_CHARS = 200000
 
 _REDIRECT_CODES = (301, 302, 303, 307, 308)
 
@@ -97,6 +101,11 @@ _SCRIPT_RE = re.compile(r"(?is)<(script|style|noscript|template)\b.*?</\1>")
 _TAG_RE = re.compile(r"<[^>]+>")
 _BLANK_RE = re.compile(r"\n[ \t]*\n[ \t]*\n+")
 _SPACE_RE = re.compile(r"[ \t\f\v]+")
+_ARTICLE_RE = re.compile(r"(?is)<article\b[^>]*>(.*?)</article>")
+_MAIN_RE = re.compile(r"(?is)<main\b[^>]*>(.*?)</main>")
+_READABILITY_DROP_RE = re.compile(
+    r"(?is)<(nav|header|footer|aside|form|script|style|noscript|template)"
+    r"\b.*?</\1>")
 
 
 class WebToolError(Exception):
@@ -238,6 +247,62 @@ def _visible_text(body: bytes, ctype: str) -> str:
     text = _SPACE_RE.sub(" ", text)
     text = _BLANK_RE.sub("\n\n", text)
     return text.strip()
+
+
+def readable_text(body: Any, *,
+                  max_chars: int = DEFAULT_MAX_READABLE_CHARS) -> Dict[str, Any]:
+    """Extract bounded readable article text from fetched HTML.
+
+    Qubit-owned equivalent of the OpenClaw ``web-readability`` extension. It is
+    pure and offline: it prefers an ``<article>``/``<main>`` region, drops page
+    chrome, then applies the same whitespace normalization as
+    :func:`_visible_text`. It never executes markup, never egresses, and never
+    fabricates content — empty input is a typed ``WEB_READABILITY_EMPTY``.
+    """
+    if isinstance(body, (bytes, bytearray)):
+        raw = bytes(body).decode("utf-8", "replace")
+    else:
+        raw = str(body or "")
+    try:
+        limit = int(max_chars)
+    except (TypeError, ValueError):
+        raise WebToolError(BAD_INPUT_CODE, "max_chars must be an int")
+    if limit < 1 or limit > MAX_MAX_READABLE_CHARS:
+        raise WebToolError(
+            BAD_INPUT_CODE,
+            f"max_chars must be in [1, {MAX_MAX_READABLE_CHARS}]")
+    if not raw.strip():
+        return {"state": UNAVAILABLE, "code": READABILITY_EMPTY_CODE,
+                "schema": READABILITY_SCHEMA, "text": "", "chars": 0,
+                "truncated": False,
+                "detail": "no readable input was provided"}
+    text = _READABILITY_DROP_RE.sub(" ", raw)
+    region = None
+    for pattern in (_ARTICLE_RE, _MAIN_RE):
+        match = pattern.search(text)
+        if match and match.group(1).strip():
+            region = match.group(1)
+            break
+    if region is not None:
+        text = region
+    text = _SCRIPT_RE.sub(" ", text)
+    text = _TAG_RE.sub(" ", text)
+    try:
+        import html as _html
+
+        text = _html.unescape(text)
+    except Exception:
+        pass
+    text = _SPACE_RE.sub(" ", text)
+    text = _BLANK_RE.sub("\n\n", text).strip()
+    truncated = len(text) > limit
+    if truncated:
+        text = text[:limit].rstrip()
+    return {"state": OK, "code": "WEB_READABILITY_OK",
+            "schema": READABILITY_SCHEMA, "text": text, "chars": len(text),
+            "truncated": truncated,
+            "detail": "readable text extracted" if text else
+                      "no readable text remained after chrome removal"}
 
 
 # --------------------------------------------------------------- fetch
@@ -721,6 +786,11 @@ TOOL_SPECS: Dict[str, Dict[str, Any]] = {
         "summary": "search X/Twitter (typed UNAVAILABLE until an adapter "
                    "is configured)",
     },
+    "web.read": {
+        "args": {"url": {"type": "string"}},
+        "required": ["url"],
+        "summary": "fetch a public page and return bounded readable text",
+    },
 }
 
 
@@ -743,4 +813,11 @@ def run(cfg: Any, tool: str, arguments: Optional[Dict[str, Any]] = None,
         return search(cfg, str(args.get("query") or ""), transport=transport)
     if name in ("x_search", "xsearch"):
         return x_search(cfg, str(args.get("query") or ""), transport=transport)
+    if name in ("read", "readable", "web_readability"):
+        fetched = fetch(cfg, str(args.get("url") or ""))
+        if fetched.get("state") != OK:
+            return fetched
+        readable = readable_text(fetched.get("text", ""))
+        readable["url"] = fetched.get("url", "")
+        return readable
     raise WebToolError(BAD_INPUT_CODE, f"unknown web tool {tool!r}")

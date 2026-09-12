@@ -63,8 +63,8 @@
       e("p", {style: S.sub},
         "Live event log, usage totals, generated reports, and insights — ",
         "all journal-derived on the shared Qubit backend (CLI/voice parity)."),
-      err ? e("div", {role: "alert", style: {color: "#e5484d"}},
-        err) : null,
+      err ? e("div", {role: "alert", "data-state": "degraded",
+        style: {color: "#e5484d"}}, err) : null,
       e("div", {style: S.card},
         e("strong", null, "Usage totals"),
         analytics ? e("div", {style: {display: "flex", gap: 18,
@@ -74,8 +74,8 @@
           spanKV("Input tokens", totals.total_input),
           spanKV("Output tokens", totals.total_output),
           spanKV("Cost", totals.total_estimated_cost)) :
-          e("div", {style: {opacity: 0.7, fontSize: 13}},
-            "Loading analytics…")),
+          e("div", {"data-state": "loading", "aria-busy": "true",
+            style: {opacity: 0.7, fontSize: 13}}, "Loading analytics…")),
       e("div", {style: S.card},
         e("strong", null, "Recent activity"),
         lines.length ? e("pre", {style: {marginTop: 8, fontSize: 12,
@@ -83,19 +83,23 @@
           lines.slice(-60).map(function (ln) {
             return typeof ln === "string" ? ln : JSON.stringify(ln);
           }).join("\n")) :
-          e("div", {style: {opacity: 0.7, fontSize: 13}},
+          e("div", {"data-state": logs ? "empty" : "loading",
+            "aria-busy": logs ? "false" : "true",
+            style: {opacity: 0.7, fontSize: 13}},
             logs ? "No events yet." : "Loading events…")),
       e("div", {style: S.card},
         e("strong", null, "Generated reports"),
         reports ? e("pre", {style: S.code},
           JSON.stringify(reports.body, null, 2).slice(0, 4000)) :
-          e("div", {style: {opacity: 0.7, fontSize: 13}},
+          e("div", {"data-state": "loading", "aria-busy": "true",
+            style: {opacity: 0.7, fontSize: 13}},
             "Loading reports…")),
       e("div", {style: S.card},
         e("strong", null, "Insights"),
         insights ? e("pre", {style: S.code},
           JSON.stringify(insights.body, null, 2).slice(0, 4000)) :
-          e("div", {style: {opacity: 0.7, fontSize: 13}},
+          e("div", {"data-state": "loading", "aria-busy": "true",
+            style: {opacity: 0.7, fontSize: 13}},
             "Loading insights…")));
   }
 

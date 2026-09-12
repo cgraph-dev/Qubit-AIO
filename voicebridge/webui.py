@@ -1125,6 +1125,39 @@ class WebUIHandler(BaseHTTPRequestHandler):
             except Exception as exc:
                 log_event("webui.hermes_backend.fallback",
                           error=str(exc)[:160])
+        # Cutover stage 3 (docs/QUBIT_HERMES_CUTOVER_MIGRATION.md): when
+        # `webui.hermes_writes` is on, a mutating request that the operator has
+        # explicitly allowlisted runs the Qubit policy middleware first (e-stop
+        # + typed compat gate + audit) and only then executes in the fork. The
+        # allowlist is empty by default, so writes fall through to the Qubit
+        # compat path unchanged -- a reversible, fail-closed stage.
+        if method in ("POST", "PUT", "PATCH", "DELETE") and \
+                self._hermes_writes_enabled():
+            try:
+                from . import hermes_asgi as HA
+                allowed, refusal = HA.write_policy(
+                    self.app.orch.cfg, method, api_path)
+                if refusal is not None:
+                    self._json(refusal[1], refusal[0])
+                    return
+                if allowed and HA.safe_write_to_proxy(method, api_path):
+                    payload = json.dumps(body).encode("utf-8")
+                    code, hdrs, rbody = HA.call(
+                        method, api_path, query=query,
+                        headers={"accept": "application/json",
+                                 "content-type": "application/json"},
+                        body=payload)
+                    if code < 500 and code not in (404, 405):
+                        log_event("webui.hermes_writes.proxied",
+                                  path=api_path[:120], status=code)
+                        ctype = hdrs.get("content-type", "application/json")
+                        self._send(code, rbody, ctype)
+                        return
+                    log_event("webui.hermes_writes.degraded",
+                              path=api_path[:120], status=code)
+            except Exception as exc:
+                log_event("webui.hermes_writes.fallback",
+                          error=str(exc)[:160])
         try:
             from . import hermes_compat as HC
             code, out = HC.dispatch(self.app.orch.cfg, method, api_path,
@@ -1145,6 +1178,18 @@ class WebUIHandler(BaseHTTPRequestHandler):
                                               default=True))
         except Exception:
             return True
+
+    def _hermes_writes_enabled(self) -> bool:
+        """Cutover stage 3 flag: run the Qubit write-policy middleware before
+        an allowlisted mutation executes in the fork. Default off (writes take
+        the Qubit compat path); set ``webui.hermes_writes: true`` to enable the
+        middleware for routes the operator has added to
+        ``hermes_asgi.WRITE_PROXY_ALLOWLIST``."""
+        try:
+            return bool(self.app.orch.cfg.get("webui", "hermes_writes",
+                                              default=False))
+        except Exception:
+            return False
 
     # -- public read-only session share ----------------------------------
     def _public_share(self, path: str) -> None:

@@ -72,7 +72,8 @@
       e("p", {style: S.sub},
         "Local memory provider, grounded search, and the learning ledger — ",
         "same store as CLI `qubit memory`/`qubit lessons` and voice."),
-      err ? e("div", {role: "alert", style: {color: "#e5484d"}}, err) : null,
+      err ? e("div", {role: "alert", "data-state": "degraded",
+        style: {color: "#e5484d"}}, err) : null,
       e("div", {style: S.card},
         e("strong", null, "Providers"),
         providers.length ? providers.map(function (p, i) {
@@ -80,7 +81,9 @@
             e("strong", null, p.name || p.id || "provider"),
             e("span", {style: S.badge}, p.status || (p.available ? "ready" : "?")),
             " " + (p.description || ""));
-        }) : e("div", {style: {opacity: 0.7, fontSize: 13}},
+        }) : e("div", {"data-state": mem ? "empty" : "loading",
+          "aria-busy": mem ? "false" : "true",
+          style: {opacity: 0.7, fontSize: 13}},
           mem ? "No providers." : "Loading provider status…")),
       e("div", {style: S.card},
         e("strong", null, "Search memory"),
@@ -95,7 +98,10 @@
             "aria-label": "Search memory", onClick: search},
             busy ? "Searching…" : "Search")),
         result ? e("pre", {style: Object.assign({}, S.code, {marginTop: 8})},
-          JSON.stringify(result.body, null, 2).slice(0, 4000)) : null),
+          JSON.stringify(result.body, null, 2).slice(0, 4000)) :
+          e("div", {"data-state": "empty", style: {opacity: 0.7,
+            fontSize: 13, marginTop: 8}},
+            "No search yet — enter a query above.")),
       e("div", {style: S.card},
         e("strong", null, "Learning ledger"),
         summary ? e("pre", {style: {marginTop: 8, fontSize: 12,
@@ -105,7 +111,9 @@
             pinned: summary.verified && summary.verified.pinned,
             journal: summary.verified && summary.verified.journal},
             null, 2)) :
-          e("div", {style: {opacity: 0.7, fontSize: 13}},
+          e("div", {"data-state": curator ? "empty" : "loading",
+            "aria-busy": curator ? "false" : "true",
+            style: {opacity: 0.7, fontSize: 13}},
             curator ? "No ledger data." : "Loading ledger…")));
   }
 

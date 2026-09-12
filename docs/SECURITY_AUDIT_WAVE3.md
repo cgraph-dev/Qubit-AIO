@@ -4,6 +4,13 @@ Status: **AUDITED — in-scope gaps fixed; out-of-scope gaps recorded**
 Baseline: commit `f5fc5776` (verified, not regressed).
 Owner: Agent I (security / permissions / audit / e-stop / resource parity).
 
+> **Wave 4 follow-up:** see [`SECURITY_AUDIT_WAVE4.md`](SECURITY_AUDIT_WAVE4.md)
+> (baseline `539649d4`). In-scope gaps **G1** (CLI fork-confirm bypass),
+> **G3** (second e-stop latches), and **G5** (plugin boolean `confirmed`) are
+> now fixed; out-of-scope **G2** (unredacted receipts), **G4** (opt-in scopes),
+> and **G6** (`hermes_compat._estop` fail-open) remain recorded there for the
+> orchestrator with exact file:line spans.
+
 This report audits the shared security contract — authentication, permission
 grants, confirmation (expiry + single-use), audit, redaction, emergency stop,
 cancellation, and resource limits — across every dispatch path, and records the

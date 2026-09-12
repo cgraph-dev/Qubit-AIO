@@ -293,6 +293,24 @@ class Resolution:
     speech: str = ""
 
 
+def _iter_entries():
+    """Every voice entry in resolution order.
+
+    ``REGISTRY`` is the frozen CLI-parity surface audited by the wave-1..3
+    example/coverage tables. ``PLUGIN_FLEET_REGISTRY`` adds the wave-4
+    vendored dashboard-plugin fleet. Both flow through the same
+    resolve/execute/confirm pipeline, the same journal, and the same
+    redaction/audit path — there is still one listener and one authority.
+    """
+    yield from REGISTRY.values()
+    yield from PLUGIN_FLEET_REGISTRY.values()
+
+
+def _lookup_entry(entry_id: str) -> Optional[VoiceCommand]:
+    """Find an entry in either registry (execute paths never assume one)."""
+    return REGISTRY.get(entry_id) or PLUGIN_FLEET_REGISTRY.get(entry_id)
+
+
 def resolve(text: str) -> Resolution:
     """Match text to at most one command (pure; no side effects)."""
     norm = _norm(text)
@@ -301,7 +319,7 @@ def resolve(text: str) -> Resolution:
     tokens = [t for t in norm.split(" ") if t]
     addressed = "qubit" in (text or "").lower()
     hits: List[Tuple[int, VoiceCommand, str, str]] = []
-    for entry in REGISTRY.values():
+    for entry in _iter_entries():
         for alias in entry.aliases:
             if alias.startswith("rx:"):
                 try:
@@ -3069,6 +3087,56 @@ def _b_plugin_runtime(ctx, args):
             "detail": f"unknown plugin runtime action {action!r}"}
 
 
+class PluginFleetError(Exception):
+    """Typed failure from one vendored plugin-fleet compat route."""
+
+    def __init__(self, http_status: int, code: str, detail: str = "") -> None:
+        super().__init__(detail or f"HTTP {http_status}")
+        self.http_status = int(http_status)
+        self.code = code or f"PLUGIN_FLEET_HTTP_{http_status}"
+        self.detail = detail or self.code
+
+
+def _b_plugin_fleet(ctx, args):
+    """Vendored Hermes dashboard-plugin fleet, dispatched in-process.
+
+    Every entry names an exact ``hermes_compat`` route (the same route table
+    the dashboard SPA calls on the existing listener — no second server) via
+    :data:`PLUGIN_FLEET_OPS`. Reads execute immediately; the plugin's own
+    ``rescan``/``reset-state`` handlers keep their e-stop and confirm gates
+    (``reset-state`` always supplies ``confirm=true`` only after the shared
+    voice journal settled the spoken confirmation). A non-2xx route raises a
+    typed :class:`PluginFleetError`, so a refused/estop/engine-unavailable
+    route can never be reported as success.
+    """
+    from . import hermes_compat as HC
+
+    op = str(args.get("op", "") or "")
+    spec = PLUGIN_FLEET_OPS.get(op)
+    if spec is None:
+        raise PluginFleetError(400, "PLUGIN_FLEET_BAD_OP",
+                               f"unknown plugin fleet op {op!r}")
+    method, path_tmpl, body = spec
+    try:
+        path = path_tmpl.format(
+            **{k: str(v) for k, v in args.items() if v is not None})
+    except (KeyError, IndexError) as exc:
+        raise PluginFleetError(400, "PLUGIN_FLEET_BAD_ARGS",
+                               f"missing plugin fleet argument: {exc}") from exc
+    query = {k: str(v) for k, v in (args.get("query") or {}).items()}
+    payload_body = dict(body) if body else None
+    code, payload = HC.dispatch(ctx.cfg, method, path, query=query,
+                                body=payload_body, actor=ctx.actor)
+    if int(code) >= 400:
+        code_str = detail = ""
+        if isinstance(payload, dict):
+            code_str = str(payload.get("code") or "")
+            detail = str(payload.get("detail") or "")
+        raise PluginFleetError(int(code), code_str, detail or path)
+    return {"state": "OK", "http_status": int(code), "op": op,
+            "data": payload}
+
+
 def _b_channels(ctx, args):
     """Inbound channel framework (same module CLI/dashboard ingress call).
 
@@ -3653,6 +3721,7 @@ _BACKENDS: Dict[str, Callable] = {
     "node_host": _b_node_host, "task_ledger": _b_task_ledger,
     "media_gen": _b_media_gen, "local_models": _b_local_models,
     "plugin_runtime": _b_plugin_runtime, "channels": _b_channels,
+    "plugin_fleet": _b_plugin_fleet,
     "acp_client": _b_acp_client,
     "file_transfer": _b_file_transfer, "active_memory": _b_active_memory,
     "doc_extract": _b_doc_extract, "question_prompt": _b_question_prompt,
@@ -4066,6 +4135,42 @@ def _sum_web(result):
     return f"Fetched {title or body.get('url', 'page')}."
 
 
+def _sum_plugin_fleet(result):
+    """Voice summary for the vendored dashboard-plugin fleet reads."""
+    if not isinstance(result, dict):
+        return "Plugin fleet result recorded."
+    if result.get("state") != "OK":
+        return f"That failed: {result.get('code', result.get('state', '?'))}."
+    data = result.get("data")
+    op = str(result.get("op", "") or "")
+    if op == "achievements_list" and isinstance(data, dict):
+        return (f"Achievements: {data.get('unlocked_count', 0)} of "
+                f"{data.get('total_count', 0)} unlocked.")
+    if op == "achievements_scan_status" and isinstance(data, dict):
+        return (f"Achievement scan {data.get('state', 'idle')}; "
+                f"{data.get('run_count', 0)} runs.")
+    if op == "achievements_recent":
+        count = len(data) if isinstance(data, list) else 0
+        return f"{count} recently unlocked achievements."
+    if op == "achievements_rescan" and isinstance(data, dict):
+        return (f"Achievement rescan complete: "
+                f"{data.get('unlocked_count', 0)} unlocked.")
+    if op == "achievements_reset":
+        return "Achievement progress reset."
+    if op == "achievements_session_badges" and isinstance(data, dict):
+        return f"{len(data.get('badges', []))} session badges."
+    if op == "plugin_fleet_list" and isinstance(data, dict):
+        return f"{len(data.get('plugins', []))} vendored dashboard plugins."
+    if op == "kanban_fleet_board" and isinstance(data, dict):
+        tasks = sum(len(c.get("tasks", [])) for c in data.get("columns", []))
+        return f"Vendored board: {tasks} tasks."
+    if isinstance(data, dict):
+        for key in ("count", "total"):
+            if data.get(key) is not None:
+                return f"{key} {data[key]}."
+    return "Plugin fleet result recorded."
+
+
 _SUMMARIES = {
     "generic": _generic_summary,
     "status": _sum_status,
@@ -4094,6 +4199,7 @@ _SUMMARIES = {
     "permissions": _sum_permissions,
     "guidance": _sum_guidance,
     "audio_hw": _sum_audio_hw,
+    "plugin_fleet": _sum_plugin_fleet,
 }
 
 
@@ -7603,6 +7709,177 @@ def _register_voice_guards() -> None:
 _register_voice_guards()
 
 
+# ------------------------------------------------- wave 4: plugin fleet
+# The pinned Hermes dashboard plugin fleet (``hermes-achievements`` + the full
+# kanban plugin API) has a real in-process Qubit backend since wave 3
+# (``voicebridge/hermes_plugins.py``). Those routes are dashboard/compat
+# surfaces, so they are NOT part of the frozen CLI-parity ``REGISTRY`` whose
+# example table ``tests/test_voice_commands8tf.py`` pins exactly. They live in
+# their own registry and still flow through the one resolve/execute/confirm
+# pipeline, one journal, one redactor, and one e-stop.
+#
+# ``PLUGIN_FLEET_OPS`` maps a spoken entry to the exact ``hermes_compat``
+# (method, path, fixed-body) the dashboard SPA calls — same backend, same
+# listener. ``PLUGIN_FLEET_VOICE`` declares the compat route handler -> voice
+# entry so the wave-4 audit can prove there is no silently unspoken route.
+PLUGIN_FLEET_REGISTRY: Dict[str, VoiceCommand] = {}
+
+PLUGIN_FLEET_OPS: Dict[str, Tuple[str, str, Optional[Dict[str, Any]]]] = {
+    "achievements_list":
+        ("GET", "/api/plugins/hermes-achievements/achievements", None),
+    "achievements_scan_status":
+        ("GET", "/api/plugins/hermes-achievements/scan-status", None),
+    "achievements_recent":
+        ("GET", "/api/plugins/hermes-achievements/recent-unlocks", None),
+    "achievements_session_badges":
+        ("GET",
+         "/api/plugins/hermes-achievements/sessions/{session_id}/badges",
+         None),
+    "achievements_rescan":
+        ("POST", "/api/plugins/hermes-achievements/rescan", {}),
+    "achievements_reset":
+        ("POST", "/api/plugins/hermes-achievements/reset-state",
+         {"confirm": True}),
+    "plugin_fleet_list":
+        ("GET", "/api/dashboard/plugins/fleet", None),
+    "kanban_fleet_board": ("GET", "/api/plugins/kanban/board", None),
+    "kanban_fleet_task":
+        ("GET", "/api/plugins/kanban/tasks/{task_id}", None),
+    "kanban_fleet_stats": ("GET", "/api/plugins/kanban/stats", None),
+    "kanban_fleet_assignees": ("GET", "/api/plugins/kanban/assignees", None),
+    "kanban_fleet_boards": ("GET", "/api/plugins/kanban/boards", None),
+    "kanban_fleet_config": ("GET", "/api/plugins/kanban/config", None),
+    "kanban_fleet_projects": ("GET", "/api/plugins/kanban/projects", None),
+    "kanban_fleet_workers": ("GET", "/api/plugins/kanban/workers/active", None),
+    "kanban_fleet_diagnostics":
+        ("GET", "/api/plugins/kanban/diagnostics", None),
+    "kanban_fleet_model_options":
+        ("GET", "/api/plugins/kanban/model-options", None),
+    "kanban_fleet_home_channels":
+        ("GET", "/api/plugins/kanban/home-channels", None),
+}
+
+PLUGIN_FLEET_VOICE: Dict[str, str] = {
+    "h_plugin_achievements": "achievements_list",
+    "h_plugin_achievements_scan_status": "achievements_scan_status",
+    "h_plugin_achievements_recent_unlocks": "achievements_recent",
+    "h_plugin_achievements_session_badges": "achievements_session_badges",
+    "h_plugin_achievements_rescan": "achievements_rescan",
+    "h_plugin_achievements_reset_state": "achievements_reset",
+    "h_plugin_fleet": "plugin_fleet_list",
+    "h_plugin_kanban_board": "kanban_fleet_board",
+    "h_plugin_kanban_task": "kanban_fleet_task",
+    "h_plugin_kanban_stats": "kanban_fleet_stats",
+    "h_plugin_kanban_assignees": "kanban_fleet_assignees",
+    "h_plugin_kanban_boards": "kanban_fleet_boards",
+    "h_plugin_kanban_config": "kanban_fleet_config",
+    "h_plugin_kanban_projects": "kanban_fleet_projects",
+    "h_plugin_kanban_workers": "kanban_fleet_workers",
+    "h_plugin_kanban_diagnostics": "kanban_fleet_diagnostics",
+    "h_plugin_kanban_model_options": "kanban_fleet_model_options",
+    "h_plugin_kanban_home_channels": "kanban_fleet_home_channels",
+}
+
+
+def _FE(entry_id: str, title: str, aliases: Tuple[str, ...],
+        args: Tuple[VoiceArg, ...] = (), confirm: bool = False,
+        summary: str = "plugin_fleet", examples: Tuple[str, ...] = (),
+        split: str = "", help: str = "") -> VoiceCommand:
+    """Register a wave-4 plugin-fleet entry (same pipeline, own registry)."""
+    entry = VoiceCommand(id=entry_id, title=title, aliases=tuple(aliases),
+                         args=tuple(args), backend="plugin_fleet",
+                         fixed=(("op", entry_id),), scope=("plugin-fleet",),
+                         confirm=confirm, summary=summary,
+                         examples=tuple(examples), parity=(), help=help,
+                         split=split)
+    PLUGIN_FLEET_REGISTRY[entry_id] = entry
+    return entry
+
+
+_FE("achievements_list", "Show achievements",
+    ("show my achievements", "list achievements", "list my achievements",
+     "show achievements", "what achievements do i have"),
+    examples=("qubit, show my achievements",),
+    help="Unlocked/discovered/total badges from real session history.")
+_FE("achievements_scan_status", "Achievement scan status",
+    ("achievement scan status", "achievements scan status",
+     "achievement scanner status", "status of achievement scan"),
+    examples=("qubit, achievement scan status",),
+    help="Vendored scanner bookkeeping (idle/running, run count).")
+_FE("achievements_recent", "Recently unlocked achievements",
+    ("recent achievements", "show recent achievements",
+     "latest achievements", "recently unlocked achievements"),
+    examples=("qubit, recent achievements",),
+    help="Newest unlocked badges with timestamps.")
+_FE("achievements_session_badges", "Session badges",
+    ("rx:achievements for session (.+)", "rx:session badges for (.+)"),
+    args=(_S("session_id", True),),
+    examples=("qubit, achievements for session 12",),
+    help="Badges unlocked by one session (same session history).")
+_FE("achievements_rescan", "Rescan achievements",
+    ("rescan achievements", "recompute achievements", "refresh achievements",
+     "rescan my badges"),
+    examples=("qubit, rescan achievements",),
+    help="Bounded recompute over local history; e-stop probed.")
+_FE("achievements_reset", "Reset achievements",
+    ("reset my achievements", "reset achievement progress",
+     "clear my achievements", "reset achievements"),
+    confirm=True, examples=("qubit, reset my achievements",),
+    help="Clear unlock history and cached scans (confirmed).")
+_FE("plugin_fleet_list", "List dashboard plugins",
+    ("list dashboard plugins", "show the plugin fleet",
+     "list the plugin fleet", "which dashboard plugins"),
+    examples=("qubit, list dashboard plugins",),
+    help="Vendored dashboard plugin manifests (discovery view).")
+_FE("kanban_fleet_board", "Vendored kanban board",
+    ("fleet kanban board", "show the vendored board",
+     "read the vendored board", "show the plugin board"),
+    examples=("qubit, fleet kanban board",),
+    help="Vendored kanban plugin board (read-only, real kanban_db).")
+_FE("kanban_fleet_task", "Vendored kanban task",
+    ("rx:fleet kanban task (.+)", "rx:hermes kanban task (.+)"),
+    args=(_S("task_id", True),),
+    examples=("qubit, fleet kanban task abc123",),
+    help="One vendored kanban task by id.")
+_FE("kanban_fleet_stats", "Vendored kanban stats",
+    ("fleet kanban stats", "vendored kanban stats", "plugin kanban stats"),
+    examples=("qubit, fleet kanban stats",),
+    help="Vendored kanban counts by status.")
+_FE("kanban_fleet_assignees", "Vendored kanban assignees",
+    ("fleet kanban assignees", "plugin kanban assignees"),
+    examples=("qubit, fleet kanban assignees",),
+    help="Known assignees on the vendored board.")
+_FE("kanban_fleet_boards", "Vendored kanban boards",
+    ("fleet kanban boards", "list vendored boards"),
+    examples=("qubit, fleet kanban boards",),
+    help="Vendored kanban boards.")
+_FE("kanban_fleet_config", "Vendored kanban config",
+    ("fleet kanban config", "plugin kanban config"),
+    examples=("qubit, fleet kanban config",),
+    help="Vendored kanban plugin configuration.")
+_FE("kanban_fleet_projects", "Vendored kanban projects",
+    ("fleet kanban projects", "plugin kanban projects"),
+    examples=("qubit, fleet kanban projects",),
+    help="Kanban projects registered by the vendored plugin.")
+_FE("kanban_fleet_workers", "Vendored kanban workers",
+    ("fleet kanban workers", "plugin kanban workers"),
+    examples=("qubit, fleet kanban workers",),
+    help="Active vendored kanban workers (read-only).")
+_FE("kanban_fleet_diagnostics", "Vendored kanban diagnostics",
+    ("fleet kanban diagnostics", "plugin kanban diagnostics"),
+    examples=("qubit, fleet kanban diagnostics",),
+    help="Vendored kanban plugin diagnostics.")
+_FE("kanban_fleet_model_options", "Vendored kanban model options",
+    ("fleet kanban model options", "plugin kanban model options"),
+    examples=("qubit, fleet kanban model options",),
+    help="Model options the vendored kanban plugin reports.")
+_FE("kanban_fleet_home_channels", "Vendored kanban channels",
+    ("fleet kanban channels", "plugin kanban channels",
+     "fleet home channels"),
+    examples=("qubit, fleet kanban channels",),
+    help="Home channel bindings of the vendored kanban plugin.")
+
+
 # ---------------------------------------------------------------- execution
 @dataclass
 class Outcome:
@@ -7737,7 +8014,7 @@ def confirm_pending(ctx, confirmation_id: Optional[str] = None) -> Outcome:
         if target is None:
             return Outcome(FAILED, None, "There's nothing to confirm.", {})
     entry_id = str(getattr(target, "capability", "") or "")[len("voice."):]
-    entry = REGISTRY.get(entry_id)
+    entry = _lookup_entry(entry_id)
     if entry is None:
         return Outcome(FAILED, None, "That confirmation is stale.", {})
     if ctx.source not in ALLOWED_SOURCES:
@@ -7841,6 +8118,24 @@ def voice_say(cfg: Any, text: str, *, actor: str = "voice:user",
             out["candidates"] = [e.id for e in resolution.candidates]
         return out
     entry = resolution.entry
+    if entry.backend == "plugin_fleet":
+        # Wave-4 vendored-plugin entries are not dashboard_ops rows; they run
+        # through the shared execute/confirm pipeline so staging, session
+        # isolation, e-stop, redaction, and single-use confirmations are the
+        # exact same code path — not a parallel dispatcher.
+        ctx = make_ctx(cfg, actor=actor, session=session, source=source)
+        out = execute(ctx, resolution)
+        payload: Dict[str, Any] = {
+            "state": out.kind,
+            "speech": out.speech,
+            "route": entry.id,
+            "entry": entry.id,
+        }
+        if out.receipt:
+            payload["receipt"] = out.receipt
+        if out.confirmation_id:
+            payload["confirmation_id"] = out.confirmation_id
+        return payload
     out = OPS.run_op(cfg, entry.id, dict(resolution.args),
                      actor=actor, session=session)
     out.setdefault("route", entry.id)

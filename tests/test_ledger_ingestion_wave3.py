@@ -307,6 +307,86 @@ def test_evidence_only_items_are_counted_not_rows(tmp_path) -> None:
     assert not [r for r in data["rows"] if r["id"].startswith("inv:")]
 
 
+# ---------------------------------------------------------------------------
+# Parent-mapping coverage (distinct vs parented surfaces)
+# ---------------------------------------------------------------------------
+def test_parented_surface_covered_by_implemented_parent(tmp_path) -> None:
+    inv_path = _write_inventory(tmp_path / "inv.json", [
+        {"id": "synthetic:model-entry", "source": "hermes",
+         "category": "hermes_model", "name": "gpt-5",
+         "path": "hermes_cli/models_catalog_static.py",
+         "parent_id": "model", "coverage": "model-entry"},
+    ])
+    data = rebuild.build_ledger(inventory_path=inv_path)
+    inv = data["inventory"]
+    assert inv["parented_surfaces"] == 1
+    assert inv["parented_covered"] == 1
+    assert inv["parented_uncovered"] == 0
+    assert inv["distinct_uncovered"] == 0
+    assert not [r for r in data["rows"] if "model-entry" in r["id"]]
+
+
+def test_parented_surface_with_missing_parent_is_open(tmp_path) -> None:
+    inv_path = _write_inventory(tmp_path / "inv.json", [
+        {"id": "synthetic:ghost-asset", "source": "hermes",
+         "category": "hermes_plugin_asset", "name": "index.js",
+         "path": "plugins/ghost/dashboard/dist/index.js",
+         "parent_id": "plugin:ghost", "coverage": "plugin-surface"},
+    ])
+    data = rebuild.build_ledger(inventory_path=inv_path)
+    inv = data["inventory"]
+    assert inv["parented_surfaces"] == 1
+    assert inv["parented_covered"] == 0
+    assert inv["parented_uncovered"] == 1
+    assert inv["distinct_uncovered"] == 0
+    inv_rows = [r for r in data["rows"] if r["id"].startswith("inv:")]
+    assert len(inv_rows) == 1
+    assert "Parented surface" in inv_rows[0]["note"]
+    assert "plugin:ghost" in inv_rows[0]["note"]
+
+
+def test_distinct_vs_parented_counts(tmp_path) -> None:
+    inv_path = _write_inventory(tmp_path / "inv.json", [
+        {"id": "synthetic:model-entry", "source": "hermes",
+         "category": "hermes_model", "name": "gpt-5",
+         "path": "m.py", "parent_id": "model", "coverage": "model-entry"},
+        {"id": "synthetic:ghost-asset", "source": "hermes",
+         "category": "hermes_plugin_asset", "name": "i.js",
+         "path": "p.js", "parent_id": "plugin:ghost",
+         "coverage": "plugin-surface"},
+        {"id": "synthetic:distinct", "source": "hermes",
+         "category": "hermes_skill", "name": "novel-skill", "path": "s"},
+        {"id": "i18n:a.b", "source": "hermes", "category": "hermes_i18n_key",
+         "name": "a.b", "path": "en.ts"},
+    ])
+    data = rebuild.build_ledger(inventory_path=inv_path)
+    inv = data["inventory"]
+    assert inv["surface_items"] == 3
+    assert inv["evidence_only"] == 1
+    assert inv["parented_surfaces"] == 2
+    assert inv["distinct_surfaces"] == 1
+    assert inv["parented_covered"] == 1
+    assert inv["parented_uncovered"] == 1
+    assert inv["distinct_uncovered"] == 1
+    assert inv["matched"] + inv["unmatched"] == inv["surface_items"]
+    assert inv["unexplained_omissions"] == 2
+    assert inv["distinct_omitted_ids"] == ["synthetic:distinct"]
+    assert inv["parented_omitted_ids"] == ["synthetic:ghost-asset"]
+
+
+def test_live_exact_id_match_is_not_missing(tmp_path) -> None:
+    """An item whose id is a live ledger row is matched, never re-emitted."""
+    inv_path = _write_inventory(tmp_path / "inv.json", [
+        {"id": "model", "source": "hermes", "category": "hermes_tool",
+         "name": "model", "path": "tools/x.py"},
+    ])
+    data = rebuild.build_ledger(inventory_path=inv_path)
+    inv = data["inventory"]
+    assert inv["matched"] == 1
+    assert inv["unmatched"] == 0
+    assert not [r for r in data["rows"] if r["id"].startswith("inv:")]
+
+
 def test_inventory_summary_is_internally_consistent() -> None:
     inv = _section().get("inventory")
     assert isinstance(inv, dict), "qubit section missing inventory block"

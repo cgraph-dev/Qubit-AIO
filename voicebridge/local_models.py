@@ -42,6 +42,9 @@ CONFIRM_CODE = "LOCAL_MODEL_CONFIRM_REQUIRED"
 UNAVAILABLE_CODE = "LOCAL_MODEL_UNAVAILABLE"
 ESTOP_CODE = "LOCAL_MODEL_ESTOP"
 JOBS_EMPTY_CODE = "LOCAL_MODEL_JOBS_EMPTY"
+TASK_UNAVAILABLE_CODE = "LOCAL_MODEL_TASK_UNAVAILABLE"
+TASK_BAD_INPUT_CODE = "LOCAL_MODEL_TASK_BAD_INPUT"
+TASK_SCHEMA = "qubit-local-model-task/1"
 
 # --- schemas ---------------------------------------------------------------
 STATUS_SCHEMA = "qubit-local-models-status/1"
@@ -526,3 +529,48 @@ def public_error(code: str, detail: str) -> Dict[str, Any]:
     return {"state": "FAILED", "code": code, "detail": _redact(detail)[:300],
             "owner": "qubit-policy",
             "rollback": "nothing was changed; nothing to roll back"}
+
+
+def structured_task(cfg: Any, *, prompt: Any, schema: Any = None,
+                    runner: Any = None) -> Dict[str, Any]:
+    """JSON-only structured task over the local model boundary.
+
+    Qubit-owned equivalent of the OpenClaw ``llm-task`` tool. The prompt is
+    bounded and validated locally; the model call is only ever made through a
+    caller-supplied ``runner`` (an injected boundary). With no runner the
+    result is a typed ``LOCAL_MODEL_TASK_UNAVAILABLE`` and a non-JSON reply
+    from the runner is a typed failure — Qubit never fabricates a structure.
+    """
+    text = str(prompt or "").strip()
+    if not text or len(text) > 8000:
+        return public_error(TASK_BAD_INPUT_CODE,
+                            "a prompt of 1..8000 characters is required")
+    if runner is None:
+        return {**_refusal("structured-task", TASK_UNAVAILABLE_CODE,
+                           "no model runner is configured; use the resident "
+                           "local runtime or the supervised agent path",
+                           state="UNAVAILABLE"),
+                "schema": TASK_SCHEMA}
+    try:
+        raw = runner({"prompt": text, "schema": schema})
+    except Exception as exc:  # noqa: BLE001 - injected boundary
+        return public_error(TASK_UNAVAILABLE_CODE, str(exc))
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except ValueError:
+            return public_error(TASK_BAD_INPUT_CODE,
+                                "runner reply was not valid JSON")
+    if not isinstance(raw, dict):
+        return public_error(TASK_BAD_INPUT_CODE,
+                            "runner reply was not a JSON object")
+    if schema is not None and isinstance(schema, dict):
+        required = [k for k in schema.get("required", []) if isinstance(k, str)]
+        absent = [k for k in required if k not in raw]
+        if absent:
+            return public_error(TASK_BAD_INPUT_CODE,
+                                "runner reply missing required keys: "
+                                + ", ".join(sorted(absent)))
+    return {"state": "OK", "schema": TASK_SCHEMA, "result": raw,
+            "detail": "structured result returned by the injected runner",
+            "rollback": "read-only; nothing to roll back"}

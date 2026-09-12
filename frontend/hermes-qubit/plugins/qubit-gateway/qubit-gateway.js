@@ -140,8 +140,10 @@
       e("p", {style: {opacity: 0.75}},
         "Account-bound records with typed link states — same backend as CLI and voice. ",
         "Process supervision is refused by policy; key references only (env:VAR/file:PATH)."),
-      err ? e("div", {role: "alert", style: {color: "#e5484d"}}, err) : null,
+      err ? e("div", {role: "alert", "data-state": "degraded",
+        style: {color: "#e5484d"}}, err) : null,
       pending ? e("div", {role: "region", "aria-label": "Pending gateway confirmation",
+        "data-state": "pending",
         style: {marginTop: 8, padding: "8px 12px", border: "1px solid #b7791f",
           borderRadius: 8, fontSize: 13}},
         e("strong", null, "Confirm " + pending.what + ": "),
@@ -186,7 +188,8 @@
           }}, "Add account")),
       e("h3", {style: {marginTop: 16}}, "Gateways (" + gateways.length + ")"),
       !gateways.length
-        ? e("p", {style: {opacity: 0.6}}, "No gateway records yet.")
+        ? e("p", {"data-state": "empty", style: {opacity: 0.6}},
+            "No gateway records yet.")
         : e("table", {style: {borderCollapse: "collapse", width: "100%"}},
             e("thead", null, e("tr", null,
               ["ID", "Provider", "Account", "Channel", "Link", ""].map(function (h) {

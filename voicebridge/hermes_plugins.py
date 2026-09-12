@@ -25,7 +25,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from . import hermes_runtime
 
@@ -38,6 +38,19 @@ _DEFAULT_SCAN_LIMIT = 20000
 _ENGINES: Dict[str, Any] = {}
 _ACTIVE_BOUND = _DEFAULT_SCAN_LIMIT
 _BOUND_INSTALLED = False
+
+# The complete vendored Hermes plugin fleet, in the order the direct source
+# inventory records it. Exposed as the single authority for the fleet audit so
+# ``scripts/rebuild_ledger_hermes.py`` cannot drift from the tree it scans.
+# Only ``hermes-achievements`` and ``kanban`` declare a dashboard surface
+# (``dashboard/manifest.json``); every other entry is an agent/provider plugin
+# with no dashboard route of its own, tracked under its own capability area.
+VENDORED_PLUGIN_FLEET: Tuple[str, ...] = (
+    "hermes-achievements", "kanban", "browser", "context_engine",
+    "cron_providers", "dashboard_auth", "disk-cleanup", "google_meet",
+    "image_gen", "memory", "model-providers", "observability", "platforms",
+    "security-guidance", "spotify", "teams_pipeline", "video_gen", "web",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -125,9 +138,24 @@ def _estop(cfg: Any) -> bool:
         return False
 
 
-def _fail(exc: Exception) -> Tuple[int, Dict[str, Any]]:
+class PluginUnavailable(RuntimeError):
+    """The vendored plugin engine could not be imported/loaded."""
+
+
+def _fail(exc: Exception, plugin: str = "") -> Tuple[int, Dict[str, Any]]:
+    if isinstance(exc, PluginUnavailable):
+        return _unavailable(exc, plugin or "unknown")
     return 500, {"ok": False, "state": "FAILED", "code": "PLUGIN_ERROR",
                  "detail": _redact(str(exc))[:300]}
+
+
+def _unavailable(exc: Exception, plugin: str) -> Tuple[int, Dict[str, Any]]:
+    """Typed 503 for a vendored engine that is present but not loadable."""
+    return 503, {"ok": False, "state": "UNAVAILABLE",
+                 "code": "PLUGIN_ENGINE_UNAVAILABLE",
+                 "plugin": plugin,
+                 "detail": _redact(str(exc))[:300],
+                 "rollback": "read-only; nothing to roll back"}
 
 
 def _need_confirm(detail: str) -> Tuple[int, Dict[str, Any]]:
@@ -145,18 +173,38 @@ def _plugin_api_path(name: str) -> Path:
         "plugin_api.py"
 
 
+def dashboard_surface(name: str) -> Optional[Path]:
+    """The vendored plugin's dashboard manifest, or ``None`` when it has none.
+
+    A plugin "has a dashboard surface" only when the pinned tree ships
+    ``plugins/<name>/dashboard/manifest.json`` (the fleet audit uses this, and so
+    does the ledger generator, so the two cannot disagree about which plugins
+    are dashboard plugins).
+    """
+    manifest = hermes_runtime.runtime_root() / "plugins" / name / "dashboard" / \
+        "manifest.json"
+    return manifest if manifest.is_file() else None
+
+
 def _load_engine(name: str) -> Any:
     engine = _ENGINES.get(name)
     if engine is not None:
         return engine
     path = _plugin_api_path(name)
     module_name = "qubit_plugin_" + name.replace("-", "_").replace(".", "_")
-    spec = importlib.util.spec_from_file_location(module_name, path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"cannot load vendored plugin {name!r} from {path}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)
+    try:
+        spec = importlib.util.spec_from_file_location(module_name, path)
+        if spec is None or spec.loader is None:
+            raise PluginUnavailable(
+                f"cannot load vendored plugin {name!r} from {path}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+    except PluginUnavailable:
+        raise
+    except Exception as exc:  # missing dependency / syntax error / etc.
+        raise PluginUnavailable(
+            f"vendored plugin {name!r} failed to import: {exc}") from exc
     _ENGINES[name] = module
     return module
 
@@ -191,13 +239,27 @@ def _achievements_engine(cfg: Any) -> Any:
 
 
 def reset_plugin_caches() -> None:
-    """Clear in-memory plugin caches (test/reload seam)."""
+    """Clear in-memory plugin caches (test/reload seam).
+
+    Mirrors a process restart for the achievements engine: snapshot cache and
+    scan bookkeeping are dropped while the durable ``plugin-data`` files remain,
+    and the active scan bound is restored to the environment default. The
+    already-installed scan bound wrapper is kept (re-wrapping would nest caps).
+    """
+    global _ACTIVE_BOUND
+    _ACTIVE_BOUND = _scan_limit()
     engine = _ENGINES.get("hermes-achievements")
     if engine is None:
         return
     engine._SNAPSHOT_CACHE = None
     engine._SNAPSHOT_CACHE_AT = 0
     engine._BACKGROUND_SCAN_THREAD = None
+    try:
+        engine._SCAN_STATUS.update(
+            state="idle", started_at=None, finished_at=None, last_error=None,
+            last_duration_ms=None, run_count=0)
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -226,7 +288,7 @@ def h_plugin_achievements(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         _harden_state(cfg, "hermes-achievements")
         return 200, payload
     except Exception as exc:
-        return _fail(exc)
+        return _fail(exc, "hermes-achievements")
 
 
 def h_plugin_achievements_scan_status(
@@ -236,7 +298,7 @@ def h_plugin_achievements_scan_status(
         engine = _achievements_engine(cfg)
         return 200, engine._scan_status_payload()
     except Exception as exc:
-        return _fail(exc)
+        return _fail(exc, "hermes-achievements")
 
 
 def h_plugin_achievements_recent_unlocks(
@@ -249,7 +311,7 @@ def h_plugin_achievements_recent_unlocks(
         return 200, sorted(unlocked, key=lambda a: a.get("unlocked_at") or 0,
                            reverse=True)[:20]
     except Exception as exc:
-        return _fail(exc)
+        return _fail(exc, "hermes-achievements")
 
 
 def h_plugin_achievements_session_badges(
@@ -270,12 +332,15 @@ def h_plugin_achievements_session_badges(
                   for d, r in results if r["unlocked"]]
         return 200, {"session_id": session_id, "badges": badges}
     except Exception as exc:
-        return _fail(exc)
+        return _fail(exc, "hermes-achievements")
 
 
 def h_plugin_achievements_rescan(
         cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "ESTOP", "code": "ESTOP_ENGAGED",
+                     "detail": "Emergency stop is engaged; rescan refused."}
     try:
         engine = _achievements_engine(cfg)
         globals()["_ACTIVE_BOUND"] = _scan_limit()
@@ -284,7 +349,7 @@ def h_plugin_achievements_rescan(
         _audit("achievements_rescan", {"unlocked": data.get("unlocked_count")})
         return 200, {"ok": True, **data}
     except Exception as exc:
-        return _fail(exc)
+        return _fail(exc, "hermes-achievements")
 
 
 def h_plugin_achievements_reset_state(
@@ -313,7 +378,7 @@ def h_plugin_achievements_reset_state(
         _audit("achievements_reset", {"ok": True})
         return 200, {"ok": True}
     except Exception as exc:
-        return _fail(exc)
+        return _fail(exc, "hermes-achievements")
 
 
 # ---------------------------------------------------------------------------
@@ -343,7 +408,7 @@ def _kanban_read(cfg: Any, fn_name: str, **kwargs: Any) -> Tuple[int, Any]:
         if status and detail is not None:
             return int(status), {"ok": False, "code": "PLUGIN_HTTP",
                                  "detail": _redact(detail)[:300]}
-        return _fail(exc)
+        return _fail(exc, "kanban")
 
 
 def h_plugin_kanban_board(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -430,18 +495,17 @@ def plugin_fleet_manifests() -> List[Dict[str, Any]]:
     (that response is fixed to the ten Qubit overlays). Fields mirror the
     dashboard manifest contract, with ``source="vendored"``.
     """
-    root = hermes_runtime.runtime_root() / "plugins"
     manifests: List[Dict[str, Any]] = []
-    if not root.is_dir():
-        return manifests
-    for manifest_path in sorted(root.glob("*/dashboard/manifest.json")):
+    for name in VENDORED_PLUGIN_FLEET:
+        manifest_path = dashboard_surface(name)
+        if not manifest_path:
+            continue
         try:
             data = json.loads(manifest_path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        name = str(data.get("name") or manifest_path.parent.parent.name)
         manifests.append({
-            "name": name,
+            "name": str(data.get("name") or name),
             "label": data.get("label", name),
             "description": data.get("description", ""),
             "icon": data.get("icon", "Puzzle"),
@@ -455,12 +519,37 @@ def plugin_fleet_manifests() -> List[Dict[str, Any]]:
     return manifests
 
 
+def plugin_fleet_audit() -> List[Dict[str, Any]]:
+    """Per-plugin disposition for the full vendored fleet.
+
+    The dashboard-surface plugins ship a real manifest + backend API; every
+    other entry is an agent/provider plugin with no dashboard route of its own.
+    The ledger generator consumes this so a fleet plugin can never be silently
+    dropped or double-counted.
+    """
+    audit: List[Dict[str, Any]] = []
+    for name in VENDORED_PLUGIN_FLEET:
+        manifest = dashboard_surface(name)
+        row: Dict[str, Any] = {
+            "name": name,
+            "has_dashboard": bool(manifest),
+            "source": "vendored",
+        }
+        if manifest:
+            row["manifest"] = str(manifest.relative_to(
+                hermes_runtime.runtime_root()))
+            row["api"] = str(_plugin_api_path(name).relative_to(
+                hermes_runtime.runtime_root()))
+        audit.append(row)
+    return audit
+
+
 def h_plugin_fleet(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     try:
         return 200, {"plugins": plugin_fleet_manifests()}
     except Exception as exc:
-        return _fail(exc)
+        return _fail(exc, "fleet")
 
 
 __all__ = [
@@ -473,5 +562,6 @@ __all__ = [
     "h_plugin_kanban_config", "h_plugin_kanban_projects",
     "h_plugin_kanban_workers", "h_plugin_kanban_diagnostics",
     "h_plugin_kanban_model_options", "h_plugin_kanban_home_channels",
-    "h_plugin_fleet", "plugin_fleet_manifests", "reset_plugin_caches",
+    "h_plugin_fleet", "plugin_fleet_manifests", "plugin_fleet_audit",
+    "dashboard_surface", "VENDORED_PLUGIN_FLEET", "reset_plugin_caches",
 ]

@@ -87,11 +87,13 @@
 
     if (err && !catalog) {
       return e("div", {style: S.wrap}, e("h1", {style: S.h}, "Operations"),
-        e("div", {role: "alert", style: {color: "#e5484d"}}, err));
+        e("div", {role: "alert", "data-state": "degraded",
+          style: {color: "#e5484d"}}, err));
     }
     if (!catalog) {
       return e("div", {style: S.wrap}, e("h1", {style: S.h}, "Operations"),
-        e("p", null, "Loading operations catalog…"));
+        e("p", {"data-state": "loading", "aria-busy": "true"},
+          "Loading operations catalog…"));
     }
 
     var groups = ["all"];
@@ -164,6 +166,7 @@
 
       pending.length ? e("div", {role: "region",
           "aria-label": "Pending confirmations",
+          "data-state": "pending",
           style: {border: "1px solid #b7791f", borderRadius: 8,
                   padding: "8px 12px", marginBottom: 14,
                   background: "rgba(183,121,31,0.08)"}},
@@ -212,15 +215,16 @@
                 e("div", {style: {fontSize: 13}},
                   e("strong", null, op.title || op.id),
                   op.confirm ? e("span", {style: S.badge}, "confirm") : null,
-                  op.voice_guard ? e("span", {style: S.badge},
-                    "voice: refusal") : null,
+                  op.voice_guard ? e("span", {style: S.badge,
+                    title: "spoken form: " + op.voice_guard}, "voice: linked")
+                    : null,
                   e("span", {style: S.badge}, groupOf(op))),
                 e("div", {style: {opacity: 0.65, fontSize: 12}},
                   op.id + " — " + (op.help || "").slice(0, 90)));
             }))),
 
         e("div", {style: S.panel},
-          !sel ? e("p", {style: {opacity: 0.7}},
+          !sel ? e("p", {"data-state": "empty", style: {opacity: 0.7}},
               "Select an operation to configure and run it.") :
           e("div", null,
             e("h2", {style: {fontSize: 16, margin: "0 0 2px"}},
@@ -228,7 +232,9 @@
             e("p", {style: {opacity: 0.7, fontSize: 12, marginTop: 0}},
               sel.id, " · group ", groupOf(sel)),
             sel.interface_reason ? e("p", {style: {fontSize: 12,
-                color: "#d29922", marginTop: 0}}, "Voice: " +
+                color: "#d29922", marginTop: 0},
+              "data-state": "degraded"},
+              (/^voice\b/i.test(sel.interface_reason) ? "" : "Voice: ") +
               sel.interface_reason) : null,
             (sel.args || []).length ? (sel.args || []).map(function (arg) {
               return e("label", {key: arg.name, style: {display: "block"}},
@@ -245,14 +251,17 @@
                     next[arg.name] = ev.target.value;
                     setArgs(next);
                   }}));
-            }) : e("p", {style: {opacity: 0.7, fontSize: 13}},
-              "No arguments."),
+            }) : e("p", {"data-state": "empty",
+              style: {opacity: 0.7, fontSize: 13}}, "No arguments."),
             e("button", {style: S.btn, disabled: working === "run",
               "aria-label": "Run " + sel.id,
               onClick: runOp},
               working === "run" ? "Running…" : "Run operation"),
-            result ? e("div", {style: {marginTop: 12}},
+            result ? e("div", {style: {marginTop: 12},
+              "data-state": result.status === 409 ? "pending"
+                : (result.status >= 400 ? "degraded" : "ready")},
               e("div", {role: result.status >= 400 ? "alert" : "status",
+                  "aria-live": "polite",
                   style: {fontSize: 13, marginBottom: 6,
                     color: result.status >= 400 ? "#e5484d" : "#3fb950"}},
                 "HTTP " + result.status + " · " +

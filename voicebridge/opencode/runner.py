@@ -20,10 +20,37 @@ from .specs import (
     ACT_PLAN, ACT_RUN, opencode_action_specs, register_opencode_specs,
 )
 from .transport import _probe_version, real_run_opencode
-from .state import (
-    _adapter_path, _opencode_cfg, _read_state, _resolve_binary,
-    _write_state,
-)
+from .state import (_adapter_path, _opencode_cfg, _read_state,
+                    _resolve_binary, _write_state)
+
+
+def _shared_call(power: Any, method: str) -> None:
+    """One human-authorized shared PowerControl mutation (fail closed)."""
+    control = getattr(power, "control", None)
+    if control is None:
+        return
+    try:
+        getattr(control, method)(issued_by="user")
+    except Exception as exc:  # noqa: BLE001 - safety boundary
+        log_event(f"opencode.adapter.{method}_shared_failed",
+                  error=str(exc)[:160])
+        raise OpenCodeError(
+            "EMERGENCY_STOP_UNAVAILABLE",
+            f"could not {method} the shared emergency stop") from exc
+
+
+def _shared_stopped(power: Any) -> bool:
+    """True when the one durable e-stop latch is engaged (fail closed)."""
+    control = getattr(power, "control", None)
+    if control is None:
+        return False
+    try:
+        control.refresh()
+        return bool(control.state.get("emergency_stop"))
+    except Exception:
+        return True
+
+
 # ---------------------------------------------------------------------------
 # Runner (same broker/gate/receipt machinery as every other channel)
 # ---------------------------------------------------------------------------
@@ -76,7 +103,8 @@ class OpenCodeRunner(ActionRunner):
         binary = _resolve_binary(ocfg)
         pinned = str(ocfg.get("pinned_version") or PINNED_OPENCODE_VERSION)
         effective = bool(master and st.get("user_enabled")
-                         and not st.get("emergency_stop"))
+                         and not st.get("emergency_stop")
+                         and not _shared_stopped(self.power))
         reason = ("OK" if effective else
                   ("CONFIG_DISABLED" if not master else
                    ("NOT_ENABLED" if not st.get("user_enabled") else
@@ -92,7 +120,8 @@ class OpenCodeRunner(ActionRunner):
                 "effective_enabled": effective, "reason": reason,
                 "config_enabled": master, "user_enabled": bool(
                     st.get("user_enabled")),
-                "emergency_stop": bool(st.get("emergency_stop")),
+                "emergency_stop": bool(st.get("emergency_stop")
+                                       or _shared_stopped(self.power)),
                 "binary": binary, "pinned_version": pinned,
                 "installed_version": installed,
                 "version_match": (installed == pinned),
@@ -120,6 +149,9 @@ class OpenCodeRunner(ActionRunner):
         return self.status()
 
     def emergency_stop(self) -> Dict[str, Any]:
+        # Wave 4 (gap G3): latch the ONE shared PowerControl authority the
+        # broker/dashboard/voice use — never only this adapter's private state.
+        _shared_call(self.power, "emergency_stop")
         st = _read_state(self.cfg)
         st["emergency_stop"] = True
         _write_state(self.cfg, st)
@@ -129,6 +161,8 @@ class OpenCodeRunner(ActionRunner):
     def reset(self, requested_by: str = "user") -> Dict[str, Any]:
         if requested_by != "user":
             raise OpenCodeError("reset requires the authenticated owner")
+        # Clear the shared latch too (the single authority), then local state.
+        _shared_call(self.power, "reset")
         _write_state(self.cfg, {"user_enabled": False,
                                 "emergency_stop": False})
         log_event("opencode.adapter.reset", requested_by="user")
@@ -141,7 +175,7 @@ class OpenCodeRunner(ActionRunner):
             return False, "CONFIG_DISABLED"
         if not bool(st.get("user_enabled")):
             return False, "ADAPTER_DISABLED"
-        if bool(st.get("emergency_stop")):
+        if _shared_stopped(self.power) or bool(st.get("emergency_stop")):
             return False, "EMERGENCY_STOP"
         return True, "OK"
 

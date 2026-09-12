@@ -28,6 +28,7 @@ CLI, dashboard, voice, and runner observe (fail closed).
 """
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 import re
@@ -58,12 +59,15 @@ NODE_CAPABILITY_UNAVAILABLE = "NODE_CAPABILITY_UNAVAILABLE"
 NODE_DISPATCH_REFUSED = "NODE_DISPATCH_REFUSED"
 NODE_ESTOP = "NODE_ESTOP"
 NODE_STORE_CORRUPT = "NODE_STORE_CORRUPT"
+NODE_GEO_UNAVAILABLE = "NODE_GEO_UNAVAILABLE"
+NODE_GEO_BAD_INPUT = "NODE_GEO_BAD_INPUT"
+GEO_SCHEMA = "qubit-node-geolocation/1"
 
 CODES = frozenset((
     NODE_HOST_UNAVAILABLE, NODE_ENROLL_CONFIRM_REQUIRED,
     NODE_REVOKE_CONFIRM_REQUIRED, NODE_UNKNOWN, NODE_EXISTS, NODE_LIMIT,
     NODE_BAD_INPUT, NODE_CAPABILITY_UNAVAILABLE, NODE_DISPATCH_REFUSED,
-    NODE_ESTOP, NODE_STORE_CORRUPT,
+    NODE_ESTOP, NODE_STORE_CORRUPT, NODE_GEO_UNAVAILABLE, NODE_GEO_BAD_INPUT,
 ))
 
 # Capability classes. Local-safe reads execute; remote actuators are not run
@@ -608,3 +612,44 @@ def refuse_unavailable(op: str, detail: str = "") -> Dict[str, Any]:
     """Typed refusal for a node-host action with no live backend."""
     return _refusal(op, NODE_HOST_UNAVAILABLE,
                     detail or "no live node-host backend is running")
+
+
+def geolocate(ip: Any, *, resolver: Any = None) -> Dict[str, Any]:
+    """Coarse, node-side IP geolocation behind an injected resolver.
+
+    Qubit-owned equivalent of the OpenClaw ``geolocation`` node capability.
+    The IP is validated locally (IPv4/IPv6) and the coarse city is only ever
+    produced by a caller-supplied ``resolver``; with no resolver the result is
+    a typed ``NODE_GEO_UNAVAILABLE``. Nothing egresses and no database ships.
+    """
+    try:
+        parsed = ipaddress.ip_address(str(ip or "").strip())
+    except ValueError:
+        return _refusal("geolocate", NODE_GEO_BAD_INPUT,
+                        "a valid IPv4/IPv6 address is required",
+                        state="REFUSED")
+    if parsed.is_private or parsed.is_loopback or parsed.is_link_local or \
+            parsed.is_reserved or parsed.is_multicast or parsed.is_unspecified:
+        return _refusal("geolocate", NODE_GEO_BAD_INPUT,
+                        "non-routable addresses are not geolocated",
+                        state="REFUSED")
+    if resolver is None:
+        return _refusal("geolocate", NODE_GEO_UNAVAILABLE,
+                        "no geolocation resolver is configured; "
+                        "Qubit never calls a third-party geo service itself",
+                        state="UNAVAILABLE")
+    try:
+        data = resolver(str(parsed)) or {}
+    except Exception as exc:  # noqa: BLE001 - injected boundary
+        return _refusal("geolocate", NODE_GEO_UNAVAILABLE,
+                        _redact(str(exc))[:160], state="UNAVAILABLE")
+    if not isinstance(data, dict):
+        return _refusal("geolocate", NODE_GEO_UNAVAILABLE,
+                        "resolver returned no structured location",
+                        state="UNAVAILABLE")
+    return {"state": "OK", "schema": GEO_SCHEMA, "ip": str(parsed),
+            "city": _redact(data.get("city", ""))[:80],
+            "region": _redact(data.get("region", ""))[:80],
+            "country": _redact(data.get("country", ""))[:80],
+            "precision": "coarse",
+            "detail": "coarse location from the injected resolver"}

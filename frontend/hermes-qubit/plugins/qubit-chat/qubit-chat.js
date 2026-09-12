@@ -201,16 +201,21 @@
       e("label", null, "Session ",
         e(C.Input || "input", {value: session, onChange: function (ev) { setSession(ev.target.value); },
           style: {maxWidth: 260}})),
-      e("div", {style: {display: "flex", flexDirection: "column", gap: 8, minHeight: 120}},
+      e("div", {style: {display: "flex", flexDirection: "column", gap: 8, minHeight: 120},
+        "data-state": voiceState === "listening" ? "pending"
+          : (busy ? "loading" : "ready"),
+        "aria-busy": busy || voiceState === "listening" ? "true" : "false"},
         msgs.length === 0
-          ? e("p", {style: {opacity: 0.6}}, "No messages yet — ask something.")
+          ? e("p", {"data-state": "empty", style: {opacity: 0.6}},
+              "No messages yet — ask something.")
           : msgs.map(function (m, i) {
               return e("div", {key: i, style: {whiteSpace: "pre-wrap"}},
                 e("strong", null, m.role === "user" ? "You: " : "Qubit: "),
                 e("span", null, m.text),
                 m.meta ? e("div", {style: {fontSize: 12, opacity: 0.6}}, m.meta) : null);
             })),
-      err ? e("div", {role: "alert", style: {color: "#e5484d"}}, err) : null,
+      err ? e("div", {role: "alert", "data-state": "degraded",
+        style: {color: "#e5484d"}}, err) : null,
       e("div", {style: {display: "flex", gap: 8}},
         e(C.Input || "input", {value: input, disabled: busy,
           "aria-label": "Message Qubit",

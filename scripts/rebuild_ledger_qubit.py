@@ -51,9 +51,12 @@ The output keeps the schema and exact row keys required by
 
 The direct source inventory
     ``docs/QUBIT_SOURCE_INVENTORY.json`` (agent A) is ingested last: every
-    non-evidence item is matched to a real merged-ledger row or emitted as an
-    explicit ``MISSING`` open row.  A missing or malformed inventory is
-    tolerated and recorded; omission counts are never treated as complete.
+    non-evidence item is either matched to a real merged-ledger row, covered as
+    a *parented surface* of an IMPLEMENTED parent capability (with no
+    standalone row), or emitted as an explicit ``MISSING`` open row classified
+    as a distinct capability or a parented surface needing parent closure.  A
+    missing or malformed inventory is tolerated and recorded; omission counts
+    are never treated as complete.
 
 Usage::
 
@@ -1039,6 +1042,46 @@ def _load_section_ids(docs_dir: Path) -> Set[str]:
     return ids
 
 
+def _load_section_status(docs_dir: Path) -> Dict[str, str]:
+    """Read-only id -> status map of the other ledger sections."""
+    status: Dict[str, str] = {}
+    for name in OTHER_SECTIONS:
+        path = docs_dir / f"QUBIT_GAP_LEDGER.{name}.json"
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        for row in data.get("rows", []):
+            if not isinstance(row, dict) or not isinstance(row.get("id"), str):
+                continue
+            value = row.get("status")
+            if isinstance(value, str):
+                status.setdefault(row["id"], value)
+    return status
+
+
+def _resolve_parent_id(parent_id: str,
+                       status_by_id: Dict[str, str]) -> str:
+    """Resolve a declared parent to the nearest existing ledger row id.
+
+    A CLI option's parent is its command; when the exact subcommand row is
+    absent the nearest declared ancestor (``cli:cron create`` -> ``cli:cron``)
+    is the parent.  Other parent ids must exist verbatim.
+    """
+    if parent_id in status_by_id:
+        return parent_id
+    if parent_id.startswith("cli:"):
+        parts = parent_id[4:].split()
+        while len(parts) > 1:
+            parts.pop()
+            candidate = "cli:" + " ".join(parts)
+            if candidate in status_by_id:
+                return candidate
+    return parent_id
+
+
 def load_source_inventory(path: Optional[Path] = None) -> Dict[str, object]:
     """Tolerant reader for ``docs/QUBIT_SOURCE_INVENTORY.json``.
 
@@ -1113,15 +1156,20 @@ def _inventory_row_id(item_id: str) -> str:
     return "inv:" + clean.replace("|", "/")
 
 
-def build_inventory_rows(report: Dict[str, object], known_ids: Set[str]
+def build_inventory_rows(report: Dict[str, object], known_ids: Set[str],
+                         known_status: Optional[Dict[str, str]] = None
                          ) -> Tuple[List[Dict[str, str]], Dict[str, object]]:
     """Turn every non-evidence inventory item into a matched or open row.
 
-    Matched items must reference a row id that genuinely exists in the merged
-    ledger (the three sections).  Everything else becomes an explicit
-    ``MISSING`` open row, so an upstream surface can never be silently dropped.
-    Returns ``(rows, summary)`` where ``summary`` has no ``items`` payload.
+    A *parented surface* whose resolved parent row is IMPLEMENTED is *covered*
+    by that parent: it is recorded as coverage evidence and produces no
+    standalone row.  A parented surface whose parent is missing or not
+    IMPLEMENTED, and any *distinct* capability with no parent, becomes an
+    explicit ``MISSING`` open row, so an upstream surface can never be silently
+    dropped.  Returns ``(rows, summary)`` where ``summary`` has no ``items``
+    payload.
     """
+    status_by_id = known_status if known_status is not None else {}
     items = sorted(
         (it for it in report.get("items", []) if isinstance(it, dict)),
         key=lambda it: (str(it.get("source") or ""),
@@ -1130,8 +1178,18 @@ def build_inventory_rows(report: Dict[str, object], known_ids: Set[str]
     )
     rows: List[Dict[str, str]] = []
     omitted: List[str] = []
+    distinct_omitted: List[str] = []
+    parented_omitted: List[str] = []
     by_category: Dict[str, int] = {}
+    distinct_by_category: Dict[str, int] = {}
+    parented_by_category: Dict[str, int] = {}
+    by_parent: Dict[str, int] = {}
+    covered_by_parent: Dict[str, int] = {}
     matched = 0
+    parented_covered = 0
+    distinct_covered = 0
+    parented_total = 0
+    distinct_total = 0
     surface_total = 0
     evidence_only = 0
     unidentified = 0
@@ -1150,11 +1208,44 @@ def build_inventory_rows(report: Dict[str, object], known_ids: Set[str]
                 unidentified += 1
                 continue
             item_id = fallback
+
+        parent_id = item.get("parent_id")
+        parent_id = parent_id if isinstance(parent_id, str) and parent_id else ""
+        is_parented = bool(parent_id)
+        if is_parented:
+            parented_total += 1
+        else:
+            distinct_total += 1
+
         match = item.get("ledger_match")
         match_id = match if isinstance(match, str) and match else ""
-        if match_id and match_id in known_ids:
+        resolved = ""
+        parent_status = str(item.get("parent_status") or "")
+        covered = bool((match_id and match_id in known_ids)
+                       or item_id in known_ids)
+        if is_parented:
+            declared = item.get("parent_resolved")
+            resolved = declared if isinstance(declared, str) else ""
+            resolved = resolved or _resolve_parent_id(parent_id, status_by_id)
+            if status_by_id:
+                # The live merged ledger is authoritative for parent status.
+                parent_status = status_by_id.get(resolved, "")
+            elif item.get("parent_covered") is True:
+                parent_status = "IMPLEMENTED"
+            else:
+                parent_status = str(item.get("parent_status") or "")
+            if parent_status == "IMPLEMENTED":
+                covered = True
+        if covered:
             matched += 1
+            if is_parented:
+                parented_covered += 1
+                key = resolved or parent_id
+                covered_by_parent[key] = covered_by_parent.get(key, 0) + 1
+            else:
+                distinct_covered += 1
             continue
+
         row_id = _inventory_row_id(item_id)
         base_id = row_id
         suffix = 2
@@ -1165,12 +1256,28 @@ def build_inventory_rows(report: Dict[str, object], known_ids: Set[str]
         omitted.append(item_id)
         by_category[category or "uncategorized"] = \
             by_category.get(category or "uncategorized", 0) + 1
-        if match_id:
-            note = (f"Source inventory ledger_match {match_id!r} does not exist "
-                    "in the merged ledger; recorded as an explicit open row.")
+        if is_parented:
+            parented_omitted.append(item_id)
+            key = resolved or parent_id
+            by_parent[key] = by_parent.get(key, 0) + 1
+            parented_by_category[category or "uncategorized"] = \
+                parented_by_category.get(category or "uncategorized", 0) + 1
+            note = (f"Parented surface of {key!r} "
+                    f"(parent status={parent_status or 'absent'}); the parent "
+                    "capability is missing or not IMPLEMENTED, so this surface "
+                    "stays open (not a distinct capability).")
         else:
-            note = ("Source inventory item has no ledger row in any section; "
-                    "recorded as an explicit open row (not dropped).")
+            distinct_omitted.append(item_id)
+            distinct_by_category[category or "uncategorized"] = \
+                distinct_by_category.get(category or "uncategorized", 0) + 1
+            if match_id:
+                note = (f"Source inventory ledger_match {match_id!r} does not "
+                        "exist in the merged ledger; recorded as an explicit "
+                        "open row.")
+            else:
+                note = ("Source inventory item is a distinct capability with no "
+                        "parent row and no ledger row in any section; recorded "
+                        "as an explicit open row (not dropped).")
         rows.append({
             "id": row_id,
             "area": str(item.get("area") or category or "source_inventory"),
@@ -1198,8 +1305,20 @@ def build_inventory_rows(report: Dict[str, object], known_ids: Set[str]
         "unmatched": unmatched,
         "unexplained_omissions": unmatched,
         "unidentified": unidentified,
+        "parented_surfaces": parented_total,
+        "parented_covered": parented_covered,
+        "parented_uncovered": len(parented_omitted),
+        "distinct_surfaces": distinct_total,
+        "distinct_covered": distinct_covered,
+        "distinct_uncovered": len(distinct_omitted),
         "by_category": dict(sorted(by_category.items())),
+        "distinct_by_category": dict(sorted(distinct_by_category.items())),
+        "parented_by_category": dict(sorted(parented_by_category.items())),
+        "by_parent": dict(sorted(by_parent.items())),
+        "covered_by_parent": dict(sorted(covered_by_parent.items())),
         "omitted_ids": sorted(omitted),
+        "distinct_omitted_ids": sorted(distinct_omitted),
+        "parented_omitted_ids": sorted(parented_omitted),
     })
     return rows, summary
 
@@ -1219,8 +1338,10 @@ def build_ledger(inventory_path: Optional[Path] = None) -> Dict[str, object]:
 
     inventory = load_source_inventory(inventory_path)
     known_ids = {r["id"] for r in rows} | _load_section_ids(ROOT / "docs")
-    inventory_rows, inventory_summary = build_inventory_rows(inventory,
-                                                             known_ids)
+    known_status = {r["id"]: r["status"] for r in rows}
+    known_status.update(_load_section_status(ROOT / "docs"))
+    inventory_rows, inventory_summary = build_inventory_rows(
+        inventory, known_ids, known_status)
     rows = rows + inventory_rows
 
     no_backend = [r["id"] for r in rows
@@ -1254,10 +1375,17 @@ def build_ledger(inventory_path: Optional[Path] = None) -> Dict[str, object]:
             "as an argument (or through an evidence table / parametrized "
             "value), so a docstring, comment, or unrelated assertion can never "
             "close a row. The direct source inventory is ingested last: every "
-            "non-evidence inventory item is matched to a real merged-ledger row "
-            "or emitted as an explicit MISSING open row; absent or malformed "
-            "inventories are recorded, never treated as complete. No status is "
-            "hand-flipped."),
+            "non-evidence inventory item is either matched to a real "
+            "merged-ledger row, covered as a *parented surface* of an "
+            "IMPLEMENTED parent capability (CLI option/positional -> its "
+            "command family, model/provider entry -> model/proxy_providers, "
+            "plugin asset/API/test/manifest -> its plugin, OpenClaw extension "
+            "-> the audited OC-* capability, workflow source -> its area "
+            "capability, dashboard component -> webui_status) with no "
+            "standalone row, or emitted as an explicit MISSING open row "
+            "classified as a distinct capability or a parented surface needing "
+            "parent closure; absent or malformed inventories are recorded, "
+            "never treated as complete. No status is hand-flipped."),
         "sources_reconciled": [
             "voicebridge/voice_commands.py (REGISTRY/_BACKENDS/CLI_COVERAGE)",
             "voicebridge/dashboard_ops.py (catalog/EXTRA_OPS)",
@@ -1279,6 +1407,12 @@ def build_ledger(inventory_path: Optional[Path] = None) -> Dict[str, object]:
             "source_inventory.items": inventory_summary.get("items_total", 0),
             "source_inventory.surface_items": inventory_summary.get(
                 "surface_items", 0),
+            "source_inventory.parented_covered": inventory_summary.get(
+                "parented_covered", 0),
+            "source_inventory.parented_uncovered": inventory_summary.get(
+                "parented_uncovered", 0),
+            "source_inventory.distinct_uncovered": inventory_summary.get(
+                "distinct_uncovered", 0),
         },
         "counts_by_status": dict(sorted(by_status.items())),
         "counts_by_area": dict(sorted(by_area.items())),

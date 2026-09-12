@@ -41,6 +41,22 @@
       "webhooks": 3
     }
   },
+  "extension_map": {
+    "total": 154,
+    "by_disposition": {
+      "parent": 28,
+      "gate": 123,
+      "distinct": 3
+    },
+    "by_needs": {
+      "none": 27,
+      "creds": 115,
+      "hardware": 8,
+      "owner": 4
+    },
+    "unexplained": [],
+    "covered": true
+  },
   "rows": [
     {
       "id": "OC-01",

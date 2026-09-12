@@ -14,6 +14,15 @@ The script is read-only against the pinned trees and the repository except for
 the two generated artifacts above. No timestamps are embedded so regeneration
 is byte-for-byte deterministic.
 
+Every non-evidence item is classified as either a **distinct capability** or a
+**parented surface** of a capability that already has a ledger row (CLI
+option/positional, model/provider entry, plugin asset/API/test/manifest,
+OpenClaw extension, workflow source file, dashboard component).  Each parented
+surface records a deterministic ``parent_id`` and ``coverage`` kind, and is
+marked covered only when its parent row is IMPLEMENTED in the pinned ledger, so
+it never inflates the gap with a standalone MISSING row.  See
+``scripts/rebuild_ledger_qubit.py`` for the live-ledger decision.
+
 Usage:
     scripts/source_inventory.py
     scripts/source_inventory.py --hermes /tmp/opencode/pinned/hermes-agent \
@@ -89,6 +98,175 @@ _SURFACE_LABEL = {
     "hermes_workflow": "backend",
     "openclaw_extension": "dashboard",
 }
+
+# ---------------------------------------------------------------------------
+# Parent-surface classification
+# ---------------------------------------------------------------------------
+# A *parented surface* is a sub-part of a parent capability that already has a
+# ledger row: a CLI flag of a command, a catalog entry of the model/provider
+# capability, a plugin asset/API/test of its plugin, an extension of an audited
+# OpenClaw capability, a workflow source file of its area, or a dashboard
+# component of the dashboard.  A *distinct* capability has no parent and stays
+# an explicit open row.  The mapping is mechanical and auditable; the ledger
+# generator suppresses a parented surface's standalone MISSING row when its
+# parent row is IMPLEMENTED (see ``scripts/rebuild_ledger_qubit.py``).
+#
+# ``coverage`` records *why* the item is a surface (CLI option, model entry,
+# plugin surface, ...); ``parent_id`` records the capability it belongs to.
+_COVERAGE_FOR_CATEGORY = {
+    "hermes_cli_option": "cli-option",
+    "hermes_cli_positional": "cli-option",
+    "hermes_model": "model-entry",
+    "hermes_provider": "provider-entry",
+    "hermes_plugin_api": "plugin-surface",
+    "hermes_plugin_asset": "plugin-surface",
+    "hermes_plugin_test": "plugin-surface",
+    "hermes_dashboard_plugin": "plugin-surface",
+    "openclaw_extension": "openclaw-capability",
+    "hermes_workflow": "workflow-surface",
+    "hermes_dashboard_component": "dashboard-surface",
+    "hermes_dashboard_dialog": "dashboard-surface",
+    "hermes_dashboard_form": "dashboard-surface",
+    "hermes_dashboard_nav": "dashboard-surface",
+    "hermes_i18n_key": "evidence-i18n",
+    "hermes_locale_key": "evidence-i18n",
+    "hermes_upstream_test": "evidence-test",
+}
+
+# OpenClaw extension -> audited capability id (docs/AUDIT_OPENCLAW_*.md).  An
+# extension whose upstream name already matched an ``OC-*`` ledger row wins;
+# otherwise the first manifest category with a documented audited capability is
+# the parent.  ``tools`` is intentionally unmapped: a generic tool extension
+# has no single audited capability and stays a distinct capability.
+_OPENCLAW_PARENT_BY_CATEGORY = {
+    "gateway": "OC-02",
+    "browser": "OC-09",
+    "desktop": "OC-15",
+    "channels": "OC-19",
+    "webhooks": "OC-23",
+    "automation": "OC-26",
+    "boards": "OC-34",
+    "skills": "OC-38",
+    "sessions": "OC-44",
+    "memory": "OC-46",
+    "reports": "OC-49",
+    "runtime": "OC-53",
+    "ide": "OC-57",
+    "web": "OC-63",
+    "web_media": "OC-64",
+    "media": "OC-64",
+    "voice": "OC-66",
+    "models": "OC-D28",
+    "security": "OC-D08",
+    "policy": "OC-D02",
+    "dashboard": "OC-69",
+    "context": "OC-D20",
+}
+
+# Hermes workflow area -> the Qubit capability row that owns it.
+_WORKFLOW_PARENT_BY_AREA = {
+    "browser": "browser_status",
+    "coding": "opencode_status",
+    "desktop": "computer_status",
+    "memory": "memory_search",
+    "messaging": "channels_status",
+    "reports": "reports_list",
+    "runtime": "runtime_status",
+    "schedules": "schedules_list",
+}
+
+# Dashboard UI surfaces belong to the dashboard capability.
+_DASHBOARD_PARENT = "webui_status"
+
+
+def _parent_for(item: dict) -> tuple[str | None, str]:
+    """Return ``(parent_id, coverage)`` for one inventory item.
+
+    ``parent_id`` is the ledger id of the owning capability (or ``None`` for a
+    distinct capability).  ``coverage`` names why the item is a surface.
+    """
+    cat = item["category"]
+    coverage = _COVERAGE_FOR_CATEGORY.get(cat, "")
+    if cat in ("hermes_cli_option", "hermes_cli_positional"):
+        cmd = str(item.get("command") or "")
+        name = cmd[len("hermes "):] if cmd.startswith("hermes ") else cmd
+        return (f"cli:{name}" if name else None, coverage)
+    if cat == "hermes_cli_subcommand" and item.get("is_alias_of"):
+        target = str(item["is_alias_of"])
+        name = (target[len("hermes "):]
+                if target.startswith("hermes ") else target)
+        return (f"cli:{name}" if name else None, "cli-alias")
+    if cat == "hermes_model":
+        return ("model", coverage)
+    if cat == "hermes_provider":
+        return ("proxy_providers", coverage)
+    if cat in ("hermes_plugin_api", "hermes_plugin_asset", "hermes_plugin_test"):
+        plugin = item.get("plugin")
+        return (f"plugin:{plugin}" if plugin else None, coverage)
+    if cat == "hermes_dashboard_plugin":
+        name = item.get("name")
+        return (f"plugin:{name}" if name else None, coverage)
+    if cat == "hermes_workflow":
+        return (_WORKFLOW_PARENT_BY_AREA.get(str(item.get("area") or "")),
+                coverage)
+    if cat in ("hermes_dashboard_component", "hermes_dashboard_dialog",
+               "hermes_dashboard_form", "hermes_dashboard_nav"):
+        return (_DASHBOARD_PARENT, coverage)
+    if cat == "openclaw_extension":
+        match = item.get("ledger_match")
+        if isinstance(match, str) and match.startswith("OC-"):
+            return (match, coverage)
+        for category in (item.get("categories") or []):
+            parent = _OPENCLAW_PARENT_BY_CATEGORY.get(category)
+            if parent:
+                return (parent, coverage)
+        return (None, coverage)
+    if cat in ("hermes_i18n_key", "hermes_locale_key"):
+        return (_DASHBOARD_PARENT, coverage)
+    return (None, coverage)
+
+
+def _ledger_status_index(repo: Path,
+                         ledger_rev: str | None) -> dict[str, str]:
+    """id -> status for every ledger row at ``ledger_rev`` (None = working).
+
+    The inventory reconciles against the same (usually pinned) revision the
+    omission comparison uses, so the artifact is reproducible even while other
+    agents edit the working-tree ledger.
+    """
+    index: dict[str, str] = {}
+    for name in ("hermes", "openclaw", "qubit"):
+        ledger = _load_ledger(repo, name, ledger_rev)
+        for row in ledger.get("rows", []):
+            index.setdefault(row["id"], row.get("status"))
+    return index
+
+
+def _is_covered(item: dict) -> bool:
+    """A surface is covered by its own ledger row or an IMPLEMENTED parent."""
+    return bool(item.get("ledger_match") or item.get("parent_covered"))
+
+
+def _resolve_parent(parent_id: str | None,
+                    status_by_id: dict[str, str]) -> str | None:
+    """Resolve a declared parent to the nearest existing ledger row.
+
+    CLI options live under a command; when the exact ``cli:<command>`` row is
+    absent, the nearest declared ancestor (``cli:cron create`` ->
+    ``cli:cron``) is the parent.  Other parent ids must exist verbatim.
+    """
+    if not parent_id:
+        return None
+    if parent_id in status_by_id:
+        return parent_id
+    if parent_id.startswith("cli:"):
+        parts = parent_id[4:].split()
+        while len(parts) > 1:
+            parts.pop()
+            candidate = "cli:" + " ".join(parts)
+            if candidate in status_by_id:
+                return candidate
+    return parent_id
 
 
 # ---------------------------------------------------------------------------
@@ -1004,6 +1182,11 @@ def _match_hermes_item(item: dict, all_ids: set, find_by_name):
     name = item["name"].split(":")[-1]
     if cat == "hermes_plugin_asset":
         return None  # generic filenames (index.js/style.css) cause noise
+    if cat in ("hermes_tool", "hermes_skill") and name in all_ids:
+        # The agent tool / skill name is the capability op id (e.g. the
+        # ``kanban_create`` tool is the ``kanban_create`` capability); the
+        # shared-name guard in ``find_by_name`` would otherwise skip it.
+        return name
     hit = find_by_name(name)
     return hit[1]["id"] if hit else None
 
@@ -1101,19 +1284,34 @@ def reconcile(repo: Path, hermes_items: list[dict],
 
 def render_omissions(inv: dict) -> str:
     items = inv["items"]
-    by_cat: dict[str, list[dict]] = {}
-    for it in items:
-        if it["category"] in _EVIDENCE_CATEGORIES:
-            continue
-        if it.get("ledger_match"):
-            continue
-        by_cat.setdefault(it["category"], []).append(it)
+    surfaces = [it for it in items
+                if it["category"] not in _EVIDENCE_CATEGORIES]
+    omissions = [it for it in surfaces if not _is_covered(it)]
+    distinct = [it for it in omissions if not it.get("parent_id")]
+    parented = [it for it in omissions if it.get("parent_id")]
+    parented_covered = [it for it in surfaces
+                        if it.get("parent_id") and _is_covered(it)]
 
-    total_omissions = sum(len(v) for v in by_cat.values())
-    evidence_counts = {}
+    def group(seq, keyfn):
+        out: dict[str, list[dict]] = {}
+        for it in seq:
+            out.setdefault(keyfn(it), []).append(it)
+        return out
+
+    distinct_by_cat = group(distinct, lambda it: it["category"])
+    parented_by_parent = group(
+        parented, lambda it: (it.get("parent_resolved")
+                              or it.get("parent_id") or "?"))
+    covered_by_parent = group(
+        parented_covered, lambda it: (it.get("parent_resolved")
+                                      or it.get("parent_id") or "?"))
+
+    total_omissions = len(omissions)
+    evidence_counts: dict[str, int] = {}
     for it in items:
         if it["category"] in _EVIDENCE_CATEGORIES:
-            evidence_counts[it["category"]] = evidence_counts.get(it["category"], 0) + 1
+            evidence_counts[it["category"]] = \
+                evidence_counts.get(it["category"], 0) + 1
 
     out = io.StringIO()
     w = out.write
@@ -1121,29 +1319,40 @@ def render_omissions(inv: dict) -> str:
     w("Machine-generated by `scripts/source_inventory.py` from the pinned\n")
     w(f"Hermes `{HERMES_PIN}` ({HERMES_TAG}) and OpenClaw `{OPENCLAW_PIN}` "
       f"({OPENCLAW_TAG}) source trees.\n\n")
-    w("**Scope.** Every inventory item in a capability-surface category "
-      "(CLI commands/subcommands/options, backend routes, dashboard "
-      "pages/routes/nav/components, plugins, tools, skills, models, providers, "
-      "workflows, OpenClaw extensions) that has **no matching row** in "
-      "`docs/QUBIT_GAP_LEDGER.hermes.json`, `QUBIT_GAP_LEDGER.openclaw.json`, or "
-      "`QUBIT_GAP_LEDGER.qubit.json` is listed below as a candidate work row. "
-      "Cross-cutting evidence surfaces (i18n keys, locale keys, upstream tests) "
-      "are counted, not enumerated per key, because they are not standalone "
-      "capability rows.\n\n")
+    w("**Scope.** Inventory items are classified as **distinct capabilities** "
+      "(no parent row) or **parented surfaces** (a CLI option/positional, model "
+      "or provider entry, plugin asset/API/test/manifest, OpenClaw extension, "
+      "workflow source file, or dashboard component whose capability already "
+      "has a ledger row). A parented surface whose parent row is `IMPLEMENTED` "
+      "is covered by the parent and is **not** a standalone gap. Cross-cutting "
+      "evidence (i18n keys, locale keys, upstream tests) is counted, not "
+      "enumerated per key.\n\n")
     w("Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes "
       "(`api:<METHOD> <path>`), and dashboard routes (`dashboard:<path>`); "
-      "otherwise a boundary-aware name/path search across every ledger row.\n\n")
+      "otherwise a boundary-aware name/path search across every ledger row. "
+      "Parent ids are resolved against the live merged ledger and the nearest "
+      "declared ancestor is used when an exact `cli:` subcommand row is "
+      "absent.\n\n")
 
     bd = inv["hermes_byte_diff"]["counts"]
     lc = inv["ledger_comparison"]
+    pm = inv.get("parent_mapping", {})
     w("## Summary\n\n")
     w(f"- Ledger comparison baseline: `{lc['ledger_revision']}` "
       f"(verified waves-1-2 revision; the live working-tree ledger is edited "
       f"by concurrent agents, so the comparison is pinned to a reproducible "
       f"revision).\n")
     w(f"- Inventory items (all categories): **{len(items)}**\n")
-    w(f"- Candidate omissions (surface categories, no ledger row): "
+    w(f"- Candidate omissions (uncovered surface items): "
       f"**{total_omissions}**\n")
+    w(f"- Distinct capability gaps (no parent row): "
+      f"**{len(distinct)}**\n")
+    w(f"- Parented surfaces needing parent closure (parent not IMPLEMENTED): "
+      f"**{len(parented)}**\n")
+    w(f"- Parented surfaces covered by an IMPLEMENTED parent: "
+      f"**{len(parented_covered)}**\n")
+    w(f"- Distinct capabilities total: **{pm.get('distinct_surfaces', '?')}**; "
+      f"parented surfaces total: **{pm.get('parented_surfaces', '?')}**\n")
     w(f"- Ledger IMPLEMENTED rows with unreproducible evidence: "
       f"**{len(lc['unreproducible_evidence'])}**\n")
     w(f"- Hermes byte diff vs `qubit_hermes/`: "
@@ -1151,21 +1360,24 @@ def render_omissions(inv: dict) -> str:
       f"identical={bd['identical']} missing={bd['missing']} "
       f"extra={bd['extra']} changed={bd['changed']}\n\n")
 
-    w("### Omission counts by category\n\n")
-    for cat in sorted(by_cat):
-        w(f"- `{cat}`: {len(by_cat[cat])}\n")
-    if not by_cat:
+    w("### Omission counts by category (all uncovered)\n\n")
+    om_by_cat = group(omissions, lambda it: it["category"])
+    for cat in sorted(om_by_cat):
+        w(f"- `{cat}`: {len(om_by_cat[cat])}\n")
+    if not om_by_cat:
         w("- (none)\n")
     w("\n### Evidence-only surface counts (not candidate rows)\n\n")
     for cat in sorted(evidence_counts):
         w(f"- `{cat}`: {evidence_counts[cat]}\n")
     w("\n")
 
-    for cat in sorted(by_cat):
-        w(f"## {cat} ({len(by_cat[cat])})\n\n")
-        for it in sorted(by_cat[cat], key=lambda x: x["id"]):
+    w(f"## Distinct capability gaps ({len(distinct)})\n\n")
+    w("No parent capability row exists; these remain explicit open rows.\n\n")
+    for cat in sorted(distinct_by_cat):
+        w(f"### {cat} ({len(distinct_by_cat[cat])})\n\n")
+        for it in sorted(distinct_by_cat[cat], key=lambda x: x["id"]):
             src = it.get("path", "?")
-            surface = _SURFACE_LABEL.get(cat, "backend")
+            surface = _SURFACE_LABEL.get(it["category"], "backend")
             if surface == "cli":
                 cli_s, dash_s = f"`{it['id']}`", "none"
             elif surface == "dashboard":
@@ -1174,17 +1386,45 @@ def render_omissions(inv: dict) -> str:
                 cli_s, dash_s = "none", "none"
             voice = "candidate" if surface in ("cli", "dashboard") else "none"
             note = ""
-            if cat == "openclaw_extension":
+            if it["category"] == "openclaw_extension":
                 note = ("" if it.get("in_audit_docs")
                         else " (not enumerated in AUDIT_OPENCLAW_2026-09-11.md "
                              "or AUDIT_OPENCLAW_V2026_9_4_DELTA.md)")
                 cats = it.get("categories") or []
                 note += f" categories={','.join(cats) or 'none'}"
                 note += f" manifest={it.get('manifest') or 'none'}"
-            w(f"- `{it['id']}` — source `{src}`; category `{cat}`; "
+            w(f"- `{it['id']}` — source `{src}`; category `{it['category']}`; "
               f"CLI={cli_s}; dashboard={dash_s}; voice={voice}; "
-              f"no ledger row{note}. Reason: upstream {cat.replace('_', ' ')} "
-              f"absent from all three gap-ledger sections.\n")
+              f"no parent row and no ledger row{note}. Reason: upstream "
+              f"{it['category'].replace('_', ' ')} is a distinct capability "
+              f"with no implementing ledger row.\n")
+        w("\n")
+
+    w(f"## Parented surfaces needing parent closure ({len(parented)})\n\n")
+    w("These belong to a parent capability row that is missing or not "
+      "IMPLEMENTED; close the parent (or wire the surface) to resolve them. "
+      "They are not distinct capabilities.\n\n")
+    for parent in sorted(parented_by_parent):
+        group_items = parented_by_parent[parent]
+        status = group_items[0].get("parent_status") or "absent"
+        w(f"### parent `{parent}` ({len(group_items)}; status={status})\n\n")
+        for it in sorted(group_items, key=lambda x: x["id"]):
+            w(f"- `{it['id']}` — category `{it['category']}`; coverage "
+              f"`{it.get('coverage') or '?'}`; source "
+              f"`{it.get('path', '?')}`; parent `{parent}` status "
+              f"`{status}`.\n")
+        w("\n")
+
+    w(f"## Parented surfaces covered by an IMPLEMENTED parent "
+      f"({len(parented_covered)})\n\n")
+    if not parented_covered:
+        w("None.\n\n")
+    else:
+        w("These are coverage evidence for their parent, not separate gaps.\n\n")
+        for parent in sorted(covered_by_parent):
+            w(f"- `{parent}`: {len(covered_by_parent[parent])} surface(s) — "
+              f"coverage `{covered_by_parent[parent][0].get('coverage') or '?'}`"
+              f"\n")
         w("\n")
 
     w("## Ledger rows with unreproducible evidence\n\n")
@@ -1246,6 +1486,24 @@ def build_inventory(repo: Path, hermes: Path, openclaw: Path,
     byte_diff = compute_hermes_byte_diff(repo, hermes)
 
     all_items = hermes_items + openclaw_items
+
+    # Parent-surface classification: attach every surface to its parent
+    # capability and record whether that parent is IMPLEMENTED in the live
+    # ledger.  A covered parented surface is evidence for the parent, not a
+    # standalone missing capability; an uncovered one is reported separately
+    # from a genuinely distinct capability.
+    status_by_id = _ledger_status_index(repo, ledger_rev)
+    for it in all_items:
+        parent_id, coverage = _parent_for(it)
+        resolved = _resolve_parent(parent_id, status_by_id)
+        it["parent_id"] = parent_id
+        it["coverage"] = coverage
+        it["parent_resolved"] = resolved
+        it["parent_status"] = (status_by_id.get(resolved)
+                               if resolved else None)
+        it["parent_covered"] = bool(
+            resolved and status_by_id.get(resolved) == "IMPLEMENTED")
+
     all_items.sort(key=lambda x: (x["source"], x["category"], x["id"]))
 
     counts: dict[str, int] = {}
@@ -1261,12 +1519,32 @@ def build_inventory(repo: Path, hermes: Path, openclaw: Path,
         for c in (it.get("categories") or ["(uncategorized)"]):
             oc_cat_counts[c] = oc_cat_counts.get(c, 0) + 1
 
+    def tally(items, keyfn):
+        out: dict[str, int] = {}
+        for it in items:
+            key = keyfn(it)
+            out[key] = out.get(key, 0) + 1
+        return dict(sorted(out.items()))
+
     omissions = [it for it in all_items
                  if it["category"] not in _EVIDENCE_CATEGORIES
-                 and not it.get("ledger_match")]
-    om_by_cat: dict[str, int] = {}
-    for it in omissions:
-        om_by_cat[it["category"]] = om_by_cat.get(it["category"], 0) + 1
+                 and not _is_covered(it)]
+    surfaces = [it for it in all_items
+                if it["category"] not in _EVIDENCE_CATEGORIES]
+    parented_all = [it for it in surfaces if it.get("parent_id")]
+    distinct_all = [it for it in surfaces if not it.get("parent_id")]
+    distinct = [it for it in omissions if not it.get("parent_id")]
+    parented = [it for it in omissions if it.get("parent_id")]
+    parented_covered = [it for it in parented_all if _is_covered(it)]
+    distinct_covered = [it for it in distinct_all if _is_covered(it)]
+    om_by_cat = tally(omissions, lambda it: it["category"])
+    distinct_by_cat = tally(distinct, lambda it: it["category"])
+    parented_by_cat = tally(parented, lambda it: it["category"])
+    by_parent = tally(parented, lambda it: (it.get("parent_resolved")
+                                            or it.get("parent_id") or "?"))
+    covered_by_parent = tally(parented_covered,
+                              lambda it: (it.get("parent_resolved")
+                                          or it.get("parent_id") or "?"))
 
     return {
         "schema": "qubit-source-inventory/1",
@@ -1281,9 +1559,44 @@ def build_inventory(repo: Path, hermes: Path, openclaw: Path,
         "openclaw_extension_categories": dict(sorted(oc_cat_counts.items())),
         "hermes_byte_diff": byte_diff,
         "ledger_comparison": comparison,
+        "parent_mapping": {
+            "method": (
+                "Mechanical parent mapping: a CLI option/positional belongs to "
+                "its command family (nearest existing cli: row); a CLI alias "
+                "to its target; a model/provider entry to model/"
+                "proxy_providers; a plugin asset/API/test/manifest to its "
+                "plugin; an OpenClaw extension to the audited OC-* capability "
+                "of its name or first mapped manifest category; a workflow "
+                "source file to its area capability; a dashboard component/"
+                "dialog/form/nav to webui_status.  A surface is covered when "
+                "it matches its own ledger row or its resolved parent row is "
+                "IMPLEMENTED in the live ledger, so it must not create a "
+                "standalone MISSING row.  Parented and distinct uncovered "
+                "items are counted and listed separately."),
+            "parented_surfaces": len(parented_all),
+            "parented_covered": len(parented_covered),
+            "parented_uncovered": len(parented),
+            "distinct_surfaces": len(distinct_all),
+            "distinct_covered": len(distinct_covered),
+            "distinct_uncovered": len(distinct),
+            "by_coverage": tally(all_items,
+                                 lambda it: it.get("coverage") or "(distinct)"),
+            "by_parent_covered": covered_by_parent,
+            "by_parent_uncovered": by_parent,
+            "uncovered_by_category": {
+                "distinct": distinct_by_cat,
+                "parented": parented_by_cat,
+            },
+        },
         "omissions": {
             "total": len(omissions),
-            "by_category": dict(sorted(om_by_cat.items())),
+            "distinct_total": len(distinct),
+            "parented_uncovered": len(parented),
+            "parented_covered": len(parented_covered),
+            "by_category": om_by_cat,
+            "distinct_by_category": distinct_by_cat,
+            "parented_by_category": parented_by_cat,
+            "by_parent": by_parent,
             "unreproducible_evidence": comparison["unreproducible_evidence"],
         },
         "items": all_items,

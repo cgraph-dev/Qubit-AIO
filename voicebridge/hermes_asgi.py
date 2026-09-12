@@ -1,11 +1,14 @@
 """In-process ASGI bridge to the Qubit-owned Hermes backend.
 
-Cutover stage 1 (docs/QUBIT_HERMES_CUTOVER_MIGRATION.md). The single-listener
-rule holds: the Qubit ``WebUI`` HTTP server remains the ONLY listening socket.
-This bridge calls the vendored FastAPI app in-process via an ``httpx``
-``ASGITransport`` on a dedicated event-loop thread, so the fork becomes the
-backend authority for dashboard reads without opening a second port or
-supervising an external process.
+Cutover stages 1-3 (docs/QUBIT_HERMES_CUTOVER_MIGRATION.md). The
+single-listener rule holds: the Qubit ``WebUI`` HTTP server remains the ONLY
+listening socket. This bridge calls the vendored FastAPI app in-process via an
+``httpx`` ``ASGITransport`` on a dedicated event-loop thread, so the fork
+becomes the backend authority for dashboard reads without opening a second port
+or supervising an external process. Stage 3 adds a fail-closed write-policy
+middleware (``write_policy`` + ``safe_write_to_proxy``) that runs the Qubit
+e-stop/gate/audit check before any explicitly allowlisted mutation reaches the
+fork.
 
 The fork app is used as-is (no lifespan): its startup would spawn gateway/cron
 services, violating single-authority/single-listener. Routes that need startup
@@ -20,7 +23,7 @@ import os
 import re
 import threading
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Pattern, Tuple
+from typing import Any, Dict, List, Optional, Pattern, Set, Tuple
 
 from . import hermes_egress_guard, hermes_runtime
 
@@ -262,6 +265,110 @@ def safe_to_proxy(method: str, path: str) -> bool:
     return known_route(path)
 
 
+# ---------------------------------------------------------------------------
+# Cutover stage 3: Qubit write-policy middleware for fork writes
+# ---------------------------------------------------------------------------
+#: Operator opt-in allowlist of ``(METHOD, path)`` fork writes that may execute
+#: in the fork *after* the Qubit policy middleware has run. It is deliberately
+#: EMPTY by default, so enabling ``webui.hermes_writes`` alone never exposes a
+#: fork write: each route is added one at a time only after its Qubit
+#: authority/parity is proven. This is the reversible next stage recorded in
+#: docs/QUBIT_HERMES_CUTOVER_MIGRATION.md.
+WRITE_PROXY_ALLOWLIST: Set[Tuple[str, str]] = set()
+
+_MUTATING_METHODS = ("POST", "PUT", "PATCH", "DELETE")
+
+
+def _sensitive_path(path: str) -> bool:
+    clean = path.split("?", 1)[0]
+    for prefix in SENSITIVE_READ_PREFIXES + QUBIT_OWNED_PREFIXES:
+        if clean == prefix or clean.startswith(prefix + "/"):
+            return True
+    return False
+
+
+def safe_write_to_proxy(method: str, path: str) -> bool:
+    """True only for an explicitly allowlisted Qubit-policy-cleared fork write.
+
+    Fail-closed: the route must be in ``WRITE_PROXY_ALLOWLIST``, must not be a
+    sensitive/Qubit-owned surface, must not be Qubit-gated, and must be declared
+    by the fork's OpenAPI. A write that is not allowlisted stays on the Qubit
+    compat path (``webui._hermes_api`` falls through to it).
+    """
+    method = method.upper()
+    if method not in _MUTATING_METHODS:
+        return False
+    clean = path.split("?", 1)[0]
+    if (method, clean) not in WRITE_PROXY_ALLOWLIST:
+        return False
+    if _sensitive_path(clean) or gated_path(clean):
+        return False
+    # A route Qubit deliberately gates for this verb is never fork-written, even
+    # if allowlisted (defense in depth; write_policy normally refuses first).
+    try:
+        from . import hermes_compat as HC
+        route, _ = HC.match(method, clean)
+        if route is not None and route.get("disposition") == "gated":
+            return False
+    except Exception:
+        pass
+    return known_route(clean)
+
+
+def write_policy(cfg: Any, method: str, path: str
+                 ) -> Tuple[bool, Optional[Tuple[int, Dict[str, Any]]]]:
+    """Qubit permission/confirmation/audit check for a candidate fork write.
+
+    Returns ``(allowed, refusal)``:
+
+    * ``(False, None)`` -- not an allowlisted cutover write; the caller must
+      use the Qubit compat path (default behavior).
+    * ``(False, (http, envelope))`` -- allowlisted but refused by Qubit policy
+      (emergency stop engaged or a typed compat gate). The refusal is audited
+      and the fork is never invoked.
+    * ``(True, None)`` -- allowlisted and policy-cleared; the caller may proxy
+      the write to the fork under the egress guard, and must audit it.
+    """
+    method = method.upper()
+    clean = path.split("?", 1)[0]
+    if method not in _MUTATING_METHODS or \
+            (method, clean) not in WRITE_PROXY_ALLOWLIST:
+        return False, None
+    # One emergency-stop authority: an engaged Qubit e-stop refuses everything.
+    try:
+        from . import broker as _broker
+        if _broker.estop_engaged(cfg):
+            from . import hermes_compat as HC
+            HC.audit_event("hermes.write.refused", "bridge",
+                           {"route": f"{method} {clean}", "code": "ESTOP_ENGAGED"})
+            return False, (423, {
+                "ok": False, "state": "UNAVAILABLE", "code": "ESTOP_ENGAGED",
+                "detail": "Qubit emergency stop is engaged; writes are refused.",
+                "qubit_counterpart": "CLI `qubit resume`"})
+    except Exception:
+        pass
+    # A Qubit-typed gate is never converted into a fork write bypass.
+    try:
+        from . import hermes_compat as HC
+        route, _ = HC.match(method, clean)
+        if route is not None and route.get("disposition") == "gated":
+            gate = route.get("gate", {})
+            HC.audit_event("hermes.write.refused", "bridge",
+                           {"route": f"{method} {clean}",
+                            "code": str(gate.get("code", ""))})
+            return False, (gate.get("http", 403), {
+                "ok": False, "state": "UNAVAILABLE",
+                "code": gate.get("code"),
+                "detail": gate.get("detail"),
+                "qubit_counterpart": gate.get("counterpart"),
+                "owner": gate.get("owner"),
+                "rollback": gate.get("rollback")})
+    except Exception:
+        pass
+    return True, None
+
+
 __all__ = ["available", "status", "call", "safe_to_proxy", "known_route",
            "gated_path", "set_home", "SENSITIVE_READ_PREFIXES",
-           "QUBIT_OWNED_PREFIXES"]
+           "QUBIT_OWNED_PREFIXES", "WRITE_PROXY_ALLOWLIST",
+           "safe_write_to_proxy", "write_policy"]

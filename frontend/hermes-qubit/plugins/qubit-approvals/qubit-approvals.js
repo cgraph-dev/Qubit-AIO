@@ -68,6 +68,7 @@
 
     if (!items.length) return null;
     return e("div", {role: "region", "aria-label": "Pending confirmations",
+      "data-state": "pending",
       style: {margin: "8px 12px 0", padding: "8px 12px",
         border: "1px solid #b7791f", borderRadius: 8, fontSize: 13,
         background: "rgba(183,121,31,0.08)"}},
@@ -93,7 +94,8 @@
             "aria-label": "Cancel " + String(a.capability || a.id),
           }, "Cancel"));
       }),
-      err ? e("div", {role: "alert", style: {color: "#e5484d", marginTop: 6}}, err) : null);
+      err ? e("div", {role: "alert", "data-state": "degraded",
+        style: {color: "#e5484d", marginTop: 6}}, err) : null);
   }
 
   function ApprovalsPage() {
@@ -144,9 +146,9 @@
         "Pending confirmations on the shared journal — the same records CLI ",
         "`qubit approvals`, voice yes/no, and the operations console settle. ",
         "Confirm executes once with a redacted audit receipt."),
-      err ? e("div", {role: "alert",
+      err ? e("div", {role: "alert", "data-state": "degraded",
         style: {color: "#e5484d", marginBottom: 10}}, err) : null,
-      !items.length ? e("p", {style: {opacity: 0.7}},
+      !items.length ? e("p", {"data-state": "empty", style: {opacity: 0.7}},
           "No pending confirmations.") :
         e("div", {role: "list", style: {border: "1px solid #2a3443",
           borderRadius: 8}},

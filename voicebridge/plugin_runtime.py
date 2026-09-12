@@ -212,6 +212,92 @@ def refuse_estop(operation: str) -> Dict[str, Any]:
             "rollback": "registry untouched; nothing executed"}
 
 
+# ---------------------------------------------------------------------------
+# Shared confirmation authority (Wave 4, gap G5). Plugin/MCP/policy mutations
+# used a boolean ``confirmed`` flag with no binding to the durable journal, so
+# replay/expiry did not apply. They now consult the SAME durable
+# ``ApprovalJournal`` the dashboard/voice/CLI approval surface uses.
+# ---------------------------------------------------------------------------
+def _approval_journal(cfg: Any):
+    from pathlib import Path
+
+    from .approvals import ApprovalJournal
+
+    return ApprovalJournal(Path(cfg.state_dir()) / "approvals.jsonl",
+                           default_ttl_s=120.0)
+
+
+def _record_human_confirmation(cfg: Any, capability: str,
+                               requested_by: str) -> None:
+    """Durably record (and immediately consume) a human ``--confirm``."""
+    try:
+        journal = _approval_journal(cfg)
+        actor = _redact(str(requested_by))[:64]
+        item = journal.create(capability, f"{capability} via {actor}",
+                              ttl_s=120.0, session="plugin", actor=actor)
+        journal.respond(item.id, "approve")
+        journal.finish(item.id)
+    except Exception as exc:  # noqa: BLE001 - fail closed at the boundary
+        raise PluginRuntimeError(
+            CONFIRM_CODE,
+            "shared confirmation unavailable: " + _redact(str(exc))[:120]
+        ) from exc
+    _audit("confirm", requested_by,
+           {"capability": capability, "confirmation_id": item.id})
+
+
+def _consume_journal_approval(cfg: Any, capability: str,
+                              confirmation_id: str) -> bool:
+    """Consume a durable human approval exactly once (expiry via the journal).
+
+    A replayed/expired/wrong-capability id returns False; a fresh approved
+    entry is settled to COMPLETE so a second call with the same id is refused.
+    """
+    from .approvals import (ABORTED, COMPLETE, DENIED, EXECUTING, IN_PROGRESS)
+
+    try:
+        journal = _approval_journal(cfg)
+        item = journal.get(str(confirmation_id or "").strip())
+    except Exception:
+        return False
+    if item is None or item.capability != capability:
+        return False
+    if item.decision not in (None, "approve"):
+        return False
+    if item.state == IN_PROGRESS:
+        if item.expires_at <= _now():
+            journal.abort(item.id)
+            return False
+        item = journal.respond(item.id, "approve")     # -> EXECUTING
+    if item.state == EXECUTING:
+        journal.finish(item.id)                        # -> COMPLETE (consumed)
+        return True
+    if item.state in (COMPLETE, ABORTED, DENIED):
+        return False
+    return False
+
+
+def _authorize_mutation(cfg: Any, capability: str, *, confirmed: bool,
+                        confirmation_id: str, requested_by: str,
+                        confirm_code: str = CONFIRM_CODE,
+                        estop_code: str = ESTOP_CODE) -> None:
+    """One gate: e-stop -> durable journal confirmation, fail closed."""
+    if estop_engaged(cfg):
+        raise PluginRuntimeError(estop_code, "emergency stop is latched")
+    if confirmation_id:
+        if not _consume_journal_approval(cfg, capability, confirmation_id):
+            raise PluginRuntimeError(
+                confirm_code,
+                "confirmation id is unknown, expired, already used, or for "
+                "another capability")
+        return
+    if not confirmed:
+        raise PluginRuntimeError(
+            confirm_code,
+            f"{capability} requires explicit --confirm or a human approval id")
+    _record_human_confirmation(cfg, capability, requested_by)
+
+
 def _check_id(text: str) -> str:
     clean = (text or "").strip().lower()
     if not _ID_RE.match(clean):
@@ -387,18 +473,18 @@ def get_plugin(cfg: Any, plugin_id: str) -> Dict[str, Any]:
 
 
 def register(cfg: Any, *, manifest: Any, confirmed: bool = False,
+             confirmation_id: str = "",
              requested_by: str = "cli:user") -> Dict[str, Any]:
     """Record a validated plugin manifest (metadata only; no execution).
 
-    Confirmation-gated, estop-aware, bounded, and redacted. Nothing is
-    fetched, imported, or run: the entrypoint string is stored verbatim so
-    the host can decide later whether to bind an in-process handler.
+    Confirmation-gated through the shared durable journal, estop-aware,
+    bounded, and redacted. Nothing is fetched, imported, or run: the entrypoint
+    string is stored verbatim so the host can decide later whether to bind an
+    in-process handler.
     """
-    if estop_engaged(cfg):
-        raise PluginRuntimeError(ESTOP_CODE, "emergency stop is latched")
-    if not confirmed:
-        raise PluginRuntimeError(CONFIRM_CODE,
-                                 "plugin register requires explicit --confirm")
+    _authorize_mutation(cfg, "plugin.register", confirmed=confirmed,
+                        confirmation_id=confirmation_id,
+                        requested_by=requested_by)
     clean = _validate_manifest(manifest)
     state = _load(cfg)
     if clean["id"] in _BUILTIN:
@@ -422,23 +508,22 @@ def register(cfg: Any, *, manifest: Any, confirmed: bool = False,
 
 def bind_handler(cfg: Any, *, manifest: Any,
                  handler: Optional[Callable[[Dict[str, Any]], Any]] = None,
-                 confirmed: bool = False,
+                 confirmed: bool = False, confirmation_id: str = "",
                  requested_by: str = "cli:user") -> Dict[str, Any]:
     """Bind a real in-process handler for any plugin kind (OC-40).
 
-    This is the Qubit plugin *runtime*: after validation and confirmation a
-    host-owned Python callable is bound in-process for ``tool``/``channel``/
-    ``provider``/``hook`` plugins. The manifest is still metadata only — no
-    entrypoint is imported, no file is fetched, no process is spawned. The
-    binding is process-local and is never persisted as code: after a restart
-    the manifest is listed but the handler is absent, so ``invoke`` degrades to
-    the typed ``PLUGIN_RUNTIME_UNAVAILABLE`` gate until the host rebinds it.
+    This is the Qubit plugin *runtime*: after validation and a shared-journal
+    confirmation a host-owned Python callable is bound in-process for
+    ``tool``/``channel``/``provider``/``hook`` plugins. The manifest is still
+    metadata only — no entrypoint is imported, no file is fetched, no process
+    is spawned. The binding is process-local and is never persisted as code:
+    after a restart the manifest is listed but the handler is absent, so
+    ``invoke`` degrades to the typed ``PLUGIN_RUNTIME_UNAVAILABLE`` gate until
+    the host rebinds it.
     """
-    if estop_engaged(cfg):
-        raise PluginRuntimeError(ESTOP_CODE, "emergency stop is latched")
-    if not confirmed:
-        raise PluginRuntimeError(
-            CONFIRM_CODE, "plugin bind requires explicit --confirm")
+    _authorize_mutation(cfg, "plugin.bind", confirmed=confirmed,
+                        confirmation_id=confirmation_id,
+                        requested_by=requested_by)
     if not callable(handler):
         raise PluginRuntimeError(
             HANDLER_REQUIRED_CODE,
@@ -468,13 +553,12 @@ def bind_handler(cfg: Any, *, manifest: Any,
 
 
 def unregister(cfg: Any, plugin_id: str, *, confirmed: bool = False,
+               confirmation_id: str = "",
                requested_by: str = "cli:user") -> Dict[str, Any]:
     """Remove a registered plugin (built-ins cannot be removed)."""
-    if estop_engaged(cfg):
-        raise PluginRuntimeError(ESTOP_CODE, "emergency stop is latched")
-    if not confirmed:
-        raise PluginRuntimeError(
-            CONFIRM_CODE, "plugin unregister requires explicit --confirm")
+    _authorize_mutation(cfg, "plugin.unregister", confirmed=confirmed,
+                        confirmation_id=confirmation_id,
+                        requested_by=requested_by)
     clean = _check_id(plugin_id)
     if clean in _BUILTIN:
         raise PluginRuntimeError(REFUSED_CODE,
@@ -490,20 +574,18 @@ def unregister(cfg: Any, plugin_id: str, *, confirmed: bool = False,
 
 
 def invoke(cfg: Any, plugin_id: str, *, args: Optional[Dict[str, Any]] = None,
-           confirmed: bool = False,
+           confirmed: bool = False, confirmation_id: str = "",
            requested_by: str = "cli:user") -> Dict[str, Any]:
     """Invoke an in-process handler, or gate with a typed UNAVAILABLE.
 
-    Order: emergency stop -> fresh confirmation -> plugin exists -> an
-    in-process host handler is bound. A manifest entrypoint alone never
+    Order: emergency stop -> shared-journal confirmation -> plugin exists ->
+    an in-process host handler is bound. A manifest entrypoint alone never
     executes; absent a handler the result is the typed
     ``PLUGIN_RUNTIME_UNAVAILABLE`` gate and nothing runs.
     """
-    if estop_engaged(cfg):
-        raise PluginRuntimeError(ESTOP_CODE, "emergency stop is latched")
-    if not confirmed:
-        raise PluginRuntimeError(CONFIRM_CODE,
-                                 "plugin invoke requires explicit --confirm")
+    _authorize_mutation(cfg, "plugin.invoke", confirmed=confirmed,
+                        confirmation_id=confirmation_id,
+                        requested_by=requested_by)
     clean = _check_id(plugin_id)
     rec = _find(cfg, clean)
     if rec is None:
@@ -643,7 +725,7 @@ def mcp_grants(cfg: Any) -> Dict[str, Any]:
 
 
 def mcp_attach(cfg: Any, app_id: str, *, capabilities: Optional[List[str]] = None,
-               confirmed: bool = False,
+               confirmed: bool = False, confirmation_id: str = "",
                requested_by: str = "cli:user") -> Dict[str, Any]:
     """Mint a loopback attach grant with a one-time bearer token (hashed at rest).
 
@@ -652,11 +734,11 @@ def mcp_attach(cfg: Any, app_id: str, *, capabilities: Optional[List[str]] = Non
     the minimal ``initialize``/``tools/list``/``tools/call`` set and may only
     narrow; the endpoint still dispatches only host-bound in-process handlers.
     """
-    if estop_engaged(cfg):
-        raise PluginRuntimeError(MCP_ESTOP_CODE, "emergency stop is latched")
-    if not confirmed:
-        raise PluginRuntimeError(
-            MCP_CONFIRM_CODE, "MCP attach requires explicit --confirm")
+    _authorize_mutation(cfg, "mcp.attach", confirmed=confirmed,
+                        confirmation_id=confirmation_id,
+                        requested_by=requested_by,
+                        confirm_code=MCP_CONFIRM_CODE,
+                        estop_code=MCP_ESTOP_CODE)
     clean = (app_id or "").strip().lower()
     if not _MCP_ID_RE.match(clean):
         raise PluginRuntimeError(
@@ -701,13 +783,14 @@ def mcp_attach(cfg: Any, app_id: str, *, capabilities: Optional[List[str]] = Non
 
 
 def mcp_revoke(cfg: Any, app_id: str, *, confirmed: bool = False,
+               confirmation_id: str = "",
                requested_by: str = "cli:user") -> Dict[str, Any]:
-    """Revoke an attach grant (confirmed, audited)."""
-    if estop_engaged(cfg):
-        raise PluginRuntimeError(MCP_ESTOP_CODE, "emergency stop is latched")
-    if not confirmed:
-        raise PluginRuntimeError(
-            MCP_CONFIRM_CODE, "MCP revoke requires explicit --confirm")
+    """Revoke an attach grant (confirmed via the shared journal, audited)."""
+    _authorize_mutation(cfg, "mcp.revoke", confirmed=confirmed,
+                        confirmation_id=confirmation_id,
+                        requested_by=requested_by,
+                        confirm_code=MCP_CONFIRM_CODE,
+                        estop_code=MCP_ESTOP_CODE)
     clean = (app_id or "").strip().lower()
     state = _mcp_load(cfg)
     rec = state["grants"].get(clean)
@@ -1057,13 +1140,14 @@ def policy_rules(cfg: Any) -> Dict[str, Any]:
 
 
 def policy_add_rule(cfg: Any, *, rule: Any, confirmed: bool = False,
+                    confirmation_id: str = "",
                     requested_by: str = "cli:user") -> Dict[str, Any]:
-    """Author/replace a conformance rule (confirmed, bounded, audited)."""
-    if estop_engaged(cfg):
-        raise PluginRuntimeError(POLICY_ESTOP_CODE, "emergency stop is latched")
-    if not confirmed:
-        raise PluginRuntimeError(
-            POLICY_CONFIRM_CODE, "policy add requires explicit --confirm")
+    """Author/replace a conformance rule (shared-journal confirmed, bounded)."""
+    _authorize_mutation(cfg, "policy.rule.add", confirmed=confirmed,
+                        confirmation_id=confirmation_id,
+                        requested_by=requested_by,
+                        confirm_code=POLICY_CONFIRM_CODE,
+                        estop_code=POLICY_ESTOP_CODE)
     clean = _validate_rule(rule)
     state = _policy_load(cfg)
     if clean["id"] not in state["rules"] \
@@ -1079,13 +1163,14 @@ def policy_add_rule(cfg: Any, *, rule: Any, confirmed: bool = False,
 
 
 def policy_remove_rule(cfg: Any, rule_id: str, *, confirmed: bool = False,
+                       confirmation_id: str = "",
                        requested_by: str = "cli:user") -> Dict[str, Any]:
-    """Remove a conformance rule (confirmed, audited)."""
-    if estop_engaged(cfg):
-        raise PluginRuntimeError(POLICY_ESTOP_CODE, "emergency stop is latched")
-    if not confirmed:
-        raise PluginRuntimeError(
-            POLICY_CONFIRM_CODE, "policy remove requires explicit --confirm")
+    """Remove a conformance rule (shared-journal confirmed, audited)."""
+    _authorize_mutation(cfg, "policy.rule.remove", confirmed=confirmed,
+                        confirmation_id=confirmation_id,
+                        requested_by=requested_by,
+                        confirm_code=POLICY_CONFIRM_CODE,
+                        estop_code=POLICY_ESTOP_CODE)
     clean = str(rule_id or "").strip().lower()
     state = _policy_load(cfg)
     if clean not in state["rules"]:

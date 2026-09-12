@@ -17,10 +17,10 @@ import time
 from typing import Any, Callable, Optional
 
 from .logging_setup import log_event
-from .redaction import redact_text
+from .redaction import redact_obj, redact_text
 from .capabilities import (
     ActionRequest, CapabilityRegistry, CapabilitySpec, ConfirmationDenied,
-    ConfirmationStore, PolicyEngine, Tier)
+    ConfirmationStore, Decision, PolicyEngine, Tier)
 
 
 class DispatchBlocked(RuntimeError):
@@ -28,6 +28,7 @@ class DispatchBlocked(RuntimeError):
         super().__init__(f"{code}: {capability} {detail}".strip())
         self.code = code
         self.capability = capability
+        self.detail = detail
 
 
 WORKER_CAPS = {
@@ -69,6 +70,36 @@ class WorkerGuard:
             self.engine, self.mode = engine, mode
         else:
             self.engine, self.mode = build_worker_engine(mode)
+
+    def authorize(self, capability: str, args: Optional[dict] = None, *,
+                  source: str, correlation_id: Optional[str] = None) -> Decision:
+        """Record the Decision for one call WITHOUT executing anything.
+
+        The same single authority as :meth:`run`: non-user sources are refused
+        (they can neither mint nor carry a confirmation), a short-lived
+        single-use confirmation is issued and consumed through the shared
+        store, and the shared PolicyEngine audits the decision. Used by
+        dispatch surfaces (e.g. the fork-confirm CLI routes) that must be
+        authorized here but execute elsewhere; a denial raises
+        :class:`DispatchBlocked` with the typed policy code.
+        """
+        if source not in ("user", "automation", "model"):
+            raise ValueError(f"invalid dispatch source: {source!r}")
+        if self.mode == "deny":
+            raise DispatchBlocked("WORKER_DISPATCH_DENIED", capability)
+        req_args = redact_obj(dict(args or {}))
+        try:
+            rec = self.engine.confirmations.issue(
+                capability, req_args,
+                issued_by="user" if source == "user" else source, ttl_s=120)
+        except ConfirmationDenied as exc:
+            raise DispatchBlocked(exc.code, capability) from None
+        d = self.engine.decide(ActionRequest(
+            capability=capability, args=req_args, source=source,
+            confirmation_id=rec.id, correlation_id=correlation_id))
+        if not d.allowed:
+            raise DispatchBlocked(d.code, capability, d.detail)
+        return d
 
     def run(self, capability: str, fn: Callable, *args: Any,
             source: str, correlation_id: Optional[str] = None,

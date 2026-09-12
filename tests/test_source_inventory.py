@@ -98,7 +98,100 @@ def test_artifacts_present_and_shaped(inventory):
     assert inventory["counts_by_source"]["openclaw"] > 0
     assert "hermes_byte_diff" in inventory
     assert "ledger_comparison" in inventory
+    assert "parent_mapping" in inventory
     assert OM_MD.is_file()
+
+
+def _item(inventory: dict, item_id: str) -> dict:
+    hits = [i for i in inventory["items"] if i["id"] == item_id]
+    assert hits, f"missing inventory item {item_id}"
+    return hits[0]
+
+
+def test_parent_mapping_counts_are_consistent(inventory):
+    pm = inventory["parent_mapping"]
+    items = inventory["items"]
+    evidence = sum(1 for i in items
+                   if i["category"] in ("hermes_i18n_key",
+                                        "hermes_locale_key",
+                                        "hermes_upstream_test"))
+    surfaces = len(items) - evidence
+    assert pm["parented_surfaces"] + pm["distinct_surfaces"] == surfaces
+    assert (pm["parented_covered"] + pm["parented_uncovered"]
+            == pm["parented_surfaces"])
+    assert (pm["distinct_covered"] + pm["distinct_uncovered"]
+            == pm["distinct_surfaces"])
+    assert (pm["parented_uncovered"] + pm["distinct_uncovered"]
+            == inventory["omissions"]["total"])
+
+
+def test_parent_mapping_rules(inventory):
+    chat = _item(inventory, "hermes chat --checkpoints")
+    assert chat["coverage"] == "cli-option"
+    assert chat["parent_id"] == "cli:chat"
+
+    model = next(i for i in inventory["items"]
+                 if i["category"] == "hermes_model")
+    assert model["coverage"] == "model-entry"
+    assert model["parent_id"] == "model"
+
+    provider = next(i for i in inventory["items"]
+                    if i["category"] == "hermes_provider")
+    assert provider["coverage"] == "provider-entry"
+    assert provider["parent_id"] == "proxy_providers"
+
+    api = _item(inventory, "plugin-api:hermes-achievements")
+    assert api["coverage"] == "plugin-surface"
+    assert api["parent_id"] == "plugin:hermes-achievements"
+
+    ext = next(i for i in inventory["items"]
+               if i["category"] == "openclaw_extension")
+    assert ext["coverage"] == "openclaw-capability"
+    assert ext["parent_id"] is None or ext["parent_id"].startswith("OC-")
+
+    wf = next(i for i in inventory["items"]
+              if i["category"] == "hermes_workflow")
+    assert wf["coverage"] == "workflow-surface"
+    assert wf["parent_id"] is not None
+
+    comp = _item(inventory, "component:ThemeSwitcher")
+    assert comp["coverage"] == "dashboard-surface"
+    assert comp["parent_id"] == "webui_status"
+
+    sub = next(i for i in inventory["items"]
+               if i["category"] == "hermes_cli_subcommand"
+               and not i.get("is_alias_of"))
+    assert sub["coverage"] == ""
+    assert sub["parent_id"] is None
+
+    tool = next(i for i in inventory["items"]
+                if i["category"] == "hermes_tool")
+    assert tool["parent_id"] is None
+
+
+def test_parent_mapping_is_deterministic():
+    if not _pins_available():
+        pytest.skip("pinned upstream trees not present")
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        a, b = Path(tmp) / "a.json", Path(tmp) / "b.json"
+        am, bm = Path(tmp) / "a.md", Path(tmp) / "b.md"
+        assert _build(a, am).returncode == 0
+        assert _build(b, bm).returncode == 0
+        da = json.loads(a.read_text(encoding="utf-8"))
+        db = json.loads(b.read_text(encoding="utf-8"))
+        assert da["parent_mapping"] == db["parent_mapping"]
+        pa = [(i["id"], i["parent_id"], i["coverage"]) for i in da["items"]]
+        pb = [(i["id"], i["parent_id"], i["coverage"]) for i in db["items"]]
+        assert pa == pb
+
+
+def test_omissions_report_classifies_gaps(omissions_text):
+    assert "## Distinct capability gaps" in omissions_text
+    assert "## Parented surfaces needing parent closure" in omissions_text
+    assert "## Parented surfaces covered by an IMPLEMENTED parent" in omissions_text
+    assert "no parent row" in omissions_text
 
 
 def test_counts_cover_every_required_category(inventory):
@@ -196,12 +289,22 @@ def test_achievements_plugin_represented_and_absent_from_ledger(inventory,
                for text in baseline.values()), (
         "verified waves-1-2 baseline unexpectedly mentions achievements")
 
-    # Recorded in the omissions report regardless of whether a concurrent
-    # wave-3 agent has since added a working-tree ledger row.
-    assert "plugin:hermes-achievements" in omissions_text
-    assert "plugin-manifest:hermes-achievements" in omissions_text
-    assert "plugin-api:hermes-achievements" in omissions_text
-    assert "plugin-test:hermes-achievements" in omissions_text
+    # The achievements plugin is represented as a distinct capability item
+    # (no parent) while its manifest/API/test/asset surfaces are parented to
+    # the plugin.  Parent coverage depends on the live working-tree ledger and
+    # is therefore not asserted here; the deterministic mapping is.
+    plugin = _item(inventory, "plugin:hermes-achievements")
+    assert plugin["parent_id"] is None
+    assert plugin["coverage"] == ""
+    for surface_id in (
+            "plugin-manifest:hermes-achievements",
+            "plugin-api:hermes-achievements",
+            "plugin-test:hermes-achievements:test_achievement_engine.py",
+            "plugin-asset:hermes-achievements:index.js",
+            "plugin-asset:hermes-achievements:style.css"):
+        surface = _item(inventory, surface_id)
+        assert surface["parent_id"] == "plugin:hermes-achievements"
+        assert surface["coverage"] == "plugin-surface"
 
 
 def test_openclaw_extensions_have_category_and_manifest(inventory):

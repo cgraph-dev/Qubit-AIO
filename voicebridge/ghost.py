@@ -1108,22 +1108,44 @@ class GhostAdapter:
     """
 
     def __init__(self, *, shell: bool = False,
-                 clock: Callable[[], float] = time.time) -> None:
+                 clock: Callable[[], float] = time.time,
+                 power_control: Optional[Any] = None) -> None:
         self._state = GhostAdapterState(shell=bool(shell))
         self._clock = clock
         self._lock = threading.RLock()
         self._active_correlations: Dict[str, Callable[[], None]] = {}
+        # Wave 4 (gap G3): when a shared PowerControl is supplied (production
+        # builds one via ``ghost_adapter(cfg)``), the emergency stop / reset
+        # latch the ONE durable authority the broker/dashboard/voice observe
+        # instead of a second adapter-private latch.
+        self._power = power_control
 
     @property
     def state(self) -> GhostAdapterState:
         return self._state
 
+    def bind_power(self, control: Optional[Any]) -> None:
+        """Bind the shared PowerControl when the adapter was built without one."""
+        if self._power is None and control is not None:
+            self._power = control
+
+    def _shared_stopped(self) -> bool:
+        """True when the ONE durable e-stop latch is engaged (fail closed)."""
+        if self._power is None:
+            return False
+        try:
+            self._power.refresh()
+            return bool(self._power.state.get("emergency_stop"))
+        except Exception:
+            return True
+
     def enable(self, *, requested_by: str) -> Dict[str, Any]:
         if requested_by != "user":
             return {"state": "denied", "code": "CONFIRMATION_SOURCE_FORBIDDEN",
                     "detail": "only a human may enable the Ghost adapter"}
+        shared = self._shared_stopped()
         with self._lock:
-            if self._state.stopped:
+            if self._state.stopped or shared:
                 return {"state": "denied", "code": "EMERGENCY_STOP",
                         "detail": "adapter is emergency-stopped; reset required"}
             self._state.enabled = True
@@ -1144,8 +1166,16 @@ class GhostAdapter:
         return {"state": "OK", "health": self._state.health}
 
     def emergency_stop(self) -> Dict[str, Any]:
-        """Global, immediate, idempotent stop: cancels every active run and
-        latches the adapter stopped until an explicit reset."""
+        """Global, immediate, idempotent stop: latches the ONE shared durable
+        emergency-stop authority (when one is wired), cancels every active run,
+        and keeps the adapter-local view stopped until an explicit reset."""
+        if self._power is not None:
+            try:
+                self._power.emergency_stop(issued_by="user")
+            except Exception as exc:
+                log_event("ghost.adapter.estop_shared_failed",
+                          error=redact_text(str(exc))[:160])
+                raise
         with self._lock:
             self._state.stopped = True
             self._state.health = HEALTH_DEGRADED
@@ -1163,6 +1193,14 @@ class GhostAdapter:
     def reset(self, *, requested_by: str) -> Dict[str, Any]:
         if requested_by != "user":
             return {"state": "denied", "code": "CONFIRMATION_SOURCE_FORBIDDEN"}
+        if self._power is not None:
+            try:
+                self._power.reset(issued_by="user")
+            except Exception as exc:
+                log_event("ghost.adapter.reset_shared_failed",
+                          error=redact_text(str(exc))[:160])
+                return {"state": "denied", "code": "EMERGENCY_STOP",
+                        "detail": "could not clear the shared emergency stop"}
         with self._lock:
             self._state.stopped = False
             self._state.enabled = False
@@ -1177,8 +1215,9 @@ class GhostAdapter:
         log_event("ghost.adapter.failed", error=redact_text(str(error))[:120])
 
     def mark_reconnect(self) -> None:
+        shared = self._shared_stopped()
         with self._lock:
-            if self._state.enabled and not self._state.stopped:
+            if self._state.enabled and not self._state.stopped and not shared:
                 self._state.health = HEALTH_ENABLED
                 self._state.last_error = ""
         log_event("ghost.adapter.reconnected")
@@ -1193,8 +1232,21 @@ class GhostAdapter:
 
 
 def ghost_adapter(cfg=None, *, env: Optional[Dict[str, str]] = None) -> GhostAdapter:
-    """Build the adapter with the effective shell setting (default off)."""
-    return GhostAdapter(shell=ghost_shell_enabled(env))
+    """Build the adapter with the effective shell setting (default off).
+
+    When a config is available the adapter is bound to the shared, durable
+    :class:`~voicebridge.power.PowerControl` so its emergency stop participates
+    in the ONE global latch (gap G3) instead of a second adapter-private state.
+    """
+    power = None
+    if cfg is not None:
+        try:
+            from .power import power_control
+
+            power = power_control(cfg)
+        except Exception:
+            power = None
+    return GhostAdapter(shell=ghost_shell_enabled(env), power_control=power)
 
 
 # ---------------------------------------------------------------------------
@@ -1378,6 +1430,10 @@ class GhostRunner(ActionRunner):
         self.ghost_grants = session_grants or (
             session_grants_store(cfg) if cfg is not None else None)
         self.adapter = adapter or ghost_adapter(cfg)
+        if power is not None:
+            # One authority: an internally-built adapter (cfg may be absent)
+            # still participates in the shared latch the runner already uses.
+            self.adapter.bind_power(getattr(power, "control", None))
         self.comet = comet
         if self.comet is not None:
             self.comet.bind(self)

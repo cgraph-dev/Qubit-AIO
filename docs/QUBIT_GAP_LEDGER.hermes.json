@@ -3,7 +3,7 @@
  "source": "hermes",
  "upstream_pin": "2237be355906fbe6065ce1815711eee52b2d646e",
  "generated": "2026-09-12",
- "method": "Evidence-based regeneration. API rows re-extract the pinned upstream route decorators and classify them from voicebridge.hermes_compat.match disposition plus the handler's real behaviour (a handler whose normal exits are typed gates/refusals is GATED; a real read/write is IMPLEMENTED; a wire-shape stub is PARTIAL). IMPLEMENTED additionally requires an on-disk tests/ function that dispatches the route, calls the handler, or calls the same downstream production module (AST scan), so no row is IMPLEMENTED on a phantom caller. cli / cli-subcommand rows derive status from the live voicebridge.cli build_parser tree plus voicebridge.cli_hermes_forward.FORWARD_TABLE and an AST scan of tests/ for the exercising caller. Plugin-fleet rows are declared explicitly and are IMPLEMENTED only when tests/test_hermes_plugins.py dispatches the registered compat handler over real local state. No status is hand-flipped.",
+ "method": "Evidence-based regeneration. API rows re-extract the pinned upstream route decorators and classify them from voicebridge.hermes_compat.match disposition plus the handler's real behaviour (a handler whose normal exits are typed gates/refusals is GATED; a real read/write is IMPLEMENTED; a wire-shape stub is PARTIAL). IMPLEMENTED additionally requires an on-disk tests/ function that dispatches the route, calls the handler, or calls the same downstream production module (AST scan), so no row is IMPLEMENTED on a phantom caller. cli / cli-subcommand rows derive status from the live voicebridge.cli build_parser tree plus voicebridge.cli_hermes_forward.FORWARD_TABLE and an AST scan of tests/ for the exercising caller. Plugin-fleet rows are declared explicitly and are IMPLEMENTED only when tests/test_hermes_plugins.py dispatches the registered compat handler over real local state. The full vendored plugin fleet is audited from voicebridge.hermes_plugins.plugin_fleet_audit (which plugin ships a dashboard/manifest.json) and embedded as the plugin_fleet metadata. No status is hand-flipped.",
  "sources_reconciled": [
   "voicebridge/hermes_compat.py",
   "voicebridge/hermes_plugins.py",
@@ -19,25 +19,121 @@
   "qubit_hermes/plugins/kanban/dashboard/plugin_api.py",
   "qubit_hermes/web/src/App.tsx"
  ],
+ "plugin_fleet": [
+  {
+   "name": "hermes-achievements",
+   "has_dashboard": true,
+   "source": "vendored",
+   "manifest": "plugins/hermes-achievements/dashboard/manifest.json",
+   "api": "plugins/hermes-achievements/dashboard/plugin_api.py"
+  },
+  {
+   "name": "kanban",
+   "has_dashboard": true,
+   "source": "vendored",
+   "manifest": "plugins/kanban/dashboard/manifest.json",
+   "api": "plugins/kanban/dashboard/plugin_api.py"
+  },
+  {
+   "name": "browser",
+   "has_dashboard": false,
+   "source": "vendored"
+  },
+  {
+   "name": "context_engine",
+   "has_dashboard": false,
+   "source": "vendored"
+  },
+  {
+   "name": "cron_providers",
+   "has_dashboard": false,
+   "source": "vendored"
+  },
+  {
+   "name": "dashboard_auth",
+   "has_dashboard": false,
+   "source": "vendored"
+  },
+  {
+   "name": "disk-cleanup",
+   "has_dashboard": false,
+   "source": "vendored"
+  },
+  {
+   "name": "google_meet",
+   "has_dashboard": false,
+   "source": "vendored"
+  },
+  {
+   "name": "image_gen",
+   "has_dashboard": false,
+   "source": "vendored"
+  },
+  {
+   "name": "memory",
+   "has_dashboard": false,
+   "source": "vendored"
+  },
+  {
+   "name": "model-providers",
+   "has_dashboard": false,
+   "source": "vendored"
+  },
+  {
+   "name": "observability",
+   "has_dashboard": false,
+   "source": "vendored"
+  },
+  {
+   "name": "platforms",
+   "has_dashboard": false,
+   "source": "vendored"
+  },
+  {
+   "name": "security-guidance",
+   "has_dashboard": false,
+   "source": "vendored"
+  },
+  {
+   "name": "spotify",
+   "has_dashboard": false,
+   "source": "vendored"
+  },
+  {
+   "name": "teams_pipeline",
+   "has_dashboard": false,
+   "source": "vendored"
+  },
+  {
+   "name": "video_gen",
+   "has_dashboard": false,
+   "source": "vendored"
+  },
+  {
+   "name": "web",
+   "has_dashboard": false,
+   "source": "vendored"
+  }
+ ],
  "counts": {
-  "total": 421,
+  "total": 433,
   "by_status": {
-   "GATED": 109,
-   "IMPLEMENTED": 311,
-   "PARTIAL": 1
+   "GATED": 108,
+   "IMPLEMENTED": 318,
+   "MISSING": 7
   },
   "by_area": {
    "analytics-config": 4,
    "audio-voice": 6,
    "chat-websocket": 5,
    "cli": 72,
-   "cli-subcommand": 50,
+   "cli-subcommand": 60,
    "config-env": 15,
    "cron": 13,
    "dashboard-auth": 11,
    "dashboard-page": 20,
    "dashboard-ui": 15,
-   "dashboard_plugin": 3,
+   "dashboard_plugin": 5,
    "files-fs": 18,
    "gateway-actions": 6,
    "git": 21,
@@ -794,7 +890,7 @@
    "dashboard": "hermes-dist Cron",
    "voice": "voice schedules",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_automation_agent6_tick_catchup.py::test_catch_up_is_zero_for_on_time_runs",
+   "proving_test": "tests/test_hermes_cutover8u.py::test_webui_write_middleware_proxies_only_allowlisted_writes",
    "note": "",
    "needs": "none"
   },
@@ -1033,7 +1129,7 @@
    "voice": "voice plugins",
    "status": "GATED",
    "proving_test": "",
-   "note": "Wildcard remote-install gate precedes the specific route.",
+   "note": "Specific typed install gate is registered ahead of the blanket remote wildcard; direct dashboard installs are refused in favour of a validated local manifest staged disabled.",
    "needs": "owner"
   },
   {
@@ -1041,13 +1137,13 @@
    "area": "dashboard-ui",
    "capability": "POST /api/dashboard/agent-plugins/{name:path}/enable",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/dashboard_ui.py:198",
-   "qubit_backend": "voicebridge/hermes_compat.py:__gate__",
+   "qubit_backend": "voicebridge/hermes_compat.py:agent_enable",
    "cli": "qubit plugins / theme",
    "dashboard": "hermes-dist Plugins/System",
    "voice": "voice plugins",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "Typed policy gate BLOCKED_REMOTE_SOURCE via compat dispatcher.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
+   "note": "",
    "needs": "owner"
   },
   {
@@ -1055,13 +1151,13 @@
    "area": "dashboard-ui",
    "capability": "POST /api/dashboard/agent-plugins/{name:path}/disable",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/dashboard_ui.py:205",
-   "qubit_backend": "voicebridge/hermes_compat.py:__gate__",
+   "qubit_backend": "voicebridge/hermes_compat.py:agent_disable",
    "cli": "qubit plugins / theme",
    "dashboard": "hermes-dist Plugins/System",
    "voice": "voice plugins",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "Typed policy gate BLOCKED_REMOTE_SOURCE via compat dispatcher.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
+   "note": "",
    "needs": "owner"
   },
   {
@@ -1075,7 +1171,7 @@
    "voice": "voice plugins",
    "status": "GATED",
    "proving_test": "",
-   "note": "Typed policy gate BLOCKED_REMOTE_SOURCE via compat dispatcher.",
+   "note": "In-place plugin updates are refused; versions are immutable. Remove and reinstall the new validated version.",
    "needs": "owner"
   },
   {
@@ -1937,12 +2033,12 @@
    "area": "mcp",
    "capability": "PUT /api/mcp/servers",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/mcp.py:117",
-   "qubit_backend": "voicebridge/hermes_compat.py:mcp_create",
+   "qubit_backend": "voicebridge/hermes_compat.py:__gate__",
    "cli": "qubit mcp status",
    "dashboard": "hermes-dist MCP",
    "voice": "voice mcp",
    "status": "GATED",
-   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_mcp_inventory_reads_are_real_and_never_connect",
+   "proving_test": "",
    "note": "Typed policy gate MCP_NO_MOUNT via compat dispatcher.",
    "needs": "owner"
   },
@@ -2035,12 +2131,12 @@
    "area": "mcp",
    "capability": "PUT /api/mcp/servers/{name}/enabled",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/mcp.py:305",
-   "qubit_backend": "voicebridge/hermes_compat.py:mcp_enabled",
+   "qubit_backend": "voicebridge/hermes_compat.py:__gate__",
    "cli": "qubit mcp status",
    "dashboard": "hermes-dist MCP",
    "voice": "voice mcp",
    "status": "GATED",
-   "proving_test": "tests/test_hermes_routes_parity8u.py::test_wrong_verb_rows_now_typed_not_404",
+   "proving_test": "",
    "note": "Typed policy gate MCP_NO_MOUNT via compat dispatcher.",
    "needs": "owner"
   },
@@ -2385,7 +2481,7 @@
    "area": "provider-oauth",
    "capability": "DELETE /api/providers/oauth/{provider_id}",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/oauth.py:541",
-   "qubit_backend": "voicebridge/hermes_compat.py:oauth_delete",
+   "qubit_backend": "voicebridge/hermes_compat.py:__gate__",
    "cli": "qubit auth login/logout",
    "dashboard": "hermes-dist Keys/Config",
    "voice": "voice auth",
@@ -2441,7 +2537,7 @@
    "area": "provider-oauth",
    "capability": "DELETE /api/providers/oauth/sessions/{session_id}",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/oauth.py:646",
-   "qubit_backend": "voicebridge/hermes_compat.py:oauth_delete",
+   "qubit_backend": "voicebridge/hermes_compat.py:__gate__",
    "cli": "qubit auth login/logout",
    "dashboard": "hermes-dist Keys/Config",
    "voice": "voice auth",
@@ -2763,12 +2859,12 @@
    "area": "ops",
    "capability": "POST /api/ops/import-upload",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/ops.py:570",
-   "qubit_backend": "voicebridge/hermes_compat.py:h_ops",
+   "qubit_backend": "voicebridge/hermes_compat.py:__gate__",
    "cli": "qubit checkpoints / hooks / product",
    "dashboard": "hermes-dist System",
    "voice": "voice ops",
    "status": "GATED",
-   "proving_test": "tests/test_dashboard_ops8tf.py::test_ops_http_end_to_end",
+   "proving_test": "",
    "note": "Uploads enter quarantine; typed refusal (handler h_import_upload).",
    "needs": "owner"
   },
@@ -2833,7 +2929,7 @@
    "area": "ops",
    "capability": "POST /api/ops/checkpoints/prune",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/ops.py:749",
-   "qubit_backend": "voicebridge/hermes_compat.py:ckpt_prune",
+   "qubit_backend": "voicebridge/hermes_compat.py:__gate__",
    "cli": "qubit checkpoints / hooks / product",
    "dashboard": "hermes-dist System",
    "voice": "voice ops",
@@ -3155,13 +3251,13 @@
    "area": "sessions",
    "capability": "POST /api/sessions/bulk-delete",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/sessions.py:392",
-   "qubit_backend": "voicebridge/hermes_compat.py:sess_bulk",
+   "qubit_backend": "voicebridge/hermes_compat.py:__gate__",
    "cli": "qubit sessions / memory",
    "dashboard": "hermes-dist Sessions",
    "voice": "voice sessions",
    "status": "GATED",
    "proving_test": "",
-   "note": "Typed policy refusal via compat dispatcher.",
+   "note": "Typed policy gate SESSIONS_RECEIPT_STORE via compat dispatcher.",
    "needs": "owner"
   },
   {
@@ -3169,13 +3265,13 @@
    "area": "sessions",
    "capability": "POST /api/sessions/import",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/sessions.py:409",
-   "qubit_backend": "voicebridge/hermes_compat.py:sess_import",
+   "qubit_backend": "voicebridge/hermes_compat.py:__gate__",
    "cli": "qubit sessions / memory",
    "dashboard": "hermes-dist Sessions",
    "voice": "voice sessions",
    "status": "GATED",
    "proving_test": "",
-   "note": "Typed policy refusal via compat dispatcher.",
+   "note": "Typed policy gate SESSIONS_RECEIPT_STORE via compat dispatcher.",
    "needs": "owner"
   },
   {
@@ -3323,13 +3419,13 @@
    "area": "sessions",
    "capability": "POST /api/sessions/prune",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/sessions.py:690",
-   "qubit_backend": "voicebridge/hermes_compat.py:sess_prune",
+   "qubit_backend": "voicebridge/hermes_compat.py:__gate__",
    "cli": "qubit sessions / memory",
    "dashboard": "hermes-dist Sessions",
    "voice": "voice sessions",
    "status": "GATED",
    "proving_test": "",
-   "note": "Typed policy refusal via compat dispatcher.",
+   "note": "Typed policy gate SESSIONS_RECEIPT_STORE via compat dispatcher.",
    "needs": "owner"
   },
   {
@@ -3729,12 +3825,12 @@
    "area": "status-curator",
    "capability": "POST /api/ops/debug-share",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/status.py:680",
-   "qubit_backend": "voicebridge/hermes_compat.py:h_ops",
+   "qubit_backend": "voicebridge/hermes_compat.py:debug_share",
    "cli": "qubit status / lessons / doctor",
    "dashboard": "hermes-dist System/Analytics",
    "voice": "voice status",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_dashboard_ops8tf.py::test_ops_http_end_to_end",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
    "note": "Runs the redacted diagnostics op; explicitly never shares externally.",
    "needs": "none"
   },
@@ -5629,6 +5725,146 @@
    "needs": "none"
   },
   {
+   "id": "cli:approvals suggest",
+   "area": "cli-subcommand",
+   "capability": "hermes approvals suggest",
+   "upstream_ref": "qubit_hermes/hermes_cli/subcommands/approvals.py:11",
+   "qubit_backend": "",
+   "cli": "none",
+   "dashboard": "",
+   "voice": "",
+   "status": "MISSING",
+   "proving_test": "",
+   "note": "Subcommand-surface gap inside the approvals family.",
+   "needs": "owner"
+  },
+  {
+   "id": "cli:approvals test",
+   "area": "cli-subcommand",
+   "capability": "hermes approvals test",
+   "upstream_ref": "qubit_hermes/hermes_cli/subcommands/approvals.py:11",
+   "qubit_backend": "",
+   "cli": "none",
+   "dashboard": "",
+   "voice": "",
+   "status": "MISSING",
+   "proving_test": "",
+   "note": "Subcommand-surface gap inside the approvals family.",
+   "needs": "owner"
+  },
+  {
+   "id": "cli:debug share",
+   "area": "cli-subcommand",
+   "capability": "hermes debug share",
+   "upstream_ref": "qubit_hermes/hermes_cli/subcommands/debug.py:9",
+   "qubit_backend": "qubit debug share (confirm-gated)",
+   "cli": "qubit debug share (confirm-gated)",
+   "dashboard": "",
+   "voice": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_family_argv_evidence",
+   "note": "Subcommand-surface gap inside the debug family.",
+   "needs": "none"
+  },
+  {
+   "id": "cli:debug delete",
+   "area": "cli-subcommand",
+   "capability": "hermes debug delete",
+   "upstream_ref": "qubit_hermes/hermes_cli/subcommands/debug.py:9",
+   "qubit_backend": "qubit debug delete (confirm-gated)",
+   "cli": "qubit debug delete (confirm-gated)",
+   "dashboard": "",
+   "voice": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_family_argv_evidence",
+   "note": "Subcommand-surface gap inside the debug family.",
+   "needs": "none"
+  },
+  {
+   "id": "cli:gateway uninstall",
+   "area": "cli-subcommand",
+   "capability": "hermes gateway uninstall",
+   "upstream_ref": "qubit_hermes/hermes_cli/subcommands/gateway.py:28",
+   "qubit_backend": "",
+   "cli": "none",
+   "dashboard": "",
+   "voice": "",
+   "status": "MISSING",
+   "proving_test": "",
+   "note": "Subcommand-surface gap inside the gateway family.",
+   "needs": "owner"
+  },
+  {
+   "id": "cli:pairing approve",
+   "area": "cli-subcommand",
+   "capability": "hermes pairing approve",
+   "upstream_ref": "qubit_hermes/hermes_cli/subcommands/pairing.py:8",
+   "qubit_backend": "qubit pairing approve",
+   "cli": "qubit pairing approve",
+   "dashboard": "",
+   "voice": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_agent1_wiring.py::test_pairing_setup_code_and_accept",
+   "note": "Subcommand-surface gap inside the pairing family.",
+   "needs": "none"
+  },
+  {
+   "id": "cli:profile update",
+   "area": "cli-subcommand",
+   "capability": "hermes profile update",
+   "upstream_ref": "qubit_hermes/hermes_cli/subcommands/profile.py:8",
+   "qubit_backend": "",
+   "cli": "none",
+   "dashboard": "",
+   "voice": "",
+   "status": "MISSING",
+   "proving_test": "",
+   "note": "Subcommand-surface gap inside the profile family.",
+   "needs": "owner"
+  },
+  {
+   "id": "cli:skills config",
+   "area": "cli-subcommand",
+   "capability": "hermes skills config",
+   "upstream_ref": "qubit_hermes/hermes_cli/subcommands/skills.py:20",
+   "qubit_backend": "",
+   "cli": "none",
+   "dashboard": "",
+   "voice": "",
+   "status": "MISSING",
+   "proving_test": "",
+   "note": "Subcommand-surface gap inside the skills family.",
+   "needs": "owner"
+  },
+  {
+   "id": "cli:skills uninstall",
+   "area": "cli-subcommand",
+   "capability": "hermes skills uninstall",
+   "upstream_ref": "qubit_hermes/hermes_cli/subcommands/skills.py:20",
+   "qubit_backend": "qubit skills remove",
+   "cli": "qubit skills remove",
+   "dashboard": "",
+   "voice": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
+   "note": "Subcommand-surface gap inside the skills family.",
+   "needs": "none"
+  },
+  {
+   "id": "cli:slack manifest",
+   "area": "cli-subcommand",
+   "capability": "hermes slack manifest",
+   "upstream_ref": "qubit_hermes/hermes_cli/subcommands/slack.py:8",
+   "qubit_backend": "",
+   "cli": "none",
+   "dashboard": "",
+   "voice": "",
+   "status": "MISSING",
+   "proving_test": "",
+   "note": "Subcommand-surface gap inside the slack family.",
+   "needs": "owner"
+  },
+  {
    "id": "dashboard:/",
    "area": "dashboard-page",
    "capability": "hermes dashboard / (RootRedirect)",
@@ -5918,8 +6154,8 @@
    "dashboard": "hermes-dist Achievements tab (/achievements)",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_plugins.py::test_achievements_routes_compute_real_state",
-   "note": "Real backend in voicebridge/hermes_plugins.py: reuses the vendored achievement engine + hermes_state.SessionDB over the local session history, persists snapshot/checkpoint/unlock state under the Qubit state dir (0600), and serves /achievements, /scan-status, /recent-unlocks, /sessions/{id}/badges, /rescan, /reset-state. The plugin JS bundle is served by the webui overlay path, not this compat backend.",
+   "proving_test": "tests/test_hermes_plugins.py::test_achievements_wire_shape_states_and_tier_progression",
+   "note": "Real backend in voicebridge/hermes_plugins.py: reuses the vendored achievement engine + hermes_state.SessionDB over the local session history, persists snapshot/checkpoint/unlock state under the Qubit state dir (0600), serves /achievements (full unlocked/discovered/secret + tier wire shape), /scan-status (lifecycle), /recent-unlocks, /sessions/{id}/badges, /rescan (bounded by QUBIT_ACHIEVEMENTS_SCAN_LIMIT) and a confirm-gated /reset-state. Dashboard-only by design: the vendored plugin ships no CLI/voice surface and Qubit invents none. The plugin JS bundle is served by the webui overlay path, not this compat backend.",
    "needs": "none"
   },
   {
@@ -5927,13 +6163,41 @@
    "area": "dashboard_plugin",
    "capability": "hermes dashboard plugin kanban (read API)",
    "upstream_ref": "qubit_hermes/plugins/kanban/dashboard/plugin_api.py:266",
-   "qubit_backend": "voicebridge/hermes_plugins.py",
-   "cli": "",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_plugin_kanban_board",
+   "cli": "qubit kanban *",
    "dashboard": "hermes-dist Kanban tab (/kanban)",
-   "voice": "",
-   "status": "PARTIAL",
+   "voice": "voice kanban_*",
+   "status": "IMPLEMENTED",
    "proving_test": "tests/test_hermes_plugins.py::test_kanban_read_routes_serve_real_board",
-   "note": "Real read API in voicebridge/hermes_plugins.py backed by the vendored hermes_cli.kanban_db (board/tasks/stats/assignees/boards/config/projects/workers/diagnostics/model-options); mutating routes stay on the shared typed KANBAN_WRITE_BROKERED confirmation/broker gate and are not yet served directly.",
+   "note": "Real read API in voicebridge/hermes_plugins.py backed by the vendored hermes_cli.kanban_db (board/tasks incl. comments+links/boards/config/projects/workers/diagnostics/model-options/home-channels). The existing CLI and voice surfaces (`qubit kanban`, voice kanban_*) reach the same local backend. Task mutations are a typed policy gate, tracked separately as plugin:kanban-write-gate.",
+   "needs": "none"
+  },
+  {
+   "id": "plugin:kanban-write-gate",
+   "area": "dashboard_plugin",
+   "capability": "hermes dashboard plugin kanban write surface (typed gate)",
+   "upstream_ref": "qubit_hermes/plugins/kanban/dashboard/plugin_api.py:373",
+   "qubit_backend": "voicebridge/hermes_compat.py:__gate__",
+   "cli": "qubit kanban * (--confirm via approvals)",
+   "dashboard": "hermes-dist Kanban tab write controls",
+   "voice": "voice kanban_* (confirm)",
+   "status": "GATED",
+   "proving_test": "tests/test_hermes_plugins.py::test_kanban_writes_stay_on_policy_gate",
+   "note": "Every pinned kanban write route (create/patch/delete/bulk task, comments, links, boards CRUD/transfer/switch, dispatch, reclaim/reassign/specify/decompose, estimate, home-subscribe, run terminate, profile describe) resolves to the shared KANBAN_WRITE_BROKERED confirmation/broker gate; nothing is served as a direct dashboard write. The CLI/voice counterpart is `qubit kanban` + the pending-approvals banner.",
+   "needs": "owner"
+  },
+  {
+   "id": "plugin:kanban-extra-reads",
+   "area": "dashboard_plugin",
+   "capability": "hermes dashboard plugin kanban auxiliary reads (routes pending)",
+   "upstream_ref": "qubit_hermes/plugins/kanban/dashboard/plugin_api.py:400",
+   "qubit_backend": "",
+   "cli": "",
+   "dashboard": "hermes-dist Kanban drawers (runs/attachments/profile/orchestration)",
+   "voice": "",
+   "status": "MISSING",
+   "proving_test": "",
+   "note": "Honest open row: the pinned plugin_api.py also serves GET /tasks/{id}/attachments, /attachments/{id} (binary download), /tasks/{id}/log, /runs/{id}, /runs/{id}/inspect, /profiles and GET/PUT /orchestration. The Qubit compat table routes the required kanban read surfaces (board/tasks/comments/links/boards/config/projects/workers/diagnostics/model-options/home-channels) and gates every write, but these auxiliary reads are not yet registered, so they 404 rather than fabricate. Route wiring lives in voicebridge/hermes_compat.py (not this module).",
    "needs": "owner"
   },
   {
@@ -5947,7 +6211,7 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_hermes_plugins.py::test_plugin_fleet_discovery_lists_vendored_plugins",
-   "note": "GET /api/dashboard/plugins/fleet returns the vendored plugin manifests (source=vendored) additively; the fixed ten-plugin overlay response at /api/dashboard/plugins is unchanged.",
+   "note": "GET /api/dashboard/plugins/fleet returns the vendored plugin manifests (source=vendored) additively; the fixed ten-plugin overlay response at /api/dashboard/plugins is unchanged. Dashboard-only discovery surface: no CLI/voice command reads the vendored fleet. The full vendored fleet audit (which plugins declare a dashboard surface) is recorded in the section plugin_fleet metadata.",
    "needs": "none"
   }
  ]

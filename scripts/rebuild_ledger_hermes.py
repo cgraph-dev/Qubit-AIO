@@ -55,6 +55,7 @@ if str(ROOT) not in sys.path:
 from voicebridge import cli as _cli  # noqa: E402
 from voicebridge import cli_hermes_forward as _fwd  # noqa: E402
 from voicebridge import hermes_compat as _hc  # noqa: E402
+from voicebridge import hermes_plugins as _hp  # noqa: E402
 
 PIN = "2237be355906fbe6065ce1815711eee52b2d646e"
 QH = "qubit_hermes/"
@@ -132,7 +133,7 @@ GATE_HANDLERS = {
 # Wire-shape stubs: handlers that only echo an honest empty/static shape (no
 # live read, no write).  Kept as a small explicit allowlist.
 STUB_HANDLERS = {
-    "h_mcp", "h_mcp_catalog", "mem_prov",
+    "h_mcp", "h_mcp_catalog",
     "mcp_test", "msg_test", "plugin_visibility",
 }
 
@@ -403,8 +404,14 @@ ROUTE_EVIDENCE: Dict[Tuple[str, str], Dict[str, str]] = {
             "Mounted under /api/memory/providers; typed manual-handoff "
             "refusal.")),
     ("POST", "/api/dashboard/agent-plugins/install"): dict(
-        status="GATED", code="BLOCKED_REMOTE_SOURCE", note=(
-            "Wildcard remote-install gate precedes the specific route.")),
+        status="GATED", code="SKILL_MANIFEST_REQUIRED", note=(
+            "Specific typed install gate is registered ahead of the blanket "
+            "remote wildcard; direct dashboard installs are refused in favour "
+            "of a validated local manifest staged disabled.")),
+    ("POST", "/api/dashboard/agent-plugins/{name:path}/update"): dict(
+        status="GATED", code="SKILL_VERSIONED", note=(
+            "In-place plugin updates are refused; versions are immutable. "
+            "Remove and reinstall the new validated version.")),
     ("DELETE", "/api/sessions/owner-backfill"): dict(status="MISSING"),
     ("GET", "/api/local-models/search"): dict(status="GATED",
         code="LOCAL_MODEL_BROKERED", note=(
@@ -1144,6 +1151,19 @@ SUBS = [
     ('worktree', 'add', 'worktree', 'add', 'IMPLEMENTED', 'qubit worktree add (confined, needs --confirm)', 'hermes_cli/subcommands/worktree.py:6'),
     ('worktree', 'remove', 'worktree', 'remove', 'IMPLEMENTED', 'qubit worktree remove (confined, needs --confirm)', 'hermes_cli/subcommands/worktree.py:6'),
     ('worktree', 'switch', 'worktree', 'switch', 'IMPLEMENTED', 'qubit worktree switch (confined, needs --confirm)', 'hermes_cli/subcommands/worktree.py:6'),
+    # Direct-source-inventory subcommands (agent A's inventory): native Qubit
+    # equivalences derive IMPLEMENTED; surfaces with no Qubit equivalent stay
+    # honest MISSING open rows -- never fabricated.
+    ('approvals', 'suggest', 'approvals', None, 'MISSING', 'none', 'hermes_cli/subcommands/approvals.py:11'),
+    ('approvals', 'test', 'approvals', None, 'MISSING', 'none', 'hermes_cli/subcommands/approvals.py:11'),
+    ('debug', 'share', 'debug', 'share', 'MISSING', 'qubit debug share (confirm-gated)', 'hermes_cli/subcommands/debug.py:9'),
+    ('debug', 'delete', 'debug', 'delete', 'MISSING', 'qubit debug delete (confirm-gated)', 'hermes_cli/subcommands/debug.py:9'),
+    ('gateway', 'uninstall', 'gateway', None, 'MISSING', 'none', 'hermes_cli/subcommands/gateway.py:28'),
+    ('pairing', 'approve', 'pairing', 'approve', 'MISSING', 'qubit pairing approve', 'hermes_cli/subcommands/pairing.py:8'),
+    ('profile', 'update', 'profile', None, 'MISSING', 'none', 'hermes_cli/subcommands/profile.py:8'),
+    ('skills', 'config', 'skills', None, 'MISSING', 'none', 'hermes_cli/subcommands/skills.py:20'),
+    ('skills', 'uninstall', 'skills', 'remove', 'MISSING', 'qubit skills remove', 'hermes_cli/subcommands/skills.py:20'),
+    ('slack', 'manifest', 'msg', None, 'MISSING', 'none', 'hermes_cli/subcommands/slack.py:8'),
 ]
 
 # (path, component, qubit_backend, status, note, upstream_ref)
@@ -1477,44 +1497,85 @@ def build_dashboard_rows() -> List[Dict[str, str]]:
 
 
 # (plugin, area, capability, qubit_backend, status, proving_test, needs,
-#  dashboard, note, upstream_ref)
+#  dashboard, cli, voice, note, upstream_ref)
 # Hand-maintained because the plugin APIs live under qubit_hermes/plugins/*,
-# outside the web_routers glob the API extractor scans. The achievements row is
-# IMPLEMENTED only because tests/test_hermes_plugins.py executes the real
-# compat routes over a seeded SessionDB; kanban reads are real but the plugin's
-# mutating routes stay on the typed policy gate, so that row stays PARTIAL.
+# outside the web_routers glob the API extractor scans. Every row is IMPLEMENTED
+# only with a real registered compat caller AND an on-disk behavioural test in
+# tests/test_hermes_plugins.py; the kanban mutating surface is the one genuine
+# typed policy gate and is tracked as its own GATED row, never folded into the
+# read row. CLI/voice are cited only where an existing Qubit surface already
+# reaches the same backend; a plugin with no such surface is recorded
+# dashboard-only with the reason in its note (no second authority invented).
+# The full 18-plugin vendored fleet (dashboard and non-dashboard) is audited
+# from ``voicebridge.hermes_plugins.plugin_fleet_audit`` and embedded in the
+# section's ``plugin_fleet`` metadata so no fleet plugin is silently dropped.
 PLUGINS = [
     ("hermes-achievements", "dashboard_plugin",
      "hermes dashboard plugin hermes-achievements (API + state)",
      "voicebridge/hermes_compat.py:h_plugin_achievements", "IMPLEMENTED",
-     "tests/test_hermes_plugins.py::test_achievements_routes_compute_real_state",
-     "none", "hermes-dist Achievements tab (/achievements)",
+     "tests/test_hermes_plugins.py::test_achievements_wire_shape_states_and_tier_progression",
+     "none", "hermes-dist Achievements tab (/achievements)", "", "",
      "Real backend in voicebridge/hermes_plugins.py: reuses the vendored "
      "achievement engine + hermes_state.SessionDB over the local session "
      "history, persists snapshot/checkpoint/unlock state under the Qubit state "
-     "dir (0600), and serves /achievements, /scan-status, /recent-unlocks, "
-     "/sessions/{id}/badges, /rescan, /reset-state. The plugin JS bundle is "
-     "served by the webui overlay path, not this compat backend.",
+     "dir (0600), serves /achievements (full unlocked/discovered/secret + tier "
+     "wire shape), /scan-status (lifecycle), /recent-unlocks, "
+     "/sessions/{id}/badges, /rescan (bounded by QUBIT_ACHIEVEMENTS_SCAN_LIMIT) "
+     "and a confirm-gated /reset-state. Dashboard-only by design: the vendored "
+     "plugin ships no CLI/voice surface and Qubit invents none. The plugin JS "
+     "bundle is served by the webui overlay path, not this compat backend.",
      "qubit_hermes/plugins/hermes-achievements/dashboard/plugin_api.py:57"),
     ("kanban", "dashboard_plugin",
      "hermes dashboard plugin kanban (read API)",
-     "voicebridge/hermes_plugins.py", "PARTIAL",
+     "voicebridge/hermes_compat.py:h_plugin_kanban_board", "IMPLEMENTED",
      "tests/test_hermes_plugins.py::test_kanban_read_routes_serve_real_board",
-     "owner", "hermes-dist Kanban tab (/kanban)",
+     "none", "hermes-dist Kanban tab (/kanban)", "qubit kanban *",
+     "voice kanban_*",
      "Real read API in voicebridge/hermes_plugins.py backed by the vendored "
-     "hermes_cli.kanban_db (board/tasks/stats/assignees/boards/config/projects/"
-     "workers/diagnostics/model-options); mutating routes stay on the shared "
-     "typed KANBAN_WRITE_BROKERED confirmation/broker gate and are not yet "
-     "served directly.",
+     "hermes_cli.kanban_db (board/tasks incl. comments+links/boards/config/"
+     "projects/workers/diagnostics/model-options/home-channels). The existing "
+     "CLI and voice surfaces (`qubit kanban`, voice kanban_*) reach the same "
+     "local backend. Task mutations are a typed policy gate, tracked separately "
+     "as plugin:kanban-write-gate.",
      "qubit_hermes/plugins/kanban/dashboard/plugin_api.py:266"),
+    ("kanban-write-gate", "dashboard_plugin",
+     "hermes dashboard plugin kanban write surface (typed gate)",
+     "voicebridge/hermes_compat.py:__gate__", "GATED",
+     "tests/test_hermes_plugins.py::test_kanban_writes_stay_on_policy_gate",
+     "owner", "hermes-dist Kanban tab write controls",
+     "qubit kanban * (--confirm via approvals)", "voice kanban_* (confirm)",
+     "Every pinned kanban write route (create/patch/delete/bulk task, comments, "
+     "links, boards CRUD/transfer/switch, dispatch, reclaim/reassign/specify/"
+     "decompose, estimate, home-subscribe, run terminate, profile describe) "
+     "resolves to the shared KANBAN_WRITE_BROKERED confirmation/broker gate; "
+     "nothing is served as a direct dashboard write. The CLI/voice counterpart "
+     "is `qubit kanban` + the pending-approvals banner.",
+     "qubit_hermes/plugins/kanban/dashboard/plugin_api.py:373"),
+    ("kanban-extra-reads", "dashboard_plugin",
+     "hermes dashboard plugin kanban auxiliary reads (routes pending)",
+     "", "MISSING", "", "owner",
+     "hermes-dist Kanban drawers (runs/attachments/profile/orchestration)",
+     "", "",
+     "Honest open row: the pinned plugin_api.py also serves GET "
+     "/tasks/{id}/attachments, /attachments/{id} (binary download), "
+     "/tasks/{id}/log, /runs/{id}, /runs/{id}/inspect, /profiles and GET/PUT "
+     "/orchestration. The Qubit compat table routes the required kanban read "
+     "surfaces (board/tasks/comments/links/boards/config/projects/workers/"
+     "diagnostics/model-options/home-channels) and gates every write, but these "
+     "auxiliary reads are not yet registered, so they 404 rather than fabricate. "
+     "Route wiring lives in voicebridge/hermes_compat.py (not this module).",
+     "qubit_hermes/plugins/kanban/dashboard/plugin_api.py:400"),
     ("fleet-discovery", "dashboard_plugin",
      "hermes dashboard plugin fleet discovery",
      "voicebridge/hermes_compat.py:h_plugin_fleet", "IMPLEMENTED",
      "tests/test_hermes_plugins.py::test_plugin_fleet_discovery_lists_vendored_plugins",
-     "none", "hermes-dist Plugins page",
+     "none", "hermes-dist Plugins page", "", "",
      "GET /api/dashboard/plugins/fleet returns the vendored plugin manifests "
      "(source=vendored) additively; the fixed ten-plugin overlay response at "
-     "/api/dashboard/plugins is unchanged.",
+     "/api/dashboard/plugins is unchanged. Dashboard-only discovery surface: no "
+     "CLI/voice command reads the vendored fleet. The full vendored fleet audit "
+     "(which plugins declare a dashboard surface) is recorded in the section "
+     "plugin_fleet metadata.",
      "qubit_hermes/hermes_cli/web_server_dashboard.py:537"),
 ]
 
@@ -1522,16 +1583,16 @@ PLUGINS = [
 def build_plugin_rows() -> List[Dict[str, str]]:
     rows: List[Dict[str, str]] = []
     for (plugin, area, capability, backend, status, proving_test, needs,
-         dashboard, note, ref) in PLUGINS:
+         dashboard, cli, voice, note, ref) in PLUGINS:
         rows.append({
             "id": f"plugin:{plugin}",
             "area": area,
             "capability": capability,
             "upstream_ref": ref,
             "qubit_backend": backend,
-            "cli": "",
+            "cli": cli,
             "dashboard": dashboard,
-            "voice": "",
+            "voice": voice,
             "status": status,
             "proving_test": proving_test,
             "note": note,
@@ -1567,7 +1628,10 @@ def build_ledger() -> Dict[str, object]:
             "tests/ for the exercising caller. Plugin-fleet rows are declared "
             "explicitly and are IMPLEMENTED only when "
             "tests/test_hermes_plugins.py dispatches the registered compat "
-            "handler over real local state. No status is hand-flipped."
+            "handler over real local state. The full vendored plugin fleet is "
+            "audited from voicebridge.hermes_plugins.plugin_fleet_audit (which "
+            "plugin ships a dashboard/manifest.json) and embedded as the "
+            "plugin_fleet metadata. No status is hand-flipped."
         ),
         "sources_reconciled": [
             "voicebridge/hermes_compat.py",
@@ -1584,6 +1648,7 @@ def build_ledger() -> Dict[str, object]:
             "qubit_hermes/plugins/kanban/dashboard/plugin_api.py",
             "qubit_hermes/web/src/App.tsx",
         ],
+        "plugin_fleet": _hp.plugin_fleet_audit(),
         "counts": {
             "total": len(rows),
             "by_status": dict(sorted(by_status.items())),

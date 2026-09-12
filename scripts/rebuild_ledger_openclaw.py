@@ -63,6 +63,263 @@ _STOP = {
     "sessions", "memory", "reports", "runtime", "gateway", "browser",
 }
 
+# ---------------------------------------------------------------------------
+# OpenClaw extension map
+# ---------------------------------------------------------------------------
+# The direct source inventory (docs/QUBIT_SOURCE_INVENTORY.json, agent A)
+# enumerates 154 ``extensions/*`` plugins. They are NOT 154 independent
+# capabilities: almost all are model/provider/transport plugins that either
+# ride an existing audited capability row or are a deliberate typed credential/
+# hardware/owner gate. This table makes that mapping explicit and machine
+# checkable so no extension is left unexplained (and no second gateway,
+# router, scheduler, memory store, listener or policy authority is created).
+#
+# disposition:
+#   parent   -> (a) an existing audited row already implements the capability
+#   gate     -> (b) a provider/transport/hardware/owner gate with a typed reason
+#   distinct -> (c) a genuinely distinct capability Qubit implements behind an
+#               injected boundary (no network, no secret, no new authority)
+EXTENSION_DISPOSITIONS = ("parent", "gate", "distinct")
+EXTENSION_NEEDS = ("none", "creds", "hardware", "owner")
+
+_INVENTORY_PATH = ROOT / "docs" / "QUBIT_SOURCE_INVENTORY.json"
+
+
+def _ext(disposition: str, parent: str, gate: str, needs: str, detail: str,
+         names) -> None:
+    for name in names:
+        assert name not in _EXTENSION_MAP, f"duplicate extension {name!r}"
+        assert disposition in EXTENSION_DISPOSITIONS, name
+        assert needs in EXTENSION_NEEDS, name
+        _EXTENSION_MAP[name] = {
+            "disposition": disposition,
+            "parent": parent,
+            "gate": gate,
+            "needs": needs,
+            "detail": detail,
+            "impl": "",
+        }
+
+
+_EXTENSION_MAP: Dict[str, Dict[str, str]] = {}
+
+# ---- (b) cloud model/provider plugins -> OC-D28 credential gate
+_ext("gate", "OC-D28", "PROVIDER_CREDENTIAL_REQUIRED", "creds",
+     "cloud model/provider plugin gated on an operator credential",
+     ["amazon-bedrock", "amazon-bedrock-mantle", "anthropic",
+      "anthropic-vertex", "arcee", "baseten", "byteplus", "cerebras",
+      "chutes", "clawrouter", "cloudflare-ai-gateway", "cohere",
+      "copilot-proxy", "deepinfra", "deepseek", "featherless", "fireworks",
+      "gmi", "github-copilot", "google", "groq", "huggingface", "kilocode",
+      "kimi-coding", "litellm", "longcat", "meta", "microsoft-foundry",
+      "minimax", "mistral", "moonshot", "novita", "nvidia", "openai",
+      "opencode-go", "openrouter", "qianfan", "qwen", "stepfun", "synthetic",
+      "tencent", "together", "venice", "vercel-ai-gateway", "volcengine",
+      "voyage", "xai", "xiaomi", "zai"])
+
+# ---- (b) local model runtimes -> OC-D28 loopback-runtime gate
+_ext("gate", "OC-D28", "LOCAL_PROVIDER_RUNTIME_REQUIRED", "none",
+     "local model server; Qubit talks only to a verified loopback runtime",
+     ["ollama", "llama-cpp", "lmstudio", "vllm", "sglang"])
+
+# ---- (b) media generation providers -> OC-64 credential gate
+_ext("gate", "OC-64", "MEDIA_PROVIDER_CREDENTIAL_REQUIRED", "creds",
+     "media generation provider gated on an operator credential",
+     ["alibaba", "comfy", "fal", "image-generation-core", "pixverse",
+      "runway", "senseaudio"])
+
+# ---- (b) voice / telephony providers -> OC-67 credential gate
+_ext("gate", "OC-67", "VOICE_PROVIDER_CREDENTIAL_REQUIRED", "creds",
+     "voice/ASR/TTS provider gated on an operator credential",
+     ["azure-speech", "deepgram", "elevenlabs", "fish-audio-speech",
+      "gradium", "inworld", "microsoft", "tts-local-cli", "vydra"])
+
+# ---- (b) web / search providers -> OC-63 credential gate
+_ext("gate", "OC-63", "WEB_PROVIDER_CREDENTIAL_REQUIRED", "creds",
+     "web search/fetch provider gated on an operator credential",
+     ["brave", "duckduckgo", "exa", "firecrawl", "parallel", "perplexity",
+      "searxng", "tavily"])
+
+# ---- (b) external memory backends -> OC-48 local-only gate
+_ext("gate", "OC-48", "MEMORY_PROVIDER_CREDENTIAL_REQUIRED", "creds",
+     "external memory backend stays local-only / typed unavailable",
+     ["memory-lancedb", "memory-wiki"])
+
+# ---- (b) external secret backends -> OC-D08 credential gate
+_ext("gate", "OC-D08", "SECRETS_PROVIDER_CREDENTIAL_REQUIRED", "creds",
+     "external secret backend gated on an operator credential",
+     ["onepassword", "vault"])
+
+# ---- (b) sandbox runtimes -> OC-57 owner gate
+_ext("gate", "OC-57", "SANDBOX_PROVIDER_REFUSED", "owner",
+     "external sandbox runtime refused by single-policy local confinement",
+     ["mxc", "openshell"])
+
+# ---- (b) external worker providers -> OC-D06 credential gate
+_ext("gate", "OC-D06", "RUNTIME_PROVIDER_CREDENTIAL_REQUIRED", "creds",
+     "external worker provider gated on an operator credential",
+     ["beam", "crabbox"])
+
+# ---- (a) channels with a real audited adapter -> parent row
+_ext("parent", "OC-D12", "", "creds",
+     "discord adapter implemented over an injected bot transport", ["discord"])
+_ext("parent", "OC-D13", "", "creds",
+     "telegram adapter implemented over an injected bot transport",
+     ["telegram"])
+_ext("parent", "OC-D14", "", "creds",
+     "slack adapter implemented over an injected transport", ["slack"])
+_ext("parent", "OC-D17", "", "creds",
+     "matrix e2ee adapter implemented over an injected crypto/transport "
+     "boundary", ["matrix"])
+_ext("parent", "OC-18", "", "creds",
+     "whatsapp account + draft/approve/send implemented", ["whatsapp"])
+
+# ---- (b) channels whose hosted side is credential-gated
+_ext("gate", "OC-D16", "CHANNEL_CREDENTIAL_REQUIRED", "creds",
+     "feishu send/receive live; hosted agent app stays credential-gated",
+     ["feishu"])
+_ext("gate", "OC-D15", "CHANNEL_CREDENTIAL_REQUIRED", "creds",
+     "imessage requires a macOS bridge; typed MSG_TRANSPORT_UNAVAILABLE",
+     ["imessage"])
+
+# ---- (b) channels with no Qubit transport -> OC-19 credential gate
+_ext("gate", "OC-19", "CHANNEL_CREDENTIAL_REQUIRED", "creds",
+     "channel plugin with no Qubit transport; typed unavailable until a "
+     "credential + adapter exist",
+     ["a2a", "buzz", "clickclack", "googlechat", "imap", "irc", "line",
+      "mattermost", "msteams", "nextcloud-talk", "nostr", "qa-channel",
+      "raft", "reef", "signal", "sms", "synology-chat", "tlon", "twitch",
+      "zalo", "zalouser"])
+
+# ---- gateway
+_ext("gate", "OC-01", "GATEWAY_NO_SERVER", "owner",
+     "no standalone gateway listener; single-event-path policy",
+     ["admin-http-rpc"])
+_ext("parent", "OC-03", "", "none",
+     "peer/discovery records cover local service discovery", ["bonjour"])
+_ext("parent", "OC-D32", "", "none",
+     "local OTLP-shaped traces/metrics cover the exporter",
+     ["diagnostics-otel"])
+_ext("parent", "OC-50", "", "none",
+     "local usage/analytics ledger covers metrics export",
+     ["diagnostics-prometheus"])
+_ext("parent", "OC-24", "", "creds",
+     "webhook verification + inbound endpoint implemented", ["webhooks"])
+
+# ---- tools / runtime / boards
+_ext("parent", "OC-D04", "", "none",
+     "active recall/session policy implemented", ["active-memory"])
+_ext("parent", "OC-09", "", "hardware",
+     "loopback CDP tab control implemented; needs a running Chromium",
+     ["browser"])
+_ext("parent", "OC-36", "", "hardware",
+     "board tabs + sandboxed widgets implemented; host panels need a device",
+     ["canvas"])
+_ext("gate", "OC-13", "COMPUTER_USE_NO_DRIVER", "hardware",
+     "no desktop actuator; typed COMPUTER_USE_NO_DRIVER", ["cua-computer"])
+_ext("parent", "OC-05", "", "creds",
+     "device-scoped token store implemented", ["device-pair"])
+_ext("parent", "OC-62", "", "none",
+     "file patch/apply path implemented", ["diffs"])
+_ext("parent", "OC-62", "", "none",
+     "syntax packs are a diff-viewer refinement of the patch path",
+     ["diffs-language-pack"])
+_ext("parent", "OC-D20", "", "none",
+     "bounded PDF/transcript extraction implemented", ["document-extract"])
+_ext("parent", "OC-D03", "", "none",
+     "confined node file transfer implemented", ["file-transfer"])
+_ext("gate", "OC-51", "LOGBOOK_NO_CAPTURE", "hardware",
+     "work journal is real; live screen grabber is the hardware gate",
+     ["logbook"])
+_ext("parent", "OC-61", "", "none",
+     "workspace file addressing maps to the read/inspect path", ["oc-path"])
+_ext("parent", "OC-D02", "", "none",
+     "policy conformance doctor implemented", ["policy"])
+_ext("parent", "OC-D05", "", "none",
+     "bounded QA scenarios/report implemented", ["qa-lab"])
+_ext("gate", "OC-D01", "TEAM_REPORTS_CREDENTIAL_REQUIRED", "creds",
+     "aggregation implemented; live GitHub/Discord transports gated",
+     ["team-reports"])
+_ext("gate", "OC-05", "VISITOR_ACCESS_CREDENTIAL_REQUIRED", "creds",
+     "expiring visitor grants extend device tokens; Cloudflare policy is "
+     "external", ["visitor-access"])
+_ext("gate", "OC-37", "KANBAN_DELEGATED", "owner",
+     "workboard dispatch refused by policy (KANBAN_DELEGATED)", ["workboard"])
+_ext("parent", "OC-57", "", "none",
+     "supervised opencode runs implemented", ["opencode"])
+_ext("gate", "OC-58", "ACP_HARNESS_BINARY_REQUIRED", "hardware",
+     "ACP adapter contract real; shipped harness binary is the gate",
+     ["copilot", "acpx", "codex"])
+_ext("parent", "OC-46", "", "none",
+     "memory store + search implemented", ["memory-core"])
+_ext("parent", "OC-31", "", "none",
+     "typed pipeline/approval flow maps to the automation directive path",
+     ["lobster"])
+_ext("parent", "OC-50", "", "none",
+     "result compaction maps to the usage/analytics path", ["tokenjuice"])
+_ext("gate", "OC-06", "NODE_HOST_HARDWARE_REQUIRED", "hardware",
+     "paired-node capabilities need a live device", ["linux-node"])
+_ext("parent", "OC-D30", "", "none",
+     "update/migration recovery path implemented",
+     ["migrate-claude", "migrate-hermes"])
+_ext("gate", "", "TEST_SUPPORT_ONLY", "none",
+     "upstream test scaffolding, not a product capability", ["test-support"])
+
+# ---- meeting / realtime voice
+_ext("parent", "OC-67", "", "creds",
+     "voice-call adapters covered by the realtime/transcription boundary",
+     ["voice-call"])
+_ext("gate", "OC-67", "MEETING_BOT_CREDENTIAL_REQUIRED", "creds",
+     "meeting join contract real; provider account/browser session is the gate",
+     ["google-meet", "teams-meetings", "zoom-meetings"])
+_ext("parent", "OC-66", "", "none",
+     "talk voice selection maps to the streaming ASR/TTS surface",
+     ["talk-voice"])
+
+# ---- (c) distinct capabilities implemented behind injected boundaries
+_ext("distinct", "OC-63", "", "none",
+     "Qubit-owned readable-text extraction added to web_tool.readable_text",
+     ["web-readability"])
+_ext("distinct", "OC-31", "", "none",
+     "Qubit-owned JSON-only structured task boundary added to "
+     "local_models.structured_task", ["llm-task"])
+_ext("distinct", "OC-56", "", "none",
+     "Qubit-owned coarse IP geolocation behind node_host.geolocate",
+     ["geolocation"])
+
+EXTENSION_MAP: Dict[str, Dict[str, str]] = _EXTENSION_MAP
+
+EXTENSION_MAP["web-readability"]["impl"] = \
+    "voicebridge/web_tool.py readable_text"
+EXTENSION_MAP["llm-task"]["impl"] = \
+    "voicebridge/local_models.py structured_task"
+EXTENSION_MAP["geolocation"]["impl"] = "voicebridge/node_host.py geolocate"
+
+
+def extension_map_summary() -> Dict[str, object]:
+    """Deterministic counts + coverage of the OpenClaw extension map."""
+    by_disposition = Counter(v["disposition"] for v in EXTENSION_MAP.values())
+    by_needs = Counter(v["needs"] for v in EXTENSION_MAP.values())
+    unexplained: List[str] = []
+    if _INVENTORY_PATH.is_file():
+        try:
+            inventory = json.loads(_INVENTORY_PATH.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            inventory = {}
+        names = {str(it.get("name") or "") for it in inventory.get("items", [])
+                 if isinstance(it, dict)
+                 and it.get("category") == "openclaw_extension"}
+        names.discard("")
+        unexplained = sorted(names ^ set(EXTENSION_MAP))
+    return {
+        "total": len(EXTENSION_MAP),
+        "by_disposition": {k: by_disposition[k]
+                           for k in EXTENSION_DISPOSITIONS},
+        "by_needs": {k: by_needs.get(k, 0) for k in EXTENSION_NEEDS},
+        "unexplained": unexplained,
+        "covered": not unexplained,
+    }
+
 # Documented per-row adjustments applied *on top of* the audited baseline.
 # Each entry records the real Qubit backend and the behavioural test that
 # exercises the production caller for a row closed since the audit.
@@ -1249,6 +1506,7 @@ def build_ledger() -> Dict[str, object]:
             "by_status": dict(sorted(by_status.items())),
             "by_area": dict(sorted(by_area.items())),
         },
+        "extension_map": extension_map_summary(),
         "rows": rows,
     }
 

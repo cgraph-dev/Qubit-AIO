@@ -155,6 +155,16 @@ WAVE1_ROUTES = [
     ("GET", "/api/sessions/wave1-rec/latest-descendant", "h_session_show"),
     ("GET", "/api/sessions/wave1-rec/messages", "h_session_messages"),
     ("PATCH", "/api/sessions/wave1-rec", "h_session_patch"),
+    # Ambiguity closure: real agent-plugin permission toggles, the local
+    # memory-provider read, the session resume transition, and the debug-share
+    # diagnostics op -- each a real registered handler, not a stub.
+    ("POST", "/api/dashboard/agent-plugins/wave1-toggle.plugin/enable",
+     "agent_enable"),
+    ("POST", "/api/dashboard/agent-plugins/wave1-toggle.plugin/disable",
+     "agent_disable"),
+    ("GET", "/api/memory/providers/qubit-local", "mem_prov"),
+    ("POST", "/api/sessions/wave1-rec/resume", "h_session_resume"),
+    ("POST", "/api/ops/debug-share", "debug_share"),
 ]
 
 
@@ -212,6 +222,13 @@ WAVE1_DISPATCH = [
     ("GET", "/api/sessions/wave1-rec/latest-descendant", {}, {}),
     ("GET", "/api/sessions/wave1-rec/messages", {}, {}),
     ("PATCH", "/api/sessions/wave1-rec", {}, {"name": "wave1 renamed"}),
+    ("POST", "/api/dashboard/agent-plugins/wave1-toggle.plugin/enable",
+     {}, {"confirm": True}),
+    ("POST", "/api/dashboard/agent-plugins/wave1-toggle.plugin/disable",
+     {}, {"confirm": True}),
+    ("GET", "/api/memory/providers/qubit-local", {}, {}),
+    ("POST", "/api/sessions/wave1-rec/resume", {}, {}),
+    ("POST", "/api/ops/debug-share", {}, {}),
     ("WEBSOCKET", "/api/pub", {}, {"channel": "wave1", "data": "hello"}),
     ("POST", "/api/pub", {}, {"channel": "wave1", "data": "hello"}),
 ]
@@ -225,6 +242,7 @@ def test_wave1_dispatch_non_refusal_success(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     _seed_schedule(cfg)
     _seed_skill(cfg)
+    _seed_skill(cfg, "wave1-toggle.plugin")
     _seed_receipt(cfg)
     _seed_principal(cfg)
     _seed_account(cfg)

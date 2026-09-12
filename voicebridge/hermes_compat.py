@@ -51,7 +51,14 @@ def _audit(op: str, actor: str, detail: Dict[str, Any]) -> None:
         pass
 
 
+def audit_event(op: str, actor: str, detail: Dict[str, Any]) -> None:
+    """Public single-audit-path writer for CLI/voice/dashboard/bridge callers."""
+    _audit(op, actor, detail)
+
+
 def _estop(cfg: Any) -> bool:
+    # Fail closed: if the single e-stop authority cannot be read, treat the
+    # system as stopped rather than allowing a mutating path to proceed.
     try:
         from .broker import estop_engaged
         return bool(estop_engaged(cfg))
@@ -60,7 +67,7 @@ def _estop(cfg: Any) -> bool:
             from . import power as PW
             return bool(PW.estop_engaged(cfg))
         except Exception:
-            return False
+            return True
 
 
 def _gate(code: str, detail: str, counterpart: str,
@@ -3913,6 +3920,44 @@ _GATE_SESSIONS_RECEIPT = {
          "CLI/voice memory_forget/correct (same stores)"),
     "http": 501,
 }
+# Typed gates for upstream dashboard plugin / MCP / checkpoint / import /
+# provider-OAuth mutations. These were previously bare-string GATED entries,
+# which the ledger generator rendered as misleading "STUB_" pseudo-codes; each
+# is a genuine operator-only Qubit-safe refusal with a real code, reason, and
+# counterpart (never an unfinished stub).
+_GATE_SKILL_MANIFEST = _g(
+    "SKILL_MANIFEST_REQUIRED",
+    "Direct dashboard plugin installs are refused; install a validated local "
+    "manifest staged disabled instead.",
+    "CLI `qubit skills install <manifest>` + 7E validation")
+_GATE_SKILL_VERSIONED = _g(
+    "SKILL_VERSIONED",
+    "In-place plugin updates are refused; versions are immutable. Remove and "
+    "reinstall the new validated version.",
+    "CLI `qubit skills remove/rollback/install`")
+_GATE_CKPT_PRUNE = _g(
+    "CHECKPOINT_CONFIRM_REQUIRED",
+    "Checkpoint prune is metadata-destructive: confirm in the Qubit operations "
+    "console with explicit scope.",
+    "dashboard /ops checkpoints + CLI")
+_GATE_IMPORT_REVIEW = _g(
+    "IMPORT_REVIEW_REQUIRED",
+    "Uploads enter quarantine for review; reviewed artifacts install via "
+    "skills install. Nothing executes on upload.",
+    "CLI `qubit import-agent inspect`")
+_GATE_MCP_NO_MOUNT = {
+    **_g("MCP_NO_MOUNT",
+         "MCP servers are inventory-only; Qubit never mounts them.",
+         "Qubit-native skills with manifests"),
+    "http": 501,
+}
+_GATE_OAUTH_DELETE = {
+    **_g("OAUTH_MANUAL_HANDOFF",
+         "No OAuth sessions are stored server-side; enrollment is a manual "
+         "handoff in your own browser.",
+         "CLI `qubit auth login` (manual-handoff guided enrollment)"),
+    "http": 404,
+}
 
 _r("GET", r"/api/status", "h_status")
 _r("GET", r"/api/health", "h_health")
@@ -4007,6 +4052,11 @@ _r("GET", r"/api/ops/approvals", "h_approvals_list")
 _r("POST", r"/api/ops/run", "h_ops_run")
 _r("POST", r"/api/ops/confirm", "h_ops_confirm")
 _r("POST", r"/api/ops/cancel", "h_ops_cancel")
+# Specific ops mutations must precede the generic `/api/ops/<name>` dispatch,
+# otherwise they are swallowed by h_ops and answer OPS_UNKNOWN instead of their
+# real operation / typed gate.
+_r("POST", r"/api/ops/debug-share", "debug_share")
+_r("POST", r"/api/ops/import-upload", "__gate__", "gated", _GATE_IMPORT_REVIEW)
 _r("GET", r"/api/ops/(?P<name>[a-z-]+)", "h_ops")
 _r("POST", r"/api/ops/(?P<name>[a-z-]+)", "h_ops")
 _r("DELETE", r"/api/ops/hooks", "hooks_delete")
@@ -4223,6 +4273,18 @@ _r("POST", r"/api/git/worktree/remove", "h_git_worktree_remove")
 _r("POST", r"/api/git/branch/switch", "h_git_branch_switch")
 _r("POST", r"/api/cron/blueprints/instantiate", "h_blueprint_instantiate")
 
+# Dashboard agent-plugin mutations: the specific typed routes precede the
+# blanket `/api/dashboard/agent-plugins/.*` remote gate below, so the precise
+# Qubit operation (real permission toggle for enable/disable, typed local-
+# manifest gate for install/update) answers instead of the blanket remote
+# refusal. `{name:path}` upstream ids are multi-segment, hence `.+`.
+_r("POST", r"/api/dashboard/agent-plugins/install", "__gate__", "gated",
+   _GATE_SKILL_MANIFEST)
+_r("POST", r"/api/dashboard/agent-plugins/(?P<id>.+)/enable", "agent_enable")
+_r("POST", r"/api/dashboard/agent-plugins/(?P<id>.+)/disable", "agent_disable")
+_r("POST", r"/api/dashboard/agent-plugins/(?P<id>.+)/update", "__gate__",
+   "gated", _GATE_SKILL_VERSIONED)
+
 GATED: List[Dict[str, Any]] = [
     ("GET", r"/api/pty", _NO_PTY), ("POST", r"/api/pty", _NO_PTY),
     ("GET", r"/api/ws", _g("WS_SINGLE_PATH",
@@ -4282,9 +4344,9 @@ GATED: List[Dict[str, Any]] = [
         "GET /api/skills + CLI `qubit skills list`")),
     ("GET", r"/api/cron/blueprints", "blueprints"),
     ("GET", r"/api/cron/delivery-targets", "delivery"),
-    ("POST", r"/api/sessions/import", "sess_import"),
-    ("POST", r"/api/sessions/prune", "sess_prune"),
-    ("POST", r"/api/sessions/bulk-delete", "sess_bulk"),
+    ("POST", r"/api/sessions/import", _GATE_SESSIONS_RECEIPT),
+    ("POST", r"/api/sessions/prune", _GATE_SESSIONS_RECEIPT),
+    ("POST", r"/api/sessions/bulk-delete", _GATE_SESSIONS_RECEIPT),
     ("DELETE", r"/api/sessions/(?P<id>[^/]+)", "h_session_delete"),
     ("PATCH", r"/api/sessions/(?P<id>[^/]+)", "h_session_patch"),
     ("POST", r"/api/sessions/(?P<id>[^/]+)/resume", "h_session_resume"),
@@ -4309,21 +4371,20 @@ GATED: List[Dict[str, Any]] = [
         "CLI `qubit auth login` + msg account ops")),
     ("POST", r"/api/messaging/platforms/(?P<id>[^/]+)/test", "h_msg_test_live"),
     ("POST", r"/api/mcp/servers/(?P<name>[^/]+)/test", "h_mcp_test_local"),
-    ("POST", r"/api/mcp/servers/[^/]+/enabled", "mcp_enabled"),
-    ("PUT", r"/api/mcp/servers/[^/]+/enabled", "mcp_enabled"),
-    ("PUT", r"/api/mcp/servers", "mcp_create"),
+    ("POST", r"/api/mcp/servers/[^/]+/enabled", _GATE_MCP_NO_MOUNT),
+    ("PUT", r"/api/mcp/servers/[^/]+/enabled", _GATE_MCP_NO_MOUNT),
+    ("PUT", r"/api/mcp/servers", _GATE_MCP_NO_MOUNT),
     ("PUT", r"/api/tools/toolsets/.*", "toolset_write"),
     ("POST", r"/api/tools/toolsets/.*/post-setup", "toolset_write"),
     ("PUT", r"/api/config", "config_save"),
-    ("POST", r"/api/dashboard/agent-plugins/install", "agent_install"),
-    ("POST", r"/api/dashboard/agent-plugins/(?P<id>[^/]+)/enable", "agent_enable"),
-    ("POST", r"/api/dashboard/agent-plugins/(?P<id>[^/]+)/disable", "agent_disable"),
-    ("POST", r"/api/dashboard/agent-plugins/(?P<id>[^/]+)/update", "agent_update"),
+    # Agent-plugin install/enable/disable/update are registered above (ahead of
+    # the blanket remote gate) so the precise typed operation answers; only the
+    # DELETE remove route stays here (it is unshadowed and real).
     ("DELETE", r"/api/dashboard/agent-plugins/(?P<id>.+)", "agent_remove"),
     ("PUT", r"/api/dashboard/plugin-providers", "toolset_write"),
     ("GET", r"/api/dashboard/plugins/hub", "plugins_hub"),
-    ("DELETE", r"/api/providers/oauth/(?P<id>[^/]+)", "oauth_delete"),
-    ("DELETE", r"/api/providers/oauth/sessions/(?P<id>[^/]+)", "oauth_delete"),
+    ("DELETE", r"/api/providers/oauth/(?P<id>[^/]+)", _GATE_OAUTH_DELETE),
+    ("DELETE", r"/api/providers/oauth/sessions/(?P<id>[^/]+)", _GATE_OAUTH_DELETE),
     ("PUT", r"/api/env", "env_write"),
     ("DELETE", r"/api/env", "env_write"),
     ("PUT", r"/api/memory/provider", "mem_provider_set"),
@@ -4331,9 +4392,9 @@ GATED: List[Dict[str, Any]] = [
     ("POST", r"/api/memory/providers/(?P<id>[^/]+)/setup", "mem_config_write"),
     ("GET", r"/api/dashboard/plugins/rescan", "plugins_rescan"),
     ("POST", r"/api/dashboard/plugins/(?P<id>.+)/visibility", "h_plugin_visibility_set"),
-    ("POST", r"/api/ops/debug-share", "debug_share"),
-    ("POST", r"/api/ops/import-upload", "import_upload"),
-    ("POST", r"/api/ops/checkpoints/prune", "ckpt_prune"),
+    # debug-share and import-upload are registered above (ahead of the generic
+    # /api/ops/<name> dispatch) so their real op / typed gate answers.
+    ("POST", r"/api/ops/checkpoints/prune", _GATE_CKPT_PRUNE),
     ("GET", r"/api/ops/checkpoints.*", "ckpt"),
     ("GET", r"/api/actions/.*", "actions_read"),
     ("GET", r"/api/dashboard/font", "font"),
@@ -4457,8 +4518,30 @@ def h_mem_reset(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 def h_mem_provider(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    return _ok(provider="qubit-local", tiers=["core", "working", "recall", "archive"],
-               detail="local-only SQLite/FTS5 MemoryStore; cloud sync refused by policy")
+    """GET /api/memory/providers/<name> -> live local provider status.
+
+    ``qubit-local`` is the only provider; the response reads the real local
+    active-memory store state (never a static shape), and any other name is an
+    honest typed 404 -- no cloud provider can be selected.
+    """
+    name = str(p.get("id", p.get("name", "")) or "")
+    if name and name != "qubit-local":
+        return 404, {"ok": False, "code": "NOT_FOUND",
+                     "detail": f"no memory provider {name!r}",
+                     "qubit_counterpart": "CLI `qubit memory` (same local store)"}
+    from . import active_memory as AM
+    try:
+        status = AM.status(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    state = str(status.get("state", "OK") or "OK")
+    return _ok(provider="qubit-local", active="qubit-local",
+               tiers=["core", "working", "recall", "archive"],
+               state=state,
+               enabled=bool(status.get("enabled", True)),
+               store_state=status.get("store_state"),
+               detail="local-only SQLite/FTS5 MemoryStore; cloud sync refused "
+                      "by policy")
 
 
 def h_msg_test(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -5262,7 +5345,7 @@ def _agent_status(name: str, status: str, cfg: Any,
     if not name:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "plugin name required"}
-    if not b.get("confirm", True):
+    if not b.get("confirm"):
         return _need_confirm(f"plugin {status}")
     try:
         permissions_store(cfg).set_skill_status(
