@@ -41,18 +41,26 @@ dashboard / page rows
 proving tests
     An AST scan of ``tests/test_*.py`` marks the tests that reach a production
     dispatch entry point (``run_op`` / ``run_registry_op`` / ``run_extra_op`` /
-    ``voice_say`` / ``confirm_op`` / ``cancel_op`` / ``execute`` / ...) and
-    then matches the op id (literal, module constant, or a downstream call the
-    backend makes).
+    ``voice_say`` / ``confirm_op`` / ``cancel_op`` / ``execute`` / ...).  An op
+    id counts only when it is *linked* to such a call -- literal argument,
+    evidence-constant table, parametrized value, or a downstream call the
+    backend makes.  A docstring/comment/assertion mention is never evidence.
 
 The output keeps the schema and exact row keys required by
 ``scripts/gap_ledger.py`` plus the provenance fields.
+
+The direct source inventory
+    ``docs/QUBIT_SOURCE_INVENTORY.json`` (agent A) is ingested last: every
+    non-evidence item is matched to a real merged-ledger row or emitted as an
+    explicit ``MISSING`` open row.  A missing or malformed inventory is
+    tolerated and recorded; omission counts are never treated as complete.
 
 Usage::
 
     python scripts/rebuild_ledger_qubit.py            # write the section
     python scripts/rebuild_ledger_qubit.py --out P    # write elsewhere
     python scripts/rebuild_ledger_qubit.py --check    # non-zero if stale
+    python scripts/rebuild_ledger_qubit.py --inventory P  # alternate inventory
 """
 from __future__ import annotations
 
@@ -261,6 +269,145 @@ def _strings_in(node: ast.AST) -> Set[str]:
             if isinstance(n, ast.Constant) and isinstance(n.value, str)}
 
 
+def _parametrize_evidence(func: ast.AST) -> Dict[str, Set[str]]:
+    """Map a parametrized test's parameter names to evidence ids.
+
+    ``@pytest.mark.parametrize("op_id", ["a", "b"])`` runs the same test once
+    per value; when the parameter is passed to a production dispatcher those
+    values are genuine evidence.  A string that never reaches a dispatcher is
+    not, so only the parametrize values are returned here; the dispatcher link
+    is applied by :func:`_linked_evidence_ids`.
+    """
+    result: Dict[str, Set[str]] = {}
+    for dec in getattr(func, "decorator_list", []) or []:
+        if not isinstance(dec, ast.Call):
+            continue
+        parts: List[str] = []
+        f = dec.func
+        while isinstance(f, ast.Attribute):
+            parts.append(f.attr)
+            f = f.value
+        if not (isinstance(f, ast.Name) and f.id == "pytest"
+                and "parametrize" in parts):
+            continue
+        if len(dec.args) < 2:
+            continue
+        names = dec.args[0]
+        pnames: List[str] = []
+        if isinstance(names, ast.Constant) and isinstance(names.value, str):
+            pnames = [names.value]
+        elif isinstance(names, (ast.List, ast.Tuple)):
+            pnames = [e.value for e in names.elts
+                      if isinstance(e, ast.Constant)
+                      and isinstance(e.value, str)]
+        values = {s for s in _strings_in(dec.args[1]) if s in EVIDENCE_IDS}
+        for pname in pnames:
+            result.setdefault(pname, set()).update(values)
+    return result
+
+
+def _value_table_names(value: ast.AST, const_ids: Dict[str, Set[str]]
+                       ) -> Set[str]:
+    """Names of evidence-constant tables a value resolves to."""
+    names: Set[str] = set()
+    if isinstance(value, ast.Name) and value.id in const_ids:
+        names.add(value.id)
+    elif isinstance(value, ast.Call):
+        for arg in value.args:
+            names |= _value_table_names(arg, const_ids)
+    elif isinstance(value, (ast.List, ast.Tuple, ast.Set, ast.Dict)):
+        for child in ast.iter_child_nodes(value):
+            names |= _value_table_names(child, const_ids)
+    return names
+
+
+def _resolve_table_names(func: ast.AST, const_ids: Dict[str, Set[str]]
+                         ) -> Dict[str, Set[str]]:
+    """Local variables/loop targets that carry an evidence-constant table.
+
+    Handles ``table = dict(EVIDENCE_TABLE)`` and
+    ``for op_id, args in EVIDENCE_TABLE.items():`` so table-driven tests still
+    carry their ids, without crediting a table that is only mentioned.
+    """
+    assigned: Dict[str, Set[str]] = {}
+    changed = True
+    while changed:
+        changed = False
+        for sub in ast.walk(func):
+            if isinstance(sub, ast.Assign):
+                tables = _value_table_names(sub.value, const_ids)
+                if tables:
+                    for target in sub.targets:
+                        if isinstance(target, ast.Name) and \
+                                not assigned.get(target.id, set()) >= tables:
+                            assigned.setdefault(target.id, set()).update(tables)
+                            changed = True
+            if isinstance(sub, (ast.For, ast.AsyncFor)):
+                base = None
+                it = sub.iter
+                if isinstance(it, ast.Call) and \
+                        isinstance(it.func, ast.Attribute) and \
+                        isinstance(it.func.value, ast.Name):
+                    base = it.func.value.id
+                elif isinstance(it, ast.Name):
+                    base = it.id
+                tables: Set[str] = set()
+                if base in const_ids:
+                    tables.add(base)
+                if base in assigned:
+                    tables |= assigned[base]
+                if tables:
+                    for target in ast.walk(sub.target):
+                        if isinstance(target, ast.Name) and \
+                                not assigned.get(target.id, set()) >= tables:
+                            assigned.setdefault(target.id, set()).update(tables)
+                            changed = True
+    return assigned
+
+
+def _linked_evidence_ids(func: ast.AST, const_ids: Dict[str, Set[str]],
+                         dispatch_names: Set[str]) -> Set[str]:
+    """Evidence ids actually linked to a production dispatch call.
+
+    An id only counts when it is a literal argument to a call that reaches a
+    dispatcher (``run_op``/``run_extra_op``/``voice_say``/...), or reaches a
+    dispatcher through a referenced evidence-constant table or a parametrized
+    parameter.  A string that appears only in a comment, docstring, assertion,
+    or an unrelated call is never evidence -- this is what stops a textual
+    mention from closing a row.
+    """
+    assigned = _resolve_table_names(func, const_ids)
+    params = _parametrize_evidence(func)
+    ids: Set[str] = set()
+    for sub in ast.walk(func):
+        if not isinstance(sub, ast.Call):
+            continue
+        f = sub.func
+        if isinstance(f, ast.Attribute):
+            callee = f.attr
+        elif isinstance(f, ast.Name):
+            callee = f.id
+        else:
+            continue
+        if callee not in dispatch_names:
+            continue
+        for arg in list(sub.args) + [k.value for k in sub.keywords]:
+            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                if arg.value in EVIDENCE_IDS:
+                    ids.add(arg.value)
+            for name in ast.walk(arg):
+                if not isinstance(name, ast.Name):
+                    continue
+                if name.id in const_ids:
+                    ids |= const_ids[name.id]
+                elif name.id in assigned:
+                    for table in assigned[name.id]:
+                        ids |= const_ids.get(table, set())
+                elif name.id in params:
+                    ids |= params[name.id]
+    return ids
+
+
 class TestIndex:
     """Behavioural-test evidence for the production callers."""
 
@@ -272,7 +419,10 @@ class TestIndex:
         self.guard_tests: Set[Tuple[str, str]] = set()
 
     def add_file(self, path: Path) -> None:
-        rel = str(path.relative_to(ROOT))
+        try:
+            rel = str(path.relative_to(ROOT))
+        except ValueError:
+            rel = str(path)
         try:
             text = path.read_text(encoding="utf-8")
             tree = ast.parse(text)
@@ -321,6 +471,8 @@ class TestIndex:
 
         exec_set = _closure(EXEC_NAMES)
         route_set = _closure(DASHBOARD_ROUTE_NAMES)
+        dispatch_names = (EXEC_NAMES | DASHBOARD_ROUTE_NAMES
+                          | exec_set | route_set)
         for node in funcs:
             if not node.name.startswith("test_"):
                 continue
@@ -333,18 +485,25 @@ class TestIndex:
             if has_exec and "VOICE_GUARDS" in refs:
                 self.guard_tests.add((rel, node.name))
             if has_exec or has_route:
-                hits = set()
+                # op evidence is *linked*: an id only counts when it reaches a
+                # production dispatcher, so a textual mention in a docstring,
+                # comment, or unrelated assertion can never close a row.
+                linked = _linked_evidence_ids(node, const_ids, dispatch_names)
+                # Dashboard page/plugin rows have no backend callable: their
+                # proof is a real route test that references the row id (or a
+                # table constant), so keep that broad route path.
+                broad = set()
                 for s in strings:
                     if s in EVIDENCE_IDS:
-                        hits.add(s)
+                        broad.add(s)
                 for nm in names:
                     if nm in const_ids:
-                        hits |= const_ids[nm]
+                        broad |= const_ids[nm]
                 if has_exec:
-                    for s in hits:
+                    for s in linked:
                         self.op_hits[s].add((rel, node.name))
                 if has_route:
-                    for s in hits:
+                    for s in broad:
                         self.route_hits[s].add((rel, node.name))
             for sub in ast.walk(node):
                 if isinstance(sub, ast.Call):
@@ -830,9 +989,225 @@ def build_page_rows(index: TestIndex,
 
 
 # ---------------------------------------------------------------------------
+# Direct source-inventory ingestion (agent A: scripts/source_inventory.py)
+# ---------------------------------------------------------------------------
+# The inventory is the *discovery* source.  The ledger must not silently drop
+# an upstream surface just because no row exists: every non-evidence inventory
+# item is matched to a real ledger row (across all three sections) or recorded
+# as an explicit open row.  Absence/unreadability of the inventory is tolerated
+# and recorded in the section provenance, never treated as "complete".
+INVENTORY_PATH = ROOT / "docs" / "QUBIT_SOURCE_INVENTORY.json"
+OTHER_SECTIONS = ("hermes", "openclaw")
+# Cross-cutting evidence surfaces (i18n/locale keys, upstream tests) are
+# counted but are not standalone capability rows (mirrors source_inventory.py).
+EVIDENCE_CATEGORIES = frozenset({
+    "hermes_i18n_key", "hermes_locale_key", "hermes_upstream_test",
+})
+_HARDWARE_TOKENS = (
+    "device", "audio", "camera", "screen", "desktop", "browser",
+    "local_model", "local-model", "computer", "gpu", "mic", "vision",
+    "node_host", "media", "hardware", "pairing", "wake",
+)
+_CREDS_TOKENS = (
+    "provider", "oauth", "credential", "secret", "token", "channel",
+    "messaging", "auth", "webhook", "account", "model", "api_key",
+    "telegram", "whatsapp", "discord", "slack", "email", "imap", "smtp",
+)
+
+
+def _relpath_str(path: Path) -> str:
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
+def _load_section_ids(docs_dir: Path) -> Set[str]:
+    """Read-only id set of the other ledger sections (never modified)."""
+    ids: Set[str] = set()
+    for name in OTHER_SECTIONS:
+        path = docs_dir / f"QUBIT_GAP_LEDGER.{name}.json"
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        for row in data.get("rows", []):
+            if isinstance(row, dict) and isinstance(row.get("id"), str):
+                ids.add(row["id"])
+    return ids
+
+
+def load_source_inventory(path: Optional[Path] = None) -> Dict[str, object]:
+    """Tolerant reader for ``docs/QUBIT_SOURCE_INVENTORY.json``.
+
+    Never raises.  A missing, malformed, or schema-shifted inventory yields a
+    report whose ``present``/``error`` fields record exactly what happened and
+    whose item list is empty, so the generator still runs deterministically.
+    """
+    target = Path(path) if path is not None else INVENTORY_PATH
+    report: Dict[str, object] = {
+        "present": False,
+        "path": _relpath_str(target),
+        "schema": "",
+        "items_total": 0,
+        "surface_items": 0,
+        "evidence_only": 0,
+        "matched": 0,
+        "unmatched": 0,
+        "unexplained_omissions": 0,
+        "unidentified": 0,
+        "by_category": {},
+        "omitted_ids": [],
+        "unreproducible_evidence": 0,
+        "error": "inventory file absent",
+        "items": [],
+    }
+    if not target.is_file():
+        return report
+    report["present"] = True
+    report["error"] = ""
+    try:
+        data = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        report["error"] = f"inventory unreadable: {exc}"
+        return report
+    if not isinstance(data, dict):
+        report["error"] = "inventory root is not a JSON object"
+        return report
+    items = data.get("items")
+    if not isinstance(items, list):
+        for key in ("surfaces", "rows", "inventory", "entries"):
+            if isinstance(data.get(key), list):
+                items = data[key]
+                break
+    if not isinstance(items, list):
+        report["error"] = "inventory has no items list"
+        return report
+    report["schema"] = str(data.get("schema") or "")
+    report["items"] = [it for it in items if isinstance(it, dict)]
+    report["items_total"] = len(items)
+    ledger_comparison = data.get("ledger_comparison")
+    if isinstance(ledger_comparison, dict):
+        unusable = ledger_comparison.get("unreproducible_evidence")
+        if isinstance(unusable, list):
+            report["unreproducible_evidence"] = len(unusable)
+    return report
+
+
+def _inventory_needs(item: Dict[str, object]) -> str:
+    text = " ".join(
+        str(item.get(key) or "") for key in
+        ("category", "id", "name", "path", "area")
+    ).lower()
+    if any(token in text for token in _HARDWARE_TOKENS):
+        return "hardware"
+    if any(token in text for token in _CREDS_TOKENS):
+        return "creds"
+    return "owner"
+
+
+def _inventory_row_id(item_id: str) -> str:
+    clean = re.sub(r"\s+", "_", item_id.strip())
+    return "inv:" + clean.replace("|", "/")
+
+
+def build_inventory_rows(report: Dict[str, object], known_ids: Set[str]
+                         ) -> Tuple[List[Dict[str, str]], Dict[str, object]]:
+    """Turn every non-evidence inventory item into a matched or open row.
+
+    Matched items must reference a row id that genuinely exists in the merged
+    ledger (the three sections).  Everything else becomes an explicit
+    ``MISSING`` open row, so an upstream surface can never be silently dropped.
+    Returns ``(rows, summary)`` where ``summary`` has no ``items`` payload.
+    """
+    items = sorted(
+        (it for it in report.get("items", []) if isinstance(it, dict)),
+        key=lambda it: (str(it.get("source") or ""),
+                        str(it.get("category") or ""),
+                        str(it.get("id") or "")),
+    )
+    rows: List[Dict[str, str]] = []
+    omitted: List[str] = []
+    by_category: Dict[str, int] = {}
+    matched = 0
+    surface_total = 0
+    evidence_only = 0
+    unidentified = 0
+    used_ids: Set[str] = set()
+
+    for item in items:
+        category = str(item.get("category") or "")
+        if category in EVIDENCE_CATEGORIES:
+            evidence_only += 1
+            continue
+        surface_total += 1
+        item_id = str(item.get("id") or "").strip()
+        if not item_id:
+            fallback = str(item.get("name") or item.get("path") or "").strip()
+            if not fallback:
+                unidentified += 1
+                continue
+            item_id = fallback
+        match = item.get("ledger_match")
+        match_id = match if isinstance(match, str) and match else ""
+        if match_id and match_id in known_ids:
+            matched += 1
+            continue
+        row_id = _inventory_row_id(item_id)
+        base_id = row_id
+        suffix = 2
+        while row_id in used_ids or row_id in known_ids:
+            row_id = f"{base_id}#{suffix}"
+            suffix += 1
+        used_ids.add(row_id)
+        omitted.append(item_id)
+        by_category[category or "uncategorized"] = \
+            by_category.get(category or "uncategorized", 0) + 1
+        if match_id:
+            note = (f"Source inventory ledger_match {match_id!r} does not exist "
+                    "in the merged ledger; recorded as an explicit open row.")
+        else:
+            note = ("Source inventory item has no ledger row in any section; "
+                    "recorded as an explicit open row (not dropped).")
+        rows.append({
+            "id": row_id,
+            "area": str(item.get("area") or category or "source_inventory"),
+            "capability": str(item.get("name") or item.get("help") or item_id),
+            "upstream_ref": str(item.get("path") or item.get("source") or ""),
+            "qubit_backend": "",
+            "cli": "",
+            "dashboard": "",
+            "voice": "",
+            "status": "MISSING",
+            "proving_test": "",
+            "note": note,
+            "needs": _inventory_needs(item),
+        })
+
+    summary = {key: value for key, value in report.items() if key != "items"}
+    # Unidentified items have no usable id, so they cannot be listed in
+    # omitted_ids but they are still unexplained omissions: fold them in so
+    # matched + unmatched == surface_items always holds.
+    unmatched = len(omitted) + unidentified
+    summary.update({
+        "surface_items": surface_total,
+        "evidence_only": evidence_only,
+        "matched": matched,
+        "unmatched": unmatched,
+        "unexplained_omissions": unmatched,
+        "unidentified": unidentified,
+        "by_category": dict(sorted(by_category.items())),
+        "omitted_ids": sorted(omitted),
+    })
+    return rows, summary
+
+
+# ---------------------------------------------------------------------------
 # Assemble
 # ---------------------------------------------------------------------------
-def build_ledger() -> Dict[str, object]:
+def build_ledger(inventory_path: Optional[Path] = None) -> Dict[str, object]:
     tree = _parser_tree()
     index = build_test_index()
     catalog = {o["id"]: o for o in DO.catalog()}
@@ -841,6 +1216,12 @@ def build_ledger() -> Dict[str, object]:
             build_gated_rows() +
             build_plugin_rows(index) +
             build_page_rows(index))
+
+    inventory = load_source_inventory(inventory_path)
+    known_ids = {r["id"] for r in rows} | _load_section_ids(ROOT / "docs")
+    inventory_rows, inventory_summary = build_inventory_rows(inventory,
+                                                             known_ids)
+    rows = rows + inventory_rows
 
     no_backend = [r["id"] for r in rows
                   if r["status"] == "IMPLEMENTED" and not r["qubit_backend"]]
@@ -868,8 +1249,15 @@ def build_ledger() -> Dict[str, object]:
             "dashboard route references its row id (directly or through a "
             "module constant), else UNVERIFIED. IMPLEMENTED requires a "
             "resolvable backend, an on-disk proving test, and every applicable "
-            "surface present (catalog ops use the catalog interfaces). No "
-            "status is hand-flipped."),
+            "surface present (catalog ops use the catalog interfaces). An op "
+            "proof is *linked*: the row id must reach a production dispatcher "
+            "as an argument (or through an evidence table / parametrized "
+            "value), so a docstring, comment, or unrelated assertion can never "
+            "close a row. The direct source inventory is ingested last: every "
+            "non-evidence inventory item is matched to a real merged-ledger row "
+            "or emitted as an explicit MISSING open row; absent or malformed "
+            "inventories are recorded, never treated as complete. No status is "
+            "hand-flipped."),
         "sources_reconciled": [
             "voicebridge/voice_commands.py (REGISTRY/_BACKENDS/CLI_COVERAGE)",
             "voicebridge/dashboard_ops.py (catalog/EXTRA_OPS)",
@@ -878,6 +1266,7 @@ def build_ledger() -> Dict[str, object]:
             "tests/ (AST caller evidence)",
             "frontend/hermes-qubit/plugins/*/manifest.json",
             "frontend/hermes-web/src/pages/*.tsx",
+            "docs/QUBIT_SOURCE_INVENTORY.json (direct source inventory, agent A)",
         ],
         "generated_from": {
             "voice_commands.REGISTRY": len(VC.REGISTRY),
@@ -887,6 +1276,9 @@ def build_ledger() -> Dict[str, object]:
             "hermes_compat.ROUTES": len(HC.ROUTES),
             "hermes_compat.GATED": len(HC.GATED),
             "cli_families": len(tree),
+            "source_inventory.items": inventory_summary.get("items_total", 0),
+            "source_inventory.surface_items": inventory_summary.get(
+                "surface_items", 0),
         },
         "counts_by_status": dict(sorted(by_status.items())),
         "counts_by_area": dict(sorted(by_area.items())),
@@ -896,8 +1288,10 @@ def build_ledger() -> Dict[str, object]:
         "provenance": {
             "generator": "scripts/rebuild_ledger_qubit.py",
             "evidence": ("production backend + declared interfaces + live CLI "
-                         "tree + voice registry + tests/ AST proofs"),
+                         "tree + voice registry + linked tests/ AST proofs + "
+                         "direct source inventory"),
         },
+        "inventory": inventory_summary,
         "rows": rows,
     }
 
@@ -912,9 +1306,13 @@ def main(argv: Optional[List[str]] = None) -> int:
                         help="output JSON path (default: docs section)")
     parser.add_argument("--check", action="store_true",
                         help="exit 1 if the committed section differs")
+    parser.add_argument(
+        "--inventory", default=None,
+        help=("direct source inventory JSON (default: "
+              "docs/QUBIT_SOURCE_INVENTORY.json; absent is tolerated)"))
     args = parser.parse_args(argv)
 
-    data = build_ledger()
+    data = build_ledger(Path(args.inventory) if args.inventory else None)
     text = _render(data)
     out = Path(args.out)
     if args.check:

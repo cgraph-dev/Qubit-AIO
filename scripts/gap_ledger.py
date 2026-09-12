@@ -168,6 +168,52 @@ def counts_by(rows, key):
     return {k: counts[k] for k in sorted(counts)}
 
 
+def inventory_reports(sections) -> list:
+    """Per-section ``inventory`` provenance blocks (machine readable)."""
+    reports = []
+    for section in sections:
+        block = (section.get("meta") or {}).get("inventory")
+        if isinstance(block, dict):
+            reports.append({"section": section["file_section"], **block})
+    return reports
+
+
+def inventory_omissions(sections) -> dict:
+    """Machine-readable summary of unexplained source-inventory omissions."""
+    reports = inventory_reports(sections)
+    omitted = []
+    for report in reports:
+        for item_id in report.get("omitted_ids") or []:
+            omitted.append({"section": report.get("section"), "id": item_id})
+    errors = [str(report.get("error")) for report in reports
+              if report.get("error")]
+    return {
+        "present": any(bool(report.get("present")) for report in reports),
+        "reports": reports,
+        "unexplained_omissions": sum(
+            int(report.get("unexplained_omissions") or 0)
+            for report in reports),
+        "omitted": omitted,
+        "errors": errors,
+    }
+
+
+def inventory_complete(sections) -> tuple:
+    """Return ``(ok, reason)`` for ``--require-inventory-complete``."""
+    data = inventory_omissions(sections)
+    if not data["reports"]:
+        return False, "no source-inventory report in any ledger section"
+    if not data["present"]:
+        return False, "source inventory absent"
+    for report in data["reports"]:
+        if report.get("error"):
+            return False, (f"{report.get('section')}: {report['error']}")
+    if data["unexplained_omissions"]:
+        return False, (f"{data['unexplained_omissions']} unexplained source "
+                       "inventory omission(s)")
+    return True, ""
+
+
 def build_summary(sections, missing) -> dict:
     merged = []
     for section in sections:
@@ -186,6 +232,7 @@ def build_summary(sections, missing) -> dict:
         "by_area": by_area,
         "open_rows": len(open_rows),
         "complete": not open_rows,
+        "inventory": inventory_omissions(sections),
     }
 
 
@@ -257,6 +304,28 @@ def render_markdown(sections, missing, summary) -> str:
         lines.append(f"- {key}: {value}")
     lines.append("")
 
+    # ---- direct source-inventory reconciliation
+    inventory = summary.get("inventory") or {}
+    if inventory.get("reports"):
+        lines.append("## Source-inventory reconciliation")
+        lines.append("")
+        lines.append(f"- Inventory present: **{inventory.get('present')}**")
+        lines.append(
+            f"- Unexplained omissions: "
+            f"**{inventory.get('unexplained_omissions', 0)}**")
+        if inventory.get("errors"):
+            lines.append(
+                f"- Inventory errors: {inventory['errors']}")
+        for report in inventory["reports"]:
+            lines.append(
+                f"- `{report.get('section')}`: present="
+                f"{report.get('present')}, "
+                f"items={report.get('items_total', 0)}, "
+                f"matched={report.get('matched', 0)}, "
+                f"unmatched={report.get('unmatched', 0)}, "
+                f"unexplained={report.get('unexplained_omissions', 0)}")
+        lines.append("")
+
     # ---- open rows grouped by source then area
     lines.append("## Open rows (status != IMPLEMENTED)")
     lines.append("")
@@ -312,6 +381,17 @@ def main(argv=None) -> int:
         "--require-all", action="store_true",
         help="fail (exit 1) if any of the three sections is missing",
     )
+    parser.add_argument(
+        "--require-inventory-complete", action="store_true",
+        dest="require_inventory_complete",
+        help=("fail (exit 1) unless the direct source inventory is present, "
+              "readable, and reports zero unexplained omissions"),
+    )
+    parser.add_argument(
+        "--omissions-out", default=None,
+        help=("write the machine-readable source-inventory omissions summary "
+              "to this path"),
+    )
     args = parser.parse_args(argv)
 
     docs_dir = Path(args.docs_dir)
@@ -335,6 +415,23 @@ def main(argv=None) -> int:
         return 1
 
     summary = build_summary(sections, missing)
+    omissions = summary["inventory"]
+
+    if args.omissions_out:
+        omissions_path = Path(args.omissions_out)
+        omissions_path.parent.mkdir(parents=True, exist_ok=True)
+        omissions_path.write_text(
+            json.dumps(omissions, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8")
+        print(f"gap ledger: wrote omissions summary {omissions_path}")
+
+    if args.require_inventory_complete:
+        ok, reason = inventory_complete(sections)
+        if not ok:
+            print(f"INVENTORY INCOMPLETE: {reason}", file=sys.stderr)
+            print(json.dumps(omissions, indent=2, sort_keys=True),
+                  file=sys.stderr)
+            return 1
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(render_markdown(sections, missing, summary),

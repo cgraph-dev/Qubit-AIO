@@ -16,6 +16,7 @@ import {
   notifyPluginRegistry,
   setPluginLoadError,
 } from "./registry";
+import { loadFleetManifests, pluginAssetRoot } from "./fleet";
 
 export const MANIFEST_CACHE_KEY = "hermes:plugin-manifests";
 
@@ -82,15 +83,33 @@ export function usePlugins() {
   // Always re-fetch in the background to keep the cache fresh.
   // This handles: new plugins added, plugins removed, manifest changes.
   // setManifests(list) will update routes if the server list differs from cache.
+  // The SPA-shipped static fleet (pinned plugin tabs) merges with the compat
+  // overlay manifests the backend advertises; same-name entries never double.
   useEffect(() => {
-    api
-      .getPlugins()
-      .then((list) => {
-        cacheManifests(list);
-        setManifests(list);
-        if (list.length === 0) setLoading(false);
+    let alive = true;
+    const apply = (apiList: PluginManifest[], fleet: PluginManifest[]) => {
+      const byName = new Map<string, PluginManifest>();
+      for (const m of [...fleet, ...apiList]) {
+        if (!byName.has(m.name)) byName.set(m.name, m);
+      }
+      const list = [...byName.values()];
+      cacheManifests(list);
+      setManifests(list);
+      if (list.length === 0) setLoading(false);
+    };
+    Promise.all([
+      api.getPlugins().catch(() => [] as PluginManifest[]),
+      loadFleetManifests(),
+    ])
+      .then(([apiList, fleet]) => {
+        if (alive) apply(apiList, fleet);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // Load plugin assets when manifests arrive.
@@ -100,9 +119,12 @@ export function usePlugins() {
     const injectedScripts: HTMLScriptElement[] = [];
 
     for (const manifest of manifests) {
+      // Static fleet plugins ship inside the served SPA (`/plugins/<name>`);
+      // compat overlay plugins are served by the backend overlay root.
+      const assetRoot = `${HERMES_BASE_PATH}${pluginAssetRoot(manifest)}`;
       // Inject CSS if specified.
       if (manifest.css) {
-        const cssUrl = `${HERMES_BASE_PATH}/dashboard-plugins/${manifest.name}/${manifest.css}`;
+        const cssUrl = `${assetRoot}/${manifest.css}`;
         if (!document.querySelector(`link[href="${cssUrl}"]`)) {
           const link = document.createElement("link");
           link.rel = "stylesheet";
@@ -114,7 +136,7 @@ export function usePlugins() {
       // Load JS bundle. In dev, cache-bust so Vite HMR can clear the
       // in-memory registry while the browser would otherwise never
       // re-execute a previously cached <script> URL.
-      const baseUrl = `${HERMES_BASE_PATH}/dashboard-plugins/${manifest.name}/${manifest.entry}`;
+      const baseUrl = `${assetRoot}/${manifest.entry}`;
       const scriptSrc = import.meta.env.DEV
         ? `${baseUrl}?hermes_dv=${Date.now()}`
         : baseUrl;

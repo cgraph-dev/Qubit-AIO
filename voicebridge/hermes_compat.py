@@ -28,6 +28,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 # Overlay (theme + plugins) resolution: package data first (clean wheel
 # install), then the checkout. Keeps an isolated install self-contained.
 from . import resources as _resources  # noqa: E402
+from . import hermes_plugins as _hermes_plugins  # noqa: E402
 OVERLAY_DIR = _resources.resource_path("frontend/hermes-qubit")
 
 Handler = Callable[..., Tuple[int, Dict[str, Any]]]
@@ -4010,6 +4011,37 @@ _r("GET", r"/api/ops/(?P<name>[a-z-]+)", "h_ops")
 _r("POST", r"/api/ops/(?P<name>[a-z-]+)", "h_ops")
 _r("DELETE", r"/api/ops/hooks", "hooks_delete")
 _r("GET", r"/api/plugins/kanban/events", "h_kanban_events")
+# Vendored dashboard plugin fleet (hermes-achievements + kanban). Real
+# backends live in voicebridge/hermes_plugins.py and read the same local
+# session history / kanban DB the Qubit-owned Hermes runtime uses. Read routes
+# precede the GATED kanban write wildcard below so they are never shadowed.
+_r("GET", r"/api/plugins/hermes-achievements/achievements",
+   "h_plugin_achievements")
+_r("GET", r"/api/plugins/hermes-achievements/scan-status",
+   "h_plugin_achievements_scan_status")
+_r("GET", r"/api/plugins/hermes-achievements/recent-unlocks",
+   "h_plugin_achievements_recent_unlocks")
+_r("GET", r"/api/plugins/hermes-achievements/sessions/(?P<session_id>[^/]+)/badges",
+   "h_plugin_achievements_session_badges")
+_r("POST", r"/api/plugins/hermes-achievements/rescan",
+   "h_plugin_achievements_rescan")
+_r("POST", r"/api/plugins/hermes-achievements/reset-state",
+   "h_plugin_achievements_reset_state")
+_r("GET", r"/api/plugins/kanban/board", "h_plugin_kanban_board")
+_r("GET", r"/api/plugins/kanban/tasks/(?P<task_id>[^/]+)", "h_plugin_kanban_task")
+_r("GET", r"/api/plugins/kanban/stats", "h_plugin_kanban_stats")
+_r("GET", r"/api/plugins/kanban/assignees", "h_plugin_kanban_assignees")
+_r("GET", r"/api/plugins/kanban/boards", "h_plugin_kanban_boards")
+_r("GET", r"/api/plugins/kanban/config", "h_plugin_kanban_config")
+_r("GET", r"/api/plugins/kanban/projects", "h_plugin_kanban_projects")
+_r("GET", r"/api/plugins/kanban/workers/active", "h_plugin_kanban_workers")
+_r("GET", r"/api/plugins/kanban/diagnostics", "h_plugin_kanban_diagnostics")
+_r("GET", r"/api/plugins/kanban/model-options", "h_plugin_kanban_model_options")
+_r("GET", r"/api/plugins/kanban/home-channels", "h_plugin_kanban_home_channels")
+# Discovery for the vendored plugin fleet. The existing
+# /api/dashboard/plugins response stays fixed to the Qubit overlay set; this
+# additive view reports the vendored manifests without changing that contract.
+_r("GET", r"/api/dashboard/plugins/fleet", "h_plugin_fleet")
 _r("POST", r"/api/qubit/chat", "h_chat_turn")
 _r("GET", r"/api/dashboard/plugins", "h_plugins")
 _r("GET", r"/api/dashboard/themes", "h_themes")
@@ -4343,6 +4375,22 @@ GATED: List[Dict[str, Any]] = [
     ("POST", r"/api/memory/providers/[^/]+/oauth/start", _NO_OAUTH),
     ("DELETE", r"/api/mcp/oauth/flows/[^/]+", _NO_OAUTH),
     ("GET", r"/api/mcp/oauth/callback.*", _NO_OAUTH),
+    # Vendored kanban dashboard plugin: reads are served by
+    # voicebridge/hermes_plugins.py; task mutations stay on the shared Qubit
+    # confirmation/broker path (`qubit kanban` + approvals) rather than the
+    # plugin's direct server-side writes.
+    ("POST", r"/api/plugins/kanban/.*", _g("KANBAN_WRITE_BROKERED",
+        "Kanban task mutations run through the Qubit confirmation/broker path "
+        "(`qubit kanban` + approvals), not a direct dashboard write.",
+        "CLI `qubit kanban` + pending-approvals banner")),
+    ("PATCH", r"/api/plugins/kanban/.*", _g("KANBAN_WRITE_BROKERED",
+        "Kanban task mutations run through the Qubit confirmation/broker path "
+        "(`qubit kanban` + approvals), not a direct dashboard write.",
+        "CLI `qubit kanban` + pending-approvals banner")),
+    ("DELETE", r"/api/plugins/kanban/.*", _g("KANBAN_WRITE_BROKERED",
+        "Kanban task mutations run through the Qubit confirmation/broker path "
+        "(`qubit kanban` + approvals), not a direct dashboard write.",
+        "CLI `qubit kanban` + pending-approvals banner")),
 ]
 
 for _m, _p, _ginfo in GATED:
@@ -6828,6 +6876,31 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "h_auth_logout": h_auth_logout,
     "h_auth_native_token": h_auth_native_token,
     "h_auth_native_refresh": h_auth_native_refresh,
+    "h_plugin_achievements": _hermes_plugins.h_plugin_achievements,
+    "h_plugin_achievements_scan_status":
+        _hermes_plugins.h_plugin_achievements_scan_status,
+    "h_plugin_achievements_recent_unlocks":
+        _hermes_plugins.h_plugin_achievements_recent_unlocks,
+    "h_plugin_achievements_session_badges":
+        _hermes_plugins.h_plugin_achievements_session_badges,
+    "h_plugin_achievements_rescan":
+        _hermes_plugins.h_plugin_achievements_rescan,
+    "h_plugin_achievements_reset_state":
+        _hermes_plugins.h_plugin_achievements_reset_state,
+    "h_plugin_kanban_board": _hermes_plugins.h_plugin_kanban_board,
+    "h_plugin_kanban_task": _hermes_plugins.h_plugin_kanban_task,
+    "h_plugin_kanban_stats": _hermes_plugins.h_plugin_kanban_stats,
+    "h_plugin_kanban_assignees": _hermes_plugins.h_plugin_kanban_assignees,
+    "h_plugin_kanban_boards": _hermes_plugins.h_plugin_kanban_boards,
+    "h_plugin_kanban_config": _hermes_plugins.h_plugin_kanban_config,
+    "h_plugin_kanban_projects": _hermes_plugins.h_plugin_kanban_projects,
+    "h_plugin_kanban_workers": _hermes_plugins.h_plugin_kanban_workers,
+    "h_plugin_kanban_diagnostics": _hermes_plugins.h_plugin_kanban_diagnostics,
+    "h_plugin_kanban_model_options":
+        _hermes_plugins.h_plugin_kanban_model_options,
+    "h_plugin_kanban_home_channels":
+        _hermes_plugins.h_plugin_kanban_home_channels,
+    "h_plugin_fleet": _hermes_plugins.h_plugin_fleet,
 }
 
 HANDLERS: Dict[str, Handler] = {

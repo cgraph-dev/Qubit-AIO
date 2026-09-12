@@ -1476,10 +1476,74 @@ def build_dashboard_rows() -> List[Dict[str, str]]:
     return rows
 
 
+# (plugin, area, capability, qubit_backend, status, proving_test, needs,
+#  dashboard, note, upstream_ref)
+# Hand-maintained because the plugin APIs live under qubit_hermes/plugins/*,
+# outside the web_routers glob the API extractor scans. The achievements row is
+# IMPLEMENTED only because tests/test_hermes_plugins.py executes the real
+# compat routes over a seeded SessionDB; kanban reads are real but the plugin's
+# mutating routes stay on the typed policy gate, so that row stays PARTIAL.
+PLUGINS = [
+    ("hermes-achievements", "dashboard_plugin",
+     "hermes dashboard plugin hermes-achievements (API + state)",
+     "voicebridge/hermes_compat.py:h_plugin_achievements", "IMPLEMENTED",
+     "tests/test_hermes_plugins.py::test_achievements_routes_compute_real_state",
+     "none", "hermes-dist Achievements tab (/achievements)",
+     "Real backend in voicebridge/hermes_plugins.py: reuses the vendored "
+     "achievement engine + hermes_state.SessionDB over the local session "
+     "history, persists snapshot/checkpoint/unlock state under the Qubit state "
+     "dir (0600), and serves /achievements, /scan-status, /recent-unlocks, "
+     "/sessions/{id}/badges, /rescan, /reset-state. The plugin JS bundle is "
+     "served by the webui overlay path, not this compat backend.",
+     "qubit_hermes/plugins/hermes-achievements/dashboard/plugin_api.py:57"),
+    ("kanban", "dashboard_plugin",
+     "hermes dashboard plugin kanban (read API)",
+     "voicebridge/hermes_plugins.py", "PARTIAL",
+     "tests/test_hermes_plugins.py::test_kanban_read_routes_serve_real_board",
+     "owner", "hermes-dist Kanban tab (/kanban)",
+     "Real read API in voicebridge/hermes_plugins.py backed by the vendored "
+     "hermes_cli.kanban_db (board/tasks/stats/assignees/boards/config/projects/"
+     "workers/diagnostics/model-options); mutating routes stay on the shared "
+     "typed KANBAN_WRITE_BROKERED confirmation/broker gate and are not yet "
+     "served directly.",
+     "qubit_hermes/plugins/kanban/dashboard/plugin_api.py:266"),
+    ("fleet-discovery", "dashboard_plugin",
+     "hermes dashboard plugin fleet discovery",
+     "voicebridge/hermes_compat.py:h_plugin_fleet", "IMPLEMENTED",
+     "tests/test_hermes_plugins.py::test_plugin_fleet_discovery_lists_vendored_plugins",
+     "none", "hermes-dist Plugins page",
+     "GET /api/dashboard/plugins/fleet returns the vendored plugin manifests "
+     "(source=vendored) additively; the fixed ten-plugin overlay response at "
+     "/api/dashboard/plugins is unchanged.",
+     "qubit_hermes/hermes_cli/web_server_dashboard.py:537"),
+]
+
+
+def build_plugin_rows() -> List[Dict[str, str]]:
+    rows: List[Dict[str, str]] = []
+    for (plugin, area, capability, backend, status, proving_test, needs,
+         dashboard, note, ref) in PLUGINS:
+        rows.append({
+            "id": f"plugin:{plugin}",
+            "area": area,
+            "capability": capability,
+            "upstream_ref": ref,
+            "qubit_backend": backend,
+            "cli": "",
+            "dashboard": dashboard,
+            "voice": "",
+            "status": status,
+            "proving_test": proving_test,
+            "note": note,
+            "needs": needs,
+        })
+    return rows
+
+
 def build_ledger() -> Dict[str, object]:
     api_index = build_api_index()
     rows = (build_api_rows(api_index) + build_cli_rows() +
-            build_dashboard_rows())
+            build_dashboard_rows() + build_plugin_rows())
     by_status = Counter(r["status"] for r in rows)
     by_area = Counter(r["area"] for r in rows)
     return {
@@ -1500,17 +1564,24 @@ def build_ledger() -> Dict[str, object]:
             "cli-subcommand rows derive status from the live "
             "voicebridge.cli build_parser tree plus "
             "voicebridge.cli_hermes_forward.FORWARD_TABLE and an AST scan of "
-            "tests/ for the exercising caller. No status is hand-flipped."
+            "tests/ for the exercising caller. Plugin-fleet rows are declared "
+            "explicitly and are IMPLEMENTED only when "
+            "tests/test_hermes_plugins.py dispatches the registered compat "
+            "handler over real local state. No status is hand-flipped."
         ),
         "sources_reconciled": [
             "voicebridge/hermes_compat.py",
+            "voicebridge/hermes_plugins.py",
             "voicebridge/cli.py",
             "voicebridge/cli_hermes_forward.py",
             "tests/ (AST caller evidence)",
+            "tests/test_hermes_plugins.py (plugin-fleet proof)",
             "qubit_hermes/hermes_cli/web_routers",
             "qubit_hermes/hermes_cli/web_server*.py",
             "qubit_hermes/hermes_cli/memory_oauth.py",
             "qubit_hermes/hermes_cli/dashboard_auth/routes.py",
+            "qubit_hermes/plugins/hermes-achievements/dashboard/plugin_api.py",
+            "qubit_hermes/plugins/kanban/dashboard/plugin_api.py",
             "qubit_hermes/web/src/App.tsx",
         ],
         "counts": {

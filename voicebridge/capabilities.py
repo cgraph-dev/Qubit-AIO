@@ -53,6 +53,18 @@ class Tier(str, enum.Enum):
     DESTRUCTIVE = "destructive"
 
 
+# One authority for confirmation issuance: only an authenticated human control
+# surface may mint a confirmation record. Model output, page text, tool
+# results, generated plans, and arbitrary caller strings are refused at
+# issuance AND at consumption, so untrusted text can never grant or widen
+# scope (even if a non-human issuer label was persisted by another process).
+HUMAN_ISSUERS = frozenset({"user", "cli:user", "dashboard", "voice", "voice:user"})
+ISSUER_MODEL_FORBIDDEN = "ISSUER_MODEL_FORBIDDEN"
+ISSUER_NOT_HUMAN = "ISSUER_NOT_HUMAN"
+STORE_FULL = "CONFIRMATION_STORE_FULL"
+DEFAULT_MAX_RECORDS = 4096
+
+
 @dataclass(frozen=True)
 class CapabilitySpec:
     """Immutable declaration of one tool/action contract."""
@@ -130,19 +142,37 @@ class ConfirmationStore:
     """Expiring, single-use, target-bound confirmation records."""
 
     def __init__(self, clock: Callable[[], float] = time.time,
-                 default_ttl_s: float = 300.0):
+                 default_ttl_s: float = 300.0,
+                 max_records: int = DEFAULT_MAX_RECORDS):
         if not (0 < default_ttl_s <= 86400):
             raise ValueError("default_ttl_s outside (0, 86400]")
+        if max_records < 1:
+            raise ValueError("max_records must be >= 1")
         self._clock = clock
         self._ttl = float(default_ttl_s)
+        self._max_records = int(max_records)
         self._records: Dict[str, ConfirmationRecord] = {}
         self._lock = threading.Lock()
 
-    def issue(self, capability: str, args: Dict[str, Any], *, issued_by: str,
-              ttl_s: Optional[float] = None) -> ConfirmationRecord:
+    @staticmethod
+    def _require_human(issued_by: str) -> None:
+        """Fail closed unless the issuer is an authenticated human surface."""
         if issued_by == "model":
             # A model proposal can never create authority for itself.
-            raise ConfirmationDenied("ISSUER_MODEL_FORBIDDEN")
+            raise ConfirmationDenied(ISSUER_MODEL_FORBIDDEN)
+        if issued_by not in HUMAN_ISSUERS:
+            raise ConfirmationDenied(ISSUER_NOT_HUMAN)
+
+    def _prune_locked(self, now: float) -> None:
+        """Drop consumed/expired records; caller holds ``self._lock``."""
+        dead = [rid for rid, r in self._records.items()
+                if r.consumed or now >= r.expires_at]
+        for rid in dead:
+            self._records.pop(rid, None)
+
+    def issue(self, capability: str, args: Dict[str, Any], *, issued_by: str,
+              ttl_s: Optional[float] = None) -> ConfirmationRecord:
+        self._require_human(issued_by)
         ttl = float(ttl_s) if ttl_s is not None else self._ttl
         if not (1.0 <= ttl <= 86400):
             raise ValueError("ttl_s outside [1, 86400]")
@@ -152,6 +182,11 @@ class ConfirmationStore:
             args_digest=_args_digest(dict(args)), issued_at=now,
             expires_at=now + ttl, issued_by=issued_by)
         with self._lock:
+            if len(self._records) >= self._max_records:
+                self._prune_locked(now)
+            if len(self._records) >= self._max_records:
+                # Bounded resource: fail closed rather than grow without limit.
+                raise ConfirmationDenied(STORE_FULL)
             self._records[rec.id] = rec
         log_event("confirmation.issued", capability=capability,
                   confirmation_id=rec.id, ttl_s=round(ttl, 3),
@@ -166,6 +201,9 @@ class ConfirmationStore:
             rec = self._records.get(confirmation_id)
             if rec is None:
                 raise ConfirmationDenied("UNKNOWN_CONFIRMATION_ID")
+            # Defense in depth: a record loaded from a durable store (or
+            # tampered with) is still refused unless a human surface issued it.
+            self._require_human(rec.issued_by)
             if rec.consumed:
                 raise ConfirmationDenied("REPLAYED_CONFIRMATION")
             if now >= rec.expires_at:
@@ -192,6 +230,7 @@ class ConfirmationStore:
             rec = self._records.get(confirmation_id)
             if rec is None:
                 raise ConfirmationDenied("UNKNOWN_CONFIRMATION_ID")
+            self._require_human(rec.issued_by)
             if rec.consumed:
                 raise ConfirmationDenied("REPLAYED_CONFIRMATION")
             if now >= rec.expires_at:

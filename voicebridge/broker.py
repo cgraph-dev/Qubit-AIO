@@ -128,6 +128,23 @@ def _kill_tree(pid: Optional[int]) -> None:
         pass
 
 
+def estop_engaged(cfg: Any = None) -> bool:
+    """Fail-closed emergency-stop probe over the single shared power latch.
+
+    Thin, stable alias over :func:`plugins.estop_engaged` (which reads the one
+    durable ``PowerControlStore`` the broker, dashboard, voice, and runner paths
+    share). Any read error reports ENGAGED so a path can never fail open when
+    the latch cannot be read. Kept here so every dispatch path has one import
+    target for the e-stop authority; there is no second latch.
+    """
+    try:
+        from .plugins import estop_engaged as _engaged
+
+        return bool(_engaged(cfg))
+    except Exception:
+        return True
+
+
 class CapabilityBroker:
     """Decides, then executes trusted host tools; never falls back to shell."""
 
@@ -149,20 +166,30 @@ class CapabilityBroker:
 
     def _power_denied(self, capability: str, spec: Optional[CapabilitySpec]) \
             -> Optional[str]:
-        """Return a denial code when the shared power control forbids the run."""
+        """Return a denial code when the shared power control forbids the run.
+
+        Fail-closed: any error while reading the single shared latch denies the
+        run with POWER_UNAVAILABLE rather than letting it proceed unchecked.
+        """
         if self._power is None:
             return None
-        # Refresh the cross-process latch (no-op when the control has no
-        # durable store) so an emergency stop / disable set by another process
-        # is observed before every real execution.
-        self._power.refresh()
-        if self._power.state.get("emergency_stop"):
-            return "EMERGENCY_STOP"
-        if self._power.state.get("global_disable"):
-            return "POWER_DISABLED"
-        adapter = str(getattr(spec, "adapter", "power") or "power")
-        if self._power.breaker_state(adapter) == "open":
-            return "CIRCUIT_OPEN"
+        try:
+            # Refresh the cross-process latch (no-op when the control has no
+            # durable store) so an emergency stop / disable set by another
+            # process is observed before every real execution.
+            self._power.refresh()
+            state = self._power.state
+            if state.get("emergency_stop"):
+                return "EMERGENCY_STOP"
+            if state.get("global_disable"):
+                return "POWER_DISABLED"
+            adapter = str(getattr(spec, "adapter", "power") or "power")
+            if self._power.breaker_state(adapter) == "open":
+                return "CIRCUIT_OPEN"
+        except Exception as exc:  # noqa: BLE001 - safety boundary fails closed
+            log_event("broker.power.probe_error", capability=capability,
+                      error=str(exc)[:160])
+            return "POWER_UNAVAILABLE"
         return None
 
     # ------------------------------------------------------------ registration

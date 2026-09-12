@@ -60,6 +60,25 @@ def _manifest_by_qubit():
     return {r["qubit"]: r for r in man["rows"] if r.get("qubit")}
 
 
+def _documented_added():
+    """Qubit-added vendored paths (owner amendment QUBIT_ADDED category).
+
+    A vendored tree may carry intentional Qubit additions when the comparison
+    manifest records them with a reason; anything else must remain
+    upstream-clean/byte-identical.
+    """
+    man = json.loads(
+        (REPO_ROOT / "docs/HERMES_SOURCE_COMPARISON.json").read_text())
+    added = set()
+    for entry in man.get("wave3", {}).get("added", []) or []:
+        if entry.get("qubit") and entry.get("role"):
+            added.add(entry["qubit"])
+    for row in man["rows"]:
+        if row.get("qubit") and row.get("patch") and row.get("reason"):
+            added.add(row["qubit"])
+    return added
+
+
 def test_vendor_byte_identical_or_documented_patch():
     """Every vendored file is either byte-identical to its pinned upstream
     file or carries a documented patch whose on-disk Qubit hash matches the
@@ -68,10 +87,18 @@ def test_vendor_byte_identical_or_documented_patch():
     for up_root, q_root in VENDOR_PAIRS:
         up = _tree_files(up_root)
         q = _tree_files(q_root)
-        assert set(up) == set(q), (
-            f"file-set drift in {q_root.name}: "
-            f"missing={sorted(set(up) - set(q))[:10]} "
-            f"extra={sorted(set(q) - set(up))[:10]}")
+        extra = set(q) - set(up)
+        qprefix = q_root.relative_to(REPO_ROOT).as_posix()
+        added = _documented_added()
+        undocumented_extra = sorted(
+            f"{qprefix}/{rel}" for rel in extra
+            if f"{qprefix}/{rel}" not in added)
+        assert not undocumented_extra, (
+            f"undocumented file additions in {q_root.name}: "
+            f"{undocumented_extra[:10]}")
+        assert not (set(up) - set(q)), (
+            f"missing vendored files in {q_root.name}: "
+            f"{sorted(set(up) - set(q))[:10]}")
         for rel in up:
             qrel = f"{q_root.relative_to(REPO_ROOT).as_posix()}/{rel}"
             row = rows.get(qrel)
@@ -94,11 +121,14 @@ def test_vendor_contains_no_undocumented_qubit_edits():
     upstream-clean. See docs/QUBIT_HERMES_CUTOVER_MIGRATION.md.
     """
     rows = _manifest_by_qubit()
+    added = _documented_added()
     hits = []
     for _, q_root in VENDOR_PAIRS:
         for rel, p in _tree_files(q_root).items():
             qrel = f"{q_root.relative_to(REPO_ROOT).as_posix()}/{rel}"
             row = rows.get(qrel) or {}
+            if qrel in added:
+                continue  # documented Qubit addition
             if row.get("patch") and row.get("reason"):
                 continue  # documented owner rebrand patch
             try:

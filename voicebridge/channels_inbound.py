@@ -60,6 +60,7 @@ REPLAY_CODE = "CHANNEL_REPLAY"
 TOO_LARGE_CODE = "CHANNEL_TOO_LARGE"
 EVENT_REFUSED_CODE = "CHANNEL_EVENT_REFUSED"
 CORRUPT_CODE = "CHANNEL_STORE_CORRUPT"
+E2EE_UNAVAILABLE_CODE = "CHANNEL_E2EE_UNAVAILABLE"
 
 _EVENT_RE = re.compile(r"^[a-z0-9][a-z0-9_.:-]{0,63}$")
 
@@ -663,6 +664,7 @@ def normalize_event(channel: str, payload: Any) -> Dict[str, Any]:
     sender = ""
     text = ""
     event_id = ""
+    encrypted = False
     if clean == "discord":
         author = data.get("author") if isinstance(data.get("author"), dict) else {}
         sender = str(author.get("id") or data.get("user_id") or "")
@@ -679,6 +681,11 @@ def normalize_event(channel: str, payload: Any) -> Dict[str, Any]:
         content = data.get("content") if isinstance(data.get("content"), dict) else {}
         text = str(content.get("body") or "")
         event_id = str(data.get("event_id") or "")
+        if not text and content.get("ciphertext"):
+            # E2EE event: no plaintext without a crypto boundary. Normalize the
+            # envelope metadata only; decrypt_event must be used to read it.
+            encrypted = True
+            event_id = event_id or str(content.get("session_id") or "")
     elif clean == "feishu":
         ev = data.get("event") if isinstance(data.get("event"), dict) else data
         msg = ev.get("message") if isinstance(ev.get("message"), dict) else {}
@@ -710,7 +717,47 @@ def normalize_event(channel: str, payload: Any) -> Dict[str, Any]:
                            f"payload has no recognizable {clean} message")
     return {"channel": clean, "sender": _redact(sender)[:MAX_SENDER_LEN],
             "text": _redact(text)[:MAX_NORMALIZED_TEXT],
-            "event_id": str(event_id)[:200]}
+            "event_id": str(event_id)[:200], "encrypted": bool(encrypted)}
+
+
+def decrypt_event(channel: str, payload: Any, *, decrypt: Any = None) -> Dict[str, Any]:
+    """Decrypt one encrypted channel event over an injected crypto boundary.
+
+    Matrix E2EE (``m.room.encrypted``) requires an olm/megolm boundary Qubit
+    does not ship. Without an injected ``decrypt(mapping) -> {"body": ...}``
+    callable an encrypted event is a typed ``CHANNEL_E2EE_UNAVAILABLE``; the
+    ciphertext is never treated as plaintext and is never logged.
+    """
+    clean = (channel or "").strip().lower()
+    if clean not in CHANNELS:
+        raise ChannelError(UNKNOWN_CODE, f"unknown channel {channel!r}")
+    data = _decode_json_payload(payload)
+    content = data.get("content") if isinstance(data, dict) else None
+    if not isinstance(content, dict) or not content.get("ciphertext"):
+        raise ChannelError(BAD_INPUT_CODE, "event is not an encrypted payload")
+    if not callable(decrypt):
+        raise ChannelError(
+            E2EE_UNAVAILABLE_CODE,
+            "encrypted events need an injected olm/megolm crypto boundary; "
+            "nothing was decrypted")
+    try:
+        out = decrypt({"ciphertext": content.get("ciphertext"),
+                       "algorithm": content.get("algorithm"),
+                       "sender_key": content.get("sender_key")})
+    except ChannelError:
+        raise
+    except Exception as exc:
+        raise ChannelError(
+            E2EE_UNAVAILABLE_CODE,
+            f"crypto boundary failed: {_redact(str(exc))[:160]}") from exc
+    if not isinstance(out, dict) or "body" not in out:
+        raise ChannelError(E2EE_UNAVAILABLE_CODE,
+                           "crypto boundary returned no plaintext body")
+    return {"state": "OK", "schema": SCHEMA, "channel": clean,
+            "encrypted": True,
+            "algorithm": str(content.get("algorithm", ""))[:64],
+            "sender": _redact(str(data.get("sender", "")))[:MAX_SENDER_LEN],
+            "text": _redact(str(out["body"]))[:MAX_NORMALIZED_TEXT]}
 
 
 def ingest(cfg: Any, *, channel: str, payload: Any, signature: str = "",

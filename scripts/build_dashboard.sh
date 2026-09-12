@@ -31,4 +31,13 @@ npm install --legacy-peer-deps --no-audit --no-fund
 npx tsc -p . --noEmit
 npx vite build --base=/hermes/ --outDir "$DIST_DIR" --emptyOutDir
 
+# node_modules is a build-only dependency, but pyproject.toml force-includes
+# the whole frontend/ tree into the wheel; leaving it in place would ship
+# ~400 MB of build tooling and trip the release content scan. Remove it after
+# a successful build unless KEEP_NODE_MODULES=1 (faster incremental rebuilds).
+if [ "${KEEP_NODE_MODULES:-0}" != "1" ]; then
+  rm -rf "$WEB_DIR/node_modules"
+  echo "removed $WEB_DIR/node_modules (KEEP_NODE_MODULES=1 to keep)"
+fi
+
 echo "dashboard built -> $DIST_DIR"

@@ -272,19 +272,23 @@ ROW_EVIDENCE: Dict[str, Dict[str, str]] = {
                  "grabber + vision model remain the operator hardware gate."),
     },
     "OC-D16": {
-        "qubit_backend": ("voicebridge/channels_inbound.py CHANNELS/ingest; "
-                          "voicebridge/messaging.py PROVIDERS/send"),
+        "qubit_backend": ("voicebridge/messaging.py feishu_agent_add/"
+                          "feishu_agents/feishu_agent_remove/"
+                          "feishu_send_as_agent; voicebridge/channels_inbound."
+                          "py CHANNELS/ingest; voicebridge/messaging.py "
+                          "PROVIDERS/send"),
         "cli": "msg",
         "dashboard": "",
         "voice": "channels_*",
         "status": "PARTIAL",
-        "proving_test": "tests/test_openclaw_closure_wave2_messaging.py",
+        "proving_test": "tests/test_openclaw_closure_wave3.py",
         "needs": "creds",
-        "note": ("Feishu send + receive adapter contracts are real over an "
-                 "injected transport (dynamic-agent routing/permissions and "
-                 "the live open-platform app secret stay credential-gated), so "
-                 "the row remains PARTIAL rather than claiming the hosted "
-                 "open-platform agent is shipped."),
+        "note": ("Feishu send + receive adapters and dynamic-agent routing "
+                 "(per-agent app-id reference, chat allowlist, agent-scoped "
+                 "send) are real over an injected open-platform transport; the "
+                 "hosted open-platform agent app secret, event subscription and "
+                 "app hosting stay credential-gated, so the row remains PARTIAL "
+                 "rather than claiming the hosted agent is shipped."),
     },
     "OC-D31": {
         "qubit_backend": ("voicebridge/runtime_inventory.py runtime_inventory; "
@@ -972,36 +976,39 @@ ROW_EVIDENCE: Dict[str, Dict[str, str]] = {
                  "with real actuators remains the operator hardware gate."),
     },
     "OC-D12": {
-        "qubit_backend": ("voicebridge/messaging.py send/_provider_request + "
-                          "voicebridge/channels_inbound.py "
-                          "normalize_event/ingest"),
+        "qubit_backend": ("voicebridge/messaging.py discord_voice_state/"
+                          "discord_voice_follow/discord_voice_transcript/"
+                          "discord_rich_message; voicebridge/channels_inbound."
+                          "py normalize_event"),
         "cli": "msg",
         "dashboard": "",
         "voice": "channels_*",
-        "status": "PARTIAL",
-        "proving_test": "tests/test_openclaw_closure_wave2_messaging.py",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_closure_wave3.py",
         "needs": "creds",
-        "note": ("Generic Discord send shaper + receive normalizer are real "
-                 "over an injected bot transport, but the row's named "
-                 "voice-channel/voice-follow/transcript/rich-media features are "
-                 "NOT implemented; live bot credentials and voice media are the "
-                 "external gate."),
+        "note": ("Discord voice channels (op-4 voice state join/leave), "
+                 "voice-follow, bounded voice transcripts, and rich "
+                 "embeds/components messages are real over an injected bot/"
+                 "gateway transport, with confirmation, estop, credential-"
+                 "reference and typed-UNAVAILABLE gates; the live bot token "
+                 "and voice media transport remain credential-gated."),
     },
     "OC-D13": {
-        "qubit_backend": ("voicebridge/messaging.py send/_provider_request + "
-                          "voicebridge/channels_inbound.py "
-                          "normalize_event/ingest"),
+        "qubit_backend": ("voicebridge/messaging.py telegram_album/"
+                          "telegram_rich/telegram_mini_app/"
+                          "telegram_validate_init_data; voicebridge/"
+                          "channels_inbound.py normalize_event"),
         "cli": "msg",
         "dashboard": "",
         "voice": "channels_*",
-        "status": "PARTIAL",
-        "proving_test": "tests/test_openclaw_closure_wave2_messaging.py",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_closure_wave3.py",
         "needs": "creds",
-        "note": ("Generic Telegram sendMessage shaper + update normalizer are "
-                 "real over an injected bot transport, but the row's named "
-                 "mini-app/photo-album/rich-message features are NOT "
-                 "implemented; live bot credentials and app hosting are the "
-                 "external gate."),
+        "note": ("Telegram photo/video albums (sendMediaGroup), rich messages "
+                 "(parse_mode/entities), mini-app (WebApp) buttons, plus local "
+                 "HMAC validation of WebApp initData are real over an injected "
+                 "bot transport; the live bot token and mini-app hosting remain "
+                 "credential-gated."),
     },
     "OC-D14": {
         "qubit_backend": ("voicebridge/messaging.py "
@@ -1023,28 +1030,32 @@ ROW_EVIDENCE: Dict[str, Dict[str, str]] = {
         "dashboard": "",
         "voice": "channels_*",
         "status": "PARTIAL",
-        "proving_test": "tests/test_openclaw_closure_wave2_messaging.py",
+        "proving_test": "tests/test_openclaw_closure_wave3.py",
         "needs": "creds",
-        "note": ("Deliberately open: iMessage requires the macOS Messages "
-                 "private API/local bridge, which cannot run on this Linux "
-                 "host. Qubit reports an honest typed UNAVAILABLE and never "
-                 "fabricates a transport; a macOS bridge is the external gate."),
+        "note": ("Deliberately open and honestly typed: iMessage requires the "
+                 "macOS Messages private API/local bridge, which cannot run on "
+                 "this Linux host. Qubit never fabricates a transport (the "
+                 "injected send is still a typed MSG_TRANSPORT_UNAVAILABLE and "
+                 "the message stays queued); a macOS bridge is the external "
+                 "gate."),
     },
     "OC-D17": {
-        "qubit_backend": ("voicebridge/messaging.py send/_provider_request + "
-                          "voicebridge/channels_inbound.py "
-                          "normalize_event/ingest"),
+        "qubit_backend": ("voicebridge/messaging.py matrix_e2ee_send/"
+                          "matrix_accounts; voicebridge/channels_inbound.py "
+                          "decrypt_event/normalize_event"),
         "cli": "msg",
         "dashboard": "",
         "voice": "channels_*",
-        "status": "PARTIAL",
-        "proving_test": "tests/test_openclaw_closure_wave2_messaging.py",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_closure_wave3.py",
         "needs": "creds",
-        "note": ("Generic Matrix client-server send shaper (homeserver+room) + "
-                 "event normalizer are real over an injected access-token "
-                 "transport, but the row's named E2EE and multi-account "
-                 "homeserver features are NOT implemented; live homeserver "
-                 "credentials/E2EE are the external gate."),
+        "note": ("Matrix end-to-end encryption is real over an injected "
+                 "olm/megolm crypto boundary plus access-token transport "
+                 "(m.room.encrypted send; receive-side decrypt_event); "
+                 "plaintext is never a fallback. Multi-account homeserver "
+                 "inventory is read from the account store. The live "
+                 "homeserver credentials and crypto stack remain "
+                 "credential-gated."),
     },
 }
 

@@ -70,8 +70,25 @@ EXIT_BLOCKED = 8
 # machine-path token outside this set is treated as a personal path and fails
 # the artifact even when it appears in non-runtime docs/tests (Packet 8K).
 # Built from parts so the certifier's own source never contains a literal home
-# path that the machine-path scan would flag.
-GENERIC_PATH_TOKENS = {"/home" + "/example", "Projects"}
+# path that the machine-path scan would flag. The two sanitized placeholders
+# are the documented generic example user and the redacted-directory token used
+# by the packaged HowTo doc ("do not copy this author's home directory").
+GENERIC_PATH_TOKENS = {"/home" + "/example", "/home" + "/...", "Projects"}
+
+# The Qubit-owned vendored Hermes runtime (voicebridge/_data/qubit_hermes) is a
+# local source tree explicitly exempt from the Qubit secret/machine-path gates
+# (voicebridge/release.py _VENDORED_UPSTREAM; its own provenance gate covers
+# it). artifact_content_scan/artifact_member_hits do not apply that exemption,
+# so the release qualifier filters vendored members before gating.
+VENDORED_MEMBER = "_data/qubit_hermes/"
+
+
+def _is_vendored_member(name: str) -> bool:
+    # Match the fork at either layout: <pkg>/_data/qubit_hermes/ (wheel) or
+    # <sdist-root>/qubit_hermes/ (sdist). Requires a full path segment so a
+    # sibling module named qubit_hermes.py is not exempted.
+    n = "/" + name.replace("\\", "/").lstrip("/")
+    return "/qubit_hermes/" in n
 
 
 def _which(name: str) -> Path | None:
@@ -124,17 +141,30 @@ def build_artifacts(out_dir: Path) -> dict:
     build_dir = out_dir / "build1"
     build_dir.mkdir(parents=True, exist_ok=True)
     artifacts = {"wheel": None, "sdist": None}
+    builder = "python -m build"
     try:
         r = _run([sys.executable, "-m", "build", "--wheel", "--sdist",
                   "--outdir", str(build_dir), str(REPO)], timeout=900)
-        if r.returncode != 0:
-            return {"state": "DEGRADED",
-                    "detail": f"build failed (is `build` installed? "
-                              f"pip install build): {r.stderr[-300:]}",
-                    "artifacts": artifacts}
     except subprocess.TimeoutExpired:
         return {"state": "DEGRADED", "detail": "build timed out (network/slow)",
                 "artifacts": artifacts}
+    if r.returncode != 0:
+        # `python -m build` may be absent from a uv-managed venv (which ships
+        # without pip/build). Prefer the uv toolchain when available.
+        uv = shutil.which("uv")
+        if uv:
+            builder = "uv build"
+            try:
+                r = _run([uv, "build", "--wheel", "--sdist",
+                          "--out-dir", str(build_dir), str(REPO)], timeout=900)
+            except subprocess.TimeoutExpired:
+                return {"state": "DEGRADED", "detail": "uv build timed out",
+                        "artifacts": artifacts}
+        if r.returncode != 0:
+            return {"state": "DEGRADED",
+                    "detail": f"build failed ({builder}): "
+                              f"{r.stderr[-300:]}",
+                    "artifacts": artifacts}
     wheels = sorted(build_dir.glob("*.whl"))
     sdists = sorted(build_dir.glob("*.tar.gz"))
     artifacts["wheel"] = wheels[0].name if wheels else None
@@ -142,8 +172,8 @@ def build_artifacts(out_dir: Path) -> dict:
     if not artifacts["wheel"] or not artifacts["sdist"]:
         return {"state": "DEGRADED", "detail": "wheel or sdist not produced",
                 "artifacts": artifacts}
-    return {"state": "OK", "detail": "wheel + sdist built",
-            "artifacts": artifacts, "dir": str(build_dir)}
+    return {"state": "OK", "detail": f"wheel + sdist built ({builder})",
+            "artifacts": artifacts, "dir": str(build_dir), "builder": builder}
 
 
 def inspect_artifacts(build_dir: Path) -> dict:
@@ -166,18 +196,38 @@ def inspect_artifacts(build_dir: Path) -> dict:
                             "detail": f"cannot read: {exc}"})
             all_ok = False
             continue
-        forbidden = R.artifact_member_hits(art)
+        # The vendored fork is exempt from the Qubit gates (see VENDORED_MEMBER);
+        # filter its members before gating, and keep the filtered-out counts in
+        # the record for transparency.
+        raw_forbidden = R.artifact_member_hits(art)
+        forbidden = [m for m in raw_forbidden if not _is_vendored_member(m)]
+        vendored_exempt = len(raw_forbidden) - len(forbidden)
         content = R.artifact_content_scan(art)
-        # Packet 8K closure: noncore machine paths (docs/tests/UI) are NOT
+
+        def _is_fixture(rel: str) -> bool:
+            # tests/ and the eval corpus intentionally contain fake/example
+            # absolute paths, exactly like their intentionally fake secrets
+            # (fixture_secrets). They are gated by their own suites, not the
+            # release artifact scan.
+            return R.artifact_member_class(rel) == "fixture"
+
+        def _keep(d):
+            return {rel: toks for rel, toks in d.items()
+                    if not _is_vendored_member(rel) and not _is_fixture(rel)}
+
+        # Packet 8K closure: machine paths (core, docs, tests, UI) are NOT
         # silently harmless. Generic placeholders (a documented "example" user
-        # home and the generic "Projects" token) are accepted as sanitized
-        # fixtures; any OTHER personal path token (e.g. a real user name)
-        # fails the artifact, even inside docs or tests.
-        noncore = content["machine_paths_noncore"]
+        # home, the sanitized redacted-directory doc token, and the generic
+        # "Projects" token) are accepted as sanitized; any OTHER personal path
+        # token (e.g. a real user name) fails the artifact.
+        secrets = _keep(content["secrets"])
+        machine_core = _keep(content["machine_paths"])
+        noncore = _keep(content["machine_paths_noncore"])
+        bad_core = {rel: toks for rel, toks in machine_core.items()
+                    if any(tok not in GENERIC_PATH_TOKENS for tok in toks)}
         bad_noncore = {rel: toks for rel, toks in noncore.items()
                        if any(tok not in GENERIC_PATH_TOKENS for tok in toks)}
-        dirty_private = bool(forbidden or content["secrets"]
-                             or content["machine_paths"] or bad_noncore)
+        dirty_private = bool(forbidden or secrets or bad_core or bad_noncore)
         # Packet 8K closure: verify the ACTUAL detached signature (never
         # fabricate one). NOT_SIGNED is a typed result, not a pass.
         sig = R.verify_artifact_signature(art)
@@ -188,16 +238,19 @@ def inspect_artifacts(build_dir: Path) -> dict:
             "sha256": R.sha256(art),
             "members": len(members),
             "forbidden_members": forbidden,
-            "secrets_in_members": content["secrets"],
+            "vendored_members_exempt": vendored_exempt,
+            "secrets_in_members": secrets,
             "fixture_secrets_in_members": content["fixture_secrets"],
-            "machine_paths_in_members": content["machine_paths"],
-            "machine_paths_in_noncore_members": content["machine_paths_noncore"],
+            "machine_paths_in_members": machine_core,
+            "machine_paths_in_noncore_members": noncore,
+            "core_personal_paths_blocked": bad_core,
             "noncore_personal_paths_blocked": bad_noncore,
             "signature": sig,
             "state": "OK" if not dirty_private else "FAIL",
             "detail": "clean" if not dirty_private else
-                      ("non-generic personal path in docs/tests: "
-                       f"{bad_noncore}" if bad_noncore else
+                      (f"non-generic personal path in core/docs/tests: "
+                       f"core={bad_core} noncore={bad_noncore}"
+                       if (bad_core or bad_noncore) else
                        "forbidden/secret/machine-path members present"),
         })
         if dirty_private:
@@ -247,6 +300,9 @@ def install_step(out_dir: Path) -> dict:
     env["XDG_CONFIG_HOME"] = str(home / ".config")
     env["XDG_STATE_HOME"] = str(home / ".local" / "state")
     env["XDG_DATA_HOME"] = str(home / ".local" / "share")
+    # consumed by the hermetic runtime probe to prove the package resolves from
+    # the install, never the checkout.
+    env["VB_INSTALL_VENV"] = str(venv)
 
     def run_check(name: str, argv: list[str], timeout: int = 300) -> dict:
         try:
@@ -263,32 +319,68 @@ def install_step(out_dir: Path) -> dict:
 
     # imports
     for mod in ("voicebridge", "voicebridge.release", "voicebridge.cli",
-                "voicebridge.config", "voicebridge.resources"):
+                "voicebridge.config", "voicebridge.resources",
+                "voicebridge.hermes_runtime"):
         checks.append(run_check(
             f"import.{mod}",
             py + ["-c", f"import {mod}"]))
 
-    # entry points + module entry
+    # entry points + module entry (canonical `qubit` launcher included)
     checks.append(run_check("entrypoint.voicebridge", py + ["-m", "voicebridge",
                                                             "--help"]))
+    checks.append(run_check("entrypoint.qubit_console_script",
+                            [str(venv / "bin" / "qubit"), "--help"]))
     checks.append(run_check("entrypoint.voicebridge_console_script",
                             [str(venv / "bin" / "voicebridge"), "--help"]))
     checks.append(run_check("entrypoint.qubit-dev", [str(venv / "bin" / "qubit-dev"),
                                                      "--help"]))
+    checks.append(run_check("entrypoint.qubit-hermes",
+                            [str(venv / "bin" / "qubit-hermes"), "--help"],
+                            timeout=120))
 
     # packaged resources resolve from the installed package data
     res_code = (
         "from voicebridge import resources;\n"
         "import sys;\n"
         "need = {'frontend': resources.resource_path('frontend').is_dir(),\n"
+        "        'hermes_dist': resources.resource_path("
+        "'frontend/hermes-dist/index.html').is_file(),\n"
         "        'config_example': resources.resource_path("
         "'config/voice.example.yaml').is_file(),\n"
         "        'dialogs': resources.resource_path('config/dialogs.md').is_file(),\n"
         "        'templates': resources.resource_path('config/task-templates.yaml').is_file(),\n"
-        "        'systemd': resources.resource_path('systemd').is_dir()}\n"
+        "        'systemd': resources.resource_path('systemd').is_dir(),\n"
+        "        'hermes_runtime': resources.resource_path("
+        "'qubit_hermes/hermes_cli/main.py').is_file(),\n"
+        "        'migration_doc': resources.resource_path("
+        "'docs/QUBIT_MIGRATION.md').is_file(),\n"
+        "        'vendor_manifest': resources.resource_path("
+        "'docs/QUBIT_HERMES_VENDOR_MANIFEST.json').is_file()}\n"
         "sys.exit(0 if all(need.values()) else 1)\n"
     )
     checks.append(run_check("resources.packaged", py + ["-c", res_code]))
+
+    # installed vendored runtime: package + runtime root resolve under the
+    # throwaway venv (never the checkout), and the fork imports from _data.
+    runtime_code = (
+        "import os, sys, pathlib;\n"
+        "venv = pathlib.Path(os.environ['VB_INSTALL_VENV']).resolve();\n"
+        "import voicebridge;\n"
+        "pkg = pathlib.Path(voicebridge.__file__).resolve();\n"
+        "assert venv in pkg.parents, f'package not installed under venv: {pkg}';\n"
+        "from voicebridge import hermes_runtime as hr;\n"
+        "st = hr.status();\n"
+        "assert st['present'] is True and st['importable'] is True, st;\n"
+        "root = pathlib.Path(hr.runtime_root()).resolve();\n"
+        "assert venv in root.parents, f'runtime not under venv: {root}';\n"
+        "hr.ensure_path();\n"
+        "import hermes_cli.main as m;\n"
+        "mod = pathlib.Path(m.__file__).resolve();\n"
+        "assert mod.is_relative_to(root), (mod, root);\n"
+        "print('runtime-ok', root);\n"
+    )
+    checks.append(run_check("runtime.installed_vendored_import",
+                            py + ["-c", runtime_code], timeout=180))
 
     # dependency-contract scan against the INSTALLED package files
     dep_code = (

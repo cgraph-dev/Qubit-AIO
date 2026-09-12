@@ -1,0 +1,28 @@
+[
+  {
+    "name": "hermes-achievements",
+    "label": "Achievements",
+    "description": "Steam-style achievements for vibe coding and agentic Qubit workflows.",
+    "icon": "Star",
+    "version": "0.4.0",
+    "tab": { "path": "/achievements", "position": "after:analytics" },
+    "entry": "dist/index.js",
+    "css": "dist/style.css",
+    "has_api": true,
+    "source": "bundled",
+    "assetBase": "/plugins/hermes-achievements"
+  },
+  {
+    "name": "kanban",
+    "label": "Kanban",
+    "description": "Multi-agent collaboration board — drag-drop cards across columns, read comment threads, see which profile is running what",
+    "icon": "Package",
+    "version": "1.0.0",
+    "tab": { "path": "/kanban", "position": "after:skills" },
+    "entry": "dist/index.js",
+    "css": "dist/style.css",
+    "has_api": true,
+    "source": "bundled",
+    "assetBase": "/plugins/kanban"
+  }
+]

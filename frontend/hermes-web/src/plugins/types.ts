@@ -29,6 +29,13 @@ export interface PluginManifest {
    */
   integrity?: string;
   source: string;
+  /**
+   * Dashboard-relative asset root for the plugin's ``entry``/``css`` files.
+   * When omitted, the host loads them from the compat overlay root
+   * (``/dashboard-plugins/<name>``). Static fleet plugins ship their bundles
+   * inside the served SPA and set this to e.g. ``/plugins/<name>``.
+   */
+  assetBase?: string;
 }
 
 export interface RegisteredPlugin {

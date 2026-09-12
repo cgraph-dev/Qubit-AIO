@@ -88,7 +88,14 @@ def test_installer_qubit_owned_no_foreign_runtime():
 
     assert F.INSTALL_IDENTITY == "qubit-voicebridge"
     install_sh = (REPO_ROOT / "scripts" / "install.sh").read_text()
-    assert "hermes" not in install_sh.lower(), \
+    # The Qubit-owned vendored build-artifact path and fork directory carry the
+    # upstream name as a provenance/developer identifier; scrub exactly those
+    # before asserting the installer never references a foreign assistant
+    # runtime (no external install, command, service, or dependency).
+    scrubbed = install_sh.lower()
+    for vendored in ("frontend/hermes-dist", "qubit_hermes"):
+        scrubbed = scrubbed.replace(vendored, "<qubit-vendored>")
+    assert "hermes" not in scrubbed, \
         "installer must not reference a foreign assistant"
     assert not (REPO_ROOT / "scripts" / "install_hermes_runtime.sh").exists()
     assert not (REPO_ROOT / "voicebridge" / "runtime").exists()

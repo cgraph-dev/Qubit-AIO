@@ -1067,3 +1067,565 @@ def refuse_estop(operation: str) -> Dict[str, Any]:
                            "is latched; reset it before messaging changes.",
             "owner": "qubit-policy",
             "rollback": "outbox untouched; nothing sent"}
+
+
+# ---------------------------------------------------------------------------
+# OC-D12/D13/D17: channel feature adapters (voice / rich media / E2EE / agents)
+#
+# The code-side half of the named OpenClaw channel features. Qubit performs no
+# network or crypto I/O itself: the caller injects the transport (the live
+# bot/crypto boundary). Without one every call is a typed UNAVAILABLE, never a
+# fabricated success; each call is estop + confirmation + credential-reference
+# gated and audited redacted. No credential value is stored or returned.
+# ---------------------------------------------------------------------------
+MATRIX_E2EE_CODE = "MSG_MATRIX_E2EE_UNAVAILABLE"
+MAX_RICH_ITEMS = 10
+MAX_RICH_BYTES = 16_000
+MAX_TRANSCRIPT_CHARS = 8000
+FEISHU_AGENTS_NAME = "feishu-agents.json"
+
+
+def _bounded_items(items: Any, *, label: str,
+                   max_items: int = MAX_RICH_ITEMS) -> List[Any]:
+    """Validate a bounded list of JSON-serializable rich items."""
+    if items is None:
+        return []
+    if not isinstance(items, (list, tuple)):
+        raise MessagingError(BAD_INPUT_CODE, f"{label} must be a list")
+    if len(items) > max_items:
+        raise MessagingError(BAD_INPUT_CODE,
+                             f"{label} exceeds {max_items} items")
+    out: List[Any] = []
+    for item in items:
+        if not isinstance(item, dict):
+            raise MessagingError(BAD_INPUT_CODE,
+                                 f"{label} items must be mappings")
+        try:
+            raw = json.dumps(item, default=str)
+        except (TypeError, ValueError) as exc:
+            raise MessagingError(
+                BAD_INPUT_CODE, f"{label} not serializable: {exc}") from exc
+        if len(raw.encode("utf-8")) > MAX_RICH_BYTES:
+            raise MessagingError(BAD_INPUT_CODE,
+                                 f"{label} item exceeds the size cap")
+        out.append(item)
+    return out
+
+
+def _require_id(value: Any, label: str, *, max_len: int = 200) -> str:
+    text = str(value or "").strip()
+    if not text or len(text) > max_len:
+        raise MessagingError(BAD_INPUT_CODE,
+                             f"{label} must be 1..{max_len} chars")
+    return text
+
+
+def _feature_call(cfg: Any, account_id: str, provider: str, build: Any, *,
+                  operation: str, confirmed: bool, transport: Any,
+                  unavailable: str,
+                  requested_by: str = "cli:user") -> tuple:
+    """Shared gate for a channel feature adapter.
+
+    Order: estop -> confirmation -> account/provider match -> credential
+    reference resolvable -> injected transport present -> dispatch. The build
+    callable receives the account record and returns the bounded request. A
+    missing transport or credential is a typed refusal with nothing attempted.
+    """
+    from .plugins import estop_engaged
+    from .providers.credentials import resolve_key
+
+    if estop_engaged(cfg):
+        raise MessagingError(ESTOP_CODE,
+                             f"{operation}: emergency stop is latched")
+    if not confirmed:
+        raise MessagingError(CONFIRM_CODE,
+                             f"{operation} requires explicit --confirm")
+    rec = _get_account(cfg, account_id)
+    if rec.get("provider") != provider:
+        raise MessagingError(
+            BAD_INPUT_CODE,
+            f"account {account_id!r} is {rec.get('provider')!r}, not "
+            f"{provider!r}")
+    key, code = resolve_key(provider, _resolve_account_ref(rec))
+    if code or not key:
+        raise MessagingError(
+            NO_CREDENTIAL_CODE,
+            f"{operation}: credential reference unresolvable; nothing "
+            "attempted")
+    if transport is None:
+        raise MessagingError(UNAVAILABLE_CODE, unavailable)
+    if not callable(transport):
+        raise MessagingError(BAD_INPUT_CODE, "transport must be callable")
+    request = build(rec) if callable(build) else build
+    if not isinstance(request, dict) or not request:
+        raise MessagingError(UNAVAILABLE_CODE,
+                             f"{operation}: no bounded request could be built")
+    try:
+        data = transport(request)
+    except MessagingError:
+        raise
+    except Exception as exc:
+        detail = _redact(str(exc))
+        if key:
+            detail = detail.replace(key, "<redacted>")
+        raise MessagingError(UPSTREAM_CODE,
+                             f"{operation} failed: {detail}") from exc
+    if not isinstance(data, dict):
+        raise MessagingError(UPSTREAM_CODE,
+                             f"{operation}: transport returned a non-object")
+    _audit(operation, requested_by,
+           {"account": rec["id"], "provider": provider})
+    return rec, data
+
+
+# ------------------------------------------------------------------ Discord
+def discord_voice_state(cfg: Any, account_id: str, *, channel_id: Any,
+                        guild_id: Any = "", join: bool = True,
+                        self_mute: bool = True, self_deaf: bool = True,
+                        confirmed: bool = False, transport: Any = None,
+                        requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Join/leave a Discord voice channel (OC-D12) over a bot transport."""
+    ch = _require_id(channel_id, "channel_id")
+    request = {"provider": "discord", "type": "voice.state_update", "op": 4,
+               "d": {"guild_id": str(guild_id or "")[:64],
+                     "channel_id": ch if join else None,
+                     "self_mute": bool(self_mute),
+                     "self_deaf": bool(self_deaf)}}
+    rec, data = _feature_call(
+        cfg, account_id, "discord", request,
+        operation="discord.voice", confirmed=confirmed, transport=transport,
+        unavailable="Discord voice needs an injected gateway/bot transport; "
+                    "no voice state was sent",
+        requested_by=requested_by)
+    return {"state": "OK", "provider": "discord",
+            "operation": "voice.state_update", "channel_id": ch,
+            "joined": bool(join),
+            "provider_msg_id": str(data.get("id", ""))[:120]}
+
+
+def discord_voice_follow(cfg: Any, account_id: str, *, channel_id: Any,
+                         user_id: Any, confirmed: bool = False,
+                         transport: Any = None,
+                         requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Follow a user across Discord voice channels (OC-D12)."""
+    ch = _require_id(channel_id, "channel_id")
+    uid = _require_id(user_id, "user_id")
+    request = {"provider": "discord", "type": "voice.follow",
+               "channel_id": ch, "user_id": uid, "d": {"auto_follow": True}}
+    rec, data = _feature_call(
+        cfg, account_id, "discord", request,
+        operation="discord.voice_follow", confirmed=confirmed,
+        transport=transport,
+        unavailable="Discord voice-follow needs an injected voice transport; "
+                    "no follow was requested",
+        requested_by=requested_by)
+    return {"state": "OK", "provider": "discord", "channel_id": ch,
+            "following": uid}
+
+
+def discord_voice_transcript(cfg: Any, account_id: str, *, channel_id: Any,
+                             confirmed: bool = False, transport: Any = None,
+                             requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Fetch a bounded voice transcript (OC-D12) over a bot transport."""
+    ch = _require_id(channel_id, "channel_id")
+    request = {"provider": "discord", "type": "voice.transcript",
+               "channel_id": ch}
+    rec, data = _feature_call(
+        cfg, account_id, "discord", request,
+        operation="discord.voice_transcript", confirmed=confirmed,
+        transport=transport,
+        unavailable="Discord voice transcripts need an injected voice "
+                    "transport; nothing was captured",
+        requested_by=requested_by)
+    text = data.get("transcript") or data.get("text") or ""
+    return {"state": "OK", "provider": "discord", "channel_id": ch,
+            "transcript": _redact(str(text))[:MAX_TRANSCRIPT_CHARS],
+            "segments": int(data.get("segments") or 0)}
+
+
+def discord_rich_message(cfg: Any, account_id: str, *, channel_id: Any,
+                         content: str = "", embeds: Any = None,
+                         components: Any = None, confirmed: bool = False,
+                         transport: Any = None,
+                         requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Send a bounded rich Discord message (embeds/components, OC-D12)."""
+    ch = _require_id(channel_id, "channel_id")
+    body = {"content": _redact(str(content or ""))[:MAX_BODY_CHARS],
+            "embeds": _bounded_items(embeds, label="embeds"),
+            "components": _bounded_items(components, label="components",
+                                         max_items=5)}
+    if not body["content"] and not body["embeds"] and not body["components"]:
+        raise MessagingError(BAD_INPUT_CODE,
+                             "rich message needs content, embeds, or "
+                             "components")
+    request = {"provider": "discord", "type": "message.create",
+               "method": "POST",
+               "url": ("https://discord.com/api/v10/channels/"
+                       f"{urllib.parse.quote(ch, safe='')}/messages"),
+               "body": body}
+    rec, data = _feature_call(
+        cfg, account_id, "discord", request,
+        operation="discord.rich_message", confirmed=confirmed,
+        transport=transport,
+        unavailable="Discord rich messages need an injected bot transport; "
+                    "nothing was sent",
+        requested_by=requested_by)
+    return {"state": "OK", "provider": "discord",
+            "provider_msg_id": str(data.get("id", ""))[:120]}
+
+
+# ----------------------------------------------------------------- Telegram
+def telegram_album(cfg: Any, account_id: str, *, chat_id: Any, media: Any,
+                   caption: str = "", confirmed: bool = False,
+                   transport: Any = None,
+                   requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Send a bounded Telegram photo/video album via sendMediaGroup (OC-D13)."""
+    chat = _require_id(chat_id, "chat_id", max_len=64)
+    items = _bounded_items(media, label="media", max_items=10)
+    if not items:
+        raise MessagingError(BAD_INPUT_CODE,
+                             "album needs at least one media item")
+    for item in items:
+        kind = str(item.get("type", "")).strip().lower()
+        ref = str(item.get("media", "")).strip()
+        if kind not in ("photo", "video", "document", "audio"):
+            raise MessagingError(
+                BAD_INPUT_CODE, f"unsupported album item type {kind!r}")
+        if not ref or len(ref) > 1024:
+            raise MessagingError(BAD_INPUT_CODE,
+                                 "album media reference is invalid")
+    request = {"provider": "telegram", "type": "sendMediaGroup",
+               "body": {"chat_id": chat, "media": items,
+                        "caption": _redact(str(caption or ""))[:1024]}}
+    rec, data = _feature_call(
+        cfg, account_id, "telegram", request,
+        operation="telegram.album", confirmed=confirmed,
+        transport=transport,
+        unavailable="Telegram albums need an injected bot transport; nothing "
+                    "was sent",
+        requested_by=requested_by)
+    result = data.get("result")
+    first = result[0] if isinstance(result, list) and result else {}
+    mid = first.get("message_id") if isinstance(first, dict) else ""
+    return {"state": "OK", "provider": "telegram", "count": len(items),
+            "provider_msg_id": str(mid) if mid != "" else ""}
+
+
+def telegram_rich(cfg: Any, account_id: str, *, chat_id: Any, text: str,
+                  parse_mode: str = "", entities: Any = None,
+                  confirmed: bool = False, transport: Any = None,
+                  requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Send a bounded rich Telegram message (parse_mode/entities, OC-D13)."""
+    chat = _require_id(chat_id, "chat_id", max_len=64)
+    body: Dict[str, Any] = {
+        "chat_id": chat,
+        "text": _redact(str(text or ""))[:MAX_BODY_CHARS]}
+    if parse_mode:
+        if parse_mode not in ("Markdown", "MarkdownV2", "HTML"):
+            raise MessagingError(
+                BAD_INPUT_CODE,
+                "parse_mode must be Markdown, MarkdownV2, or HTML")
+        body["parse_mode"] = parse_mode
+    ents = _bounded_items(entities, label="entities", max_items=50)
+    if ents:
+        body["entities"] = ents
+    request = {"provider": "telegram", "type": "sendMessage", "body": body}
+    rec, data = _feature_call(
+        cfg, account_id, "telegram", request,
+        operation="telegram.rich", confirmed=confirmed, transport=transport,
+        unavailable="Telegram rich messages need an injected bot transport; "
+                    "nothing was sent",
+        requested_by=requested_by)
+    result = data.get("result") if isinstance(data.get("result"), dict) else {}
+    return {"state": "OK", "provider": "telegram",
+            "provider_msg_id": str(result.get("message_id", ""))}
+
+
+def telegram_mini_app(cfg: Any, account_id: str, *, chat_id: Any, text: str,
+                      mini_app_url: Any, confirmed: bool = False,
+                      transport: Any = None,
+                      requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Send a Telegram mini-app (WebApp) button (OC-D13)."""
+    chat = _require_id(chat_id, "chat_id", max_len=64)
+    url = str(mini_app_url or "").strip()
+    if not url.startswith("https://") or len(url) > 1024:
+        raise MessagingError(BAD_INPUT_CODE,
+                             "mini_app_url must be a bounded https URL")
+    body = {"chat_id": chat,
+            "text": _redact(str(text or ""))[:MAX_BODY_CHARS],
+            "reply_markup": {"inline_keyboard": [
+                [{"text": "Open", "web_app": {"url": url}}]]}}
+    request = {"provider": "telegram", "type": "sendMessage", "body": body}
+    rec, data = _feature_call(
+        cfg, account_id, "telegram", request,
+        operation="telegram.mini_app", confirmed=confirmed,
+        transport=transport,
+        unavailable="Telegram mini-apps need an injected bot transport; "
+                    "nothing was sent",
+        requested_by=requested_by)
+    result = data.get("result") if isinstance(data.get("result"), dict) else {}
+    return {"state": "OK", "provider": "telegram",
+            "mini_app_url": url,
+            "provider_msg_id": str(result.get("message_id", ""))}
+
+
+def telegram_validate_init_data(init_data: Any, bot_token: Any) -> Dict[str, Any]:
+    """Validate Telegram WebApp ``initData`` with the bot token (OC-D13).
+
+    Pure, local HMAC-SHA256 verification of the documented Telegram scheme
+    (``secret = HMAC_SHA256(bot_token, "WebAppData")``). Never returns the
+    token and never makes a network call; a malformed or unsigned blob is a
+    typed INVALID result rather than an exception.
+    """
+    import hmac as _hmac
+
+    raw = str(init_data or "")
+    token = str(bot_token or "")
+    if not raw or not token:
+        return {"state": "INVALID", "valid": False, "code": BAD_INPUT_CODE,
+                "reason": "initData and bot token are required"}
+    try:
+        pairs = urllib.parse.parse_qsl(raw, keep_blank_values=True)
+    except ValueError:
+        return {"state": "INVALID", "valid": False, "code": BAD_INPUT_CODE,
+                "reason": "initData is not a query string"}
+    fields = {str(k): str(v) for k, v in pairs}
+    presented = fields.pop("hash", "")
+    if not presented:
+        return {"state": "INVALID", "valid": False, "code": BAD_INPUT_CODE,
+                "reason": "initData has no hash"}
+    check = "\n".join(f"{k}={fields[k]}" for k in sorted(fields))
+    secret = _hmac.new(b"WebAppData", token.encode("utf-8"),
+                       hashlib.sha256).digest()
+    expected = _hmac.new(secret, check.encode("utf-8"),
+                         hashlib.sha256).hexdigest()
+    valid = _hmac.compare_digest(expected, presented.lower())
+    auth_date: Any = fields.get("auth_date", "")
+    try:
+        auth_date = int(auth_date)
+    except (TypeError, ValueError):
+        auth_date = 0
+    return {"state": "OK" if valid else "INVALID", "valid": bool(valid),
+            "auth_date": auth_date,
+            "user": _redact(fields.get("user", ""))[:400]}
+
+
+# ------------------------------------------------------------------- Matrix
+def matrix_accounts(cfg: Any) -> Dict[str, Any]:
+    """Read-only multi-account Matrix homeserver inventory (OC-D17)."""
+    state = _load_json(_accounts_path(cfg), _blank_accounts, "accounts")
+    rows: List[Dict[str, Any]] = []
+    for rec in state["accounts"].values():
+        if rec.get("provider") != "matrix":
+            continue
+        fields = rec.get("fields", {}) if isinstance(rec.get("fields"), dict) \
+            else {}
+        rows.append({"account": rec.get("id", ""),
+                     "homeserver": _redact(
+                         str(fields.get("homeserver", "")))[:200],
+                     "device_id": _redact(
+                         str(fields.get("device_id", "")))[:64],
+                     "key_ref_kind": rec.get("key_ref_kind", "missing")})
+    return {"state": "OK", "accounts": rows,
+            "homeservers": sorted({r["homeserver"] for r in rows
+                                   if r["homeserver"]})}
+
+
+def matrix_e2ee_send(cfg: Any, account_id: str, *, room_id: Any, body: str,
+                     algorithm: str = "m.megolm.v1.aes-sha2",
+                     crypto: Any = None, transport: Any = None,
+                     confirmed: bool = False,
+                     requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Send an end-to-end-encrypted Matrix event (OC-D17).
+
+    E2EE requires an injected olm/megolm crypto boundary (Qubit ships no
+    crypto stack) *and* an injected access-token transport. Without the crypto
+    boundary the call is a typed ``MSG_MATRIX_E2EE_UNAVAILABLE``; without the
+    transport it is the shared UNAVAILABLE gate. Plaintext is never sent as a
+    fallback.
+    """
+    room = _require_id(room_id, "room_id")
+    if not callable(crypto):
+        raise MessagingError(
+            MATRIX_E2EE_CODE,
+            "Matrix E2EE needs an injected olm/megolm crypto boundary; "
+            "nothing was sent")
+    try:
+        envelope = crypto({"body": str(body or ""), "room_id": room,
+                           "algorithm": algorithm})
+    except Exception as exc:
+        raise MessagingError(
+            UPSTREAM_CODE,
+            f"matrix crypto boundary failed: {_redact(str(exc))[:160]}"
+        ) from exc
+    if not isinstance(envelope, dict) or not envelope.get("ciphertext"):
+        raise MessagingError(UPSTREAM_CODE,
+                             "crypto boundary returned no ciphertext")
+
+    def _build(rec: Dict[str, Any]) -> Dict[str, Any]:
+        fields = rec.get("fields", {}) if isinstance(rec.get("fields"), dict) \
+            else {}
+        homeserver = str(fields.get("homeserver", "")).strip().rstrip("/")
+        txn = uuid.uuid4().hex
+        return {"provider": "matrix", "type": "m.room.encrypted",
+                "method": "PUT",
+                "url": (f"{homeserver}/_matrix/client/v3/rooms/"
+                        f"{urllib.parse.quote(room, safe='')}"
+                        f"/send/m.room.encrypted/{txn}"),
+                "body": {
+                    "algorithm": str(envelope.get("algorithm")
+                                     or algorithm)[:64],
+                    "ciphertext": str(envelope["ciphertext"])[:100_000],
+                    "sender_key": str(envelope.get("sender_key", ""))[:128],
+                    "device_id": str(envelope.get("device_id", ""))[:64],
+                    "session_id": str(envelope.get("session_id", ""))[:128]}}
+
+    rec, data = _feature_call(
+        cfg, account_id, "matrix", _build,
+        operation="matrix.e2ee_send", confirmed=confirmed,
+        transport=transport,
+        unavailable="Matrix E2EE needs an injected access-token transport; "
+                    "nothing was sent",
+        requested_by=requested_by)
+    return {"state": "OK", "provider": "matrix", "room_id": room,
+            "encrypted": True,
+            "provider_msg_id": str(data.get("event_id", ""))[:200]}
+
+
+# ------------------------------------------------------------------- Feishu
+def _feishu_agents_path(cfg: Any) -> Path:
+    return Path(cfg.state_dir()) / FEISHU_AGENTS_NAME
+
+
+def _blank_agents() -> Dict[str, Any]:
+    return {"schema": SCHEMA, "agents": {}}
+
+
+def _check_allowlist(allowlist: Any) -> List[str]:
+    if allowlist is None:
+        return []
+    if isinstance(allowlist, str):
+        allowlist = [a for a in allowlist.replace(",", " ").split() if a]
+    if not isinstance(allowlist, (list, tuple)):
+        raise MessagingError(BAD_INPUT_CODE, "allowlist must be a list")
+    out: List[str] = []
+    for item in allowlist:
+        text = str(item or "").strip()[:120]
+        if text and text not in out:
+            out.append(text)
+    if len(out) > 50:
+        raise MessagingError(BAD_INPUT_CODE, "allowlist exceeds 50 entries")
+    return out
+
+
+def feishu_agent_add(cfg: Any, agent_id: Any, *, app_id_ref: str,
+                     allowlist: Any = None, commands: Any = None,
+                     confirmed: bool = False,
+                     requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Record a dynamic Feishu agent route (OC-D16).
+
+    Stores only a routing record: the open-platform ``app_id`` *reference*
+    (``env:``/``file:``), an optional chat allowlist, and optional command
+    allowlist. The secret value is never stored. Explicit confirmation.
+    """
+    if not confirmed:
+        raise MessagingError(CONFIRM_CODE,
+                             "feishu agent add requires explicit --confirm")
+    clean = _check_id(agent_id)
+    ref = (app_id_ref or "").strip()
+    if _secret_kind(ref) == "missing":
+        raise MessagingError(BAD_INPUT_CODE,
+                             "app_id_ref must be an env:VAR or file:PATH "
+                             "reference")
+    cmds = _check_allowlist(commands)
+    state = _load_json(_feishu_agents_path(cfg), _blank_agents, "feishu agents")
+    if clean in state["agents"]:
+        raise MessagingError(EXISTS_CODE, f"agent {clean!r} exists")
+    rec = {"id": clean, "app_id_ref_kind": _secret_kind(ref),
+           "allowlist": _check_allowlist(allowlist), "commands": cmds,
+           "enabled": True, "created_at": _now(),
+           "updated_by": requested_by}
+    if ref.startswith("env:"):
+        rec["_app_id_name"] = ref[len("env:"):].strip()[:64]
+    else:
+        rec["_app_id_path"] = ref
+    state["agents"][clean] = rec
+    _save_json(_feishu_agents_path(cfg), state, "feishu agents")
+    _audit("feishu.agent_add", requested_by, {"agent": clean})
+    return {"state": "OK", "agent": {k: v for k, v in rec.items()
+                                     if not k.startswith("_app_id")}}
+
+
+def feishu_agents(cfg: Any) -> Dict[str, Any]:
+    """Read-only dynamic-agent inventory (redacted references)."""
+    state = _load_json(_feishu_agents_path(cfg), _blank_agents, "feishu agents")
+    return {"state": "OK",
+            "agents": [{k: v for k, v in rec.items()
+                        if not k.startswith("_app_id")}
+                       for rec in sorted(state["agents"].values(),
+                                         key=lambda r: r.get("id", ""))]}
+
+
+def feishu_agent_remove(cfg: Any, agent_id: Any, *, confirmed: bool = False,
+                        requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Remove a dynamic Feishu agent route (confirmed)."""
+    if not confirmed:
+        raise MessagingError(CONFIRM_CODE,
+                             "feishu agent remove requires explicit --confirm")
+    state = _load_json(_feishu_agents_path(cfg), _blank_agents, "feishu agents")
+    clean = _check_id(agent_id)
+    if clean not in state["agents"]:
+        raise MessagingError(NOT_FOUND_CODE, f"no agent {agent_id!r}")
+    del state["agents"][clean]
+    _save_json(_feishu_agents_path(cfg), state, "feishu agents")
+    _audit("feishu.agent_remove", requested_by, {"agent": clean})
+    return {"state": "OK", "removed": clean}
+
+
+def feishu_send_as_agent(cfg: Any, account_id: str, *, to: Any, body: str,
+                         agent_id: Any, confirmed: bool = False,
+                         transport: Any = None,
+                         requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Send as a configured dynamic Feishu agent (OC-D16).
+
+    Routes the send through the stored agent record and the injected
+    open-platform transport. An unknown/disabled agent is a typed refusal;
+    a chat outside the agent's allowlist is refused before any transport call.
+    """
+    clean = _check_id(agent_id)
+    agents = _load_json(_feishu_agents_path(cfg), _blank_agents,
+                        "feishu agents")["agents"]
+    agent = agents.get(clean)
+    if agent is None:
+        raise MessagingError(NOT_FOUND_CODE, f"no agent {agent_id!r}")
+    if agent.get("enabled") is False:
+        raise MessagingError(BAD_INPUT_CODE, f"agent {agent_id!r} is disabled")
+    allow = agent.get("allowlist", [])
+    target = _require_id(to, "recipient", max_len=MAX_TO_LEN)
+    if allow and target not in allow and "*" not in allow:
+        raise MessagingError(BAD_INPUT_CODE,
+                             f"recipient {target!r} is not in agent "
+                             f"{agent_id!r}'s allowlist")
+
+    def _build(rec: Dict[str, Any]) -> Dict[str, Any]:
+        fields = rec.get("fields", {}) if isinstance(rec.get("fields"), dict) \
+            else {}
+        webhook = str(fields.get("webhook_url", "")).strip()
+        return {"provider": "feishu", "type": "message.create",
+                "agent_id": clean, "url": webhook,
+                "body": {"msg_type": "text",
+                         "content": {"text": _redact(str(body or ""))
+                                     [:MAX_BODY_CHARS]},
+                         "agent_id": clean}}
+
+    rec, data = _feature_call(
+        cfg, account_id, "feishu", _build,
+        operation="feishu.send_as_agent", confirmed=confirmed,
+        transport=transport,
+        unavailable="Feishu dynamic agents need an injected open-platform "
+                    "transport; nothing was sent",
+        requested_by=requested_by)
+    inner = data.get("data") if isinstance(data.get("data"), dict) else {}
+    mid = inner.get("message_id") or data.get("message_id", "")
+    return {"state": "OK", "provider": "feishu", "agent_id": clean,
+            "provider_msg_id": str(mid)[:120]}

@@ -14,11 +14,15 @@ MAX_DEPTH = 6
 MAX_ITEMS = 200
 MASK = "[REDACTED]"
 
+# The optional ``\"?`` on both sides of the separator lets quoted JSON/object
+# keys redact too: ``{"password": "hunter2"}`` and ``"token":"abc"`` must not
+# leak just because the key/separator are double-quoted. The replacement keeps
+# groups 1 (key) + 2 (separator, quotes included) verbatim.
 _SECRET_KEY = re.compile(
     r"(?i)(?:\b|(?<=_))(api[_-]?key|apikey|access[_-]?token|refresh[_-]?token|"
     r"auth[_-]?token|token|secret|client[_-]?secret|password|passwd|pwd|"
     r"authorization|cookie|session[_-]?id|private[_-]?key|credentials?)"
-    r"\b(\s*[=:]\s*)([^\s,&\"']+)")
+    r"\b(\"?\s*[=:]\s*\"?)([^\s,&\"']+)")
 _BEARER = re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}")
 _JWT = re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}")
 _SK_KEY = re.compile(r"\bsk-[A-Za-z0-9_-]{12,}\b")

@@ -55,7 +55,7 @@ SPEECH_WORDS = 40
 MATCH, CLARIFY, AMBIGUOUS, UNKNOWN = "match", "clarify", "ambiguous", "unknown"
 EXECUTED, NEEDS_CONFIRM, FAILED, REFUSED = "executed", "needs-confirm", "failed", "refused"
 
-_WAKE_RE = re.compile(r"\b(hey\s+qubit|ok\s+qubit|qubit|computer)\b", re.I)
+_WAKE_RE = re.compile(r"\b(hey\s+qubit|ok\s+qubit|qubit)\b", re.I)
 _PLEASE_RE = re.compile(r"\bplease\b", re.I)
 _WS_RE = re.compile(r"\s+")
 
@@ -4929,7 +4929,7 @@ _E("brain_account_remove", "Remove Brain account",
    examples=("qubit, remove brain account",),
    help="Remove an account binding (confirmed).")
 _E("brain_vault_list", "List vault references",
-   ("list vault references", "show vault", "vault status"),
+   ("list vault references", "show vault", "brain vault status"),
    "brain", ("memory",), fixed=(("action", "vault_list"),),
    examples=("qubit, list vault references",),
    help="Secret references (kinds only).")
@@ -5426,7 +5426,7 @@ _E("computer_doctor", "Desktop health",
    examples=("qubit, desktop health",),
    help="Display/accessibility/driver probes.")
 _E("computer_permissions", "Desktop permissions",
-   ("desktop permissions", "computer permissions", "what can qubit touch"),
+   ("desktop permissions", "computer permissions", "what can you touch"),
    "computer", ("computer-use",), fixed=(("action", "permissions"),),
    examples=("qubit, desktop permissions",),
    help="Bounded desktop scope (control disabled).")
@@ -5473,7 +5473,7 @@ _E("lsp_install_refusal", "Install language server",
    examples=("qubit, install language server",),
    help="Typed refusal: binaries are never downloaded.")
 _E("lessons_list", "List lessons",
-   ("list lessons", "show lessons", "what did you learn", "pending reviews"),
+   ("list lessons", "show lessons", "what have you learned", "pending reviews"),
    "lessons", ("curator/journey/learning/memory-graph",),
    fixed=(("action", "list"),),
    examples=("qubit, list lessons",),
@@ -5906,7 +5906,7 @@ _E("ghost_type", "Fill this form",
    examples=("qubit, type into this field name hello",),
    help="Type into the exact semantic target (confirmed, grant-bound).")
 _E("ghost_read_tab", "Read the browser tab",
-   ("read the browser tab", "read this tab", "read the tab",
+   ("read the browser tab", "ghost read this tab", "read the tab",
     "what is in the tab", "list browser tabs"),
    "ghost", ("ghost",), args=(_S("role"), _S("scope")),
    fixed=(("action", "read_tab"),),
@@ -6168,7 +6168,7 @@ _E("experiments_promote", "Promote experiment",
    examples=("qubit, promote experiment",),
    help="Owner-approved promotion (confirmed).")
 _E("product_status", "Product status",
-   ("product status", "installation overview", "qubit install status",
+   ("product status", "installation overview", "install status",
     "product capabilities"),
    "product", ("product",), fixed=(("action", "status"),),
    examples=("qubit, product status",),
@@ -6909,7 +6909,7 @@ _E("local_models_resolve", "Resolve model fallback",
    examples=("qubit, resolve model fallback",),
    help="Pick the requested or first available loopback model.")
 _E("gateway_supervision_request", "Request gateway supervision",
-   ("request gateway supervision", "supervise gateway"),
+   ("request gateway supervision", "supervise the gateway"),
    "gateway", ("gateway",),
    args=(_S("gateway_id"),
          _S("target_action")),

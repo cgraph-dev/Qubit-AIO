@@ -3,23 +3,28 @@
  "source": "hermes",
  "upstream_pin": "2237be355906fbe6065ce1815711eee52b2d646e",
  "generated": "2026-09-12",
- "method": "Evidence-based regeneration. API rows re-extract the pinned upstream route decorators and classify them from voicebridge.hermes_compat.match disposition plus the handler's real behaviour (a handler whose normal exits are typed gates/refusals is GATED; a real read/write is IMPLEMENTED; a wire-shape stub is PARTIAL). IMPLEMENTED additionally requires an on-disk tests/ function that dispatches the route, calls the handler, or calls the same downstream production module (AST scan), so no row is IMPLEMENTED on a phantom caller. cli / cli-subcommand rows derive status from the live voicebridge.cli build_parser tree plus voicebridge.cli_hermes_forward.FORWARD_TABLE and an AST scan of tests/ for the exercising caller. No status is hand-flipped.",
+ "method": "Evidence-based regeneration. API rows re-extract the pinned upstream route decorators and classify them from voicebridge.hermes_compat.match disposition plus the handler's real behaviour (a handler whose normal exits are typed gates/refusals is GATED; a real read/write is IMPLEMENTED; a wire-shape stub is PARTIAL). IMPLEMENTED additionally requires an on-disk tests/ function that dispatches the route, calls the handler, or calls the same downstream production module (AST scan), so no row is IMPLEMENTED on a phantom caller. cli / cli-subcommand rows derive status from the live voicebridge.cli build_parser tree plus voicebridge.cli_hermes_forward.FORWARD_TABLE and an AST scan of tests/ for the exercising caller. Plugin-fleet rows are declared explicitly and are IMPLEMENTED only when tests/test_hermes_plugins.py dispatches the registered compat handler over real local state. No status is hand-flipped.",
  "sources_reconciled": [
   "voicebridge/hermes_compat.py",
+  "voicebridge/hermes_plugins.py",
   "voicebridge/cli.py",
   "voicebridge/cli_hermes_forward.py",
   "tests/ (AST caller evidence)",
+  "tests/test_hermes_plugins.py (plugin-fleet proof)",
   "qubit_hermes/hermes_cli/web_routers",
   "qubit_hermes/hermes_cli/web_server*.py",
   "qubit_hermes/hermes_cli/memory_oauth.py",
   "qubit_hermes/hermes_cli/dashboard_auth/routes.py",
+  "qubit_hermes/plugins/hermes-achievements/dashboard/plugin_api.py",
+  "qubit_hermes/plugins/kanban/dashboard/plugin_api.py",
   "qubit_hermes/web/src/App.tsx"
  ],
  "counts": {
-  "total": 418,
+  "total": 421,
   "by_status": {
    "GATED": 109,
-   "IMPLEMENTED": 309
+   "IMPLEMENTED": 311,
+   "PARTIAL": 1
   },
   "by_area": {
    "analytics-config": 4,
@@ -32,6 +37,7 @@
    "dashboard-auth": 11,
    "dashboard-page": 20,
    "dashboard-ui": 15,
+   "dashboard_plugin": 3,
    "files-fs": 18,
    "gateway-actions": 6,
    "git": 21,
@@ -928,7 +934,7 @@
    "dashboard": "hermes-dist Plugins/System",
    "voice": "voice plugins",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_dashboard_font_theme_and_visibility_persist",
+   "proving_test": "tests/test_branding_parity_wave3.py::test_served_theme_carries_full_visual_identity",
    "note": "",
    "needs": "owner"
   },
@@ -5900,6 +5906,48 @@
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_docs_served_spa",
    "note": "Docs page reachable via the served SPA shell (200).",
+   "needs": "none"
+  },
+  {
+   "id": "plugin:hermes-achievements",
+   "area": "dashboard_plugin",
+   "capability": "hermes dashboard plugin hermes-achievements (API + state)",
+   "upstream_ref": "qubit_hermes/plugins/hermes-achievements/dashboard/plugin_api.py:57",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_plugin_achievements",
+   "cli": "",
+   "dashboard": "hermes-dist Achievements tab (/achievements)",
+   "voice": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_plugins.py::test_achievements_routes_compute_real_state",
+   "note": "Real backend in voicebridge/hermes_plugins.py: reuses the vendored achievement engine + hermes_state.SessionDB over the local session history, persists snapshot/checkpoint/unlock state under the Qubit state dir (0600), and serves /achievements, /scan-status, /recent-unlocks, /sessions/{id}/badges, /rescan, /reset-state. The plugin JS bundle is served by the webui overlay path, not this compat backend.",
+   "needs": "none"
+  },
+  {
+   "id": "plugin:kanban",
+   "area": "dashboard_plugin",
+   "capability": "hermes dashboard plugin kanban (read API)",
+   "upstream_ref": "qubit_hermes/plugins/kanban/dashboard/plugin_api.py:266",
+   "qubit_backend": "voicebridge/hermes_plugins.py",
+   "cli": "",
+   "dashboard": "hermes-dist Kanban tab (/kanban)",
+   "voice": "",
+   "status": "PARTIAL",
+   "proving_test": "tests/test_hermes_plugins.py::test_kanban_read_routes_serve_real_board",
+   "note": "Real read API in voicebridge/hermes_plugins.py backed by the vendored hermes_cli.kanban_db (board/tasks/stats/assignees/boards/config/projects/workers/diagnostics/model-options); mutating routes stay on the shared typed KANBAN_WRITE_BROKERED confirmation/broker gate and are not yet served directly.",
+   "needs": "owner"
+  },
+  {
+   "id": "plugin:fleet-discovery",
+   "area": "dashboard_plugin",
+   "capability": "hermes dashboard plugin fleet discovery",
+   "upstream_ref": "qubit_hermes/hermes_cli/web_server_dashboard.py:537",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_plugin_fleet",
+   "cli": "",
+   "dashboard": "hermes-dist Plugins page",
+   "voice": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_plugins.py::test_plugin_fleet_discovery_lists_vendored_plugins",
+   "note": "GET /api/dashboard/plugins/fleet returns the vendored plugin manifests (source=vendored) additively; the fixed ten-plugin overlay response at /api/dashboard/plugins is unchanged.",
    "needs": "none"
   }
  ]

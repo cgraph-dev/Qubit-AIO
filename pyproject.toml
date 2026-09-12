@@ -206,6 +206,19 @@ exclude = [
   # working-tree documents the developer edits in parallel with packaging; they
   # carry machine-specific history and must not ship (Packet 8K sdist privacy)
   "docs/UNIFIED_AGENT_PLAN.md",
+  # internal migration/audit/evidence notes that record the developer's real
+  # home path; excluded from the sdist so the release carries no developer
+  # home path (the repo retains the provenance records). Sanitizing the source
+  # docs remains the owning agent's follow-up.
+  "docs/8TF_COMPLETE_MIGRATION_PLAN.md",
+  "docs/8TF_SOURCE_OF_TRUTH.md",
+  "docs/AUDIT_OPENCLAW_2026-09-11.md",
+  "docs/AUDIT_OPENCLAW_V2026_9_4_DELTA.md",
+  "docs/BAKEOFF_4D.json",
+  "docs/BAKEOFF_4D.md",
+  "docs/OPERATIONS_8S.md",
+  "docs/QUBIT_COMPLETION_EVIDENCE.md",
+  "docs/QUBIT_FINAL_CODE_READY_PROMPT.md",
   "tests/test_new_features.py",
   "scripts/browser_profiles",
   "scripts/browser_auto_state",

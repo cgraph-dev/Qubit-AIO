@@ -154,7 +154,10 @@ class ApprovalJournal:
             item = self._items[approval_id]
             if item.state == COMPLETE:
                 return item
-            assert item.state == EXECUTING, f"finish on {item.state}"
+            if item.state != EXECUTING:
+                # Explicit (not ``assert``) so ``python -O`` cannot strip the
+                # guard and let an unapproved record reach COMPLETE.
+                raise AssertionError(f"finish on {item.state}")
             item.state, item.settled_at = COMPLETE, self._clock()
         self._append(item)
         self._emit("approval.finished", item)

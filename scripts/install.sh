@@ -32,15 +32,28 @@ if [ ! -x "$VENV/bin/python" ]; then
   command -v uv >/dev/null || { echo "ERROR: uv not found — install: curl -LsSf https://astral.sh/uv/install.sh | sh"; exit 1; }
   (cd "$PROJECT_DIR" && uv venv --python 3.12 .venv)
 fi
-echo "==> installing python deps"
-uv pip install --python "$VENV/bin/python" \
-  sherpa-onnx sounddevice numpy pyyaml websockets piper-tts \
-  faster-whisper webrtcvad setuptools pynput pytest playwright edge-tts onnx 2>/dev/null \
-  || uv pip install --python "$VENV/bin/python" \
-     sherpa-onnx sounddevice numpy pyyaml websockets piper-tts \
-     faster-whisper webrtcvad setuptools pynput pytest playwright edge-tts onnx
+# The dashboard bundle (frontend/hermes-dist) is a build artifact and is not
+# tracked in git; a fresh checkout/sdist without it would install a package
+# that cannot serve the dashboard. Build it once when node/npm are available;
+# otherwise record a typed warning instead of aborting the whole install.
+if [ ! -f "$PROJECT_DIR/frontend/hermes-dist/index.html" ]; then
+  if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+    echo "==> building dashboard (frontend/hermes-dist missing)"
+    "$PROJECT_DIR/scripts/build_dashboard.sh" \
+      || echo "    WARNING: dashboard build failed — packaged dashboard unavailable; re-run scripts/build_dashboard.sh"
+  else
+    echo "    WARNING: frontend/hermes-dist missing and node/npm not found —"
+    echo "             the dashboard will be unavailable until you run scripts/build_dashboard.sh"
+  fi
+fi
+
+echo "==> installing Qubit package + declared dependencies (pyproject.toml)"
+# Install the package ITSELF so the venv is a real isolated install whose
+# dependencies come from pyproject.toml (never a hand-maintained list that
+# drifts). hotkey/edge/test are the optional runtime surfaces.
+uv pip install --python "$VENV/bin/python" "$PROJECT_DIR[hotkey,edge,test]"
 # webrtcvad needs the legacy pkg_resources API (removed in setuptools 81+)
-"$VENV/bin/python" -m pip install 'setuptools<81' -q 2>/dev/null || true
+uv pip install --python "$VENV/bin/python" 'setuptools<81'
 
 # ------------------------------------------------------------------ models
 mkdir -p "$MODELS"
@@ -171,9 +184,19 @@ else
   echo "==> config exists:  $CONFIG_DIR/voice.yaml (leave as-is; merge new keys from"
   echo "    config/voice.example.yaml manually if you want them)"
 fi
-# personal knowledge for the local chat model (user-editable)
+# personal knowledge for the local chat model (user-editable). The sdist
+# intentionally excludes the developer's own file, so a release install must
+# not fail on its absence — create an empty starter instead.
 if [ ! -f "$CONFIG_DIR/personal-knowledge.md" ]; then
-  cp "$PROJECT_DIR/config/personal-knowledge.md" "$CONFIG_DIR/personal-knowledge.md"
+  if [ -f "$PROJECT_DIR/config/personal-knowledge.md" ]; then
+    cp "$PROJECT_DIR/config/personal-knowledge.md" "$CONFIG_DIR/personal-knowledge.md"
+  else
+    cat > "$CONFIG_DIR/personal-knowledge.md" <<'EOF'
+# Personal knowledge (optional)
+# Add stable facts the assistant may use when answering. This starter ships
+# with the release; the developer's own file is never distributed.
+EOF
+  fi
   echo "==> personal-knowledge.md created: edit it, then restart the bridge"
 else
   echo "==> personal-knowledge.md exists (leave as-is)"
