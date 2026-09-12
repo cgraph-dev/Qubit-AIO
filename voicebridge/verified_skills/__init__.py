@@ -16,7 +16,8 @@ from __future__ import annotations
 from ._models import (COST_CHEAP, COST_EXPENSIVE, COST_NORMAL, DEFAULT_HOT_CAP,
                       DEFAULT_MAX_NEGATIVES, DEFAULT_NEGATIVE_THRESHOLD,
                       DEFAULT_TOKEN_BUDGET, DEFAULT_TOP_K, DEDUP_THRESHOLD,
-                      KIND_NEGATIVE, KIND_POSITIVE, MIN_ACCEPTANCE_STRENGTH,
+                      HUMAN_REQUESTERS, KIND_NEGATIVE, KIND_POSITIVE,
+                      MIN_ACCEPTANCE_STRENGTH,
                       SKILL_COSTS, SKILL_KINDS, SKILL_STATE_SCHEMA,
                       SKILL_STATUSES, SKILL_TIERS, ST_ARCHIVED, ST_COLD,
                       ST_HOT, ST_QUARANTINED, ST_REFUTED, ST_VERIFIED,
@@ -24,9 +25,12 @@ from ._models import (COST_CHEAP, COST_EXPENSIVE, COST_NORMAL, DEFAULT_HOT_CAP,
                       TRUST_TOOL, TRUST_USER, TRUSTS, SecretRejectedError,
                       SkillProposal, SkillRecord, VerifiedSkillError,
                       VerifiedSkillStateError, acceptance_strength, bound,
-                      cosine, digest, looks_secret, normalize_words,
-                      recipe_embedding, recency_decay, utility_score)
+                      cosine, digest, is_human_requester, looks_secret,
+                      normalize_words, recipe_embedding, recency_decay,
+                      utility_score)
 from .store import VerifiedSkillStore, verified_skills_store
+from .workshop import (COLLECTION_CONTRACTS, CURATOR_ROLES, WorkshopError,
+                       SkillWorkshop, verified_skill_workshop)
 
 __all__ = [
     "ST_QUARANTINED", "ST_VERIFIED", "ST_REFUTED", "ST_ARCHIVED",
@@ -38,8 +42,11 @@ __all__ = [
     "DEFAULT_NEGATIVE_THRESHOLD", "DEFAULT_MAX_NEGATIVES", "DEFAULT_HOT_CAP",
     "DEDUP_THRESHOLD", "MIN_ACCEPTANCE_STRENGTH",
     "VerifiedSkillError", "VerifiedSkillStateError", "SecretRejectedError",
+    "HUMAN_REQUESTERS", "is_human_requester",
     "SkillProposal", "SkillRecord", "VerifiedSkillStore",
     "verified_skills_store",
+    "SkillWorkshop", "verified_skill_workshop", "WorkshopError",
+    "COLLECTION_CONTRACTS", "CURATOR_ROLES",
     "acceptance_strength", "recipe_embedding", "cosine", "bound",
     "looks_secret", "digest", "normalize_words", "recency_decay",
     "utility_score",

@@ -165,3 +165,51 @@ def test_cli_wiring(tmp_path, monkeypatch):
                                       scope=["messaging"], account="",
                                       ttl=600.0))
     assert rc == 3, "confirm required"
+
+
+def _run_integration(cfg, **kw):
+    from voicebridge import cli as CLI
+
+    args = type("A", (), {})()
+    args.pairing_command = kw.get("sub")
+    args.label = kw.get("label", "")
+    args.scopes = list(kw.get("scopes", []))
+    args.account = kw.get("account", "")
+    args.ttl_s = kw.get("ttl_s")
+    args.setup = kw.get("setup", "")
+    args.confirm = kw.get("confirm", False)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        rc = CLI._run_integration(cfg, "pairing", args)
+    return rc, json.loads(buf.getvalue() or "{}")
+
+
+def test_setup_code_accept_through_integration_dispatcher(tmp_path,
+                                                          monkeypatch):
+    """OC-08: QR/join-URL setup code + channel DM pairing via the one
+    existing integration dispatcher (the same path the CLI/voice use)."""
+    from voicebridge import pairing as PA
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    rc, body = _run_integration(cfg, sub="setup-code", label="phone",
+                               scopes=["messaging"], account="team",
+                               confirm=True)
+    assert rc == 0 and body["state"] == "OK"
+    assert body["join_url"].startswith("qubit://pair")
+    assert body["qr"]["format"] == "url" and body["code"] in body["qr"]["payload"]
+    stored = json.loads(
+        (__import__("pathlib").Path(cfg.state_dir()) /
+         "pairing.json").read_text())
+    assert body["code"] not in json.dumps(stored), "code shown once, hashed"
+
+    # Unconfirmed accept is a typed gate; confirmed accept binds the DM.
+    rc, bad = _run_integration(cfg, sub="accept", setup=body["join_url"])
+    assert rc == 3 and bad["code"] == PA.CONFIRM_CODE
+    rc, accepted = _run_integration(cfg, sub="accept", setup=body["join_url"],
+                                    confirm=True)
+    assert rc == 0 and accepted["setup_accepted"] is True
+    assert accepted["dm_pairing"] is True
+    # A consumed setup code cannot be replayed.
+    rc, replay = _run_integration(cfg, sub="accept", setup=body["join_url"],
+                                  confirm=True)
+    assert rc == 2 and replay["code"] == "PAIRING_BAD_CODE"

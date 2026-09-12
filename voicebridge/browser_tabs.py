@@ -24,6 +24,7 @@ import base64
 import json
 import math
 import os
+import time
 import urllib.parse
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -47,6 +48,10 @@ MAX_FILL_LEN = 2000
 MAX_SCREENSHOT_BYTES = 2 * 1024 * 1024
 MAX_SCREENSHOT_DIM = 10000
 SCREENSHOT_TIMEOUT_S = 15.0
+SCREENCAST_MAX_FRAMES = 8
+SCREENCAST_TIMEOUT_S = 5.0
+SCREENCAST_MAX_BYTES = 512 * 1024
+SCREENCAST_FRAME_METHOD = "Page.screencastFrame"
 
 
 class BrowserTabsError(Exception):
@@ -469,6 +474,179 @@ def screenshot(cfg: Any, target: str = "", *, clip: Any = None,
         session.close()
 
 
+# -------------------------------------------------------------- screencast
+def _bounded_frames(value: Any) -> int:
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        count = 1
+    return max(1, min(count, SCREENCAST_MAX_FRAMES))
+
+
+def _pop_screencast_frames(session: cdp.WsSession, limit: int,
+                           deadline: float) -> List[Dict[str, Any]]:
+    """Boundedly drain ``Page.screencastFrame`` events, ACKing each one.
+
+    Uses a harmless ``Runtime.evaluate`` as the socket pump so a pending
+    frame is read while waiting for a command reply; never blocks past
+    ``deadline`` and never fabricates a frame.
+    """
+    frames: List[Dict[str, Any]] = []
+    while len(frames) < limit and time.monotonic() < deadline:
+        found: Optional[Dict[str, Any]] = None
+        for index, event in enumerate(list(session.events)):
+            if (isinstance(event, dict)
+                    and event.get("method") == SCREENCAST_FRAME_METHOD):
+                found = session.events.pop(index)
+                break
+        if found is None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            try:
+                session.call("Runtime.evaluate",
+                             {"expression": "0", "returnByValue": True},
+                             timeout=max(0.1, remaining))
+            except cdp.CdpError:
+                break
+            continue
+        params = found.get("params") if isinstance(found, dict) else None
+        params = params if isinstance(params, dict) else {}
+        sid = params.get("sessionId")
+        if isinstance(sid, int) and sid > 0:
+            try:
+                session.call(SCREENCAST_FRAME_METHOD + "Ack",
+                             {"sessionId": sid})
+            except cdp.CdpError:
+                pass
+        frames.append(params)
+    return frames
+
+
+def screencast(cfg: Any, target: str = "", *, frames: int = 1,
+               fmt: str = "jpeg", quality: Optional[int] = 70,
+               max_bytes: int = SCREENCAST_MAX_BYTES,
+               timeout: float = SCREENCAST_TIMEOUT_S,
+               fallback: bool = True) -> Dict[str, Any]:
+    """Bounded live-panel capture over loopback CDP with screenshot fallback.
+
+    Starts ``Page.startScreencast`` and drains up to ``frames`` screencast
+    frames (each ACKed), stopping the stream afterwards. When the endpoint
+    does not support screencast (or yields no frame) and ``fallback`` is
+    true, the call degrades to the existing bounded :func:`screenshot` and
+    reports ``mode: screenshot-fallback`` — never a fake frame. A missing
+    endpoint returns the typed ``BROWSER_UNAVAILABLE`` state; other CDP
+    failures fail closed.
+    """
+    clean_fmt = str(fmt or "jpeg").lower()
+    if clean_fmt not in ("png", "jpeg"):
+        raise BrowserTabsError(BAD_INPUT_CODE, "format must be png or jpeg")
+    count = _bounded_frames(frames)
+    cap = _bounded_cap(max_bytes)
+    try:
+        wait = max(0.1, min(float(timeout), SCREENCAST_TIMEOUT_S))
+    except (TypeError, ValueError):
+        wait = SCREENCAST_TIMEOUT_S
+    try:
+        page = _resolve_target(cfg, target)
+    except BrowserTabsError as exc:
+        if exc.code == cdp.UNAVAILABLE_CODE:
+            return _screenshot_unavailable(exc.detail)
+        raise
+    tid = str(page.get("id", ""))
+    try:
+        session = _target_session(page)
+    except BrowserTabsError as exc:
+        if exc.code == cdp.UNAVAILABLE_CODE:
+            return _screenshot_unavailable(exc.detail)
+        raise
+    start_params: Dict[str, Any] = {"format": clean_fmt}
+    if clean_fmt == "jpeg" and quality is not None:
+        try:
+            start_params["quality"] = max(0, min(100, int(quality)))
+        except (TypeError, ValueError):
+            start_params["quality"] = 70
+    fallback_reason = ""
+    raw_frames: List[Dict[str, Any]] = []
+    try:
+        try:
+            session.call("Page.startScreencast", start_params, timeout=wait)
+        except cdp.CdpError as exc:
+            if exc.code == cdp.UNAVAILABLE_CODE:
+                return _screenshot_unavailable(exc.detail)
+            fallback_reason = f"screencast unavailable ({exc.detail[:120]})"
+        else:
+            deadline = time.monotonic() + wait
+            raw_frames = _pop_screencast_frames(session, count, deadline)
+            try:
+                session.call("Page.stopScreencast", {})
+            except cdp.CdpError:
+                pass
+            if not raw_frames:
+                fallback_reason = "screencast produced no frame"
+    finally:
+        session.close()
+    if fallback_reason and fallback:
+        out = screenshot(cfg, target, fmt=clean_fmt, quality=quality,
+                         max_bytes=cap, timeout=wait)
+        if isinstance(out, dict):
+            out = dict(out)
+            out["mode"] = "screenshot-fallback"
+            out["fallback_reason"] = fallback_reason[:200]
+        _audit("screencast_fallback", "qubit",
+               {"target": tid, "reason": fallback_reason[:120]})
+        return out
+    if fallback_reason:
+        return {"state": "UNAVAILABLE", "code": UNAVAILABLE_CODE,
+                "detail": fallback_reason[:300],
+                "owner": "qubit-policy",
+                "rollback": "browser untouched; nothing to roll back"}
+    decoded: List[Dict[str, Any]] = []
+    total = 0
+    for item in raw_frames:
+        payload = item.get("data") if isinstance(item, dict) else None
+        if not isinstance(payload, str) or not payload:
+            continue
+        try:
+            raw = base64.b64decode(payload, validate=True)
+        except Exception:
+            continue
+        if total + len(raw) > cap:
+            _audit("screencast_too_large", "qubit",
+                   {"target": tid, "bytes": str(total + len(raw))})
+            return {"state": "denied", "code": SCREENSHOT_TOO_LARGE_CODE,
+                    "detail": f"capture {total + len(raw)} bytes exceeds cap "
+                              f"{cap}",
+                    "max_bytes": cap, "owner": "qubit-policy",
+                    "rollback": "browser untouched; nothing to roll back"}
+        total += len(raw)
+        decoded.append({"image_base64": payload, "bytes": len(raw),
+                        "format": clean_fmt})
+    if not decoded:
+        if fallback:
+            out = screenshot(cfg, target, fmt=clean_fmt, quality=quality,
+                             max_bytes=cap, timeout=wait)
+            if isinstance(out, dict):
+                out = dict(out)
+                out["mode"] = "screenshot-fallback"
+                out["fallback_reason"] = "screencast frames undecodable"
+            return out
+        return {"state": "UNAVAILABLE", "code": UNAVAILABLE_CODE,
+                "detail": "no screencast frame captured",
+                "owner": "qubit-policy",
+                "rollback": "browser untouched; nothing to roll back"}
+    _remember(cfg, tid)
+    _audit("screencast", "qubit",
+           {"target": tid, "frames": str(len(decoded)), "bytes": str(total)})
+    return {"state": "OK", "mode": "screencast", "target": tid,
+            "format": clean_fmt, "frames": decoded, "frame_count": len(decoded),
+            "bytes": total, "max_bytes": cap,
+            "url": redact_spec(page.get("url", ""))[:300],
+            "title": redact_spec(page.get("title", ""))[:120],
+            "trust": "untrusted-page-image",
+            "authority": "loopback CDP read-only; personal profiles untouched"}
+
+
 # --------------------------------------------------------------- mutations
 def activate(cfg: Any, target: str, *, requested_by: str = "cli:user",
              confirmed: bool = False) -> Dict[str, Any]:
@@ -702,6 +880,10 @@ def doctor(cfg: Any) -> Dict[str, Any]:
             "browser": redact_spec(info.get("Browser", ""))[:120],
             "protocol": redact_spec(info.get("Protocol-Version", ""))[:40],
             "tabs": len(pages),
+            "screencast": {"supported": True,
+                           "max_frames": SCREENCAST_MAX_FRAMES,
+                           "max_bytes": SCREENCAST_MAX_BYTES,
+                           "screenshot_fallback": True},
             "current_target": str(led.get("current_target", "")),
             "approved_launch": bool(launch_approved),
             "profiles": "user-managed; never cloned or inspected"}

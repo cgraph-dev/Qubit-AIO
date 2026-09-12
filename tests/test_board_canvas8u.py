@@ -311,6 +311,106 @@ def test_voice_move_and_widget_lifecycle(tmp_path, monkeypatch):
     assert removed.receipt["result"]["removed"] == wid
 
 
+def test_plugin_widget_kind_and_show_widget(tmp_path, monkeypatch):
+    """OC-36: plugin widget kind + the read-only ``show_widget`` surface.
+
+    A plugin widget is an inert JSON descriptor gated by the review-only
+    ``plugin:read`` grant (declaring it adds no execution capability), and
+    ``show_widget`` returns the redacted render contract without rendering,
+    fetching, executing, or mutating anything."""
+    from voicebridge import kanban as KB
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    _setup_board(cfg)
+    desc = '{"name":"clock","version":"1.0","props":{"tz":"UTC"}}'
+    out = KB.widget_add(cfg, "main", "plugin", "clock widget",
+                        content=desc, declared_grants=["plugin:read"],
+                        requested_by="t", confirmed=True)
+    assert out["state"] == "OK"
+    widget = out["widget"]
+    assert widget["kind"] == "plugin"
+    assert widget["inert"] is True and widget["executable"] is False
+    assert widget["trust"] == "inert"
+    assert widget["grants"] == ["plugin:read"]
+
+    shown = KB.show_widget(cfg, widget["id"])
+    assert shown["state"] == "OK"
+    assert shown["render"] == {"kind": "plugin", "trust": "inert",
+                               "executable": False,
+                               "sandbox": "inert-html"}
+    assert shown["widget"]["content"] == (
+        '{"name":"clock","props":{"tz":"UTC"},"version":"1.0"}')
+    # show_widget is genuinely read-only: it survives the e-stop, and an
+    # unknown id is a typed error, never a fabricated widget.
+    monkeypatch.setattr(KB, "estop_engaged", lambda _c: True)
+    assert KB.show_widget(cfg, widget["id"])["state"] == "OK"
+    with pytest.raises(KB.KanbanError) as exc:
+        KB.show_widget(cfg, 9999)
+    assert exc.value.code == KB.NOT_FOUND_CODE
+
+
+def test_plugin_widget_access_and_validation(tmp_path, monkeypatch):
+    """OC-36: plugin access control + descriptor validation (negative)."""
+    from voicebridge import kanban as KB
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    _setup_board(cfg)
+    # Access control: a plugin widget requires the declared review-only
+    # grant; declaring it never grants execution, but omitting it is denied.
+    with pytest.raises(KB.KanbanError) as exc:
+        KB.widget_add(cfg, "main", "plugin", "p", content='{"name":"x"}',
+                      requested_by="t", confirmed=True)
+    assert exc.value.code == KB.DENIED_CODE
+    # Unknown declared grants stay refused by the closed allow-list.
+    with pytest.raises(KB.KanbanError):
+        KB.widget_add(cfg, "main", "plugin", "p", content='{"name":"ok"}',
+                      declared_grants=["plugin:exec"], requested_by="t",
+                      confirmed=True)
+    # The descriptor must be a bounded JSON object: a safe name slug and a
+    # closed key set only (no code, URLs, or unknown behavior contracts).
+    for bad in ("not json", '["a"]', '{"name":"Bad Name!"}',
+                '{"name":"ok","exec":"rm -rf /"}',
+                '{"name":"ok","props":"nope"}'):
+        with pytest.raises(KB.KanbanError):
+            KB.widget_add(cfg, "main", "plugin", "p", content=bad,
+                          declared_grants=["plugin:read"], requested_by="t",
+                          confirmed=True)
+
+
+def test_voice_kanban_task_lifecycle_and_widget_move(tmp_path, monkeypatch):
+    """qubit-ledger kanban rows: assign/block/comment/complete/edit/
+    reassign/reclaim/unblock + widget-move voice entries all reach the same
+    real backend functions (no read/write divergence)."""
+    from voicebridge import kanban as KB
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    task = _setup_board(cfg)
+    tid = task["id"]
+    assert _voice(cfg, "kanban_assign", task_id=tid,
+                  assignee="sam").receipt["result"]["task"]["assignee"] == "sam"
+    assert _voice(cfg, "kanban_reassign", task_id=tid,
+                  assignee="jo").receipt["result"]["task"]["assignee"] == "jo"
+    assert _voice(cfg, "kanban_reclaim", task_id=tid).receipt["result"][
+        "task"]["status"] == "open"
+    assert _voice(cfg, "kanban_block", task_id=tid).receipt["result"][
+        "task"]["status"] == "blocked"
+    assert _voice(cfg, "kanban_unblock", task_id=tid).receipt["result"][
+        "task"]["status"] == "open"
+    edited = _voice(cfg, "kanban_edit", task_id=tid, title="Edited title")
+    assert edited.receipt["result"]["task"]["title"] == "Edited title"
+    commented = _voice(cfg, "kanban_comment", task_id=tid, body="looks good")
+    assert commented.receipt["result"]["comment_id"] >= 1
+    assert _voice(cfg, "kanban_complete", task_id=tid).receipt["result"][
+        "task"]["status"] == "done"
+
+    widget = KB.widget_add(cfg, "main", "note", "w", requested_by="t",
+                           confirmed=True)["widget"]
+    moved = _voice(cfg, "kanban_widget_move_voice", widget_id=widget["id"],
+                   geometry="x=3 y=4")
+    assert moved.receipt["result"]["widget"]["x"] == 3
+    assert moved.receipt["result"]["widget"]["y"] == 4
+
+
 def test_atomic_claim_single_winner(tmp_path, monkeypatch):
     """Explicit-transaction discipline (H-sqlite-txn equivalent): concurrent
     claimants serialize on BEGIN IMMEDIATE; exactly one wins, the loser gets

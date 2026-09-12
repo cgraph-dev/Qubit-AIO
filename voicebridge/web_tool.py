@@ -70,6 +70,7 @@ UNREACHABLE_CODE = "WEB_UNREACHABLE"
 TLS_CODE = "WEB_TLS_ERROR"
 SEARCH_UNAVAILABLE_CODE = "WEB_SEARCH_UNAVAILABLE"
 SEARCH_PROVIDER_CODE = "WEB_SEARCH_PROVIDER_ERROR"
+X_SEARCH_UNAVAILABLE_CODE = "WEB_X_SEARCH_UNAVAILABLE"
 
 UNAVAILABLE = "UNAVAILABLE"
 OK = "OK"
@@ -569,6 +570,48 @@ def search(cfg: Any, query: str, *, limit: int = DEFAULT_SEARCH_LIMIT,
 
 
 # --------------------------------------------------------------- agent tool
+def x_search(cfg: Any, query: str, *,
+             limit: int = DEFAULT_SEARCH_LIMIT) -> Dict[str, Any]:
+    """X/Twitter search — typed UNAVAILABLE until a transport adapter exists.
+
+    The credential/reference gate is real; there is no X API shaper or
+    transport in this module, so even with a configured reference no network
+    call is made and the call returns a typed ``WEB_X_SEARCH_UNAVAILABLE``
+    (never a fabricated result). Exposed here so the shared agent path has one
+    consistent ``web.x_search`` entry instead of an unknown-tool error.
+    """
+    q = str(query or "").strip()
+    if estop_engaged(cfg):
+        return refuse_estop("x_search")
+    if not q or len(q) > MAX_QUERY_CHARS:
+        raise WebToolError(BAD_INPUT_CODE,
+                           f"query must be 1..{MAX_QUERY_CHARS} chars")
+    try:
+        limit_i = max(1, min(int(limit or DEFAULT_SEARCH_LIMIT),
+                             MAX_SEARCH_LIMIT))
+    except (TypeError, ValueError):
+        limit_i = DEFAULT_SEARCH_LIMIT
+    provider = ""
+    try:
+        provider = str(cfg.get("web", "x_search", "provider",
+                               default="") or "")
+    except Exception:
+        provider = ""
+    _audit("x_search", query=q, provider=provider,
+           state=X_SEARCH_UNAVAILABLE_CODE)
+    return {
+        "state": UNAVAILABLE,
+        "code": X_SEARCH_UNAVAILABLE_CODE,
+        "query": q,
+        "provider": provider[:40],
+        "limit": limit_i,
+        "results": [],
+        "explanation": "Qubit Agent cannot do this: no X/Twitter search "
+                       "transport adapter is shipped; configure one before "
+                       "use. No request was attempted.",
+    }
+
+
 TOOL_SPECS: Dict[str, Dict[str, Any]] = {
     "web.fetch": {
         "args": {"url": {"type": "string"}},
@@ -579,6 +622,12 @@ TOOL_SPECS: Dict[str, Dict[str, Any]] = {
         "args": {"query": {"type": "string"}},
         "required": ["query"],
         "summary": "search the web via the configured provider",
+    },
+    "web.x_search": {
+        "args": {"query": {"type": "string"}},
+        "required": ["query"],
+        "summary": "search X/Twitter (typed UNAVAILABLE until an adapter "
+                   "is configured)",
     },
 }
 
@@ -598,4 +647,6 @@ def run(cfg: Any, tool: str, arguments: Optional[Dict[str, Any]] = None,
         return fetch(cfg, str(args.get("url") or ""))
     if name in ("search", "web_search"):
         return search(cfg, str(args.get("query") or ""))
+    if name in ("x_search", "xsearch"):
+        return x_search(cfg, str(args.get("query") or ""))
     raise WebToolError(BAD_INPUT_CODE, f"unknown web tool {tool!r}")

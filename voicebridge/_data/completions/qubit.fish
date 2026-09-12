@@ -8,6 +8,7 @@ complete -c qubit -n '__fish_use_subcommand' -f -a ask
 complete -c qubit -n '__fish_use_subcommand' -f -a asr-test
 complete -c qubit -n '__fish_use_subcommand' -f -a audio
 complete -c qubit -n '__fish_use_subcommand' -f -a auth
+complete -c qubit -n '__fish_use_subcommand' -f -a backup
 complete -c qubit -n '__fish_use_subcommand' -f -a brain
 complete -c qubit -n '__fish_use_subcommand' -f -a branding
 complete -c qubit -n '__fish_use_subcommand' -f -a browser
@@ -18,6 +19,7 @@ complete -c qubit -n '__fish_use_subcommand' -f -a completion
 complete -c qubit -n '__fish_use_subcommand' -f -a computer-use
 complete -c qubit -n '__fish_use_subcommand' -f -a device
 complete -c qubit -n '__fish_use_subcommand' -f -a documents
+complete -c qubit -n '__fish_use_subcommand' -f -a egress
 complete -c qubit -n '__fish_use_subcommand' -f -a enroll
 complete -c qubit -n '__fish_use_subcommand' -f -a experiments
 complete -c qubit -n '__fish_use_subcommand' -f -a export-state
@@ -35,7 +37,10 @@ complete -c qubit -n '__fish_use_subcommand' -f -a import-state
 complete -c qubit -n '__fish_use_subcommand' -f -a kanban
 complete -c qubit -n '__fish_use_subcommand' -f -a lessons
 complete -c qubit -n '__fish_use_subcommand' -f -a local-models
+complete -c qubit -n '__fish_use_subcommand' -f -a logbook
+complete -c qubit -n '__fish_use_subcommand' -f -a logs
 complete -c qubit -n '__fish_use_subcommand' -f -a lsp
+complete -c qubit -n '__fish_use_subcommand' -f -a marketplace
 complete -c qubit -n '__fish_use_subcommand' -f -a mcp
 complete -c qubit -n '__fish_use_subcommand' -f -a media
 complete -c qubit -n '__fish_use_subcommand' -f -a memory
@@ -50,12 +55,17 @@ complete -c qubit -n '__fish_use_subcommand' -f -a pairing
 complete -c qubit -n '__fish_use_subcommand' -f -a peer
 complete -c qubit -n '__fish_use_subcommand' -f -a permissions
 complete -c qubit -n '__fish_use_subcommand' -f -a plugins
+complete -c qubit -n '__fish_use_subcommand' -f -a policy
 complete -c qubit -n '__fish_use_subcommand' -f -a power
 complete -c qubit -n '__fish_use_subcommand' -f -a product
 complete -c qubit -n '__fish_use_subcommand' -f -a profile
 complete -c qubit -n '__fish_use_subcommand' -f -a project
+complete -c qubit -n '__fish_use_subcommand' -f -a prompt-budget
 complete -c qubit -n '__fish_use_subcommand' -f -a proxy
+complete -c qubit -n '__fish_use_subcommand' -f -a reasoning
 complete -c qubit -n '__fish_use_subcommand' -f -a recall
+complete -c qubit -n '__fish_use_subcommand' -f -a receipts
+complete -c qubit -n '__fish_use_subcommand' -f -a reports
 complete -c qubit -n '__fish_use_subcommand' -f -a roundtrip
 complete -c qubit -n '__fish_use_subcommand' -f -a run
 complete -c qubit -n '__fish_use_subcommand' -f -a runtime
@@ -69,9 +79,11 @@ complete -c qubit -n '__fish_use_subcommand' -f -a sync
 complete -c qubit -n '__fish_use_subcommand' -f -a task
 complete -c qubit -n '__fish_use_subcommand' -f -a tasks
 complete -c qubit -n '__fish_use_subcommand' -f -a theme
+complete -c qubit -n '__fish_use_subcommand' -f -a tools
 complete -c qubit -n '__fish_use_subcommand' -f -a transfers
 complete -c qubit -n '__fish_use_subcommand' -f -a tts-test
 complete -c qubit -n '__fish_use_subcommand' -f -a tui
+complete -c qubit -n '__fish_use_subcommand' -f -a usage
 complete -c qubit -n '__fish_use_subcommand' -f -a verified-skills
 complete -c qubit -n '__fish_use_subcommand' -f -a verify
 complete -c qubit -n '__fish_use_subcommand' -f -a verify-release

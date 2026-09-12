@@ -18,10 +18,27 @@ force for every operation.
 | Stage | Change | Default | Affected contract tests | Rollback |
 |---|---|---|---|---|
 | 1 (this commit) | Add `voicebridge/hermes_asgi.py` (in-process ASGI bridge) and a `webui.hermes_backend` flag. When enabled, **safe GET/HEAD reads** are served by the fork; writes and Qubit-gated surfaces stay on the compat path. 404/405 from the fork fall back to compat. | **off** | none (default off; behavior unchanged) | set `webui.hermes_backend: false`, or revert this commit |
-| 2 | Flip `webui.hermes_backend` default to **on**; serve all safe reads from the fork. | on | tests that boot `WebUI` and assert compat JSON for safe GET `/hermes/api/*` routes (`test_hermes_readsurfaces8u.py`, `test_hermes_read_routes8u.py`, `test_hermes_routes_parity8u.py`, `test_dashboard_families8u.py`, `test_webui*.py`, `test_hermes_parity8tf.py`) are updated in that commit to assert the fork response, with the diff documented per test | set `webui.hermes_backend: false`; or revert the Stage-2 commit |
+| 2 | Flip `webui.hermes_backend` default to **on**; serve all safe reads from the fork. Qubit-owned `/api/dashboard*`, `/api/qubit*`, `/api/ops*` reads, all sensitive prefixes, and **every route in `hermes_compat.GATED`** are never proxied; writes always take the Qubit gated path. The bridge sends the fork's own session token for authenticated fork routes and proxies only paths declared in the fork's OpenAPI. | **on** | `tests/test_hermes_cutover8u.py` (gate policy, fork-served reads, sensitive/write non-proxy), `tests/test_hermes_backend8u.py`, `tests/test_webui.py`, dashboard suites | set `webui.hermes_backend: false` or revert this commit |
+| 2b | **Implemented.** `voicebridge/hermes_egress_guard.py` installs a deny-by-default outbound guard scoped by a `contextvar` set only while the ASGI bridge invokes the fork. Non-loopback connects/resolves inside a fork request raise `EgressBlocked` and are audited (`hermes.egress.denied`); Qubit's own egress is unaffected. `hermes_asgi.gated_path` also derives its no-proxy set from `hermes_compat.GATED`, so a new gate cannot become a bypass. | on | guard test in `tests/test_hermes_cutover8u.py` (external denied + audited, loopback allowed, flag resets) | guard is inert outside fork scope |
 | 3 | Route fork **writes/mutations** through Qubit permission/confirmation/audit middleware before execution. | on | new middleware tests; compat write tests updated where the fork now performs the write | flag or revert |
 | 4 | Route Qubit CLI and VoiceBridge operations at the same backend endpoints (single operation path). | on | parity suites | flag or revert |
 | 5 | Package backend + frontend/runtime deps; clean isolated-install serve proof. | — | packaging gate | rebuild from prior commit |
+
+## Stage 2 blocker (resolved)
+
+Enabling the fork backend by default previously made the dashboard perform
+**outbound provider calls** during reads (observed: `Auxiliary: marking
+openrouter/nous unhealthy`, Copilot token exchange, unclosed `ssl.SSLSocket`
+`ResourceWarning` under `-W error`). Resolved by the Stage 2b fail-closed
+egress guard: fork-context outbound connections are refused before the syscall
+and audited, so no provider token is exchanged and no socket is left open.
+Qubit's own provider egress (voice/CLI/agent) runs outside fork scope and is
+untouched.
+
+Also applied: the vendored frontend was rebranded for the two product-facing
+strings the cutover rendering exposed (`Hermes Flow` -> `Qubit Flow` in
+`SessionsPage.tsx`; `Update Hermes`/`Updating Hermes` -> `Qubit` in the English
+locale), recorded in `docs/HERMES_SOURCE_COMPARISON.json`.
 
 ## Safety policy (all stages)
 

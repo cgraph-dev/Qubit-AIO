@@ -110,3 +110,109 @@ def test_capability_catalog_reports_browser_implemented():
     out = check("browser")
     assert out["state"] == "IMPLEMENTED", out
     assert out["code"] == "OK"
+
+
+# --------------------------------------------- OC-10: profile lifecycle
+def test_managed_profile_lifecycle(tmp_path, monkeypatch):
+    from voicebridge import browser as BR
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    assert BR.profiles(cfg)["profiles"] == []
+    assert not BR._registry_path(cfg).exists()
+
+    # Confirmation is mandatory; a missing confirm never creates state.
+    denied = BR.create_profile(cfg, "research")
+    assert denied["state"] == "denied" and denied["code"] == BR.CONFIRM_CODE
+    assert not BR._registry_path(cfg).exists()
+
+    # Reserved user-profile names and malformed names are refused.
+    assert BR.create_profile(cfg, "default",
+                             confirmed=True)["code"] == BR.PROFILE_BAD_INPUT_CODE
+    assert BR.create_profile(cfg, "Bad Name",
+                             confirmed=True)["code"] == BR.PROFILE_BAD_INPUT_CODE
+
+    created = BR.create_profile(cfg, "research", cdp_port=9310, confirmed=True)
+    assert created["state"] == "OK"
+    assert created["profile"]["managed"] is True
+    assert created["profile"]["state"] == "stopped"
+    assert created["profile"]["cdp_port"] == 9310
+    assert (BR._profiles_root(cfg) / "research").is_dir()
+    # Duplicate is typed, never a silent second record.
+    assert BR.create_profile(cfg, "research",
+                             confirmed=True)["code"] == BR.PROFILE_EXISTS_CODE
+    # Port must stay in the dedicated loopback range.
+    assert BR.create_profile(cfg, "work", cdp_port=80,
+                             confirmed=True)["code"] == BR.PROFILE_BAD_INPUT_CODE
+
+    listed = BR.profiles(cfg)
+    assert [p["name"] for p in listed["profiles"]] == ["research"]
+    assert "personal profiles are never" in listed["authority"]
+
+    # Launch requires an injected approved launcher (no browser is spawned).
+    assert BR.open_profile(cfg, "research",
+                           confirmed=True)["code"] == BR.PROFILE_NO_LAUNCHER_CODE
+    seen = {}
+
+    def _fake_launcher(directory, port):
+        seen["dir"] = directory
+        seen["port"] = port
+        return {"pid": 4242}
+
+    opened = BR.open_profile(cfg, "research", launcher=_fake_launcher,
+                             confirmed=True)
+    assert opened["state"] == "OK"
+    assert opened["profile"]["state"] == "running"
+    assert opened["profile"]["pid"] == 4242
+    assert seen["port"] == 9310
+    assert str(BR._profiles_root(cfg)) in seen["dir"]
+
+    # Closing a QUBIT-managed profile is a real transition (not a refusal).
+    stopped = []
+    closed = BR.close_profile(cfg, "research",
+                              stopper=lambda entry: stopped.append(entry),
+                              confirmed=True)
+    assert closed["state"] == "OK" and closed["closed"] is True
+    assert closed["profile"]["state"] == "stopped"
+    assert stopped and stopped[0]["pid"] == 4242
+
+    # Removing the managed profile deletes only its Qubit-owned directory.
+    removed = BR.remove_profile(cfg, "research", confirmed=True)
+    assert removed["removed"] is True and removed["dir_removed"] is True
+    assert not (BR._profiles_root(cfg) / "research").exists()
+    assert BR._load_registry(cfg)["profiles"] == {}
+
+
+def test_close_profile_refuses_real_user_profiles(tmp_path, monkeypatch):
+    from voicebridge import browser as BR
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    for name in ("Default", "default", "user", "personal", "work",
+                 "chromium"):
+        out = BR.close_profile(cfg, name, confirmed=True)
+        assert out["state"] == "REFUSED", name
+        assert out["code"] == BR.CLOSE_CODE, name
+        assert out["owner"] == "qubit-policy"
+    # A refusal never creates a registry or a profile directory.
+    assert not BR._registry_path(cfg).exists()
+
+
+def test_profile_lifecycle_confirmation_and_estop(tmp_path, monkeypatch):
+    from voicebridge import browser as BR
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    monkeypatch.setattr(BR, "_estop", lambda _cfg: True)
+    assert BR.create_profile(cfg, "research",
+                             confirmed=True)["code"] == BR.ESTOP_CODE
+    monkeypatch.setattr(BR, "_estop", lambda _cfg: False)
+    BR.create_profile(cfg, "research", confirmed=True)
+    # Confirmation gates open/close/remove (no launcher/state change yet).
+    assert BR.open_profile(cfg, "research")["code"] == BR.CONFIRM_CODE
+    assert BR.close_profile(cfg, "research")["code"] == BR.CONFIRM_CODE
+    assert BR.remove_profile(cfg, "research")["code"] == BR.CONFIRM_CODE
+    monkeypatch.setattr(BR, "_estop", lambda _cfg: True)
+    assert BR.open_profile(cfg, "research",
+                           confirmed=True)["code"] == BR.ESTOP_CODE
+    assert BR.close_profile(cfg, "research",
+                            confirmed=True)["code"] == BR.ESTOP_CODE
+    assert BR.remove_profile(cfg, "research",
+                             confirmed=True)["code"] == BR.ESTOP_CODE

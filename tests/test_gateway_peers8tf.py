@@ -187,3 +187,62 @@ def test_cli_wiring_and_catalog(tmp_path, monkeypatch):
     for token in ("gateway", "gateway-manage", "pairing", "webhook", "peer"):
         out = check(token)
         assert out["state"] == "IMPLEMENTED", (token, out)
+
+
+def _run_integration(cfg, command, **kw):
+    import io
+    from contextlib import redirect_stdout
+
+    from voicebridge import cli as CLI
+
+    args = type("A", (), {})()
+    args.gateway_command = kw.get("sub")
+    args.gateway_id = kw.get("gateway_id", "")
+    args.action = kw.get("action", "")
+    args.approval_id = kw.get("approval_id", "")
+    args.confirm = kw.get("confirm", False)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        rc = CLI._run_integration(cfg, command, args)
+    return rc, json.loads(buf.getvalue() or "{}")
+
+
+def test_gateway_supervision_through_integration_dispatcher(tmp_path,
+                                                            monkeypatch):
+    from voicebridge import gateway_peers as GW
+    from voicebridge.permissions import permissions_store
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    monkeypatch.setenv("SLACK_TOKEN", "x")
+    _acct(cfg)
+    GW.gateway_add(cfg, "gw1", "slack", "team", "webhook",
+                   key_ref="env:SLACK_TOKEN", confirmed=True)
+
+    # Unconfirmed -> typed confirm gate, no state change.
+    rc, body = _run_integration(cfg, "gateway", sub="supervision-request",
+                                gateway_id="gw1", action="start")
+    assert rc == 3 and body["code"] == GW.CONFIRM_CODE
+    assert GW.supervision_status(cfg, "gw1")["process"] == "UNMANAGED"
+    # Without a grant/approval: a real broker approval is created, untouched.
+    rc, body = _run_integration(cfg, "gateway", sub="supervision-request",
+                                gateway_id="gw1", action="start", confirm=True)
+    assert body["state"] == "APPROVAL_REQUIRED"
+    assert body["code"] == GW.SUPERVISION_PENDING_CODE and body["approval_id"]
+    # The SAME permission store authorizes the transition; revert recovers.
+    permissions_store(cfg).grant(GW.SUPERVISION_CAPABILITY, requested_by="t",
+                                 confirmed=True, scopes=("gateway",))
+    rc, body = _run_integration(cfg, "gateway", sub="supervision-request",
+                                gateway_id="gw1", action="start", confirm=True)
+    assert rc == 0 and body["state"] == "OK"
+    assert body["process"] == GW.SUPERVISED_PROCESS
+    rc, body = _run_integration(cfg, "gateway", sub="supervision-revert",
+                                gateway_id="gw1", confirm=True)
+    assert rc == 0 and body["process"] == "UNMANAGED"
+    rc, body = _run_integration(cfg, "gateway", sub="discovery")
+    assert rc == 0 and body["state"] == "OK"
+
+    # E-stop fails closed through the dispatcher boundary.
+    monkeypatch.setattr(GW, "estop_engaged", lambda _c: True)
+    rc, body = _run_integration(cfg, "gateway", sub="supervision-request",
+                                gateway_id="gw1", action="stop", confirm=True)
+    assert rc == 2 and body["code"] == GW.ESTOP_CODE

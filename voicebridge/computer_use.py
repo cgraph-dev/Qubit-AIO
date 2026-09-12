@@ -19,12 +19,25 @@ All outputs are redacted; paths are shortened to ``~`` where applicable.
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
+import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 NO_DRIVER_CODE = "COMPUTER_USE_NO_DRIVER"
+
+SCREEN_SCHEMA = "qubit-screen/1"
+SCREEN_CONFIRM_CODE = "SCREEN_CONFIRM_REQUIRED"
+SCREEN_ESTOP_CODE = "SCREEN_ESTOP"
+SCREEN_BAD_INPUT_CODE = "SCREEN_BAD_INPUT"
+SCREEN_PANES: Tuple[str, ...] = (
+    "terminal", "browser", "desktop", "files", "chat", "reports",
+    "ops", "memory", "boards", "devices", "vision", "sessions",
+)
+SCREEN_LAYOUTS: Tuple[str, ...] = ("columns", "rows", "grid", "focus")
+MAX_SCREEN_PANES = 6
 
 
 def _short(path: str) -> str:
@@ -79,6 +92,7 @@ def status() -> Dict[str, Any]:
             "atspi_reachable": bus["reachable"],
             "atspi_via": bus["via"],
             "driver": driver,
+            "screen": screen_panes(),
             "control": "DISABLED",
             "control_policy": "desktop control is Packet 8V scope "
                               "(accessibility APIs, owner confirmation); "
@@ -182,3 +196,148 @@ def desktop_session(env: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
                        if kind == "none" else
                        f"{kind} graphical session detected; supervised"
                        " desktop capabilities select this backend")}
+
+
+# ---------------------------------------------------------------------------
+# `screen` tool: bounded Control UI arrangement (OC-15)
+# ---------------------------------------------------------------------------
+def _estop(cfg: Any) -> bool:
+    try:
+        from .plugins import estop_engaged
+
+        return bool(estop_engaged(cfg))
+    except Exception:
+        return True  # fail closed
+
+
+def _audit(op: str, actor: str, detail: Dict[str, Any]) -> None:
+    try:
+        from .logging_setup import log_event
+
+        log_event(f"screen.{op}", actor=actor,
+                  **{k: str(v)[:160] for k, v in detail.items()})
+    except Exception:
+        pass
+
+
+def _screen_path(cfg: Any) -> Path:
+    return Path(cfg.state_dir()) / "screen-layout.json"
+
+
+def _load_screen(cfg: Any) -> Dict[str, Any]:
+    try:
+        raw = _screen_path(cfg).read_text(encoding="utf-8")
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_screen(cfg: Any, data: Dict[str, Any]) -> None:
+    path = _screen_path(cfg)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=2, sort_keys=True),
+                   encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def _check_panes(panes: Any) -> List[str]:
+    if isinstance(panes, str):
+        items = [p.strip() for p in panes.split(",") if p.strip()]
+    else:
+        try:
+            items = [str(p).strip() for p in panes]
+        except TypeError:
+            raise ValueError("panes must be a sequence of pane ids")
+    if not items:
+        raise ValueError("at least one pane is required")
+    if len(items) > MAX_SCREEN_PANES:
+        raise ValueError(f"at most {MAX_SCREEN_PANES} panes may be arranged")
+    seen: List[str] = []
+    for pane in items:
+        if pane not in SCREEN_PANES:
+            raise ValueError(
+                f"unknown pane {pane!r}; allowed: {', '.join(SCREEN_PANES)}")
+        if pane in seen:
+            raise ValueError(f"duplicate pane {pane!r}")
+        seen.append(pane)
+    return seen
+
+
+def screen_panes() -> Dict[str, Any]:
+    """Bounded pane/layout catalog for CLI/voice/dashboard discovery."""
+    return {"state": "OK", "schema": SCREEN_SCHEMA,
+            "panes": list(SCREEN_PANES), "layouts": list(SCREEN_LAYOUTS),
+            "max_panes": MAX_SCREEN_PANES,
+            "detail": "arranges the Qubit Control UI only; never a window "
+                      "manager or external display"}
+
+
+def screen_status(cfg: Any) -> Dict[str, Any]:
+    """Read the persisted Control UI arrangement (never touches a display)."""
+    current = _load_screen(cfg)
+    return {"state": "OK", "schema": SCREEN_SCHEMA,
+            "arranged": bool(current),
+            "layout": str(current.get("layout", "columns")),
+            "panes": list(current.get("panes", [])),
+            "updated_at": current.get("updated_at"),
+            "rollback": "read-only; nothing to roll back"}
+
+
+def arrange_screen(cfg: Any, panes: Any, *, layout: str = "columns",
+                   requested_by: str = "desktop:user") -> Dict[str, Any]:
+    """Validate + persist a bounded Control UI pane arrangement.
+
+    The arrangement is a declarative layout descriptor for the Qubit Control
+    UI; it never drives a window manager, moves a real window, or reads the
+    screen. Unsupported panes/layouts and empty/oversized arrangements fail
+    closed with a typed ``SCREEN_BAD_INPUT``.
+    """
+    clean_layout = str(layout or "columns").strip().lower()
+    if clean_layout not in SCREEN_LAYOUTS:
+        return {"state": "FAILED", "code": SCREEN_BAD_INPUT_CODE,
+                "detail": f"layout must be one of {SCREEN_LAYOUTS}",
+                "owner": "qubit-policy",
+                "rollback": "Control UI untouched; nothing to roll back"}
+    try:
+        clean_panes = _check_panes(panes)
+    except ValueError as exc:
+        return {"state": "FAILED", "code": SCREEN_BAD_INPUT_CODE,
+                "detail": str(exc), "owner": "qubit-policy",
+                "rollback": "Control UI untouched; nothing to roll back"}
+    data = {"schema": SCREEN_SCHEMA, "layout": clean_layout,
+            "panes": clean_panes, "updated_at": time.time()}
+    try:
+        _save_screen(cfg, data)
+    except OSError as exc:
+        return {"state": "FAILED", "code": SCREEN_BAD_INPUT_CODE,
+                "detail": f"arrangement could not be persisted ({exc})",
+                "owner": "qubit-policy",
+                "rollback": "previous arrangement preserved"}
+    _audit("arrange", requested_by,
+           {"layout": clean_layout, "panes": ",".join(clean_panes)})
+    return {"state": "OK", "schema": SCREEN_SCHEMA,
+            "layout": clean_layout, "panes": clean_panes,
+            "updated_at": data["updated_at"],
+            "authority": "Qubit Control UI arrangement only; no desktop or "
+                         "display access"}
+
+
+def screen(cfg: Any, panes: Any = None, *, layout: str = "columns",
+           requested_by: str = "cli:user",
+           confirmed: bool = False) -> Dict[str, Any]:
+    """Confirmed ``screen`` entry point (arrange Control UI panes)."""
+    if _estop(cfg):
+        return {"state": "ESTOP", "code": SCREEN_ESTOP_CODE,
+                "detail": "emergency stop latched; screen arrange refused",
+                "owner": "qubit-policy",
+                "rollback": "Control UI untouched; nothing to roll back"}
+    if not confirmed:
+        return {"state": "denied", "code": SCREEN_CONFIRM_CODE,
+                "detail": "arranging the Control UI requires explicit "
+                          "--confirm",
+                "owner": "qubit-policy",
+                "rollback": "Control UI untouched; nothing to roll back"}
+    return arrange_screen(cfg, panes, layout=layout,
+                          requested_by=requested_by)

@@ -39,13 +39,25 @@ def _cfg(tmp_path, monkeypatch):
     return C.Config.load(p)
 
 
-def _guard_entry_id(op_id):
+def _guard_entry_id(op_id, declared_guard=""):
     from voicebridge import voice_commands as VC
 
+    # A catalog entry may name its canonical spoken surface directly
+    # (``voice_guard``): the Tier-2 extra is the CLI/dashboard form of a
+    # capability whose real voice entry lives under a different registry id.
+    if declared_guard and VC.REGISTRY.get(declared_guard) is not None:
+        return declared_guard
     if op_id in VC.VOICE_GUARDS:
         assert VC.VOICE_GUARDS[op_id]["aliases"]
         return f"guard_{op_id}"
-    return EXISTING_VOICE_GUARDS.get(op_id)
+    # Dedicated spoken refusal entries shipped under the "<op>_refusal" (or
+    # legacy "<op>_voice") convention are real typed-policy voice surfaces too
+    # -- the same convention test_hermes_command_parity8u relies on.
+    for cand in (EXISTING_VOICE_GUARDS.get(op_id), f"{op_id}_refusal",
+                 f"{op_id}_voice"):
+        if cand and VC.REGISTRY.get(cand) is not None:
+            return cand
+    return None
 
 
 def test_every_catalog_op_has_a_voice_surface(tmp_path, monkeypatch):
@@ -65,7 +77,7 @@ def test_every_catalog_op_has_a_voice_surface(tmp_path, monkeypatch):
             continue
         # not voice-executable: must be documented AND have a spoken guard
         assert op.get("interface_reason"), op_id
-        entry_id = _guard_entry_id(op_id)
+        entry_id = _guard_entry_id(op_id, op.get("voice_guard", ""))
         assert entry_id, f"{op_id}: no voice guard"
         assert VC.REGISTRY.get(entry_id) is not None, (op_id, entry_id)
 

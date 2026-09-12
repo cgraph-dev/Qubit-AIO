@@ -1,6 +1,12 @@
-# Packet 8T-F — Qubit foundation migration (implementation record)
+# Packet 8T-F — Qubit foundation migration (historical record)
 
-Status: implemented (code-side). Packet 8U is NOT started.
+Status: **SUPERSEDED FOUNDATION RECORD — full cutover and parity remain open**
+
+The current execution authority is
+[`QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md`](QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md)
+and the current completion authority is `docs/QUBIT_GAP_LEDGER.md`. This file
+records earlier foundation work and must not be read as proof that the complete
+Hermes backend, OpenClaw capabilities, dashboard, and voice surface are done.
 
 ## 1. Identity applied in this packet
 
@@ -37,7 +43,7 @@ driver caveats: Porcupine key terms, cloud STT/TTS ToS, unpinned cua-driver,
 Playwright Chromium, Electron, cloud-memory ToS, extension models/voices —
 each needs its own review before any use (see UPSTREAM_REUSE R29/R30).
 
-## 2b. Real Hermes execution (close-out)
+## 2b. Earlier runtime evidence (historical; not final architecture)
 
 > SUPERSEDED 2026-09-10: the supervision stack described below was
 > retired and replaced by the Qubit-native agent runtime

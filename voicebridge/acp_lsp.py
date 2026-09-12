@@ -37,6 +37,13 @@ ACCEPT_HOOKS_CODE = "ACP_ACCEPT_HOOKS_REFUSED"
 UNKNOWN_EDITOR_CODE = "ACP_UNKNOWN_EDITOR"
 NO_DOWNLOADS_CODE = "LSP_NO_DOWNLOADS"
 UNKNOWN_SERVER_CODE = "LSP_UNKNOWN_SERVER"
+NO_CLIENTS_CODE = "LSP_NO_CLIENTS"
+
+# Lifecycle states for the (absent) persistent LSP client layer. Qubit never
+# spawns a persistent client: diagnostics run inside supervised opencode runs.
+LSP_LIFECYCLE_STATES = ("STOPPED", "STARTING", "RUNNING", "STOPPING",
+                        "UNAVAILABLE")
+LSP_ACTIVE_STATE = "STOPPED"
 
 # (server, file extensions, conventional PATH binary)
 KNOWN_LSP = (
@@ -142,6 +149,19 @@ def acp_refuse_accept_hooks() -> Dict[str, Any]:
             "rollback": "nothing approved; nothing to roll back"}
 
 
+# Named production callers matching the Qubit ledger voice ids
+# (``acp_serve_refusal`` / ``acp_accept_hooks_refusal``). They are the exact
+# same typed refusals the CLI/voice path dispatches.
+def acp_serve_refusal() -> Dict[str, Any]:
+    """Voice/ledger alias for the ACP serve refusal (no second authority)."""
+    return acp_refuse_serve()
+
+
+def acp_accept_hooks_refusal() -> Dict[str, Any]:
+    """Voice/ledger alias for the hook auto-approval refusal."""
+    return acp_refuse_accept_hooks()
+
+
 # ------------------------------------------------------------------- LSP
 def lsp_list() -> Dict[str, Any]:
     """Known language servers with PATH presence (never executed)."""
@@ -167,8 +187,61 @@ def lsp_status() -> Dict[str, Any]:
     present = sum(1 for s in inv["servers"] if s["present"])
     return {"state": "OK", "schema": "qubit-lsp-status/1",
             "layer": "ABSENT", "active_clients": "none",
+            "lifecycle": LSP_ACTIVE_STATE,
+            "lifecycle_states": list(LSP_LIFECYCLE_STATES),
             "known_servers": len(inv["servers"]), "present": present,
             "detail": inv["layer_detail"]}
+
+
+def lsp_lifecycle(server: str = "") -> Dict[str, Any]:
+    """Per-server lifecycle inventory (read-only, never starts a client).
+
+    Every known server reports the ``STOPPED``/absent persistent-client state:
+    Qubit runs diagnostics inside supervised opencode runs, so there is no
+    long-lived LSP process to manage.
+    """
+    name = (server or "").strip().lower()
+    rows: List[Dict[str, Any]] = []
+    for known, extensions, binary in KNOWN_LSP:
+        if name and known != name:
+            continue
+        found = shutil.which(binary)
+        rows.append({"server": known, "extensions": list(extensions),
+                     "present": found is not None,
+                     "lifecycle": LSP_ACTIVE_STATE, "clients": 0,
+                     "managed": "externally: Qubit never downloads or spawns "
+                                "persistent server clients"})
+    if name and not rows:
+        return {"state": "UNKNOWN", "code": UNKNOWN_SERVER_CODE,
+                "server": _redact(name)[:80],
+                "known_servers": [k[0] for k in KNOWN_LSP],
+                "owner": "qubit-policy",
+                "rollback": "nothing changed; nothing to roll back"}
+    return {"state": "OK", "schema": "qubit-lsp-lifecycle/1",
+            "states": list(LSP_LIFECYCLE_STATES), "servers": rows,
+            "active_clients": "none"}
+
+
+def lsp_start(server: str = "") -> Dict[str, Any]:
+    """Typed no-client report: Qubit starts no persistent LSP client."""
+    return {"state": "NO_CLIENTS", "code": NO_CLIENTS_CODE,
+            "server": _redact((server or "all"))[:80],
+            "lifecycle": LSP_ACTIVE_STATE,
+            "detail": "Qubit spawns no persistent LSP clients; there is "
+                      "nothing to start. Diagnostics run inside supervised "
+                      "opencode runs.",
+            "owner": "qubit-policy",
+            "rollback": "nothing started; nothing to roll back"}
+
+
+def lsp_stop(server: str = "") -> Dict[str, Any]:
+    """Typed no-client report: no persistent LSP client exists to stop."""
+    return {"state": "NO_CLIENTS", "code": NO_CLIENTS_CODE,
+            "server": _redact((server or "all"))[:80],
+            "lifecycle": LSP_ACTIVE_STATE,
+            "detail": "no persistent LSP client is running; nothing to stop.",
+            "owner": "qubit-policy",
+            "rollback": "nothing stopped; nothing to roll back"}
 
 
 def lsp_which(server: str) -> Dict[str, Any]:

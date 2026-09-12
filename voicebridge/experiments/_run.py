@@ -185,6 +185,10 @@ class RunMixin(PersistMixin):
         t = self.trial(trial_id)
         if t is None:
             raise ExperimentError(f"unknown trial {trial_id}")
+        if t.ended_at is None:
+            raise ExperimentError(
+                "trial is not finished; finish it before recording outcome "
+                "signals")
         if t.outcome != "completed":
             raise ExperimentError("only completed trials may carry outcome signals")
         s = Signal(id=self._new_id("sig"), trial_id=trial_id, kind=kind,
@@ -212,7 +216,8 @@ class RunMixin(PersistMixin):
         with self._lock:
             cur = self._conn.execute(
                 "SELECT * FROM trials WHERE experiment_id=? AND config_id=? "
-                "AND outcome='completed' ORDER BY started_at",
+                "AND outcome='completed' AND ended_at IS NOT NULL "
+                "ORDER BY started_at",
                 (experiment_id, config_id))
             return [self._row_trial(r) for r in cur.fetchall()]
 

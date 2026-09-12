@@ -94,3 +94,75 @@ def test_reader_drops_bad_frames_and_keeps_connection():
     assert reader.frame_guard.dropped == 2
     assert reader.frame_guard.ignored_unknown == 1
     assert reader._pending == {}
+
+
+def _cfg(tmp_path, monkeypatch):
+    from voicebridge import config as C
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "c"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "s"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "d"))
+    p = tmp_path / "voice.yaml"
+    p.write_text("logging:\n  jsonl: false\n")
+    return C.Config.load(p)
+
+
+def _fake_ws(frames):
+    class _FakeWS:
+        def __aiter__(self):
+            async def _gen():
+                for frame in frames:
+                    yield frame
+            return _gen()
+
+    return _FakeWS()
+
+
+def test_rpc_methods_dispatch_through_frame_reader(tmp_path, monkeypatch):
+    """OC-D09: the new gateway server methods dispatch through the real,
+    transport-neutral FrameReader (Qubit's safe gateway-server equivalent)."""
+    from voicebridge.gateway.gateway_ws import FrameReader
+    from voicebridge.gateway.rpc import default_registry, handle_request
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    assert set(default_registry().names()) >= {
+        "environments.prepare", "task.history", "task.suggestions",
+        "update.report", "workspace.files", "plugin.mutations", "migrations"}
+
+    responses = []
+    reader = FrameReader(methods=default_registry(), cfg=cfg,
+                         respond=responses.append)
+    frames = [
+        json.dumps({"type": "req", "id": "a",
+                    "method": "environments.prepare", "params": {}}),
+        json.dumps({"type": "req", "id": "b", "method": "task.history",
+                    "params": {"limit": 5}}),
+        json.dumps({"type": "req", "id": "c", "method": "task.suggestions",
+                    "params": {}}),
+        json.dumps({"type": "req", "id": "d", "method": "update.report",
+                    "params": {}}),
+        json.dumps({"type": "req", "id": "e", "method": "workspace.files",
+                    "params": {"action": "inspect"}}),
+        json.dumps({"type": "req", "id": "f", "method": "plugin.mutations",
+                    "params": {"action": "status"}}),
+        json.dumps({"type": "req", "id": "g", "method": "migrations",
+                    "params": {}}),
+        json.dumps({"type": "req", "id": "h", "method": "does.not.exist",
+                    "params": {}}),
+    ]
+    loop = asyncio.new_event_loop()
+    loop.run_until_complete(reader.drain(_fake_ws(frames)))
+    loop.close()
+    by_id = {r["id"]: r for r in responses}
+    for rid in "abcdefg":
+        assert by_id[rid]["ok"] is True, (rid, by_id.get(rid))
+        assert by_id[rid]["type"] == "res"
+    assert by_id["h"]["ok"] is False
+    assert by_id["h"]["error"]["code"] == "GATEWAY_METHOD_NOT_FOUND"
+
+    # Unknown gated plugin mutation is a typed error, never a fabricated OK.
+    res = handle_request(default_registry(), cfg, {
+        "type": "req", "id": "z", "method": "plugin.mutations",
+        "params": {"action": "register", "manifest": {"id": "x",
+                                                      "kind": "tool"}}})
+    assert res["ok"] is False and res["error"]["code"]

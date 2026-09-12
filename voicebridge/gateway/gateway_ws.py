@@ -33,7 +33,7 @@ class GatewayError(Exception):
         self.details = details
 
 
-FRAME_TYPES = ("res", "event")
+FRAME_TYPES = ("res", "event", "req")
 MAX_FRAME_BYTES = 8 * 1024 * 1024
 
 
@@ -89,6 +89,10 @@ class FrameGuard:
         if kind == "res" and not msg.get("id"):
             raise GatewayError("FRAME_BAD_SHAPE",
                                "gateway response has no id")
+        if kind == "req" and (not msg.get("id")
+                              or not isinstance(msg.get("method"), str)):
+            raise GatewayError("FRAME_BAD_SHAPE",
+                               "gateway request needs id + method")
         if kind == "event" and not isinstance(msg.get("event"), str):
             raise GatewayError("FRAME_BAD_SHAPE",
                                "gateway event has no name")
@@ -108,14 +112,26 @@ class FrameReader:
     async iterator of raw frames; it never touches a socket itself."""
 
     def __init__(self, guard: Optional[FrameGuard] = None,
-                 event_cb: Optional[Callable[[str, Dict[str, Any]], None]] = None) -> None:
+                 event_cb: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+                 *, methods: Any = None,
+                 respond: Optional[Callable[[Dict[str, Any]], Any]] = None,
+                 cfg: Any = None) -> None:
         self.frame_guard = guard or FrameGuard()
         self.event_cb = event_cb
+        self.methods = methods
+        self.respond = respond
+        self.cfg = cfg
         self._pending: Dict[str, asyncio.Future] = {}
 
     def expect(self, call_id: str, fut: asyncio.Future) -> None:
         """Register a pending response future (test/transport use)."""
         self._pending[call_id] = fut
+
+    def dispatch_request(self, cfg: Any, msg: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle one inbound ``req`` frame through the shared RPC registry."""
+        from .rpc import handle_request
+
+        return handle_request(self.methods, cfg, msg)
 
     async def drain(self, frames) -> None:
         """Consume raw frames until the iterator ends. Survives bad data."""
@@ -127,6 +143,22 @@ class FrameReader:
                 self.frame_guard.note_dropped(exc.code)
                 continue
             if kind == "ignore":
+                continue
+            if kind == "req":
+                if self.methods is not None and self.respond is not None:
+                    try:
+                        res = self.dispatch_request(self.cfg, msg)
+                    except Exception:
+                        res = {"type": "res", "id": msg.get("id"),
+                               "ok": False,
+                               "error": {"code": "RPC_ERROR",
+                                         "message": "method dispatch failed"}}
+                    try:
+                        self.respond(res)
+                    except Exception:
+                        log.exception("gateway response sink failed")
+                else:
+                    self.frame_guard.note_dropped("FRAME_NO_DISPATCH")
                 continue
             if kind == "res":
                 fut = self._pending.pop(msg.get("id"), None)

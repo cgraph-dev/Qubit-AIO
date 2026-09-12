@@ -237,6 +237,8 @@
                   arg.clarifier ? " — " + arg.clarifier : ""),
                 e("input", {style: S.input, value: args[arg.name] || "",
                   placeholder: arg.type || "text",
+                  type: arg.secret ? "password" : "text",
+                  autoComplete: arg.secret ? "new-password" : "off",
                   "aria-label": arg.name,
                   onChange: function (ev) {
                     var next = Object.assign({}, args);

@@ -12,8 +12,10 @@ It is separate from:
 
 This plan combines the useful capabilities of OpenClaw, Hermes, Atomic Agent,
 and Voice Bridge behind one Qubit interface. Packet 8T-F audits pinned
-upstream sources and adapts only approved material into the Qubit-owned tree;
-it is not satisfied by supervising an external upstream installation.
+upstream sources and establishes the complete pinned Hermes source as the
+Qubit-owned runtime foundation; it is not satisfied by supervising an external
+upstream installation. OpenClaw is integrated as reviewed Qubit overlays and
+capability implementations on that foundation.
 OpenClaw capabilities are integrated through the feature matrix and the full
 parity contract in `docs/QUBIT_FULL_PARITY_CONTRACT.md`, with provenance and
 license retained. “Selective” means selecting the smallest justified source
@@ -33,9 +35,11 @@ requirements in that contract to make progress appear complete.
 The owner’s stricter completion target is defined in
 [`QUBIT_NATIVE_COMPLETION_PLAN.md`](QUBIT_NATIVE_COMPLETION_PLAN.md) and
 [`QUBIT_NATIVE_COMPLETION_CHECKLIST.md`](QUBIT_NATIVE_COMPLETION_CHECKLIST.md).
-Those documents supersede wording that treats Qubit as a supervisor of an
-upstream assistant. Until their gates pass, describe the product as an
-integration in progress, not as a complete native Qubit replacement.
+The approved runtime amendment and
+[`QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md`](QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md)
+supersede wording that treats Qubit as a supervisor of an upstream assistant.
+Until their gates pass, describe the product as an integration in progress,
+not as a complete Qubit replacement.
 
 ### Packet 8S identity decision
 
@@ -66,7 +70,8 @@ website or program.
 ### Required Hermes rebrand/parity decision
 
 The owner’s target is not a Qubit wrapper that merely starts Hermes chat. The
-8T-F foundation is incomplete until the supported Hermes user experience has
+8T-F foundation is incomplete until the complete pinned Hermes source is the
+effective Qubit runtime and the supported Hermes user experience has
 been migrated into Qubit: every supported Hermes CLI command, command group,
 interactive workflow, configuration surface, session workflow,
 skill/task/schedule workflow, model/provider workflow, and coding/agent
@@ -173,8 +178,8 @@ read-only calls, progressive skill loading, compact browser state, explicit
 task/trace failure categories, and a no-progress guard.
 
 Earlier packets audited and bounded those projects as possible upstream
-sources; that audit is not itself integration. Before 8T-F is accepted, the
-current Qubit VoiceBridge remains a separate reference/rollback tree and no
+sources; that audit is not itself integration. The approved runtime amendment
+now makes the complete pinned Hermes source the Qubit runtime foundation. No
 Hermes or OpenClaw capability may be described as integrated merely because a
 contract, label, stub, or external installation exists.
 
@@ -189,7 +194,9 @@ For every reused file or substantial implementation:
 2. inspect and comply with its license and notices;
 3. preserve required copyright and attribution text;
 4. record the reuse in `THIRD_PARTY_NOTICES.md`;
-5. write a Qubit adapter or compatibility boundary around it;
+5. integrate it into the Qubit-owned Hermes foundation or write a Qubit
+   adapter/compatibility boundary where the source unit is not directly
+   suitable;
 6. add tests proving that Qubit’s permissions and data rules still apply;
 7. document all local modifications and their maintenance burden.
 
@@ -1126,14 +1133,15 @@ must never share a dirty checkout or overwrite unrelated user work.
 ### Packet 8T-F — Qubit Agent foundation migration before 8U
 
 Packet 8T-F is a prerequisite for the whole-computer capability track. It
-starts from a fresh, pinned Hermes checkout and produces a new Hermes-derived
-Qubit source tree. It makes Qubit Agent the product identity, integrates the
+vendors the complete pinned Hermes checkout as the Qubit-owned runtime
+foundation, then applies Qubit policy, VoiceBridge, and OpenClaw integrations.
+It makes Qubit Agent the product identity, integrates the
 existing Qubit VoiceBridge as the only voice/audio session, and integrates all
 requested OpenClaw capabilities in the current foundation scope behind Qubit
 contracts. A supervisor-only wrapper around an unchanged Qubit tree is not an
 acceptable substitute.
 The current Qubit checkout remains preserved as a rollback/reference tree
-until the new foundation is independently verified. The canonical architecture
+until the cutover is independently verified. The canonical architecture
 and current status are recorded in [8TF_SOURCE_OF_TRUTH.md](8TF_SOURCE_OF_TRUTH.md).
 The execution sequence and hard gate are recorded in
 [8TF_COMPLETE_MIGRATION_PLAN.md](8TF_COMPLETE_MIGRATION_PLAN.md).
@@ -1156,7 +1164,7 @@ Required outcomes:
   barge-in use one Qubit voice/session path;
 - Hermes duplicate voice/listener paths are disabled or routed through Qubit;
 - every requested OpenClaw capability in the current foundation scope is
-  adapted only through Qubit contracts;
+  integrated through Qubit contracts;
 - every OpenClaw row marked REUSE or ADAPT is implemented in the new Qubit
   tree; a blocked row is allowed only for a genuine operator-only gate with a
   complete hermetic path, typed state, test evidence, and manual procedure;

@@ -12,6 +12,8 @@ import subprocess
 from contextlib import redirect_stdout
 from pathlib import Path
 
+import pytest
+
 
 def _cfg(tmp_path, monkeypatch):
     from voicebridge import config as C
@@ -201,3 +203,83 @@ def test_capability_catalog_reports_hooks_implemented():
     out = check("hooks")
     assert out["state"] == "IMPLEMENTED", out
     assert out["code"] == "OK"
+
+
+class _Ctx:
+    """Minimal production context (hook backend reads only ``.cfg``)."""
+
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.source = "voice"
+        self.actor = "voice:user"
+        self.session = "hooks-test"
+
+
+def test_voice_backend_show_revoke_remove(tmp_path, monkeypatch):
+    from voicebridge import hooks as HK
+    from voicebridge import voice_commands as VC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    _declare(cfg)
+    ctx = _Ctx(cfg)
+
+    shown = VC._b_hooks(ctx, {"action": "show", "name": "deploy"})
+    assert shown["hook"]["name"] == "deploy"
+    assert shown["hook"]["status"] == "disabled"
+
+    revoked = VC._b_hooks(ctx, {"action": "revoke", "name": "deploy"})
+    assert revoked["revoked"] == "deploy"
+    assert HK.list_hooks(cfg)["hooks"] == []
+
+    _declare(cfg)
+    removed = VC._b_hooks(ctx, {"action": "remove", "name": "deploy"})
+    assert removed["removed"] == "deploy"
+    assert HK.list_hooks(cfg)["hooks"] == []
+
+    with pytest.raises(HK.HookError) as exc:
+        VC._b_hooks(ctx, {"action": "show", "name": "deploy"})
+    assert exc.value.code == HK.NOT_FOUND_CODE
+
+
+def test_voice_backend_emit_documented_event_types(tmp_path, monkeypatch):
+    from voicebridge import hooks as HK
+    from voicebridge import voice_commands as VC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    ctx = _Ctx(cfg)
+    HK.declare(cfg, "notify", "task.completed", "echo done", confirmed=True)
+
+    out = VC._b_hooks(ctx, {"action": "emit", "event": "task.completed"})
+    assert out["state"] == "OK" and out["matched"] == ["notify"]
+    assert out["shell_executed"] is False
+
+    doctor = VC._b_hooks(ctx, {"action": "doctor"})
+    assert "task.completed" in doctor["events_known"]
+    assert doctor["emissions"] == 1
+    assert set(HK.EVENT_TYPES) >= {"session.started", "task.completed",
+                                   "tool.invoked", "plugin.invoked",
+                                   "skill.verified"}
+
+    with pytest.raises(HK.HookError):
+        VC._b_hooks(ctx, {"action": "emit", "event": "bad event!"})
+
+
+def test_bundled_hook_templates_are_metadata_only(tmp_path, monkeypatch):
+    from voicebridge import hooks as HK
+    from voicebridge import voice_commands as VC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    out = HK.bundled()
+    assert out["state"] == "OK"
+    names = {h["name"] for h in out["bundled"]}
+    assert {"command-logger", "session-notifier", "task-notifier"} <= names
+    for hook in out["bundled"]:
+        assert hook["kind"] == "bundled" and hook["events"]
+        for event in hook["events"]:
+            assert event in HK.EVENT_TYPES
+    # templates are never auto-declared
+    assert HK.list_hooks(cfg)["hooks"] == []
+    assert set(HK.doctor(cfg)["bundled_known"]) == names
+    # and the production doctor path reports them
+    ctx = _Ctx(cfg)
+    assert set(VC._b_hooks(ctx, {"action": "doctor"})["bundled_known"]) == names

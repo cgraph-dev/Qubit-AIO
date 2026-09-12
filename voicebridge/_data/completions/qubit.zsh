@@ -2,7 +2,7 @@
 # scripts/gen_completions.py — do not hand-edit; regenerate instead.
 #compdef qubit
 _qubit() {
-    local -a commands=(acp actions agent approvals ask asr-test audio auth brain branding browser capability channels checkpoints completion computer-use device documents enroll experiments export-state files flag-drill flags frontier gateway ghost git hooks ide import-agent import-state kanban lessons local-models lsp mcp media memory mic-test monitor msg node once opencode package pairing peer permissions plugins power product profile project proxy recall roundtrip run runtime schedules sessions setup shares skills status sync task tasks theme transfers tts-test tui verified-skills verify verify-release vision voice webhook websites webui worker)
+    local -a commands=(acp actions agent approvals ask asr-test audio auth backup brain branding browser capability channels checkpoints completion computer-use device documents egress enroll experiments export-state files flag-drill flags frontier gateway ghost git hooks ide import-agent import-state kanban lessons local-models logbook logs lsp marketplace mcp media memory mic-test monitor msg node once opencode package pairing peer permissions plugins policy power product profile project prompt-budget proxy reasoning recall receipts reports roundtrip run runtime schedules sessions setup shares skills status sync task tasks theme tools transfers tts-test tui usage verified-skills verify verify-release vision voice webhook websites webui worker)
     _describe 'qubit commands' commands
 }
 compdef _qubit qubit

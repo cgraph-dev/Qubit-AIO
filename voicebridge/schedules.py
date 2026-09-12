@@ -333,6 +333,34 @@ def parse_when(spec: str, *, now: Optional[float] = None) -> Dict[str, Any]:
         f"'daily 9am', or 'once in 10 minutes'")
 
 
+def _missed_windows(job: Dict[str, Any], now: float) -> int:
+    """Coalesced catch-up count: scheduled windows passed while not firing.
+
+    Qubit never replays a backlog unboundedly; a job that missed one or more
+    windows while the process was down fires exactly once on the next tick
+    and reports here how many windows were missed, so the receipt is honest
+    about the downtime without letting a backlog monopolize a tick.
+    """
+    base = float(job.get("last_run_at") or job.get("created_at") or 0.0)
+    if base <= 0:
+        return 0
+    kind = job["kind"]
+    if kind == "interval":
+        step = float(job["interval_min"]) * 60.0
+        if step <= 0:
+            return 0
+        elapsed = now - base
+        if elapsed < step:
+            return 0
+        return max(0, int(elapsed // step) - 1)
+    if kind == "daily":
+        elapsed = now - base
+        if elapsed < 86400.0:
+            return 0
+        return max(0, int(elapsed // 86400.0) - 1)
+    return 0
+
+
 def _due(job: Dict[str, Any], now: float) -> bool:
     if not job["enabled"]:
         return False
@@ -874,6 +902,30 @@ def _default_executor(task_text: str, *, session: str,
             "detail": str(res.get("reply", ""))[:300]}
 
 
+def _directive_task(task_text: Any) -> bool:
+    """True when a job carries a user automation directive (never raises)."""
+    try:
+        from .automation import is_directive
+
+        return bool(is_directive(task_text))
+    except Exception:  # noqa: BLE001 — a broken import never dispatches
+        return False
+
+
+def _run_automation_directive(cfg: Any, task_text: str, *,
+                              estop_engaged: Callable[[], bool],
+                              now: Optional[float]) -> Dict[str, Any]:
+    """Dispatch a scheduled automation directive (fail-closed, never raises)."""
+    from .automation import run_directive
+
+    out = run_directive(cfg, task_text, estop=estop_engaged, now=now,
+                        requested_by=MONITOR_ACTOR)
+    if not isinstance(out, dict):
+        return {"state": "FAILED", "code": RUNTIME_CODE,
+                "detail": "automation directive produced no result"}
+    return out
+
+
 def run_due(cfg: Any, *, requested_by: str = "cli:user",
             executor: Optional[Callable[..., Dict[str, Any]]] = None,
             now: Optional[float] = None,
@@ -917,9 +969,20 @@ def run_due(cfg: Any, *, requested_by: str = "cli:user",
         conn.commit()
         results: List[Dict[str, Any]] = []
         for job, run_id in claimed:
+            catch_up = _missed_windows(job, moment)
             try:
-                outcome = run(job["task_text"], session=f"schedule-{job['id']}",
-                              estop_engaged=stop)
+                if _directive_task(job["task_text"]):
+                    # A user-authored automation directive runs on the same
+                    # one scheduler via the real automation dispatcher; it is
+                    # pre-authorized by the (confirmed) job, estop-aware, and
+                    # never reaches the agent.
+                    outcome = _run_automation_directive(cfg, job["task_text"],
+                                                        estop_engaged=stop,
+                                                        now=moment)
+                else:
+                    outcome = run(job["task_text"],
+                                  session=f"schedule-{job['id']}",
+                                  estop_engaged=stop)
             except Exception as exc:
                 outcome = {"state": "FAILED", "code": type(exc).__name__,
                            "detail": str(exc)[:200]}
@@ -936,15 +999,43 @@ def run_due(cfg: Any, *, requested_by: str = "cli:user",
                 (state, job["run_count"] + 1, _now(), job["id"]))
             conn.commit()
             _audit("run", requested_by,
-                   {"job_id": str(job["id"]), "state": state, "code": code})
+                   {"job_id": str(job["id"]), "state": state, "code": code,
+                    "catch_up": str(catch_up)})
             # Delivery is downstream of a durable run receipt: it may fail,
             # degrade, or be unavailable without touching the run outcome.
             delivery = _deliver_result(cfg, conn, job, run_id, outcome, stop,
                                        requested_by)
             results.append({"job_id": job["id"], "name": job["name"],
                             "state": state, "code": code,
+                            "catch_up": catch_up,
                             "delivery": delivery})
-        return {"state": "OK", "ran": len(results), "results": results}
+        return {"state": "OK", "ran": len(results), "results": results,
+                "catch_up": sum(int(r.get("catch_up", 0)) for r in results)}
+    finally:
+        conn.close()
+
+
+def scheduler_status(cfg: Any, *, now: Optional[float] = None) -> Dict[str, Any]:
+    """Read-only scheduler posture: per-job due + coalesced catch-up windows."""
+    moment = now if now is not None else _now()
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        rows = conn.execute(
+            "SELECT * FROM jobs ORDER BY id").fetchall()
+        jobs = []
+        for row in rows:
+            job = _job_dict(row)
+            jobs.append({"id": job["id"], "name": job["name"],
+                         "kind": job["kind"], "enabled": job["enabled"],
+                         "due": _due(job, moment),
+                         "missed_windows": _missed_windows(job, moment),
+                         "last_run_at": job["last_run_at"],
+                         "last_state": job["last_state"],
+                         "run_count": job["run_count"]})
+        return {"state": "OK", "now": moment, "jobs": jobs,
+                "due_count": sum(1 for j in jobs if j["due"]),
+                "catch_up_total": sum(j["missed_windows"] for j in jobs)}
     finally:
         conn.close()
 
@@ -1007,4 +1098,23 @@ def autofire(cfg: Any, *, now: Optional[float] = None,
                 "detail": redact_spec(str(exc))[:300],
                 "ran": 0, "results": []}
     out["actor"] = MONITOR_ACTOR
+    out["catch_up"] = sum(int(r.get("catch_up", 0))
+                          for r in out.get("results", []))
+    # The same one monitor tick also drives due automation heartbeats and
+    # queued standing-order auto-replies. This adds no timer/thread of its
+    # own (the monitor owns the cadence) and never raises into the loop.
+    out["automation"] = _automation_tick(cfg, now=now, stop=stop)
     return out
+
+
+def _automation_tick(cfg: Any, *, now: Optional[float],
+                     stop: Callable[[], bool]) -> Dict[str, Any]:
+    """Fail-closed automation tick invoked by :func:`autofire` (one authority)."""
+    try:
+        from . import automation as _automation
+
+        return _automation.tick(cfg, now=now, estop=stop)
+    except Exception as exc:  # noqa: BLE001 — never raise into the monitor
+        return {"state": "FAILED", "code": RUNTIME_CODE,
+                "detail": redact_spec(str(exc))[:300],
+                "heartbeats": 0, "processed": 0, "results": []}

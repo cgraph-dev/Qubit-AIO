@@ -19,6 +19,17 @@ from .gate import (APPROVE, NEEDS_REVIEW, REJECT, PromotionDecision,
                    PromotionGate)
 from .poisoning import DANGEROUS_KINDS, run_poisoning, summarize_poisoning
 from .runner import EvalComponents, evaluate_cases
+from .policy_conformance import (ConformanceError, attestation, default_rules,
+                                 doctor as policy_doctor, findings,
+                                 pass_conformance)
+from .telemetry import (TelemetryError, Tracer, export as otel_export,
+                        parse_traceparent, telemetry_enabled, traceparent)
+from .usage_analytics import (UsageError, UsageLedger, UsageRecord, analyze)
+from .receipts import (ExecutionIdentity, ExecutionReceipt, ReceiptChain,
+                       ReceiptError, verify_receipts)
+from .logbook import (CAPTURE_UNAVAILABLE, Logbook, LogbookEntry,
+                      LogbookError, capture as logbook_capture,
+                      journal_from_items)
 
 __all__ = [
     "TaskOutcomeError", "TaskOutcomeStore", "VALID_APPROVALS",
@@ -30,4 +41,13 @@ __all__ = [
     "APPROVE", "REJECT", "NEEDS_REVIEW",
     "DANGEROUS_KINDS", "run_poisoning", "summarize_poisoning",
     "EvalComponents", "evaluate_cases",
+    "ConformanceError", "attestation", "default_rules", "policy_doctor",
+    "findings", "pass_conformance",
+    "TelemetryError", "Tracer", "otel_export", "parse_traceparent",
+    "telemetry_enabled", "traceparent",
+    "UsageError", "UsageLedger", "UsageRecord", "analyze",
+    "ExecutionIdentity", "ExecutionReceipt", "ReceiptChain", "ReceiptError",
+    "verify_receipts",
+    "CAPTURE_UNAVAILABLE", "Logbook", "LogbookEntry", "LogbookError",
+    "logbook_capture", "journal_from_items",
 ]

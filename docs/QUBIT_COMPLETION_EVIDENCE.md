@@ -788,3 +788,17 @@ frozen contract).
 - `compileall` clean; `git diff --check` clean.
 - Verdict: still INCOMPLETE (active dashboard fronted by `hermes_compat`; the
   v2026.9.4 MISSING/PARTIAL deltas; final product rebrand).
+## Addendum — 2026-09-12 execution-authority correction
+
+This append-only correction supersedes any earlier close-out language in this
+file that described the Qubit-native or compatibility foundation as the final
+Hermes/OpenClaw runtime. The owner-approved target is now explicit: the
+complete pinned Hermes source is the Qubit-owned runtime foundation, OpenClaw
+capabilities are integrated on top of it, and CLI/dashboard/VoiceBridge use
+the same real backend operations.
+
+The current status authority is `docs/QUBIT_GAP_LEDGER.md`. Its open rows mean
+the product remains incomplete; historical narrow matrices and earlier green
+test counts do not establish 1:1 parity. See
+`docs/QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md` for the required work order and
+the batched test/storage cadence. No prior evidence is deleted or rewritten.

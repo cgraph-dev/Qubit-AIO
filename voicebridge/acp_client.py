@@ -16,6 +16,11 @@ connection:
 * ``send`` always resolves to the typed ``ACP_REFUSED`` gate (no live ACP
   session/transport exists and Qubit never executes a harness) and shapes the
   ``session/prompt`` request without sending it;
+* the per-harness *adapter* contract (``adapters``/``shape_method``) shapes
+  every documented ACP method, and ``adapter_session`` drives a real
+  ``initialize`` + ``session/prompt`` exchange over an operator-injected
+  in-process transport — Qubit still never spawns the harness binary, and
+  without a transport the typed ``ACP_TRANSPORT_UNAVAILABLE`` gate is raised;
 * prompts, paths, and receipts pass through centralized redaction, and the
   config store is 0600 and bounded.
 
@@ -52,6 +57,8 @@ BAD_INPUT_CODE = "ACP_BAD_INPUT"
 EXISTS_CODE = "ACP_EXISTS"
 NOT_FOUND_CODE = "ACP_NOT_FOUND"
 CORRUPT_CODE = "ACP_STORE_CORRUPT"
+TRANSPORT_CODE = "ACP_TRANSPORT_UNAVAILABLE"
+ADAPTER_METHODS = ("initialize", "session/prompt", "session/cancel")
 
 # Conventional harness binaries and their ambient credential kind. Presence is
 # detected by PATH lookup only; the binary is never executed.
@@ -94,6 +101,12 @@ def _redact(text: str) -> str:
     from .redaction import redact_text
 
     return redact_text(text)
+
+
+def _redact_obj(obj: Any) -> Any:
+    from .redaction import redact_obj
+
+    return redact_obj(obj)
 
 
 def _now() -> float:
@@ -341,6 +354,7 @@ def catalog(cfg: Any) -> Dict[str, Any]:
                      "credential_kind": caps.get("credential_kind", "unknown"),
                      "credential": credential,
                      "configured": rec is not None,
+                     "adapter": "operator-injected",
                      "state": state, "code": code,
                      "detail": caps.get("detail", "")})
     return {"state": "OK", "schema": SCHEMA, "harnesses": rows,
@@ -491,3 +505,116 @@ def doctor(cfg: Any) -> Dict[str, Any]:
             "live_sessions": 0,
             "external_runtime": HARNESS_UNAVAILABLE_CODE,
             "estop": estop_engaged(cfg), "warnings": warnings}
+
+
+# ===========================================================================
+# ACP harness adapters (OC-58, no-credential parts)
+#
+# A real adapter contract per recognized harness: the method set, the
+# request/response shapes, and a *transport-injected* session loop. Qubit
+# never spawns the harness binary; an operator (or a test) injects an
+# in-process transport callable, and the adapter drives the ACP JSON-RPC
+# exchange through it. Without a transport the call is the typed
+# ACP_TRANSPORT_UNAVAILABLE gate, so production stays non-executing.
+# ===========================================================================
+def _adapter_record(harness: str) -> Dict[str, Any]:
+    caps = HARNESS_CAPS[harness]
+    return {"harness": harness, "label": caps.get("label", harness),
+            "binary": caps.get("binary", ""),
+            "protocol": "acp-jsonrpc/1", "methods": list(ADAPTER_METHODS),
+            "credential_kind": caps.get("credential_kind", "unknown"),
+            "transport": "operator-injected (Qubit never spawns the harness)",
+            "client_info": {"name": "qubit", "version": "1.0.0"}}
+
+
+def adapters(cfg: Any = None) -> Dict[str, Any]:
+    """Every harness adapter descriptor (read-only)."""
+    rows = [_adapter_record(h) for h in HARNESSES]
+    return {"state": "OK", "schema": "qubit-acp-adapters/1", "adapters": rows}
+
+
+def adapter_descriptor(harness: str) -> Dict[str, Any]:
+    """One harness adapter descriptor, or the typed unknown-harness error."""
+    clean = _check_harness(harness)
+    return {"state": "OK", "schema": "qubit-acp-adapters/1",
+            "adapter": _adapter_record(clean)}
+
+
+def shape_method(harness: str, method: str,
+                 params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Shape one ACP JSON-RPC request for a harness (pure; never sent)."""
+    clean = _check_harness(harness)
+    caps = HARNESS_CAPS[clean]
+    name = str(method or "").strip()
+    if name not in ADAPTER_METHODS:
+        raise AcpError(BAD_INPUT_CODE,
+                       f"method must be one of {ADAPTER_METHODS}")
+    if name == "initialize":
+        return {"state": "OK", "request": _handshake_request(clean, caps)}
+    if name == "session/cancel":
+        return {"state": "OK", "request": {
+            "jsonrpc": "2.0", "id": 3, "method": "session/cancel",
+            "params": {"harness": clean,
+                       "sessionId": str((params or {}).get("sessionId", ""))[:128]}}}
+    prompt = str((params or {}).get("prompt", ""))
+    if len(prompt) > MAX_PROMPT_CHARS:
+        raise AcpError(BAD_INPUT_CODE,
+                       f"prompt exceeds {MAX_PROMPT_CHARS} characters")
+    return {"state": "OK", "request": _prompt_request(clean, prompt)}
+
+
+def adapter_session(cfg: Any, harness: str, *, prompt: str,
+                    transport: Any = None, confirmed: bool = False,
+                    requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Drive a real ACP exchange over an operator-injected transport (OC-58).
+
+    Qubit shapes the ``initialize`` and ``session/prompt`` requests and passes
+    them, in order, to the injected ``transport(request) -> response`` callable.
+    The harness binary is never spawned and no socket is opened by Qubit; with
+    no transport the typed ``ACP_TRANSPORT_UNAVAILABLE`` gate is raised.
+    """
+    if estop_engaged(cfg):
+        raise AcpError(ESTOP_CODE, "emergency stop is latched")
+    if not confirmed:
+        raise AcpError(CONFIRM_CODE,
+                       "ACP session requires explicit --confirm")
+    clean = _check_harness(harness)
+    text = (prompt or "").strip()
+    if not text:
+        raise AcpError(BAD_INPUT_CODE, "prompt must not be empty")
+    if len(text) > MAX_PROMPT_CHARS:
+        raise AcpError(BAD_INPUT_CODE,
+                       f"prompt exceeds {MAX_PROMPT_CHARS} characters")
+    if not callable(transport):
+        _receipt(cfg, clean, "TRANSPORT_UNAVAILABLE",
+                 "no operator transport injected; Qubit spawns nothing")
+        raise AcpError(
+            TRANSPORT_CODE,
+            "no operator-injected ACP transport: Qubit never spawns a harness "
+            "binary; inject a transport to drive a real exchange")
+    caps = HARNESS_CAPS[clean]
+    requests = [_handshake_request(clean, caps), _prompt_request(clean, text)]
+    responses: List[Any] = []
+    for request in requests:
+        try:
+            response = transport(dict(request))
+        except Exception as exc:
+            _receipt(cfg, clean, "TRANSPORT_ERROR", _redact(str(exc)))
+            raise AcpError(
+                TRANSPORT_CODE,
+                f"operator transport failed: {_redact(str(exc))[:160]}")
+        if not isinstance(response, dict):
+            raise AcpError(TRANSPORT_CODE,
+                           "operator transport returned a non-object response")
+        responses.append(_redact_obj(response))
+    _receipt(cfg, clean, "ADAPTER_SESSION",
+             f"{len(requests)} requests via operator transport")
+    _audit("adapter_session", requested_by,
+           {"harness": clean, "prompt_sha256": hashlib.sha256(
+               text.encode()).hexdigest()})
+    return {"state": "OK", "schema": "qubit-acp-adapters/1",
+            "harness": clean, "requests": [_redact_obj(r) for r in requests],
+            "responses": responses, "executed": True, "spawned": False,
+            "transport": "operator-injected",
+            "note": "ACP exchange driven in-process; Qubit never spawns the "
+                    "harness"}

@@ -1,11 +1,16 @@
 # Operations — Packet 8T-F: Qubit Agent foundation migration
 
-Status: **IMPLEMENTATION COMPLETE — pending independent verification**
+Status: **IN PROGRESS — cutover and full parity not verified**
 
 The authoritative architecture/status document is
 [8TF_SOURCE_OF_TRUTH.md](8TF_SOURCE_OF_TRUTH.md). This runbook supplies the
 operational migration and rollback requirements; it does not permit a
 supervisor-only implementation to pass.
+
+The owner-directed runtime and test cadence are defined in
+[QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md](QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md).
+The current status gate is the gap ledger, not the historical close-out
+numbers in this runbook.
 
 The phase-by-phase execution plan is
 [8TF_COMPLETE_MIGRATION_PLAN.md](8TF_COMPLETE_MIGRATION_PLAN.md).

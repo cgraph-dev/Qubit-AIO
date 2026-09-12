@@ -125,28 +125,36 @@ NEW_REFUSALS = [
      "CONFIRM_REQUIRED", 409),
     ("DELETE", "/api/learning/node", {}, {"id": "x"},
      "CONFIRM_REQUIRED", 409),
+    # Wave 2: blanket gates converted to real Qubit confirm/audit operations.
+    # Without confirm each stages a typed 409 (never a fabricated 2xx); the
+    # confirmed real path is proven in test_hermes_routes_agent2b_wiring.py.
+    ("POST", "/api/providers/custom-endpoints", {},
+     {"id": "local-llm", "base_url": "http://127.0.0.1:8080"},
+     "CONFIRM_REQUIRED", 409),
+    ("POST", "/api/providers/custom-endpoints/aa/activate", {}, {},
+     "CONFIRM_REQUIRED", 409),
+    ("DELETE", "/api/providers/custom-endpoints/aa", {}, {},
+     "CONFIRM_REQUIRED", 409),
+    ("PUT", "/api/tools/terminal/backend", {}, {"backend": "local"},
+     "CONFIRM_REQUIRED", 409),
+    ("POST", "/api/tools/computer-use/permissions/grant", {}, {},
+     "CONFIRM_REQUIRED", 409),
+    ("POST", "/api/profiles/aa/export", {}, {},
+     "CONFIRM_REQUIRED", 409),
 ]
 
 # (method, path, code, http) -- declarative typed policy gates.
 NEW_GATES = [
-    ("POST", "/api/providers/custom-endpoints",
-     "PROVIDER_ENDPOINT_STAGED", 403),
-    ("POST", "/api/providers/custom-endpoints/aa/activate",
-     "PROVIDER_ENDPOINT_STAGED", 403),
-    ("DELETE", "/api/providers/custom-endpoints/aa",
-     "PROVIDER_ENDPOINT_STAGED", 403),
     ("POST", "/api/providers/custom-endpoints/validate",
      "NETWORK_PROBE_BLOCKED", 403),
     ("POST", "/api/providers/validate", "NETWORK_PROBE_BLOCKED", 403),
-    ("PUT", "/api/tools/terminal/backend", "TERMINAL_BACKEND_STAGED", 403),
-    ("POST", "/api/tools/computer-use/permissions/grant",
-     "COMPUTER_USE_GRANT_STAGED", 403),
     ("POST", "/api/profiles/import", "PROFILE_IMPORT_REVIEW", 403),
     ("POST", "/api/profiles/aa/open-terminal", "PTY_NO_SHELL", 403),
-    ("POST", "/api/profiles/aa/export", "EXPORT_BROKERED", 403),
     ("GET", "/api/profiles/aa/desktop-overlay", "DESKTOP_OVERLAY_ONLY", 403),
     ("POST", "/api/sessions/owner-backfill", "SESSIONS_RECEIPT_STORE", 501),
     ("POST", "/api/memory/providers/aa/oauth/start",
+     "OAUTH_MANUAL_HANDOFF", 403),
+    ("GET", "/api/memory/providers/aa/oauth/status",
      "OAUTH_MANUAL_HANDOFF", 403),
     ("DELETE", "/api/mcp/oauth/flows/f1", "OAUTH_MANUAL_HANDOFF", 403),
     ("GET", "/api/mcp/oauth/callback/aa/bb", "OAUTH_MANUAL_HANDOFF", 403),
@@ -695,4 +703,81 @@ def test_wave3_routes_dispatch_typed_never_404(tmp_path, monkeypatch):
         assert code not in (404, 500), (method, path, code, out)
         assert out.get("ok") is False, (method, path, out)
         assert out.get("code"), (method, path, out)
+
+
+# ===========================================================================
+# Remaining needs=none rows that stay typed Qubit gates because the upstream
+# behavior is genuinely unsafe/operator-only (secrets, credentialed network,
+# PTY/desktop, destructive receipt sweeps) or has no Qubit equivalent. The
+# positive is the typed envelope; the negative proves ``confirm`` cannot bypass
+# the gate and that a body is never interpreted as success.
+# ===========================================================================
+REMAINING_TYPED = [
+    ("GET", "/api/config/raw", "SECRET_NEVER_SERVED", 403),
+    ("PUT", "/api/config/raw", "SECRET_NEVER_SERVED", 403),
+    ("POST", "/api/env/reveal", "SECRET_NEVER_SERVED", 403),
+    ("GET", "/api/credentials/pool", "SECRET_NEVER_SERVED", 403),
+    ("POST", "/api/credentials/pool", "SECRET_NEVER_SERVED", 403),
+    ("DELETE", "/api/credentials/pool/openai/0", "SECRET_NEVER_SERVED", 403),
+    ("POST", "/api/providers/validate", "NETWORK_PROBE_BLOCKED", 403),
+    ("POST", "/api/providers/custom-endpoints/validate",
+     "NETWORK_PROBE_BLOCKED", 403),
+    ("GET", "/api/media", "MEDIA_NOT_SERVED", 403),
+    ("POST", "/api/chat/image-upload", "CHAT_IMAGE_OVERLAY", 403),
+    ("GET", "/api/files/download", "FILES_BINARY_STREAM", 403),
+    ("GET", "/api/files/stream", "FILES_BINARY_STREAM", 403),
+    ("HEAD", "/api/files/stream", "FILES_BINARY_STREAM", 403),
+    ("GET", "/api/fs/download", "FILES_BINARY_STREAM", 403),
+    ("GET", "/api/git/gh-auth", "GH_AUTH_OPERATOR", 403),
+    ("GET", "/api/git/review/ship-info", "GIT_SHIP_GH_EXTERNAL", 403),
+    ("POST", "/api/git/review/pr-list", "GIT_WRITE_BROKERED", 403),
+    ("POST", "/api/git/review/push", "GIT_WRITE_BROKERED", 403),
+    ("POST", "/api/git/review/create-pr", "GIT_WRITE_BROKERED", 403),
+    ("GET", "/api/ops/backup/download", "BACKUP_PASSPHRASE", 403),
+    ("GET", "/api/ssh/ownership", "SSH_OWNERSHIP_OPERATOR", 403),
+    ("PUT", "/api/curator/paused", "CURATOR_ON_DEMAND", 403),
+    ("POST", "/api/curator/run", "CURATOR_ON_DEMAND", 403),
+    ("GET", "/api/portal", "UPDATE_OPERATOR_OWNED", 403),
+    ("POST", "/api/profiles/import", "PROFILE_IMPORT_REVIEW", 403),
+    ("POST", "/api/profiles/work/open-terminal", "PTY_NO_SHELL", 403),
+    ("GET", "/api/profiles/work/desktop-overlay", "DESKTOP_OVERLAY_ONLY", 403),
+    ("POST", "/api/profiles/sessions/pull-requests", "GH_PR_EXTERNAL", 403),
+    ("POST", "/api/memory/providers/x/oauth/start",
+     "OAUTH_MANUAL_HANDOFF", 403),
+    ("POST", "/api/sessions/owner-backfill", "SESSIONS_RECEIPT_STORE", 501),
+    ("POST", "/api/sessions/bulk-delete", "SESSIONS_RECEIPT_STORE", 501),
+    ("POST", "/api/sessions/import", "SESSIONS_RECEIPT_STORE", 501),
+    ("POST", "/api/sessions/prune", "SESSIONS_RECEIPT_STORE", 501),
+    ("PUT", "/api/model/moa", "MOA_SUPERSEDED", 501),
+    ("POST", "/api/profiles/work/describe-auto", "DESCRIBE_AUTO_MANUAL", 403),
+    ("PATCH", "/api/profiles/work", "PERSONA_IMMUTABLE_ID", 501),
+    ("POST", "/api/memory/providers/cloud/setup",
+     "MEMORY_LOCAL_ONLY", 403),
+    ("PUT", "/api/memory/providers/cloud/config",
+     "MEMORY_LOCAL_ONLY", 403),
+]
+
+
+def test_remaining_typed_rows_are_typed_and_confirm_cannot_bypass(
+        tmp_path, monkeypatch):
+    from voicebridge import hermes_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    for method, path, code_want, http in REMAINING_TYPED:
+        route, _ = HC.match(method, path)
+        assert route is not None, (method, path)
+        code, out = HC.dispatch(cfg, method, path, {}, {})
+        assert code == http, (method, path, code, str(out)[:200])
+        assert out.get("ok") is False, (method, path, out)
+        assert out.get("state") == "UNAVAILABLE", (method, path, out)
+        assert out.get("code") == code_want, (method, path, out)
+        assert out.get("qubit_counterpart"), (method, path, out)
+        assert out.get("owner"), (method, path, out)
+        assert out.get("rollback"), (method, path, out)
+
+        # Negative: claiming confirm must not bypass a typed gate.
+        code2, out2 = HC.dispatch(cfg, method, path, {}, {"confirm": True})
+        assert code2 == http, (method, path, code2, str(out2)[:200])
+        assert out2.get("ok") is False and out2.get("code") == code_want, \
+            (method, path, out2)
 

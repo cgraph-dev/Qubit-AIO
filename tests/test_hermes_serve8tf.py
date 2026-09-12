@@ -106,7 +106,9 @@ def test_hermes_api_auth_and_status(tmp_path):
                                     hermes_token=True)
         assert status == 200, (status, body[:200])
         out = json.loads(body)
-        assert out.get("ok"), out
+        # Cutover stage 2: /api/status is a safe read served by the vendored
+        # Hermes backend (real status shape), not the compat wrapper.
+        assert out.get("version") and "overall" in out, out
         status, _, body = _http(port, "GET", "/hermes/api/dashboard/themes",
                                 hermes_token=True)
         assert status == 200

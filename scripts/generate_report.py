@@ -17,6 +17,39 @@ The spoken summary is ALWAYS the last paragraph (≤40w).
 """
 import argparse, re, sys, pathlib, datetime
 
+REPO = pathlib.Path(__file__).resolve().parents[1]
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+
+def _record_run(task, md, state_dir):
+    """Append an execution-identity receipt + logbook entry (OC-51/52)."""
+    try:
+        import hashlib
+        import json
+
+        from voicebridge.evaluation.logbook import Logbook, LogbookEntry
+        from voicebridge.evaluation.receipts import (ExecutionIdentity,
+                                                     ReceiptChain)
+
+        root = pathlib.Path(state_dir).expanduser()
+        ident = ExecutionIdentity.create(run_id=task or "report",
+                                         actor="report-script",
+                                         tool="generate_report",
+                                         workspace=str(pathlib.Path.cwd()))
+        chain = ReceiptChain(ident)
+        chain.append(status="OK",
+                     outputs_digest=hashlib.sha256(md.encode()).hexdigest())
+        root.mkdir(parents=True, exist_ok=True)
+        with open(root / "receipts.jsonl", "a", encoding="utf-8") as fh:
+            for rec in chain.receipts():
+                fh.write(json.dumps(rec, sort_keys=True) + "\n")
+        Logbook(root / "logbook.jsonl").append(
+            LogbookEntry.create(kind="report", summary=task or "report",
+                                source="monitor"))
+    except Exception:
+        pass
+
 def clamp_words(text, max_words=40):
     w=text.split()
     if len(w)<=max_words:
@@ -290,6 +323,7 @@ def main():
             raw=args.raw
 
     md, spoken = auto_build(raw, args)
+    _record_run(args.task, md, args.state_dir)
 
     out_path=None
     if args.out:

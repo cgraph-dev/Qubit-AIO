@@ -4,6 +4,9 @@ Owner directive step 1: the vendored Hermes FastAPI/uvicorn server executes from
 the Qubit tree. These tests prove it imports from the fork, reports a real
 route table, and actually serves HTTP from a temp HOME with no repository
 checkout on PYTHONPATH.
+
+All fork imports run in subprocesses: importing the vendored backend starts
+upstream background threads, and the hermetic Qubit suite must not inherit them.
 """
 from __future__ import annotations
 
@@ -31,36 +34,57 @@ def _free_port() -> int:
     return port
 
 
-def test_backend_status_is_real_fork_app():
-    from voicebridge import hermes_backend as hb
+def _child_env(home: Path) -> dict:
+    env = dict(os.environ)
+    env["HOME"] = str(home)
+    env["XDG_CONFIG_HOME"] = str(home / ".config")
+    env["XDG_DATA_HOME"] = str(home / ".local" / "share")
+    env.pop("PYTHONPATH", None)
+    return env
 
-    st = hb.status()
-    assert st["runtime"] == "qubit-hermes-backend"
-    assert st["present"] is True
-    assert st["importable"] is True, st.get("import_error")
-    assert st["title"] == "Hermes Agent"
-    assert st["routes"] > 0
-    assert st["start_server"] is True
-    assert st["upstream_revision"] == PIN
+
+def _run_py(body: str) -> dict:
+    """Run a snippet in a child process and parse its last stdout line as JSON."""
+    home = Path(tempfile.mkdtemp(prefix="hermes-be-"))
+    code = "import json\n" + body
+    try:
+        p = subprocess.run([sys.executable, "-c", code], cwd=str(REPO),
+                           env=_child_env(home), capture_output=True,
+                           text=True, timeout=180)
+        assert p.returncode == 0, p.stderr[-1000:]
+        return json.loads(p.stdout.strip().splitlines()[-1])
+    finally:
+        shutil.rmtree(home, ignore_errors=True)
+
+
+def test_backend_status_is_real_fork_app():
+    out = _run_py(
+        "from voicebridge import hermes_backend as hb\n"
+        "print(json.dumps(hb.status()))\n")
+    assert out["runtime"] == "qubit-hermes-backend"
+    assert out["present"] is True
+    assert out["importable"] is True, out.get("import_error")
+    assert out["title"] == "Hermes Agent"
+    assert out["routes"] > 0
+    assert out["start_server"] is True
+    assert out["upstream_revision"] == PIN
 
 
 def test_backend_app_is_from_the_fork():
-    from voicebridge import hermes_backend as hb
-
-    ws = hb._web_server_module()
-    assert Path(ws.__file__).resolve().is_relative_to(FORK)
-    assert hb.app() is ws.app
+    out = _run_py(
+        "from voicebridge import hermes_backend as hb\n"
+        "ws = hb._web_server_module()\n"
+        "print(json.dumps({'file': str(ws.__file__), "
+        "'same': hb.app() is ws.app}))\n")
+    assert Path(out["file"]).resolve().is_relative_to(FORK)
+    assert out["same"] is True
 
 
 def test_backend_actually_serves_http():
     """Start the real backend headless from a temp HOME and probe it."""
     port = _free_port()
     home = Path(tempfile.mkdtemp(prefix="hermes-backend-test-"))
-    env = dict(os.environ)
-    env["HOME"] = str(home)
-    env["XDG_CONFIG_HOME"] = str(home / ".config")
-    env["XDG_DATA_HOME"] = str(home / ".local" / "share")
-    env.pop("PYTHONPATH", None)
+    env = _child_env(home)
     proc = subprocess.Popen(
         [sys.executable, "-m", "voicebridge", "agent", "serve",
          "--host", "127.0.0.1", "--port", str(port), "--skip-build"],

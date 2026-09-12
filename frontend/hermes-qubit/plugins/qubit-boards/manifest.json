@@ -1,7 +1,7 @@
 {
   "name": "qubit-boards",
   "label": "Boards",
-  "description": "Kanban boards and cards on the canonical store (same backend as qubit kanban CLI and voice). OpenClaw addition on the Hermes baseline.",
+  "description": "Kanban boards and cards on the canonical store (same backend as qubit kanban CLI and voice).",
   "icon": "kanban-square",
   "version": "1.1.0",
   "tab": {"path": "/qubit-boards", "position": "after:cron"},

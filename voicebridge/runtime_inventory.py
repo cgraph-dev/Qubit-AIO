@@ -138,6 +138,119 @@ def _messaging(cfg: Any) -> Dict[str, Any]:
         return {"state": "UNAVAILABLE", "detail": str(exc)[:160]}
 
 
+def _browser_capability(cfg: Any) -> Dict[str, Any]:
+    """Real loopback-CDP browser capability (typed UNAVAILABLE otherwise)."""
+    from . import browser_tabs as BT
+
+    out = BT.doctor(cfg)
+    return {"state": out.get("state", "OK"),
+            "cdp": out.get("state") == "OK",
+            "browser": str(out.get("browser", ""))[:120],
+            "protocol": str(out.get("protocol", ""))[:40],
+            "tabs": int(out.get("tabs", 0) or 0),
+            "screencast": out.get("screencast", {}),
+            "profiles": str(out.get("profiles", ""))[:200]}
+
+
+def _desktop_capability() -> Dict[str, Any]:
+    """Real desktop-control capability state (read-only probes)."""
+    from . import computer_use as CU
+
+    st = CU.status()
+    return {"state": st.get("state", "OK"),
+            "session_type": str(st.get("session_type", ""))[:40],
+            "display_present": bool(st.get("display_present", False)),
+            "atspi_reachable": bool(st.get("atspi_reachable", False)),
+            "control": str(st.get("control", "DISABLED"))[:40]}
+
+
+def _ide_capability(cfg: Any) -> Dict[str, Any]:
+    """Real editor launcher inventory (read-only PATH probe)."""
+    from . import ide as IDE
+
+    st = IDE.status(cfg)
+    return {"state": st.get("state", "OK"),
+            "editors": [str(e.get("editor", "")) for e in st.get("editors", [])],
+            "default": str(st.get("default", ""))[:80]}
+
+
+def _runtime_capability(cfg: Any) -> Dict[str, Any]:
+    """Real pinned-runtime provision state (digest-verified)."""
+    from . import runtime_images as RI
+
+    st = RI.status(cfg)
+    return {"state": st.get("state", "OK"),
+            "runtimes": [{"name": str(r.get("name", "")),
+                          "state": str(r.get("state", ""))}
+                         for r in st.get("runtimes", [])],
+            "daemon": str(st.get("daemon", ""))[:40]}
+
+
+def _node_host_capability(cfg: Any) -> Dict[str, Any]:
+    """Node-host-derived capabilities (declared only; availability typed)."""
+    from . import node_host as NH
+
+    st = NH.status(cfg)
+    return {"state": st.get("state", "OK"),
+            "nodes": int(st.get("nodes", 0) or 0),
+            "host_state": str(st.get("host_state", ""))[:40],
+            "supported_capabilities": list(st.get("supported_capabilities", [])),
+            "remote_capabilities": list(st.get("remote_capabilities", []))}
+
+
+def device_inventory(cfg: Any) -> Dict[str, Any]:
+    """Device capability inventory: browser / desktop / IDE / vision / runtime.
+
+    One real, read-only probe per family plus the node-host-derived
+    capabilities. Every leaf is observed or typed UNAVAILABLE/DISABLED;
+    availability is never treated as authorization. No process is started,
+    no outbound network is opened (the browser probe only checks the
+    loopback CDP endpoint), and every string is redacted.
+    """
+    return {
+        "schema": "qubit-device-capabilities/1",
+        "state": "OK",
+        "browser": _safe(_browser_capability, cfg),
+        "desktop": _safe(_desktop_capability),
+        "ide": _safe(_ide_capability, cfg),
+        "vision": _safe(_vision, cfg),
+        "runtime": _safe(_runtime_capability, cfg),
+        "node_host": _safe(_node_host_capability, cfg),
+        "authority": "read-only probes; availability is not authorization",
+    }
+
+
+def _discovery(cfg: Any) -> Dict[str, Any]:
+    """Gateway/peer discovery for the runtime surface (read-only)."""
+    from . import gateway_peers as GW
+
+    out = GW.discovery(cfg)
+    return {"state": out.get("state", "OK"),
+            "gateways": len(out.get("gateways", [])),
+            "peers": len(out.get("peers", [])),
+            "providers": out.get("providers", []),
+            "marketplace": out.get("marketplace", "")}
+
+
+def _marketplace(cfg: Any) -> Dict[str, Any]:
+    """Local reviewed plugin catalog; remote marketplace fetches refused."""
+    try:
+        from . import plugin_runtime as PR
+
+        status = PR.status(cfg)
+        plugins = PR.list_plugins(cfg).get("plugins", [])
+        return {"state": "OK", "local_plugins": len(plugins),
+                "kinds": status.get("kinds", []),
+                "marketplace": "remote plugin/marketplace installs are "
+                               "refused by pinned-source policy; local "
+                               "reviewed manifests only",
+                "plugins": plugins}
+    except Exception as exc:
+        return {"state": "UNAVAILABLE", "detail": str(exc)[:160],
+                "marketplace": "remote plugin/marketplace installs are "
+                               "refused by pinned-source policy"}
+
+
 def runtime_inventory(cfg: Any) -> Dict[str, Any]:
     """Assemble the real runtime inventory; every leaf is observed or typed."""
     from .auth_status import auth_status, recent_sessions
@@ -160,8 +273,11 @@ def runtime_inventory(cfg: Any) -> Dict[str, Any]:
         "mcp": _safe(mcp_status, cfg),
         "worker": _safe(worker_status, cfg),
         "vision": _safe(_vision, cfg),
+        "devices": _safe(device_inventory, cfg),
         "messaging": _safe(_messaging, cfg),
         "sessions": _safe(recent_sessions, cfg, 5),
         "capabilities": _safe(_cap_summary),
+        "discovery": _safe(_discovery, cfg),
+        "marketplace": _safe(_marketplace, cfg),
     }
     return inv

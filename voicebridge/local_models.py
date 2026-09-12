@@ -48,6 +48,7 @@ STATUS_SCHEMA = "qubit-local-models-status/1"
 HARDWARE_SCHEMA = "qubit-local-models-hardware/1"
 CATALOG_SCHEMA = "qubit-local-models-catalog/1"
 JOBS_SCHEMA = "qubit-local-models-jobs/1"
+FALLBACK_SCHEMA = "qubit-local-models-fallback/1"
 
 PROVIDER = "ollama"
 BACKEND = "ollama-http"
@@ -253,6 +254,7 @@ def status(cfg: Any) -> Dict[str, Any]:
             "available": state == "AVAILABLE", "provider": PROVIDER,
             "backend": BACKEND, "enabled": section["enabled"],
             "model": alias, "model_present": model_present,
+            "fallback": resolve_fallback(cfg),
             "endpoint": _redact(section["url"]), "observed_models": len(names),
             "detail": _redact(detail),
             "rollback": "read-only; nothing to roll back"}
@@ -321,6 +323,7 @@ def catalog(cfg: Any) -> Dict[str, Any]:
         rows.append({"id": model_id, "name": model_id, "size": None,
                      "state": "configured", "source": source})
     return {"state": "OK", "schema": CATALOG_SCHEMA, "models": rows,
+            "fallback": fallback_chain(cfg)["chain"],
             "runtime_observed": probe is not None,
             "detail": ("runtime model list observed" if probe is not None
                        else "runtime not observed; only configured models "
@@ -449,6 +452,73 @@ def quickstart(cfg: Any, *, model: Optional[str] = None,
             return _refusal("quickstart", UNKNOWN_CODE,
                             f"unknown local model {clean!r}")
     return _provision_gate(cfg, "quickstart", confirmed=confirmed)
+
+
+def fallback_chain(cfg: Any) -> Dict[str, Any]:
+    """Ordered model fallback chain derived from real config + runtime state.
+
+    Read-only and loopback-only: each configured candidate is annotated with
+    whether the resident runtime actually reports it. Nothing is downloaded,
+    loaded, or probed off loopback, and no provider credentials are required.
+    """
+    observed = [row.get("id", "") for row in _observed_models(cfg)]
+    observed = [name for name in observed if name]
+    chain: List[Dict[str, Any]] = []
+    for model_id, source in _known_models(cfg):
+        available = bool(observed) and _model_matches(observed, model_id)
+        chain.append({"id": model_id, "source": source,
+                      "available": available,
+                      "state": "available" if available else "configured"})
+    runtime_observed = bool(observed)
+    return {"state": "OK", "schema": FALLBACK_SCHEMA, "chain": chain,
+            "runtime_observed": runtime_observed,
+            "detail": ("ordered from configured models; availability is "
+                       "observed only from the loopback runtime"
+                       if runtime_observed else
+                       "runtime not observed; no model is marked available"),
+            "rollback": "read-only; nothing to roll back"}
+
+
+def resolve_fallback(cfg: Any, model: str = "") -> Dict[str, Any]:
+    """Pick the requested model, or automatically fall back to one available.
+
+    No credentials and no egress: selection is over the configured candidates
+    observed from the loopback runtime. When the requested model is not
+    present (or absent entirely) the first available candidate is selected;
+    with no observed candidate the result is the typed
+    ``LOCAL_MODEL_UNAVAILABLE`` — never a fabricated pick.
+    """
+    wanted = str(model or "").strip()
+    chain = fallback_chain(cfg)["chain"]
+    available = [row for row in chain if row.get("available")]
+    base = {"schema": FALLBACK_SCHEMA, "wanted": _redact(wanted)[:120],
+            "chain": chain}
+
+    def _picked(selected: str, *, fallback: bool) -> Dict[str, Any]:
+        return {**base, "state": "OK", "selected": selected,
+                "fallback": bool(fallback),
+                "detail": ("requested model available" if not fallback else
+                           "requested model unavailable; fell back to the "
+                           "first available configured model"),
+                "rollback": "read-only; nothing to roll back"}
+
+    if wanted:
+        for row in chain:
+            if row["id"] == wanted or \
+                    row["id"].split(":")[0] == wanted.split(":")[0]:
+                if row["available"]:
+                    return _picked(row["id"], fallback=False)
+                break
+        if available:
+            return _picked(available[0]["id"], fallback=True)
+    elif available:
+        return _picked(available[0]["id"], fallback=False)
+    return {**base, "state": "UNAVAILABLE", "code": UNAVAILABLE_CODE,
+            "selected": None, "fallback": False,
+            "detail": "no configured local model is available on the loopback "
+                      "runtime; nothing was started or loaded",
+            "owner": "qubit-policy",
+            "rollback": "read-only; nothing to roll back"}
 
 
 def public_error(code: str, detail: str) -> Dict[str, Any]:

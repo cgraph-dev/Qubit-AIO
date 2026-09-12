@@ -43,7 +43,18 @@ SENSITIVE_ARGS = ("passphrase", "password", "secret", "token", "api_key",
                   "key_ref")
 
 INTERFACES_ALL = ("cli", "dashboard", "voice")
-INTERFACES_NO_VOICE_PASSPHRASE = ("cli", "dashboard")
+# Real CLI + dashboard surfaces; the spoken surface is a dedicated canonical
+# registry entry (declared per-op via ``voice_guard``), not this Tier-2 id.
+INTERFACES_NO_VOICE = ("cli", "dashboard")
+INTERFACES_NO_VOICE_PASSPHRASE = INTERFACES_NO_VOICE
+# Ops that are honestly dashboard-only: a rendered form is the only surface
+# that can carry the structured/sensitive argument, and the CLI/voice path for
+# the underlying capability is a different (already-covered) entry point.
+INTERFACES_DASHBOARD = ("dashboard",)
+REASON_DASHBOARD_REFUSAL = (
+    "dashboard-only: this is a typed refusal surface (no CLI/voice equivalent "
+    "is meaningful); the dashboard console shows the honest typed state"
+)
 REASON_PASSPHRASE = (
     "voice unsupported: spoken passphrases would leak into transcripts, "
     "journal records, and audio history; use the dashboard password form "
@@ -56,6 +67,11 @@ REASON_BYTES = (
 REASON_NESTED = (
     "voice unsupported: nested structured answers cannot be spoken "
     "reliably; use the dashboard onboarding form or the CLI wizard instead"
+)
+REASON_VOICE_CANONICAL = (
+    "no separate voice surface: the spoken form of this capability is the "
+    "canonical voice registry entry named by voice_guard (same backend); "
+    "this Tier-2 entry is the CLI/dashboard form only"
 )
 
 
@@ -173,9 +189,10 @@ def catalog() -> List[Dict[str, Any]]:
             "scope": ["dashboard"],
             "interfaces": list(spec.interfaces),
             "interface_reason": spec.interface_reason,
-            "voice_guard": (f"guard_{op_id}"
-                            if op_id in getattr(VC, "VOICE_GUARDS", {})
-                            else ""),
+            "voice_guard": (spec.voice_guard
+                            or (f"guard_{op_id}"
+                                if op_id in getattr(VC, "VOICE_GUARDS", {})
+                                else "")),
             "parity": list(spec.parity or ()),
         })
     return items
@@ -304,6 +321,9 @@ class ExtraOp:
     confirm: bool = True
     interfaces: Tuple[str, ...] = INTERFACES_ALL
     interface_reason: str = ""
+    # Canonical voice registry entry that speaks for this capability when the
+    # Tier-2 entry itself is CLI/dashboard only (same backend, different id).
+    voice_guard: str = ""
     parity: Tuple[str, ...] = ()
     run: Optional[Callable[[Any, Dict[str, Any], str], Dict[str, Any]]] = None
     estop: Optional[Callable[[Any], bool]] = None
@@ -317,6 +337,7 @@ def extra(op_id: str, group: str, title: str, help: str, *,
           confirm: bool = True,
           interfaces: Tuple[str, ...] = INTERFACES_ALL,
           interface_reason: str = "",
+          voice_guard: str = "",
           parity: Tuple[str, ...] = (),
           estop: Optional[Callable[[Any], bool]] = None) -> Callable:
     """Decorator registering a Tier-2 extra op (backend = same fn CLI calls)."""
@@ -325,15 +346,29 @@ def extra(op_id: str, group: str, title: str, help: str, *,
         EXTRA_OPS[op_id] = ExtraOp(
             id=op_id, group=group, title=title, help=help, args=args,
             confirm=confirm, interfaces=interfaces,
-            interface_reason=interface_reason, parity=parity, run=fn,
-            estop=estop)
+            interface_reason=interface_reason, voice_guard=voice_guard,
+            parity=parity, run=fn, estop=estop)
         return fn
 
     return _wrap
 
 
+def _sensitive_names(spec: ExtraOp) -> set:
+    """Argument names that must never be journaled or audited.
+
+    The global ``SENSITIVE_ARGS`` list plus any per-argument ``secret`` flag
+    declared on the extra. A ``secret`` arg is therefore never persisted in
+    the shared approval journal and must be re-supplied at confirm time —
+    exactly like a passphrase, but usable for nested structured payloads
+    (onboarding answers, snapshots) that carry private data.
+    """
+    declared = {a["name"] for a in spec.args if a.get("secret")}
+    return set(SENSITIVE_ARGS) | declared
+
+
 def _redacted_args(spec: ExtraOp, args: Dict[str, Any]) -> Dict[str, Any]:
-    return {k: ("<redacted>" if k in SENSITIVE_ARGS else v)
+    sensitive = _sensitive_names(spec)
+    return {k: ("<redacted>" if k in sensitive else v)
             for k, v in args.items()}
 
 
@@ -398,8 +433,9 @@ def run_extra_op(cfg: Any, op_id: str, args: Dict[str, Any], *,
         return {"state": "executed", "speech": f"{spec.title}: done.",
                 "receipt": {"op": op_id, "result": result}}
     journal = _journal(cfg)
-    sensitive = sorted(k for k in coerced if k in SENSITIVE_ARGS)
-    staged = {k: v for k, v in coerced.items() if k not in SENSITIVE_ARGS}
+    secret_names = _sensitive_names(spec)
+    sensitive = sorted(k for k in coerced if k in secret_names)
+    staged = {k: v for k, v in coerced.items() if k not in secret_names}
     shown = ", ".join(f"{k} {_redact(str(v))[:40]}" for k, v in
                       sorted(staged.items()))[:200]
     wording = f"{spec.title}: confirm to proceed. {shown}".strip()
@@ -602,7 +638,9 @@ def _opt(args: str) -> Dict[str, Any]:
 # flows; voice entries land in the registry, Tier 1 covers them there).
 @extra("brain_sweep", group="brain", title="Brain expiry sweep",
        help="Delete expired Brain profile fields (audited, reversible via export).",
-       args=(), parity=("memory",))
+       args=(), interfaces=INTERFACES_NO_VOICE,
+       interface_reason=REASON_VOICE_CANONICAL,
+       voice_guard="brain_profile_sweep", parity=("memory",))
 def _extra_brain_sweep(cfg: Any, args: Dict[str, Any],
                        actor: str) -> Dict[str, Any]:
     from . import brain as BR
@@ -613,7 +651,9 @@ def _extra_brain_sweep(cfg: Any, args: Dict[str, Any],
 @extra("brain_export", group="brain", title="Brain profile export",
        help="Export scoped Brain profile data (secrets stay as references).",
        args=(_req("principal"), _opt("identity")), confirm=False,
-       parity=("memory",))
+       interfaces=INTERFACES_NO_VOICE,
+       interface_reason=REASON_VOICE_CANONICAL,
+       voice_guard="brain_profile_export", parity=("memory",))
 def _extra_brain_export(cfg: Any, args: Dict[str, Any],
                         actor: str) -> Dict[str, Any]:
     from . import brain as BR
@@ -626,6 +666,7 @@ def _extra_brain_export(cfg: Any, args: Dict[str, Any],
        help="Apply first-run onboarding answers (JSON map). Voice offers the "
             "plan; nested answers need the dashboard form or CLI wizard.",
        args=({"name": "answers", "type": "str", "required": True,
+               "secret": True,
                "clarifier": "Paste the answers JSON from the plan preview."},),
        interfaces=INTERFACES_NO_VOICE_PASSPHRASE, interface_reason=REASON_NESTED,
        parity=("memory",))
@@ -841,7 +882,9 @@ def _extra_browser_close(cfg: Any, args: Dict[str, Any],
 @extra("proxy_start", group="proxy", title="Proxy start",
        help="Typed refusal: no forwarding server runs (would bypass egress "
             "policy and audit).",
-       args=(), confirm=False, parity=("proxy",))
+       args=(), confirm=False, interfaces=INTERFACES_NO_VOICE,
+       interface_reason=REASON_VOICE_CANONICAL,
+       voice_guard="proxy_start_refusal", parity=("proxy",))
 def _extra_proxy_start(cfg: Any, args: Dict[str, Any],
                        actor: str) -> Dict[str, Any]:
     from . import proxy_status as PX
@@ -851,7 +894,9 @@ def _extra_proxy_start(cfg: Any, args: Dict[str, Any],
 
 @extra("acp_serve", group="editor", title="ACP serve",
        help="Typed refusal: no ACP server is shipped.",
-       args=(), confirm=False, parity=("acp/lsp",))
+       args=(), confirm=False, interfaces=INTERFACES_DASHBOARD,
+       interface_reason=REASON_DASHBOARD_REFUSAL,
+       voice_guard="acp_serve_refusal", parity=("acp/lsp",))
 def _extra_acp_serve(cfg: Any, args: Dict[str, Any],
                      actor: str) -> Dict[str, Any]:
     from . import acp_lsp as AL
@@ -861,7 +906,9 @@ def _extra_acp_serve(cfg: Any, args: Dict[str, Any],
 
 @extra("acp_accept_hooks", group="editor", title="ACP accept-hooks",
        help="Typed refusal: upstream hook bypass flags are never honored.",
-       args=(), confirm=False, parity=("acp/lsp",))
+       args=(), confirm=False, interfaces=INTERFACES_DASHBOARD,
+       interface_reason=REASON_DASHBOARD_REFUSAL,
+       voice_guard="acp_accept_hooks_refusal", parity=("acp/lsp",))
 def _extra_acp_accept_hooks(cfg: Any, args: Dict[str, Any],
                             actor: str) -> Dict[str, Any]:
     from . import acp_lsp as AL
@@ -871,7 +918,9 @@ def _extra_acp_accept_hooks(cfg: Any, args: Dict[str, Any],
 
 @extra("lsp_install", group="editor", title="LSP install",
        help="Typed refusal: language-server binaries are never downloaded.",
-       args=(_opt("server"),), confirm=False, parity=("acp/lsp",))
+       args=(_opt("server"),), confirm=False, interfaces=INTERFACES_DASHBOARD,
+       interface_reason=REASON_DASHBOARD_REFUSAL,
+       voice_guard="lsp_install_refusal", parity=("acp/lsp",))
 def _extra_lsp_install(cfg: Any, args: Dict[str, Any],
                        actor: str) -> Dict[str, Any]:
     from . import acp_lsp as AL
@@ -880,8 +929,10 @@ def _extra_lsp_install(cfg: Any, args: Dict[str, Any],
 
 
 @extra("computer_install", group="computer", title="Computer-use install",
-       help="Typed refusal: control drivers are never auto-installed.",
-       args=(), confirm=False, parity=("computer-use",))
+       help="Typed refusal: control drivers are never auto-installed on any "
+            "surface; the operator installs them deliberately outside Qubit.",
+       args=(), confirm=False, interfaces=INTERFACES_DASHBOARD,
+       interface_reason=REASON_DASHBOARD_REFUSAL, parity=("computer-use",))
 def _extra_computer_install(cfg: Any, args: Dict[str, Any],
                             actor: str) -> Dict[str, Any]:
     from . import computer_use as CU
@@ -892,7 +943,9 @@ def _extra_computer_install(cfg: Any, args: Dict[str, Any],
 @extra("import_agent_import", group="agent", title="Import-agent import",
        help="Typed refusal: foreign agent setups need human review; reviewed "
             "artifacts install via skills install.",
-       args=(), confirm=False, parity=("import-agent",))
+       args=(), confirm=False, interfaces=INTERFACES_NO_VOICE,
+       interface_reason=REASON_VOICE_CANONICAL,
+       voice_guard="import_refusal", parity=("import-agent",))
 def _extra_import_agent_import(cfg: Any, args: Dict[str, Any],
                                actor: str) -> Dict[str, Any]:
     from . import import_agent as IA
@@ -910,7 +963,9 @@ def _extra_import_agent_import(cfg: Any, args: Dict[str, Any],
             "(single event path; the operator supervises processes).",
        args=({"name": "action", "type": "choice", "required": True,
                "choices": ("run", "start", "stop", "restart", "install")},),
-       confirm=False, parity=("gateway", "gateway-manage"))
+       confirm=False, interfaces=INTERFACES_DASHBOARD,
+       interface_reason=REASON_DASHBOARD_REFUSAL,
+       parity=("gateway", "gateway-manage"))
 def _extra_gateway_supervision(cfg: Any, args: Dict[str, Any],
                                actor: str) -> Dict[str, Any]:
     from . import gateway_peers as GW
@@ -923,7 +978,9 @@ def _extra_gateway_supervision(cfg: Any, args: Dict[str, Any],
             "`qubit kanban widget-move`).",
        args=({"name": "widget_id", "type": "int", "required": True},
              _opt("x"), _opt("y"), _opt("w"), _opt("h")),
-       parity=("kanban",))
+       interfaces=INTERFACES_NO_VOICE,
+       interface_reason=REASON_VOICE_CANONICAL,
+       voice_guard="kanban_widget_move_voice", parity=("kanban",))
 def _extra_kanban_widget_move(cfg: Any, args: Dict[str, Any],
                               actor: str) -> Dict[str, Any]:
     from . import kanban as KB
@@ -939,7 +996,9 @@ def _extra_kanban_widget_move(cfg: Any, args: Dict[str, Any],
        args=(_req("board"), _req("principal"),
              {"name": "role", "type": "choice", "required": True,
               "choices": ("owner", "editor", "viewer")}),
-       parity=("kanban",))
+       interfaces=INTERFACES_NO_VOICE,
+       interface_reason=REASON_VOICE_CANONICAL,
+       voice_guard="kanban_role_grant_voice", parity=("kanban",))
 def _extra_kanban_role_grant(cfg: Any, args: Dict[str, Any],
                              actor: str) -> Dict[str, Any]:
     from . import kanban as KB
@@ -952,7 +1011,9 @@ def _extra_kanban_role_grant(cfg: Any, args: Dict[str, Any],
        help="Revoke a board role (same backend as "
             "`qubit kanban role-revoke`).",
        args=(_req("board"), _req("principal")),
-       parity=("kanban",))
+       interfaces=INTERFACES_NO_VOICE,
+       interface_reason=REASON_VOICE_CANONICAL,
+       voice_guard="kanban_role_revoke_voice", parity=("kanban",))
 def _extra_kanban_role_revoke(cfg: Any, args: Dict[str, Any],
                               actor: str) -> Dict[str, Any]:
     from . import kanban as KB
@@ -966,7 +1027,9 @@ def _extra_kanban_role_revoke(cfg: Any, args: Dict[str, Any],
        help="Restore a canvas snapshot: widgets, layout, roles, and task "
             "positions (same backend as `qubit kanban snapshot-restore`).",
        args=({"name": "snapshot_id", "type": "int", "required": True},),
-       parity=("kanban",))
+       interfaces=INTERFACES_NO_VOICE,
+       interface_reason=REASON_VOICE_CANONICAL,
+       voice_guard="kanban_snapshot_restore_voice", parity=("kanban",))
 def _extra_kanban_snapshot_restore(cfg: Any, args: Dict[str, Any],
                                    actor: str) -> Dict[str, Any]:
     from . import kanban as KB
@@ -1045,7 +1108,9 @@ def _extra_opencode_run_confirmed(cfg: Any, args: Dict[str, Any],
        help="Typed delegation notice: swarm/dispatch/daemon/watch/notify "
             "execution ops delegate to the brokered worker path.",
        args=({"name": "subcommand", "type": "str", "required": True},),
-       confirm=False, parity=("kanban",))
+       confirm=False, interfaces=INTERFACES_NO_VOICE,
+       interface_reason=REASON_VOICE_CANONICAL,
+       voice_guard="kanban_swarm", parity=("kanban",))
 def _extra_kanban_delegated(cfg: Any, args: Dict[str, Any],
                             actor: str) -> Dict[str, Any]:
     from . import kanban as KB
@@ -1056,7 +1121,9 @@ def _extra_kanban_delegated(cfg: Any, args: Dict[str, Any],
 @extra("pets_downloads", group="themes", title="Pet gallery downloads",
        help="Typed refusal: gallery pet downloads are never fetched; "
             "built-in Qubit presets apply locally.",
-       args=(), confirm=False, parity=("pets/skin",))
+       args=(), confirm=False, interfaces=INTERFACES_DASHBOARD,
+       interface_reason=REASON_VOICE_CANONICAL,
+       voice_guard="pets_downloads_refusal", parity=("pets/skin",))
 def _extra_pets_downloads(cfg: Any, args: Dict[str, Any],
                           actor: str) -> Dict[str, Any]:
     from . import themes as TH
@@ -1068,7 +1135,9 @@ def _extra_pets_downloads(cfg: Any, args: Dict[str, Any],
        help="Typed refusal: remote Git/index plugin identifiers are never "
             "fetched; local reviewed manifests install via skills install.",
        args=(_req("identifier"),), confirm=False,
-       parity=("plugins-install",))
+       interfaces=INTERFACES_NO_VOICE,
+       interface_reason=REASON_VOICE_CANONICAL,
+       voice_guard="plugins_remote_refusal", parity=("plugins-install",))
 def _extra_plugins_remote(cfg: Any, args: Dict[str, Any],
                           actor: str) -> Dict[str, Any]:
     return {"state": "BLOCKED", "code": "BLOCKED_REMOTE_PLUGIN",
@@ -1218,7 +1287,4 @@ def _extra_ghost_preview(cfg: Any, args: Dict[str, Any],
     return runner.preview(args["action_id"], _args_json(args["args_json"]),
                           target=args.get("target", "") or "desktop",
                           scope=args.get("scope", "") or "", role="")
-
-
-
 

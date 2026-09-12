@@ -349,3 +349,40 @@ def test_run_dispatches_known_tools_and_refuses_unknown(tmp_path, monkeypatch):
     with pytest.raises(WT.WebToolError) as exc:
         WT.run(cfg, "web.delete", {})
     assert exc.value.code == WT.BAD_INPUT_CODE
+
+
+# ------------------------------------------------------------- x_search
+def test_x_search_is_typed_unavailable_and_never_touches_network(
+        tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    cfg.data["web"] = {"x_search": {"provider": "xai"}}
+    monkeypatch.setattr(WT, "_open", _boom)
+    out = WT.x_search(cfg, "qubit release")
+    assert out["state"] == WT.UNAVAILABLE
+    assert out["code"] == WT.X_SEARCH_UNAVAILABLE_CODE
+    assert out["results"] == []
+    assert out["provider"] == "xai"
+    assert "No request was attempted." in out["explanation"]
+
+
+def test_run_dispatches_x_search(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    out = WT.run(cfg, "web.x_search", {"query": "hello"})
+    assert out["state"] == WT.UNAVAILABLE
+    assert "web.x_search" in WT.TOOL_SPECS
+
+
+def test_x_search_rejects_empty_query(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    monkeypatch.setattr(WT, "_open", _boom)
+    with pytest.raises(WT.WebToolError) as exc:
+        WT.x_search(cfg, "   ")
+    assert exc.value.code == WT.BAD_INPUT_CODE
+
+
+def test_x_search_respects_estop(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    monkeypatch.setattr(WT, "estop_engaged", lambda cfg: True)
+    out = WT.x_search(cfg, "q")
+    assert out["state"] == "DENIED"
+    assert out["code"] == WT.ESTOP_CODE

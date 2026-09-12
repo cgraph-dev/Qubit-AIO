@@ -15,7 +15,8 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from ._models import (COST_NORMAL, KIND_POSITIVE, SKILL_STATE_SCHEMA,
-                      ST_QUARANTINED, TIER_COLD, TRUST_OBSERVED, _EMBEDDER_VERSION)
+                      ST_QUARANTINED, TIER_COLD, TRUST_OBSERVED,
+                      _EMBEDDER_VERSION, is_human_requester)
 from ._models import SkillRecord
 from ._persist import PersistMixin
 
@@ -41,7 +42,7 @@ class TransferMixin(PersistMixin):
     def restore(self, data: Dict[str, Any], *, requested_by: str,
                 merge: bool = False) -> Dict[str, Any]:
         from ._models import VerifiedSkillError, VerifiedSkillStateError
-        if requested_by != "user":
+        if not is_human_requester(requested_by):
             raise VerifiedSkillError("only a human may restore a snapshot")
         if not isinstance(data, dict) or data.get("schema") != SKILL_STATE_SCHEMA:
             raise VerifiedSkillError("invalid or unsupported snapshot schema")

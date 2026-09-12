@@ -226,3 +226,123 @@ def test_protocol_error_from_resolution_is_not_swallowed(tmp_path,
     with pytest.raises(BT.BrowserTabsError) as exc:
         BT.screenshot(cfg)
     assert exc.value.code == CDP.PROTOCOL_CODE
+
+
+# ------------------------------------------- OC-D27: screencast + fallback
+class _FakeScreencastSession(_FakeSession):
+    """Fake attached CDP session with scriptable screencast behavior."""
+
+    def __init__(self, *, frames=(), fail_start=None, payload=b"\x89PNG-fb"):
+        super().__init__(base64.b64encode(payload).decode())
+        self.events = [{"method": "Page.screencastFrame", "params": params}
+                       for params in frames]
+        self.fail_start = fail_start
+
+    def call(self, method, params=None, *, timeout=None, session_id=""):
+        if method == "Page.startScreencast" and self.fail_start is not None:
+            self.calls.append({"method": method, "params": params,
+                               "timeout": timeout})
+            raise self.fail_start
+        return super().call(method, params, timeout=timeout,
+                            session_id=session_id)
+
+
+def _attach_screencast(monkeypatch, BT, session):
+    page = {"id": "AAA111", "title": PAGE_TITLE, "url": PAGE_URL,
+            "type": "page"}
+    monkeypatch.setattr(BT, "_resolve_target", lambda cfg, t="": page)
+    monkeypatch.setattr(BT, "_target_session", lambda p: session)
+    return session
+
+
+def test_screencast_captures_frames_and_acks(tmp_path, monkeypatch):
+    from voicebridge import browser_tabs as BT
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    raw1, raw2 = b"\x89PNG-one", b"\x89PNG-two"
+    session = _FakeScreencastSession(frames=[
+        {"data": base64.b64encode(raw1).decode(), "sessionId": 7},
+        {"data": base64.b64encode(raw2).decode(), "sessionId": 8},
+    ])
+    _attach_screencast(monkeypatch, BT, session)
+    out = BT.screencast(cfg, frames=2)
+    assert out["state"] == "OK" and out["mode"] == "screencast"
+    assert out["frame_count"] == 2 and out["bytes"] == len(raw1) + len(raw2)
+    assert base64.b64decode(out["frames"][0]["image_base64"]) == raw1
+    methods = [call["method"] for call in session.calls]
+    assert "Page.startScreencast" in methods
+    assert methods.count("Page.screencastFrameAck") == 2
+    assert "Page.stopScreencast" in methods
+    assert session.closed is True
+
+
+def test_screencast_falls_back_when_unsupported(tmp_path, monkeypatch):
+    from voicebridge import browser_tabs as BT
+    from voicebridge import cdp as CDP
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    raw = b"\x89PNG-fallback"
+    session = _FakeScreencastSession(
+        payload=raw, fail_start=CDP.CdpError(CDP.METHOD_CODE,
+                                             "screencast unsupported"))
+    _attach_screencast(monkeypatch, BT, session)
+    out = BT.screencast(cfg)
+    assert out["state"] == "OK" and out["mode"] == "screenshot-fallback"
+    assert "screencast unavailable" in out["fallback_reason"]
+    assert base64.b64decode(out["image_base64"]) == raw
+
+
+def test_screencast_no_frame_falls_back(tmp_path, monkeypatch):
+    from voicebridge import browser_tabs as BT
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    session = _FakeScreencastSession(frames=[], payload=b"\x89PNG-empty")
+    _attach_screencast(monkeypatch, BT, session)
+    out = BT.screencast(cfg, timeout=0.1)
+    assert out["state"] == "OK" and out["mode"] == "screenshot-fallback"
+    assert "no frame" in out["fallback_reason"]
+    # Even with no frames the stream is still stopped and the session closed.
+    methods = [call["method"] for call in session.calls]
+    assert "Page.stopScreencast" in methods
+    assert session.closed is True
+
+
+def test_screencast_fallback_disabled_is_typed_unavailable(tmp_path,
+                                                           monkeypatch):
+    from voicebridge import browser_tabs as BT
+    from voicebridge import cdp as CDP
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    session = _FakeScreencastSession(
+        fail_start=CDP.CdpError(CDP.METHOD_CODE, "screencast unsupported"))
+    _attach_screencast(monkeypatch, BT, session)
+    out = BT.screencast(cfg, fallback=False)
+    assert out["state"] == "UNAVAILABLE"
+    assert out["code"] == BT.UNAVAILABLE_CODE
+
+
+def test_screencast_no_browser_is_typed_unavailable(tmp_path, monkeypatch):
+    from voicebridge import browser_tabs as BT
+    from voicebridge import cdp as CDP
+
+    cfg = _cfg(tmp_path, monkeypatch)
+
+    def _down(method, path, *, timeout=CDP.HTTP_TIMEOUT_S, query=""):
+        raise CDP.CdpError(CDP.UNAVAILABLE_CODE, "no loopback CDP endpoint")
+
+    monkeypatch.setattr(CDP, "http_json", _down)
+    out = BT.screencast(cfg)  # must not raise
+    assert out["state"] == "UNAVAILABLE" and out["code"] == BT.UNAVAILABLE_CODE
+
+
+def test_screencast_enforces_byte_cap(tmp_path, monkeypatch):
+    from voicebridge import browser_tabs as BT
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    session = _FakeScreencastSession(frames=[
+        {"data": base64.b64encode(b"Z" * 64).decode(), "sessionId": 1}])
+    _attach_screencast(monkeypatch, BT, session)
+    out = BT.screencast(cfg, max_bytes=8)
+    assert out["state"] == "denied"
+    assert out["code"] == BT.SCREENSHOT_TOO_LARGE_CODE
+    assert "frames" not in out

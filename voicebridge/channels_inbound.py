@@ -159,6 +159,9 @@ CHANNEL_CAPS: Dict[str, Dict[str, Any]] = {
     "nostr": {"label": "Nostr", "transport": "relay",
               "credential_kind": "nsec-key", "available": False,
               "detail": "no Nostr relay adapter"},
+    "feishu": {"label": "Feishu / Lark", "transport": "open-platform",
+               "credential_kind": "app-secret", "available": False,
+               "detail": "no Feishu open-platform event listener adapter"},
 }
 
 # Single source of truth for channel membership (order preserved).
@@ -484,17 +487,18 @@ def _receipt(cfg: Any, channel: str, verdict: str, detail: str) -> None:
         pass
 
 
-def receive(cfg: Any, *, channel: str, payload: bytes, signature: str = "",
+def _verify(cfg: Any, *, channel: str, payload: bytes, signature: str = "",
             timestamp: Optional[float] = None, delivery_id: str = "",
-            sender: str = "", event: str = "message") -> Dict[str, Any]:
-    """Validate a signed inbound delivery, then gate with UNAVAILABLE.
+            sender: str = "", event: str = "message",
+            verdict: str = "VERIFIED_UNAVAILABLE",
+            detail: str = "") -> Dict[str, Any]:
+    """Ordered signed-delivery kernel shared by receive/verify_delivery.
 
     Validation order: estop -> channel configured -> body cap -> event
     allowlist -> credential reference resolvable -> signature presence ->
-    timestamp freshness -> HMAC -> replay nonce. A fully valid delivery
-    records a redacted receipt plus a replay nonce and returns the typed
-    ``CHANNEL_UNAVAILABLE`` gate: signature evidence only, because Qubit runs
-    no listener and nothing is dispatched or executed.
+    timestamp freshness -> HMAC -> replay nonce. On success records a
+    redacted receipt plus replay nonce and returns the verified facts; the
+    caller decides whether to gate (receive) or dispatch (a listener).
     """
     from .providers.credentials import resolve_key
 
@@ -558,16 +562,63 @@ def receive(cfg: Any, *, channel: str, payload: bytes, signature: str = "",
     if replayed:
         _receipt(cfg, rec["channel"], "REPLAY", "nonce already seen")
         raise ChannelError(REPLAY_CODE, "duplicate delivery (replay)")
-    _receipt(cfg, rec["channel"], "VERIFIED_UNAVAILABLE",
-             f"{len(body)} bytes; signature valid, no listener transport")
-    _audit("receive", "channel-ingress",
-           {"channel": rec["channel"], "event": clean_event,
-            "bytes": len(body)})
-    return {"state": "UNAVAILABLE", "code": UNAVAILABLE_CODE,
-            "schema": SCHEMA, "channel": rec["channel"],
-            "event": clean_event, "verified": True, "bytes": len(body),
-            "sender": _redact(clean_sender)[:MAX_SENDER_LEN],
+    _receipt(cfg, rec["channel"], verdict, detail)
+    return {"channel": rec["channel"], "event": clean_event,
+            "bytes": len(body), "sender": clean_sender,
             "transport": CHANNEL_CAPS.get(rec["channel"], {}).get(
-                "transport", "none"),
+                "transport", "none")}
+
+
+def verify_delivery(cfg: Any, *, channel: str, payload: bytes,
+                    signature: str = "", timestamp: Optional[float] = None,
+                    delivery_id: str = "", sender: str = "",
+                    event: str = "message") -> Dict[str, Any]:
+    """Validate a signed delivery and return the verified facts.
+
+    Identical ordered kernel to :func:`receive`, but returns the verified
+    sender/event/bytes so a real listener can dispatch the delivery through
+    the one communications ingress path. Starts no socket and dispatches
+    nothing itself: verification evidence only.
+    """
+    info = _verify(cfg, channel=channel, payload=payload,
+                   signature=signature, timestamp=timestamp,
+                   delivery_id=delivery_id, sender=sender, event=event,
+                   verdict="VERIFIED",
+                   detail=f"{len(payload or b'')} bytes; signature valid")
+    _audit("verify", "channel-ingress",
+           {"channel": info["channel"], "event": info["event"],
+            "bytes": info["bytes"]})
+    info["state"] = "VERIFIED"
+    info["schema"] = SCHEMA
+    info["verified"] = True
+    return info
+
+
+def receive(cfg: Any, *, channel: str, payload: bytes, signature: str = "",
+            timestamp: Optional[float] = None, delivery_id: str = "",
+            sender: str = "", event: str = "message") -> Dict[str, Any]:
+    """Validate a signed inbound delivery, then gate with UNAVAILABLE.
+
+    Validation order: estop -> channel configured -> body cap -> event
+    allowlist -> credential reference resolvable -> signature presence ->
+    timestamp freshness -> HMAC -> replay nonce. A fully valid delivery
+    records a redacted receipt plus a replay nonce and returns the typed
+    ``CHANNEL_UNAVAILABLE`` gate: signature evidence only, because Qubit runs
+    no listener and nothing is dispatched or executed.
+    """
+    info = _verify(cfg, channel=channel, payload=payload,
+                   signature=signature, timestamp=timestamp,
+                   delivery_id=delivery_id, sender=sender, event=event,
+                   verdict="VERIFIED_UNAVAILABLE",
+                   detail=f"{len(payload or b'')} bytes; signature valid, "
+                          "no listener transport")
+    _audit("receive", "channel-ingress",
+           {"channel": info["channel"], "event": info["event"],
+            "bytes": info["bytes"]})
+    return {"state": "UNAVAILABLE", "code": UNAVAILABLE_CODE,
+            "schema": SCHEMA, "channel": info["channel"],
+            "event": info["event"], "verified": True, "bytes": info["bytes"],
+            "sender": _redact(info["sender"])[:MAX_SENDER_LEN],
+            "transport": info["transport"],
             "note": "signature/timestamp/replay validated; no listener "
                     "transport exists, nothing dispatched or executed"}

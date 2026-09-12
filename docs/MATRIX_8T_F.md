@@ -1,20 +1,24 @@
-# Packet 8T-F close-out matrix (human companion)
+# Packet 8T-F foundation matrix (human companion; historical narrow scope)
 
-Machine-readable: `docs/MATRIX_8T_F.json` (authoritative; every id below is
-parity-tested). Gate rule enforced in tests: every row has status
-IMPLEMENTED with proof (vendored code, wired behavior, or proven
-Qubit-owned counterpart); unsafe upstream variants stay refused with
-typed errors and absence tests. No row is BLOCKED, REJECTED, or DEFERRED:
-postponement without evidence is not accepted. (The older
+This matrix is a narrow foundation record, not the current full-parity gate.
+The authoritative current status is `docs/QUBIT_GAP_LEDGER.md` and its
+machine-readable sections. The owner-approved runtime directive is
+`docs/QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md`. The old all-green summary
+below must not be used to claim that Hermes/OpenClaw/Qubit parity is complete.
+
+Machine-readable: `docs/MATRIX_8T_F.json` (authoritative only for this narrow
+foundation axis; every id below is parity-tested). Unsafe upstream variants
+stay refused with typed errors and absence tests. (The older
 `FEATURE_MATRIX_8U.json` rates upstream reusability for future 8U tickets
 — a different axis, not foundation integration.)
 
-## Qubit-native runtime (no pinned Hermes code executes)
+## Legacy foundation runtime record — superseded by the owner amendment
 
-Normal Qubit execution contains no third-party product code. The former
-vendored Hermes modules were retired and replaced by independent Qubit
-implementations; the retirement record with former pin, license, and
-differential fixtures lives in `voicebridge/upstream/ATTRIBUTION.md`:
+The former record below described a Qubit-native replacement that did not
+execute the pinned Hermes source. That architecture is superseded by the
+owner-approved requirement to vendor and execute the complete pinned Hermes
+source from the Qubit-owned tree. It is retained only as historical evidence
+of the earlier foundation work; it is not the current runtime claim:
 
 1. `voicebridge/textutil.py` — Qubit-owned output sanitizing, wired into
    every `voicebridge/agent.py` turn/session reply (differential-tested
@@ -27,7 +31,7 @@ differential fixtures lives in `voicebridge/upstream/ATTRIBUTION.md`:
    and receipts); no external assistant process is launched or
    supervised (`tests/test_agent8u.py`). Operator installs untouched.
 
-## IMPLEMENTED rows (35 — no code-side BLOCKED/REJECTED rows remain)
+## Legacy foundation rows (35 — not full parity)
 
 H-ansi-strip, H-real-exec, H-approvals (Qubit confirmations),
 H-estop (latch+cancel + pause/resume/bind_estop cross-wire, proven live),
@@ -58,16 +62,16 @@ no desktop actuators, no cloud browser, no unreviewed auto-install):
 full parity means the safe Qubit equivalent is fully implemented, not
 that the unsafe behavior was copied.
 
-## BLOCKED rows (0)
+## Historical row summary (not the completion gate)
 
-None. Former blocks resolved to the Qubit-native implementations above;
-the JSON keeps no BLOCKED rows.
+The narrow foundation matrix contains no rows in those states, but the current
+gap ledger contains open Hermes, OpenClaw, and Qubit rows.
 
-## REJECTED rows (0 code-side)
+## Historical rejected-row summary (not the completion gate)
 
-None. Former rejections resolved to safe equivalents above. The unsafe
-variants (cloud exfiltration, raw actuators, cloud browser, unreviewed
-auto-install) remain refused with typed errors and absence tests.
+The former rejections were mapped to safe equivalents for this narrow matrix.
+That does not close unrelated full-parity rows or prove every CLI, dashboard,
+and voice workflow.
 
 ## Matrix ids
 

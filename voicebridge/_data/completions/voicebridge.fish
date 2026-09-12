@@ -8,6 +8,7 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a ask
 complete -c voicebridge -n '__fish_use_subcommand' -f -a asr-test
 complete -c voicebridge -n '__fish_use_subcommand' -f -a audio
 complete -c voicebridge -n '__fish_use_subcommand' -f -a auth
+complete -c voicebridge -n '__fish_use_subcommand' -f -a backup
 complete -c voicebridge -n '__fish_use_subcommand' -f -a brain
 complete -c voicebridge -n '__fish_use_subcommand' -f -a branding
 complete -c voicebridge -n '__fish_use_subcommand' -f -a browser
@@ -18,6 +19,7 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a completion
 complete -c voicebridge -n '__fish_use_subcommand' -f -a computer-use
 complete -c voicebridge -n '__fish_use_subcommand' -f -a device
 complete -c voicebridge -n '__fish_use_subcommand' -f -a documents
+complete -c voicebridge -n '__fish_use_subcommand' -f -a egress
 complete -c voicebridge -n '__fish_use_subcommand' -f -a enroll
 complete -c voicebridge -n '__fish_use_subcommand' -f -a experiments
 complete -c voicebridge -n '__fish_use_subcommand' -f -a export-state
@@ -35,7 +37,10 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a import-state
 complete -c voicebridge -n '__fish_use_subcommand' -f -a kanban
 complete -c voicebridge -n '__fish_use_subcommand' -f -a lessons
 complete -c voicebridge -n '__fish_use_subcommand' -f -a local-models
+complete -c voicebridge -n '__fish_use_subcommand' -f -a logbook
+complete -c voicebridge -n '__fish_use_subcommand' -f -a logs
 complete -c voicebridge -n '__fish_use_subcommand' -f -a lsp
+complete -c voicebridge -n '__fish_use_subcommand' -f -a marketplace
 complete -c voicebridge -n '__fish_use_subcommand' -f -a mcp
 complete -c voicebridge -n '__fish_use_subcommand' -f -a media
 complete -c voicebridge -n '__fish_use_subcommand' -f -a memory
@@ -50,12 +55,17 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a pairing
 complete -c voicebridge -n '__fish_use_subcommand' -f -a peer
 complete -c voicebridge -n '__fish_use_subcommand' -f -a permissions
 complete -c voicebridge -n '__fish_use_subcommand' -f -a plugins
+complete -c voicebridge -n '__fish_use_subcommand' -f -a policy
 complete -c voicebridge -n '__fish_use_subcommand' -f -a power
 complete -c voicebridge -n '__fish_use_subcommand' -f -a product
 complete -c voicebridge -n '__fish_use_subcommand' -f -a profile
 complete -c voicebridge -n '__fish_use_subcommand' -f -a project
+complete -c voicebridge -n '__fish_use_subcommand' -f -a prompt-budget
 complete -c voicebridge -n '__fish_use_subcommand' -f -a proxy
+complete -c voicebridge -n '__fish_use_subcommand' -f -a reasoning
 complete -c voicebridge -n '__fish_use_subcommand' -f -a recall
+complete -c voicebridge -n '__fish_use_subcommand' -f -a receipts
+complete -c voicebridge -n '__fish_use_subcommand' -f -a reports
 complete -c voicebridge -n '__fish_use_subcommand' -f -a roundtrip
 complete -c voicebridge -n '__fish_use_subcommand' -f -a run
 complete -c voicebridge -n '__fish_use_subcommand' -f -a runtime
@@ -69,9 +79,11 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a sync
 complete -c voicebridge -n '__fish_use_subcommand' -f -a task
 complete -c voicebridge -n '__fish_use_subcommand' -f -a tasks
 complete -c voicebridge -n '__fish_use_subcommand' -f -a theme
+complete -c voicebridge -n '__fish_use_subcommand' -f -a tools
 complete -c voicebridge -n '__fish_use_subcommand' -f -a transfers
 complete -c voicebridge -n '__fish_use_subcommand' -f -a tts-test
 complete -c voicebridge -n '__fish_use_subcommand' -f -a tui
+complete -c voicebridge -n '__fish_use_subcommand' -f -a usage
 complete -c voicebridge -n '__fish_use_subcommand' -f -a verified-skills
 complete -c voicebridge -n '__fish_use_subcommand' -f -a verify
 complete -c voicebridge -n '__fish_use_subcommand' -f -a verify-release

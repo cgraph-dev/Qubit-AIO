@@ -11,6 +11,13 @@ This is stronger than a source audit, a capability inventory, a renamed
 launcher, a status tile, or a passing unit test that never executes the real
 operation.
 
+Current status is tracked by `docs/QUBIT_GAP_LEDGER.md`, generated from its
+machine-readable Hermes, OpenClaw, and Qubit sections. That ledger is the
+completion authority for open rows; older narrow parity matrices cannot
+override it. The owner-approved runtime target and execution order are in
+`docs/QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md` and
+`docs/QUBIT_HERMES_CUTOVER_MIGRATION.md`.
+
 ## Product requirement
 
 For every user-facing capability present in the pinned Hermes and OpenClaw

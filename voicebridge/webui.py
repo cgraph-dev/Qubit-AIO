@@ -1103,11 +1103,12 @@ class WebUIHandler(BaseHTTPRequestHandler):
                     return
                 if not isinstance(body, dict):
                     body = {"_list": body}
-        # Cutover stage 1 (docs/QUBIT_HERMES_CUTOVER_MIGRATION.md): when the
-        # owner enables webui.hermes_backend, safe reads are served by the
-        # vendored Hermes backend in-process (single listener, no second
-        # server); Qubit-gated surfaces and all writes stay on the Qubit
-        # permissions/confirmation/audit path. 404/405 fall back to compat.
+        # Cutover stage 2 (docs/QUBIT_HERMES_CUTOVER_MIGRATION.md): safe reads
+        # are served by the vendored Hermes backend in-process (single
+        # listener, no second server); every Qubit-gated/sensitive surface and
+        # all writes stay on the Qubit permissions/confirmation/audit path.
+        # The fork runs under a fail-closed egress guard. 404/405/5xx fall back
+        # to the compatibility layer so a degraded fork never blanks the UI.
         if method in ("GET", "HEAD") and self._hermes_backend_enabled():
             try:
                 from . import hermes_asgi as HA
@@ -1115,10 +1116,12 @@ class WebUIHandler(BaseHTTPRequestHandler):
                     code, hdrs, rbody = HA.call(
                         method, api_path, query=query,
                         headers={"accept": "application/json"})
-                    if code not in (404, 405):
+                    if code < 500 and code not in (404, 405):
                         ctype = hdrs.get("content-type", "application/json")
                         self._send(code, rbody, ctype)
                         return
+                    log_event("webui.hermes_backend.degraded",
+                              path=api_path[:120], status=code)
             except Exception as exc:
                 log_event("webui.hermes_backend.fallback",
                           error=str(exc)[:160])
@@ -1134,13 +1137,14 @@ class WebUIHandler(BaseHTTPRequestHandler):
 
     def _hermes_backend_enabled(self) -> bool:
         """Cutover flag: serve safe dashboard reads from the vendored Hermes
-        backend. Stage 1 default is off so compatibility behavior is unchanged
-        until the documented migration flips it (Stage 2)."""
+        backend. Stage 2 default is on: the Qubit-owned fork is the runtime
+        authority for safe reads. Set ``webui.hermes_backend: false`` (or
+        revert the Stage 2 commit) to fall back to the compatibility layer."""
         try:
             return bool(self.app.orch.cfg.get("webui", "hermes_backend",
-                                              default=False))
+                                              default=True))
         except Exception:
-            return False
+            return True
 
     # -- public read-only session share ----------------------------------
     def _public_share(self, path: str) -> None:
@@ -3187,6 +3191,13 @@ class WebUI:
         self._asr_factory = asr_factory or _default_asr_factory(orchestrator)
         self._tts = tts
         self._state_dir = state_dir or Path("/tmp")
+        # Point the vendored Hermes backend at a Qubit-owned HERMES_HOME (never
+        # the operator's real ~/.hermes) before the in-process bridge starts.
+        try:
+            from . import hermes_asgi as _HA
+            _HA.set_home(str(self._state_dir / "hermes"))
+        except Exception:
+            pass
         # pre-seed the live feed from the persisted event journal so the
         # dashboard reflects everything (mic loop, taps, typed, web, history)
         self.feed.load_history(self._state_dir / "events.jsonl", limit=200)
@@ -3672,7 +3683,7 @@ class WebUI:
         """True when the bridge plays TTS on the PC speakers (webui.speak_web_locally).
         When true, the dashboard must NOT also autoplay audio_b64 (responds twice)."""
         try:
-            return bool(self.orch.cfg.get("webui", "speak_web_locally", default=True))
+            return bool(self.orch.cfg.get("webui", "speak_web_locally", default=False))
         except Exception:
             return True
 

@@ -624,6 +624,93 @@ def resume(cfg: Any, node_id: str, transfer_id: str, *,
             "authority": "plan and chunk digests verified"}
 
 
+def verify_transfer(cfg: Any, node_id: str, transfer_id: str, *,
+                    received: Any) -> Dict[str, Any]:
+    """Verify a completed resumable transfer without writing anything.
+
+    ``received`` is the ordered set the receiver assembled, each entry
+    ``{"index": int, "data": "<base64>"}``. Every plan chunk must be covered
+    exactly once with a matching length and SHA-256, and the reconstructed
+    whole-file digest must equal the plan digest. Read-only: no file is
+    written, no socket is opened, and only digests/counters are returned.
+    """
+    op = "verify"
+    if estop_engaged(cfg):
+        return _estop(op)
+    try:
+        _rec, refusal = _eligible(cfg, node_id, op)
+        if refusal is not None:
+            return refusal
+        state = _load_transfers(cfg)
+        plan = state["transfers"].get(str(transfer_id or "").strip())
+        if plan is None or plan.get("node_id") != node_id:
+            return _unknown_transfer(op, transfer_id)
+        _verify_plan(plan)
+        chunks = plan["chunks"]
+        if not isinstance(received, (list, tuple)):
+            raise FileTransferError(FILE_TRANSFER_BAD_INPUT,
+                                    "received chunks must be a list")
+        if len(received) != len(chunks):
+            raise FileTransferError(
+                FILE_TRANSFER_BAD_INPUT,
+                f"expected {len(chunks)} received chunks, got {len(received)}")
+        by_index: Dict[int, bytes] = {}
+        total = 0
+        for item in received:
+            if not isinstance(item, dict):
+                raise FileTransferError(FILE_TRANSFER_BAD_INPUT,
+                                        "each received chunk must be an object")
+            if len(chunks) == 0:
+                raise FileTransferError(FILE_TRANSFER_BAD_INPUT,
+                                        "empty plans take no chunks")
+            index = _check_bounded_int(item.get("index"), default=-1, lo=0,
+                                       hi=len(chunks) - 1, name="chunk index")
+            if index in by_index:
+                raise FileTransferError(FILE_TRANSFER_BAD_INPUT,
+                                        "chunk indexes must be unique")
+            data = item.get("data")
+            if not isinstance(data, str):
+                raise FileTransferError(FILE_TRANSFER_BAD_INPUT,
+                                        "chunk data must be base64 text")
+            try:
+                raw = base64.b64decode(data.encode("ascii"), validate=True)
+            except Exception:
+                raise FileTransferError(
+                    FILE_TRANSFER_BAD_INPUT,
+                    "chunk data is not valid base64") from None
+            total += len(raw)
+            if total > MAX_TRANSFER_BYTES:
+                raise FileTransferError(FILE_TRANSFER_TOO_LARGE,
+                                        "received bytes exceed the cap")
+            by_index[index] = raw
+        if len(by_index) != len(chunks):
+            raise FileTransferError(FILE_TRANSFER_BAD_INPUT,
+                                    "received chunk set is incomplete")
+        whole = hashlib.sha256()
+        for chunk in chunks:
+            raw = by_index[chunk["index"]]
+            if len(raw) != chunk["length"]:
+                raise FileTransferError(FILE_TRANSFER_CORRUPT,
+                                        "chunk length mismatch")
+            if hashlib.sha256(raw).hexdigest() != chunk["sha256"]:
+                raise FileTransferError(FILE_TRANSFER_CORRUPT,
+                                        "chunk digest mismatch")
+            whole.update(raw)
+        digest = whole.hexdigest()
+        if digest != plan["digest"]:
+            raise FileTransferError(FILE_TRANSFER_CORRUPT,
+                                    "whole-file digest mismatch")
+    except FileTransferError as exc:
+        _audit("verify.refused", {"node": node_id, "code": exc.code})
+        return _refusal(op, exc.code, exc.detail)
+    _audit("verify", {"node": node_id, "transfer": plan["transfer_id"],
+                      "chunks": len(chunks)})
+    return {"state": "COMPLETE", "code": "", "transfer_id": plan["transfer_id"],
+            "node": node_id, "size": plan["size"], "chunks": len(chunks),
+            "digest": digest, "verified": True, "transport": "local-confined",
+            "authority": "receiver bytes digest-verified against the plan"}
+
+
 def refuse_unavailable(op: str = "file transfer",
                        detail: str = "") -> Dict[str, Any]:
     """Typed refusal for a file-transfer action with no live backend."""

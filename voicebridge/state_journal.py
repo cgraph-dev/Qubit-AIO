@@ -94,7 +94,13 @@ class HashChainJournal:
                   id=payload.get("id", ""))
 
     def verify(self) -> Dict[str, Any]:
-        """Replay the chain. Returns a typed report; never returns secrets."""
+        """Replay the chain. Returns a typed report; never returns secrets.
+
+        Only a malformed FINAL non-empty line is a recoverable torn tail (a
+        crash mid-append). A malformed earlier line is committed-history
+        tampering and fails closed: silently truncating a committed chain would
+        let an attacker delete/alter records and still see ``state: OK``.
+        """
         if not self._path.exists():
             return {"state": "OK", "exists": False, "count": 0,
                     "torn_tail": False, "error": ""}
@@ -104,24 +110,35 @@ class HashChainJournal:
         error = ""
         try:
             with open(self._path, "r") as fh:
-                for ln in fh:
-                    if not ln.strip():
-                        continue
-                    try:
-                        rec = json.loads(ln)
-                    except (ValueError, TypeError):
-                        torn = True
-                        break
-                    body = rec.get("body", "")
-                    chain = rec.get("chain", "")
-                    if _chain(prev, body) != chain:
-                        error = f"chain mismatch at record {count + 1}"
-                        break
-                    prev = chain
-                    count += 1
+                lines = [ln for ln in fh if ln.strip()]
         except OSError as exc:
-            return {"state": "failed", "exists": True, "count": count,
-                    "torn_tail": torn, "error": str(exc)}
+            return {"state": "failed", "exists": True, "count": 0,
+                    "torn_tail": False, "error": str(exc)}
+        last = len(lines) - 1
+        for index, ln in enumerate(lines):
+            try:
+                rec = json.loads(ln)
+            except (ValueError, TypeError):
+                rec = None
+            if not isinstance(rec, dict):
+                if index == last:
+                    torn = True
+                    break
+                error = f"unparseable record {index + 1} (not a torn tail)"
+                break
+            body = rec.get("body", "")
+            chain = rec.get("chain", "")
+            if not isinstance(body, str) or not isinstance(chain, str):
+                if index == last:
+                    torn = True
+                    break
+                error = f"malformed record {index + 1} (not a torn tail)"
+                break
+            if _chain(prev, body) != chain:
+                error = f"chain mismatch at record {count + 1}"
+                break
+            prev = chain
+            count += 1
         if error:
             return {"state": "failed", "exists": True, "count": count,
                     "torn_tail": torn, "error": error}

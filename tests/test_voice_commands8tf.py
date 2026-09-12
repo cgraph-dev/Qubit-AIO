@@ -101,10 +101,13 @@ MUTATING_ACTIONS = {
     "checkpoints": {"create", "prune"},
     "hooks": {"fire", "declare", "revoke", "remove"},
     "webhook": {"add", "remove"},
-    "gateway": {"add", "remove"},
+    "gateway": {"add", "remove", "supervision_request",
+                "supervision_revert"},
+    "runtime": {"install", "upgrade", "rollback", "remove", "recover",
+                "repair"},
     "themes": {"set", "tweak_set", "tweak_clear", "reset"},
     "memory": {"remember", "forget"},
-    "pairing": {"create", "approve", "revoke"},
+    "pairing": {"create", "approve", "revoke", "setup_code", "accept"},
     "msg": {"draft", "approve", "send", "account_add", "account_remove",
             "retry", "draft_reply"},
     "peer": {"dm", "run", "add", "remove"},
@@ -142,7 +145,7 @@ MUTATING_ACTIONS = {
     "task_ledger": set(),
     "media_gen": {"generate"},
     "local_models": set(),
-    "plugin_runtime": {"register", "invoke", "unregister"},
+    "plugin_runtime": {"register", "invoke", "unregister", "policy_attest"},
     "channels": {"configure", "unconfigure"},
     "acp_client": {"configure", "unconfigure", "handshake", "send"},
     "file_transfer": {"fetch", "plan"},
@@ -150,6 +153,14 @@ MUTATING_ACTIONS = {
     "doc_extract": {"extract"},
     "question_prompt": {"ask"},
     "session_share": {"publish", "revoke", "purge"},
+    "browser_profiles": {"create", "open", "close", "remove"},
+    "computer_screen": {"arrange"},
+    "egress": {"substitute"},
+    "workshop": {"backup", "restore", "rollback"},
+    "usage": set(),
+    "receipts_ledger": set(),
+    "logbook": set(),
+    "automation": {"directive"},
 }
 
 
@@ -400,6 +411,35 @@ COMPLETE_EXAMPLES = {
     "schedules_delete": "qubit, delete schedule 2",
     "schedules_history": "qubit, schedule history",
     "schedules_run_due": "qubit, run due schedules",
+    # OpenClaw automation (OC-31 auto-reply/heartbeat/flows, OC-D05 QA,
+    # OC-D25 yields) on the shared schedules directive dispatcher.
+    "automation_status": "qubit, automation status",
+    "automation_orders": "qubit, list standing orders",
+    "automation_heartbeats": "qubit, list heartbeats",
+    "automation_flows": "qubit, list automation flows",
+    "automation_scenarios": "qubit, list qa scenarios",
+    "automation_yield_pending": "qubit, list pending handoffs",
+    "automation_order_add":
+        "qubit, add standing order name=greet match=hello reply=hi "
+        "account=team to=C1",
+    "automation_order_enable": "qubit, enable standing order name=greet",
+    "automation_order_disable": "qubit, disable standing order name=greet",
+    "automation_order_remove": "qubit, remove standing order name=greet",
+    "automation_heartbeat_add":
+        "qubit, add heartbeat name=hb every=5 note=liveness",
+    "automation_flow_add":
+        "qubit, add automation flow name=wake steps='[{\"action\":\"notify\","
+        "\"text\":\"up\"}]'",
+    "automation_flow_run": "qubit, run automation flow name=wake",
+    "automation_qa_add":
+        "qubit, add qa scenario name=smoke scenario='[{\"name\":\"ok\","
+        "\"action\":\"check\"}]'",
+    "automation_qa_run": "qubit, run qa scenario name=smoke",
+    "automation_yield_handoff":
+        "qubit, create yield handoff session=sess-1 reason=review "
+        "context=continue depth=1",
+    "automation_yield_resume":
+        "qubit, resume yield handoff session=sess-1 consume=1",
     "files_inspect": "qubit, inspect this project folder",
     "files_list": "qubit, list project files",
     "file_patch_rollback": "qubit, roll back the patch on /srv/project/app.py",
@@ -597,6 +637,49 @@ COMPLETE_EXAMPLES = {
     "guard_transfers_fetch_raw": "qubit, read raw file bytes",
     "guard_ask_answer": "qubit, answer with structured answers",
     "guard_shares_resolve": "qubit, open a shared session",
+    # --- integration wave: Agents 5-10 real backends
+    "browser_profiles": "qubit, list browser profiles",
+    "browser_profile_create": "qubit, create browser profile work",
+    "browser_profile_open": "qubit, open browser profile work",
+    "browser_profile_close": "qubit, close managed profile work",
+    "browser_profile_remove": "qubit, remove browser profile work",
+    "computer_screen": "qubit, show control ui layout",
+    "computer_screen_panes": "qubit, list screen panes",
+    "computer_screen_arrange": "qubit, arrange screen main board",
+    "local_models_fallback": "qubit, model fallback chain",
+    "local_models_resolve": "qubit, resolve model fallback",
+    "gateway_supervision_request":
+        "qubit, request gateway supervision team start",
+    "gateway_supervision_revert": "qubit, revert gateway supervision team",
+    "gateway_discovery": "qubit, gateway discovery",
+    "pairing_setup_code": "qubit, generate pairing setup code",
+    "pairing_accept": "qubit, accept setup code AB12CD",
+    "runtime_recover": "qubit, recover runtime opencode-binary",
+    "runtime_repair": "qubit, repair runtime",
+    "runtime_history": "qubit, runtime update history",
+    "runtime_discovery": "qubit, runtime discovery",
+    "runtime_marketplace": "qubit, runtime marketplace",
+    "egress_status": "qubit, egress status",
+    "egress_check": "qubit, egress check api.example.com",
+    "policy_conformance": "qubit, policy conformance",
+    "policy_attest": "qubit, policy attest",
+    "marketplace_discovery": "qubit, marketplace discovery",
+    "hooks_emit": "qubit, emit lifecycle event task.completed",
+    "skills_workshop": "qubit, skill workshop",
+    "skills_workshop_backups": "qubit, workshop backups",
+    "skills_workshop_curator": "qubit, workshop curator",
+    "skills_workshop_backup": "qubit, back up workshop",
+    "skills_workshop_restore": "qubit, restore workshop backup abc123",
+    "skills_workshop_rollback": "qubit, rollback workshop",
+    "usage_summary": "qubit, usage analytics",
+    "evaluation_telemetry": "qubit, telemetry status",
+    "receipts_ledger": "qubit, execution receipts",
+    "logbook_entries": "qubit, work logbook",
+    "logbook_summary": "qubit, logbook summary",
+    "runtime_update_report": "qubit, runtime update report",
+    "substitute_egress":
+        "qubit, substitute egress secrets api.example.com "
+        "authorization {{secret:api}}",
 }
 
 

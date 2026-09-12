@@ -32,6 +32,7 @@ import secrets
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import parse_qs, urlparse
 
 SCHEMA = "qubit-pairing/1"
 STORE_NAME = "pairing.json"
@@ -42,6 +43,8 @@ MAX_TTL_S = 86400.0
 MAX_ATTEMPTS = 5
 MAX_CODES = 256
 MAX_FILE_BYTES = 1_000_000
+DEFAULT_JOIN_BASE = "qubit://pair"
+MAX_SETUP_LEN = 2048
 
 CONFIRM_CODE = "PAIRING_CONFIRM_REQUIRED"
 ESTOP_CODE = "PAIRING_ESTOP"
@@ -72,6 +75,72 @@ def _now() -> float:
 
 def _new_code() -> str:
     return "".join(secrets.choice(CODE_CHARS) for _ in range(CODE_LEN))
+
+
+def _join_base(cfg: Any, explicit: str = "") -> str:
+    base = (explicit or "").strip()
+    if not base:
+        get = (lambda *p, default=None: cfg.get(*p, default=default)) \
+            if hasattr(cfg, "get") else (lambda *p, default=None: default)
+        base = str(get("pairing", "join_base", default="") or "").strip()
+    if not base:
+        base = DEFAULT_JOIN_BASE
+    if len(base) > 512 or any(ch in base for ch in "\n\r\t\x00"):
+        raise PairingError("PAIRING_BAD_SETUP", "join base is not usable")
+    try:
+        parts = urlparse(base)
+    except ValueError as exc:
+        raise PairingError("PAIRING_BAD_SETUP",
+                           f"join base unparseable: {exc}") from exc
+    if not parts.scheme or (parts.scheme in ("http", "https")
+                            and not parts.hostname):
+        raise PairingError("PAIRING_BAD_SETUP",
+                           "join base must be a URL with a scheme")
+    if parts.username or parts.password:
+        raise PairingError("PAIRING_BAD_SETUP",
+                           "join base must not carry credentials")
+    return base
+
+
+def join_url(cfg: Any, code: str, *, base: str = "") -> str:
+    """Encode a one-time code into an out-of-band join link (no listener)."""
+    clean = (code or "").strip().upper()
+    if not clean:
+        raise PairingError("PAIRING_BAD_SETUP", "a code is required")
+    root = _join_base(cfg, base)
+    sep = "&" if "?" in root else "?"
+    return f"{root}{sep}code={clean}"
+
+
+def qr_payload(cfg: Any, code: str, *, base: str = "") -> Dict[str, Any]:
+    """QR descriptor: the join URL is the payload; Qubit renders no page."""
+    url = join_url(cfg, code, base=base)
+    return {"format": "url", "payload": url,
+            "note": "encode with any QR generator; Qubit opens no public "
+                    "listener and publishes no web page"}
+
+
+def _extract_code(text: Any) -> str:
+    """Accept a bare code OR a join URL/setup payload; return the code part."""
+    raw = str(text or "").strip()
+    if not raw:
+        return ""
+    if len(raw) > MAX_SETUP_LEN:
+        raise PairingError("PAIRING_BAD_SETUP", "setup payload too long")
+    if "//" in raw or "code=" in raw:
+        try:
+            parsed = urlparse(raw)
+            vals = parse_qs(parsed.query)
+            if vals.get("code"):
+                return str(vals["code"][0])
+        except ValueError:
+            pass
+        m = re.search(r"code[=/]([A-Za-z0-9-]{4,32})", raw)
+        if m:
+            return m.group(1)
+        raise PairingError("PAIRING_BAD_SETUP",
+                           "setup payload has no pairing code")
+    return raw
 
 
 def _hash(salt: bytes, code: str) -> str:
@@ -198,8 +267,25 @@ def create(cfg: Any, label: str, scopes: List[str], *, account: str = "",
             "account_bound": bool(account)})
     return {"state": "OK", "code": code,
             "code_id": code_id, "expires_at": rec["expires_at"],
+            "join_url": join_url(cfg, code),
+            "qr": qr_payload(cfg, code),
             "warning": "shown once: deliver it out-of-band; it is never "
                        "stored or shown again"}
+
+
+def encode_setup(cfg: Any, label: str, scopes: List[str], *, account: str = "",
+                 ttl_s: float = DEFAULT_TTL_S, base_url: str = "",
+                 requested_by: str = "cli:user",
+                 confirmed: bool = False) -> Dict[str, Any]:
+    """Issue a one-time code AND its join URL/QR payload (shown once)."""
+    out = create(cfg, label, scopes, account=account, ttl_s=ttl_s,
+                 requested_by=requested_by, confirmed=confirmed)
+    out["join_url"] = join_url(cfg, out["code"], base=base_url)
+    out["qr"] = qr_payload(cfg, out["code"], base=base_url)
+    _audit("setup.encode", requested_by,
+           {"code_id": out["code_id"], "scopes": list(scopes),
+            "account_bound": bool(account)})
+    return out
 
 
 def _find_live(state: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -215,7 +301,7 @@ def approve(cfg: Any, code: str, *, requested_by: str = "cli:user",
                            "pairing approve requires explicit --confirm")
     from .permissions import permissions_store
 
-    attempt = (code or "").strip().upper().replace("-", "").replace(" ", "")
+    attempt = _extract_code(code).strip().upper().replace("-", "").replace(" ", "")
     state = _load(cfg)
     now = _now()
     match = None
@@ -256,6 +342,57 @@ def approve(cfg: Any, code: str, *, requested_by: str = "cli:user",
     return {"state": "OK", "approved": match["id"],
             "grant_id": grant.id, "scopes": match["scopes"],
             "account": match.get("account", "")}
+
+
+def accept(cfg: Any, setup: Any, *, requested_by: str = "cli:user",
+           confirmed: bool = False) -> Dict[str, Any]:
+    """Redeem a setup code or join URL; bind its channel DM account."""
+    if not confirmed:
+        raise PairingError(CONFIRM_CODE,
+                           "pairing accept requires explicit --confirm")
+    if estop_engaged(cfg):
+        raise PairingError(ESTOP_CODE,
+                           "the emergency stop is latched; reset it before "
+                           "accepting a setup code")
+    code = _extract_code(setup)
+    if not code:
+        raise PairingError("PAIRING_BAD_SETUP", "no setup code supplied")
+    approved = approve(cfg, code, requested_by=requested_by, confirmed=True)
+    account = str(approved.get("account", "") or "").strip()
+    if account:
+        state = _load(cfg)
+        dm = state.setdefault("dm", {})
+        if not isinstance(dm, dict):
+            dm = {}
+            state["dm"] = dm
+        dm[account] = {"account": account,
+                       "grant_id": approved.get("grant_id", ""),
+                       "paired_at": _now(),
+                       "paired_by": requested_by}
+        _save(cfg, state)
+        _audit("accept", requested_by,
+               {"code_id": approved["approved"], "account": account,
+                "grant_id": approved.get("grant_id", "")})
+    approved["setup_accepted"] = True
+    approved["dm_pairing"] = bool(account)
+    return approved
+
+
+def channel_dm_pairings(cfg: Any) -> Dict[str, Any]:
+    """Read-only channel DM pairings bound by accepted setup codes."""
+    try:
+        state = _load(cfg)
+    except PairingError as exc:
+        return {"state": "DEGRADED", "code": exc.code, "pairings": []}
+    dm = state.get("dm", {})
+    if not isinstance(dm, dict):
+        dm = {}
+    rows = sorted(
+        ({"account": str(k), "grant_id": str(v.get("grant_id", "")),
+          "paired_at": v.get("paired_at"), "paired_by": str(v.get("paired_by", ""))}
+         for k, v in dm.items() if isinstance(v, dict)),
+        key=lambda r: r.get("paired_at") or 0, reverse=True)
+    return {"state": "OK", "pairings": rows}
 
 
 def list_codes(cfg: Any) -> Dict[str, Any]:

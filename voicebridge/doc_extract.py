@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import importlib
 import re
+import zlib
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -46,7 +47,14 @@ SUPPORTED_KINDS = ("pdf",) + PLAIN_KINDS
 PDF_BACKENDS: Tuple[Tuple[str, str], ...] = (
     ("pypdf", "PdfReader"),
     ("PyPDF2", "PdfReader"),
+    ("stdlib", "stdlib"),
 )
+
+_STREAM_RE = re.compile(rb"stream\r?\n(.*?)\r?\nendstream", re.DOTALL)
+_PDF_TOKEN_RE = re.compile(
+    r"\((?:\\.|[^\\()])*\)|\bTJ\b|\bTj\b|\bTd\b|\bTD\b|\bT\*\b|\bET\b")
+_PDF_ESCAPES = {"n": "\n", "r": "\r", "t": "\t", "b": "\b",
+                "f": "\f", "(": "(", ")": ")", "\\": "\\"}
 
 _SIMPLE_TS = re.compile(
     r"^\s*\[?(\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?)\]?\s*(.*)$")
@@ -101,8 +109,15 @@ def kind_for_path(path: Any) -> str:
 
 
 def pdf_backend() -> str:
-    """Name of an installed optional PDF text extractor ("" = unavailable)."""
+    """Name of an installed optional PDF text extractor ("" = unavailable).
+
+    ``stdlib`` is the always-available zero-dependency fallback: it reads
+    uncompressed and FlateDecode content streams (the format most simple
+    text PDFs use) when no third-party extractor is installed.
+    """
     for module_name, attr in PDF_BACKENDS:
+        if module_name == "stdlib":
+            return "stdlib"
         try:
             module = importlib.import_module(module_name)
         except Exception:
@@ -210,11 +225,111 @@ def _parse_transcript(text: str) -> List[Dict[str, Any]]:
     return segments[:MAX_SEGMENTS]
 
 
+def _pdf_unescape(token: str) -> str:
+    out: List[str] = []
+    i = 0
+    while i < len(token):
+        ch = token[i]
+        if ch != "\\":
+            out.append(ch)
+            i += 1
+            continue
+        i += 1
+        if i >= len(token):
+            break
+        nxt = token[i]
+        if nxt in _PDF_ESCAPES:
+            out.append(_PDF_ESCAPES[nxt])
+            i += 1
+        elif nxt in "01234567":
+            j = i
+            while j < len(token) and j < i + 3 and token[j] in "01234567":
+                j += 1
+            try:
+                out.append(chr(int(token[i:j], 8)))
+            except ValueError:
+                pass
+            i = j
+        elif nxt == "\n":
+            i += 1  # escaped line continuation
+        else:
+            out.append(nxt)
+            i += 1
+    return "".join(out)
+
+
+def _pdf_text_from_stream(data: bytes) -> str:
+    text = data.decode("latin-1", "replace")
+    parts: List[str] = []
+    for match in _PDF_TOKEN_RE.finditer(text):
+        token = match.group(0)
+        if token.startswith("("):
+            parts.append(_pdf_unescape(token[1:-1]))
+        elif token == "ET":
+            parts.append("\n")
+    return "".join(parts)
+
+
+def _decode_stream(blob: bytes, flate: bool) -> bytes:
+    if not flate:
+        return blob
+    for candidate in (blob, blob.lstrip(b"\r\n")):
+        try:
+            return zlib.decompress(candidate)
+        except zlib.error:
+            continue
+    try:
+        return zlib.decompressobj().decompress(blob)
+    except Exception:
+        return b""
+
+
+def _pdf_streams(raw: bytes) -> List[Tuple[bytes, bool]]:
+    streams: List[Tuple[bytes, bool]] = []
+    for match in _STREAM_RE.finditer(raw):
+        preceding = raw[max(0, match.start() - 400):match.start()]
+        streams.append((match.group(1), b"/FlateDecode" in preceding))
+    return streams
+
+
+def _extract_pdf_stdlib(raw: bytes, limit: int, page: Any
+                        ) -> Dict[str, Any]:
+    streams = _pdf_streams(raw)
+    if not streams:
+        raise DocExtractError(BAD_INPUT_CODE,
+                              "PDF has no extractable content streams")
+    texts = [_pdf_text_from_stream(_decode_stream(blob, flate))
+             for blob, flate in streams]
+    page_count = len(texts)
+    truncated = False
+    if page is not None:
+        try:
+            wanted = int(page)
+        except (TypeError, ValueError):
+            raise DocExtractError(BAD_INPUT_CODE, "page must be an integer")
+        if wanted < 1 or wanted > page_count:
+            raise DocExtractError(
+                BAD_INPUT_CODE, f"page {wanted} outside 1..{page_count}")
+        selected = [texts[wanted - 1]]
+    else:
+        selected = texts[:MAX_PAGES]
+        if page_count > MAX_PAGES:
+            truncated = True
+    text = _redact("\n".join(selected))
+    if len(text) > limit:
+        truncated = True
+        text = text[:limit]
+    return {"text": text, "char_count": len(text), "truncated": truncated,
+            "page_count": page_count, "extractor": "stdlib"}
+
+
 def _extract_pdf(target: Path, raw: bytes, limit: int, page: Any
                  ) -> Dict[str, Any]:
     backend = pdf_backend()
     if not backend:
         raise DocExtractError(UNAVAILABLE_CODE, _pdf_guidance())
+    if backend == "stdlib":
+        return _extract_pdf_stdlib(raw, limit, page)
     try:
         module = importlib.import_module(backend)
         reader = module.PdfReader(str(target))

@@ -342,3 +342,63 @@ def test_explicit_config_binary_still_wins(tmp_path, monkeypatch):
     runner = OC.opencode_runner(cfg)
     assert runner._ctx.binary == str(explicit)
     assert POL.PINNED_OPENCODE_VERSION == "1.18.29"
+
+
+def _run_integration(cfg, **kw):
+    from voicebridge import cli as CLI
+
+    args = type("A", (), {})()
+    args.runtime_command = kw.get("sub")
+    args.name = kw.get("name", "")
+    args.confirm = kw.get("confirm", False)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        rc = CLI._run_integration(cfg, "runtime", args)
+    return rc, json.loads(buf.getvalue() or "{}")
+
+
+def test_recover_repair_history_through_integration_dispatcher(tmp_path,
+                                                               monkeypatch):
+    """OC-D30/D07: update rollback/recovery/repair/history reachable through
+    the one existing integration dispatcher (the CLI/voice surface path)."""
+    import stat
+
+    from voicebridge import runtime_images as RI
+    from voicebridge.opencode import policy as POL
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    fake = tmp_path / "opencode-stage"
+    fake.write_text("#!/bin/sh\necho \"" + POL.PINNED_OPENCODE_VERSION
+                    + "\"\n")
+    fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
+    monkeypatch.setattr(POL, "DEFAULT_BINARY", "/nonexistent-oc-test")
+    monkeypatch.setattr("shutil.which", lambda _n: None)
+    assert RI.install(cfg, "opencode-binary", requested_by="t",
+                      confirmed=True, source=str(fake))["state"] == "OK"
+
+    # Confirmation gates stay typed through the dispatcher.
+    rc, body = _run_integration(cfg, sub="recover", name="opencode-binary")
+    assert rc == 3 and body["code"] == RI.CONFIRM_CODE
+    rc, body = _run_integration(cfg, sub="repair")
+    assert rc == 3 and body["code"] == RI.CONFIRM_CODE
+
+    rc, body = _run_integration(cfg, sub="recover", name="opencode-binary",
+                                confirm=True)
+    assert rc == 0 and body["state"] == "OK"
+    assert body["outcome"] == "ALREADY_HEALTHY"
+    rc, body = _run_integration(cfg, sub="repair", confirm=True)
+    assert rc == 0 and body["state"] == "OK" and body["findings"]
+    rc, body = _run_integration(cfg, sub="history")
+    assert rc == 0 and any(e.get("event") == "install"
+                           for e in body["entries"])
+    rc, body = _run_integration(cfg, sub="update-report")
+    assert rc == 0 and body["state"] == "OK"
+    assert body["recovery"]["modes"] == ["recover", "repair", "rollback"]
+    # Recovery is honest when nothing is recoverable (never a false healthy).
+    from voicebridge.opencode import state as OCS
+
+    monkeypatch.setattr(OCS, "verify_owned_binary", lambda *a, **k: {"ok": False})
+    monkeypatch.setattr(RI, "_staged_opencode_binary", lambda *a, **k: None)
+    rc, body = _run_integration(cfg, sub="recover", name="opencode-binary",
+                                confirm=True)
+    assert rc == 2 and body["code"] == RI.UNRECOVERABLE_CODE

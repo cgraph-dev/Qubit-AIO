@@ -12,6 +12,9 @@ from .semantic import (SemanticMemory, SemanticMemoryError,
                        write_semantic_state)
 from .journal import (Journal, JournalCorruptionError, snapshot_hash,
                       verify_chain, replay, verify_journal, apply_op)
+from .workspace import (WorkspaceError, workspace_dir, write_note, read_note,
+                        list_notes, forget_note, dream, providers,
+                        estop_engaged)
 
 __all__ = ["MemoryStore", "MemoryStoreError", "SecretRejectedError",
            "TIERS", "normalize_text", "norm_hash", "redact_secrets",
@@ -23,4 +26,7 @@ __all__ = ["MemoryStore", "MemoryStoreError", "SecretRejectedError",
            "PROVIDERS", "SOURCES", "SEMANTIC_STATE_SCHEMA",
            "load_semantic_state", "write_semantic_state",
            "Journal", "JournalCorruptionError", "snapshot_hash",
-           "verify_chain", "replay", "verify_journal", "apply_op"]
+           "verify_chain", "replay", "verify_journal", "apply_op",
+           "WorkspaceError", "workspace_dir", "write_note", "read_note",
+           "list_notes", "forget_note", "dream", "providers",
+           "estop_engaged"]

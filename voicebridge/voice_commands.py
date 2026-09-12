@@ -42,6 +42,11 @@ from types import SimpleNamespace
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 ALLOWED_SOURCES = ("user", "cli", "dashboard")
+# Confirm-gated backends reachable while the emergency stop is latched: the
+# whole point of the reset op is to clear the latch, so pre-probing the latch
+# would make the e-stop unrecoverable by voice/dashboard. Every other
+# mutation still fails closed while latched.
+ESTOP_EXEMPT_BACKENDS = ("resume",)
 CONFIRM_TTL_S = 120.0
 MAX_PENDING_PER_SESSION = 10
 EXECUTED_KEEP = 500
@@ -402,14 +407,17 @@ def _b_status(ctx, args):
 def _b_pause(ctx, args):
     from . import power as PW
 
-    out = PW.power_control(ctx.cfg).emergency_stop(issued_by="voice:user")
+    # The voice confirmation (single-use journal, user source) is the human
+    # authorization; the power backend only accepts an authenticated human
+    # channel, so pass the canonical principal it normalizes to.
+    out = PW.power_control(ctx.cfg).emergency_stop(issued_by="user")
     return {"latched": True, "detail": out.get("detail", "")}
 
 
 def _b_resume(ctx, args):
     from . import power as PW
 
-    out = PW.power_control(ctx.cfg).reset(issued_by="voice:user")
+    out = PW.power_control(ctx.cfg).reset(issued_by="user")
     detail = out.get("detail", "") if isinstance(out, dict) else ""
     return {"cleared": True, "detail": detail}
 
@@ -478,14 +486,14 @@ def _b_voice_unsupported(ctx, args):
 def _b_backup(ctx, args):
     if args.get("action") == "export_refused":
         return {"state": "refused", "code": "PASSPHRASE_NEVER_SPOKEN",
-                "guidance": VOICE_IMPOSSIBLE["export-state"],
+                "guidance": VOICE_IMPOSSIBLE["export-state.voice"],
                 "detail": "I cannot take a passphrase by voice: spoken words"
                           " land in transcripts, the journal, and audio"
                           " history. Use the dashboard password form or run"
                           " `qubit export-state` in a terminal."}
     if args.get("action") == "import_refused":
         return {"state": "refused", "code": "PASSPHRASE_NEVER_SPOKEN",
-                "guidance": VOICE_IMPOSSIBLE["import-state"],
+                "guidance": VOICE_IMPOSSIBLE["import-state.voice"],
                 "detail": "I cannot take a passphrase by voice: spoken words"
                           " land in transcripts, the journal, and audio"
                           " history. Use the dashboard password form or run"
@@ -916,6 +924,9 @@ def _b_hooks(ctx, args):
     if action == "fire":
         return HK.fire(ctx.cfg, str(args.get("event", "")),
                        requested_by="voice:user", confirmed=True)
+    if action == "emit":
+        return HK.emit(ctx.cfg, str(args.get("event", "")),
+                       requested_by="voice:user")
     raise ValueError(f"unknown hooks action {action!r}")
 
 
@@ -962,6 +973,16 @@ def _b_pairing(ctx, args):
                           requested_by="voice:user", confirmed=True)
     if action == "revoke":
         return PA.revoke(ctx.cfg, str(args.get("code_id", "")),
+                         requested_by="voice:user", confirmed=True)
+    if action == "setup_code":
+        scopes = [s.strip() for s in
+                  str(args.get("scopes", "messaging")
+                      or "messaging").split(",") if s.strip()]
+        return PA.encode_setup(
+            ctx.cfg, str(args.get("label", "voice") or "voice"), scopes,
+            requested_by="voice:user", confirmed=True)
+    if action == "accept":
+        return PA.accept(ctx.cfg, str(args.get("setup", "") or ""),
                          requested_by="voice:user", confirmed=True)
     raise ValueError(f"unknown pairing action {action!r}")
 
@@ -1104,6 +1125,17 @@ def _b_gateway(ctx, args):
         return GW.gateway_link(ctx.cfg, str(args.get("gateway_id", "")))
     if action == "supervision":
         return GW.refuse_supervision(str(args.get("target", "") or "run"))
+    if action == "supervision_request":
+        return GW.supervision_request(
+            ctx.cfg, str(args.get("gateway_id", "") or ""),
+            str(args.get("target_action", "run") or "run"),
+            requested_by="voice:user", confirmed=True)
+    if action == "supervision_revert":
+        return GW.supervision_revert(
+            ctx.cfg, str(args.get("gateway_id", "") or ""),
+            requested_by="voice:user", confirmed=True)
+    if action == "discovery":
+        return {"discovery": GW.discovery(ctx.cfg)}
     raise ValueError(f"unknown gateway action {action!r}")
 
 
@@ -1488,6 +1520,51 @@ def _b_schedules(ctx, args):
         return {"schedule": SC.delete(
             ctx.cfg, job_id, requested_by="voice:user", confirmed=True)}
     raise ValueError(f"unknown schedules action {action!r}")
+
+
+def _b_automation(ctx, args):
+    """OpenClaw automation: standing orders, flows, heartbeat, QA, yields.
+
+    Writes call the REAL production ``automation.*`` function immediately,
+    through the canonical ``automation: <verb> key=value`` directive that
+    ``automation.run_directive`` shlex-parses (so quoted values containing
+    spaces/JSON survive), and return its structured result. The voice/journal
+    confirmation already authorized the write, so the automation store is
+    persisted before the receipt is returned -- no schedule round-trip. The
+    one ``schedules`` authority still fires any ``automation:`` job the user
+    authored through the CLI/dashboard, and reads answer from that same
+    automation store read-only.
+    """
+    from . import automation as A
+
+    action = str(args.get("action", "") or "")
+    if action == "status":
+        return {"automation": A.status(ctx.cfg)}
+    if action == "orders":
+        return {"automation": A.order_list(ctx.cfg)}
+    if action == "heartbeats":
+        return {"automation": A.heartbeat_list(ctx.cfg)}
+    if action == "flows":
+        return {"automation": A.flow_list(ctx.cfg)}
+    if action == "scenarios":
+        return {"automation": A.qa_scenario_list(ctx.cfg)}
+    if action == "yield_pending":
+        return {"automation": A.yield_pending(ctx.cfg)}
+    verb = ""
+    if action == "directive":
+        verb = str(args.get("verb", "") or "").strip()
+    elif action in ("yield_handoff", "yield_resume"):
+        verb = {"yield_handoff": "yield.handoff",
+                "yield_resume": "yield.resume"}[action]
+    if verb:
+        spec = str(args.get("spec", "") or "").strip()
+        directive = f"{A.DIRECTIVE_PREFIX} {verb} {spec}".strip()
+        # Immediate persisted write: run_directive reuses the production spec
+        # parser (shlex) and the real automation function, and never raises
+        # into the confirmation pipeline (typed FAILED envelopes instead).
+        out = A.run_directive(ctx.cfg, directive, requested_by="voice:user")
+        return {"automation": out, "directive": verb, "task_text": directive}
+    raise ValueError(f"unknown automation action {action!r}")
 
 
 def _b_tui_guidance(ctx, args):
@@ -2140,6 +2217,24 @@ def _b_runtime(ctx, args):
     if action == "remove":
         return RI.remove(ctx.cfg, str(args.get("name", "")),
                          requested_by="voice:user", confirmed=True)
+    if action == "recover":
+        return RI.recover(ctx.cfg, str(args.get("name", "")),
+                          requested_by="voice:user", confirmed=True)
+    if action == "repair":
+        return RI.repair(ctx.cfg, requested_by="voice:user", confirmed=True)
+    if action == "history":
+        return {"history": RI.update_history(
+            ctx.cfg, str(args.get("name", "") or ""))}
+    if action == "update_report":
+        return {"update": RI.update_report(ctx.cfg)}
+    if action == "discovery":
+        from .runtime_inventory import _discovery
+
+        return {"discovery": _discovery(ctx.cfg)}
+    if action == "marketplace":
+        from .runtime_inventory import _marketplace
+
+        return {"marketplace": _marketplace(ctx.cfg)}
     raise ValueError(f"unknown runtime action {action!r}")
 
 
@@ -2792,6 +2887,11 @@ def _b_local_models(ctx, args):
             return {"local_models": LM.quickstart(
                 cfg, model=model, requested_by="voice:user",
                 confirmed=confirmed)}
+        if action == "fallback":
+            return {"local_models": LM.fallback_chain(cfg)}
+        if action == "resolve_fallback":
+            return {"local_models": LM.resolve_fallback(
+                cfg, str(args.get("model", "") or ""))}
     except Exception as exc:  # typed gate only; never raise out
         return {"local_models": LM.public_error(
             getattr(exc, "code", "LOCAL_MODEL_BAD_INPUT"),
@@ -2868,6 +2968,24 @@ def _b_plugin_runtime(ctx, args):
             return {"unregistered": PR.unregister(
                 ctx.cfg, str(args.get("plugin_id", "") or ""),
                 confirmed=True, requested_by="voice:user")}
+        if action == "policy_rules":
+            return {"policy_runtime": PR.policy_rules(ctx.cfg)}
+        if action == "policy_doctor":
+            from . import release as REL
+
+            return {"policy": REL.workspace_conformance(
+                _workspace_arg(ctx, str(args.get("workspace", "") or "")))}
+        if action == "policy_attest":
+            from . import release as REL
+
+            return {"policy": REL.workspace_attestation(
+                _workspace_arg(ctx, str(args.get("workspace", "") or "")))}
+        if action == "marketplace":
+            return {"marketplace": PR.marketplace_doctor(ctx.cfg)}
+        if action == "marketplace_discover":
+            return {"marketplace": PR.marketplace_discover(
+                ctx.cfg, str(args.get("source", "") or ""),
+                query=str(args.get("query", "") or ""))}
     except PR.PluginRuntimeError as exc:
         return {"state": "FAILED", "code": exc.code,
                 "detail": exc.detail[:300], "owner": "qubit-policy",
@@ -3217,6 +3335,200 @@ def _b_session_share(ctx, args):
         "owner": "qubit-policy", "rollback": "share store untouched"}}
 
 
+# ------------------------------------- integration wave (Agents 5-10)
+def _b_browser_profiles(ctx, args):
+    """Qubit-managed browser profile lifecycle (same ``browser`` module the
+    CLI uses). Reads list only Qubit-dedicated profiles; create/open/close/
+    remove run after the voice confirmation and never alias or touch a
+    personal/user profile (an unmanaged name is the typed refusal)."""
+    from . import browser as BW
+
+    action = str(args.get("action", "list") or "list")
+    profile = str(args.get("profile", "") or "")
+    if action == "list":
+        return {"browser_profiles": BW.profiles(ctx.cfg)}
+    if action == "create":
+        return {"browser_profile": BW.create_profile(
+            ctx.cfg, profile, requested_by="voice:user", confirmed=True)}
+    if action == "open":
+        return {"browser_profile": BW.open_profile(
+            ctx.cfg, profile, requested_by="voice:user", confirmed=True)}
+    if action == "close":
+        return {"browser_profile": BW.close_profile(
+            ctx.cfg, profile, requested_by="voice:user", confirmed=True)}
+    if action == "remove":
+        return {"browser_profile": BW.remove_profile(
+            ctx.cfg, profile, requested_by="voice:user", confirmed=True)}
+    raise ValueError(f"unknown browser profiles action {action!r}")
+
+
+def _b_computer_screen(ctx, args):
+    """Control-UI pane arrangement (same ``computer_use`` module the CLI
+    uses). Reads are free; arranging persists only the Qubit Control UI
+    layout under the voice confirmation — never a window manager or a real
+    display read."""
+    from . import computer_use as CU
+
+    action = str(args.get("action", "status") or "status")
+    if action == "panes":
+        return {"screen": CU.screen_panes()}
+    if action == "arrange":
+        raw = str(args.get("panes", "") or "")
+        panes = [p for p in re.split(r"[\s,]+", raw) if p]
+        layout = str(args.get("layout", "") or "").strip().lower()
+        if panes and panes[-1].lower() in ("columns", "rows", "grid"):
+            layout = panes.pop().lower()
+        return {"screen": CU.screen(
+            ctx.cfg, panes, layout=layout or "columns",
+            requested_by="voice:user", confirmed=True)}
+    return {"screen": CU.screen_status(ctx.cfg)}
+
+
+def _b_egress(ctx, args):
+    """Deny-by-default egress policy status / per-host decision (the same
+    ``proxy_status`` backend the CLI ``egress status|check`` calls). Both
+    are read-only local evaluations; no traffic is sent."""
+    from . import proxy_status as PX
+
+    action = str(args.get("action", "status") or "status")
+    if action == "check":
+        return {"egress": PX.check_egress(
+            ctx.cfg, str(args.get("host", "") or ""))}
+    if action == "substitute":
+        import hashlib as _hashlib
+
+        from .proxy_secrets import SecretRegistry
+
+        value = PX.substitute_egress(
+            ctx.cfg, str(args.get("request", "") or ""),
+            str(args.get("host", "") or ""), registry=SecretRegistry())
+        return {"egress": {
+            "state": "OK", "host": str(args.get("host", "") or ""),
+            "substituted": True,
+            "request_sha256": _hashlib.sha256(value.encode()).hexdigest(),
+            "detail": "secret materialized in memory only; the value is "
+                      "never spoken, receipted, or logged",
+            "authority": "deny-by-default egress policy; allowlisted host "
+                         "and registered reference only"}}
+    return {"egress": PX.egress_status(ctx.cfg)}
+
+
+def _b_telemetry(ctx, args):
+    """Opt-in telemetry gate status (the exact ``voicebridge.cli`` reader).
+    Read-only: disabled unless explicitly enabled; no transport is created
+    and no data leaves the machine in the default state."""
+    from . import cli as CLI
+
+    return {"telemetry": CLI._it_exp_telemetry(ctx.cfg, SimpleNamespace())}
+
+
+def _workspace_arg(ctx, explicit):
+    """Resolve a workspace to an absolute path: explicit, else the active
+    project's first folder, else the current directory (same default the
+    CLI uses). The policy backend requires an absolute existing dir."""
+    import os as _os
+
+    text = str(explicit or "").strip()
+    if not text:
+        try:
+            from . import projects as PJ
+
+            active = PJ.active_project(ctx.cfg)
+            if active.get("state") == "OK" and active.get("project"):
+                folders = (active["project"] or {}).get("folders", []) or []
+                if folders:
+                    text = str(folders[0])
+        except Exception:
+            text = ""
+    if not text:
+        text = _os.getcwd()
+    return _os.path.abspath(_os.path.expanduser(text))
+
+
+def _b_workshop(ctx, args):
+    """Verified-skill workshop collection (same workshop the CLI uses).
+    Reads are free; backup/restore/rollback run under the voice
+    confirmation with pre-restore protection. Structured authoring
+    proposals stay CLI/dashboard-only (typed refusal; nothing bound)."""
+    from .verified_skills.workshop import verified_skill_workshop
+
+    ws = verified_skill_workshop(ctx.cfg)
+    action = str(args.get("action", "collection") or "collection")
+    try:
+        if action == "contracts":
+            return {"workshop": ws.contracts()}
+        if action == "collection":
+            return {"workshop": ws.collection()}
+        if action == "backups":
+            return {"workshop": ws.backups()}
+        if action == "curator":
+            return {"workshop": ws.curator_status()}
+        if action == "backup":
+            return {"workshop": ws.backup(
+                label=str(args.get("label", "") or ""))}
+        if action == "restore":
+            return {"workshop": ws.restore(
+                str(args.get("backup_id", "") or ""),
+                requested_by="user")}
+        if action == "rollback":
+            return {"workshop": ws.rollback(
+                str(args.get("backup_id", "") or ""),
+                requested_by="user")}
+        if action == "author":
+            return {"workshop": {
+                "state": "refused", "code": "VOICE_NESTED_UNSUPPORTED",
+                "detail": "structured skill proposals cannot be spoken; use "
+                          "`qubit verified-skills submit` or the dashboard"}}
+    except Exception as exc:
+        return {"workshop": {
+            "state": "FAILED",
+            "code": getattr(exc, "code", type(exc).__name__),
+            "detail": _redact(str(exc))[:200]}}
+    raise ValueError(f"unknown workshop action {action!r}")
+
+
+def _b_usage(ctx, args):
+    """Token/cost usage ledger reader (the exact ``voicebridge.cli``
+    evaluation reader the CLI ``usage`` family calls). Local, redacted;
+    no secrets, no network."""
+    from . import cli as CLI
+
+    try:
+        limit = max(1, min(int(args.get("limit", 1000) or 1000), 5000))
+    except (TypeError, ValueError):
+        limit = 1000
+    return {"usage": CLI._it_exp_usage(ctx.cfg,
+                                       SimpleNamespace(limit=limit))}
+
+
+def _b_receipts_ledger(ctx, args):
+    """Execution-identity receipt ledger reader + hash-chain verification
+    (the exact ``voicebridge.cli`` receipts reader). An absent ledger is
+    the typed ``RECEIPTS_NOT_FOUND`` state, never a fabricated chain."""
+    from . import cli as CLI
+
+    return {"receipts": CLI._it_exp_receipts(ctx.cfg, SimpleNamespace())}
+
+
+def _b_logbook(ctx, args):
+    """Append-only work-journal reader (the exact ``voicebridge.cli``
+    logbook reader). Reads only; capture stays the typed no-screen-access
+    refusal, and note creation stays CLI-only."""
+    from . import cli as CLI
+
+    action = str(args.get("action", "entries") or "entries")
+    if action == "capture":
+        from .evaluation import logbook as LB
+
+        return {"logbook": LB.capture()}
+    out = CLI._it_exp_logbook(ctx.cfg,
+                              SimpleNamespace(limit=100, window_s=None))
+    if action == "summary":
+        return {"logbook": {"state": out.get("state", "OK"),
+                            "summary": out.get("summary", {})}}
+    return {"logbook": out}
+
+
 _BACKENDS: Dict[str, Callable] = {
     "status": _b_status, "pause": _b_pause, "resume": _b_resume,
     "doctor": _b_doctor, "setup_check": _b_setup_check,
@@ -3270,6 +3582,15 @@ _BACKENDS: Dict[str, Callable] = {
     "file_transfer": _b_file_transfer, "active_memory": _b_active_memory,
     "doc_extract": _b_doc_extract, "question_prompt": _b_question_prompt,
     "session_share": _b_session_share,
+    "browser_profiles": _b_browser_profiles,
+    "computer_screen": _b_computer_screen,
+    "egress": _b_egress,
+    "workshop": _b_workshop,
+    "usage": _b_usage,
+    "receipts_ledger": _b_receipts_ledger,
+    "logbook": _b_logbook,
+    "telemetry": _b_telemetry,
+    "automation": _b_automation,
 }
 
 
@@ -5166,6 +5487,142 @@ _E("schedules_run_due", "Run scheduled tasks",
    fixed=(("action", "run_due"),), confirm=True, summary="schedules",
    examples=("qubit, run due schedules",),
    help="Execute due jobs now, typed per-job results (confirmed).")
+# ------------------------------ OpenClaw automation (OC-31/OC-D05/OC-D25)
+# Standing orders / auto-reply, flows, heartbeat, QA scenarios, and subagent
+# yield handoffs. Writes compose the canonical `automation: <verb> key=value`
+# directive and run it through the ONE production directive dispatcher the
+# single schedules tick calls; reads answer from the same automation store.
+_AUTO = "automation"
+_E("automation_status", "Automation status",
+   ("automation status", "standing orders status", "automation report"),
+   _AUTO, ("automation",), fixed=(("action", "status"),),
+   summary="generic", examples=("qubit, automation status",),
+   help="Standing-order/flow/heartbeat/QA/yield counts (read-only).")
+_E("automation_orders", "List standing orders",
+   ("list standing orders", "show standing orders", "list auto replies",
+    "list autoresponders"),
+   _AUTO, ("automation",), fixed=(("action", "orders"),),
+   summary="generic", examples=("qubit, list standing orders",),
+   help="Configured auto-reply standing orders (read-only).")
+_E("automation_heartbeats", "List heartbeats",
+   ("list heartbeats", "show heartbeats", "list heartbeat monitors"),
+   _AUTO, ("automation",), fixed=(("action", "heartbeats"),),
+   summary="generic", examples=("qubit, list heartbeats",),
+   help="Configured liveness heartbeat monitors (read-only).")
+_E("automation_flows", "List automation flows",
+   ("list automation flows", "show automation flows", "list flows"),
+   _AUTO, ("automation",), fixed=(("action", "flows"),),
+   summary="generic", examples=("qubit, list automation flows",),
+   help="Configured bounded automation flows (read-only).")
+_E("automation_scenarios", "List QA scenarios",
+   ("list qa scenarios", "show qa scenarios", "qa lab scenarios"),
+   _AUTO, ("automation",), fixed=(("action", "scenarios"),),
+   summary="generic", examples=("qubit, list qa scenarios",),
+   help="Persisted QA Lab scenarios and last state (read-only).")
+_E("automation_yield_pending", "List pending handoffs",
+   ("list pending handoffs", "show pending yields", "pending handoffs"),
+   _AUTO, ("automation",), fixed=(("action", "yield_pending"),),
+   summary="generic", examples=("qubit, list pending handoffs",),
+   help="Unconsumed subagent yield handoffs (read-only).")
+_E("automation_order_add", "Add standing order",
+   ("add standing order", "create standing order", "add auto reply",
+    "add autoresponder"),
+   _AUTO, ("automation",), args=(_R("spec",
+       clarifier="Say the order as key=value pairs, for example "
+                 "name=greet match=hello reply=hi account=team to=C1."),),
+   fixed=(("action", "directive"), ("verb", "order.add")),
+   confirm=True, summary="generic",
+   examples=("qubit, add standing order name=greet match=hello reply=hi "
+             "account=team to=C1",),
+   help="Register an auto-reply standing order (confirmed).")
+_E("automation_order_enable", "Enable standing order",
+   ("enable standing order", "turn on standing order", "enable auto reply"),
+   _AUTO, ("automation",), args=(_R("spec",
+       clarifier="Which standing order? Say name=greet."),),
+   fixed=(("action", "directive"), ("verb", "order.enable")),
+   confirm=True, summary="generic",
+   examples=("qubit, enable standing order name=greet",),
+   help="Re-enable a standing order (confirmed).")
+_E("automation_order_disable", "Disable standing order",
+   ("disable standing order", "turn off standing order",
+    "disable auto reply"),
+   _AUTO, ("automation",), args=(_R("spec",
+       clarifier="Which standing order? Say name=greet."),),
+   fixed=(("action", "directive"), ("verb", "order.disable")),
+   confirm=True, summary="generic",
+   examples=("qubit, disable standing order name=greet",),
+   help="Disable a standing order without deleting it (confirmed).")
+_E("automation_order_remove", "Remove standing order",
+   ("remove standing order", "delete standing order", "remove auto reply"),
+   _AUTO, ("automation",), args=(_R("spec",
+       clarifier="Which standing order? Say name=greet."),),
+   fixed=(("action", "directive"), ("verb", "order.remove")),
+   confirm=True, summary="generic",
+   examples=("qubit, remove standing order name=greet",),
+   help="Delete a standing order (confirmed).")
+_E("automation_heartbeat_add", "Add heartbeat",
+   ("add heartbeat", "create heartbeat", "add heartbeat monitor"),
+   _AUTO, ("automation",), args=(_R("spec",
+       clarifier="Say the heartbeat as key=value pairs, for example "
+                 "name=hb every=5 note=liveness."),),
+   fixed=(("action", "directive"), ("verb", "heartbeat.add")),
+   confirm=True, summary="generic",
+   examples=("qubit, add heartbeat name=hb every=5 note=liveness",),
+   help="Register a liveness heartbeat (confirmed).")
+_E("automation_flow_add", "Add automation flow",
+   ("add automation flow", "create automation flow", "add flow"),
+   _AUTO, ("automation",), args=(_R("spec",
+       clarifier="Say the flow as key=value pairs, for example "
+                 "name=wake steps='[{\"action\":\"notify\",\"text\":\"up\"}]'."),),
+   fixed=(("action", "directive"), ("verb", "flow.add")),
+   confirm=True, summary="generic",
+   examples=("qubit, add automation flow name=wake steps='[{\"action\":"
+             "\"notify\",\"text\":\"up\"}]'",),
+   help="Register a bounded automation flow (confirmed).")
+_E("automation_flow_run", "Run automation flow",
+   ("run automation flow", "execute automation flow", "run flow"),
+   _AUTO, ("automation",), args=(_R("spec",
+       clarifier="Which flow? Say name=wake."),),
+   fixed=(("action", "directive"), ("verb", "flow.run")),
+   confirm=True, summary="generic",
+   examples=("qubit, run automation flow name=wake",),
+   help="Run a stored automation flow (confirmed).")
+_E("automation_qa_add", "Add QA scenario",
+   ("add qa scenario", "create qa scenario", "add qa test"),
+   _AUTO, ("automation",), args=(_R("spec",
+       clarifier="Say the scenario as key=value pairs, for example "
+                 "name=smoke scenario='[{\"name\":\"ok\",\"action\":\"check\"}]'."),),
+   fixed=(("action", "directive"), ("verb", "qa.add")),
+   confirm=True, summary="generic",
+   examples=("qubit, add qa scenario name=smoke scenario='[{\"name\":\"ok\","
+             "\"action\":\"check\"}]'",),
+   help="Persist a named QA Lab scenario (confirmed).")
+_E("automation_qa_run", "Run QA scenario",
+   ("run qa scenario", "execute qa scenario", "run qa test"),
+   _AUTO, ("automation",), args=(_R("spec",
+       clarifier="Which scenario? Say name=smoke."),),
+   fixed=(("action", "directive"), ("verb", "qa.run")),
+   confirm=True, summary="generic",
+   examples=("qubit, run qa scenario name=smoke",),
+   help="Run a stored QA scenario and persist the report (confirmed).")
+_E("automation_yield_handoff", "Create yield handoff",
+   ("yield handoff", "create yield handoff", "handoff session"),
+   _AUTO, ("automation",), args=(_R("spec",
+       clarifier="Say the handoff as key=value pairs, for example "
+                 "session=sess-1 reason=review context=continue depth=1."),),
+   fixed=(("action", "yield_handoff"),),
+   confirm=True, summary="generic",
+   examples=("qubit, create yield handoff session=sess-1 reason=review "
+             "context=continue depth=1",),
+   help="Publish bounded continuation context for a session (confirmed).")
+_E("automation_yield_resume", "Resume yield handoff",
+   ("resume yield handoff", "consume yield handoff", "resume handoff"),
+   _AUTO, ("automation",), args=(_R("spec",
+       clarifier="Which session? Say session=sess-1 consume=1."),),
+   fixed=(("action", "yield_resume"),),
+   confirm=True, summary="generic",
+   examples=("qubit, resume yield handoff session=sess-1 consume=1",),
+   help="Consume a pending yield handoff (confirmed).")
 # ------------------------------------------- scoped files + IDE launcher
 _E("files_inspect", "Inspect this project folder",
    ("inspect this project folder", "inspect this folder",
@@ -6277,6 +6734,235 @@ _E("shares_purge", "Purge expired shares",
    help="Confirmed removal of expired share records.")
 
 
+# ---------------------------- integration wave: Agents 5-10 real backends
+# One op id per capability, exposed to voice AND (Tier 1) the dashboard
+# console; reads execute immediately, mutations stage the shared journal
+# confirmation. Every backend is the same module function the CLI calls.
+_E("browser_profiles", "Browser profiles",
+   ("browser profiles", "list browser profiles", "managed browser profiles"),
+   "browser_profiles", ("browser",), fixed=(("action", "list"),),
+   examples=("qubit, list browser profiles",),
+   help="Qubit-managed dedicated profiles only.")
+_E("browser_profile_create", "Create browser profile",
+   ("create browser profile", "new browser profile"),
+   "browser_profiles", ("browser",), args=(_R("profile"),),
+   fixed=(("action", "create"),), confirm=True,
+   examples=("qubit, create browser profile work",),
+   help="Create a Qubit-dedicated profile (confirmed).")
+_E("browser_profile_open", "Open browser profile",
+   ("open browser profile", "launch browser profile"),
+   "browser_profiles", ("browser",), args=(_R("profile"),),
+   fixed=(("action", "open"),), confirm=True,
+   examples=("qubit, open browser profile work",),
+   help="Launch via the approved launcher seam only (confirmed).")
+_E("browser_profile_close", "Close managed profile",
+   ("close managed profile", "stop managed browser profile"),
+   "browser_profiles", ("browser",), args=(_R("profile"),),
+   fixed=(("action", "close"),), confirm=True,
+   examples=("qubit, close managed profile work",),
+   help="Close a Qubit-managed profile (confirmed).")
+_E("browser_profile_remove", "Remove browser profile",
+   ("remove browser profile", "delete managed browser profile"),
+   "browser_profiles", ("browser",), args=(_R("profile"),),
+   fixed=(("action", "remove"),), confirm=True,
+   examples=("qubit, remove browser profile work",),
+   help="Delete a Qubit-managed profile (confirmed).")
+_E("computer_screen", "Control UI layout",
+   ("screen layout", "show control ui layout", "control ui panes"),
+   "computer_screen", ("computer-use",), fixed=(("action", "status"),),
+   examples=("qubit, show control ui layout",),
+   help="Read the persisted Control UI arrangement.")
+_E("computer_screen_panes", "Control UI pane catalog",
+   ("screen pane catalog", "list screen panes", "control ui pane catalog"),
+   "computer_screen", ("computer-use",), fixed=(("action", "panes"),),
+   examples=("qubit, list screen panes",),
+   help="Bounded pane/layout catalog (read-only).")
+_E("computer_screen_arrange", "Arrange Control UI",
+   ("arrange screen", "arrange control ui", "set screen panes"),
+   "computer_screen", ("computer-use",),
+   args=(_R("panes"),),
+   fixed=(("action", "arrange"),), confirm=True,
+   examples=("qubit, arrange screen main board",),
+   help="Persist a bounded Control UI arrangement (confirmed).")
+_E("local_models_fallback", "Model fallback chain",
+   ("model fallback chain", "local model fallback", "list fallbacks"),
+   "local_models", ("local-models",), fixed=(("action", "fallback"),),
+   examples=("qubit, model fallback chain",),
+   help="Ordered configured fallback chain (read-only).")
+_E("local_models_resolve", "Resolve model fallback",
+   ("resolve model fallback", "pick fallback model"),
+   "local_models", ("local-models",), args=(_S("model"),),
+   fixed=(("action", "resolve_fallback"),),
+   examples=("qubit, resolve model fallback",),
+   help="Pick the requested or first available loopback model.")
+_E("gateway_supervision_request", "Request gateway supervision",
+   ("request gateway supervision", "supervise gateway"),
+   "gateway", ("gateway",),
+   args=(_S("gateway_id"),
+         _S("target_action")),
+   fixed=(("action", "supervision_request"),), confirm=True, split="first-rest",
+   examples=("qubit, request gateway supervision team start",),
+   help="Approval-gated supervised transition (confirmed).")
+_E("gateway_supervision_revert", "Revert gateway supervision",
+   ("revert gateway supervision", "undo gateway supervision"),
+   "gateway", ("gateway",), args=(_R("gateway_id"),),
+   fixed=(("action", "supervision_revert"),), confirm=True,
+   examples=("qubit, revert gateway supervision team",),
+   help="Restore the pre-supervision process state (confirmed).")
+_E("gateway_discovery", "Gateway discovery",
+   ("gateway discovery", "discover gateways", "find gateways"),
+   "gateway", ("gateway",), fixed=(("action", "discovery"),),
+   examples=("qubit, gateway discovery",),
+   help="Read-only gateways/peers/providers discovery.")
+_E("pairing_setup_code", "Pairing setup code",
+   ("generate pairing setup code", "new setup code", "pairing setup code"),
+   "pairing", ("pairing",), args=(_S("label"), _S("scopes")),
+   fixed=(("action", "setup_code"),), confirm=True,
+   examples=("qubit, generate pairing setup code",),
+   help="One-time code + join URL/QR, shown once (confirmed).")
+_E("pairing_accept", "Accept setup code",
+   ("accept setup code", "redeem pairing setup code"),
+   "pairing", ("pairing",), args=(_R("setup"),),
+   fixed=(("action", "accept"),), confirm=True,
+   examples=("qubit, accept setup code AB12CD",),
+   help="Redeem a setup code and bind the DM account (confirmed).")
+_E("runtime_recover", "Recover runtime",
+   ("recover runtime", "restore runtime install"),
+   "runtime", ("runtime",), args=(_R("name"),),
+   fixed=(("action", "recover"),), confirm=True,
+   examples=("qubit, recover runtime opencode-binary",),
+   help="Reconcile/re-stage from verified local state (confirmed).")
+_E("runtime_repair", "Repair runtime state",
+   ("repair runtime", "fix runtime state"),
+   "runtime", ("runtime",), fixed=(("action", "repair"),), confirm=True,
+   examples=("qubit, repair runtime",),
+   help="Bounded state repair; never downloads (confirmed).")
+_E("runtime_history", "Runtime update history",
+   ("runtime update history", "show runtime history"),
+   "runtime", ("runtime",), args=(_S("name"),),
+   fixed=(("action", "history"),),
+   examples=("qubit, runtime update history",),
+   help="Append-only bounded local update history.")
+_E("runtime_discovery", "Runtime discovery",
+   ("runtime discovery", "discover runtime", "runtime inventory discovery"),
+   "runtime", ("runtime",), fixed=(("action", "discovery"),),
+   examples=("qubit, runtime discovery",),
+   help="Read-only gateway/peer/provider discovery counts.")
+_E("runtime_marketplace", "Runtime marketplace",
+   ("runtime marketplace", "show runtime marketplace", "plugin marketplace"),
+   "runtime", ("runtime",), fixed=(("action", "marketplace"),),
+   examples=("qubit, runtime marketplace",),
+   help="Local reviewed plugins only; remote installs refused.")
+_E("runtime_update_report", "Runtime update report",
+   ("runtime update report", "show runtime update report",
+    "runtime recovery report"),
+   "runtime", ("runtime",), fixed=(("action", "update_report"),),
+   examples=("qubit, runtime update report",),
+   help="Status + history + recovery modes (read-only).")
+_E("egress_status", "Egress status",
+   ("egress status", "egress guard status", "network egress status"),
+   "egress", ("egress",), fixed=(("action", "status"),),
+   examples=("qubit, egress status",),
+   help="Loopback-only egress guard state.")
+_E("egress_check", "Egress check",
+   ("egress check", "check egress host", "is host allowed"),
+   "egress", ("egress",), args=(_R("host"),),
+   fixed=(("action", "check"),),
+   examples=("qubit, egress check api.example.com",),
+   help="Local allowlist check; sends no traffic.")
+_E("substitute_egress", "Substitute egress secrets",
+   ("substitute egress secrets", "apply egress secret substitution",
+    "materialize egress request"),
+   "egress", ("egress",), args=(_S("host"), _R("request")),
+   fixed=(("action", "substitute"),), confirm=True, split="first-rest",
+   examples=("qubit, substitute egress secrets api.example.com "
+             "authorization {{secret:api}}",),
+   help="Confirmed allowlisted-only substitution; value never receipted.")
+_E("policy_conformance", "Policy conformance",
+   ("policy conformance", "check policy conformance", "conformance doctor"),
+   "plugin_runtime", ("policy",), args=(_S("workspace"),),
+   fixed=(("action", "policy_doctor"),),
+   examples=("qubit, policy conformance",),
+   help="Workspace policy conformance findings (read-only).")
+_E("policy_attest", "Policy attestation",
+   ("policy attest", "attest conformance", "attest policy"),
+   "plugin_runtime", ("policy",), args=(_S("workspace"), _S("note")),
+   fixed=(("action", "policy_attest"),), confirm=True,
+   examples=("qubit, policy attest",),
+   help="Content-addressed conformance attestation (confirmed).")
+_E("marketplace_discovery", "Marketplace discovery",
+   ("marketplace discovery", "discover marketplace", "browse marketplace"),
+   "plugin_runtime", ("marketplace",), args=(_S("source"),),
+   fixed=(("action", "marketplace_discover"),),
+   examples=("qubit, marketplace discovery",),
+   help="Local reviewed sources only; remote fetches refused.")
+_E("hooks_emit", "Emit hook event",
+   ("emit hook event", "emit lifecycle event"),
+   "hooks", ("hooks",), args=(_R("event"),),
+   fixed=(("action", "emit"),),
+   examples=("qubit, emit lifecycle event task.completed",),
+   help="Core lifecycle emission; shell never executes.")
+_E("skills_workshop", "Skill workshop",
+   ("skill workshop", "workshop collection", "show skill workshop"),
+   "workshop", ("skills/workshop",), fixed=(("action", "collection"),),
+   examples=("qubit, skill workshop",),
+   help="Quarantined collection + contracts (read-only).")
+_E("skills_workshop_backups", "Workshop backups",
+   ("workshop backups", "list workshop backups", "skill backups"),
+   "workshop", ("skills/workshop",), fixed=(("action", "backups"),),
+   examples=("qubit, workshop backups",),
+   help="Digest-signed bounded backups (read-only).")
+_E("skills_workshop_curator", "Workshop curator",
+   ("workshop curator", "workshop curator status"),
+   "workshop", ("skills/workshop",), fixed=(("action", "curator"),),
+   examples=("qubit, workshop curator",),
+   help="Curator status over the verified store (read-only).")
+_E("skills_workshop_backup", "Back up workshop",
+   ("back up workshop", "create workshop backup", "backup skills"),
+   "workshop", ("skills/workshop",), args=(_S("label"),),
+   fixed=(("action", "backup"),), confirm=True,
+   examples=("qubit, back up workshop",),
+   help="Create a signed workshop backup (confirmed).")
+_E("skills_workshop_restore", "Restore workshop",
+   ("restore workshop backup", "restore workshop", "restore skill backup"),
+   "workshop", ("skills/workshop",), args=(_R("backup_id"),),
+   fixed=(("action", "restore"),), confirm=True,
+   examples=("qubit, restore workshop backup abc123",),
+   help="Human-only restore with pre-restore protection (confirmed).")
+_E("skills_workshop_rollback", "Rollback workshop",
+   ("rollback workshop", "undo workshop restore"),
+   "workshop", ("skills/workshop",), args=(_S("backup_id"),),
+   fixed=(("action", "rollback"),), confirm=True,
+   examples=("qubit, rollback workshop",),
+   help="Revert to the previous workshop snapshot (confirmed).")
+_E("usage_summary", "Usage analytics",
+   ("usage analytics", "show usage", "token usage", "cost usage"),
+   "usage", ("usage",), args=(_S("limit"),),
+   examples=("qubit, usage analytics",),
+   help="Token/cost usage aggregation (read-only).")
+_E("evaluation_telemetry", "Telemetry status",
+   ("telemetry status", "evaluation telemetry", "check telemetry"),
+   "telemetry", ("telemetry",),
+   fixed=(("action", "status"),),
+   examples=("qubit, telemetry status",),
+   help="Opt-in only; typed DISABLED with no transport by default.")
+_E("receipts_ledger", "Execution receipts",
+   ("execution receipts", "verify receipts", "receipt ledger"),
+   "receipts_ledger", ("receipts",),
+   examples=("qubit, execution receipts",),
+   help="Execution-identity receipt ledger + verification.")
+_E("logbook_entries", "Work logbook",
+   ("work logbook", "show logbook", "logbook entries"),
+   "logbook", ("logbook",), fixed=(("action", "entries"),),
+   examples=("qubit, work logbook",),
+   help="Append-only work journal (read-only).")
+_E("logbook_summary", "Logbook summary",
+   ("logbook summary", "summarize logbook"),
+   "logbook", ("logbook",), fixed=(("action", "summary"),),
+   examples=("qubit, logbook summary",),
+   help="Windowed logbook aggregation (read-only).")
+
+
 
 # ---------------------------------------------------------------- coverage
 # Chat-flag rows have no distinct voice command: voice IS the chat
@@ -6341,7 +7027,16 @@ CLI_COVERAGE = {
     "task": ("task_run", "task_run_current"),
     "schedules": ("schedules_create", "schedules_list", "schedules_show",
                   "schedules_pause", "schedules_resume", "schedules_delete",
-                  "schedules_history", "schedules_run_due"),
+                  "schedules_history", "schedules_run_due",
+                  "automation_status", "automation_orders",
+                  "automation_heartbeats", "automation_flows",
+                  "automation_scenarios", "automation_yield_pending",
+                  "automation_order_add", "automation_order_enable",
+                  "automation_order_disable", "automation_order_remove",
+                  "automation_heartbeat_add", "automation_flow_add",
+                  "automation_flow_run", "automation_qa_add",
+                  "automation_qa_run", "automation_yield_handoff",
+                  "automation_yield_resume"),
     "files": ("files_inspect", "files_list", "files_read",
               "file_patch_rollback"),
     "git": ("git_status", "git_log", "git_diff", "git_show"),
@@ -6384,7 +7079,10 @@ CLI_COVERAGE = {
                "skills_disable", "skills_remove", "skills_rollback",
                "plugins_install", "plugins_remote_refusal",
                "verified_list", "verified_show", "verified_recall",
-               "verified_verdict", "verified_pin", "verified_unpin"),
+               "verified_verdict", "verified_pin", "verified_unpin",
+               "skills_workshop", "skills_workshop_backups",
+               "skills_workshop_curator", "skills_workshop_backup",
+               "skills_workshop_restore", "skills_workshop_rollback"),
     "verified-skills": ("verified_list", "verified_show",
                         "verified_recall", "verified_verdict",
                         "verified_pin", "verified_unpin"),
@@ -6395,12 +7093,16 @@ CLI_COVERAGE = {
                "kanban_tab_list", "kanban_tab_create", "kanban_tab_rename",
                "kanban_tab_delete", "kanban_tab_move", "kanban_widget_add",
                "kanban_swarm", "kanban_watch", "kanban_dispatch"),
-    "computer-use": ("computer_status",),
+    "computer-use": ("computer_status", "computer_screen",
+                     "computer_screen_panes", "computer_screen_arrange"),
     "browser": ("browser_status", "browser_doctor", "browser_tabs",
                 "browser_read", "browser_find", "browser_screenshot",
                 "browser_open_browser",
                 "browser_activate", "browser_open", "browser_navigate",
-                "browser_fill", "browser_click", "browser_close_tab"),
+                "browser_fill", "browser_click", "browser_close_tab",
+                "browser_profiles", "browser_profile_create",
+                "browser_profile_open", "browser_profile_close",
+                "browser_profile_remove"),
     "acp": ("acp", "acp_client_status", "acp_client_catalog",
             "acp_client_configure", "acp_client_unconfigure",
             "acp_client_handshake", "acp_client_send", "acp_client_receipts"),
@@ -6413,14 +7115,16 @@ CLI_COVERAGE = {
                  "channels_receive_refusal", "channels_doctor"),
     "theme": ("themes", "pets_downloads_refusal"),
     "proxy": ("proxy",),
-    "hooks": ("hooks_list",),
+    "hooks": ("hooks_list", "hooks_doctor", "hooks_emit"),
     "sync": ("sync_list", "sync_revoke_voice"),
     "pairing": ("pairing_list", "pairing_create", "pairing_approve",
-                "pairing_revoke"),
+                "pairing_revoke", "pairing_setup_code", "pairing_accept"),
     "webhook": ("webhooks",),
     "msg": ("msg_accounts",),
     "brain": ("brain",),
-    "gateway": ("gateway", "gateway_supervision_refusal"),
+    "gateway": ("gateway", "gateway_supervision_refusal",
+                "gateway_supervision_request", "gateway_supervision_revert",
+                "gateway_discovery"),
     "peer": ("peer_list", "peer_dm", "peer_run"),
     "tui": ("tui_help",),
     "vision": ("vision_status",),
@@ -6455,7 +7159,14 @@ CLI_COVERAGE = {
                  "opencode_retry", "opencode_recover", "opencode_receipts"),
     "runtime": ("runtime_images", "runtime_status", "runtime_doctor",
                 "runtime_install", "runtime_upgrade", "runtime_rollback",
-                "runtime_remove"),
+                "runtime_remove", "runtime_recover", "runtime_repair",
+                "runtime_history", "runtime_discovery",
+                "runtime_marketplace", "runtime_update_report"),
+    "egress": ("egress_status", "egress_check", "substitute_egress"),
+    "policy": ("policy_conformance", "policy_attest"),
+    "usage": ("usage_summary", "evaluation_telemetry"),
+    "receipts": ("receipts_ledger",),
+    "logbook": ("logbook_entries", "logbook_summary"),
     "node": ("node_host_status", "node_host_list", "node_host_show",
              "node_host_capabilities", "node_host_enroll", "node_host_revoke",
              "node_host_dispatch"),
@@ -6467,7 +7178,8 @@ CLI_COVERAGE = {
                      "local_models_runtime_install", "local_models_download",
                      "local_models_sideload", "local_models_server",
                      "local_models_eject", "local_models_activate",
-                     "local_models_quickstart"),
+                     "local_models_quickstart", "local_models_fallback",
+                     "local_models_resolve"),
     "transfers": ("transfers_status", "transfers_list", "transfers_fetch",
                   "transfers_plan", "transfers_resume"),
     "recall": ("recall_status", "recall_policy_get", "recall_policy_set",
@@ -6479,14 +7191,89 @@ CLI_COVERAGE = {
     "agent": (),
 }
 
+# Guard rows: a guard's typed refusal is the voice surface for a capability
+# that already has a CLI/dashboard production path, so map each guard op id to
+# the real CLI family it guards. The ledger derives the CLI surface from this
+# mapping, so a guard with a genuine CLI equivalent is not left PARTIAL.
+GUARD_CLI_FAMILY = {
+    "guard_actions_prepare": "actions",
+    "guard_actions_preview": "actions",
+    "guard_actions_retry": "actions",
+    "guard_actions_recover": "actions",
+    "guard_ask_answer": "ask",
+    "guard_backup_create": "export-state",
+    "guard_backup_restore": "import-state",
+    "guard_brain_onboard_apply": "brain",
+    "guard_file_patch": "files",
+    "guard_ghost_preview": "ghost",
+    "guard_kanban_import": "kanban",
+    "guard_opencode_prepare": "opencode",
+    "guard_opencode_run_confirmed": "opencode",
+    "guard_shares_resolve": "shares",
+    "guard_sync_accept": "sync",
+    "guard_sync_offer": "sync",
+    "guard_transfers_fetch_raw": "transfers",
+    "guard_webhook_verify": "webhook",
+}
+for _guard_id, _guard_family in GUARD_CLI_FAMILY.items():
+    CLI_COVERAGE[_guard_family] = tuple(
+        CLI_COVERAGE.get(_guard_family, ())) + (_guard_id,)
+
+# Non-guard voice rows whose capability genuinely has a CLI production path
+# (a family or family.subcommand) that the spoken entry mirrors. Mapping the
+# op id here lets the ledger count the CLI surface it actually has instead of
+# leaving the row PARTIAL. Voice-only guidance/status rows with no CLI
+# equivalent are intentionally absent.
+VOICE_CLI_FAMILY = {
+    "pause": "power",
+    "resume": "power",
+    "memory_remember": "memory",
+    "memory_forget": "memory",
+    "projects_create": "project",
+    "projects_use": "project",
+    "projects_archive": "project",
+    "themes_set": "theme",
+    "themes_reset": "theme",
+    "themes_tweak_set": "theme",
+    "themes_tweak_clear": "theme",
+    "ghost_action_preview": "ghost",
+    "ghost_action_retry": "ghost",
+    "ghost_action_recover": "ghost",
+    "ghost_click": "ghost",
+    "ghost_type": "ghost",
+    "ghost_read_tab": "ghost",
+    "acp_serve_refusal": "acp",
+    "acp_accept_hooks_refusal": "acp",
+    "lsp_install_refusal": "lsp",
+    "proxy_start_refusal": "proxy",
+    "import_refusal": "import-agent",
+    "brain_onboard_plan": "brain",
+    "curator": "verified-skills",
+    "tui_help": "tui",
+    "mic_help": "mic-test",
+    "console_help": "run",
+    "backup_info": "export-state",
+    "export_state_voice": "export-state",
+    "import_state_voice": "import-state",
+    "diagnostics": "setup",
+    "doctor": "setup",
+    "security": "verify-release",
+    "insights": "sessions",
+    "update_status": "product",
+    "worktree": "opencode",
+}
+for _voice_id, _voice_family in VOICE_CLI_FAMILY.items():
+    CLI_COVERAGE[_voice_family] = tuple(
+        CLI_COVERAGE.get(_voice_family, ())) + (_voice_id,)
+
 # CLI families with no voice entry: explicit tested reason + where to run
 # them instead. Keys must stay in sync with CLI_COVERAGE (empty tuple).
 VOICE_IMPOSSIBLE = {
     # passphrases must never be spoken (transcripts/journal/audio history)
-    "export-state": "passphrase-sealed bundles: use the dashboard form or "
-                    "`qubit export-state` in a terminal",
-    "import-state": "passphrase-sealed bundles: use the dashboard form or "
-                    "`qubit import-state <bundle> [--apply]` in a terminal",
+    "export-state.voice": "passphrase-sealed bundles: use the dashboard form or "
+                          "`qubit export-state` in a terminal",
+    "import-state.voice": "passphrase-sealed bundles: use the dashboard form or "
+                          "`qubit import-state <bundle> [--apply]` in a terminal",
     # nested JSON envelopes cannot be spoken reliably (dashboard/CLI only)
     "actions.preview": "structured args envelopes: use `qubit actions "
                        "preview` or the dashboard form",
@@ -6763,7 +7550,7 @@ def execute(ctx, resolution: Resolution) -> Outcome:
     for key, value in (entry.fixed or ()):
         merged.setdefault(key, value)
     if entry.confirm:
-        if _estop(ctx.cfg):
+        if entry.backend not in ESTOP_EXEMPT_BACKENDS and _estop(ctx.cfg):
             _audit("estop", ctx.actor,
                    {"entry": entry.id, "session": ctx.session})
             return Outcome(REFUSED, entry,
@@ -6839,7 +7626,7 @@ def confirm_pending(ctx, confirmation_id: Optional[str] = None) -> Outcome:
         return Outcome(FAILED, None, "That confirmation is stale.", {})
     if ctx.source not in ALLOWED_SOURCES:
         return Outcome(REFUSED, entry, "That request did not come from you.", {})
-    if _estop(ctx.cfg):
+    if entry.backend not in ESTOP_EXEMPT_BACKENDS and _estop(ctx.cfg):
         try:
             journal.respond(target.id, "deny")
         except Exception:
@@ -6900,13 +7687,58 @@ def cancel_pending(ctx, confirmation_id: Optional[str] = None) -> Outcome:
                    {"cancelled": count})
 
 
+def voice_say(cfg: Any, text: str, *, actor: str = "voice:user",
+              session: str = "voice",
+              source: str = "user") -> Dict[str, Any]:
+    """One spoken turn routed through the SAME production op dispatcher
+    the CLI and dashboard console share (``dashboard_ops.run_op``).
+
+    Voice never gets a private execution path: the spoken text is resolved
+    to a registry entry, then dispatched by op id with the resolved args,
+    exactly as the dashboard page would. Confirm-tier entries return
+    ``{"state": "needs-confirm", "confirmation_id": ...}`` and are settled
+    with the shared ``confirm_op``/``cancel_op`` (one journal, one
+    settle-once path) so confirmation, cancellation, receipts, audit, and
+    redaction are identical on every surface.
+
+    Read/guidance/refusal entries execute immediately. Unresolved text
+    returns ``clarify``/``ambiguous``/``unknown`` without touching a
+    backend. Only user-issued sources ever execute; a model/page/tool
+    source is refused before dispatch (defence in depth on top of the
+    registry's own source gate and the dispatcher's coercion)."""
+    if source not in ALLOWED_SOURCES:
+        _audit("refused_source", actor,
+               {"source": str(source)[:40], "session": session})
+        return {"state": REFUSED, "code": "SOURCE_REFUSED",
+                "speech": "That request did not come from you."}
+    from . import dashboard_ops as OPS
+
+    try:
+        resolution = resolve(text)
+    except Exception as exc:
+        _audit("turn_error", actor, {"error": str(exc)[:160]})
+        return {"state": FAILED, "speech": "I didn't understand that."}
+    if resolution.kind != MATCH or resolution.entry is None:
+        out: Dict[str, Any] = {"state": resolution.kind,
+                               "speech": resolution.speech}
+        if resolution.candidates:
+            out["candidates"] = [e.id for e in resolution.candidates]
+        return out
+    entry = resolution.entry
+    out = OPS.run_op(cfg, entry.id, dict(resolution.args),
+                     actor=actor, session=session)
+    out.setdefault("route", entry.id)
+    return out
+
+
 # ------------------------------------------------- turn integration
 def handle_turn(orch: Any, intent_kind: str, text: str) -> bool:
     """Voice-first routing for one turn; True when fully handled.
 
     Takes a duck-typed orchestrator (``cfg``/``speak``/``feed_push``) so
     the branch is unit-testable without the audio graph. MATCH executes
-    (or stages confirmation), CLARIFY/AMBIGUOUS speak the question, and
+    (or stages confirmation) through ``voice_say`` -> the shared
+    production dispatcher, CLARIFY/AMBIGUOUS speak the question, and
     UNKNOWN returns False for existing routing.
     """
     if intent_kind in ("system", "confirm", "cancel"):
@@ -6918,15 +7750,14 @@ def handle_turn(orch: Any, intent_kind: str, text: str) -> bool:
     if resolution.kind == UNKNOWN:
         return False
     try:
-        ctx = make_ctx(orch.cfg, actor="voice:user", session="voice",
-                       source="user")
-        outcome = execute(ctx, resolution)
-        orch.speak(outcome.speech or "Done.")
+        out = voice_say(orch.cfg, text, actor="voice:user", session="voice",
+                        source="user")
+        orch.speak(str(out.get("speech", "")) or "Done.")
         try:
+            route = str(out.get("route", "") or "")
             orch.feed_push({"kind": "voice-command", "text": text[:160],
-                            "route": f"voice:{outcome.entry.id}"
-                            if outcome.entry else "voice",
-                            "detail": outcome.kind})
+                            "route": f"voice:{route}" if route else "voice",
+                            "detail": str(out.get("state", ""))})
         except Exception:
             pass
         return True

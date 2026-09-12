@@ -207,3 +207,56 @@ def test_estop_latches_writes(tmp_path, monkeypatch):
     assert out["state"] == "ESTOP" and out["code"] == LM.ESTOP_CODE
     out = LM.server(cfg, "start", confirmed=True)
     assert out["state"] == "ESTOP" and out["code"] == LM.ESTOP_CODE
+
+
+# ----------------------------------- OC-D28: model fallback picker (no creds)
+def test_fallback_chain_is_read_only_and_honest(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    monkeypatch.setattr(LM, "_probe_local", lambda *_a, **_k: None)
+    out = LM.fallback_chain(cfg)
+    assert out["state"] == "OK" and out["schema"] == LM.FALLBACK_SCHEMA
+    assert out["runtime_observed"] is False
+    assert all(row["available"] is False for row in out["chain"])
+    assert any(row["id"] == "qubit-brain4" for row in out["chain"])
+    assert "read-only" in out["rollback"]
+
+
+def test_resolve_fallback_selects_available_model(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    monkeypatch.setattr(LM, "_probe_local",
+                        lambda *_a, **_k: _runtime(["qubit-brain4:latest"]))
+    direct = LM.resolve_fallback(cfg, model="qubit-brain4")
+    assert direct["state"] == "OK" and direct["fallback"] is False
+    assert direct["selected"] == "qubit-brain4"
+
+    # Requested but absent -> automatic fallback to an available candidate.
+    fell = LM.resolve_fallback(cfg, model="no-such-model-xyz")
+    assert fell["state"] == "OK" and fell["fallback"] is True
+    assert fell["selected"] == "qubit-brain4"
+    assert "unavailable" in fell["detail"]
+
+    # No requested model -> first available candidate, no fallback claimed.
+    auto = LM.resolve_fallback(cfg)
+    assert auto["state"] == "OK" and auto["fallback"] is False
+    assert auto["selected"] == "qubit-brain4"
+
+
+def test_resolve_fallback_unavailable_never_fabricates(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    monkeypatch.setattr(LM, "_probe_local", lambda *_a, **_k: None)
+    out = LM.resolve_fallback(cfg, model="qubit-brain4")
+    assert out["state"] == "UNAVAILABLE" and out["code"] == LM.UNAVAILABLE_CODE
+    assert out["selected"] is None
+    assert "nothing was started" in out["detail"]
+
+
+def test_resolve_fallback_redacts_and_needs_no_creds(tmp_path, monkeypatch):
+    secret = "sk-AbCdEfGhIjKlMnOpQrStUvWxYz1234567890"
+    cfg = _cfg(tmp_path, monkeypatch)
+    monkeypatch.setattr(LM, "_probe_local",
+                        lambda *_a, **_k: _runtime(["qubit-brain4"]))
+    out = LM.resolve_fallback(cfg, model=secret)
+    assert secret not in json.dumps(out)
+    assert out["state"] == "OK" and out["fallback"] is True
+    # No credential (api key/token) is ever required to run the picker.
+    assert "key" not in json.dumps(out).lower()

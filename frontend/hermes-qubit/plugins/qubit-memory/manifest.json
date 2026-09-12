@@ -1,7 +1,7 @@
 {
   "name": "qubit-memory",
   "label": "Memory",
-  "description": "Memory provider status, search, and the learning ledger (same MemoryStore/curator backend as CLI `qubit memory`/`lessons` and voice). OpenClaw addition on the Hermes baseline.",
+  "description": "Memory provider status, search, and the learning ledger (same MemoryStore/curator backend as CLI `qubit memory`/`lessons` and voice).",
   "icon": "database",
   "version": "1.0.0",
   "tab": {"path": "/memory", "position": "after:profiles"},

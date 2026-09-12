@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 NO_SERVER_CODE = "PROXY_NO_SERVER"
 
@@ -69,3 +69,45 @@ def refuse_start() -> Dict[str, Any]:
                            "through the brokered frontier gateway instead.",
             "owner": "qubit-policy",
             "rollback": "no server started; nothing to roll back"}
+
+
+# ----------------------------------------------------- secrets egress proxy
+def egress_status(cfg: Any,
+                  registry: Optional[Any] = None) -> Dict[str, Any]:
+    """Status of the deny-by-default broker (policy + registry; no values).
+
+    The forwarding server is still refused; this exposes the *replacement*
+    contract: an allowlist of destinations plus a registry of secret
+    references that may be substituted only for allowed destinations.
+    """
+    from .proxy_secrets import EgressPolicy, SecretRegistry
+
+    policy = EgressPolicy.from_config(cfg)
+    reg = registry if registry is not None else SecretRegistry()
+    return {"schema": "qubit-egress-status/1", "state": "OK",
+            "server": refuse_start(),
+            "policy": {"allow_all": policy.allow_all,
+                       "allowed_hosts": policy.allowed_hosts},
+            "registry": reg.status()}
+
+
+def check_egress(cfg: Any, host: str,
+                 registry: Optional[Any] = None) -> Dict[str, Any]:
+    """Typed allow/deny decision for one destination (read-only)."""
+    from .proxy_secrets import EgressPolicy
+
+    policy = EgressPolicy.from_config(cfg)
+    return policy.check(host)
+
+
+def substitute_egress(cfg: Any, request: str, host: str, *,
+                      registry: Any) -> str:
+    """Substitute secret placeholders for an allowlisted destination.
+
+    Delegates to :mod:`voicebridge.proxy_secrets`; raises the typed egress
+    error for a denied destination or an unresolvable placeholder.
+    """
+    from .proxy_secrets import EgressPolicy, substitute
+
+    policy = EgressPolicy.from_config(cfg)
+    return substitute(request, policy, registry, host)

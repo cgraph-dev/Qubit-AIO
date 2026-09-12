@@ -30,7 +30,140 @@ def _launcher_name() -> str:
     return base if base in ("qubit", "voicebridge") else "qubit"
 
 
+# ---------------------------------------------------------------------------
+# Agent 1 wave 3: catalog-op CLI surfaces.
+#
+# Every entry maps `qubit <family> <sub>` to the SAME production op id the
+# dashboard/voice surfaces use (`voicebridge.dashboard_ops.run_op`), so all
+# three surfaces share one operation, one confirmation journal and one audit
+# path. Read ops execute; confirm-tier ops stage the shared confirmation and
+# return `needs-confirm` (settled via `qubit approvals respond`). Only ops the
+# live parser does not already own are listed (no native surface is shadowed).
+# ---------------------------------------------------------------------------
+_OP_CLI = (
+    # family, subcommand, op_id, help, argparse specs
+    ("brain", "export", "brain_export",
+     "export a Brain profile (read-only)",
+     (("principal", {}), ("--identity", {"default": ""}))),
+    ("brain", "onboard-plan", "brain_onboard_plan",
+     "Brain setup plan (read-only)", ()),
+    ("brain", "onboard-apply", "brain_onboard_apply",
+     "apply a Brain onboarding plan (stages confirmation)",
+     (("answers", {}),)),
+    ("brain", "sweep", "brain_sweep",
+     "sweep expired Brain fields (stages confirmation)", ()),
+    ("ghost", "action-preview", "ghost_action_preview",
+     "preview a Ghost action (read-only)",
+     (("action_id", {"nargs": "*"}), ("--target", {"default": ""}),
+      ("--text", {"default": ""}), ("--role", {"default": ""}))),
+    ("ghost", "action-recover", "ghost_action_recover",
+     "recover a Ghost action receipt (stages confirmation)",
+     (("receipt_id", {"nargs": "*"}),)),
+    ("ghost", "action-retry", "ghost_action_retry",
+     "retry a Ghost action (stages confirmation)",
+     (("receipt_id", {"nargs": "*"}), ("--target", {"default": ""}),
+      ("--text", {"default": ""}), ("--role", {"default": ""}),
+      ("--scope", {"default": ""}))),
+    ("ghost", "click", "ghost_click",
+     "click a Ghost target (stages confirmation)",
+     (("target", {"nargs": "*"}), ("--role", {"default": ""}),
+      ("--scope", {"default": ""}))),
+    ("ghost", "type", "ghost_type",
+     "type into a Ghost target (stages confirmation)",
+     (("target", {}), ("text", {"nargs": "+"}),
+      ("--role", {"default": ""}), ("--scope", {"default": ""}))),
+    ("ghost", "read-tab", "ghost_read_tab",
+     "read the active Ghost tab (read-only)",
+     (("--role", {"default": ""}), ("--scope", {"default": ""}))),
+    ("memory", "remember", "memory_remember",
+     "remember a fact (stages confirmation)",
+     (("text", {"nargs": "*"}),)),
+    ("memory", "forget", "memory_forget",
+     "forget a memory by id (stages confirmation)",
+     (("memory_id", {"type": int}),)),
+    ("acp", "accept-hooks", "acp_accept_hooks",
+     "typed refusal: hook bypass flags are never honored", ()),
+    ("acp", "serve", "acp_serve",
+     "typed refusal: no ACP server is shipped", ()),
+    ("skills", "workshop-backup", "skills_workshop_backup",
+     "back up the verified-skill collection (stages confirmation)",
+     (("--label", {"default": ""}),)),
+    ("skills", "workshop-restore", "skills_workshop_restore",
+     "restore the collection from a backup (stages confirmation)",
+     (("backup_id", {"nargs": "*"}),)),
+    ("skills", "workshop-rollback", "skills_workshop_rollback",
+     "roll back the verified-skill collection (stages confirmation)",
+     (("backup_id", {"nargs": "?"}),)),
+    ("kanban", "delegated", "kanban_delegated",
+     "delegated kanban subcommand guidance (read-only)",
+     (("subcommand", {}),)),
+    ("opencode", "run-confirmed", "opencode_run_confirmed",
+     "apply a prepared OpenCode change by expected hash (stages confirmation)",
+     (("task", {}), ("--project", {"default": ""}),
+      ("--in-project", {"default": ""}),
+      ("--expected-hash", {"required": True}))),
+    # CLI-coverage gaps: catalog ops that declared a `cli` interface but had
+    # no binding. Each resolves to the same op id the dashboard/voice run.
+    ("backup", "create", "backup_create",
+     "create a passphrase-encrypted portable backup (stages confirmation)",
+     (("--passphrase", {"required": True}), ("--label", {"default": ""}))),
+    ("backup", "restore", "backup_restore",
+     "preview/restore a portable backup (stages confirmation)",
+     (("bundle", {}), ("--passphrase", {"required": True}),
+      ("--apply", {"action": "store_true"}))),
+    ("reports", "list", "reports_list",
+     "published report bundles, newest first (read-only)", ()),
+    ("marketplace", "discovery", "marketplace_discovery",
+     "local reviewed sources only; remote fetches refused (read-only)",
+     (("--source", {"default": ""}),)),
+    ("plugins", "remote", "plugins_remote",
+     "typed refusal: remote plugin identifiers are never fetched",
+     (("identifier", {}),)),
+)
+
+_OP_CLI_INDEX = {(fam, sub): op_id for fam, sub, op_id, _, _ in _OP_CLI}
+
+# Leaf families whose production op is a single read/diagnostic with no
+# subcommand: `qubit <family>` runs the same op id the dashboard/voice run.
+_OP_LEAF_CLI = (
+    ("logs", "logs", "redacted journal tail (read-only)"),
+    ("tools", "tools", "brokered tool names (read-only)"),
+    ("reasoning", "reasoning", "per-request output budgets (read-only)"),
+    ("prompt-budget", "prompt_budget", "context budget report (read-only)"),
+)
+
+# The CLI families above are the surface for catalog ops that previously had
+# no `qubit` binding. Declare that coverage to the voice registry so the
+# single-clear invariant (`voice_commands.CLI_COVERAGE` == live CLI families)
+# holds and the ledger resolves each family to its real op id. Fills only
+# absent keys; a richer mapping from voice_commands always wins.
+_CLI_COVERAGE = {
+    "logs": ("logs",),
+    "tools": ("tools",),
+    "reasoning": ("reasoning",),
+    "prompt-budget": ("prompt_budget",),
+    "reports": ("reports_list",),
+    "marketplace": ("marketplace_discovery",),
+    "backup": (),   # passphrase-sealed: extra ops only, never spoken
+}
+_CLI_VOICE_IMPOSSIBLE = {
+    "backup.voice": "passphrase-sealed backups: use `qubit backup create` / "
+                    "`qubit backup restore` in a terminal or the dashboard form",
+}
+
+
+def _sync_cli_coverage() -> None:
+    """Declare the CLI-coverage-gap families to the voice registry (idempotent)."""
+    from . import voice_commands as VC
+
+    for family, targets in _CLI_COVERAGE.items():
+        VC.CLI_COVERAGE.setdefault(family, targets)
+    for key, reason in _CLI_VOICE_IMPOSSIBLE.items():
+        VC.VOICE_IMPOSSIBLE.setdefault(key, reason)
+
+
 def build_parser() -> argparse.ArgumentParser:
+    _sync_cli_coverage()
     # Provider choices come from the single messaging capability registry so a
     # newly registered channel is selectable without a second list drifting.
     from .messaging import PROVIDERS as _MSG_PROVIDERS
@@ -2288,6 +2421,178 @@ def build_parser() -> argparse.ArgumentParser:
     ag.add_argument("agent_args", nargs=argparse.REMAINDER,
                     help="arguments passed verbatim to the Qubit Agent runtime "
                          "(e.g. 'status', 'sessions list', 'gateway --help')")
+
+    # --- Agent 1 integration wave: real Agent 5-10 backends served by the
+    # canonical `qubit <family> <sub>` CLI. Parsers are declared here and the
+    # handlers live in the _INTEGRATION table (dispatch below); existing
+    # families gain subcommands, and the integration-only families
+    # (egress/policy/usage/receipts/logbook) are declared for the voice parity
+    # map. Top-level completions are regenerated by scripts/gen_completions.py.
+    def _integ(parser, name, help_text, spec=()):
+        sp = parser.add_parser(name, parents=[common], help=help_text)
+        for arg, kwargs in spec:
+            sp.add_argument(arg, **kwargs)
+        return sp
+
+    # browser.py: managed-profile lifecycle (personal profiles stay refused)
+    _integ(br_sub, "profiles",
+           "list Qubit-managed browser profiles (read-only)")
+    _integ(br_sub, "create-profile",
+           "create a Qubit-managed browser profile (needs --confirm)",
+           (("name", {}),
+            ("--cdp-port", {"type": int, "default": None}),
+            ("--confirm", {"action": "store_true"})))
+    _integ(br_sub, "open-profile",
+           "launch a managed profile via the approved launcher (needs --confirm)",
+           (("profile", {}), ("--confirm", {"action": "store_true"})))
+    _integ(br_sub, "close-managed-profile",
+           "close a Qubit-managed profile (needs --confirm; real profiles refused)",
+           (("profile", {}), ("--confirm", {"action": "store_true"})))
+    _integ(br_sub, "remove-profile",
+           "delete a Qubit-managed profile (needs --confirm)",
+           (("profile", {}), ("--confirm", {"action": "store_true"})))
+
+    # computer_use.py: Control-UI pane arrangement (no desktop/display access)
+    _integ(cu_sub, "screen",
+           "persist the Control UI pane arrangement (needs --confirm)",
+           (("--panes", {"default": ""}),
+            ("--layout", {"default": "columns"}),
+            ("--confirm", {"action": "store_true"})))
+
+    # local_models.py: ordered fallback chain / resolver
+    _integ(lm_sub, "fallback",
+           "ordered local-model fallback chain (optionally resolve a model)",
+           (("model", {"nargs": "?", "default": ""}),))
+
+    # gateway_peers.py: approval-gated supervision + discovery
+    _integ(gw_sub, "supervision-request",
+           "approval-gated supervised bridge transition (needs --confirm)",
+           (("gateway_id", {}), ("action", {}),
+            ("--approval-id", {"default": ""}),
+            ("--confirm", {"action": "store_true"})))
+    _integ(gw_sub, "supervision-revert",
+           "restore the pre-supervision process state (needs --confirm)",
+           (("gateway_id", {}), ("--confirm", {"action": "store_true"})))
+    _integ(gw_sub, "discovery",
+           "gateway/peer/provider discovery (read-only)")
+
+    # pairing.py: setup-code + accept (create/approve already exist)
+    _integ(pr_sub, "setup-code",
+           "issue a one-time pairing code + join URL/QR (needs --confirm)",
+           (("label", {}), ("scopes", {"nargs": "*"}),
+            ("--account", {"default": ""}),
+            ("--ttl-s", {"type": float, "default": None}),
+            ("--confirm", {"action": "store_true"})))
+    _integ(pr_sub, "accept",
+           "redeem a setup code/join URL and bind its account (needs --confirm)",
+           (("setup", {}), ("--confirm", {"action": "store_true"})))
+
+    # runtime_images.py + runtime_inventory.py: recovery/report/discovery
+    _integ(rt_sub, "recover",
+           "reconcile/re-stage a runtime from verified local state (needs --confirm)",
+           (("name", {}), ("--confirm", {"action": "store_true"})))
+    _integ(rt_sub, "repair",
+           "bounded runtime-state repair, never downloads (needs --confirm)",
+           (("--confirm", {"action": "store_true"}),))
+    _integ(rt_sub, "history",
+           "append-only local update history (read-only)",
+           (("name", {"nargs": "?", "default": ""}),))
+    _integ(rt_sub, "update-report",
+           "update status + history + recovery plan (read-only)")
+    _integ(rt_sub, "discovery",
+           "runtime gateway/peer discovery (read-only)")
+    _integ(rt_sub, "marketplace",
+           "local reviewed plugin catalog; remote fetches refused (read-only)")
+
+    # hooks.py: core lifecycle emission (shell never executes)
+    _integ(hk_sub, "emit",
+           "emit a core lifecycle event into the hook registry",
+           (("event", {}), ("--payload", {"default": ""})))
+
+    # verified_skills/workshop.py: agent-owned collection layer
+    _integ(sk_sub, "workshop",
+           "verified-skill collection workshop (contracts/collection/curator-status/"
+           "backups/backup/restore/rollback)",
+           (("workshop_action", {"nargs": "?", "default": "curator-status"}),
+            ("backup_id", {"nargs": "?", "default": ""}),
+            ("--status", {"default": None}),
+            ("--label", {"default": ""})))
+
+    # Top-level families declared by the voice parity map for the integration
+    # wave: egress / policy / usage / receipts / logbook (the same backend
+    # functions the voice and dashboard surfaces call).
+    eg = add("egress",
+             help="Deny-by-default egress policy + per-host decisions (read-only)")
+    eg_sub = eg.add_subparsers(dest="egress_command")
+    _integ(eg_sub, "status",
+           "deny-by-default egress policy + secret registry (read-only)")
+    _integ(eg_sub, "check",
+           "typed allow/deny decision for one destination (read-only)",
+           (("host", {}),))
+
+    pol = add("policy",
+              help="Workspace policy conformance + attestation (read-only)")
+    pol_sub = pol.add_subparsers(dest="policy_command")
+    _integ(pol_sub, "conformance",
+           "policy workspace-conformance doctor (read-only)")
+    _integ(pol_sub, "attest",
+           "content-addressed workspace attestation (read-only)")
+
+    use = add("usage",
+              help="Token/cost usage analytics + telemetry gate (local, redacted)")
+    use.add_argument("--limit", type=int, default=1000)
+    use_sub = use.add_subparsers(dest="usage_command")
+    use_sub.add_parser("analytics", parents=[common],
+                       help="aggregate the local usage ledger (read-only)")
+    use_sub.add_parser("telemetry", parents=[common],
+                       help="OpenTelemetry-style telemetry gate status (read-only)")
+
+    add("receipts",
+        help="Verify the local execution-receipt chain (read-only)")
+
+    lb = add("logbook", help="Append-only work journal (entries/summary/note)")
+    lb.add_argument("--limit", type=int, default=100)
+    lb.add_argument("--window-s", type=float, default=None)
+    lb_sub = lb.add_subparsers(dest="logbook_command")
+    lb_sub.add_parser("entries", parents=[common],
+                      help="entries + summary (read-only)")
+    lb_sub.add_parser("summary", parents=[common],
+                      help="windowed logbook aggregation (read-only)")
+    lb_note = lb_sub.add_parser("note", parents=[common],
+                                help="append a work-journal note")
+    lb_note.add_argument("summary")
+    lb_note.add_argument("--kind", default="note")
+    lb_note.add_argument("--source", default="user")
+
+    # CLI-coverage-gap families: catalog ops that declared a `cli` interface
+    # but had no parser binding. Each subcommand maps to the same production op
+    # id the dashboard/voice surfaces run.
+    bk = add("backup", help="Passphrase-sealed portable backup (create/restore)")
+    bk_sub = bk.add_subparsers(dest="backup_command")
+    rp = add("reports", help="Published report bundles (read-only)")
+    rp_sub = rp.add_subparsers(dest="reports_command")
+    mk = add("marketplace", help="Local reviewed plugin/agent sources (read-only)")
+    mk_sub = mk.add_subparsers(dest="marketplace_command")
+
+    # Leaf families: one read/diagnostic op id apiece, run via _it_run_op.
+    for _leaf_fam, _leaf_op, _leaf_help in _OP_LEAF_CLI:
+        _leaf = add(_leaf_fam, help=_leaf_help)
+        _leaf.set_defaults(_op_id=_leaf_op, _op_argnames=[])
+
+    # `plugins remote` is declared in _OP_CLI (no manual parser here).
+
+    # Catalog-op CLI surfaces (wave 3): each maps to the same production op id
+    # the dashboard/voice surfaces run, via _it_run_op + dashboard_ops.run_op.
+    _op_parsers = {"brain": bn_sub, "ghost": ghost_sub, "memory": mem_sub,
+                   "acp": acp_sub, "skills": sk_sub, "kanban": kb_sub,
+                   "opencode": oc_sub, "backup": bk_sub, "reports": rp_sub,
+                   "marketplace": mk_sub,
+                   "plugins": pl_sub}
+    for fam, sub, op_id, help_text, specs in _OP_CLI:
+        op_sp = _integ(_op_parsers[fam], sub, help_text, specs)
+        op_sp.set_defaults(
+            _op_id=op_id,
+            _op_argnames=[s[0].lstrip("-") for s in specs])
     return p
 
 
@@ -2314,6 +2619,430 @@ def _resolve_task_text(cfg, args):
     return " ".join(args.text), None, 0
 
 
+# ---------------------------------------------------------------------------
+# Agent 1 integration wave: `qubit <family> <sub>` -> real Agent 5-10 backends.
+# One data-driven table; the dispatcher in main() runs the matching handler
+# before the family `_cmd_*` ladders and renders a typed JSON envelope.
+# ---------------------------------------------------------------------------
+
+def _eval_path(cfg, name):
+    return Path(cfg.state_dir()) / "evaluation" / name
+
+
+def _it_confirm(args) -> bool:
+    return bool(getattr(args, "confirm", False))
+
+
+# --- browser.py -----------------------------------------------------------
+def _it_browser_profiles(cfg, args):
+    from . import browser as BR
+
+    return BR.profiles(cfg)
+
+
+def _it_browser_create(cfg, args):
+    from . import browser as BR
+
+    return BR.create_profile(cfg, args.name,
+                             cdp_port=getattr(args, "cdp_port", None),
+                             requested_by="cli:user", confirmed=_it_confirm(args))
+
+
+def _it_browser_open(cfg, args):
+    from . import browser as BR
+
+    return BR.open_profile(cfg, args.profile, requested_by="cli:user",
+                           confirmed=_it_confirm(args))
+
+
+def _it_browser_close(cfg, args):
+    from . import browser as BR
+
+    return BR.close_profile(cfg, args.profile, requested_by="cli:user",
+                            confirmed=_it_confirm(args))
+
+
+def _it_browser_remove(cfg, args):
+    from . import browser as BR
+
+    return BR.remove_profile(cfg, args.profile, requested_by="cli:user",
+                             confirmed=_it_confirm(args))
+
+
+# --- computer_use.py ------------------------------------------------------
+def _it_cu_screen(cfg, args):
+    from . import computer_use as CU
+
+    raw = getattr(args, "panes", "") or ""
+    panes = None
+    if raw:
+        try:
+            panes = json.loads(raw)
+        except ValueError:
+            panes = [p.strip() for p in raw.split(",") if p.strip()]
+    return CU.screen(cfg, panes, layout=getattr(args, "layout", "columns")
+                     or "columns", requested_by="cli:user",
+                     confirmed=_it_confirm(args))
+
+
+# --- local_models.py ------------------------------------------------------
+def _it_lm_fallback(cfg, args):
+    from . import local_models as LM
+
+    model = getattr(args, "model", "") or ""
+    return LM.resolve_fallback(cfg, model) if model else LM.fallback_chain(cfg)
+
+
+# --- gateway_peers.py -----------------------------------------------------
+def _it_gateway_supervision_request(cfg, args):
+    from . import gateway_peers as GW
+
+    return GW.supervision_request(
+        cfg, args.gateway_id, args.action,
+        approval_id=getattr(args, "approval_id", "") or "",
+        requested_by="cli:user", confirmed=_it_confirm(args))
+
+
+def _it_gateway_supervision_revert(cfg, args):
+    from . import gateway_peers as GW
+
+    return GW.supervision_revert(cfg, args.gateway_id, requested_by="cli:user",
+                                 confirmed=_it_confirm(args))
+
+
+def _it_gateway_discovery(cfg, args):
+    from . import gateway_peers as GW
+
+    return GW.discovery(cfg)
+
+
+# --- pairing.py -----------------------------------------------------------
+def _it_pairing_setup(cfg, args):
+    from . import pairing as PR
+
+    ttl = getattr(args, "ttl_s", None)
+    return PR.encode_setup(
+        cfg, args.label, list(getattr(args, "scopes", []) or []),
+        account=getattr(args, "account", "") or "",
+        ttl_s=(PR.DEFAULT_TTL_S if ttl is None else ttl),
+        requested_by="cli:user", confirmed=_it_confirm(args))
+
+
+def _it_pairing_accept(cfg, args):
+    from . import pairing as PR
+
+    return PR.accept(cfg, args.setup, requested_by="cli:user",
+                     confirmed=_it_confirm(args))
+
+
+# --- runtime_images.py / runtime_inventory.py -----------------------------
+def _it_runtime_recover(cfg, args):
+    from . import runtime_images as RI
+
+    return RI.recover(cfg, args.name, requested_by="cli:user",
+                      confirmed=_it_confirm(args))
+
+
+def _it_runtime_repair(cfg, args):
+    from . import runtime_images as RI
+
+    return RI.repair(cfg, requested_by="cli:user", confirmed=_it_confirm(args))
+
+
+def _it_runtime_history(cfg, args):
+    from . import runtime_images as RI
+
+    return RI.update_history(cfg, getattr(args, "name", "") or "")
+
+
+def _it_runtime_update_report(cfg, args):
+    from . import runtime_images as RI
+
+    return RI.update_report(cfg)
+
+
+def _it_runtime_discovery(cfg, args):
+    from . import runtime_inventory as RIN
+
+    return RIN._discovery(cfg)
+
+
+def _it_runtime_marketplace(cfg, args):
+    from . import runtime_inventory as RIN
+
+    return RIN._marketplace(cfg)
+
+
+# --- proxy_status.py ------------------------------------------------------
+def _it_proxy_egress_status(cfg, args):
+    from . import proxy_status as PX
+
+    return PX.egress_status(cfg)
+
+
+def _it_proxy_egress_check(cfg, args):
+    from . import proxy_status as PX
+
+    return PX.check_egress(cfg, args.host)
+
+
+# --- release.py -----------------------------------------------------------
+def _it_product_conformance(cfg, args):
+    from . import release as REL
+
+    return REL.workspace_conformance()
+
+
+def _it_product_attest(cfg, args):
+    from . import release as REL
+
+    return REL.workspace_attestation()
+
+
+# --- hooks.py -------------------------------------------------------------
+def _it_hooks_emit(cfg, args):
+    from . import hooks as HK
+
+    raw = getattr(args, "payload", "") or ""
+    payload = {}
+    if raw:
+        try:
+            payload = json.loads(raw)
+        except ValueError:
+            return {"state": "FAILED", "code": "HOOK_BAD_PAYLOAD",
+                    "detail": "--payload must be a JSON object"}
+        if not isinstance(payload, dict):
+            return {"state": "FAILED", "code": "HOOK_BAD_PAYLOAD",
+                    "detail": "--payload must be a JSON object"}
+    return HK.emit(cfg, args.event, payload=payload, requested_by="cli:user")
+
+
+# --- verified_skills/workshop.py ------------------------------------------
+def _it_skills_workshop(cfg, args):
+    from .verified_skills.workshop import verified_skill_workshop
+
+    ws = verified_skill_workshop(cfg)
+    action = str(getattr(args, "workshop_action", "") or "curator-status")
+    bid = str(getattr(args, "backup_id", "") or "")
+    if action == "contracts":
+        return ws.contracts()
+    if action == "collection":
+        return ws.collection(status=getattr(args, "status", None))
+    if action == "curator-status":
+        return ws.curator_status()
+    if action == "backups":
+        return ws.backups()
+    if action == "backup":
+        return ws.backup(label=getattr(args, "label", "") or "")
+    if action == "restore":
+        return ws.restore(bid, requested_by="user")
+    if action == "rollback":
+        return ws.rollback(bid, requested_by="user")
+    return {"state": "FAILED", "code": "UNKNOWN_WORKSHOP_ACTION",
+            "detail": f"unknown workshop action {action!r}"}
+
+
+# --- evaluation: usage / receipts / logbook / telemetry -------------------
+def _it_exp_usage(cfg, args):
+    from .evaluation import usage_analytics as UA
+
+    ledger = UA.UsageLedger(_eval_path(cfg, "usage.jsonl"))
+    limit = int(getattr(args, "limit", 1000) or 1000)
+    records = ledger.read(limit=limit)
+    out = UA.analyze(records)
+    out.update({"state": "OK", "records": len(records),
+                "rejections": ledger.rejections, "path": str(ledger.path),
+                "authority": "append-only local usage ledger; no prompts or "
+                             "secrets are stored"})
+    return out
+
+
+def _it_exp_receipts(cfg, args):
+    from .evaluation import receipts as RC
+
+    path = _eval_path(cfg, "receipts.jsonl")
+    if not path.exists():
+        return {"state": "NOT_FOUND", "code": "RECEIPTS_NOT_FOUND",
+                "detail": f"no execution-receipt chain at {path}"}
+    rows, rejected = [], 0
+    for line in path.read_text(errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            rows.append(json.loads(line))
+        except ValueError:
+            rejected += 1
+    verdict = RC.verify_receipts(rows)
+    return {"state": "OK" if verdict.get("valid") else "FAILED",
+            "schema": "qubit-receipts/1", "records": len(rows),
+            "rejected": rejected, "verify": verdict, "path": str(path)}
+
+
+def _it_exp_logbook(cfg, args):
+    from .evaluation import logbook as LB
+
+    ledger = LB.Logbook(_eval_path(cfg, "logbook.jsonl"))
+    window = getattr(args, "window_s", None)
+    limit = int(getattr(args, "limit", 100) or 100)
+    return {"state": "OK", "schema": "qubit-logbook/1",
+            "entries": ledger.entries(limit=limit, window_s=window),
+            "summary": ledger.summary(window_s=window),
+            "path": str(ledger.path)}
+
+
+def _it_exp_logbook_note(cfg, args):
+    from .evaluation import logbook as LB
+
+    ledger = LB.Logbook(_eval_path(cfg, "logbook.jsonl"))
+    entry = LB.LogbookEntry.create(kind=getattr(args, "kind", "note"),
+                                   summary=args.summary,
+                                   source=getattr(args, "source", "user"))
+    return {"state": "OK", "schema": "qubit-logbook/1",
+            "entry": ledger.append(entry), "path": str(ledger.path)}
+
+
+def _it_exp_telemetry(cfg, args):
+    from .evaluation import telemetry as TE
+
+    return {"state": "OK", "schema": "qubit-telemetry/1",
+            "enabled": bool(TE.telemetry_enabled(cfg)),
+            "endpoint": TE.endpoint_for(cfg),
+            "detail": "opt-in only; no transport is created when disabled"}
+
+
+_INTEGRATION_DESTS = {
+    "browser": "browser_command",
+    "computer-use": "computer_use_command",
+    "local-models": "local_models_command",
+    "gateway": "gateway_command",
+    "pairing": "pairing_command",
+    "runtime": "runtime_command",
+    "hooks": "hooks_command",
+    "skills": "skills_command",
+    "egress": "egress_command",
+    "policy": "policy_command",
+    "usage": "usage_command",
+    "receipts": None,
+    "logbook": "logbook_command",
+    "brain": "brain_command",
+    "ghost": "ghost_command",
+    "memory": "memory_command",
+    "acp": "acp_command",
+    "kanban": "kanban_command",
+    "opencode": "opencode_command",
+    "backup": "backup_command",
+    "reports": "reports_command",
+    "marketplace": "marketplace_command",
+    "plugins": "plugins_command",
+    "logs": None,
+    "tools": None,
+    "reasoning": None,
+    "prompt-budget": None,
+}
+
+_INTEGRATION = {
+    ("browser", "profiles"): _it_browser_profiles,
+    ("browser", "create-profile"): _it_browser_create,
+    ("browser", "open-profile"): _it_browser_open,
+    ("browser", "close-managed-profile"): _it_browser_close,
+    ("browser", "remove-profile"): _it_browser_remove,
+    ("computer-use", "screen"): _it_cu_screen,
+    ("local-models", "fallback"): _it_lm_fallback,
+    ("gateway", "supervision-request"): _it_gateway_supervision_request,
+    ("gateway", "supervision-revert"): _it_gateway_supervision_revert,
+    ("gateway", "discovery"): _it_gateway_discovery,
+    ("pairing", "setup-code"): _it_pairing_setup,
+    ("pairing", "accept"): _it_pairing_accept,
+    ("runtime", "recover"): _it_runtime_recover,
+    ("runtime", "repair"): _it_runtime_repair,
+    ("runtime", "history"): _it_runtime_history,
+    ("runtime", "update-report"): _it_runtime_update_report,
+    ("runtime", "discovery"): _it_runtime_discovery,
+    ("runtime", "marketplace"): _it_runtime_marketplace,
+    ("hooks", "emit"): _it_hooks_emit,
+    ("skills", "workshop"): _it_skills_workshop,
+    ("egress", "status"): _it_proxy_egress_status,
+    ("egress", "check"): _it_proxy_egress_check,
+    ("policy", "conformance"): _it_product_conformance,
+    ("policy", "attest"): _it_product_attest,
+    ("usage", None): _it_exp_usage,
+    ("usage", "analytics"): _it_exp_usage,
+    ("usage", "telemetry"): _it_exp_telemetry,
+    ("receipts", None): _it_exp_receipts,
+    ("logbook", None): _it_exp_logbook,
+    ("logbook", "entries"): _it_exp_logbook,
+    ("logbook", "summary"): _it_exp_logbook,
+    ("logbook", "note"): _it_exp_logbook_note,
+}
+
+
+def _it_run_op(cfg, args):
+    """Run the catalog op id bound to this CLI subcommand via the shared
+    production dispatcher (same op the dashboard console and voice run)."""
+    from . import dashboard_ops as OPS
+
+    op_id = str(getattr(args, "_op_id", "") or "")
+    payload: Dict[str, Any] = {}
+    for name in getattr(args, "_op_argnames", ()) or ():
+        key = name.replace("-", "_")
+        val = getattr(args, key, None)
+        if val is None:
+            continue
+        if isinstance(val, list):
+            if not val:
+                continue
+            val = " ".join(str(v) for v in val)
+        elif isinstance(val, bool):
+            # store_true flags feed choice args ("true"/"false") on extras.
+            val = "true" if val else "false"
+        elif isinstance(val, str) and not val:
+            continue
+        payload[key] = val
+    return OPS.run_op(cfg, op_id, payload, actor="cli:user", session="cli")
+
+
+# CLI-coverage-gap leaf families share the production dispatcher.
+for _leaf_pair in (("logs", None), ("tools", None), ("reasoning", None),
+                   ("prompt-budget", None)):
+    _INTEGRATION[_leaf_pair] = _it_run_op
+
+
+def _finish_integration(out) -> int:
+    """Render one integration result and map its typed state to an exit code."""
+    print(json.dumps(out, indent=2, sort_keys=True))
+    state = str(out.get("state", "")).upper()
+    code = str(out.get("code", "") or "").upper()
+    if state in ("OK", "READY", "HEALTHY", "PASS", "EXECUTED", "AVAILABLE"):
+        return 0
+    if state == "NEEDS-CONFIRM" or "CONFIRM" in code:
+        return 3
+    return 2
+
+
+def _run_integration(cfg, command, args):
+    """Run a wired integration handler, or ``None`` for a native command."""
+    if command not in _INTEGRATION_DESTS:
+        return None
+    dest = _INTEGRATION_DESTS[command]
+    sub = getattr(args, dest, None) if dest else None
+    handler = _INTEGRATION.get((command, sub))
+    if handler is None:
+        if (command, sub) not in _OP_CLI_INDEX:
+            return None
+        handler = _it_run_op
+    try:
+        out = handler(cfg, args)
+    except Exception as exc:  # typed backend boundary: never a traceback
+        out = {"state": "FAILED",
+               "code": str(getattr(exc, "code", None) or "CLI_ERROR"),
+               "detail": str(getattr(exc, "detail", None) or exc)[:400],
+               "owner": "qubit-policy",
+               "rollback": "no state changed by the failed call"}
+    if isinstance(out, int):
+        return out
+    return _finish_integration(out)
+
+
 def main(argv=None) -> int:
     raw = list(sys.argv[1:] if argv is None else argv)
     # Passthrough to the vendored Qubit Agent runtime must not be re-parsed by
@@ -2324,6 +3053,13 @@ def main(argv=None) -> int:
     if raw and raw[0] in ("agent", "hermes"):
         from . import hermes_runtime
         return hermes_runtime.run(raw[1:])
+    # Agent 1: forward supported `<family> <sub>` pairs to the real vendored
+    # fork (same in-process runtime as `qubit agent`). Only pairs the Qubit
+    # parser does not own are routed, so native commands are never shadowed.
+    from . import cli_hermes_forward as _hermes_forward
+    _forwarded = _hermes_forward.maybe_forward(raw)
+    if _forwarded is not None:
+        return _forwarded
     args = build_parser().parse_args(argv)
     command = args.command or "run"
 
@@ -2334,6 +3070,12 @@ def main(argv=None) -> int:
     setup(level=cfg.get("logging", "level", default="INFO"),
           jsonl=cfg.get("logging", "jsonl", default=True),
           state_dir=cfg.state_dir())
+
+    # Agent 1 integration wave: wired family subcommands execute their real
+    # backend here, before the native family handlers below.
+    _integration = _run_integration(cfg, command, args)
+    if _integration is not None:
+        return _integration
 
     if command == "status":
         return _cmd_status(cfg)

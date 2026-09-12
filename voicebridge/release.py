@@ -1542,3 +1542,27 @@ def report_pass(report: Dict[str, Any]) -> bool:
     if not report["units"].get("all_ok", False):
         return False
     return True
+
+
+# --------------------------------------------- policy workspace conformance
+def workspace_conformance(root: Optional[Path] = None, *,
+                          rules: Optional[List[Dict[str, Any]]] = None
+                          ) -> Dict[str, Any]:
+    """Policy workspace-conformance doctor (OC-D02).
+
+    Thin, shared entry point over
+    :mod:`voicebridge.evaluation.policy_conformance` so reports, the CLI, and
+    the dashboard all evaluate the same ruleset and produce the same findings.
+    """
+    from .evaluation.policy_conformance import doctor
+
+    return doctor(Path(root) if root else REPO, rules)
+
+
+def workspace_attestation(root: Optional[Path] = None, *,
+                          generated_at: str = "") -> Dict[str, Any]:
+    """Content-addressed conformance attestation for a workspace (OC-D02)."""
+    from .evaluation.policy_conformance import attestation
+
+    return attestation(Path(root) if root else REPO,
+                       generated_at=generated_at)

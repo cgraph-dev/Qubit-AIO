@@ -373,3 +373,103 @@ def test_cli_preview_carries_project(tmp_path, monkeypatch):
     assert rc == 0, out
     assert out["state"] == "preview", out
     assert out["action_hash"]
+
+
+# ------------------------------------------- OC-D26 managed worktrees
+def _require_git():
+    import shutil
+    if shutil.which("git") is None:
+        pytest.skip("git not installed")
+
+
+def test_worktree_lifecycle_prepare_and_cleanup(tmp_path):
+    """OC-D26: a disposable run gets a real isolated worktree under a 0700
+    base, the live project is untouched, and cleanup removes the base."""
+    _require_git()
+    from voicebridge.opencode import workdir as WD
+
+    root = _git_project(tmp_path, "repo")
+    run_id = f"a9life-{tmp_path.name}"
+    wt = WD._prepare_workdir(root, disposable=True, run_id=run_id)
+    base = wt.parent
+    try:
+        assert wt.is_dir() and wt != root
+        assert base.name == f"vb-opencode-{run_id}"
+        assert (wd_is_in_tmp(base))
+        # A write inside the worktree never touches the project checkout.
+        (wt / "scratch.txt").write_text("work\n")
+        assert not (root / "scratch.txt").exists()
+        # A populated worktree validates clean.
+        report = WD._validate_workdir(root, wt)
+        assert report["ok"] is True, report
+    finally:
+        WD._cleanup_workdir(root, wt, run_id)
+    assert not base.exists()
+
+
+def wd_is_in_tmp(base):
+    import tempfile
+    from pathlib import Path
+    return Path(tempfile.gettempdir()) in base.parents
+
+
+def test_worktree_non_repo_refused(tmp_path):
+    """OC-D26 negative: a non-git directory cannot host a disposable run."""
+    _require_git()
+    from voicebridge.opencode import workdir as WD
+    from voicebridge.opencode.policy import OpenCodeError
+
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    with pytest.raises(OpenCodeError) as exc:
+        WD._prepare_workdir(plain, disposable=True, run_id="a9norepo")
+    assert "DISPOSABLE_UNAVAILABLE" in str(exc.value)
+
+
+def test_orphan_sweep_reaps_only_stale(tmp_path):
+    """OC-D26 recovery: the orphan sweep reaps stale bases and leaves a
+    live one alone."""
+    import os
+    import tempfile
+    import time
+    from pathlib import Path
+
+    from voicebridge.opencode import workdir as WD
+
+    tmp = Path(tempfile.gettempdir())
+    old = tmp / f"vb-opencode-a9old-{os.getpid()}"
+    new = tmp / f"vb-opencode-a9new-{os.getpid()}"
+    for base in (old, new):
+        (base / "wt").mkdir(parents=True, exist_ok=True)
+    stale = time.time() - 10_000
+    os.utime(old, (stale, stale))
+    try:
+        out = WD.sweep_orphaned_workdirs(max_age_s=1_000)
+        assert old.name in out["swept"]
+        assert new.name not in out["swept"]
+        assert not old.exists()
+        assert new.exists(), "a fresh/live base must never be reaped"
+    finally:
+        import shutil
+        shutil.rmtree(new, ignore_errors=True)
+
+
+def test_workdir_validation_flags_symlink_escape(tmp_path):
+    """OC-D26 access control: a symlink resolving outside the approved
+    root fails validation as SYMLINK_ESCAPE."""
+    import os
+
+    from voicebridge.opencode import workdir as WD
+
+    root = tmp_path / "root"
+    root.mkdir()
+    outside = tmp_path / "outside.txt"
+    outside.write_text("secret")
+    wd = root / "wt"
+    wd.mkdir()
+    (wd / "ok.txt").write_text("fine")
+    if not hasattr(os, "symlink"):
+        pytest.skip("no symlink support")
+    os.symlink(outside, wd / "escape")
+    out = WD._validate_workdir(root, wd)
+    assert out["ok"] is False and out["code"] == "SYMLINK_ESCAPE", out

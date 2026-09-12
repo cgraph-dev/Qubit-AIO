@@ -2,6 +2,25 @@
 
 Use this file with `docs/UNIFIED_AGENT_PLAN.md`.
 
+The authoritative architecture for the current completion effort is
+[`QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md`](QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md).
+It records the owner-approved runtime decision: the complete pinned Hermes
+source is the Qubit-owned runtime foundation; OpenClaw is integrated on top of
+it; and CLI, dashboard, and VoiceBridge use the same real backend operations.
+The gap ledger, not a narrow historical matrix, is the current status
+authority. Do not call the work 1:1 while that ledger contains open code-side
+rows.
+
+### Current full-parity test cadence
+
+For the master completion prompt, batch related implementation work and do not
+repeat full pytest/UI/Playwright/upstream suites after every small edit. Use
+static inspection and targeted compile/import checks while batching; run
+focused and affected suites after each coherent implementation batch, then run
+all final gates once the code is implementation-ready. A failure must be
+repaired and rerun at the appropriate scope. This changes test timing only; it
+does not waive any acceptance gate or permit weakened tests.
+
 The workflow is always:
 
 1. Copy the **Implementation Base Prompt** and the selected packet prompt into
@@ -31,7 +50,7 @@ You are the implementation agent. Implement ONLY the packet named below.
 
 Before any search, edit, model load/download, dependency install, browser
 access, service operation, or state-changing command:
-he sa
+
 1. Read AGENTS.md completely.
 2. Read docs/UNIFIED_AGENT_PLAN.md completely.
 3. Read this prompt pack and the selected packet prompt completely.
@@ -64,9 +83,12 @@ exception applies to the dashboard only. All non-dashboard runtime, broker,
 voice, security, and service packets retain the Qubit Python/static-JS/
 systemd/Bubblewrap/Ollama stack and must not add a second runtime authority.
 
-Outside the approved dashboard exception, do not add FastAPI, Uvicorn, React,
-Node, Docker, Kubernetes, another database, another queue, another model
-server, or an undeclared dependency.
+Outside the approved Hermes-runtime/cutover and dashboard exceptions, do not
+add FastAPI, Uvicorn, React, Node, Docker, Kubernetes, another database,
+another queue, another model server, or an undeclared dependency. The
+Qubit-owned Hermes fork may use its pinned FastAPI/Uvicorn source in-process
+behind the one existing Qubit listener; this does not authorize a second
+server, listener, or policy authority.
 Model output is never permission. Never execute generated shell directly,
 expose secrets, bake private data into a model, or change per-call Ollama
 runner options outside the authorized model packet.
@@ -74,14 +96,86 @@ runner options outside the authorized model packet.
 Implement the smallest coherent change with typed boundaries, bounded I/O,
 timeouts, cancellation, redacted logs, reversible migrations, documentation,
 normal/negative/degraded/concurrency/security tests, and packet benchmarks.
-Run focused tests first, then affected regressions. Inspect actual output. Run
-git diff --check. Rebuild Graft after substantial source changes.
+For a multi-step packet, batch related implementation work before running
+tests. Do not run the full suite, UI suite, Playwright suite, or expensive live
+checks after every small edit. Once the batch is implementation-ready, run the
+focused tests, affected regressions, and required final gates in the packet.
+Inspect actual output. Run git diff --check. Rebuild Graft after substantial
+source changes.
 
 Before handoff, verify every new code path has a caller and a test. Never say
 done, complete, fixed, or ready. End with the exact section 5.1 handoff
 template, using INCOMPLETE, BLOCKED, DEGRADED, or FAILED. Include files,
 symbols, commands, pass/fail/skip/degraded counts, measurements, security
 checks, untested paths, risks, and rollback. Then STOP.
+```
+
+## Master completion prompt — current owner directive
+
+Use this prompt when assigning the remaining full-parity work. It is an
+execution prompt, not permission to change the frozen contract.
+
+```text
+You are responsible for completing Qubit against the owner-approved
+QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md. Read that directive, the frozen
+acceptance contract and amendments, the complete migration plan, the full
+parity contract, the dashboard rebuild plan, the gap ledger, and this prompt
+pack before editing.
+
+The required architecture is fixed: vendor and execute the complete pinned
+Hermes source from the Qubit-owned source/package tree; integrate OpenClaw
+capabilities into that same foundation; integrate Qubit VoiceBridge; and make
+CLI, dashboard, and voice call the same real backend operations. Do not build
+another compatibility imitation, external-Hermes supervisor, or reduced
+custom dashboard. The existing Qubit listener may invoke the fork in-process,
+but there must be one listener, one backend/session/memory/scheduler, one
+broker, one audit path, one emergency stop, and one resource policy.
+
+Use docs/QUBIT_GAP_LEDGER.md as the status authority. Reconcile every row in
+the pinned Hermes, pinned OpenClaw, and Qubit sections. A row is not complete
+because a source file, matrix entry, status tile, route, alias, mock, or typed
+refusal exists. Close it only with a real production caller, the required
+CLI/dashboard/voice surface, and behavioral, negative, persistence, security,
+resource, cancellation, recovery, and clean-install evidence. Replace
+compatibility-only paths with the Qubit-owned Hermes backend as cutover
+progresses. Do not hide ordinary implementation work under GATED, MANUAL, or
+REJECTED.
+
+Preserve the complete Hermes dashboard source and workflows first. Add the
+OpenClaw workflows into that information architecture, then apply the Qubit
+brand and visual system without removing controls or pages. Keep upstream
+names only in legal, attribution, provenance, migration, compatibility, and
+developer records. Do not copy secrets or private user data.
+
+Work continuously through every code-side ledger row. Use disjoint subagents
+only with explicit file ownership and integrate their work; do not stop after
+one wave or after a green focused suite. Run focused tests after coherent
+changes, affected regressions at each milestone, and the complete gates at the
+end: full pytest with warnings as errors, UI/Playwright, CLI/dashboard/voice
+parity, source/caller audit, provenance/license/dependency scans, compileall,
+package and isolated clean-install, service/runtime identity, migration,
+upgrade, rollback, uninstall, security, persistence, resource, and Graft
+checks. Never weaken, skip, delete, or rewrite a test to make it pass.
+
+Do not waste storage on repeated artifacts. Remove only disposable screenshots,
+audio captures, pytest temp directories, logs, probe output, and throwaway
+environments after recording their useful evidence. Preserve pinned upstream
+clones until the final audit is complete, and never delete source, user state,
+credentials, browser profiles, or provenance.
+
+Preserve unrelated dirty/untracked files byte-for-byte. Never use reset --hard,
+clean, broad checkout, mass formatting, or destructive deletion. Update only
+source, tests, legal/provenance records, and append-only evidence. Do not edit
+acceptance requirements to resolve an implementation conflict. If a true
+owner decision is required, record the exact conflict and stop only there;
+otherwise continue repairing the code.
+
+Before claiming completion, regenerate the gap ledger and require zero
+code-side rows with status other than IMPLEMENTED. Then obtain independent
+verification. Only after the verifier reproduces all evidence may you report
+VERIFIED, commit the complete intended change set, and provide exact rollback
+instructions. Until then report INCOMPLETE with the exact remaining rows.
+Do not start 8U or another packet while this gate is open.
 ```
 
 ## Verification Base Prompt

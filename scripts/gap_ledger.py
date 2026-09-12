@@ -226,7 +226,7 @@ def render_markdown(sections, missing, summary) -> str:
                 continue
             rendered = json.dumps(value, sort_keys=True) if isinstance(
                 value, (dict, list)) else str(value)
-            lines.append(f"  - {key}: {rendered[:400]}")
+            lines.append(f"  - {key}: {rendered[:400].rstrip()}")
     if missing:
         lines.append("")
         lines.append(

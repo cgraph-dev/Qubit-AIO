@@ -797,8 +797,12 @@ def test_no_unauthorized_runtime_surface(tmp_path):
                 "import flask", "import torch", "import sentence_transformers",
                 "import numpy"):
         assert bad not in src
-    assert not any(m.startswith(("fastapi", "uvicorn", "mcp", "flask"))
-                   for m in sys.modules)
+    # Owner amendment 2026-09-11 (runtime): the Qubit-owned vendored Hermes
+    # backend is authorized, so its ASGI stack (fastapi/uvicorn/starlette) may
+    # be loaded. Genuinely unauthorized runtime surfaces stay forbidden. This
+    # migration is recorded in docs/QUBIT_HERMES_CUTOVER_MIGRATION.md.
+    assert not any(m.startswith(("mcp", "flask", "torch",
+                                 "sentence_transformers")) for m in sys.modules)
     s = SemanticMemory(tmp_path / "m.db", enabled=True, provider="hash")
     s.remember("fallback fact")
     # provider unavailability is typed, not a crash

@@ -38,6 +38,8 @@ BAD_INPUT_CODE = "RUNTIME_BAD_INPUT"
 STAGING_CODE = "RUNTIME_NEEDS_STAGING"
 MISMATCH_CODE = "RUNTIME_DIGEST_MISMATCH"
 IN_USE_CODE = "RUNTIME_IN_USE"
+UNRECOVERABLE_CODE = "RUNTIME_UNRECOVERABLE"
+CORRUPT_STATE_CODE = "RUNTIME_STATE_CORRUPT"
 
 STATE_FILE = "runtime_images.json"
 SCHEMA = "qubit-runtime-images/1"
@@ -93,12 +95,30 @@ def _load(cfg: Any) -> Dict[str, Any]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return {"schema": SCHEMA, "images": {}}
+        return {"schema": SCHEMA, "images": {}, "history": []}
     if not isinstance(data, dict) or data.get("schema") != SCHEMA:
-        return {"schema": SCHEMA, "images": {}}
+        return {"schema": SCHEMA, "images": {}, "history": []}
     if not isinstance(data.get("images"), dict):
         data["images"] = {}
+    if not isinstance(data.get("history"), list):
+        data["history"] = []
     return data
+
+
+def _append_history(cfg: Any, name: str, event: str, actor: str,
+                    detail: Optional[Dict[str, Any]] = None) -> None:
+    """Append a bounded, redacted update-history entry (best effort)."""
+    try:
+        state = _load(cfg)
+        entry: Dict[str, Any] = {"at": _now(), "image": name, "event": event,
+                                 "actor": _redact(actor)[:64]}
+        for key, value in (detail or {}).items():
+            entry[key] = value
+        state["history"].append(entry)
+        state["history"] = state["history"][-200:]
+        _save(cfg, state)
+    except Exception:
+        pass
 
 
 def _save(cfg: Any, data: Dict[str, Any]) -> None:
@@ -213,6 +233,8 @@ def status(cfg: Any) -> Dict[str, Any]:
         out.append(item)
     return {"state": "OK", "runtimes": out,
             "daemon": "none-required",
+            "update_history": len(state.get("history", [])),
+            "recovery": {"modes": ["recover", "repair", "rollback"]},
             "detail": "Qubit runtimes are confined local provisions; no"
                       " Docker daemon, image pull, or background service"
                       " is used or required."}
@@ -293,6 +315,9 @@ def install(cfg: Any, name: str, *, requested_by: str = "cli:user",
     record = _record_install(cfg, name, digest_ref, requested_by)
     _audit("install", requested_by,
            {"image": name, "digest": "<redacted-sha>"})
+    _append_history(cfg, name, "install", requested_by,
+                    {"digest": digest_ref,
+                     "previous": record.get("previous")})
     return {"state": "OK", "image": name, "digest": digest_ref,
             "binary": str(owned),
             "previous": record["previous"],
@@ -340,6 +365,8 @@ def upgrade(cfg: Any, name: str, *, requested_by: str = "cli:user",
     else:
         out["note"] = (f"{name} staged at pin {entry['pin']}; previous"
                        " receipt kept for rollback")
+    _append_history(cfg, name, "upgrade", requested_by,
+                    {"digest": out.get("digest", "")})
     return out
 
 
@@ -365,9 +392,155 @@ def rollback(cfg: Any, name: str, *, requested_by: str = "cli:user",
     state["images"][name] = record
     _save(cfg, state)
     _audit("rollback", requested_by, {"image": name})
+    _append_history(cfg, name, "rollback", requested_by,
+                    {"digest": prev["digest"]})
     return {"state": "OK", "image": name, "digest": prev["digest"],
             "rollback": "restored previous receipt; re-run `qubit runtime"
                         " status` to re-verify the artifact"}
+
+
+def update_history(cfg: Any, name: str = "") -> Dict[str, Any]:
+    """Bounded, append-only local update history (redacted)."""
+    state = _load(cfg)
+    clean = (name or "").strip().lower()
+    entries = [e for e in state.get("history", [])
+               if not clean or e.get("image") == clean]
+    return {"state": "OK", "image": clean, "entries": entries[-100:],
+            "authority": "append-only bounded local update history"}
+
+
+def recover(cfg: Any, name: str, *, requested_by: str = "cli:user",
+            confirmed: bool = False) -> Dict[str, Any]:
+    """Reconcile or re-stage a runtime from verified local state.
+
+    Recovery never downloads: it rebuilds the install record from the
+    digest-verified owned receipt, or re-installs from the pinned local
+    candidate when the owned bytes were lost. With neither, the call is a
+    typed ``RUNTIME_UNRECOVERABLE`` (never a silent false-healthy claim)."""
+    _guard(cfg, f"recover {name}", confirmed)
+    entry = _check_name(name)
+    from .opencode import state as _OCS
+
+    owned = _OCS.verify_owned_binary()
+    state = _load(cfg)
+    if owned.get("ok"):
+        digest = f"sha256:{owned['sha256']}"
+        record = state["images"].get(name)
+        if (isinstance(record, dict) and not record.get("removed_at")
+                and record.get("digest") == digest):
+            return {"state": "OK", "image": name,
+                    "outcome": "ALREADY_HEALTHY", "digest": digest,
+                    "detail": "verified owned artifact already matches the "
+                              "recorded state"}
+        state["images"][name] = {"digest": digest, "installed_at": _now(),
+                                 "actor": requested_by, "previous": None,
+                                 "recovered_at": _now(),
+                                 "recovered_by": requested_by}
+        state["images"].pop(name + ":removed", None)
+        _save(cfg, state)
+        _audit("recover", requested_by,
+               {"image": name, "outcome": "RECONCILED"})
+        _append_history(cfg, name, "recover", requested_by,
+                        {"digest": digest, "outcome": "RECONCILED"})
+        return {"state": "OK", "image": name, "outcome": "RECONCILED",
+                "digest": digest,
+                "detail": "rebuilt the install record from the verified "
+                          "on-disk receipt"}
+    if entry["name"] == "opencode-binary":
+        staged = _staged_opencode_binary("")
+        if staged is not None:
+            out = install(cfg, name, requested_by=requested_by,
+                          confirmed=True, source=str(staged))
+            out["outcome"] = "RESTAGED"
+            _audit("recover", requested_by,
+                   {"image": name, "outcome": "RESTAGED"})
+            _append_history(cfg, name, "recover", requested_by,
+                            {"outcome": "RESTAGED"})
+            return out
+    raise RuntimeImageError(
+        UNRECOVERABLE_CODE,
+        "no verified owned artifact and no pinned local candidate to "
+        "restore; re-stage the pinned binary and run `qubit runtime install`")
+
+
+def repair(cfg: Any, *, requested_by: str = "cli:user",
+           confirmed: bool = False) -> Dict[str, Any]:
+    """Bounded repair/recovery of runtime state (confirmed; no downloads).
+
+    Rebuilds a corrupt state file (preserving the bad copy), reconciles
+    records against the digest-verified owned artifact, and is honest when
+    nothing can be recovered."""
+    _guard(cfg, "repair", confirmed)
+    findings: List[Dict[str, str]] = []
+    actions: List[Dict[str, str]] = []
+    path = _state_path(cfg)
+    if path.exists():
+        try:
+            json.loads(path.read_text(encoding="utf-8"))
+            findings.append({"check": "state_json", "result": "OK"})
+        except (OSError, ValueError) as exc:
+            findings.append({"check": "state_json",
+                             "result": f"CORRUPT: {_redact(str(exc))[:120]}"})
+            try:
+                path.replace(path.with_suffix(".corrupt"))
+                _save(cfg, {"schema": SCHEMA, "images": {}, "history": []})
+            except OSError as exc2:
+                raise RuntimeImageError(
+                    CORRUPT_STATE_CODE,
+                    f"state corrupt and not repairable: {exc2}") from exc2
+            actions.append({"action": "state_backup",
+                            "result": "rewrote a clean state file; corrupt "
+                                      "copy preserved"})
+    else:
+        findings.append({"check": "state_json", "result": "no state yet"})
+    for entry in REGISTRY:
+        name = entry["name"]
+        state = _load(cfg)
+        rec = state["images"].get(name)
+        prov = _opencode_provenance()
+        if not prov.get("installed"):
+            findings.append({"check": f"artifact:{name}", "result": "MISSING"})
+            if rec is not None or (name + ":removed") in state["images"]:
+                actions.append({"action": "recover", "image": name,
+                                "result": "attempted"})
+                try:
+                    recover(cfg, name, requested_by=requested_by,
+                            confirmed=True)
+                except RuntimeImageError as exc:
+                    actions[-1]["result"] = f"UNRECOVERABLE: {exc.code}"
+            continue
+        if not prov.get("effective"):
+            findings.append({"check": f"artifact:{name}",
+                             "result": "DEGRADED: present but not the "
+                                       "verified owned copy"})
+            continue
+        digest = str(prov.get("digest") or "")
+        if isinstance(rec, dict) and rec.get("digest") == digest:
+            findings.append({"check": f"artifact:{name}", "result": "OK"})
+        else:
+            findings.append({"check": f"artifact:{name}",
+                             "result": "RECORD_MISMATCH"})
+            actions.append({"action": "recover", "image": name,
+                            "result": "reconciled"})
+            recover(cfg, name, requested_by=requested_by, confirmed=True)
+    _audit("repair", requested_by,
+           {"actions": len(actions), "findings": len(findings)})
+    return {"state": "OK", "findings": findings, "actions": actions,
+            "detail": "bounded repair; never downloads and never invents a "
+                      "healthy state"}
+
+
+def update_report(cfg: Any) -> Dict[str, Any]:
+    """Update status + history + recovery plan (read-only report)."""
+    return {"state": "OK", "status": status(cfg),
+            "history": update_history(cfg)["entries"],
+            "recovery": {
+                "modes": ["recover", "repair", "rollback"],
+                "recover": "rebuild from the verified owned receipt or "
+                           "re-stage the pinned local candidate",
+                "repair": "bounded state repair; never downloads",
+                "rollback": "restore the previous install receipt"},
+            "authority": "local, pinned, digest-verified updates only"}
 
 
 def remove(cfg: Any, name: str, *, requested_by: str = "cli:user",
@@ -401,6 +574,8 @@ def remove(cfg: Any, name: str, *, requested_by: str = "cli:user",
         "previous_receipt": record if isinstance(record, dict) else None}
     _save(cfg, state)
     _audit("remove", requested_by, {"image": name, "removed": removed})
+    _append_history(cfg, name, "remove", requested_by,
+                    {"removed": list(removed)})
     return {"state": "OK", "image": name, "removed": removed,
             "rollback": ("re-stage the pinned artifact and `qubit runtime"
                          f" install {name} --confirm`; the prior receipt is"

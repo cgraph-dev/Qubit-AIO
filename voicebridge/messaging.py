@@ -138,6 +138,14 @@ PROVIDER_CAPS: Dict[str, Dict[str, Any]] = {
         "detail": "iMessage needs a macOS Messages bridge; no adapter exists "
                   "in Qubit",
     },
+    "feishu": {
+        "label": "Feishu / Lark",
+        "transport": "webhook",
+        "available": False,
+        "credential_kind": "app-secret",
+        "detail": "Feishu dynamic agents need an open-platform event adapter; "
+                  "Qubit recognizes the channel but has no Feishu transport",
+    },
 }
 
 # Single source of truth for provider membership (order preserved).

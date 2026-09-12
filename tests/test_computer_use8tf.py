@@ -90,3 +90,66 @@ def test_capability_catalog_reports_computer_use_implemented():
     out = check("computer-use")
     assert out["state"] == "IMPLEMENTED", out
     assert out["code"] == "OK"
+
+
+# --------------------------------------------- OC-15: `screen` arrange tool
+def _cfg(tmp_path, monkeypatch):
+    from voicebridge import config as C
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "c"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "s"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "d"))
+    p = tmp_path / "voice.yaml"
+    p.write_text("logging:\n  jsonl: false\n")
+    return C.Config.load(p)
+
+
+def test_screen_panes_catalog(tmp_path, monkeypatch):
+    from voicebridge import computer_use as CU
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    out = CU.screen_panes()
+    assert out["schema"] == CU.SCREEN_SCHEMA
+    assert set(out["panes"]) == set(CU.SCREEN_PANES)
+    assert set(out["layouts"]) == set(CU.SCREEN_LAYOUTS)
+    assert "never a window manager" in out["detail"]
+    assert CU.screen_status(cfg)["arranged"] is False
+
+
+def test_screen_arrange_persists_and_validates(tmp_path, monkeypatch):
+    from voicebridge import computer_use as CU
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    monkeypatch.setattr(CU, "_estop", lambda _cfg: False)
+
+    # Confirmation is mandatory.
+    assert CU.screen(cfg, ["chat"])["code"] == CU.SCREEN_CONFIRM_CODE
+    # Unknown pane, duplicates, empty, and over-budget arrangements fail closed.
+    assert CU.screen(cfg, ["chat", "nope"],
+                     confirmed=True)["code"] == CU.SCREEN_BAD_INPUT_CODE
+    assert CU.screen(cfg, ["chat", "chat"],
+                     confirmed=True)["code"] == CU.SCREEN_BAD_INPUT_CODE
+    assert CU.screen(cfg, [],
+                     confirmed=True)["code"] == CU.SCREEN_BAD_INPUT_CODE
+    too_many = list(CU.SCREEN_PANES[:CU.MAX_SCREEN_PANES + 1])
+    assert CU.screen(cfg, too_many,
+                     confirmed=True)["code"] == CU.SCREEN_BAD_INPUT_CODE
+    assert CU.screen(cfg, ["chat"], layout="spiral",
+                     confirmed=True)["code"] == CU.SCREEN_BAD_INPUT_CODE
+
+    out = CU.screen(cfg, "chat,files", layout="columns", confirmed=True)
+    assert out["state"] == "OK" and out["panes"] == ["chat", "files"]
+    assert "no desktop" in out["authority"]
+    status = CU.screen_status(cfg)
+    assert status["arranged"] is True
+    assert status["panes"] == ["chat", "files"] and status["layout"] == "columns"
+
+
+def test_screen_estop_latches(tmp_path, monkeypatch):
+    from voicebridge import computer_use as CU
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    monkeypatch.setattr(CU, "_estop", lambda _cfg: True)
+    out = CU.screen(cfg, ["chat"], confirmed=True)
+    assert out["state"] == "ESTOP" and out["code"] == CU.SCREEN_ESTOP_CODE
+    assert not CU.screen_status(cfg)["arranged"]

@@ -123,3 +123,46 @@ def test_capability_catalog_reports_acp_lsp_implemented():
     for token in ("acp", "lsp"):
         out = check(token)
         assert out["state"] == "IMPLEMENTED", (token, out)
+
+
+def test_voice_backend_acp_refusals_name_their_codes():
+    from voicebridge import acp_lsp as AL
+    from voicebridge import voice_commands as VC
+
+    serve = VC._b_acp(None, {"action": "serve"})["refused"]
+    assert serve == AL.acp_refuse_serve() == AL.acp_serve_refusal()
+    assert serve["state"] == "REFUSED" and serve["code"] == "ACP_NO_SERVER"
+
+    hooks = VC._b_acp(None, {"action": "accept_hooks"})["refused"]
+    assert hooks == AL.acp_refuse_accept_hooks()
+    assert hooks == AL.acp_accept_hooks_refusal()
+    assert hooks["state"] == "REJECTED"
+    assert hooks["code"] == "ACP_ACCEPT_HOOKS_REFUSED"
+
+    setup = VC._b_acp(None, {"action": "setup", "editor": "zed"})["setup"]
+    assert setup["state"] == "OK" and setup["editor"] == "zed"
+    assert "ws://127.0.0.1:18789" in setup["snippet"]
+
+
+def test_voice_backend_lsp_install_and_restart_refusals():
+    from voicebridge import acp_lsp as AL
+    from voicebridge import voice_commands as VC
+
+    refused = VC._b_lsp(None, {"action": "install", "server": "gopls"})["refused"]
+    assert refused == AL.lsp_refuse_install("gopls")
+    assert refused["code"] == "LSP_NO_DOWNLOADS" and "gopls" in json.dumps(refused)
+
+    assert VC._b_lsp(None, {"action": "restart"}) == AL.lsp_restart()
+    assert VC._b_lsp(None, {"action": "which", "server": "gopls"}) == \
+        AL.lsp_which("gopls")
+
+
+def test_dashboard_extra_acp_and_lsp_refusals():
+    from voicebridge import acp_lsp as AL
+    from voicebridge import dashboard_ops as DO
+
+    assert DO._extra_acp_serve(None, {}, "dashboard:user") == AL.acp_refuse_serve()
+    assert DO._extra_acp_accept_hooks(None, {}, "dashboard:user") == \
+        AL.acp_refuse_accept_hooks()
+    assert DO._extra_lsp_install(None, {"server": "gopls"}, "dashboard:user") == \
+        AL.lsp_refuse_install("gopls")

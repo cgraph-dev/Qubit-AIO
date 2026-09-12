@@ -1,7 +1,7 @@
 {
   "name": "qubit-gateway",
   "label": "Gateway",
-  "description": "Gateway records and link states (same backend as qubit gateway CLI). OpenClaw addition on the Hermes baseline.",
+  "description": "Gateway records and link states (same backend as qubit gateway CLI).",
   "icon": "network",
   "version": "1.1.0",
   "tab": {"path": "/qubit-gateway", "position": "after:mcp"},

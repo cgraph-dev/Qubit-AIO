@@ -1,12 +1,15 @@
 # Packet 8T-F — Canonical Source of Truth
 
-Status: **IMPLEMENTATION COMPLETE — pending independent verification (do not start Packet 8U)**
+Status: **CUTOVER IN PROGRESS — not complete; do not start Packet 8U**
 
 Date: 2026-09-08
 
 This document resolves the architecture ambiguity that caused a supervisor-only
-Hermes implementation to be mistaken for a Hermes-based Qubit product.
+or compatibility-only Hermes implementation to be mistaken for a Hermes-based
+Qubit product. The current cutover is evidence of progress, not final parity.
 
+The owner-approved execution directive is in
+[`QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md`](QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md).
 The detailed execution sequence is in
 [8TF_COMPLETE_MIGRATION_PLAN.md](8TF_COMPLETE_MIGRATION_PLAN.md). Agents must
 read both documents before changing 8T-F.
@@ -16,7 +19,7 @@ read both documents before changing 8T-F.
 The target is one product:
 
 ```text
-pinned Hermes source foundation
+pinned Hermes source foundation and Qubit-owned fork
         -> Qubit rebrand
         -> Qubit VoiceBridge integration
         -> reviewed OpenClaw capability integration
@@ -42,10 +45,11 @@ executed source/module/process identity.
 - Fresh Hermes/OpenClaw clones: isolated sibling or temporary directories;
   never the operator’s existing installations
 
-The current checkout is dirty and must be preserved. The agent must build the
-new Hermes-derived foundation in a clean worktree, with a backup and rollback
-journal, and migrate it only after independent verification. Do not manually
-overwrite the current checkout.
+The current checkout must be preserved. The Qubit-owned Hermes fork is the
+approved foundation; the in-process cutover must make it the effective runtime
+behind the one existing Qubit listener. Any remaining compat path is a staged
+migration fallback, not the final backend. Keep backups and a rollback journal;
+never overwrite unrelated dirty work.
 
 ## Non-negotiable acceptance rules
 
@@ -70,15 +74,16 @@ The agent must:
 
 1. Pin and audit the exact Hermes and OpenClaw commits, licenses, notices,
    dependencies, tests, models, and optional integrations.
-2. Create the new Qubit foundation from the pinned Hermes source in a clean
-   worktree.
+2. Vendor the complete pinned Hermes source baseline into the Qubit-owned
+   foundation and make it executable from the packaged Qubit tree.
 3. Preserve Hermes’s supported documented capabilities unless a specific
    compatibility, platform, license, or security blocker is recorded.
 4. Rebrand user-facing Hermes surfaces as Qubit Agent.
 5. Integrate Qubit VoiceBridge as the only microphone, ASR, TTS, Right Ctrl,
    dashboard voice, session, cancellation, and barge-in path.
-6. Integrate OpenClaw capabilities marked `REUSE` or `ADAPT` through Qubit
-   contracts. Do not copy the entire OpenClaw repository blindly.
+6. Integrate every required OpenClaw capability through Qubit contracts. Do
+   not copy the entire OpenClaw repository blindly, but do not leave a required
+   capability as an external-only adapter.
 7. Keep Qubit broker, grants, confirmations, redaction, audit, resource
    limits, emergency stop, state, and rollback authoritative.
 8. Preserve configuration, memory, reports, models, audio settings, browser

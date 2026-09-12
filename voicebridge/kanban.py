@@ -716,15 +716,90 @@ def export(cfg: Any) -> Dict[str, Any]:
         conn.close()
 
 
+def _validate_snapshot(snapshot: Dict[str, Any]) -> None:
+    """Reject a malformed snapshot BEFORE any row is deleted or rewritten.
+
+    Recovery contract: validation is all-or-nothing. Unknown schema, a slug
+    that violates the canonical board form, a task status/priority outside
+    the closed sets, an oversized title/body/comment, a task pointing at a
+    board absent from the snapshot, or a comment pointing at an absent task
+    raise a typed ``KANBAN_BAD_INPUT`` before the transaction starts, so a
+    bad import can never leave the store partially restored."""
+    if not isinstance(snapshot, dict) or snapshot.get("schema") != SCHEMA:
+        raise KanbanError(BAD_INPUT_CODE, "snapshot has an unknown schema")
+    boards = snapshot.get("boards", [])
+    tasks = snapshot.get("tasks", [])
+    comments = snapshot.get("comments", [])
+    events = snapshot.get("events", [])
+    if not isinstance(boards, list) or len(boards) > MAX_BOARDS:
+        raise KanbanError(BAD_INPUT_CODE,
+                          f"snapshot boards must be a list of <= {MAX_BOARDS}")
+    slugs = set()
+    for b in boards:
+        if not isinstance(b, dict):
+            raise KanbanError(BAD_INPUT_CODE,
+                              "snapshot board must be an object")
+        slug = str(b.get("slug", ""))
+        if not _BOARD_RE.match(slug):
+            raise KanbanError(BAD_INPUT_CODE,
+                              f"bad board slug in snapshot: {slug!r}")
+        if slug in slugs:
+            raise KanbanError(BAD_INPUT_CODE,
+                              f"duplicate board slug in snapshot: {slug!r}")
+        slugs.add(slug)
+        if len(str(b.get("name", "") or "")) > MAX_TITLE_LEN:
+            raise KanbanError(BAD_INPUT_CODE, "snapshot board name too long")
+    if not isinstance(tasks, list):
+        raise KanbanError(BAD_INPUT_CODE, "snapshot tasks must be a list")
+    if not isinstance(comments, list) or not isinstance(events, list):
+        raise KanbanError(BAD_INPUT_CODE,
+                          "snapshot comments/events must be lists")
+    task_ids = set()
+    for t in tasks:
+        if not isinstance(t, dict):
+            raise KanbanError(BAD_INPUT_CODE, "snapshot task must be an object")
+        if str(t.get("board", "")) not in slugs:
+            raise KanbanError(
+                BAD_INPUT_CODE,
+                f"snapshot task references unknown board {t.get('board')!r}")
+        if t.get("status") not in STATUSES:
+            raise KanbanError(
+                BAD_INPUT_CODE, f"bad task status in snapshot: {t.get('status')!r}")
+        if str(t.get("priority", "normal")) not in PRIORITIES:
+            raise KanbanError(
+                BAD_INPUT_CODE,
+                f"bad task priority in snapshot: {t.get('priority')!r}")
+        title = str(t.get("title", "") or "")
+        if not title.strip() or len(title) > MAX_TITLE_LEN:
+            raise KanbanError(BAD_INPUT_CODE,
+                              "snapshot task title must be 1..200 chars")
+        if len(str(t.get("body", "") or "")) > MAX_BODY_LEN:
+            raise KanbanError(BAD_INPUT_CODE, "snapshot task body too long")
+        if t.get("id") is not None:
+            task_ids.add(t.get("id"))
+    for c in comments:
+        if not isinstance(c, dict) or c.get("task_id") not in task_ids:
+            raise KanbanError(BAD_INPUT_CODE,
+                              "snapshot comment references an unknown task")
+        if len(str(c.get("body", "") or "")) > MAX_COMMENT_LEN:
+            raise KanbanError(BAD_INPUT_CODE, "snapshot comment too long")
+    for e in events:
+        if not isinstance(e, dict) or not str(e.get("kind", "") or ""):
+            raise KanbanError(BAD_INPUT_CODE, "snapshot event needs a kind")
+
+
 def import_snapshot(cfg: Any, snapshot: Dict[str, Any], *,
                     requested_by: str = "cli:user",
                     confirmed: bool = False) -> Dict[str, Any]:
-    """Restore a snapshot (auto-backup first; the rollback mechanism)."""
+    """Restore a snapshot (auto-backup first; the rollback mechanism).
+
+    The snapshot is fully validated before the first delete, then applied
+    inside one ``BEGIN IMMEDIATE`` transaction: any failure rolls back to
+    the pre-import store, so an import is always all-or-nothing."""
     if not confirmed:
         raise KanbanError(CONFIRM_CODE,
                           "kanban import requires explicit --confirm")
-    if not isinstance(snapshot, dict) or snapshot.get("schema") != SCHEMA:
-        raise KanbanError(BAD_INPUT_CODE, "snapshot has an unknown schema")
+    _validate_snapshot(snapshot)
     conn = _connect(cfg)
     try:
         _migrate(conn)
@@ -736,38 +811,43 @@ def import_snapshot(cfg: Any, snapshot: Dict[str, Any], *,
         if len(payload) > 20_000_000:
             raise KanbanError(BAD_INPUT_CODE, "snapshot too large (20MB cap)")
         backup = export(cfg)["snapshot"]
-        conn.execute("DELETE FROM events")
-        conn.execute("DELETE FROM comments")
-        conn.execute("DELETE FROM tasks")
-        conn.execute("DELETE FROM boards")
-        for b in snapshot.get("boards", []):
-            conn.execute("INSERT INTO boards(slug, name, project_slug,"
-                         " created_at) VALUES(?,?,?,?)",
-                         (b["slug"], b["name"], b.get("project_slug"),
-                          b.get("created_at", _now())))
-        for t in snapshot.get("tasks", []):
-            if t.get("status") not in STATUSES:
-                raise KanbanError(BAD_INPUT_CODE,
-                                  f"bad task status in snapshot: {t.get('status')!r}")
-            conn.execute("INSERT INTO tasks(id, board, title, body, status,"
-                         " assignee, priority, created_at, updated_at)"
-                         " VALUES(?,?,?,?,?,?,?,?,?)",
-                         (t.get("id"), t["board"], t["title"],
-                          t.get("body", ""), t["status"], t.get("assignee"),
-                          t.get("priority", "normal"),
-                          t.get("created_at", _now()),
-                          t.get("updated_at", _now())))
-        for c in snapshot.get("comments", []):
-            conn.execute("INSERT INTO comments(id, task_id, author, body,"
-                         " created_at) VALUES(?,?,?,?,?)",
-                         (c.get("id"), c["task_id"], c.get("author", ""),
-                          c["body"], c.get("created_at", _now())))
-        for e in snapshot.get("events", []):
-            conn.execute("INSERT INTO events(id, task_id, kind, detail,"
-                         " created_at) VALUES(?,?,?,?,?)",
-                         (e.get("id"), e["task_id"], e["kind"],
-                          e.get("detail", ""), e.get("created_at", _now())))
-        conn.commit()
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            conn.execute("DELETE FROM events")
+            conn.execute("DELETE FROM comments")
+            conn.execute("DELETE FROM tasks")
+            conn.execute("DELETE FROM boards")
+            for b in snapshot.get("boards", []):
+                conn.execute("INSERT INTO boards(slug, name, project_slug,"
+                             " created_at) VALUES(?,?,?,?)",
+                             (b["slug"], b["name"], b.get("project_slug"),
+                              b.get("created_at", _now())))
+            for t in snapshot.get("tasks", []):
+                conn.execute("INSERT INTO tasks(id, board, title, body, status,"
+                             " assignee, priority, created_at, updated_at)"
+                             " VALUES(?,?,?,?,?,?,?,?,?)",
+                             (t.get("id"), t["board"], t["title"],
+                              t.get("body", ""), t["status"], t.get("assignee"),
+                              t.get("priority", "normal"),
+                              t.get("created_at", _now()),
+                              t.get("updated_at", _now())))
+            for c in snapshot.get("comments", []):
+                conn.execute("INSERT INTO comments(id, task_id, author, body,"
+                             " created_at) VALUES(?,?,?,?,?)",
+                             (c.get("id"), c["task_id"], c.get("author", ""),
+                              c["body"], c.get("created_at", _now())))
+            for e in snapshot.get("events", []):
+                conn.execute("INSERT INTO events(id, task_id, kind, detail,"
+                             " created_at) VALUES(?,?,?,?,?)",
+                             (e.get("id"), e["task_id"], e["kind"],
+                              e.get("detail", ""), e.get("created_at", _now())))
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except sqlite3.Error:
+                pass
+            raise
         _audit("import", requested_by,
                {"boards": len(snapshot.get("boards", [])),
                 "tasks": len(snapshot.get("tasks", []))})
@@ -784,11 +864,29 @@ def import_snapshot(cfg: Any, snapshot: Dict[str, Any], *,
 
 
 def refuse_delegated(subcommand: str) -> Dict[str, Any]:
-    """Typed refusal for execution-shaped subcommands (nothing started)."""
+    """Typed delegation notice for execution-shaped subcommands.
+
+    Nothing is ever started here: each known subcommand names the Qubit
+    authority that owns it. An unknown subcommand returns the same typed
+    ``KANBAN_DELEGATED`` state (never an untyped ``KeyError``) and lists the
+    known set so CLI and dashboard dispatch stay equivalent."""
+    name = str(subcommand or "").strip()
+    reason = DELEGATED.get(name)
+    if reason is None:
+        return {"state": "DELEGATED", "code": DELEGATED_CODE,
+                "subcommand": name,
+                "explanation": "Qubit Agent cannot do this here: "
+                               f"`kanban {name or '<subcommand>'}` is not a "
+                               "Qubit board operation; execution-shaped work "
+                               "goes through the Qubit broker/scheduler. "
+                               f"Known delegated subcommands: "
+                               f"{', '.join(sorted(DELEGATED))}.",
+                "known_subcommands": sorted(DELEGATED),
+                "owner": "qubit-policy",
+                "rollback": "nothing started; nothing to roll back"}
     return {"state": "DELEGATED", "code": DELEGATED_CODE,
-            "subcommand": subcommand,
-            "explanation": "Qubit Agent cannot do this here: "
-                           + DELEGATED[subcommand],
+            "subcommand": name,
+            "explanation": "Qubit Agent cannot do this here: " + reason,
             "owner": "qubit-policy",
             "rollback": "nothing started; nothing to roll back"}
 
@@ -830,12 +928,18 @@ def refuse_estop(operation: str) -> Dict[str, Any]:
 # redaction contracts, same backend for CLI, dashboard, and voice.
 
 WIDGET_KINDS = ("note", "text", "tasks", "stats", "links", "link",
-                "html", "svg")
+                "html", "svg", "plugin")
 # Markup kinds are stored verbatim as INERT content: the backend never
 # renders or executes them; callers get an explicit trust marker and the
 # dashboard must render them inside a sandbox (or not at all). The other
-# kinds keep the existing active-markup stripping.
+# kinds keep the existing active-markup stripping. ``plugin`` is a
+# JSON-descriptor kind: validated against a closed key set, stored inert,
+# and only accepted when the widget declares the review-only
+# ``plugin:read`` grant (declaring it never grants execution).
 WIDGET_MARKUP_KINDS = ("html", "svg")
+WIDGET_PLUGIN_KIND = "plugin"
+WIDGET_PLUGIN_KEYS = ("name", "version", "props")
+_PLUGIN_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 WIDGET_TITLE_LEN = 200
 WIDGET_CONTENT_LEN = 4000
 WIDGET_MARKUP_LEN = 8000
@@ -847,7 +951,7 @@ WIDGET_MAX_PER_BOARD = 64
 # from this closed allow-list. They are recorded for review, never granted
 # at runtime, so declaring one cannot widen access.
 WIDGET_GRANT_TOKENS = ("note:read", "tasks:read", "stats:read",
-                       "links:read", "link:open")
+                       "links:read", "link:open", "plugin:read")
 WIDGET_DECLARED_GRANTS_MAX = 16
 LAYOUT_MAX_COLS = 6
 SNAPSHOTS_KEPT = 20
@@ -965,7 +1069,7 @@ def _widget_dict(row: sqlite3.Row) -> Dict[str, Any]:
     kind = row["kind"]
     tab = (row["tab"] if "tab" in keys else None) or DEFAULT_TAB_SLUG
     grants = _parse_grants(row["grants"] if "grants" in keys else None)
-    inert = kind in WIDGET_MARKUP_KINDS
+    inert = kind in WIDGET_MARKUP_KINDS or kind == WIDGET_PLUGIN_KIND
     out = {"id": row["id"], "board": row["board"], "kind": kind,
            "title": redact_spec(row["title"]),
            "content": redact_spec(row["content"]),
@@ -989,11 +1093,62 @@ def _check_widget_kind(kind: str) -> str:
 
 
 def _widget_content_cap(kind: str) -> int:
-    if kind in WIDGET_MARKUP_KINDS:
+    if kind in WIDGET_MARKUP_KINDS or kind == WIDGET_PLUGIN_KIND:
         return WIDGET_MARKUP_LEN
     if kind == "link":
         return WIDGET_URL_LEN
     return WIDGET_CONTENT_LEN
+
+
+def _check_plugin_content(text: str) -> str:
+    """Validate a plugin widget descriptor: inert JSON, closed key set.
+
+    The descriptor is persisted verbatim and never executed or imported
+    by the backend; only ``name`` (a safe slug), optional ``version``, and
+    an optional ``props`` object are accepted so a hostile descriptor can
+    never smuggle code, URLs, or unknown behavior contracts."""
+    raw = (text or "").strip()
+    if not raw:
+        raise KanbanError(BAD_INPUT_CODE,
+                          "plugin widget needs a JSON descriptor")
+    if len(raw) > WIDGET_MARKUP_LEN:
+        raise KanbanError(BAD_INPUT_CODE,
+                          f"plugin descriptor must be <={WIDGET_MARKUP_LEN}"
+                          " chars")
+    try:
+        obj = json.loads(raw)
+    except (TypeError, ValueError):
+        raise KanbanError(BAD_INPUT_CODE,
+                          "plugin descriptor must be valid JSON") from None
+    if not isinstance(obj, dict):
+        raise KanbanError(BAD_INPUT_CODE,
+                          "plugin descriptor must be a JSON object")
+    extra = set(obj) - set(WIDGET_PLUGIN_KEYS)
+    if extra:
+        raise KanbanError(BAD_INPUT_CODE,
+                          "plugin descriptor keys must be within "
+                          f"{list(WIDGET_PLUGIN_KEYS)} (got {sorted(extra)})")
+    name = str(obj.get("name", "") or "").strip().lower()
+    if not _PLUGIN_NAME_RE.match(name):
+        raise KanbanError(BAD_INPUT_CODE,
+                          "plugin descriptor needs a safe 'name' slug")
+    props = obj.get("props")
+    if props is not None and not isinstance(props, dict):
+        raise KanbanError(BAD_INPUT_CODE,
+                          "plugin descriptor 'props' must be an object")
+    clean = {"name": name}
+    if "version" in obj:
+        version = str(obj.get("version", "") or "").strip()
+        if len(version) > 40:
+            raise KanbanError(BAD_INPUT_CODE,
+                              "plugin descriptor version too long")
+        clean["version"] = version
+    if props is not None:
+        if len(json.dumps(props)) > WIDGET_CONTENT_LEN:
+            raise KanbanError(BAD_INPUT_CODE,
+                              "plugin descriptor props too large")
+        clean["props"] = props
+    return json.dumps(clean, sort_keys=True, separators=(",", ":"))
 
 
 def _check_link_url(text: str) -> str:
@@ -1375,15 +1530,23 @@ def widget_add(cfg: Any, board: str = "main", kind: str = "",
     if len(body) > cap:
         raise KanbanError(BAD_INPUT_CODE,
                           f"content must be <={cap} chars for {clean_kind!r}")
+    grants = _check_declared_grants(declared_grants)
     if clean_kind == "link":
         body = _check_link_url(body)
+        scrubbed = {"content": body, "removed": 0, "sanitized": False}
+    elif clean_kind == WIDGET_PLUGIN_KIND:
+        if "plugin:read" not in grants:
+            raise KanbanError(DENIED_CODE,
+                              "plugin widget requires the declared "
+                              "'plugin:read' grant (review-only; adds no "
+                              "execution capability)")
+        body = _check_plugin_content(body)
         scrubbed = {"content": body, "removed": 0, "sanitized": False}
     elif clean_kind in WIDGET_MARKUP_KINDS:
         # Inert markup: persisted verbatim, never executed server-side.
         scrubbed = {"content": body, "removed": 0, "sanitized": False}
     else:
         scrubbed = sanitize_widget_content(body)
-    grants = _check_declared_grants(declared_grants)
     conn = _connect(cfg)
     try:
         _migrate(conn)
@@ -1417,7 +1580,8 @@ def widget_add(cfg: Any, board: str = "main", kind: str = "",
         _audit("canvas.widget_add", requested_by,
                {"board": slug, "widget_id": cur.lastrowid,
                 "kind": clean_kind, "tab": tab_slug or DEFAULT_TAB_SLUG,
-                "inert": clean_kind in WIDGET_MARKUP_KINDS,
+                "inert": clean_kind in WIDGET_MARKUP_KINDS
+                or clean_kind == WIDGET_PLUGIN_KIND,
                 "sanitized": scrubbed["sanitized"]})
         row = conn.execute("SELECT * FROM canvas_widgets WHERE id=?",
                            (cur.lastrowid,)).fetchone()
@@ -1457,6 +1621,33 @@ def widget_list(cfg: Any, board: str = "main",
             + " ORDER BY y, x, id", params).fetchall()
         return {"state": "OK", "board": slug, "tab": tab or "",
                 "widgets": [_widget_dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+
+def show_widget(cfg: Any, widget_id: int) -> Dict[str, Any]:
+    """Return one canvas widget plus its inert render contract (read-only).
+
+    This is the backend the ``show_widget`` agent/dashboard surface calls:
+    it never renders, executes, fetches, or mutates anything — it returns
+    the redacted widget, an explicit ``trust`` marker, and the sandbox the
+    caller must use (``inert-html`` for markup/plugin widgets, else
+    ``plain-text``). Reads stay available while the emergency stop is
+    latched, matching every other read path on this store."""
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _migrate_canvas(conn)
+        row = conn.execute("SELECT * FROM canvas_widgets WHERE id=?",
+                           (int(widget_id),)).fetchone()
+        if row is None:
+            raise KanbanError(NOT_FOUND_CODE, f"no widget #{widget_id}")
+        out = _widget_dict(row)
+        return {"state": "OK", "widget": out,
+                "render": {"kind": out["kind"], "trust": out["trust"],
+                           "executable": False,
+                           "sandbox": ("inert-html" if out["inert"]
+                                       else "plain-text")}}
     finally:
         conn.close()
 

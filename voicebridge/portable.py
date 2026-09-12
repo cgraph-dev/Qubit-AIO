@@ -469,9 +469,21 @@ def restore_state(cfg: Any, payload: Dict[str, Any], *, dry_run: bool) -> Dict[s
         if plan.backup_dir and plan.backup_dir.exists():
             for name in ("memory", "learning.jsonl", "reports", "shared_memory.jsonl"):
                 bak = plan.backup_dir / name
-                if not bak.exists():
-                    continue
                 src = plan.target_state / name
+                if not bak.exists():
+                    # The path did not exist before the restore: rolling back
+                    # means removing whatever the failed restore created, or
+                    # the store would silently keep a partial restore.
+                    if not src.exists():
+                        continue
+                    try:
+                        if src.is_dir():
+                            shutil.rmtree(src)
+                        else:
+                            src.unlink()
+                    except OSError as rb_exc:
+                        rollback_failures.append(f"{src}: {str(rb_exc)[:120]}")
+                    continue
                 try:
                     if bak.is_dir():
                         if src.exists():

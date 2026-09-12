@@ -42,6 +42,9 @@ NOT_FOUND_CODE = "GW_NOT_FOUND"
 EXISTS_CODE = "GW_EXISTS"
 BAD_INPUT_CODE = "GW_BAD_INPUT"
 NO_SUPERVISION_CODE = "GATEWAY_NO_SUPERVISION"
+SUPERVISION_CAPABILITY = "gateway.supervise"
+SUPERVISION_PENDING_CODE = "GATEWAY_SUPERVISION_APPROVAL_REQUIRED"
+SUPERVISION_DENIED_CODE = "GATEWAY_SUPERVISION_DENIED"
 NO_CREDENTIAL_CODE = "PEER_NO_CREDENTIAL"
 UPSTREAM_CODE = "PEER_UPSTREAM"
 CORRUPT_CODE = "GW_STORE_CORRUPT"
@@ -276,19 +279,219 @@ def gateway_link(cfg: Any, gw_id: str) -> Dict[str, Any]:
     last = rec.get("last_outcome", "NEVER_USED")
     return {"state": "LINKED" if last in ("NEVER_USED", "DELIVERED") else "DEGRADED",
             "gateway": rec["id"], "provider": rec["provider"],
-            "channel": rec["channel"], "last_outcome": last}
+            "channel": rec["channel"], "last_outcome": last,
+            "supervision": _supervision_public(rec)}
 
 
 def refuse_supervision(action: str) -> Dict[str, Any]:
     """Typed refusal for gateway process control (single event path)."""
     return {"state": "REFUSED", "code": NO_SUPERVISION_CODE, "action": action,
-            "explanation": "Qubit Agent cannot do this: gateway processes "
-                           "are supervised by the operator (service "
+            "explanation": "Qubit Agent cannot do this: external gateway "
+                           "daemons are supervised by the operator (service "
                            "approval); Qubit runs exactly one event path — "
-                           "the bridge itself. Records, enrollment, and "
-                           "link state stay available.",
+                           "the bridge itself, whose approval-gated lifecycle "
+                           "is `gateway supervision-request`. Records, "
+                           "enrollment, and link state stay available.",
             "owner": "qubit-policy",
             "rollback": "no process touched; nothing to roll back"}
+
+
+_SUPERVISION_ACTIONS = ("start", "stop", "restart", "install", "run")
+# Qubit supervises exactly one process: the in-process bridge event path.
+# "start"-family actions mark the bridge supervised only after an operator
+# approval or a live broker grant; "stop" returns it to operator-managed.
+SUPERVISED_PROCESS = "SUPERVISED"
+
+
+def _approval_authorizes(cfg: Any, approval_id: str) -> bool:
+    cid = str(approval_id or "").strip()
+    if not cid:
+        return False
+    try:
+        from .approvals import COMPLETE, EXECUTING, ApprovalJournal
+
+        item = ApprovalJournal(
+            Path(cfg.state_dir()) / "approvals.jsonl").get(cid)
+        if item is None or item.decision != "approve":
+            return False
+        if item.state not in (EXECUTING, COMPLETE):
+            return False
+        return item.capability in (SUPERVISION_CAPABILITY, "gateway.manage")
+    except Exception:
+        return False
+
+
+def _grant_authorizes(cfg: Any) -> bool:
+    try:
+        from .permissions import permissions_store
+
+        return any(g.capability == SUPERVISION_CAPABILITY and g.is_active()
+                   for g in permissions_store(cfg).grants())
+    except Exception:
+        return False
+
+
+def _supervision_authorized(cfg: Any, approval_id: str) -> bool:
+    """A live broker grant OR a durable human approval authorizes the path."""
+    return _grant_authorizes(cfg) or _approval_authorizes(cfg, approval_id)
+
+
+def _supervision_public(rec: Dict[str, Any]) -> Dict[str, Any]:
+    last = rec.get("last_supervision") or {}
+    return {"gateway": rec["id"], "process": rec.get("process", "UNMANAGED"),
+            "supervised_at": rec.get("supervised_at"),
+            "action": last.get("action", ""),
+            "previous": last.get("previous", "UNMANAGED"),
+            "approval_id": last.get("approval_id", "")}
+
+
+def supervision_status(cfg: Any, gw_id: str) -> Dict[str, Any]:
+    """Read-only supervised-process policy state for one gateway record."""
+    try:
+        rec = _get_gw(_load(cfg), gw_id)
+    except GatewayError as exc:
+        return {"state": "NO_GATEWAY", "code": exc.code,
+                "detail": exc.detail[:160]}
+    return {"state": "OK", **_supervision_public(rec),
+            "authorized": _supervision_authorized(cfg, ""),
+            "capability": SUPERVISION_CAPABILITY,
+            "authority": "one supervised event path; no second listener"}
+
+
+def supervision_request(cfg: Any, gw_id: str, action: str, *,
+                        approval_id: str = "",
+                        requested_by: str = "cli:user",
+                        confirmed: bool = False) -> Dict[str, Any]:
+    """Request a supervised bridge lifecycle transition (approval-gated).
+
+    With no live grant or durable approval this creates a broker approval
+    and returns ``APPROVAL_REQUIRED`` — no process or record is touched.
+    Once authorized it performs a real, audited, revertible state change on
+    the single bridge event path (never a second server)."""
+    if estop_engaged(cfg):
+        raise GatewayError(ESTOP_CODE, "emergency stop is latched")
+    if not confirmed:
+        raise GatewayError(CONFIRM_CODE,
+                           "gateway supervision requires explicit --confirm")
+    clean = str(action or "").strip().lower()
+    if clean not in _SUPERVISION_ACTIONS:
+        raise GatewayError(BAD_INPUT_CODE,
+                           f"action must be one of {_SUPERVISION_ACTIONS}")
+    state = _load(cfg)
+    rec = _get_gw(state, gw_id)
+    if not _supervision_authorized(cfg, approval_id):
+        from .approvals import ApprovalJournal
+
+        item = ApprovalJournal(
+            Path(cfg.state_dir()) / "approvals.jsonl").create(
+                SUPERVISION_CAPABILITY,
+                f"gateway {clean} {rec['id']}",
+                gateway=rec["id"], action=clean)
+        _audit("supervision.request", requested_by,
+               {"gateway": rec["id"], "action": clean, "approval": item.id})
+        return {"state": "APPROVAL_REQUIRED",
+                "code": SUPERVISION_PENDING_CODE, "gateway": rec["id"],
+                "action": clean, "approval_id": item.id,
+                "detail": "approve the journal entry, then re-run with "
+                          "--approval-id (or issue a gateway.supervise "
+                          "grant); no process was touched",
+                "owner": "qubit-policy",
+                "rollback": "no process touched; nothing to roll back"}
+    previous = rec.get("process", "UNMANAGED")
+    if clean == "stop":
+        rec["process"] = "UNMANAGED"
+    else:
+        rec["process"] = SUPERVISED_PROCESS
+        rec["supervised_at"] = _now()
+        rec["supervisor"] = "qubit-bridge"
+    rec["last_supervision"] = {"action": clean, "at": _now(),
+                               "by": requested_by, "previous": previous,
+                               "approval_id": str(approval_id or "")}
+    state["gateways"][rec["id"]] = rec
+    _save(cfg, state)
+    _audit("supervision", requested_by,
+           {"gateway": rec["id"], "action": clean,
+            "process": rec["process"]})
+    return {"state": "OK", **_supervision_public(rec),
+            "rollback": "`qubit gateway supervision-revert` restores the "
+                        "previous process state"}
+
+
+def supervision_revert(cfg: Any, gw_id: str, *,
+                       requested_by: str = "cli:user",
+                       confirmed: bool = False) -> Dict[str, Any]:
+    """Recovery: restore the pre-supervision process state (confirmed)."""
+    if estop_engaged(cfg):
+        raise GatewayError(ESTOP_CODE, "emergency stop is latched")
+    if not confirmed:
+        raise GatewayError(CONFIRM_CODE,
+                           "supervision revert requires explicit --confirm")
+    state = _load(cfg)
+    rec = _get_gw(state, gw_id)
+    last = rec.get("last_supervision") or {}
+    previous = last.get("previous")
+    if previous not in ("UNMANAGED", SUPERVISED_PROCESS):
+        raise GatewayError(NOT_FOUND_CODE,
+                           f"no supervision receipt for {gw_id!r} to revert")
+    rec["process"] = previous
+    rec["supervised_at"] = None
+    rec["last_supervision"] = {"action": "revert", "at": _now(),
+                               "by": requested_by, "previous": previous,
+                               "approval_id": ""}
+    state["gateways"][rec["id"]] = rec
+    _save(cfg, state)
+    _audit("supervision.revert", requested_by,
+           {"gateway": rec["id"], "process": previous})
+    return {"state": "OK", **_supervision_public(rec),
+            "detail": "restored the pre-supervision process state"}
+
+
+def discovery(cfg: Any) -> Dict[str, Any]:
+    """Gateway/peer discovery for the dashboard + marketplace surfaces.
+
+    Read-only: enumerates recorded gateways/peers with live link state and
+    the recognized provider connectors, each typed honestly. Remote
+    marketplace fetches stay refused by policy (pinned-source)."""
+    try:
+        state = _load(cfg)
+    except GatewayError as exc:
+        return {"state": "DEGRADED", "code": exc.code,
+                "detail": exc.detail[:200], "gateways": [], "peers": [],
+                "providers": []}
+    gateways = []
+    for rec in sorted(state["gateways"].values(),
+                      key=lambda r: r.get("id", "")):
+        link = gateway_link(cfg, rec["id"])
+        gateways.append({"id": rec["id"], "provider": rec.get("provider", ""),
+                         "channel": rec.get("channel", ""),
+                         "process": rec.get("process", "UNMANAGED"),
+                         "link": link.get("state", "UNKNOWN")})
+    peers = []
+    for rec in sorted(state["peers"].values(), key=lambda r: r.get("id", "")):
+        link = peer_link(cfg, rec["id"])
+        peers.append({"id": rec["id"], "url": _redact(rec.get("url", ""))[:160],
+                      "link": link.get("state", "UNKNOWN")})
+    providers = []
+    try:
+        from . import messaging as MG
+
+        accounts = MG.account_list(cfg).get("accounts", [])
+        configured = {str(a.get("provider", "")) for a in accounts}
+        for provider in MG.PROVIDERS:
+            providers.append({"provider": provider,
+                              "configured": provider in configured,
+                              "transport": "live" if provider in
+                              ("slack", "whatsapp-cloud") else "UNAVAILABLE"})
+    except Exception as exc:
+        providers = [{"provider": "?", "configured": False,
+                      "transport": f"DEGRADED: {_redact(str(exc))[:120]}"}]
+    return {"state": "OK", "schema": SCHEMA, "gateways": gateways,
+            "peers": peers, "providers": providers,
+            "marketplace": "remote plugin/marketplace fetches are refused "
+                           "by pinned-source policy; local reviewed plugins "
+                           "only",
+            "authority": "read-only discovery; availability is not "
+                         "authorization"}
 
 
 # ---------------------------------------------------------------- peers

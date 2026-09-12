@@ -5,6 +5,13 @@ only becomes VERIFIED through an explicit OWNER verdict (there is no
 self-verification path). Also negative (observed-failure) records, dedup on
 verify (a verified near-duplicate reinforces), reinforcement, quarantine on
 failure/revocation, and pin/unpin.
+
+Owner-gated operations (verdict/pin/unpin/remove/reinforce-failure) require a
+canonical confirmed-human principal (``HUMAN_REQUESTERS``): the CLI passes
+``"user"`` and the voice/dashboard backends pass ``"<channel>:user"``
+(``"voice:user"`` / ``"dashboard:user"``). Tool, agent, and model principals
+are refused with ``CONFIRMATION_SOURCE_FORBIDDEN`` — there is no
+self-verification path.
 """
 from __future__ import annotations
 
@@ -18,7 +25,7 @@ from ._models import (COST_CHEAP, KIND_NEGATIVE, KIND_POSITIVE,
                       ST_REFUTED, ST_VERIFIED, TIER_HOT, TRUST_OBSERVED,
                       TRUST_TOOL, TRUSTS, VerifiedSkillError, _EMBEDDER_VERSION,
                       acceptance_strength, bound, cosine, digest,
-                      recipe_embedding, utility_score)
+                      is_human_requester, recipe_embedding, utility_score)
 from ._models import SkillProposal, SkillRecord
 from ._persist import PersistMixin
 
@@ -113,7 +120,7 @@ class LifecycleMixin(PersistMixin):
 
     def apply_verdict(self, skill_id: str, *, decision: str,
                       requested_by: str, reason: str = "") -> SkillRecord:
-        if requested_by != "user":
+        if not is_human_requester(requested_by):
             raise VerifiedSkillError(
                 "only a human owner may issue a verify/refute verdict "
                 "(CONFIRMATION_SOURCE_FORBIDDEN)")
@@ -200,7 +207,7 @@ class LifecycleMixin(PersistMixin):
         if rec.status != ST_VERIFIED:
             raise VerifiedSkillError("only verified skills can be reinforced")
         if outcome == "failure":
-            if requested_by != "user":
+            if not is_human_requester(requested_by):
                 raise VerifiedSkillError(
                     "only a human may confirm a failure (no self-verification)")
             rec.status = ST_QUARANTINED
@@ -237,7 +244,7 @@ class LifecycleMixin(PersistMixin):
         return rec
 
     def pin(self, skill_id: str, *, requested_by: str) -> SkillRecord:
-        if requested_by != "user":
+        if not is_human_requester(requested_by):
             raise VerifiedSkillError("only a human may pin a skill")
         rec = self._get(skill_id)
         if rec is None:
@@ -254,7 +261,7 @@ class LifecycleMixin(PersistMixin):
         return rec
 
     def unpin(self, skill_id: str, *, requested_by: str) -> SkillRecord:
-        if requested_by != "user":
+        if not is_human_requester(requested_by):
             raise VerifiedSkillError("only a human may unpin a skill")
         rec = self._get(skill_id)
         if rec is None:
@@ -268,7 +275,7 @@ class LifecycleMixin(PersistMixin):
         return rec
 
     def remove(self, skill_id: str, *, requested_by: str) -> SkillRecord:
-        if requested_by != "user":
+        if not is_human_requester(requested_by):
             raise VerifiedSkillError("only a human may remove a skill")
         rec = self._get(skill_id)
         if rec is None:

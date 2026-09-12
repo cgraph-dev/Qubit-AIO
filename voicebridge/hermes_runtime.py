@@ -39,20 +39,51 @@ def manifest_path() -> Path:
     return _REPO_ROOT / "docs" / "QUBIT_HERMES_VENDOR_MANIFEST.json"
 
 
+def _cache_repo_tests_namespace() -> None:
+    """Cache the Qubit checkout's namespace ``tests`` package.
+
+    The fork ships a *regular* ``tests/__init__.py`` package; the Qubit
+    checkout's ``tests/`` has no ``__init__.py`` (a PEP 420 namespace package).
+    A regular package wins over a namespace portion regardless of ``sys.path``
+    order, so without this the fork's ``tests`` would shadow ``tests.<module>``
+    imports (e.g. ``from tests.test_webui_reports import _start``). Cache the
+    Qubit namespace before the fork root becomes importable.
+    """
+    import types
+    if "tests" in sys.modules:
+        return
+    repo_tests = _REPO_ROOT / "tests"
+    if not repo_tests.is_dir():
+        return
+    mod = types.ModuleType("tests")
+    mod.__path__ = [str(repo_tests)]  # type: ignore[attr-defined]
+    mod.__package__ = "tests"
+    sys.modules["tests"] = mod
+
+
 def ensure_path() -> Path:
-    """Idempotently put the fork root first on ``sys.path`` and return it.
+    """Idempotently put the fork root on ``sys.path`` and return it.
 
     The fork's modules are top-level (``hermes_cli``, ``agent``, ``tools``,
-    ``hermes_state`` …), so the fork root itself is the import root.
-    NOTE: the fork root also contains top-level ``tests/`` and ``tools/``
-    directories, so callers that only probe or run one command should use
+    ``hermes_state`` …), so the fork root itself is the import root. The fork
+    root also contains top-level ``docs/``, ``scripts/``, ``skills/`` and
+    ``tests/`` directories that collide with the Qubit checkout; the Qubit repo
+    root stays *ahead* of the fork root so Qubit's own packages win, and the
+    Qubit ``tests`` namespace is cached first (the fork ships a regular package
+    of the same name).
+    NOTE: callers that only probe or run one command should use
     :func:`run`/:func:`status`, which restore ``sys.path`` afterwards.
     """
     root = runtime_root()
     s = str(root)
     if s in sys.path:
         sys.path.remove(s)
-    sys.path.insert(0, s)
+    repo = str(_REPO_ROOT)
+    if repo in sys.path:
+        sys.path.insert(sys.path.index(repo) + 1, s)
+    else:
+        sys.path.insert(0, s)
+    _cache_repo_tests_namespace()
     return root
 
 

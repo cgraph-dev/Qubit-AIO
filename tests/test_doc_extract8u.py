@@ -213,3 +213,64 @@ def test_estop_fails_closed(tmp_path, monkeypatch):
     finally:
         store.set(emergency_stop=False, global_disable=False,
                   issued_by="cli:user")
+
+
+# --------------------------------------- OC-D20: zero-dependency PDF path
+def _synthetic_pdf(pages):
+    """Minimal content-stream PDF (uncompressed + FlateDecode variants)."""
+    out = bytearray(b"%PDF-1.4\n")
+    for number, (content, flate) in enumerate(pages, 1):
+        payload = content.encode("latin-1")
+        filt = b""
+        if flate:
+            import zlib
+            payload = zlib.compress(payload)
+            filt = b"/Filter /FlateDecode "
+        out += (f"{number} 0 obj<</Length {len(payload)} ".encode()
+                + filt + b">>stream\n")
+        out += payload + b"\nendstream\nendobj\n"
+    out += b"trailer<<>>\n%%EOF\n"
+    return bytes(out)
+
+
+def test_stdlib_pdf_backend_is_default(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    monkeypatch.setattr(DE, "PDF_BACKENDS", (("stdlib", "stdlib"),))
+    assert DE.pdf_backend() == "stdlib"
+    assert DE.status(cfg)["pdf"]["available"] is True
+
+
+def test_stdlib_pdf_extraction_and_pages(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    folder = _project(cfg, tmp_path)
+    raw = _synthetic_pdf([
+        ("BT /F1 12 Tf (Hello PDF 8U) Tj ET", False),
+        ("BT /F1 12 Tf (Second page token=deadbeef) Tj ET", True),
+    ])
+    (folder / "doc.pdf").write_bytes(raw)
+    monkeypatch.setattr(DE, "PDF_BACKENDS", (("stdlib", "stdlib"),))
+
+    out = DE.extract(cfg, str(folder / "doc.pdf"), confirmed=True)
+    assert out["kind"] == "pdf" and out["extractor"] == "stdlib"
+    assert out["page_count"] == 2
+    assert "Hello PDF 8U" in out["text"]
+    assert "Second page" in out["text"]
+    assert "deadbeef" not in out["text"]  # PDF text is redacted evidence
+    assert out["sha256"] == hashlib.sha256(raw).hexdigest()
+    assert out["trust"] == "untrusted-file-text"
+
+    one = DE.extract(cfg, str(folder / "doc.pdf"), page=2, confirmed=True)
+    assert "Second page" in one["text"] and "Hello" not in one["text"]
+    with pytest.raises(DE.DocExtractError) as exc:
+        DE.extract(cfg, str(folder / "doc.pdf"), page=9, confirmed=True)
+    assert exc.value.code == DE.BAD_INPUT_CODE
+
+
+def test_stdlib_pdf_requires_content_streams(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    folder = _project(cfg, tmp_path)
+    (folder / "empty.pdf").write_bytes(b"%PDF-1.4\nno streams here\n")
+    monkeypatch.setattr(DE, "PDF_BACKENDS", (("stdlib", "stdlib"),))
+    with pytest.raises(DE.DocExtractError) as exc:
+        DE.extract(cfg, str(folder / "empty.pdf"), confirmed=True)
+    assert exc.value.code == DE.BAD_INPUT_CODE

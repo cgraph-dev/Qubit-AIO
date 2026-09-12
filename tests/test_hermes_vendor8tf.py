@@ -86,18 +86,28 @@ def test_vendor_byte_identical_or_documented_patch():
                     f"undocumented hash mismatch in {q_root.name}: {rel}"
 
 
-def test_vendor_contains_no_qubit_edits():
-    """Vendored trees carry no Qubit branding/edits (overlay-only rule)."""
+def test_vendor_contains_no_undocumented_qubit_edits():
+    """Vendored trees carry no undocumented Qubit edits (overlay-only rule).
+
+    Owner-approved brand patches are permitted when the comparison manifest
+    records an exact patch + reason for the file; every other file must remain
+    upstream-clean. See docs/QUBIT_HERMES_CUTOVER_MIGRATION.md.
+    """
+    rows = _manifest_by_qubit()
     hits = []
     for _, q_root in VENDOR_PAIRS:
-        for p in _tree_files(q_root).values():
+        for rel, p in _tree_files(q_root).items():
+            qrel = f"{q_root.relative_to(REPO_ROOT).as_posix()}/{rel}"
+            row = rows.get(qrel) or {}
+            if row.get("patch") and row.get("reason"):
+                continue  # documented owner rebrand patch
             try:
                 text = p.read_text(encoding="utf-8", errors="strict")
             except (UnicodeDecodeError, OSError):
                 continue
             if "qubit" in text.lower():
                 hits.append(p.name)
-    assert not hits, f"Qubit edits leaked into vendored tree: {hits[:10]}"
+    assert not hits, f"Undocumented Qubit edits leaked into vendored tree: {hits[:10]}"
 
 
 def test_manifest_covers_every_upstream_file():

@@ -140,10 +140,14 @@ def test_plain_api_alias_ws_is_gated(server):
 
 
 def test_normal_get_to_real_route_still_works(server):
+    # Cutover stage 2: safe reads are served by the vendored Hermes backend,
+    # so /api/status carries the real Hermes status shape (version/overall),
+    # not the compat wrapper's `ok`. See docs/QUBIT_HERMES_CUTOVER_MIGRATION.md.
     status, ctype, body = _http(server, "GET", "/hermes/api/status")
     assert status == 200, (status, body[:200])
     assert "application/json" in ctype
-    assert json.loads(body)["ok"] is True
+    served = json.loads(body)
+    assert served.get("version") and "overall" in served, served
     status, _, body = _http(server, "GET", "/api/status")
     assert status == 200, (status, body[:200])
 

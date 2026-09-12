@@ -12,6 +12,10 @@ the registry keeps the shell permanently disarmed:
   screening (schema, hash, hostile markers; redacted echoes);
 * ``test`` — dry-run delivery plan (what WOULD match, findings) without
   executing anything and without writing audit events;
+* ``emit`` — the production core lifecycle entry point (OC-29/D23): session,
+  task, tool, plugin, and skill paths emit documented event types into the
+  registry; matching DISABLED subscriptions get a redacted ``hook.emitted``
+  broker audit event and a bounded emission receipt, and the shell never runs;
 * ``fire`` — manual, confirmed delivery through the broker audit path:
   appends a redacted ``hook.fired`` event for matching subscriptions and
   reports the shell as NOT executed (disarmed delivery); hash mismatch
@@ -25,6 +29,7 @@ Shell text is data for review, never an instruction.
 """
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import json
 import os
@@ -40,6 +45,37 @@ MAX_NAME_LEN = 64
 MAX_EVENT_LEN = 128
 MAX_SHELL_LEN = 4000
 MAX_FILE_BYTES = 1_000_000
+MAX_EMISSIONS = 200
+MAX_PAYLOAD_KEYS = 32
+
+# Documented core lifecycle events a Qubit caller may emit into the registry
+# (OpenClaw hooks event-types parity, execution stays disarmed).
+EVENT_TYPES = (
+    "session.started", "session.completed",
+    "task.started", "task.completed", "task.failed",
+    "tool.invoked", "tool.failed",
+    "plugin.invoked", "plugin.bound",
+    "skill.submitted", "skill.verified",
+    "agent.started", "agent.stopped",
+    "hook.error",
+)
+
+# Review-only authoring templates for the hooks Qubit ships "bundled"
+# (OpenClaw bundled-hooks parity, OC-D23). Metadata only: nothing is
+# auto-declared and the registry never executes a shell. ``bundled`` surfaces
+# them as starting points and ``doctor`` reports their names; a caller still
+# runs ``declare --confirm`` to create a review-only subscription.
+BUNDLED_HOOKS = (
+    {"name": "command-logger",
+     "description": "Record emitted lifecycle events to the broker audit log.",
+     "events": ("tool.invoked", "plugin.invoked"), "kind": "bundled"},
+    {"name": "session-notifier",
+     "description": "Surface session start/complete lifecycle notices.",
+     "events": ("session.started", "session.completed"), "kind": "bundled"},
+    {"name": "task-notifier",
+     "description": "Surface task completion/failure lifecycle notices.",
+     "events": ("task.completed", "task.failed"), "kind": "bundled"},
+)
 
 CONFIRM_CODE = "HOOK_CONFIRM_REQUIRED"
 ESTOP_CODE = "HOOK_ESTOP"
@@ -51,6 +87,7 @@ CORRUPT_CODE = "HOOK_STORE_CORRUPT"
 
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,63}$")
 _EVENT_RE = re.compile(r"^[a-z0-9][a-z0-9_.:-]{0,127}$")
+_EVENT_GLOB_RE = re.compile(r"^[a-z0-9*][a-z0-9_.:*-]{0,127}$")
 
 
 class HookError(Exception):
@@ -83,7 +120,7 @@ def _store_path(cfg: Any) -> Path:
 
 
 def _blank() -> Dict[str, Any]:
-    return {"schema": SCHEMA, "hooks": {}}
+    return {"schema": SCHEMA, "hooks": {}, "emissions": []}
 
 
 def _load(cfg: Any) -> Dict[str, Any]:
@@ -142,10 +179,21 @@ def _check_name(name: str) -> str:
 
 def _check_event(event: str) -> str:
     text = (event or "").strip().lower()
-    if not _EVENT_RE.match(text):
+    if text == "*":
+        return text
+    pattern = _EVENT_GLOB_RE if "*" in text else _EVENT_RE
+    if not pattern.match(text):
         raise HookError(BAD_INPUT_CODE,
-                        "event pattern must match ^[a-z0-9][a-z0-9_.:-]{0,127}$")
+                        "event pattern must match ^[a-z0-9][a-z0-9_.:-]{0,127}$ "
+                        "or a '*'-glob of the same shape")
     return text
+
+
+def _event_matches(pattern: str, event: str) -> bool:
+    """Exact match, ``fnmatch`` glob (``task.*``), or the ``*`` wildcard."""
+    if pattern == "*":
+        return True
+    return fnmatch.fnmatchcase(event, pattern)
 
 
 def _public(rec: Dict[str, Any]) -> Dict[str, Any]:
@@ -206,6 +254,19 @@ def list_hooks(cfg: Any) -> Dict[str, Any]:
     return {"state": "OK", "hooks": [_public(r) for r in recs]}
 
 
+def bundled() -> Dict[str, Any]:
+    """Qubit-bundled hook authoring templates (metadata only).
+
+    Mirrors OpenClaw's bundled hooks as review-only starting points: no
+    subscription is created and no shell is ever executed. Callers still use
+    ``declare(..., confirmed=True)`` to subscribe.
+    """
+    return {"state": "OK", "schema": SCHEMA,
+            "bundled": [dict(h) for h in BUNDLED_HOOKS],
+            "events_known": list(EVENT_TYPES),
+            "note": "templates only; `declare --confirm` to subscribe"}
+
+
 def show(cfg: Any, name: str) -> Dict[str, Any]:
     """Show one declaration (read-only, redacted preview)."""
     state = _load(cfg)
@@ -249,7 +310,8 @@ def fire(cfg: Any, event: str, *, requested_by: str = "cli:user",
     clean_event = _check_event(event)
     state = _load(cfg)
     matched = [r for r in state["hooks"].values()
-               if r.get("event") == clean_event and r.get("status") == "disabled"]
+               if _event_matches(r.get("event", ""), clean_event)
+               and r.get("status") == "disabled"]
     delivered = []
     for rec in matched:
         if _hash_shell(rec.get("shell", "")) != rec.get("content_hash"):
@@ -264,6 +326,62 @@ def fire(cfg: Any, event: str, *, requested_by: str = "cli:user",
     return {"state": "OK", "event": clean_event, "matched": sorted(delivered),
             "shell_executed": False,
             "delivery": "broker audit event only; shell never executes"}
+
+
+def emit(cfg: Any, event: str, *, payload: Dict[str, Any] | None = None,
+         requested_by: str = "core:lifecycle") -> Dict[str, Any]:
+    """Emit a real core lifecycle event into the hook registry (OC-29).
+
+    Production callers (session/task/plugin/skill paths) emit their lifecycle
+    events here. Matching DISABLED subscriptions receive a redacted
+    ``hook.emitted`` broker audit event and a bounded emission receipt is
+    persisted; the shell is *never* executed. Tampered subscriptions are
+    reported and skipped rather than raising into the caller. While the
+    emergency stop is latched emission is refused with a typed result.
+    """
+    clean_event = _check_event(event)
+    if estop_engaged(cfg):
+        return refuse_estop(f"hook emit {clean_event}")
+    raw_payload = payload if isinstance(payload, dict) else {}
+    keys = [str(k)[:64] for k in list(raw_payload)[:MAX_PAYLOAD_KEYS]]
+    state = _load(cfg)
+    matched = [r for r in state["hooks"].values()
+               if _event_matches(r.get("event", ""), clean_event)
+               and r.get("status") == "disabled"]
+    delivered: List[str] = []
+    tampered: List[str] = []
+    for rec in matched:
+        if _hash_shell(rec.get("shell", "")) != rec.get("content_hash"):
+            tampered.append(rec["name"])
+            from .logging_setup import log_event
+
+            try:
+                log_event("hook.error", actor=requested_by, hook=rec["name"],
+                          code=TAMPERED_CODE, match_event=clean_event)
+            except Exception:
+                pass
+            continue
+        from .logging_setup import log_event
+
+        try:
+            log_event("hook.emitted", actor=requested_by, hook=rec["name"],
+                      match_event=clean_event, shell_executed=False)
+        except Exception:
+            pass
+        delivered.append(rec["name"])
+    emissions = state.setdefault("emissions", [])
+    if not isinstance(emissions, list):
+        emissions = state["emissions"] = []
+    emissions.append({"event": clean_event, "matched": sorted(delivered),
+                      "tampered": sorted(tampered), "at": _now(),
+                      "by": requested_by, "payload_keys": sorted(keys)})
+    state["emissions"] = emissions[-MAX_EMISSIONS:]
+    _save(cfg, state)
+    return {"state": "OK", "event": clean_event,
+            "matched": sorted(delivered), "tampered": sorted(tampered),
+            "shell_executed": False, "payload_keys": sorted(keys),
+            "delivery": "core lifecycle event; broker audit only; shell never "
+                        "executes"}
 
 
 def revoke(cfg: Any, name: str, *, requested_by: str = "cli:user",
@@ -301,7 +419,11 @@ def doctor(cfg: Any) -> Dict[str, Any]:
                        "state": "OK" if intact else "TAMPERED",
                        "findings": _findings(rec.get("shell", ""))})
     overall = "OK" if all(r["state"] == "OK" for r in report) else "DEGRADED"
-    return {"state": overall, "hooks": report}
+    emissions = state.get("emissions", [])
+    return {"state": overall, "hooks": report,
+            "events_known": list(EVENT_TYPES),
+            "bundled_known": [h["name"] for h in BUNDLED_HOOKS],
+            "emissions": len(emissions) if isinstance(emissions, list) else 0}
 
 
 def estop_engaged(cfg: Any) -> bool:

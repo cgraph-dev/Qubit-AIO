@@ -18,6 +18,12 @@ The resulting Qubit tree must prove the pinned Hermes implementation and the
 required OpenClaw REUSE/ADAPT rows are actually integrated. This note does not
 change the scope of packets before 8T-F.
 
+For the current full-parity execution, the owner-directed architecture is
+defined by `docs/QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md`; its gap ledger and
+batched test/storage cadence take precedence over older packet-era execution
+habits. Do not run expensive full suites after every small edit, but do run all
+required final gates before verification.
+
 ## 1. Non-negotiable goals
 
 The agent must:

@@ -8,6 +8,11 @@ merely “Qubit can call an upstream assistant.” The target is one coherent
 Qubit-owned product whose runtime, CLI, dashboard, voice path, and OpenClaw
 capabilities do not depend on an exposed upstream assistant.
 
+The current owner-directed architecture and document precedence are recorded
+in [`QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md`](QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md).
+If older wording in this plan says to adapt only a subset of Hermes source,
+the approved complete pinned Hermes fork is authoritative.
+
 Reports that prove only an upstream subprocess, upstream chat turns, or a
 Qubit supervisor are reference evidence, not completion. They must not be used
 to claim that Qubit is a complete native product.
@@ -39,11 +44,13 @@ Qubit VoiceBridge
     └── launches or supervises a separate Hermes installation
 ```
 
-Pinned upstream source may be used as a build and differential-test reference,
-and legally permitted source units may be adapted into Qubit. The final
-product must execute the Qubit-owned runtime and must not launch or expose an
-external upstream assistant. A protocol-shaped worker, renamed banner, or
-supervised upstream installation is not the final product.
+The exact pinned Hermes source is the Qubit-owned runtime baseline under the
+approved runtime amendment. It must be present in the packaged Qubit tree and
+executed in-process by Qubit. Qubit patches, OpenClaw integrations, and policy
+overlays remain separately auditable. The pinned source is also used for
+differential testing, but an external Hermes installation must never be the
+normal runtime. A protocol-shaped worker, renamed banner, or supervised
+upstream installation is not the final product.
 
 ## 2. Canonical locations and names
 
@@ -60,9 +67,9 @@ supervised upstream installation is not the final product.
 
 ## 3. Non-negotiable rules
 
-1. Qubit must be the effective source and runtime foundation, informed by
-   pinned upstream audits and legally permitted adaptations, not a supervised
-   upstream backend.
+1. The complete pinned Hermes source must be the effective Qubit runtime
+   foundation, with Qubit and OpenClaw overlays behind Qubit policy—not a
+   supervised external upstream backend.
 2. The full Hermes capability inventory must be reconciled. Every capability
    is preserved, adapted, blocked with a written reason, or rejected with a
    written reason.
@@ -100,11 +107,15 @@ supervised upstream installation is not the final product.
 
 Gate: no unknown source, capability, license, or dependency remains.
 
-### Phase B — Build the Qubit-owned runtime foundation
+### Phase B — Build and activate the Qubit-owned Hermes runtime foundation
 
-- Create a clean Qubit worktree from the audited source material.
-- Adapt only the smallest legally permitted upstream units into Qubit-owned
-  modules and entry points.
+- Create or preserve a clean Qubit worktree from the audited source material.
+- Vendor the complete exact pinned Hermes source baseline into the Qubit-owned
+  source/package tree, retaining licenses and per-file provenance.
+- Apply Qubit patches and OpenClaw integrations as separately auditable
+  overlays behind Qubit contracts.
+- Make the fork the effective backend for CLI, dashboard, and VoiceBridge;
+  `hermes_compat` remains a migration fallback only.
 - Ensure Qubit modules/process/source paths execute from the Qubit installation.
 - Remove reliance on temporary external upstream paths and binaries.
 - Preserve supported behavior through differential tests against the pinned

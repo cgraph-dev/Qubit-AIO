@@ -22,6 +22,13 @@ a machine-readable per-file hash/patch manifest. Qubit backend, permission,
 audit, OpenClaw, accessibility, and branding changes must be explicit,
 reviewable overlays or patches over that baseline.
 
+The dashboard must be backed by the Qubit-owned pinned Hermes runtime described
+in `docs/QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md`. The existing compatibility
+server may serve as a staged migration fallback, but it is not the final
+authority for operations already implemented by the fork. CLI, dashboard, and
+VoiceBridge must reach the same backend operation; a Hermes-looking shell over
+the old compatibility layer is not dashboard parity.
+
 The current Talk page is only the front door. It must not be presented as the
 complete dashboard.
 

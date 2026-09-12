@@ -713,9 +713,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "82ffe1cfe23cfdaf1b15fb6e043090ce4f30e24e71115b7a9c2066d0c49a5f40",
       "qubit": "frontend/hermes-web/src/i18n/en.ts",
-      "qubit_sha256": "82ffe1cfe23cfdaf1b15fb6e043090ce4f30e24e71115b7a9c2066d0c49a5f40",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "3aa3d6cc59abde6458c2f85a3385228544d3b3f2c244b3d64bc241eaca18e43e",
+      "patch": "product-string rebrand: 'Update Hermes'/'Updating Hermes'/'Update Hermes?' -> Qubit; confirm text hermes->qubit (owner rebrand)",
+      "reason": "Qubit rebrand of product-facing English dashboard strings; translation keys unchanged."
     },
     {
       "scope": "hermes-agent/web",
@@ -1868,9 +1868,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "a919556cc0848f0fe7ca14ab33d253071615753c6711a74b06bf0bdab10105ff",
       "qubit": "frontend/hermes-web/src/pages/SessionsPage.tsx",
-      "qubit_sha256": "a919556cc0848f0fe7ca14ab33d253071615753c6711a74b06bf0bdab10105ff",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "58097bb32b0ad85e9c4861dd7c8483b7d8aae5aeb97240683e96d95b326e5562",
+      "patch": "hermes_flow source label 'Hermes Flow' -> 'Qubit Flow' (owner rebrand; no logic change)",
+      "reason": "Qubit rebrand of a product-facing session source label; the source id hermes_flow is unchanged for compatibility."
     },
     {
       "scope": "hermes-agent/web",

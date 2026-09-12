@@ -1,7 +1,7 @@
 {
   "name": "qubit-reports",
   "label": "Reports",
-  "description": "Activity event log, usage analytics, generated report bundles, and insights (same journal/analytics/reports backend as CLI and voice). Qubit-owned addition on the Hermes baseline.",
+  "description": "Activity event log, usage analytics, generated report bundles, and insights (same journal/analytics/reports backend as CLI and voice).",
   "icon": "file-text",
   "version": "1.0.0",
   "tab": {"path": "/reports", "position": "after:analytics"},

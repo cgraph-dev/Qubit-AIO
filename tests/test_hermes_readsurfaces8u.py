@@ -107,25 +107,31 @@ GATED = [
     ("GET", "/api/git/gh-auth", "GH_AUTH_OPERATOR"),
     ("GET", "/api/git/review/ship-info", "GIT_SHIP_GH_EXTERNAL"),
     ("POST", "/api/git/review/pr-list", "GIT_WRITE_BROKERED"),
-    ("POST", "/api/git/review/stage", "GIT_WRITE_BROKERED"),
-    ("POST", "/api/git/review/unstage", "GIT_WRITE_BROKERED"),
-    ("POST", "/api/git/review/revert", "GIT_WRITE_BROKERED"),
-    ("POST", "/api/git/review/commit", "GIT_WRITE_BROKERED"),
     ("POST", "/api/git/review/push", "GIT_WRITE_BROKERED"),
     ("POST", "/api/git/review/create-pr", "GIT_WRITE_BROKERED"),
-    ("POST", "/api/git/worktree/add", "GIT_WRITE_BROKERED"),
-    ("POST", "/api/git/worktree/remove", "GIT_WRITE_BROKERED"),
-    ("POST", "/api/git/branch/switch", "GIT_WRITE_BROKERED"),
     ("GET", "/api/media", "MEDIA_NOT_SERVED"),
     ("GET", "/api/files/download", "FILES_BINARY_STREAM"),
     ("GET", "/api/files/stream", "FILES_BINARY_STREAM"),
     ("GET", "/api/fs/download", "FILES_BINARY_STREAM"),
-    ("POST", "/api/files/upload", "WRITE_BROKERED"),
-    ("POST", "/api/fs/write-text", "WRITE_BROKERED"),
     ("GET", "/api/audio/elevenlabs/voices", "PROVIDER_EXTERNAL"),
     ("POST", "/api/audio/tts-lease", "AUDIO_LEASE_DESKTOP"),
     ("GET", "/api/audio/speak-stream", "AUDIO_STREAM_LOCAL"),
     ("POST", "/api/audio/speak-stream", "AUDIO_STREAM_LOCAL"),
+]
+
+# (method, path) -- real brokered writes converted in Wave 4. Unconfirmed they
+# answer a typed 409 CONFIRM_REQUIRED; confirmed they run the real Qubit
+# file/git broker (see test_hermes_routes_agent2b_wiring.py).
+BROKERED = [
+    ("POST", "/api/fs/write-text"),
+    ("POST", "/api/files/upload"),
+    ("POST", "/api/git/review/stage"),
+    ("POST", "/api/git/review/unstage"),
+    ("POST", "/api/git/review/revert"),
+    ("POST", "/api/git/review/commit"),
+    ("POST", "/api/git/worktree/add"),
+    ("POST", "/api/git/worktree/remove"),
+    ("POST", "/api/git/branch/switch"),
 ]
 
 
@@ -136,6 +142,15 @@ def _query_for(path, root):
         return {"file": "notes.md"}
     if path in ("/api/fs/read", "/api/fs/read-text", "/api/fs/read-data-url"):
         return {"path": str(root / "notes.md")}
+    return {}
+
+
+def _brokered_body(path, root):
+    """Unconfirmed request body for a Wave 4 brokered write."""
+    if path == "/api/fs/write-text":
+        return {"path": str(root / "notes.md"), "content": "changed"}
+    if path == "/api/files/upload":
+        return {"path": str(root / "uploaded.txt"), "content": "uploaded"}
     return {}
 
 
@@ -169,6 +184,26 @@ def test_gated_routes_resolve_to_typed_gates():
         assert route["gate"]["counterpart"], (method, path, route["gate"])
 
 
+def test_brokered_routes_are_real_confirm_gated(tmp_path, monkeypatch):
+    """Wave 4 brokered writes resolve to implemented handlers that stage a
+    typed 409 until confirmed (the confirmed apply is proven separately)."""
+    from voicebridge import hermes_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    root, _ = _repo(tmp_path)
+    _project(cfg, root)
+    for method, path in BROKERED:
+        route, _ = HC.match(method, path)
+        assert route is not None, (method, path)
+        assert route["disposition"] == "implemented", (method, path, route)
+        code, out = HC.dispatch(cfg, method, path, {},
+                                _brokered_body(path, root))
+        assert code == 409, (method, path, code, str(out)[:200])
+        assert out.get("ok") is False, (method, path, out)
+        assert out.get("code") == "CONFIRM_REQUIRED", (method, path, out)
+        assert out.get("qubit_counterpart"), (method, path, out)
+
+
 # ------------------------------------------------------------------ dispatch
 def test_all_new_routes_dispatch_200_or_typed_never_404_500(
         tmp_path, monkeypatch):
@@ -188,6 +223,12 @@ def test_all_new_routes_dispatch_200_or_typed_never_404_500(
         code, out = HC.dispatch(cfg, method, path, {}, {})
         assert code not in (404, 500), (method, path, code, str(out)[:200])
         assert code != 200, (method, path, out)
+
+    for method, path in BROKERED:
+        code, out = HC.dispatch(cfg, method, path, {},
+                                _brokered_body(path, root))
+        assert code == 409, (method, path, code, str(out)[:200])
+        assert out.get("code") == "CONFIRM_REQUIRED", (method, path, out)
 
     for method, path in AUDIO_ACTIONS:
         code, out = HC.dispatch(cfg, method, path, {}, {})

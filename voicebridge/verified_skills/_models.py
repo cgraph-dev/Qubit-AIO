@@ -43,6 +43,20 @@ TRUST_TOOL = 2
 TRUST_OBSERVED = 1
 TRUSTS = (TRUST_USER, TRUST_TOOL, TRUST_OBSERVED)
 
+# Canonical confirmed-human principals allowed to perform owner-only
+# verified-skill actions (verdict/pin/unpin/remove/restore). The Qubit CLI
+# passes ``"user"``; the voice command backend and the dashboard dispatcher
+# pass the channel-qualified ``"<channel>:user"`` forms. Only these exact
+# strings are accepted: ``tool``/``agent``/``model``/``core:*`` actors are
+# intentionally absent, so no self-verification path exists.
+HUMAN_REQUESTERS = ("user", "cli:user", "voice:user", "dashboard:user",
+                    "tui:user", "web:user")
+
+
+def is_human_requester(requested_by: str) -> bool:
+    """True only for the canonical confirmed-human actor identities."""
+    return str(requested_by or "") in HUMAN_REQUESTERS
+
 SKILL_STATE_SCHEMA = 1
 
 DEFAULT_TOP_K = 5

@@ -28,18 +28,22 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
+import subprocess
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 SCHEMA = "qubit-projects/1"
 STORE_NAME = "projects.json"
+DEFAULT_CLONE_ROOT = "~/Qubit/projects"
 MAX_FILE_BYTES = 1_000_000
 MAX_PROJECTS = 128
 MAX_FOLDERS_PER_PROJECT = 32
 MAX_NAME_LEN = 80
 MAX_SLUG_LEN = 64
 MAX_DESCRIPTION_LEN = 500
+MAX_REF_LEN = 200
 BACKUP_KEEP = 5
 
 CONFIRM_CODE = "PROJECT_CONFIRM_REQUIRED"
@@ -52,8 +56,13 @@ ARCHIVED_CODE = "PROJECT_ARCHIVED"
 NO_BOARD_CODE = "PROJECT_NO_BOARD"
 CORRUPT_CODE = "PROJECT_STORE_CORRUPT"
 ROLLBACK_CODE = "PROJECT_NO_ROLLBACK"
+CLONE_REMOTE_CODE = "PROJECT_CLONE_REMOTE_REFUSED"
+CLONE_FAILED_CODE = "PROJECT_CLONE_FAILED"
+CLONE_DEST_CODE = "PROJECT_CLONE_DEST_EXISTS"
+CHECKOUT_FAILED_CODE = "PROJECT_CHECKOUT_FAILED"
 
 _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+_SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.\-]*://")
 
 
 class ProjectError(Exception):
@@ -213,6 +222,63 @@ def _resolve_folder(folder: str) -> str:
         return str(resolve_project_root(folder))
     except ActionError as exc:
         raise ProjectError(BAD_FOLDER_CODE, str(exc)) from exc
+
+
+def _clone_root(cfg: Any) -> Path:
+    """Confined root for locally cloned workspace repositories."""
+    get = (lambda *p, default=None: cfg.get(*p, default=default)) \
+        if hasattr(cfg, "get") else (lambda *p, default=None: default)
+    raw = str(get("projects", "clone_root", default="") or "").strip()
+    return Path(os.path.expanduser(raw or DEFAULT_CLONE_ROOT))
+
+
+def _looks_remote(source: str) -> bool:
+    """True for anything that is not a plain local path (URLs/SCP)."""
+    text = str(source or "").strip()
+    return bool(_SCHEME_RE.match(text)) or text.startswith("git@") \
+        or text.startswith("ssh:")
+
+
+def _git(args: List[str], cwd: Optional[Path] = None, *,
+         timeout: int = 60) -> subprocess.CompletedProcess:
+    """Run one bounded git command with prompts disabled (never a shell)."""
+    git = shutil.which("git")
+    if git is None:
+        raise ProjectError(CLONE_FAILED_CODE,
+                           "git is required for project clone/checkout")
+    env = dict(os.environ)
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    env["GIT_ASKPASS"] = ""
+    env["GIT_CONFIG_NOSYSTEM"] = "1"
+    try:
+        return subprocess.run([git, *args], cwd=str(cwd) if cwd else None,
+                              capture_output=True, text=True,
+                              timeout=timeout, env=env)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ProjectError(CLONE_FAILED_CODE,
+                           f"git invocation failed: {exc}") from exc
+
+
+def _is_git_repo(path: Path) -> bool:
+    if not path.is_dir():
+        return False
+    out = _git(["rev-parse", "--is-inside-work-tree"], cwd=path, timeout=15)
+    return out.returncode == 0 and out.stdout.strip() == "true"
+
+
+def _check_ref(ref: str) -> str:
+    """Validate a git ref/branch/tag for checkout (no option injection)."""
+    text = str(ref or "").strip()
+    if not text:
+        return ""
+    if len(text) > MAX_REF_LEN:
+        raise ProjectError(BAD_NAME_CODE,
+                           f"ref must be <={MAX_REF_LEN} chars")
+    if text.startswith("-") or text.startswith("+") or ".." in text \
+            or any(ch in text for ch in "\x00\n\r"):
+        raise ProjectError(BAD_NAME_CODE,
+                           "ref may not start with '-'/'+' or contain '..'")
+    return text
 
 
 def _get(state: Dict[str, Any], slug: str) -> Dict[str, Any]:
@@ -389,18 +455,26 @@ def remove_folder(cfg: Any, slug: str, folder: str, *,
     if not confirmed:
         raise ProjectError(CONFIRM_CODE,
                            "project remove-folder requires explicit --confirm")
+    raw = folder.strip()
+    if not raw:
+        raise ProjectError(BAD_FOLDER_CODE, "a folder path is required")
+    # Removal must not require the folder to still exist on disk: a workspace
+    # whose folder vanished would otherwise be permanently stuck in the
+    # registry. Match the recorded canonical path (and the raw input) either
+    # way; adding a folder still validates existence through the 8R gate.
     try:
-        resolved = str(Path(os.path.expanduser(folder.strip())).resolve(strict=True))
-    except (OSError, RuntimeError) as exc:
-        raise ProjectError(BAD_FOLDER_CODE,
-                           f"folder unresolvable: {exc}") from exc
+        resolved = str(Path(os.path.expanduser(raw)).resolve())
+    except (OSError, RuntimeError):
+        resolved = os.path.expanduser(raw)
 
     def _do(state, rec):
-        if resolved not in rec["folders"]:
+        target = next((f for f in rec["folders"]
+                       if f in (resolved, raw)), None)
+        if target is None:
             raise ProjectError(BAD_FOLDER_CODE,
                                f"folder not in {rec['slug']!r}")
-        rec["folders"] = [f for f in rec["folders"] if f != resolved]
-        if rec.get("primary") == resolved:
+        rec["folders"] = [f for f in rec["folders"] if f != target]
+        if rec.get("primary") == target:
             rec["primary"] = rec["folders"][0] if rec["folders"] else None
 
     return _mutate(cfg, slug, requested_by, "remove-folder", _do)
@@ -531,6 +605,150 @@ def bind_board(cfg: Any, slug: str, board: str, *,
         rec["board"] = clean_board
 
     return _mutate(cfg, slug, requested_by, "bind-board", _do)
+
+
+def clone(cfg: Any, name: str, source: str, *, slug: str = "", ref: str = "",
+          description: str = "", requested_by: str = "cli:user",
+          confirmed: bool = False, use: bool = False) -> Dict[str, Any]:
+    """Clone a LOCAL git repository into a confined workspace.
+
+    Qubit's clone is deliberately local-only: the source must be an existing
+    on-disk git repository. Network/URL/SCP sources are typed-refused with
+    ``PROJECT_CLONE_REMOTE_REFUSED`` (no outbound fetch ever happens). The
+    clone lands under the confined ``projects.clone_root`` (default
+    ``~/Qubit/projects``), optionally checks out a validated ``ref``, and is
+    registered as a normal workspace with backup/rollback/audit.
+    """
+    if not confirmed:
+        raise ProjectError(CONFIRM_CODE,
+                           "project clone requires explicit --confirm")
+    clean_name = _check_name(name)
+    clean_slug = _check_slug(slug or slugify(clean_name))
+    if not clean_slug:
+        raise ProjectError(BAD_NAME_CODE,
+                           "project name yields an empty slug; pass --slug")
+    raw_source = str(source or "").strip()
+    if _looks_remote(raw_source):
+        raise ProjectError(
+            CLONE_REMOTE_CODE,
+            "remote/URL clone sources are refused: project clone is confined "
+            "to an existing local git repository (no network fetch)")
+    src = Path(os.path.expanduser(raw_source))
+    try:
+        src_resolved = src.resolve(strict=True)
+    except (OSError, RuntimeError):
+        raise ProjectError(BAD_FOLDER_CODE,
+                           f"clone source {raw_source!r} is not a directory")
+    if not src_resolved.is_dir():
+        raise ProjectError(BAD_FOLDER_CODE,
+                           f"clone source {raw_source!r} is not a directory")
+    if not _is_git_repo(src_resolved):
+        raise ProjectError(BAD_FOLDER_CODE,
+                           f"clone source {raw_source!r} is not a git "
+                           f"repository")
+    clean_ref = _check_ref(ref)
+
+    state = _load(cfg)
+    if clean_slug in state["projects"]:
+        raise ProjectError(EXISTS_CODE, f"project {clean_slug!r} exists")
+    if len(state["projects"]) >= MAX_PROJECTS:
+        raise ProjectError(EXISTS_CODE,
+                           f"project limit reached ({MAX_PROJECTS})")
+    base = _clone_root(cfg)
+    try:
+        base.mkdir(parents=True, exist_ok=True)
+        base_resolved = base.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise ProjectError(CLONE_FAILED_CODE,
+                           f"clone root unavailable: {exc}") from exc
+    if base_resolved == Path("/") or base_resolved == Path.home().resolve():
+        raise ProjectError(CLONE_FAILED_CODE,
+                           "clone root may not be / or the home root")
+    dest = base_resolved / clean_slug
+    if dest.exists():
+        raise ProjectError(CLONE_DEST_CODE,
+                           f"clone destination already exists: {dest}")
+    proc = _git(["clone", "--no-hardlinks", "--local",
+                 str(src_resolved), str(dest)])
+    if proc.returncode != 0:
+        shutil.rmtree(dest, ignore_errors=True)
+        raise ProjectError(CLONE_FAILED_CODE,
+                           "git clone failed: "
+                           + (proc.stderr or proc.stdout or "")[:300])
+    head = ""
+    if clean_ref:
+        co = _git(["-c", "core.hooksPath=/dev/null",
+                   "checkout", clean_ref], cwd=dest)
+        if co.returncode != 0:
+            shutil.rmtree(dest, ignore_errors=True)
+            raise ProjectError(CHECKOUT_FAILED_CODE,
+                               f"git checkout {clean_ref!r} failed: "
+                               + (co.stderr or co.stdout or "")[:300])
+    rev = _git(["rev-parse", "HEAD"], cwd=dest, timeout=15)
+    if rev.returncode == 0:
+        head = (rev.stdout or "").strip()[:64]
+    try:
+        out = create(cfg, clean_name, [str(dest)], slug=clean_slug,
+                     description=description, primary=str(dest),
+                     requested_by=requested_by, confirmed=True, use=use)
+    except ProjectError:
+        shutil.rmtree(dest, ignore_errors=True)
+        raise
+    _audit("clone", requested_by,
+           {"slug": clean_slug, "ref": clean_ref, "remote": False})
+    out["source"] = redact_spec(str(src_resolved))
+    out["destination"] = str(dest)
+    out["ref"] = clean_ref
+    out["head"] = head
+    return out
+
+
+def checkout(cfg: Any, slug: str, ref: str, *,
+             requested_by: str = "cli:user",
+             confirmed: bool = False) -> Dict[str, Any]:
+    """Check out a validated ref in a workspace's primary git folder.
+
+    Plain ``git checkout`` inside the already-approved project root: no fetch,
+    no network, no shell, hooks disarmed. Returns the resulting HEAD.
+    """
+    if not confirmed:
+        raise ProjectError(CONFIRM_CODE,
+                           "project checkout requires explicit --confirm")
+    clean_ref = _check_ref(ref)
+    if not clean_ref:
+        raise ProjectError(BAD_NAME_CODE,
+                           "project checkout requires a ref/branch/tag")
+    state = _load(cfg)
+    rec = _get(state, _check_slug(slug))
+    if rec.get("archived", False):
+        raise ProjectError(ARCHIVED_CODE,
+                           f"project {rec['slug']!r} is archived; restore it "
+                           f"before `checkout`")
+    folder = rec.get("primary") or (rec["folders"][0] if rec["folders"] else "")
+    if not folder:
+        raise ProjectError(BAD_FOLDER_CODE,
+                           f"project {rec['slug']!r} has no folder to check "
+                           f"out")
+    root = Path(folder)
+    if not _is_git_repo(root):
+        raise ProjectError(CHECKOUT_FAILED_CODE,
+                           f"{folder!r} is not a git repository")
+    co = _git(["-c", "core.hooksPath=/dev/null", "checkout", clean_ref],
+              cwd=root)
+    if co.returncode != 0:
+        raise ProjectError(CHECKOUT_FAILED_CODE,
+                           f"git checkout {clean_ref!r} failed: "
+                           + (co.stderr or co.stdout or "")[:300])
+    head = ""
+    rev = _git(["rev-parse", "HEAD"], cwd=root, timeout=15)
+    if rev.returncode == 0:
+        head = (rev.stdout or "").strip()[:64]
+    _touch(rec, requested_by)
+    _backup(cfg)
+    _save(cfg, state)
+    _audit("checkout", requested_by, {"slug": rec["slug"], "ref": clean_ref})
+    return {"state": "OK", "ref": clean_ref, "head": head,
+            "project": _public(rec, state.get("active_slug") == rec["slug"])}
 
 
 def rollback(cfg: Any, *, requested_by: str = "cli:user",
