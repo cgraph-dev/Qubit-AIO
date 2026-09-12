@@ -16,16 +16,15 @@
   "voice_commands.REGISTRY": 476,
   "dashboard_ops.catalog": 510,
   "dashboard_ops.EXTRA_OPS": 34,
-  "voice_commands.CLI_COVERAGE": 93,
-  "hermes_compat.ROUTES": 329,
+  "voice_commands.CLI_COVERAGE": 106,
+  "hermes_compat.ROUTES": 340,
   "hermes_compat.GATED": 105,
-  "cli_families": 93
+  "cli_families": 106
  },
  "counts_by_status": {
-  "GATED": 63,
-  "IMPLEMENTED": 521,
-  "PARTIAL": 7,
-  "UNVERIFIED": 11
+  "GATED": 41,
+  "IMPLEMENTED": 534,
+  "PARTIAL": 5
  },
  "counts_by_area": {
   "acp": 3,
@@ -75,7 +74,7 @@
   "gateway": 10,
   "ghost": 20,
   "git": 4,
-  "hermes_gated": 63,
+  "hermes_gated": 41,
   "hermes_web_page": 19,
   "hooks": 10,
   "ide": 2,
@@ -149,13 +148,13 @@
   "worktree": 1
  },
  "counts_by_source": {
-  "qubit-surface": 602
+  "qubit-surface": 580
  },
  "tri_surface": {
   "has-cli has-dashboard": 31,
-  "has-cli has-dashboard has-voice": 471,
-  "has-dashboard": 95,
-  "has-dashboard has-voice": 5
+  "has-cli has-dashboard has-voice": 472,
+  "has-dashboard": 73,
+  "has-dashboard has-voice": 4
  },
  "backend_flags": [],
  "provenance": {
@@ -504,13 +503,13 @@
    "area": "audio_hw",
    "capability": "Transcription test",
    "upstream_ref": "status",
-   "qubit_backend": "voicebridge.voice_commands._b_audio_hw",
+   "qubit_backend": "voicebridge.voice_commands._b_audio_hw -> voicebridge.audio.capture_probe",
    "cli": "qubit audio",
    "dashboard": "qubit-ops:/operations",
    "voice": "asr_test",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "Hardware how-to (operator-only).",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_qubit_native_parity_wave1.py::test_asr_test_drives_configured_provider_identity",
+   "note": "Real bounded audio-hardware probe (operator-gated live run).",
    "needs": "hardware"
   },
   {
@@ -550,8 +549,8 @@
    "cli": "qubit auth logout",
    "dashboard": "qubit-ops:/operations",
    "voice": "auth_logout",
-   "status": "UNVERIFIED",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_qubit_native_parity_wave1.py::test_auth_logout_reaches_real_residue_scan",
    "note": "Residue scan for stored credentials.",
    "needs": "creds"
   },
@@ -1890,13 +1889,13 @@
    "area": "audio_hw",
    "capability": "Enroll my voice",
    "upstream_ref": "status",
-   "qubit_backend": "voicebridge.voice_commands._b_audio_hw",
+   "qubit_backend": "voicebridge.voice_commands._b_audio_hw -> voicebridge.audio.capture_probe",
    "cli": "qubit enroll",
    "dashboard": "qubit-ops:/operations",
    "voice": "enroll_voice",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "Hardware how-to (operator-only).",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_qubit_native_parity_wave1.py::test_enroll_voice_drives_real_voice_id_backend",
+   "note": "Real bounded audio-hardware probe (operator-gated live run).",
    "needs": "hardware"
   },
   {
@@ -2202,8 +2201,8 @@
    "cli": "qubit frontier show",
    "dashboard": "qubit-ops:/operations",
    "voice": "frontier_show",
-   "status": "UNVERIFIED",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_qubit_native_parity_wave1.py::test_frontier_show_reads_real_policy_entry",
    "note": "One provider/model catalog entry.",
    "needs": "creds"
   },
@@ -4270,13 +4269,13 @@
    "area": "audio_hw",
    "capability": "Microphone test",
    "upstream_ref": "status",
-   "qubit_backend": "voicebridge.voice_commands._b_audio_hw",
+   "qubit_backend": "voicebridge.voice_commands._b_audio_hw -> voicebridge.audio.capture_probe",
    "cli": "qubit audio",
    "dashboard": "qubit-ops:/operations",
    "voice": "mic_test",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "Hardware how-to (operator-only).",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_qubit_native_parity_wave1.py::test_mic_test_drives_real_capture_probe",
+   "note": "Real bounded audio-hardware probe (operator-gated live run).",
    "needs": "hardware"
   },
   {
@@ -4358,8 +4357,8 @@
    "cli": "qubit msg account-show",
    "dashboard": "qubit-ops:/operations",
    "voice": "msg_account_show",
-   "status": "UNVERIFIED",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_qubit_native_parity_wave1.py::test_msg_account_show_reads_real_account_record",
    "note": "One provider account record.",
    "needs": "creds"
   },
@@ -4877,7 +4876,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "pairing_create",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_parity8tf.py::test_same_store_dashboard_voice",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_pairing_approve_then_revoke_over_compat",
    "note": "One-time code (confirmed).",
    "needs": "creds"
   },
@@ -4919,7 +4918,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "pairing_setup_code",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_parity8tf.py::test_same_store_dashboard_voice",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_pairing_approve_then_revoke_over_compat",
    "note": "One-time code + join URL/QR, shown once (confirmed).",
    "needs": "creds"
   },
@@ -4933,7 +4932,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "pause",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_packet8o.py::test_automation_monitor_observes_durable_emergency_stop",
+   "proving_test": "tests/test_cli_missing_wave2.py::test_pause_confirm_latches_the_one_qubit_estop",
    "note": "Latch the emergency stop (confirmed).",
    "needs": "none"
   },
@@ -5885,7 +5884,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "resume",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_packet8o.py::test_automation_monitor_observes_durable_emergency_stop",
+   "proving_test": "tests/test_cli_missing_wave2.py::test_pause_confirm_latches_the_one_qubit_estop",
    "note": "Clear the emergency stop (confirmed).",
    "needs": "none"
   },
@@ -5894,13 +5893,13 @@
    "area": "audio_hw",
    "capability": "Voice self-test",
    "upstream_ref": "status",
-   "qubit_backend": "voicebridge.voice_commands._b_audio_hw",
+   "qubit_backend": "voicebridge.voice_commands._b_audio_hw -> voicebridge.audio.capture_probe",
    "cli": "qubit roundtrip",
    "dashboard": "qubit-ops:/operations",
    "voice": "roundtrip_test",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "Hardware how-to (operator-only).",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_qubit_native_parity_wave1.py::test_roundtrip_test_runs_real_qualification_pipeline",
+   "note": "Real bounded audio-hardware probe (operator-gated live run).",
    "needs": "hardware"
   },
   {
@@ -6203,10 +6202,10 @@
    "capability": "Secret status",
    "upstream_ref": "secrets/egress",
    "qubit_backend": "voicebridge.voice_commands._b_secrets -> voicebridge.auth_status.auth_status",
-   "cli": "",
+   "cli": "qubit auth",
    "dashboard": "qubit-ops:/operations",
    "voice": "secrets",
-   "status": "PARTIAL",
+   "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_ops8tf.py::test_dashboard_matches_direct_backend_for_every_read_op",
    "note": "Reference kinds (never values).",
    "needs": "creds"
@@ -6612,8 +6611,8 @@
    "cli": "qubit sync accept",
    "dashboard": "qubit-ops:/operations",
    "voice": "",
-   "status": "UNVERIFIED",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_qubit_native_parity_wave1.py::test_sync_accept_extra_runs_real_accept_backend",
    "note": "Accept a handoff bundle with its passphrase (enrollment-gated apply; pre-restore backup kept).",
    "needs": "creds"
   },
@@ -6654,7 +6653,7 @@
    "cli": "qubit sync revoke",
    "dashboard": "qubit-ops:/operations",
    "voice": "",
-   "status": "PARTIAL",
+   "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_ops8tf.py::test_estop_refuses_mutations_but_not_reads",
    "note": "Revoke (tombstone) a sync offer.",
    "needs": "creds"
@@ -6668,8 +6667,8 @@
    "cli": "qubit sync",
    "dashboard": "qubit-ops:/operations",
    "voice": "sync_revoke_voice",
-   "status": "UNVERIFIED",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_qubit_native_parity_wave1.py::test_sync_revoke_voice_runs_real_revoke_backend",
    "note": "Tombstone a sync offer and delete its bundle (confirmed).",
    "needs": "creds"
   },
@@ -6916,13 +6915,13 @@
    "area": "audio_hw",
    "capability": "Speech test",
    "upstream_ref": "status",
-   "qubit_backend": "voicebridge.voice_commands._b_audio_hw",
+   "qubit_backend": "voicebridge.voice_commands._b_audio_hw -> voicebridge.audio.capture_probe",
    "cli": "qubit audio",
    "dashboard": "qubit-ops:/operations",
    "voice": "tts_test",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "Hardware how-to (operator-only).",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_qubit_native_parity_wave1.py::test_tts_test_drives_real_playback_probe",
+   "note": "Real bounded audio-hardware probe (operator-gated live run).",
    "needs": "hardware"
   },
   {
@@ -7070,13 +7069,13 @@
    "area": "audio_hw",
    "capability": "Verify my voice",
    "upstream_ref": "status",
-   "qubit_backend": "voicebridge.voice_commands._b_audio_hw",
+   "qubit_backend": "voicebridge.voice_commands._b_audio_hw -> voicebridge.audio.capture_probe",
    "cli": "qubit verify",
    "dashboard": "qubit-ops:/operations",
    "voice": "verify_voice",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "Hardware how-to (operator-only).",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_qubit_native_parity_wave1.py::test_verify_voice_drives_real_voice_id_backend",
+   "note": "Real bounded audio-hardware probe (operator-gated live run).",
    "needs": "hardware"
   },
   {
@@ -7145,7 +7144,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "web_search",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_web_tool8u.py::test_estop_blocks_fetch_and_search",
+   "proving_test": "tests/test_openclaw_closure_wave2_webmedia.py::test_oc63_web_search_fetch_xsearch_injected",
    "note": "Configured provider search; typed unavailable when none.",
    "needs": "creds"
   },
@@ -7201,7 +7200,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "webhook_test",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_parity8tf.py::test_same_store_dashboard_voice",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_webhook_add_enable_and_subscription_toggle",
    "note": "Delivery test plan (receipts only).",
    "needs": "creds"
   },
@@ -7257,7 +7256,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "websites_show",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_web_tool8u.py::test_bad_bounds_refused",
+   "proving_test": "tests/test_openclaw_closure_wave2_webmedia.py::test_oc63_web_search_fetch_xsearch_injected",
    "note": "One integration record.",
    "needs": "creds"
   },
@@ -7654,20 +7653,6 @@
    "needs": "owner"
   },
   {
-   "id": "hermes_gate_stub_actions_read",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_ACTIONS_READ",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'actions_read'; not a live upstream operation routes=1",
-   "needs": "owner"
-  },
-  {
    "id": "hermes_gate_stub_agent_disable",
    "area": "hermes_gated",
    "capability": "Gated upstream route: STUB_AGENT_DISABLE",
@@ -7710,20 +7695,6 @@
    "needs": "owner"
   },
   {
-   "id": "hermes_gate_stub_agent_remove",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_AGENT_REMOVE",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'agent_remove'; not a live upstream operation routes=1",
-   "needs": "owner"
-  },
-  {
    "id": "hermes_gate_stub_agent_update",
    "area": "hermes_gated",
    "capability": "Gated upstream route: STUB_AGENT_UPDATE",
@@ -7738,34 +7709,6 @@
    "needs": "owner"
   },
   {
-   "id": "hermes_gate_stub_blueprints",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_BLUEPRINTS",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'blueprints'; not a live upstream operation routes=1",
-   "needs": "owner"
-  },
-  {
-   "id": "hermes_gate_stub_ckpt",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_CKPT",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'ckpt'; not a live upstream operation routes=1",
-   "needs": "owner"
-  },
-  {
    "id": "hermes_gate_stub_ckpt_prune",
    "area": "hermes_gated",
    "capability": "Gated upstream route: STUB_CKPT_PRUNE",
@@ -7777,118 +7720,6 @@
    "status": "GATED",
    "proving_test": "",
    "note": "typed disposition stub handler 'ckpt_prune'; not a live upstream operation routes=1",
-   "needs": "owner"
-  },
-  {
-   "id": "hermes_gate_stub_config_save",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_CONFIG_SAVE",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'config_save'; not a live upstream operation routes=1",
-   "needs": "owner"
-  },
-  {
-   "id": "hermes_gate_stub_debug_share",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_DEBUG_SHARE",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'debug_share'; not a live upstream operation routes=1",
-   "needs": "owner"
-  },
-  {
-   "id": "hermes_gate_stub_delivery",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_DELIVERY",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'delivery'; not a live upstream operation routes=1",
-   "needs": "owner"
-  },
-  {
-   "id": "hermes_gate_stub_env_write",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_ENV_WRITE",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'env_write'; not a live upstream operation routes=2",
-   "needs": "owner"
-  },
-  {
-   "id": "hermes_gate_stub_font",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_FONT",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'font'; not a live upstream operation routes=1",
-   "needs": "owner"
-  },
-  {
-   "id": "hermes_gate_stub_font_set",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_FONT_SET",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'font_set'; not a live upstream operation routes=1",
-   "needs": "owner"
-  },
-  {
-   "id": "hermes_gate_stub_h_session_delete",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_H_SESSION_DELETE",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'h_session_delete'; not a live upstream operation routes=1",
-   "needs": "owner"
-  },
-  {
-   "id": "hermes_gate_stub_h_session_patch",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_H_SESSION_PATCH",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'h_session_patch'; not a live upstream operation routes=1",
    "needs": "owner"
   },
   {
@@ -7948,34 +7779,6 @@
    "needs": "owner"
   },
   {
-   "id": "hermes_gate_stub_mcp_test",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_MCP_TEST",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'mcp_test'; not a live upstream operation routes=1",
-   "needs": "owner"
-  },
-  {
-   "id": "hermes_gate_stub_mem_config_write",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_MEM_CONFIG_WRITE",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'mem_config_write'; not a live upstream operation routes=2",
-   "needs": "owner"
-  },
-  {
    "id": "hermes_gate_stub_mem_prov",
    "area": "hermes_gated",
    "capability": "Gated upstream route: STUB_MEM_PROV",
@@ -7987,48 +7790,6 @@
    "status": "GATED",
    "proving_test": "",
    "note": "typed disposition stub handler 'mem_prov'; not a live upstream operation routes=1",
-   "needs": "owner"
-  },
-  {
-   "id": "hermes_gate_stub_mem_provider_set",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_MEM_PROVIDER_SET",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'mem_provider_set'; not a live upstream operation routes=1",
-   "needs": "owner"
-  },
-  {
-   "id": "hermes_gate_stub_mem_reset",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_MEM_RESET",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'mem_reset'; not a live upstream operation routes=2",
-   "needs": "owner"
-  },
-  {
-   "id": "hermes_gate_stub_msg_test",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_MSG_TEST",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'msg_test'; not a live upstream operation routes=1",
    "needs": "owner"
   },
   {
@@ -8046,48 +7807,6 @@
    "needs": "owner"
   },
   {
-   "id": "hermes_gate_stub_plugins_hub",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_PLUGINS_HUB",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'plugins_hub'; not a live upstream operation routes=1",
-   "needs": "owner"
-  },
-  {
-   "id": "hermes_gate_stub_plugins_rescan",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_PLUGINS_RESCAN",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'plugins_rescan'; not a live upstream operation routes=1",
-   "needs": "owner"
-  },
-  {
-   "id": "hermes_gate_stub_plugin_visibility",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_PLUGIN_VISIBILITY",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'plugin_visibility'; not a live upstream operation routes=1",
-   "needs": "owner"
-  },
-  {
    "id": "hermes_gate_stub_sess_bulk",
    "area": "hermes_gated",
    "capability": "Gated upstream route: STUB_SESS_BULK",
@@ -8099,20 +7818,6 @@
    "status": "GATED",
    "proving_test": "",
    "note": "typed disposition stub handler 'sess_bulk'; not a live upstream operation routes=1",
-   "needs": "owner"
-  },
-  {
-   "id": "hermes_gate_stub_sess_empty",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_SESS_EMPTY",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'sess_empty'; not a live upstream operation routes=1",
    "needs": "owner"
   },
   {
@@ -8141,20 +7846,6 @@
    "status": "GATED",
    "proving_test": "",
    "note": "typed disposition stub handler 'sess_prune'; not a live upstream operation routes=1",
-   "needs": "owner"
-  },
-  {
-   "id": "hermes_gate_stub_toolset_write",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: STUB_TOOLSET_WRITE",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.hermes_compat",
-   "cli": "",
-   "dashboard": "n/a",
-   "voice": "",
-   "status": "GATED",
-   "proving_test": "",
-   "note": "typed disposition stub handler 'toolset_write'; not a live upstream operation routes=3",
    "needs": "owner"
   },
   {

@@ -450,7 +450,7 @@ export class JsonRpcGatewayClient {
 
       if (frame.error) {
         call.reject(
-          new JsonRpcGatewayError(frame.error.message || 'Hermes RPC failed', {
+          new JsonRpcGatewayError(frame.error.message || 'Qubit RPC failed', {
             code: typeof frame.error.code === 'number' ? frame.error.code : undefined,
             data: frame.error.data
           })

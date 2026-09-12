@@ -24,6 +24,7 @@ import base64
 import json
 import math
 import os
+import re
 import time
 import urllib.parse
 from pathlib import Path
@@ -887,3 +888,289 @@ def doctor(cfg: Any) -> Dict[str, Any]:
             "current_target": str(led.get("current_target", "")),
             "approved_launch": bool(launch_approved),
             "profiles": "user-managed; never cloned or inspected"}
+
+
+# ----------------------------------------------------- Annotate / Inspect
+# OC-D27: the live-panel Annotate/Inspect affordances. Inspect is a read-only
+# element probe; annotate applies a transient, bounded CSS outline (a DOM
+# mutation) and therefore requires confirmation + the e-stop.
+MAX_INSPECT_ATTRS = 8
+MAX_INSPECT_TEXT = 500
+ANNOTATION_ATTR = "data-qubit-annotation"
+
+_INSPECT_EXPR = (
+    "(sel => { const el = document.querySelector(sel);"
+    " if (!el) { return {found: false}; }"
+    " const r = el.getBoundingClientRect();"
+    " const attrs = {}; let n = 0;"
+    " for (const a of el.attributes) {"
+    "  if (n >= %d) { break; } attrs[a.name] = String(a.value).slice(0, 200);"
+    "  n++; }"
+    " const cs = getComputedStyle(el);"
+    " return {found: true, tag: el.tagName.toLowerCase(),"
+    "  id: String(el.id || '').slice(0, 128),"
+    "  classes: String(el.className || '').slice(0, 256),"
+    "  text: String(el.textContent || '').trim().slice(0, %d),"
+    "  role: String(el.getAttribute('role') || '').slice(0, 64),"
+    "  visible: !!(r.width && r.height) && cs.visibility !== 'hidden',"
+    "  rect: {x: r.x, y: r.y, width: r.width, height: r.height},"
+    "  attrs: attrs}; })(%%s)"
+    % (MAX_INSPECT_ATTRS, MAX_INSPECT_TEXT)
+)
+
+_ANNOTATE_EXPR = (
+    "(args => { const el = document.querySelector(args.sel);"
+    " if (!el) { return {found: false}; }"
+    " el.style.outline = '3px solid ' + args.color;"
+    " el.style.outlineOffset = '2px';"
+    " el.setAttribute('data-qubit-annotation', args.label);"
+    " const r = el.getBoundingClientRect();"
+    " return {found: true, tag: el.tagName.toLowerCase(),"
+    "  rect: {x: r.x, y: r.y, width: r.width, height: r.height}}; })(%s)"
+)
+
+_CLEAR_EXPR = (
+    "(() => { const els = document.querySelectorAll('[' + %s + ']');"
+    " for (const el of els) { el.style.outline = '';"
+    "  el.style.outlineOffset = '';"
+    "  el.removeAttribute('data-qubit-annotation'); }"
+    " return {cleared: els.length}; })()"
+    % json.dumps(ANNOTATION_ATTR)
+)
+
+
+def inspect_element(cfg: Any, selector: str, target: str = "") -> Dict[str, Any]:
+    """Read-only element probe (tag/id/classes/text/rect/attrs) over CDP.
+
+    The result is untrusted page evidence: bounded, redacted, and never a
+    permission grant. Missing selectors return a typed ``NOT_FOUND`` instead
+    of raising.
+    """
+    clean = _check_selector(selector)
+    page = _resolve_target(cfg, target)
+    session = _target_session(page)
+    tid = str(page.get("id", ""))
+    try:
+        expr = _INSPECT_EXPR.replace("%s", json.dumps(clean))
+        try:
+            result = session.call("Runtime.evaluate",
+                                  {"expression": expr, "returnByValue": True})
+        except cdp.CdpError as exc:
+            if exc.code == cdp.UNAVAILABLE_CODE:
+                return _screenshot_unavailable(exc.detail)
+            raise BrowserTabsError(exc.code, exc.detail)
+        value = result.get("result", {}).get("value", {})
+        if not isinstance(value, dict):
+            raise BrowserTabsError(cdp.PROTOCOL_CODE,
+                                   "CDP Runtime.evaluate: no value")
+        if not value.get("found"):
+            return {"state": "NOT_FOUND", "code": NOT_FOUND_CODE,
+                    "detail": f"no element matches {clean[:120]!r}",
+                    "target": tid, "selector": redact_spec(clean)[:256],
+                    "owner": "qubit-policy",
+                    "rollback": "browser untouched; nothing to roll back"}
+        attrs = value.get("attrs", {})
+        if not isinstance(attrs, dict):
+            attrs = {}
+        _remember(cfg, tid)
+        _audit("inspect", "qubit", {"target": tid})
+        return {"state": "OK", "target": tid,
+                "selector": redact_spec(clean)[:256],
+                "tag": str(value.get("tag", ""))[:64],
+                "id": redact_spec(value.get("id", ""))[:128],
+                "classes": redact_spec(value.get("classes", ""))[:256],
+                "role": redact_spec(value.get("role", ""))[:64],
+                "text": redact_spec(value.get("text", ""))[:MAX_INSPECT_TEXT],
+                "visible": bool(value.get("visible", False)),
+                "rect": value.get("rect", {}),
+                "attrs": {redact_spec(str(k))[:64]: redact_spec(str(v))[:200]
+                          for k, v in list(attrs.items())[:MAX_INSPECT_ATTRS]},
+                "trust": "untrusted-page-element",
+                "authority": "loopback CDP read-only; "
+                             "personal profiles untouched"}
+    finally:
+        session.close()
+
+
+def annotate(cfg: Any, selector: str, *, label: str = "", color: str = "#e11d48",
+             target: str = "", requested_by: str = "cli:user",
+             confirmed: bool = False) -> Dict[str, Any]:
+    """Apply a transient CSS outline annotation to one element (confirmed).
+
+    This is the only browser annotation path; it mutates the page DOM (style
+    + a data attribute) and is therefore confirmation- and e-stop-gated. It
+    never injects scripts, never navigates, and is reversible with
+    :func:`clear_annotation`.
+    """
+    clean = _check_selector(selector)
+    clean_label = re.sub(r"[^\w .:-]", "", str(label or ""))[:64]
+    if color not in ("#e11d48", "#2563eb", "#16a34a", "#f59e0b", "#7c3aed"):
+        raise BrowserTabsError(BAD_INPUT_CODE, "unsupported annotation color")
+    if estop_engaged(cfg):
+        return refuse_estop("browser annotate")
+    _require_confirmed(confirmed, "annotate")
+    page = _resolve_target(cfg, target)
+    session = _target_session(page)
+    tid = str(page.get("id", ""))
+    try:
+        expr = _ANNOTATE_EXPR.replace(
+            "%s", json.dumps({"sel": clean, "label": clean_label,
+                              "color": color}))
+        try:
+            result = session.call("Runtime.evaluate",
+                                  {"expression": expr, "returnByValue": True})
+        except cdp.CdpError as exc:
+            if exc.code == cdp.UNAVAILABLE_CODE:
+                return _screenshot_unavailable(exc.detail)
+            raise BrowserTabsError(exc.code, exc.detail)
+        value = result.get("result", {}).get("value", {})
+        if not isinstance(value, dict) or not value.get("found"):
+            return {"state": "NOT_FOUND", "code": NOT_FOUND_CODE,
+                    "detail": f"no element matches {clean[:120]!r}",
+                    "target": tid, "owner": "qubit-policy",
+                    "rollback": "page DOM unchanged; nothing to roll back"}
+        _remember(cfg, tid)
+        _audit("annotate", requested_by,
+               {"target": tid, "label": clean_label})
+        return {"state": "OK", "target": tid, "selector": clean[:256],
+                "label": clean_label, "color": color,
+                "tag": str(value.get("tag", ""))[:64],
+                "rect": value.get("rect", {}), "transient": True,
+                "reverse": "browser clear-annotation"}
+    finally:
+        session.close()
+
+
+def clear_annotation(cfg: Any, target: str = "", *,
+                     requested_by: str = "cli:user",
+                     confirmed: bool = False) -> Dict[str, Any]:
+    """Remove every Qubit annotation from the tab (confirmed, reversible)."""
+    if estop_engaged(cfg):
+        return refuse_estop("browser clear-annotation")
+    _require_confirmed(confirmed, "clear-annotation")
+    page = _resolve_target(cfg, target)
+    session = _target_session(page)
+    tid = str(page.get("id", ""))
+    try:
+        try:
+            result = session.call("Runtime.evaluate",
+                                  {"expression": _CLEAR_EXPR,
+                                   "returnByValue": True})
+        except cdp.CdpError as exc:
+            if exc.code == cdp.UNAVAILABLE_CODE:
+                return _screenshot_unavailable(exc.detail)
+            raise BrowserTabsError(exc.code, exc.detail)
+        value = result.get("result", {}).get("value", {})
+        count = int(value.get("cleared", 0)) if isinstance(value, dict) else 0
+        _audit("clear_annotation", requested_by,
+               {"target": tid, "cleared": str(count)})
+        return {"state": "OK", "target": tid, "cleared": count}
+    finally:
+        session.close()
+
+
+# --------------------------------------------- Remote / extension attach (OC-12)
+# Qubit's only sanctioned remote CDP path is a loopback bridge fronted by a
+# paired node host: the browser stays on the remote device and Qubit talks to
+# 127.0.0.1. No non-loopback endpoint is ever contacted directly.
+REMOTE_UNAVAILABLE_CODE = "BROWSER_REMOTE_UNAVAILABLE"
+EXTENSION_BAD_ID_CODE = "BROWSER_EXTENSION_BAD_ID"
+_EXTENSION_RE = re.compile(r"^[a-p]{32}$")
+
+
+def _bridge_plan(cfg: Any, *, node_id: str, port: int,
+                 extension_id: str = "") -> Dict[str, Any]:
+    try:
+        from . import node_host
+    except Exception:
+        node_host = None  # type: ignore
+    if node_host is None:
+        return {"state": "UNAVAILABLE", "code": REMOTE_UNAVAILABLE_CODE,
+                "detail": "node-host module unavailable",
+                "owner": "qubit-policy",
+                "rollback": "nothing started; nothing to roll back"}
+    try:
+        shown = node_host.show(cfg, node_id)
+    except Exception as exc:  # pragma: no cover - defensive
+        return {"state": "UNAVAILABLE", "code": REMOTE_UNAVAILABLE_CODE,
+                "detail": redact_spec(str(exc))[:200],
+                "owner": "qubit-policy",
+                "rollback": "nothing started; nothing to roll back"}
+    if shown.get("state") not in ("OK",):
+        return {"state": "UNAVAILABLE", "code": REMOTE_UNAVAILABLE_CODE,
+                "detail": f"node {node_id!r} is not enrolled",
+                "owner": "qubit-policy",
+                "rollback": "nothing started; nothing to roll back"}
+    node = shown.get("node", {}) if isinstance(shown, dict) else {}
+    caps = set(node.get("capabilities", []))
+    if "browser.cdp" not in caps:
+        return {"state": "UNAVAILABLE", "code": REMOTE_UNAVAILABLE_CODE,
+                "detail": f"node {node_id!r} does not declare browser.cdp",
+                "owner": "qubit-policy",
+                "rollback": "nothing started; nothing to roll back"}
+    return {"state": "READY", "code": "",
+            "bridge": {"local_host": cdp.CDP_HOST, "local_port": int(port),
+                       "remote_endpoint": node.get("endpoint", ""),
+                       "extension_id": extension_id},
+            "authority": "loopback bridge to a paired node; no direct "
+                         "non-loopback CDP is ever contacted"}
+
+
+def remote_attach(cfg: Any, node_id: str, *, port: int = cdp.CDP_PORT,
+                  requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Resolve the sanctioned remote-CDP attach plan via a paired node host.
+
+    Returns READY with a loopback bridge descriptor when the node is enrolled
+    and declares ``browser.cdp``, otherwise a typed
+    ``BROWSER_REMOTE_UNAVAILABLE``. It never opens a socket or starts a
+    tunnel on its own.
+    """
+    if estop_engaged(cfg):
+        return refuse_estop("browser remote-attach")
+    try:
+        port_i = int(port)
+    except (TypeError, ValueError):
+        raise BrowserTabsError(BAD_INPUT_CODE, "port must be an integer")
+    if not (1024 <= port_i <= 65535):
+        raise BrowserTabsError(BAD_INPUT_CODE,
+                               "port must be an unprivileged 1024..65535")
+    plan = _bridge_plan(cfg, node_id=str(node_id or "").strip(),
+                        port=port_i)
+    _audit("remote_attach", requested_by,
+           {"node": str(node_id)[:64], "state": plan.get("state", "")})
+    return plan
+
+
+def extension_attach(cfg: Any, extension_id: str, *,
+                     port: int = cdp.CDP_PORT,
+                     node_id: str = "",
+                     requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Validate a Chrome-extension attach id and resolve its bridge plan.
+
+    The extension id must be the canonical 32-char ``a``..``p`` form. With a
+    paired node the plan is the same loopback bridge as :func:`remote_attach`;
+    without one the call is an honest typed ``BROWSER_REMOTE_UNAVAILABLE``
+    (Qubit never reaches a non-loopback bridge directly).
+    """
+    if estop_engaged(cfg):
+        return refuse_estop("browser extension-attach")
+    ext = str(extension_id or "").strip().lower()
+    if not _EXTENSION_RE.match(ext):
+        return {"state": "FAILED", "code": EXTENSION_BAD_ID_CODE,
+                "detail": "extension id must be 32 chars a-p",
+                "owner": "qubit-policy",
+                "rollback": "nothing started; nothing to roll back"}
+    if node_id:
+        plan = remote_attach(cfg, node_id, port=port,
+                             requested_by=requested_by)
+        if isinstance(plan, dict):
+            plan = dict(plan)
+            plan.setdefault("bridge", {})
+            if isinstance(plan["bridge"], dict):
+                plan["bridge"]["extension_id"] = ext
+        return plan
+    return {"state": "UNAVAILABLE", "code": REMOTE_UNAVAILABLE_CODE,
+            "detail": "no paired node host providing a loopback CDP bridge; "
+                      "enroll a node with browser.cdp (`qubit node enroll`)",
+            "extension_id": ext, "owner": "qubit-policy",
+            "rollback": "nothing started; nothing to roll back"}

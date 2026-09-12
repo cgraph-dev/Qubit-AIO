@@ -40,6 +40,7 @@ import json
 import os
 import re
 import time
+import urllib.parse
 import urllib.request
 import uuid
 from pathlib import Path
@@ -97,15 +98,19 @@ PROVIDER_CAPS: Dict[str, Dict[str, Any]] = {
         "transport": "bot-gateway",
         "available": False,
         "credential_kind": "bot-token",
-        "detail": "no Discord gateway/REST adapter exists in Qubit; a bot "
-                  "token reference alone cannot deliver a message",
+        "detail": "Qubit ships a bounded REST send shaper for Discord "
+                  "messages, but catalog availability stays UNAVAILABLE until "
+                  "a live bot credential is resolved; no gateway voice/"
+                  "transcripts",
     },
     "telegram": {
         "label": "Telegram",
         "transport": "bot-api",
         "available": False,
         "credential_kind": "bot-token",
-        "detail": "no Telegram Bot API adapter exists in Qubit",
+        "detail": "Qubit ships a bounded Telegram sendMessage shaper, but "
+                  "catalog availability stays UNAVAILABLE until a live bot "
+                  "credential is resolved; no mini-app receiver",
     },
     "signal": {
         "label": "Signal",
@@ -595,10 +600,134 @@ def _paired_session(cfg: Any, account_id: str) -> bool:
 MAX_GRANT_SKEW_S = 86400.0
 
 
+# Provider transports that may be driven over an operator-injected boundary
+# (the injected callable is the credential/network adapter). Classic WhatsApp
+# stays session-based and iMessage/Signal/Teams require host-specific bridges
+# Qubit does not ship, so they stay typed UNAVAILABLE even with an injection.
+_INJECTABLE_TRANSPORTS = frozenset({
+    "slack", "whatsapp-cloud", "discord", "telegram", "matrix", "feishu"})
+
+
+def _provider_request(account_provider: str, endpoint: str,
+                      fields: Dict[str, str], to: str,
+                      body: str) -> Dict[str, Any]:
+    """Normalize a provider send into one bounded request mapping.
+
+    Used by the injected-transport boundary (and as the single description of
+    each send's method/url/body). The secret is never part of the request
+    mapping: a real transport pulls it from the resolved credential.
+    """
+    if account_provider == "slack":
+        return {"provider": "slack", "method": "POST", "url": endpoint,
+                "headers": {"Content-Type": "application/json"},
+                "body": {"channel": to, "text": body}}
+    if account_provider == "whatsapp-cloud":
+        return {"provider": "whatsapp-cloud", "method": "POST",
+                "url": endpoint, "headers": {"Content-Type": "application/json"},
+                "body": {"messaging_product": "whatsapp", "to": to,
+                         "type": "text", "text": {"body": body}}}
+    if account_provider == "discord":
+        return {"provider": "discord", "method": "POST",
+                "url": ("https://discord.com/api/v10/channels/"
+                        f"{urllib.parse.quote(str(to), safe='')}/messages"),
+                "headers": {"Content-Type": "application/json"},
+                "body": {"content": body}}
+    if account_provider == "telegram":
+        return {"provider": "telegram", "method": "POST",
+                "url": "https://api.telegram.org/bot<token>/sendMessage",
+                "headers": {"Content-Type": "application/json"},
+                "body": {"chat_id": to, "text": body}}
+    if account_provider == "matrix":
+        homeserver = str(fields.get("homeserver", "")).strip().rstrip("/")
+        if not homeserver:
+            return {}
+        txn = uuid.uuid4().hex
+        return {"provider": "matrix", "method": "PUT",
+                "url": (f"{homeserver}/_matrix/client/v3/rooms/"
+                        f"{urllib.parse.quote(str(to), safe='')}"
+                        f"/send/m.room.message/{txn}"),
+                "headers": {"Content-Type": "application/json"},
+                "body": {"msgtype": "m.text", "body": body}}
+    if account_provider == "feishu":
+        webhook = str(fields.get("webhook_url", "")).strip()
+        if not webhook:
+            return {}
+        return {"provider": "feishu", "method": "POST", "url": webhook,
+                "headers": {"Content-Type": "application/json"},
+                "body": {"msg_type": "text", "content": {"text": body}}}
+    return {}
+
+
+def _receipt_from(account_provider: str, data: Any) -> Dict[str, Any]:
+    """Map a provider/injected response to a bounded ``provider_msg_id``."""
+    if not isinstance(data, dict):
+        raise MessagingError(UPSTREAM_CODE,
+                             "provider response was not a JSON object")
+    if data.get("provider_msg_id"):
+        return {"provider_msg_id": _redact(str(data["provider_msg_id"]))[:120]}
+    if account_provider == "discord" and data.get("id"):
+        return {"provider_msg_id": str(data["id"])}
+    if account_provider == "telegram":
+        result = data.get("result")
+        if isinstance(result, dict) and result.get("message_id") is not None:
+            return {"provider_msg_id": str(result["message_id"])}
+        if data.get("message_id") is not None:
+            return {"provider_msg_id": str(data["message_id"])}
+    if account_provider == "slack" and data.get("ts"):
+        return {"provider_msg_id": str(data["ts"])}
+    if account_provider == "matrix" and data.get("event_id"):
+        return {"provider_msg_id": str(data["event_id"])}
+    if account_provider == "feishu":
+        inner = data.get("data")
+        mid = (inner.get("message_id") if isinstance(inner, dict)
+               else data.get("message_id"))
+        if mid:
+            return {"provider_msg_id": str(mid)}
+    msgs = data.get("messages")
+    if isinstance(msgs, list) and msgs and isinstance(msgs[0], dict) \
+            and "id" in msgs[0]:
+        return {"provider_msg_id": str(msgs[0]["id"])}
+    raise MessagingError(UPSTREAM_CODE, "provider returned no message id")
+
+
 def _transport(account_provider: str, endpoint: str, fields: Dict[str, str],
-               to: str, body: str, key: str) -> Dict[str, Any]:
-    """Real provider POST (key in Authorization header only)."""
+               to: str, body: str, key: str,
+               transport: Any = None) -> Dict[str, Any]:
+    """Real provider POST (key in Authorization header only).
+
+    When ``transport`` is supplied it is the operator-injected boundary: the
+    normalized request is handed to ``transport(request)`` and no network is
+    opened by Qubit. Only channels with a real Qubit-side adapter are
+    injectable; the rest stay typed ``UNAVAILABLE`` (never a fabricated send).
+    """
     import json as _json
+
+    if transport is not None:
+        if account_provider not in _INJECTABLE_TRANSPORTS:
+            caps = PROVIDER_CAPS.get(account_provider, {})
+            raise MessagingError(
+                UNAVAILABLE_CODE,
+                f"{caps.get('label', account_provider)} has no Qubit-injectable "
+                f"adapter ({caps.get('detail', 'transport unavailable')}); "
+                "nothing was sent")
+        request = _provider_request(account_provider, endpoint, fields, to,
+                                    body)
+        if not request:
+            raise MessagingError(
+                UNAVAILABLE_CODE,
+                f"{account_provider} transport is missing its endpoint/host "
+                "fields; nothing was sent")
+        try:
+            data = transport(request)
+        except MessagingError:
+            raise
+        except Exception as exc:
+            detail = _redact(str(exc))
+            if key:
+                detail = detail.replace(key, "<redacted>")
+            raise MessagingError(UPSTREAM_CODE,
+                                 f"provider request failed: {detail}") from exc
+        return _receipt_from(account_provider, data)
 
     if account_provider == "slack":
         payload = _json.dumps({"channel": to, "text": body}).encode()
@@ -612,6 +741,19 @@ def _transport(account_provider: str, endpoint: str, fields: Dict[str, str],
         headers = {"Content-Type": "application/json",
                    "Authorization": f"Bearer {key}"}
         req = urllib.request.Request(endpoint, data=payload, headers=headers)
+    elif account_provider == "discord":
+        payload = _json.dumps({"content": body}).encode()
+        headers = {"Content-Type": "application/json",
+                   "Authorization": f"Bot {key}",
+                   "User-Agent": "Qubit (https://localhost, 1.0)"}
+        url = ("https://discord.com/api/v10/channels/"
+               f"{urllib.parse.quote(str(to), safe='')}/messages")
+        req = urllib.request.Request(url, data=payload, headers=headers)
+    elif account_provider == "telegram":
+        payload = _json.dumps({"chat_id": to, "text": body}).encode()
+        headers = {"Content-Type": "application/json"}
+        url = f"https://api.telegram.org/bot{key}/sendMessage"
+        req = urllib.request.Request(url, data=payload, headers=headers)
     else:
         if account_provider == "whatsapp":
             # Classic WhatsApp delivers through a paired on-device session
@@ -633,8 +775,11 @@ def _transport(account_provider: str, endpoint: str, fields: Dict[str, str],
             raw = resp.read().decode("utf-8", "replace")
             status = getattr(resp, "status", 200)
     except Exception as exc:
+        detail = _redact(str(exc))
+        if key:
+            detail = detail.replace(key, "<redacted>")
         raise MessagingError(UPSTREAM_CODE,
-                             f"provider request failed: {exc}") from exc
+                             f"provider request failed: {detail}") from exc
     if status != 200:
         raise MessagingError(UPSTREAM_CODE,
                              f"provider HTTP {status}")
@@ -647,6 +792,18 @@ def _transport(account_provider: str, endpoint: str, fields: Dict[str, str],
             raise MessagingError(UPSTREAM_CODE,
                                  "slack refused the message")
         return {"provider_msg_id": str(data.get("ts", ""))}
+    if account_provider == "telegram":
+        result = data.get("result") if isinstance(data, dict) else None
+        if not (isinstance(data, dict) and data.get("ok") is True
+                and isinstance(result, dict)):
+            raise MessagingError(UPSTREAM_CODE,
+                                 "telegram refused the message")
+        return {"provider_msg_id": str(result.get("message_id", ""))}
+    if account_provider == "discord":
+        if not (isinstance(data, dict) and data.get("id")):
+            raise MessagingError(UPSTREAM_CODE,
+                                 "discord refused the message")
+        return {"provider_msg_id": str(data.get("id", ""))}
     msgs = data.get("messages", []) if isinstance(data, dict) else []
     if not msgs or not isinstance(msgs[0], dict) or "id" not in msgs[0]:
         raise MessagingError(UPSTREAM_CODE, "provider bad receipt")
@@ -654,8 +811,12 @@ def _transport(account_provider: str, endpoint: str, fields: Dict[str, str],
 
 
 def send(cfg: Any, msg_id: str, *, requested_by: str = "cli:user",
-         confirmed: bool = False) -> Dict[str, Any]:
-    """Send with fresh exact confirmation through every gate in order."""
+         confirmed: bool = False, transport: Any = None) -> Dict[str, Any]:
+    """Send with fresh exact confirmation through every gate in order.
+
+    ``transport`` is an optional operator-injected provider boundary; when
+    omitted the shipped HTTPS adapter is used for the channels that have one.
+    """
     from .plugins import estop_engaged
     from .providers.credentials import resolve_key
 
@@ -681,6 +842,20 @@ def send(cfg: Any, msg_id: str, *, requested_by: str = "cli:user",
         raise MessagingError(NO_CREDENTIAL_CODE,
                              "credential reference unresolvable; message "
                              "queued, nothing attempted")
+    caps = PROVIDER_CAPS.get(rec["provider"], {})
+    if transport is None and rec["provider"] != "whatsapp" \
+            and not caps.get("available", False):
+        # The catalog reports no SHIPPED transport for this channel; the
+        # default send must agree with it rather than silently POSTing. An
+        # operator-injected transport may still drive the adapter contract.
+        rec["state"] = QUEUED
+        rec["updated_at"] = _now()
+        _save_msg(cfg, state)
+        raise MessagingError(
+            UNAVAILABLE_CODE,
+            f"{caps.get('label', rec['provider'])} has no shipped Qubit "
+            f"transport adapter ({caps.get('detail', 'transport unavailable')}); "
+            "inject a transport to drive the adapter contract")
     if rec["provider"] == "whatsapp" and not _paired_session(cfg, rec["account"]):
         rec["state"] = QUEUED
         rec["updated_at"] = _now()
@@ -699,7 +874,7 @@ def send(cfg: Any, msg_id: str, *, requested_by: str = "cli:user",
     try:
         result = _transport(rec["provider"], rec.get("endpoint", ""),
                             rec.get("account_fields", {}), rec["to"],
-                            rec["body"], key)
+                            rec["body"], key, transport)
     except MessagingError as exc:
         rec["state"] = QUEUED
         rec["updated_at"] = _now()
@@ -737,7 +912,7 @@ def send(cfg: Any, msg_id: str, *, requested_by: str = "cli:user",
 
 
 def retry(cfg: Any, msg_id: str, *, requested_by: str = "cli:user",
-          confirmed: bool = False) -> Dict[str, Any]:
+          confirmed: bool = False, transport: Any = None) -> Dict[str, Any]:
     """Re-attempt a queued/failed message (same gates as send)."""
     if not confirmed:
         raise MessagingError(CONFIRM_CODE,
@@ -746,7 +921,8 @@ def retry(cfg: Any, msg_id: str, *, requested_by: str = "cli:user",
     if rec["state"] not in (QUEUED, FAILED):
         raise MessagingError(BAD_INPUT_CODE,
                              f"message is {rec['state']}; nothing to retry")
-    return send(cfg, rec["id"], requested_by=requested_by, confirmed=True)
+    return send(cfg, rec["id"], requested_by=requested_by, confirmed=True,
+                transport=transport)
 
 
 def list_msgs(cfg: Any, *, state_filter: str = "") -> Dict[str, Any]:

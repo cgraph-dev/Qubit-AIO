@@ -49,6 +49,7 @@ MAX_SETUP_LEN = 2048
 CONFIRM_CODE = "PAIRING_CONFIRM_REQUIRED"
 ESTOP_CODE = "PAIRING_ESTOP"
 NOT_FOUND_CODE = "PAIRING_NOT_FOUND"
+NOT_BOUND_CODE = "PAIRING_NOT_BOUND"
 BAD_CODE = "PAIRING_BAD_CODE"
 EXPIRED_CODE = "PAIRING_EXPIRED"
 REVOKED_CODE = "PAIRING_REVOKED"
@@ -393,6 +394,30 @@ def channel_dm_pairings(cfg: Any) -> Dict[str, Any]:
          for k, v in dm.items() if isinstance(v, dict)),
         key=lambda r: r.get("paired_at") or 0, reverse=True)
     return {"state": "OK", "pairings": rows}
+
+
+def channel_binding(cfg: Any, account: Any) -> Dict[str, Any]:
+    """Resolve the accepted channel DM binding for one account (OC-21).
+
+    The account is the provider/channel account the DM arrives on. A live
+    accepted setup code records the binding; an unknown or unpaired account
+    is a typed ``PAIRING_NOT_BOUND`` (never an implicit allow).
+    """
+    clean = str(account or "").strip()
+    if not clean:
+        return {"state": "FAILED", "code": BAD_CODE,
+                "detail": "account is required", "bound": False}
+    pairings = channel_dm_pairings(cfg).get("pairings", [])
+    for row in pairings:
+        if row.get("account") == clean:
+            return {"state": "OK", "bound": True, "account": clean,
+                    "grant_id": row.get("grant_id", ""),
+                    "paired_at": row.get("paired_at"),
+                    "authority": "accepted setup code; scoped grant only"}
+    return {"state": "UNAVAILABLE", "bound": False, "account": clean,
+            "code": NOT_BOUND_CODE,
+            "detail": "no accepted channel DM pairing for this account",
+            "rollback": "no access granted; nothing to roll back"}
 
 
 def list_codes(cfg: Any) -> Dict[str, Any]:

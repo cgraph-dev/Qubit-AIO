@@ -466,8 +466,49 @@ def _parse_results(cfg: Any, provider: str, payload: Any,
     return out
 
 
+def _search_via_transport(cfg: Any, provider: str, text: str, url: str,
+                          limit: int, transport: Any) -> Dict[str, Any]:
+    """Run a configured search over an operator-injected request boundary."""
+    import json as _json
+
+    try:
+        raw = transport({"provider": provider, "method": "GET", "url": url,
+                         "query": text, "limit": limit,
+                         "headers": {"Accept": "application/json"}})
+    except Exception as exc:
+        return {"state": "FAILED", "code": SEARCH_PROVIDER_CODE,
+                "provider": provider, "query": redact_text(text),
+                "results": [], "count": 0,
+                "detail": redact_text(str(exc))[:200]}
+    if isinstance(raw, (bytes, bytearray)):
+        try:
+            payload = _json.loads(bytes(raw).decode("utf-8", "replace"))
+        except Exception:
+            return {"state": "FAILED", "code": SEARCH_PROVIDER_CODE,
+                    "provider": provider, "query": redact_text(text),
+                    "results": [], "count": 0,
+                    "detail": "search provider returned unparseable JSON"}
+    elif isinstance(raw, (dict, list)):
+        payload = raw
+    else:
+        return {"state": "FAILED", "code": SEARCH_PROVIDER_CODE,
+                "provider": provider, "query": redact_text(text),
+                "results": [], "count": 0,
+                "detail": "search transport returned an unsupported payload"}
+    results = _parse_results(cfg, provider, payload, limit)
+    _audit("search", provider=provider, results=len(results))
+    return {"state": OK, "ok": True, "code": "WEB_SEARCH_OK",
+            "provider": provider, "query": redact_text(text),
+            "results": results, "count": len(results),
+            "receipt": redact_obj({"provider": provider,
+                                   "results": len(results),
+                                   "transport": "injected",
+                                   "limits": {"limit": limit}})}
+
+
 def search(cfg: Any, query: str, *, limit: int = DEFAULT_SEARCH_LIMIT,
-           timeout: Optional[float] = None) -> Dict[str, Any]:
+           timeout: Optional[float] = None,
+           transport: Any = None) -> Dict[str, Any]:
     """Search via an operator-configured provider, or typed UNAVAILABLE.
 
     No provider configured (or no endpoint) returns
@@ -506,6 +547,9 @@ def search(cfg: Any, query: str, *, limit: int = DEFAULT_SEARCH_LIMIT,
     timeout_s = float(timeout) if timeout is not None else _provider_timeout(cfg)
     timeout_s = min(max(timeout_s, MIN_TIMEOUT_S), MAX_TIMEOUT_S)
     url = _build_search_url(provider, endpoint, text)
+    if transport is not None:
+        return _search_via_transport(cfg, provider, text, url, limit_i,
+                                     transport)
     try:
         normalize_origin(url, resolve=True)
     except WebsiteValidationError as exc:
@@ -571,14 +615,15 @@ def search(cfg: Any, query: str, *, limit: int = DEFAULT_SEARCH_LIMIT,
 
 # --------------------------------------------------------------- agent tool
 def x_search(cfg: Any, query: str, *,
-             limit: int = DEFAULT_SEARCH_LIMIT) -> Dict[str, Any]:
-    """X/Twitter search — typed UNAVAILABLE until a transport adapter exists.
+             limit: int = DEFAULT_SEARCH_LIMIT,
+             transport: Any = None) -> Dict[str, Any]:
+    """X/Twitter search — typed UNAVAILABLE until a transport is injected.
 
-    The credential/reference gate is real; there is no X API shaper or
-    transport in this module, so even with a configured reference no network
-    call is made and the call returns a typed ``WEB_X_SEARCH_UNAVAILABLE``
-    (never a fabricated result). Exposed here so the shared agent path has one
-    consistent ``web.x_search`` entry instead of an unknown-tool error.
+    The credential/reference gate is real; Qubit ships no X API transport, so
+    without an injected ``transport`` the call returns a typed
+    ``WEB_X_SEARCH_UNAVAILABLE`` (never a fabricated result). With an injected
+    boundary the bounded search request is shaped, dispatched, and parsed into
+    redacted results.
     """
     q = str(query or "").strip()
     if estop_engaged(cfg):
@@ -597,6 +642,8 @@ def x_search(cfg: Any, query: str, *,
                                default="") or "")
     except Exception:
         provider = ""
+    if transport is not None:
+        return _x_search_via_transport(cfg, provider, q, limit_i, transport)
     _audit("x_search", query=q, provider=provider,
            state=X_SEARCH_UNAVAILABLE_CODE)
     return {
@@ -610,6 +657,51 @@ def x_search(cfg: Any, query: str, *,
                        "transport adapter is shipped; configure one before "
                        "use. No request was attempted.",
     }
+
+
+def _x_search_via_transport(cfg: Any, provider: str, query: str, limit: int,
+                            transport: Any) -> Dict[str, Any]:
+    """Shape, dispatch and parse a bounded X/Twitter search request."""
+    request = {"provider": provider or "xai", "method": "GET",
+               "url": "https://api.x.com/2/tweets/search/recent",
+               "query": query, "limit": limit,
+               "headers": {"Accept": "application/json"}}
+    try:
+        raw = transport(request)
+    except Exception as exc:
+        return {"state": "FAILED", "code": SEARCH_PROVIDER_CODE,
+                "provider": provider[:40], "query": redact_text(query),
+                "results": [], "count": 0,
+                "detail": redact_text(str(exc))[:200]}
+    if isinstance(raw, (bytes, bytearray)):
+        try:
+            import json as _json
+
+            raw = _json.loads(bytes(raw).decode("utf-8", "replace"))
+        except Exception:
+            return {"state": "FAILED", "code": SEARCH_PROVIDER_CODE,
+                    "provider": provider[:40], "query": redact_text(query),
+                    "results": [], "count": 0,
+                    "detail": "X search returned unparseable JSON"}
+    items = raw.get("data") if isinstance(raw, dict) else None
+    if not isinstance(items, list):
+        return {"state": "FAILED", "code": SEARCH_PROVIDER_CODE,
+                "provider": provider[:40], "query": redact_text(query),
+                "results": [], "count": 0,
+                "detail": "X search transport returned no data array"}
+    results: List[Dict[str, Any]] = []
+    for item in items[:limit]:
+        if not isinstance(item, dict):
+            continue
+        results.append({
+            "id": redact_text(str(item.get("id", "")))[:64],
+            "text": redact_text(str(item.get("text", "")))[:MAX_SEARCH_SNIPPET],
+        })
+    _audit("x_search", provider=provider or "xai", results=len(results))
+    return {"state": OK, "ok": True, "code": "WEB_X_SEARCH_OK",
+            "provider": provider[:40], "query": redact_text(query),
+            "results": results, "count": len(results),
+            "transport": "injected"}
 
 
 TOOL_SPECS: Dict[str, Dict[str, Any]] = {
@@ -633,11 +725,13 @@ TOOL_SPECS: Dict[str, Dict[str, Any]] = {
 
 
 def run(cfg: Any, tool: str, arguments: Optional[Dict[str, Any]] = None,
+        transport: Any = None,
         ) -> Dict[str, Any]:
     """Dispatch a planner-proposed ``web.*`` tool through this module.
 
     Wiring point for the shared agent path (orchestrator ``_agent_tool`` /
-    local action registry); unknown tools fail closed.
+    local action registry); unknown tools fail closed. ``transport`` is
+    forwarded to the injected search boundaries.
     """
     name = str(tool or "")
     if name.startswith("web."):
@@ -646,7 +740,7 @@ def run(cfg: Any, tool: str, arguments: Optional[Dict[str, Any]] = None,
     if name in ("fetch", "web_fetch"):
         return fetch(cfg, str(args.get("url") or ""))
     if name in ("search", "web_search"):
-        return search(cfg, str(args.get("query") or ""))
+        return search(cfg, str(args.get("query") or ""), transport=transport)
     if name in ("x_search", "xsearch"):
-        return x_search(cfg, str(args.get("query") or ""))
+        return x_search(cfg, str(args.get("query") or ""), transport=transport)
     raise WebToolError(BAD_INPUT_CODE, f"unknown web tool {tool!r}")

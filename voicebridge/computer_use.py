@@ -341,3 +341,302 @@ def screen(cfg: Any, panes: Any = None, *, layout: str = "columns",
                 "rollback": "Control UI untouched; nothing to roll back"}
     return arrange_screen(cfg, panes, layout=layout,
                           requested_by=requested_by)
+
+
+# ---------------------------------------------------------------------------
+# OC-13: real desktop control through a typed, injected accessibility actuator
+# ---------------------------------------------------------------------------
+ACT_SCHEMA = "qubit-computer-act/1"
+NO_DESKTOP_CODE = "COMPUTER_USE_NO_DESKTOP"
+ACT_CONFIRM_CODE = "COMPUTER_USE_CONFIRM_REQUIRED"
+ACT_BAD_INPUT_CODE = "COMPUTER_USE_BAD_ACTION"
+ACT_ESTOP_CODE = "COMPUTER_USE_ESTOP"
+ACT_FAILED_CODE = "COMPUTER_USE_ACTUATOR_FAILED"
+MAX_ACT_TEXT = 2000
+MAX_ACT_COORD = 32767
+CONTROL_ACTIONS: Tuple[str, ...] = (
+    "click", "double_click", "move", "type", "key", "scroll",
+    "focus", "window_list", "window_activate",
+)
+
+
+def control_actions() -> Dict[str, Any]:
+    """Bounded action catalog for desktop control (OC-13)."""
+    return {"state": "OK", "schema": ACT_SCHEMA,
+            "actions": list(CONTROL_ACTIONS),
+            "detail": "semantic, accessibility-API actions only; no shell, "
+                      "no coordinate injection, no unpinned driver"}
+
+
+def _resolve_actuator(executor: Any) -> Optional[Any]:
+    """Return a callable actuator boundary, or None when unavailable.
+
+    ``executor`` is the *external hardware boundary*: a callable
+    ``(action, args) -> mapping`` supplied by an injected accessibility
+    backend. With no executor the call is an honest typed driver-missing
+    state — Qubit never fabricates a desktop action.
+    """
+    if executor is None:
+        return None
+    if callable(executor):
+        return executor
+    if isinstance(executor, dict):
+        def _dispatch(action: str, args: Dict[str, Any]) -> Any:
+            fn = executor.get(action)
+            if not callable(fn):
+                return {"ok": False, "detail": f"no handler for {action}"}
+            return fn(args)
+        return _dispatch
+    return None
+
+
+def control_status(executor: Any = None) -> Dict[str, Any]:
+    """Report whether a real desktop actuator is available (read-only)."""
+    session = desktop_session()
+    resolved = _resolve_actuator(executor)
+    driver = _driver()
+    if session["headless"]:
+        state, code = "UNAVAILABLE", NO_DESKTOP_CODE
+        detail = session["detail"]
+    elif resolved is None and not driver["present"]:
+        state, code = "UNAVAILABLE", NO_DRIVER_CODE
+        detail = ("no accessibility actuator resolved and no driver present; "
+                  "inject an AT-SPI executor or run with a graphical session")
+    else:
+        state, code = "READY", ""
+        detail = ("accessibility actuator available; actions still require "
+                  "confirmation and pass the e-stop")
+    return {"state": state, "code": code, "schema": ACT_SCHEMA,
+            "session": session["session"], "atspi_reachable":
+            bool(_atspi()["reachable"]),
+            "actuator": "injected" if resolved is not None else (
+                "driver" if driver["present"] else "none"),
+            "detail": detail, "actions": list(CONTROL_ACTIONS)}
+
+
+def _check_act_args(action: str, args: Any) -> Dict[str, Any]:
+    clean = dict(args) if isinstance(args, dict) else {}
+    if action in ("click", "double_click", "move"):
+        for key in ("x", "y"):
+            if key in clean:
+                try:
+                    value = int(clean[key])
+                except (TypeError, ValueError):
+                    raise ValueError(f"{key} must be an integer")
+                if not (-MAX_ACT_COORD <= value <= MAX_ACT_COORD):
+                    raise ValueError(f"{key} out of range")
+                clean[key] = value
+    elif action == "type":
+        text = clean.get("text", "")
+        if not isinstance(text, str) or not text:
+            raise ValueError("type requires non-empty text")
+        if len(text) > MAX_ACT_TEXT:
+            raise ValueError(f"text exceeds {MAX_ACT_TEXT} chars")
+    elif action == "key":
+        name = clean.get("key", "")
+        if not isinstance(name, str) or not name or len(name) > 32:
+            raise ValueError("key requires a bounded key name")
+    elif action == "scroll":
+        direction = str(clean.get("direction", "down"))
+        if direction not in ("up", "down", "left", "right"):
+            raise ValueError("scroll direction must be up/down/left/right")
+        clean["direction"] = direction
+    return clean
+
+
+def act(cfg: Any, action: str, *, args: Any = None, executor: Any = None,
+        confirmed: bool = False, requested_by: str = "cli:user",
+        source: str = "user") -> Dict[str, Any]:
+    """Perform one bounded desktop action through an injected actuator (OC-13).
+
+    The actuator is the only external boundary. With a headless session the
+    call refuses ``COMPUTER_USE_NO_DESKTOP``; with no actuator it refuses
+    ``COMPUTER_USE_NO_DRIVER``; unconfirmed calls are denied before any
+    actuator is invoked. Nothing here shells out or downloads a driver.
+    """
+    if _estop(cfg):
+        return {"state": "ESTOP", "code": ACT_ESTOP_CODE,
+                "detail": "emergency stop latched; desktop action refused",
+                "owner": "qubit-policy",
+                "rollback": "no action sent; nothing to roll back"}
+    clean_action = str(action or "").strip().lower()
+    if clean_action not in CONTROL_ACTIONS:
+        return {"state": "FAILED", "code": ACT_BAD_INPUT_CODE,
+                "detail": f"unknown action {action!r}; allowed: "
+                          f"{', '.join(CONTROL_ACTIONS)}",
+                "owner": "qubit-policy",
+                "rollback": "no action sent; nothing to roll back"}
+    session = desktop_session()
+    if session["headless"]:
+        return {"state": "UNAVAILABLE", "code": NO_DESKTOP_CODE,
+                "detail": session["detail"], "owner": "qubit-policy",
+                "rollback": "no action sent; nothing to roll back"}
+    if not confirmed:
+        return {"state": "denied", "code": ACT_CONFIRM_CODE,
+                "detail": "desktop actions require explicit --confirm",
+                "owner": "qubit-policy",
+                "rollback": "no action sent; nothing to roll back"}
+    actuator = _resolve_actuator(executor)
+    if actuator is None and not _driver()["present"]:
+        return refuse_install()
+    try:
+        clean_args = _check_act_args(clean_action, args)
+    except ValueError as exc:
+        return {"state": "FAILED", "code": ACT_BAD_INPUT_CODE,
+                "detail": str(exc), "owner": "qubit-policy",
+                "rollback": "no action sent; nothing to roll back"}
+    if actuator is None:
+        return refuse_install()
+    try:
+        result = actuator(clean_action, clean_args)
+    except Exception as exc:
+        return {"state": "FAILED", "code": ACT_FAILED_CODE,
+                "detail": _redact(str(exc))[:200], "owner": "qubit-policy",
+                "rollback": "action may be partial; retry or reset manually"}
+    if isinstance(result, dict):
+        detail = _redact(str(result.get("detail", "")))[:200]
+        ok = bool(result.get("ok", result.get("state") == "OK"))
+        extra = {k: v for k, v in result.items()
+                 if k not in ("ok", "detail", "state") and
+                 isinstance(v, (str, int, float, bool))}
+    else:
+        ok, detail, extra = bool(result), "", {}
+    _audit("act", requested_by, {"action": clean_action, "ok": str(ok)})
+    return {"state": "OK" if ok else "FAILED",
+            "code": "" if ok else ACT_FAILED_CODE,
+            "schema": ACT_SCHEMA, "action": clean_action,
+            "detail": detail, "result": extra,
+            "authority": "injected accessibility actuator; no shell, no "
+                         "coordinates forced, no driver download"}
+
+
+def ghost_executors(transport: Any) -> Dict[str, Any]:
+    """Build real GhostRunner executors over an injected accessibility bus (OC-14).
+
+    ``transport`` is the external boundary: a callable
+    ``(action_id, env) -> str``. The returned mapping uses the exact Ghost
+    action ids so the existing :class:`voicebridge.ghost.GhostRunner` (its
+    gate, grants, audit, and e-stop) drives a real actuator instead of a
+    fixture. No executor is invented for an unknown action id.
+    """
+    namespace = "ghost"
+
+    def _executor(action_id: str) -> Any:
+        def _run(env: Dict[str, Any]) -> str:
+            return transport(f"{namespace}.{action_id}", env)
+        return _run
+
+    return {
+        f"{namespace}.desktop.discover": _executor("desktop.discover"),
+        f"{namespace}.desktop.launch": _executor("desktop.launch"),
+        f"{namespace}.window.anchor": _executor("window.anchor"),
+        f"{namespace}.desktop.screenshot": _executor("desktop.screenshot"),
+        f"{namespace}.input.click": _executor("input.click"),
+        f"{namespace}.input.type": _executor("input.type"),
+        f"{namespace}.input.scroll": _executor("input.scroll"),
+        f"{namespace}.input.key": _executor("input.key"),
+    }
+
+
+# ---------------------------------------------------------------------------
+# OC-16 / OC-51: screen snapshot work journal
+# ---------------------------------------------------------------------------
+SNAPSHOT_SCHEMA = "qubit-screen-snapshot/1"
+SNAPSHOT_CONFIRM_CODE = "COMPUTER_USE_SNAPSHOT_CONFIRM_REQUIRED"
+SNAPSHOT_ESTOP_CODE = "COMPUTER_USE_SNAPSHOT_ESTOP"
+
+
+def _journal(cfg: Any):
+    from .evaluation.logbook import Logbook
+
+    return Logbook(Path(cfg.state_dir()) / "work-journal.jsonl")
+
+
+def snapshot(cfg: Any, *, grabber: Any = None, vision: Any = None,
+             note: str = "", confirmed: bool = False,
+             requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Capture one screen snapshot into the Logbook work journal (OC-16).
+
+    ``grabber`` is the external display boundary; without it the call is the
+    typed ``LOGBOOK_CAPTURE_UNAVAILABLE`` refusal. With it, the image is
+    size-capped, persisted 0600, and journaled append-only.
+    """
+    if _estop(cfg):
+        return {"state": "ESTOP", "code": SNAPSHOT_ESTOP_CODE,
+                "detail": "emergency stop latched; snapshot refused",
+                "owner": "qubit-policy",
+                "rollback": "nothing captured; no screen access attempted"}
+    if not confirmed:
+        return {"state": "denied", "code": SNAPSHOT_CONFIRM_CODE,
+                "detail": "screen snapshot requires explicit --confirm",
+                "owner": "qubit-policy",
+                "rollback": "nothing captured; no screen access attempted"}
+    from .evaluation.logbook import capture_to
+
+    out = capture_to(_journal(cfg), grabber=grabber, vision=vision,
+                     evidence_dir=Path(cfg.state_dir()) / "screen-journal",
+                     source="screen-journal", actor=requested_by,
+                     confirmed=True)
+    if isinstance(out, dict) and note:
+        out["note"] = _redact(str(note))[:200]
+    _audit("snapshot", requested_by, {"state": str(out.get("state", ""))})
+    if out.get("state") == "OK":
+        out["schema"] = SNAPSHOT_SCHEMA
+    return out
+
+
+def snapshot_journal(cfg: Any, *, limit: int = 50) -> Dict[str, Any]:
+    """Read the screen-snapshot work journal (read-only)."""
+    try:
+        items = _journal(cfg).entries(limit=max(1, min(int(limit), 500)))
+    except Exception as exc:
+        return {"state": "DEGRADED", "code": "COMPUTER_USE_JOURNAL_ERROR",
+                "detail": _redact(str(exc))[:200], "entries": []}
+    snaps = [it for it in items if it.get("kind") == "screen.snapshot"]
+    return {"state": "OK", "schema": SNAPSHOT_SCHEMA, "entries": snaps,
+            "count": len(snaps),
+            "authority": "read-only journal; images are untrusted evidence"}
+
+
+# ---------------------------------------------------------------------------
+# OC-17: CUA browser family (get_browser_state, etc.)
+# ---------------------------------------------------------------------------
+CUA_SCHEMA = "qubit-cua-browser/1"
+
+
+def cua_browser_state(cfg: Any, target: str = "") -> Dict[str, Any]:
+    """Normalized CUA browser-family state over the loopback CDP stack (OC-17).
+
+    Composes the existing real browser operations (tabs + read) into the
+    upstream CUA shape (url/title/tabs/focused text). With no CDP endpoint the
+    result is the typed ``BROWSER_UNAVAILABLE`` state, never a fabricated
+    state.
+    """
+    from . import browser_tabs
+
+    tabs_out = browser_tabs.tabs(cfg)
+    if tabs_out.get("state") != "OK":
+        return {"state": tabs_out.get("state", "UNAVAILABLE"),
+                "code": tabs_out.get("code", browser_tabs.UNAVAILABLE_CODE),
+                "schema": CUA_SCHEMA, "detail": tabs_out.get("detail", ""),
+                "owner": "qubit-policy",
+                "rollback": "browser untouched; nothing to roll back"}
+    try:
+        page = browser_tabs.read(cfg, target)
+    except browser_tabs.BrowserTabsError as exc:
+        return {"state": "UNAVAILABLE", "code": exc.code,
+                "schema": CUA_SCHEMA, "detail": exc.detail[:300],
+                "owner": "qubit-policy",
+                "rollback": "browser untouched; nothing to roll back"}
+    if page.get("state") != "OK":
+        return {"state": page.get("state", "UNAVAILABLE"),
+                "code": page.get("code", ""), "schema": CUA_SCHEMA,
+                "detail": page.get("detail", ""), "owner": "qubit-policy",
+                "rollback": "browser untouched; nothing to roll back"}
+    return {"state": "OK", "schema": CUA_SCHEMA,
+            "url": page.get("url", ""), "title": page.get("title", ""),
+            "text": page.get("text", ""),
+            "current_target": tabs_out.get("current_target", ""),
+            "tabs": tabs_out.get("tabs", []),
+            "trust": "untrusted-page-text",
+            "authority": "loopback CDP read-only; personal profiles untouched"}

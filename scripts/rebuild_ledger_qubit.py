@@ -614,9 +614,82 @@ def build_catalog_rows(catalog: Dict[str, Dict[str, object]],
 # ---------------------------------------------------------------------------
 # Hermes gated upstream surface (distinct gate codes)
 # ---------------------------------------------------------------------------
+def _gate_sample(pattern: str) -> str:
+    """Build a concrete path for a compat regex pattern (best effort)."""
+    p = re.sub(r"\(\?P<[^>]+>", "", pattern)
+    p = p.replace("[^/]+", "x").replace(".*", "").replace(".+", "x")
+    return p.replace("(", "").replace(")", "").replace("?", "")
+
+
+def _handler_kind(name: str) -> str:
+    """Reuse the Hermes generator's live handler classification."""
+    try:
+        scripts_dir = str(Path(__file__).resolve().parent)
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        from rebuild_ledger_hermes import _handler_kind as _hk
+        return _hk(name)
+    except Exception:
+        return ""
+
+
+_API_INDEX_CACHE: Optional[object] = None
+
+
+def _api_proof(handler: str) -> str:
+    """On-disk proving test for ``handler`` (Hermes generator's own index)."""
+    global _API_INDEX_CACHE
+    try:
+        scripts_dir = str(Path(__file__).resolve().parent)
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        from rebuild_ledger_hermes import build_api_index, ROUTE_EVIDENCE
+        if _API_INDEX_CACHE is None:
+            _API_INDEX_CACHE = build_api_index()
+        return _API_INDEX_CACHE.proof(handler)
+    except Exception:
+        return ""
+
+
+def _string_gate_superseded(method: str, pattern: str, gate: object) -> bool:
+    """True when a bare-handler GATED entry is genuinely superseded.
+
+    A bare-string gate is only retired when ALL of these hold, so a capability
+    can never silently vanish from the ledger:
+
+    * ``HC.match`` resolves the route to a real read/write handler (not a
+      gate/stub);
+    * no ``ROUTE_EVIDENCE`` override still forces the route to ``GATED``;
+    * an on-disk proving test exercises the resolved handler.
+
+    Otherwise the gate stays open (it represents real Qubit policy or an
+    untested capability).
+    """
+    try:
+        from rebuild_ledger_hermes import ROUTE_EVIDENCE
+    except Exception:
+        return False
+    override = ROUTE_EVIDENCE.get((method, pattern), {})
+    if override.get("status") == "GATED":
+        return False
+    try:
+        route, _ = HC.match(method, _gate_sample(pattern))
+    except Exception:
+        return False
+    if not route or route.get("disposition") == "gated":
+        return False
+    handler = str(route.get("handler", ""))
+    if _handler_kind(handler) not in ("real", "implemented"):
+        return False
+    return bool(_api_proof(handler))
+
+
 def build_gated_rows() -> List[Dict[str, str]]:
     gate_rows: Dict[str, Dict[str, object]] = {}
     for method, pattern, gate in HC.GATED:
+        if not isinstance(gate, dict) and \
+                _string_gate_superseded(method, pattern, gate):
+            continue
         if isinstance(gate, dict):
             code = gate.get("code", "GATED")
             info = {

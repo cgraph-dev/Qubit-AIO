@@ -163,17 +163,8 @@ def test_cli_subcommand_rows_are_caller_and_test_derived() -> None:
     for fam, sub, qfam, qsub, surface, _qubit, _ref in rebuild.SUBS:
         row = rows.get(f"cli:{fam} {sub}")
         assert row is not None, (fam, sub)
-        native = bool(qfam) and (qsub in families.get(qfam, set()))
-        forwarded = bool(qfam) and (qfam, qsub) in forward
-        caller = native or forwarded
-        if forwarded:
-            proof = index.forward_proof
-        elif qfam and qsub:
-            proof = index.pair_proof(qfam, qsub)
-        elif qfam:
-            proof = index.family_proof(qfam)
-        else:
-            proof = ""
+        caller, forwarded, proof = rebuild._sub_caller_proof(
+            qfam, qsub, families, index, forward)
         expected = rebuild._derive_cli_status(surface, caller, bool(proof),
                                               forwarded=forwarded)
         if expected == "IMPLEMENTED" and not proof:

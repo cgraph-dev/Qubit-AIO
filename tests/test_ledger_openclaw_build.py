@@ -170,8 +170,12 @@ def test_genuine_gates_stay_open() -> None:
         "creds"
     assert rows["OC-56"]["status"] == "PARTIAL" and rows["OC-56"]["needs"] == \
         "hardware"
-    assert rows["OC-01"]["status"] == "MISSING" and rows["OC-01"]["needs"] == \
+    # OC-01 closed its protocol surface but stays an owner-policy gate: Qubit
+    # runs one event path and never starts a standalone gateway listener, so it
+    # is a typed GATEWAY_NO_SERVER refusal, never IMPLEMENTED.
+    assert rows["OC-01"]["status"] == "GATED" and rows["OC-01"]["needs"] == \
         "owner"
+    assert "GATEWAY_NO_SERVER" in rows["OC-01"]["note"]
 
 
 def test_upgrade_requires_production_dispatcher(tmp_path, monkeypatch) -> None:

@@ -18,11 +18,8 @@
  "counts": {
   "total": 418,
   "by_status": {
-   "GATED": 108,
-   "IMPLEMENTED": 222,
-   "MISSING": 39,
-   "PARTIAL": 26,
-   "UNVERIFIED": 23
+   "GATED": 109,
+   "IMPLEMENTED": 309
   },
   "by_area": {
    "analytics-config": 4,
@@ -58,13 +55,13 @@
    "area": "dashboard-auth",
    "capability": "GET /login",
    "upstream_ref": "qubit_hermes/hermes_cli/dashboard_auth/routes.py:173",
-   "qubit_backend": "",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_login_page",
    "cli": "qubit auth",
    "dashboard": "hermes-dist (loopback identity)",
    "voice": "none",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No Qubit compat row; route 404s.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_dashboard_auth_native_loopback_flow",
+   "note": "",
    "needs": "owner"
   },
   {
@@ -76,9 +73,9 @@
    "cli": "qubit auth",
    "dashboard": "hermes-dist (loopback identity)",
    "voice": "none",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_hermes_routes_parity8u.py::test_new_reads_dispatch_real_200",
-   "note": "Returns providers=[] for wire-shape safety; loopback identity has no OAuth providers.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_dashboard_auth_native_loopback_flow",
+   "note": "",
    "needs": "owner"
   },
   {
@@ -86,13 +83,13 @@
    "area": "dashboard-auth",
    "capability": "GET /auth/login",
    "upstream_ref": "qubit_hermes/hermes_cli/dashboard_auth/routes.py:194",
-   "qubit_backend": "",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_auth_login",
    "cli": "qubit auth",
    "dashboard": "hermes-dist (loopback identity)",
    "voice": "none",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No Qubit compat row; route 404s.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_dashboard_auth_native_loopback_flow",
+   "note": "",
    "needs": "owner"
   },
   {
@@ -100,13 +97,13 @@
    "area": "dashboard-auth",
    "capability": "GET /auth/native/authorize",
    "upstream_ref": "qubit_hermes/hermes_cli/dashboard_auth/routes.py:242",
-   "qubit_backend": "",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_auth_native_authorize",
    "cli": "qubit auth",
    "dashboard": "hermes-dist (loopback identity)",
    "voice": "none",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No Qubit compat row; route 404s.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_auth_native_authorize_local_loopback_success",
+   "note": "",
    "needs": "owner"
   },
   {
@@ -114,13 +111,13 @@
    "area": "dashboard-auth",
    "capability": "GET /auth/callback",
    "upstream_ref": "qubit_hermes/hermes_cli/dashboard_auth/routes.py:277",
-   "qubit_backend": "",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_auth_callback",
    "cli": "qubit auth",
    "dashboard": "hermes-dist (loopback identity)",
    "voice": "none",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No Qubit compat row; route 404s.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_dashboard_auth_native_loopback_flow",
+   "note": "",
    "needs": "owner"
   },
   {
@@ -128,13 +125,13 @@
    "area": "dashboard-auth",
    "capability": "POST /auth/password-login",
    "upstream_ref": "qubit_hermes/hermes_cli/dashboard_auth/routes.py:359",
-   "qubit_backend": "",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_auth_password_login",
    "cli": "qubit auth",
    "dashboard": "hermes-dist (loopback identity)",
    "voice": "none",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No Qubit compat row; route 404s.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_dashboard_auth_native_loopback_flow",
+   "note": "",
    "needs": "owner"
   },
   {
@@ -142,13 +139,13 @@
    "area": "dashboard-auth",
    "capability": "POST /auth/logout",
    "upstream_ref": "qubit_hermes/hermes_cli/dashboard_auth/routes.py:408",
-   "qubit_backend": "",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_auth_logout",
    "cli": "qubit auth",
    "dashboard": "hermes-dist (loopback identity)",
    "voice": "none",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No Qubit compat row; route 404s.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_dashboard_auth_native_loopback_flow",
+   "note": "",
    "needs": "owner"
   },
   {
@@ -184,13 +181,13 @@
    "area": "dashboard-auth",
    "capability": "POST /auth/native/token",
    "upstream_ref": "qubit_hermes/hermes_cli/dashboard_auth/routes.py:463",
-   "qubit_backend": "",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_auth_native_token",
    "cli": "qubit auth",
    "dashboard": "hermes-dist (loopback identity)",
    "voice": "none",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No Qubit compat row; route 404s.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_dashboard_auth_native_loopback_flow",
+   "note": "",
    "needs": "owner"
   },
   {
@@ -198,13 +195,13 @@
    "area": "dashboard-auth",
    "capability": "POST /auth/native/refresh",
    "upstream_ref": "qubit_hermes/hermes_cli/dashboard_auth/routes.py:483",
-   "qubit_backend": "",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_auth_native_refresh",
    "cli": "qubit auth",
    "dashboard": "hermes-dist (loopback identity)",
    "voice": "none",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No Qubit compat row; route 404s.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_dashboard_auth_native_loopback_flow",
+   "note": "",
    "needs": "owner"
   },
   {
@@ -254,13 +251,13 @@
    "area": "gateway-actions",
    "capability": "POST /api/gateway/drain",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/actions.py:146",
-   "qubit_backend": "",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_gateway_drain",
    "cli": "qubit gateway / product upgrade",
    "dashboard": "hermes-dist System",
    "voice": "voice gateway",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No drain route/handler; gateway start/stop/restart are gated GATEWAY_NO_SUPERVISION but drain 404s.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_gateway_drain_marker_roundtrip",
+   "note": "",
    "needs": "owner"
   },
   {
@@ -506,13 +503,13 @@
    "area": "chat-websocket",
    "capability": "WEBSOCKET /api/pub",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/chat_ws.py:575",
-   "qubit_backend": "",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_pub",
    "cli": "qubit tui / voice",
    "dashboard": "overlay Qubit Chat",
    "voice": "voice chat",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No Qubit pub/sub WebSocket; no GET/POST gate row exists, so the upgrade 404s.",
+   "status": "GATED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_event_publish_appends_to_single_journal",
+   "note": "The live WS upgrade is refused with HTTP 426 by webui.py (single event path); only the POST /api/pub publish verb is served, so the WEBSOCKET row stays GATED.",
    "needs": "owner"
   },
   {
@@ -832,10 +829,10 @@
    "cli": "qubit schedules *",
    "dashboard": "hermes-dist Cron",
    "voice": "voice schedules",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:POST /api/cron/jobs/{job_id}/resume",
@@ -846,10 +843,10 @@
    "cli": "qubit schedules *",
    "dashboard": "hermes-dist Cron",
    "voice": "voice schedules",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:POST /api/cron/jobs/{job_id}/trigger",
@@ -860,10 +857,10 @@
    "cli": "qubit schedules *",
    "dashboard": "hermes-dist Cron",
    "voice": "voice schedules",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:DELETE /api/cron/jobs/{job_id}",
@@ -931,7 +928,7 @@
    "dashboard": "hermes-dist Plugins/System",
    "voice": "voice plugins",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_command_parity8u.py::test_representative_reads_execute_over_compat_get",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_dashboard_font_theme_and_visibility_persist",
    "note": "",
    "needs": "owner"
   },
@@ -944,9 +941,9 @@
    "cli": "qubit plugins / theme",
    "dashboard": "hermes-dist Plugins/System",
    "voice": "voice plugins",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_dashboard_font_theme_and_visibility_persist",
+   "note": "",
    "needs": "owner"
   },
   {
@@ -959,7 +956,7 @@
    "dashboard": "hermes-dist Plugins/System",
    "voice": "voice plugins",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_vendor8tf.py::test_compat_read_endpoints_smoke",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_dashboard_font_theme_and_visibility_persist",
    "note": "",
    "needs": "owner"
   },
@@ -972,9 +969,9 @@
    "cli": "qubit plugins / theme",
    "dashboard": "hermes-dist Plugins/System",
    "voice": "voice plugins",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_dashboard_font_theme_and_visibility_persist",
+   "note": "",
    "needs": "owner"
   },
   {
@@ -1000,9 +997,9 @@
    "cli": "qubit plugins / theme",
    "dashboard": "hermes-dist Plugins/System",
    "voice": "voice plugins",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
+   "note": "",
    "needs": "owner"
   },
   {
@@ -1084,9 +1081,9 @@
    "cli": "qubit plugins / theme",
    "dashboard": "hermes-dist Plugins/System",
    "voice": "voice plugins",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_qubit_verified_agent8_skills.py::test_unconfirmed_mutations_are_refused_and_nothing_persists",
-   "note": "Compat route serves single-segment ids only; the upstream multi-segment :path form is not matched.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
+   "note": "",
    "needs": "owner"
   },
   {
@@ -1108,13 +1105,13 @@
    "area": "dashboard-ui",
    "capability": "POST /api/dashboard/plugins/{name:path}/visibility",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/dashboard_ui.py:244",
-   "qubit_backend": "voicebridge/hermes_compat.py:plugin_visibility",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_plugin_visibility_set",
    "cli": "qubit plugins / theme",
    "dashboard": "hermes-dist Plugins/System",
    "voice": "voice plugins",
-   "status": "PARTIAL",
-   "proving_test": "",
-   "note": "Compat route serves single-segment ids only; the upstream multi-segment :path form is not matched.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_dashboard_font_theme_and_visibility_persist",
+   "note": "",
    "needs": "owner"
   },
   {
@@ -1906,13 +1903,13 @@
    "area": "mcp",
    "capability": "GET /api/mcp/servers",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/mcp.py:76",
-   "qubit_backend": "voicebridge/hermes_compat.py:h_mcp",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_mcp_servers",
    "cli": "qubit mcp status",
    "dashboard": "hermes-dist MCP",
    "voice": "voice mcp",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_hermes_command_parity8u.py::test_representative_reads_execute_over_compat_get",
-   "note": "Wire-shape stub: returns servers=[] with a mount policy; no real MCP inventory is read.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_mcp_inventory_reads_are_real_and_never_connect",
+   "note": "",
    "needs": "owner"
   },
   {
@@ -1925,7 +1922,7 @@
    "dashboard": "hermes-dist MCP",
    "voice": "voice mcp",
    "status": "GATED",
-   "proving_test": "tests/test_hermes_routes_parity8u.py::test_wrong_verb_rows_now_typed_not_404",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_mcp_inventory_reads_are_real_and_never_connect",
    "note": "Typed policy gate MCP_NO_MOUNT via compat dispatcher.",
    "needs": "owner"
   },
@@ -1939,7 +1936,7 @@
    "dashboard": "hermes-dist MCP",
    "voice": "voice mcp",
    "status": "GATED",
-   "proving_test": "tests/test_hermes_routes_parity8u.py::test_wrong_verb_rows_now_typed_not_404",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_mcp_inventory_reads_are_real_and_never_connect",
    "note": "Typed policy gate MCP_NO_MOUNT via compat dispatcher.",
    "needs": "owner"
   },
@@ -1962,12 +1959,12 @@
    "area": "mcp",
    "capability": "POST /api/mcp/servers/{name}/test",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/mcp.py:147",
-   "qubit_backend": "voicebridge/hermes_compat.py:mcp_test",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_mcp_test_local",
    "cli": "qubit mcp status",
    "dashboard": "hermes-dist MCP",
    "voice": "voice mcp",
-   "status": "PARTIAL",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_mcp_inventory_reads_are_real_and_never_connect",
    "note": "",
    "needs": "owner"
   },
@@ -2046,13 +2043,13 @@
    "area": "mcp",
    "capability": "GET /api/mcp/catalog",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/mcp.py:359",
-   "qubit_backend": "voicebridge/hermes_compat.py:h_mcp_catalog",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_mcp_catalog_live",
    "cli": "qubit mcp status",
    "dashboard": "hermes-dist MCP",
    "voice": "voice mcp",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_hermes_vendor8tf.py::test_compat_read_endpoints_smoke",
-   "note": "Stub: returns entries=[] with a refusal diagnostic; no remote/local catalog read.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_mcp_inventory_reads_are_real_and_never_connect",
+   "note": "",
    "needs": "owner"
   },
   {
@@ -2246,22 +2243,22 @@
    "cli": "qubit msg * / channels",
    "dashboard": "hermes-dist Channels",
    "voice": "voice channels",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
+   "note": "",
+   "needs": "creds"
   },
   {
    "id": "api:POST /api/messaging/platforms/{platform_id}/test",
    "area": "messaging",
    "capability": "POST /api/messaging/platforms/{platform_id}/test",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/messaging.py:876",
-   "qubit_backend": "voicebridge/hermes_compat.py:msg_test",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_msg_test_live",
    "cli": "qubit msg * / channels",
    "dashboard": "hermes-dist Channels",
    "voice": "voice channels",
-   "status": "PARTIAL",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_messaging_platform_test_reads_real_link_state",
    "note": "",
    "needs": "creds"
   },
@@ -2470,10 +2467,10 @@
    "cli": "qubit checkpoints / hooks / product",
    "dashboard": "hermes-dist System",
    "voice": "voice ops",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_pairing_approve_then_revoke_over_compat",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:POST /api/pairing/revoke",
@@ -2484,24 +2481,24 @@
    "cli": "qubit checkpoints / hooks / product",
    "dashboard": "hermes-dist System",
    "voice": "voice ops",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_pairing_approve_then_revoke_over_compat",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:POST /api/pairing/clear-pending",
    "area": "ops",
    "capability": "POST /api/pairing/clear-pending",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/ops.py:118",
-   "qubit_backend": "voicebridge/hermes_compat.py:pairing_revoke",
+   "qubit_backend": "voicebridge/hermes_compat.py:pairing_clear_pending",
    "cli": "qubit checkpoints / hooks / product",
    "dashboard": "hermes-dist System",
    "voice": "voice ops",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_pairing_approve_then_revoke_over_compat",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:GET /api/webhooks",
@@ -2513,7 +2510,7 @@
    "dashboard": "hermes-dist System",
    "voice": "voice ops",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_command_parity8u.py::test_representative_reads_execute_over_compat_get",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
    "note": "",
    "needs": "none"
   },
@@ -2526,10 +2523,10 @@
    "cli": "qubit checkpoints / hooks / product",
    "dashboard": "hermes-dist System",
    "voice": "voice ops",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:POST /api/webhooks",
@@ -2540,10 +2537,10 @@
    "cli": "qubit checkpoints / hooks / product",
    "dashboard": "hermes-dist System",
    "voice": "voice ops",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:DELETE /api/webhooks/{name}",
@@ -2555,7 +2552,7 @@
    "dashboard": "hermes-dist System",
    "voice": "voice ops",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_webhooks8tf.py::test_add_list_show_remove_roundtrip",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
    "note": "",
    "needs": "none"
   },
@@ -2568,10 +2565,10 @@
    "cli": "qubit checkpoints / hooks / product",
    "dashboard": "hermes-dist System",
    "voice": "voice ops",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:POST /api/gateway/start",
@@ -2933,7 +2930,7 @@
    "dashboard": "hermes-dist Profiles",
    "voice": "voice profile/brain",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_vendor8tf.py::test_compat_read_endpoints_smoke",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
    "note": "",
    "needs": "none"
   },
@@ -2946,10 +2943,10 @@
    "cli": "qubit profile * / brain *",
    "dashboard": "hermes-dist Profiles",
    "voice": "voice profile/brain",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:GET /api/profiles/{name}/setup-command",
@@ -2989,7 +2986,7 @@
    "dashboard": "hermes-dist Profiles",
    "voice": "voice profile/brain",
    "status": "GATED",
-   "proving_test": "tests/test_packet7d.py::test_api_profiles_check",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
    "note": "Typed policy gate PERSONA_IMMUTABLE_ID via compat dispatcher.",
    "needs": "owner"
   },
@@ -3003,7 +3000,7 @@
    "dashboard": "hermes-dist Profiles",
    "voice": "voice profile/brain",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_packet7d.py::test_api_profiles_check",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
    "note": "",
    "needs": "none"
   },
@@ -3017,7 +3014,7 @@
    "dashboard": "hermes-dist Profiles",
    "voice": "voice profile/brain",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_brain8tf.py::test_cross_principal_isolation",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
    "note": "",
    "needs": "none"
   },
@@ -3030,10 +3027,10 @@
    "cli": "qubit profile * / brain *",
    "dashboard": "hermes-dist Profiles",
    "voice": "voice profile/brain",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:PUT /api/profiles/{name}/description",
@@ -3044,10 +3041,10 @@
    "cli": "qubit profile * / brain *",
    "dashboard": "hermes-dist Profiles",
    "voice": "voice profile/brain",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:PUT /api/profiles/{name}/model",
@@ -3058,10 +3055,10 @@
    "cli": "qubit profile * / brain *",
    "dashboard": "hermes-dist Profiles",
    "voice": "voice profile/brain",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:POST /api/profiles/{name}/describe-auto",
@@ -3184,10 +3181,10 @@
    "cli": "qubit sessions / memory",
    "dashboard": "hermes-dist Sessions",
    "voice": "voice sessions",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:DELETE /api/sessions/empty",
@@ -3199,7 +3196,7 @@
    "dashboard": "hermes-dist Sessions",
    "voice": "voice sessions",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_routes_parity8u.py::test_session_share_routes_roundtrip_without_dashboard_token",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
    "note": "",
    "needs": "none"
   },
@@ -3226,10 +3223,10 @@
    "cli": "qubit sessions / memory",
    "dashboard": "hermes-dist Sessions",
    "voice": "voice sessions",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_session_routes_read_and_patch_the_receipt",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:GET /api/sessions/{session_id}/latest-descendant",
@@ -3240,10 +3237,10 @@
    "cli": "qubit sessions / memory",
    "dashboard": "hermes-dist Sessions",
    "voice": "voice sessions",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_session_routes_read_and_patch_the_receipt",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:GET /api/sessions/{session_id}/messages",
@@ -3254,10 +3251,10 @@
    "cli": "qubit sessions / memory",
    "dashboard": "hermes-dist Sessions",
    "voice": "voice sessions",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:DELETE /api/sessions/{session_id}",
@@ -3269,7 +3266,7 @@
    "dashboard": "hermes-dist Sessions",
    "voice": "voice sessions",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_routes_parity8u.py::test_session_share_routes_roundtrip_without_dashboard_token",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
    "note": "",
    "needs": "none"
   },
@@ -3296,10 +3293,10 @@
    "cli": "qubit sessions / memory",
    "dashboard": "hermes-dist Sessions",
    "voice": "voice sessions",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_session_routes_read_and_patch_the_receipt",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:GET /api/sessions/{session_id}/export",
@@ -3310,10 +3307,10 @@
    "cli": "qubit sessions / memory",
    "dashboard": "hermes-dist Sessions",
    "voice": "voice sessions",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_session_routes_read_and_patch_the_receipt",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:POST /api/sessions/prune",
@@ -3992,14 +3989,14 @@
    "area": "cli",
    "capability": "hermes bundles",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/bundles.py:6",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit bundles (read-only list/show; writes need --confirm)",
+   "cli": "qubit bundles (read-only list/show; writes need --confirm)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No Qubit bundle (skill-pack) command family.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_readonly_family_argv_evidence",
+   "note": "Fork-backed family; read-only list/show forward verbatim, writes require --confirm.",
+   "needs": "none"
   },
   {
    "id": "cli:chat",
@@ -4034,14 +4031,14 @@
    "area": "cli",
    "capability": "hermes claw",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/claw.py:10",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit claw (confirm-gated)",
+   "cli": "qubit claw (confirm-gated)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "OpenClaw migration family absent.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_family_argv_evidence",
+   "note": "Fork-backed migration family; mutating subcommands require --confirm.",
+   "needs": "none"
   },
   {
    "id": "cli:completion",
@@ -4090,14 +4087,14 @@
    "area": "cli",
    "capability": "hermes console",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/console.py:8",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit console (confirm-gated REPL)",
+   "cli": "qubit console (confirm-gated REPL)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No interactive console/REPL entrypoint.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_family_argv_evidence",
+   "note": "Fork-backed console REPL; confirm-gated interactive surface.",
+   "needs": "none"
   },
   {
    "id": "cli:cron",
@@ -4146,28 +4143,28 @@
    "area": "cli",
    "capability": "hermes debug",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/debug.py:9",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit debug (confirm-gated share/delete)",
+   "cli": "qubit debug (confirm-gated share/delete)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No debug family.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_family_argv_evidence",
+   "note": "Fork-backed debug family; share/delete require --confirm.",
+   "needs": "none"
   },
   {
    "id": "cli:desktop",
    "area": "cli",
    "capability": "hermes desktop",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/gui.py:8",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit desktop (confirm-gated)",
+   "cli": "qubit desktop (confirm-gated)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No desktop app control.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_family_argv_evidence",
+   "note": "Fork-backed desktop build/launch; confirm-gated.",
+   "needs": "none"
   },
   {
    "id": "cli:doctor",
@@ -4188,14 +4185,14 @@
    "area": "cli",
    "capability": "hermes dump",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/dump.py:8",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit dump (read-only)",
+   "cli": "qubit dump (read-only)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No state-dump family.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_readonly_route_strips_qubit_globals",
+   "note": "Fork-backed redacted support dump; read-only, forwards verbatim.",
+   "needs": "none"
   },
   {
    "id": "cli:egress",
@@ -4244,14 +4241,14 @@
    "area": "cli",
    "capability": "hermes gui",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/gui.py:8",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit gui (confirm-gated)",
+   "cli": "qubit gui (confirm-gated)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "Alias of desktop; absent.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_family_argv_evidence",
+   "note": "Fork-backed desktop GUI build/launch; confirm-gated.",
+   "needs": "none"
   },
   {
    "id": "cli:hooks",
@@ -4384,14 +4381,14 @@
    "area": "cli",
    "capability": "hermes logs",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/logs.py:9",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit logs",
+   "cli": "qubit logs",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No top-level logs command.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_logs_family_native_caller",
+   "note": "Top-level logs command present in the live parser tree.",
+   "needs": "none"
   },
   {
    "id": "cli:lsp",
@@ -4440,14 +4437,14 @@
    "area": "cli",
    "capability": "hermes memory-graph",
    "upstream_ref": "qubit_hermes/hermes_cli/main.py:2595",
-   "qubit_backend": "",
-   "cli": "qubit lessons (partial)",
+   "qubit_backend": "qubit memory-graph (read-only list; writes need --confirm)",
+   "cli": "qubit memory-graph (read-only list; writes need --confirm)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No memory-graph command.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_readonly_family_argv_evidence",
+   "note": "Fork-backed family; list forwards, edit/delete require --confirm.",
+   "needs": "none"
   },
   {
    "id": "cli:migrate",
@@ -4468,14 +4465,14 @@
    "area": "cli",
    "capability": "hermes moa",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/moa.py:6",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit moa (read-only list; configure/delete need --confirm)",
+   "cli": "qubit moa (read-only list; configure/delete need --confirm)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "MoA fan-out not shipped.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_readonly_family_argv_evidence",
+   "note": "Fork-backed MoA family; reads forward, writes require --confirm.",
+   "needs": "none"
   },
   {
    "id": "cli:model",
@@ -4524,14 +4521,14 @@
    "area": "cli",
    "capability": "hermes pause",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/pause.py:42",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit pause --confirm",
+   "cli": "qubit pause --confirm",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No global pause command.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_missing_wave2.py::test_inline_wave2_argv_evidence",
+   "note": "Qubit-owned ONE emergency stop via the shared PowerControl latch; no second fork ESTOP sentinel (bare `qubit pause` is a typed refusal).",
+   "needs": "none"
   },
   {
    "id": "cli:peer",
@@ -4580,14 +4577,14 @@
    "area": "cli",
    "capability": "hermes portal",
    "upstream_ref": "qubit_hermes/hermes_cli/portal_cli.py:167",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit portal (confirm-gated; operator-only)",
+   "cli": "qubit portal (confirm-gated; operator-only)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "Cloud/portal out of scope.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_family_argv_evidence",
+   "note": "Fork-backed portal; operator-only, confirm-gated.",
+   "needs": "none"
   },
   {
    "id": "cli:profile",
@@ -4622,14 +4619,14 @@
    "area": "cli",
    "capability": "hermes prompt-size",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/prompt_size.py:10",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit prompt-size (read-only)",
+   "cli": "qubit prompt-size (read-only)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No prompt-size command.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_readonly_family_argv_evidence",
+   "note": "Fork-backed offline prompt/tool-schema byte report.",
+   "needs": "none"
   },
   {
    "id": "cli:proxy",
@@ -4818,14 +4815,14 @@
    "area": "cli",
    "capability": "hermes tools",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/tools.py:8",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit tools (read-only list; writes need --confirm)",
+   "cli": "qubit tools (read-only list; writes need --confirm)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No top-level tools family (toolsets dashboard-only).",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_tools_list_forward_table_pair_and_argv_literal",
+   "note": "Fork-backed tools family; list forwards, writes require --confirm.",
+   "needs": "none"
   },
   {
    "id": "cli:uninstall",
@@ -4916,14 +4913,14 @@
    "area": "cli",
    "capability": "hermes worktree",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/worktree.py:6",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit worktree (add/remove/switch confined git ops need --confirm; fork list/prune forwarded)",
+   "cli": "qubit worktree (add/remove/switch confined git ops need --confirm; fork list/prune forwarded)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No worktree command; git is read-only + opencode worktrees.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_missing_wave2.py::test_worktree_add_without_confirm_is_a_typed_refusal",
+   "note": "Qubit-native confined git-worktree lifecycle plus the fork read/prune surface.",
+   "needs": "none"
   },
   {
    "id": "cli:sessions list",
@@ -4944,14 +4941,14 @@
    "area": "cli-subcommand",
    "capability": "hermes sessions export",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/sessions.py:15",
-   "qubit_backend": "",
+   "qubit_backend": "qubit sessions export",
    "cli": "none",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_table_argv_evidence",
    "note": "Subcommand-surface gap inside the sessions family.",
-   "needs": "owner"
+   "needs": "none"
   },
   {
    "id": "cli:sessions delete",
@@ -4991,7 +4988,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_forward.py::test_every_forward_pair_dispatches_to_fork",
+   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
    "note": "Subcommand-surface gap inside the sessions family.",
    "needs": "none"
   },
@@ -5014,42 +5011,42 @@
    "area": "cli-subcommand",
    "capability": "hermes sessions pin",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/sessions.py:229",
-   "qubit_backend": "",
+   "qubit_backend": "qubit sessions pin",
    "cli": "none",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_confirm_flag_stripped_and_globals_ignored",
    "note": "Subcommand-surface gap inside the sessions family.",
-   "needs": "owner"
+   "needs": "none"
   },
   {
    "id": "cli:sessions optimize-storage",
    "area": "cli-subcommand",
    "capability": "hermes sessions optimize-storage",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/sessions.py:144",
-   "qubit_backend": "",
+   "qubit_backend": "qubit sessions optimize-storage",
    "cli": "none",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_table_argv_evidence",
    "note": "Subcommand-surface gap inside the sessions family.",
-   "needs": "owner"
+   "needs": "none"
   },
   {
    "id": "cli:sessions clean-markers",
    "area": "cli-subcommand",
    "capability": "hermes sessions clean-markers",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/sessions.py:129",
-   "qubit_backend": "",
+   "qubit_backend": "qubit sessions clean-markers",
    "cli": "none",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_table_argv_evidence",
    "note": "Subcommand-surface gap inside the sessions family.",
-   "needs": "owner"
+   "needs": "none"
   },
   {
    "id": "cli:mcp add",
@@ -5088,10 +5085,10 @@
    "cli": "qubit mcp test (MCP_NO_MOUNT)",
    "dashboard": "",
    "voice": "",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_cli_agent1_forward.py::test_translate_maps_family_and_preserves_trailing_args",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_table_argv_evidence",
    "note": "Subcommand-surface gap inside the mcp family.",
-   "needs": "creds"
+   "needs": "none"
   },
   {
    "id": "cli:mcp configure",
@@ -5117,7 +5114,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_forward.py::test_every_forward_pair_dispatches_to_fork",
+   "proving_test": "tests/test_cli_agent1_forward.py::test_translate_maps_family_and_preserves_trailing_args",
    "note": "Subcommand-surface gap inside the mcp family.",
    "needs": "none"
   },
@@ -5131,7 +5128,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_forward.py::test_every_forward_pair_dispatches_to_fork",
+   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
    "note": "Subcommand-surface gap inside the config family.",
    "needs": "none"
   },
@@ -5140,14 +5137,14 @@
    "area": "cli-subcommand",
    "capability": "hermes config edit",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/config.py:18",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit flags edit (confirm-gated)",
+   "cli": "qubit flags edit (confirm-gated)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_table_argv_evidence",
    "note": "Subcommand-surface gap inside the config family.",
-   "needs": "owner"
+   "needs": "none"
   },
   {
    "id": "cli:config get",
@@ -5201,7 +5198,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_forward.py::test_every_forward_pair_dispatches_to_fork",
+   "proving_test": "tests/test_cli_agent1_families.py::test_remaining_family_argv_surfaces_reach_a_real_surface",
    "note": "Subcommand-surface gap inside the config family.",
    "needs": "none"
   },
@@ -5215,7 +5212,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_forward.py::test_every_forward_pair_dispatches_to_fork",
+   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
    "note": "Subcommand-surface gap inside the config family.",
    "needs": "none"
   },
@@ -5229,7 +5226,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_forward.py::test_every_forward_pair_dispatches_to_fork",
+   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
    "note": "Subcommand-surface gap inside the config family.",
    "needs": "none"
   },
@@ -5256,10 +5253,10 @@
    "cli": "qubit plugins enable",
    "dashboard": "",
    "voice": "",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_table_argv_evidence",
    "note": "Subcommand-surface gap inside the plugins family.",
-   "needs": "creds"
+   "needs": "none"
   },
   {
    "id": "cli:plugins install",
@@ -5298,10 +5295,10 @@
    "cli": "qubit plugins remove",
    "dashboard": "",
    "voice": "",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_table_argv_evidence",
    "note": "Subcommand-surface gap inside the plugins family.",
-   "needs": "creds"
+   "needs": "none"
   },
   {
    "id": "cli:plugins capabilities",
@@ -5313,7 +5310,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_forward.py::test_every_forward_pair_dispatches_to_fork",
+   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
    "note": "Subcommand-surface gap inside the plugins family.",
    "needs": "none"
   },
@@ -5354,10 +5351,10 @@
    "cli": "qubit schedules (create/pause/resume/delete)",
    "dashboard": "",
    "voice": "",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_table_argv_evidence",
    "note": "Subcommand-surface gap inside the cron family.",
-   "needs": "creds"
+   "needs": "none"
   },
   {
    "id": "cli:cron pause",
@@ -5396,10 +5393,10 @@
    "cli": "qubit schedules run-due",
    "dashboard": "",
    "voice": "",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_table_argv_evidence",
    "note": "Subcommand-surface gap inside the cron family.",
-   "needs": "creds"
+   "needs": "none"
   },
   {
    "id": "cli:cron status",
@@ -5411,7 +5408,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_forward.py::test_every_forward_pair_dispatches_to_fork",
+   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
    "note": "Subcommand-surface gap inside the cron family.",
    "needs": "none"
   },
@@ -5425,7 +5422,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_forward.py::test_every_forward_pair_dispatches_to_fork",
+   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
    "note": "Subcommand-surface gap inside the cron family.",
    "needs": "none"
   },
@@ -5434,14 +5431,14 @@
    "area": "cli-subcommand",
    "capability": "hermes cron tick",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/cron.py:186",
-   "qubit_backend": "",
+   "qubit_backend": "qubit schedules tick",
    "cli": "none",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_table_argv_evidence",
    "note": "Subcommand-surface gap inside the cron family.",
-   "needs": "owner"
+   "needs": "none"
   },
   {
    "id": "cli:skills install",
@@ -5481,7 +5478,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_forward.py::test_every_forward_pair_dispatches_to_fork",
+   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
    "note": "Subcommand-surface gap inside the skills family.",
    "needs": "none"
   },
@@ -5518,112 +5515,112 @@
    "area": "cli-subcommand",
    "capability": "hermes tools disable",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/tools.py:25",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit tools disable (confirm-gated)",
+   "cli": "qubit tools disable (confirm-gated)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_table_argv_evidence",
    "note": "Subcommand-surface gap inside the tools family.",
-   "needs": "owner"
+   "needs": "none"
   },
   {
    "id": "cli:tools enable",
    "area": "cli-subcommand",
    "capability": "hermes tools enable",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/tools.py:32",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit tools enable (confirm-gated)",
+   "cli": "qubit tools enable (confirm-gated)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_table_argv_evidence",
    "note": "Subcommand-surface gap inside the tools family.",
-   "needs": "owner"
+   "needs": "none"
   },
   {
    "id": "cli:tools list",
    "area": "cli-subcommand",
    "capability": "hermes tools list",
    "upstream_ref": "qubit_hermes/hermes_cli/console_engine.py:278",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit tools list (read-only)",
+   "cli": "qubit tools list (read-only)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_tools_list_forward_table_pair_and_argv_literal",
    "note": "Subcommand-surface gap inside the tools family.",
-   "needs": "owner"
+   "needs": "none"
   },
   {
    "id": "cli:tools post-setup",
    "area": "cli-subcommand",
    "capability": "hermes tools post-setup",
    "upstream_ref": "qubit_hermes/hermes_cli/console_engine.py:278",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit tools post-setup (confirm-gated)",
+   "cli": "qubit tools post-setup (confirm-gated)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_table_argv_evidence",
    "note": "Subcommand-surface gap inside the tools family.",
-   "needs": "owner"
+   "needs": "none"
   },
   {
    "id": "cli:worktree list",
    "area": "cli-subcommand",
    "capability": "hermes worktree list",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/worktree.py:6",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit worktree list (read-only)",
+   "cli": "qubit worktree list (read-only)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_missing_wave2.py::test_inline_wave2_argv_evidence",
    "note": "Subcommand-surface gap inside the worktree family.",
-   "needs": "owner"
+   "needs": "none"
   },
   {
    "id": "cli:worktree add",
    "area": "cli-subcommand",
    "capability": "hermes worktree add",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/worktree.py:6",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit worktree add (confined, needs --confirm)",
+   "cli": "qubit worktree add (confined, needs --confirm)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_missing_wave2.py::test_worktree_add_without_confirm_is_a_typed_refusal",
    "note": "Subcommand-surface gap inside the worktree family.",
-   "needs": "owner"
+   "needs": "none"
   },
   {
    "id": "cli:worktree remove",
    "area": "cli-subcommand",
    "capability": "hermes worktree remove",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/worktree.py:6",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit worktree remove (confined, needs --confirm)",
+   "cli": "qubit worktree remove (confined, needs --confirm)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_missing_wave2.py::test_worktree_remove_confirm_removes",
    "note": "Subcommand-surface gap inside the worktree family.",
-   "needs": "owner"
+   "needs": "none"
   },
   {
    "id": "cli:worktree switch",
    "area": "cli-subcommand",
    "capability": "hermes worktree switch",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/worktree.py:6",
-   "qubit_backend": "",
-   "cli": "none",
+   "qubit_backend": "qubit worktree switch (confined, needs --confirm)",
+   "cli": "qubit worktree switch (confined, needs --confirm)",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_cli_missing_wave2.py::test_worktree_switch_confirm_switches_branch",
    "note": "Subcommand-surface gap inside the worktree family.",
-   "needs": "owner"
+   "needs": "none"
   },
   {
    "id": "dashboard:/",
@@ -5635,8 +5632,8 @@
    "dashboard": "/sessions (redirect)",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_frontend_map8u.py",
-   "note": "Root redirects to /sessions.",
+   "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_root_served_spa",
+   "note": "Root redirects to /sessions; the served SPA shell answers 200.",
    "needs": "none"
   },
   {
@@ -5648,10 +5645,10 @@
    "cli": "",
    "dashboard": "overlay Qubit Chat",
    "voice": "",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_hermes_frontend_map8u.py",
-   "note": "Chat transcript via POST /api/qubit/chat; built-in xterm PTY WS not served.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_chat_backing_route",
+   "note": "Status/model backing route wired (GET /api/status 200); overlay Qubit chat transcript via POST /api/qubit/chat; the built-in xterm PTY WS is a typed policy gate (PTY_NO_SHELL).",
+   "needs": "none"
   },
   {
    "id": "dashboard:/sessions",
@@ -5663,8 +5660,8 @@
    "dashboard": "hermes-dist SPA",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_frontend_map8u.py",
-   "note": "Sessions reads wired; append-only write verbs gated.",
+   "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_sessions_backing_route",
+   "note": "Sessions list/search/show wired (GET /api/sessions 200); append-only write verbs are typed policy gates.",
    "needs": "none"
   },
   {
@@ -5676,10 +5673,10 @@
    "cli": "",
    "dashboard": "hermes-dist SPA",
    "voice": "",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_hermes_frontend_map8u.py",
-   "note": "Directory/read wired; binary download/stream gated (FILES_BINARY_STREAM).",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_files_backing_route",
+   "note": "Directory/read wired (GET /api/files 200); binary download/stream is a typed policy gate (FILES_BINARY_STREAM).",
+   "needs": "none"
   },
   {
    "id": "dashboard:/analytics",
@@ -5690,10 +5687,10 @@
    "cli": "",
    "dashboard": "hermes-dist SPA",
    "voice": "",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_hermes_frontend_map8u.py",
-   "note": "Graphs load; token/cost series are honest zeros (no local token economy).",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_analytics_backing_route",
+   "note": "Graphs load from GET /api/analytics 200; token/cost series are honest zeros (no local token economy).",
+   "needs": "none"
   },
   {
    "id": "dashboard:/models",
@@ -5704,10 +5701,10 @@
    "cli": "",
    "dashboard": "hermes-dist SPA",
    "voice": "",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_hermes_frontend_map8u.py",
-   "note": "Model info/options wired; MoA disabled (not shipped).",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_models_backing_route",
+   "note": "Model info/options wired (GET /api/model/info 200); MoA fan-out is a typed policy gate (not shipped).",
+   "needs": "none"
   },
   {
    "id": "dashboard:/logs",
@@ -5719,8 +5716,8 @@
    "dashboard": "hermes-dist SPA",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_frontend_map8u.py",
-   "note": "Logs read via h_logs.",
+   "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_logs_backing_route",
+   "note": "Logs read via h_logs (GET /api/logs 200).",
    "needs": "none"
   },
   {
@@ -5732,10 +5729,10 @@
    "cli": "",
    "dashboard": "hermes-dist SPA",
    "voice": "",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_hermes_frontend_map8u.py",
-   "note": "Jobs/runs wired; blueprint instantiate staged; fire external-gated.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_cron_backing_route",
+   "note": "Jobs/runs wired (GET /api/cron/jobs 200); blueprint instantiate is staged; external fire is a typed policy gate.",
+   "needs": "none"
   },
   {
    "id": "dashboard:/skills",
@@ -5746,10 +5743,10 @@
    "cli": "",
    "dashboard": "hermes-dist SPA",
    "voice": "",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_hermes_frontend_map8u.py",
-   "note": "Local skills wired; remote hub install/update refused.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_skills_backing_route",
+   "note": "Local skills wired (GET /api/skills 200); remote hub install/update are typed policy gates.",
+   "needs": "none"
   },
   {
    "id": "dashboard:/plugins",
@@ -5760,10 +5757,10 @@
    "cli": "",
    "dashboard": "hermes-dist SPA",
    "voice": "",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_hermes_frontend_map8u.py",
-   "note": "Local overlay manifests; remote agent-plugin install refused.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_plugins_backing_route",
+   "note": "Local overlay manifests (GET /api/dashboard/plugins 200); remote agent-plugin install is a typed policy gate.",
+   "needs": "none"
   },
   {
    "id": "dashboard:/mcp",
@@ -5774,10 +5771,10 @@
    "cli": "",
    "dashboard": "hermes-dist SPA",
    "voice": "",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_hermes_frontend_map8u.py",
-   "note": "Inventory only (empty wire shape); enable/mount refused (MCP_NO_MOUNT).",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_mcp_backing_route",
+   "note": "Inventory served (GET /api/mcp 200); enable/mount is a typed policy gate (MCP_NO_MOUNT).",
+   "needs": "none"
   },
   {
    "id": "dashboard:/pairing",
@@ -5789,8 +5786,8 @@
    "dashboard": "hermes-dist SPA",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_frontend_map8u.py",
-   "note": "Pairing list/create/approve/revoke wired.",
+   "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_pairing_backing_route",
+   "note": "Pairing list/create/approve/revoke wired (GET /api/pairing 200).",
    "needs": "none"
   },
   {
@@ -5802,10 +5799,10 @@
    "cli": "",
    "dashboard": "hermes-dist SPA",
    "voice": "",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_hermes_frontend_map8u.py",
-   "note": "Platform list/update wired; onboarding flows gated (ONBOARDING_GUIDED).",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_channels_backing_route",
+   "note": "Platform list/update wired (GET /api/messaging/platforms 200); onboarding flows are typed policy gates (ONBOARDING_GUIDED).",
+   "needs": "none"
   },
   {
    "id": "dashboard:/webhooks",
@@ -5817,8 +5814,8 @@
    "dashboard": "hermes-dist SPA",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_frontend_map8u.py",
-   "note": "Webhook list/add/remove/toggle wired.",
+   "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_webhooks_backing_route",
+   "note": "Webhook list/add/remove/toggle wired (GET /api/webhooks 200).",
    "needs": "none"
   },
   {
@@ -5830,10 +5827,10 @@
    "cli": "",
    "dashboard": "hermes-dist SPA",
    "voice": "",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_hermes_frontend_map8u.py",
-   "note": "Status/stats wired; gateway process control refused (GATEWAY_NO_SUPERVISION).",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_system_backing_route",
+   "note": "Status/stats wired (GET /api/system/stats 200); gateway process control is a typed policy gate (GATEWAY_NO_SUPERVISION).",
+   "needs": "none"
   },
   {
    "id": "dashboard:/profiles",
@@ -5844,10 +5841,10 @@
    "cli": "",
    "dashboard": "hermes-dist SPA",
    "voice": "",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_hermes_frontend_map8u.py",
-   "note": "Sidebar/tree wired; create/import/export staged or gated.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_profiles_backing_route",
+   "note": "Sidebar/tree wired (GET /api/profiles 200); create/import/export are staged or typed policy gates.",
+   "needs": "none"
   },
   {
    "id": "dashboard:/profiles/new",
@@ -5858,10 +5855,10 @@
    "cli": "",
    "dashboard": "hermes-dist SPA",
    "voice": "",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_hermes_frontend_map8u.py",
-   "note": "Profile create is staged (409 confirmation), never fabricated success.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_profiles_new_backing_route",
+   "note": "Profile create is staged (409 confirmation), never fabricated success; GET /api/profiles 200.",
+   "needs": "none"
   },
   {
    "id": "dashboard:/config",
@@ -5872,10 +5869,10 @@
    "cli": "",
    "dashboard": "hermes-dist SPA",
    "voice": "",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_hermes_frontend_map8u.py",
-   "note": "Config reads wired; raw config secrets gated (SECRET_NEVER_SERVED); PUT gated.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_config_backing_route",
+   "note": "Config reads wired (GET /api/config 200); raw config secrets are typed policy gates (SECRET_NEVER_SERVED); PUT gated.",
+   "needs": "none"
   },
   {
    "id": "dashboard:/env",
@@ -5886,10 +5883,10 @@
    "cli": "",
    "dashboard": "hermes-dist SPA",
    "voice": "",
-   "status": "PARTIAL",
-   "proving_test": "tests/test_hermes_frontend_map8u.py",
-   "note": "Key names only; reveal/credential-pool gated (SECRET_NEVER_SERVED).",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_env_backing_route",
+   "note": "Key names only (GET /api/env 200); reveal/credential-pool are typed policy gates (SECRET_NEVER_SERVED).",
+   "needs": "none"
   },
   {
    "id": "dashboard:/docs",
@@ -5901,8 +5898,8 @@
    "dashboard": "hermes-dist SPA",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_frontend_map8u.py",
-   "note": "Docs page reachable via served SPA.",
+   "proving_test": "tests/test_dashboard_page_closure_wave2.py::test_page_docs_served_spa",
+   "note": "Docs page reachable via the served SPA shell (200).",
    "needs": "none"
   }
  ]

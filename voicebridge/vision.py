@@ -363,3 +363,181 @@ def describe(cfg: Any, image: str, *, prompt: str = "", model: str = "",
             "free_vram_mib_before": free,
             "resident_restored": report.restored,
             "restore_ms": report.restore_ms, "elapsed_ms": elapsed_ms}
+
+
+# ---------------------------------------------------------------------------
+# OC-65: media understanding beyond single-image vision (multi-attachment)
+# ---------------------------------------------------------------------------
+BATCH_SCHEMA = "qubit-vision-batch/1"
+MAX_BATCH_IMAGES = 8
+
+
+def describe_batch(cfg: Any, images: Any, *, prompt: str = "",
+                   model: str = "", requested_by: str = "cli:user",
+                   confirmed: bool = False,
+                   timeout_s: Optional[float] = None,
+                   analyzer: Any = None) -> Dict[str, Any]:
+    """Analyze up to :data:`MAX_BATCH_IMAGES` images in one confirmed call.
+
+    Each attachment is validated through the same :func:`validate_image`
+    boundary and analyzed via :func:`describe`; a per-attachment failure is
+    recorded as a typed per-item error and never aborts the remaining items.
+    An empty or oversized batch fails closed.
+
+    ``analyzer`` is an optional injected boundary ``(path, prompt) ->
+    description`` used by an operator/host that already owns a vision model;
+    it lets the multi-attachment contract be driven without the local runtime.
+    """
+    if isinstance(images, str):
+        items = [p.strip() for p in images.split(",") if p.strip()]
+    else:
+        try:
+            items = [str(p) for p in images]
+        except TypeError:
+            raise VisionError(BAD_IMAGE_CODE,
+                              "images must be a sequence of paths") from None
+    if not items:
+        raise VisionError(BAD_IMAGE_CODE, "at least one image is required")
+    if len(items) > MAX_BATCH_IMAGES:
+        raise VisionError(BAD_IMAGE_CODE,
+                          f"at most {MAX_BATCH_IMAGES} images per batch")
+    results: List[Dict[str, Any]] = []
+    for path in items:
+        if callable(analyzer):
+            try:
+                res = analyzer(path, prompt)
+                if isinstance(res, dict):
+                    desc = str(res.get("description") or res.get("text") or "")
+                    sha = str(res.get("sha256", ""))[:128]
+                else:
+                    desc = str(res)
+                    sha = ""
+                results.append({"state": "OK", "image": path,
+                                "description": _redact(desc)[:8000],
+                                "sha256": sha})
+            except Exception as exc:
+                results.append({"state": "FAILED", "image": path,
+                                "code": MEDIA_UNAVAILABLE_CODE,
+                                "detail": _redact(str(exc))[:200]})
+            continue
+        try:
+            out = describe(cfg, path, prompt=prompt, model=model,
+                           requested_by=requested_by, confirmed=confirmed,
+                           timeout_s=timeout_s)
+            results.append({"state": "OK", "image": path,
+                            "description": out.get("description", ""),
+                            "sha256": out.get("image", {}).get("sha256", "")})
+        except VisionError as exc:
+            results.append({"state": "FAILED", "image": path,
+                            "code": exc.code,
+                            "detail": _redact(exc.detail)[:200]})
+    ok = sum(1 for r in results if r["state"] == "OK")
+    return {"state": "OK" if ok else "FAILED", "schema": BATCH_SCHEMA,
+            "count": len(results), "succeeded": ok,
+            "failed": len(results) - ok, "results": results}
+
+
+# ---------------------------------------------------------------------------
+# OC-67: realtime transcription / voice-call / meeting-bot adapter boundary
+# ---------------------------------------------------------------------------
+MEDIA_UNAVAILABLE_CODE = "VISION_MEDIA_UNAVAILABLE"
+TRANSCRIBE_SCHEMA = "qubit-transcribe/1"
+MEETING_SCHEMA = "qubit-meeting-bot/1"
+
+
+def transcribe(cfg: Any, audio: Any, *, transport: Any = None,
+               model: str = "", language: str = "",
+               requested_by: str = "cli:user",
+               confirmed: bool = False) -> Dict[str, Any]:
+    """Transcribe an audio attachment over an injected provider transport.
+
+    ``transport`` is the external ASR boundary: a callable
+    ``(request: dict) -> mapping``. Without it the call is a typed
+    ``VISION_MEDIA_UNAVAILABLE`` (no fabricated transcript). With it the
+    returned text is redacted and bounded. This is the batch/realtime
+    transcription contract shared by ``voice_call`` and ``meeting_bot``.
+    """
+    if estop_engaged(cfg):
+        return refuse_estop("transcribe")
+    if transport is None:
+        return {"state": "UNAVAILABLE", "code": MEDIA_UNAVAILABLE_CODE,
+                "schema": TRANSCRIBE_SCHEMA,
+                "detail": "no ASR transport injected; use a supervised "
+                          "asr-test/tts-test path or inject a provider",
+                "owner": "qubit-policy",
+                "rollback": "nothing recorded; nothing to roll back"}
+    if not confirmed:
+        return {"state": "denied", "code": CONFIRM_CODE,
+                "schema": TRANSCRIBE_SCHEMA,
+                "detail": "transcription requires explicit --confirm",
+                "owner": "qubit-policy",
+                "rollback": "nothing recorded; nothing to roll back"}
+    raw = audio if isinstance(audio, (bytes, bytearray)) else str(audio)
+    request = {"kind": "transcribe", "model": str(model)[:64],
+               "language": str(language)[:16],
+               "audio_bytes": len(raw) if isinstance(raw, (bytes, bytearray))
+               else 0,
+               "audio_ref": raw if isinstance(raw, str) else ""}
+    try:
+        response = transport(request)
+    except Exception as exc:
+        return {"state": "FAILED", "code": MEDIA_UNAVAILABLE_CODE,
+                "schema": TRANSCRIBE_SCHEMA,
+                "detail": _redact(str(exc))[:200], "owner": "qubit-policy",
+                "rollback": "nothing recorded; nothing to roll back"}
+    if not isinstance(response, dict):
+        return {"state": "FAILED", "code": MEDIA_UNAVAILABLE_CODE,
+                "schema": TRANSCRIBE_SCHEMA,
+                "detail": "ASR transport returned a non-mapping",
+                "owner": "qubit-policy",
+                "rollback": "nothing recorded; nothing to roll back"}
+    text = _redact(str(response.get("text", "")))[:8000]
+    _audit("transcribe", requested_by, {"bytes": len(text)})
+    return {"state": "OK", "schema": TRANSCRIBE_SCHEMA, "text": text,
+            "language": str(response.get("language", language))[:16],
+            "segments": response.get("segments", [])[:200],
+            "authority": "injected ASR transport; no fabricated transcript"}
+
+
+def meeting_bot(cfg: Any, *, transport: Any = None, join_url: str = "",
+                display_name: str = "Qubit",
+                requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Meeting-bot / voice-call adapter contract (OC-67).
+
+    The adapter requires an injected telephony transport; without one it is
+    a typed ``VISION_MEDIA_UNAVAILABLE``. It never joins a call or opens a
+    socket on its own, and never stores raw audio.
+    """
+    if estop_engaged(cfg):
+        return refuse_estop("meeting_bot")
+    if transport is None:
+        return {"state": "UNAVAILABLE", "code": MEDIA_UNAVAILABLE_CODE,
+                "schema": MEETING_SCHEMA,
+                "detail": "no telephony/meeting transport injected; Qubit "
+                          "runs no meeting bot without one",
+                "owner": "qubit-policy",
+                "rollback": "no call joined; nothing to roll back"}
+    if not str(join_url or "").strip():
+        return {"state": "FAILED", "code": "VISION_MEETING_BAD_URL",
+                "schema": MEETING_SCHEMA,
+                "detail": "a meeting join URL is required",
+                "owner": "qubit-policy",
+                "rollback": "no call joined; nothing to roll back"}
+    try:
+        response = transport({"kind": "meeting.join",
+                              "join_url": str(join_url)[:1024],
+                              "display_name": str(display_name)[:64]})
+    except Exception as exc:
+        return {"state": "FAILED", "code": MEDIA_UNAVAILABLE_CODE,
+                "schema": MEETING_SCHEMA,
+                "detail": _redact(str(exc))[:200], "owner": "qubit-policy",
+                "rollback": "no call joined; nothing to roll back"}
+    if not isinstance(response, dict) or response.get("joined") is not True:
+        return {"state": "FAILED", "code": MEDIA_UNAVAILABLE_CODE,
+                "schema": MEETING_SCHEMA, "detail": "transport did not join",
+                "owner": "qubit-policy",
+                "rollback": "no call joined; nothing to roll back"}
+    return {"state": "OK", "schema": MEETING_SCHEMA,
+            "session": _redact(str(response.get("session", "")))[:120],
+            "live_transcription": bool(response.get("transcription", False)),
+            "authority": "injected meeting transport; no raw audio retained"}

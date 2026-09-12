@@ -162,6 +162,10 @@ CHANNEL_CAPS: Dict[str, Dict[str, Any]] = {
     "feishu": {"label": "Feishu / Lark", "transport": "open-platform",
                "credential_kind": "app-secret", "available": False,
                "detail": "no Feishu open-platform event listener adapter"},
+    "gmail": {"label": "Gmail (Pub/Sub push)", "transport": "pubsub-push",
+              "credential_kind": "oidc-bearer", "available": False,
+              "detail": "Pub/Sub push envelope verified; no mailbox watcher "
+                        "transport runs in Qubit"},
 }
 
 # Single source of truth for channel membership (order preserved).
@@ -622,3 +626,367 @@ def receive(cfg: Any, *, channel: str, payload: bytes, signature: str = "",
             "transport": info["transport"],
             "note": "signature/timestamp/replay validated; no listener "
                     "transport exists, nothing dispatched or executed"}
+
+
+# ---------------------------------------------------------------------------
+# OC-19/OC-20: per-channel receive adapters + bounded ingress loop
+# ---------------------------------------------------------------------------
+MAX_NORMALIZED_TEXT = 4000
+MAX_INGRESS_BATCH = 200
+
+
+def _decode_json_payload(payload: Any) -> Any:
+    raw = payload if isinstance(payload, (bytes, bytearray)) else \
+        str(payload or "").encode("utf-8")
+    try:
+        return json.loads(raw.decode("utf-8", "replace"))
+    except (ValueError, UnicodeDecodeError):
+        raise ChannelError(BAD_INPUT_CODE,
+                           "channel payload is not valid JSON") from None
+
+
+def normalize_event(channel: str, payload: Any) -> Dict[str, Any]:
+    """Normalize one channel-native inbound payload into a bounded message.
+
+    This is the receive half of each channel adapter: it reads only the
+    sender/text/event-id fields it needs, caps every string, redacts through
+    the shared redactor, and raises a typed ``CHANNEL_BAD_INPUT`` for an
+    unrecognized shape instead of guessing. Nothing is executed.
+    """
+    clean = (channel or "").strip().lower()
+    if clean not in CHANNELS:
+        raise ChannelError(UNKNOWN_CODE, f"unknown channel {channel!r}")
+    data = _decode_json_payload(payload)
+    if not isinstance(data, dict):
+        raise ChannelError(BAD_INPUT_CODE,
+                           "channel payload must be a JSON object")
+    sender = ""
+    text = ""
+    event_id = ""
+    if clean == "discord":
+        author = data.get("author") if isinstance(data.get("author"), dict) else {}
+        sender = str(author.get("id") or data.get("user_id") or "")
+        text = str(data.get("content") or "")
+        event_id = str(data.get("id") or "")
+    elif clean == "telegram":
+        msg = data.get("message") if isinstance(data.get("message"), dict) else data
+        frm = msg.get("from") if isinstance(msg.get("from"), dict) else {}
+        sender = str(frm.get("id") or frm.get("username") or "")
+        text = str(msg.get("text") or msg.get("caption") or "")
+        event_id = str(msg.get("message_id") or data.get("update_id") or "")
+    elif clean == "matrix":
+        sender = str(data.get("sender") or "")
+        content = data.get("content") if isinstance(data.get("content"), dict) else {}
+        text = str(content.get("body") or "")
+        event_id = str(data.get("event_id") or "")
+    elif clean == "feishu":
+        ev = data.get("event") if isinstance(data.get("event"), dict) else data
+        msg = ev.get("message") if isinstance(ev.get("message"), dict) else {}
+        esender = ev.get("sender")
+        if isinstance(esender, dict):
+            sid = esender.get("sender_id")
+            sender = str(sid.get("open_id", "") if isinstance(sid, dict)
+                         else sid or "")
+        content = msg.get("content")
+        if isinstance(content, str):
+            try:
+                content = json.loads(content)
+            except ValueError:
+                content = {}
+        text = str(content.get("text", "") if isinstance(content, dict) else "")
+        event_id = str(msg.get("message_id") or ev.get("event_id") or "")
+    else:
+        sender = str(data.get("sender") or data.get("from") or "")
+        text = str(data.get("text") or data.get("body") or "")
+        event_id = str(data.get("id") or data.get("event_id") or "")
+    if not text and not event_id:
+        # Generic fallback for a channel-shaped payload the adapter above did
+        # not recognize (e.g. a plain bridge envelope); still bounded.
+        sender = sender or str(data.get("sender") or data.get("from") or "")
+        text = str(data.get("text") or data.get("body") or "")
+        event_id = str(data.get("id") or data.get("event_id") or "")
+    if not text and not event_id:
+        raise ChannelError(BAD_INPUT_CODE,
+                           f"payload has no recognizable {clean} message")
+    return {"channel": clean, "sender": _redact(sender)[:MAX_SENDER_LEN],
+            "text": _redact(text)[:MAX_NORMALIZED_TEXT],
+            "event_id": str(event_id)[:200]}
+
+
+def ingest(cfg: Any, *, channel: str, payload: Any, signature: str = "",
+           timestamp: Optional[float] = None, delivery_id: str = "",
+           sender: str = "", event: str = "message",
+           sink: Any = None) -> Dict[str, Any]:
+    """Authenticate a delivery, normalize it, and hand it to a sink.
+
+    The HMAC/freshness/replay kernel is identical to :func:`receive`; the
+    difference is the injected ``sink(message)`` boundary: an
+    operator-provided consumer (channel bridge/agent). Without a sink the
+    verified delivery is the typed ``CHANNEL_UNAVAILABLE`` gate, never a
+    fabricated dispatch.
+    """
+    info = _verify(cfg, channel=channel, payload=payload,
+                   signature=signature, timestamp=timestamp,
+                   delivery_id=delivery_id, sender=sender, event=event,
+                   verdict="VERIFIED_INBOUND",
+                   detail=f"{len(payload or b'')} bytes; signature valid")
+    normalized = normalize_event(info["channel"], payload)
+    if sink is None:
+        return {"state": "UNAVAILABLE", "code": UNAVAILABLE_CODE,
+                "schema": SCHEMA, "channel": info["channel"],
+                "event": info["event"], "verified": True,
+                "message": normalized,
+                "note": "verified; no sink injected, nothing dispatched"}
+    if not callable(sink):
+        raise ChannelError(BAD_INPUT_CODE, "sink must be callable")
+    try:
+        result = sink(normalized)
+    except ChannelError:
+        raise
+    except Exception as exc:
+        _receipt(cfg, info["channel"], "SINK_ERROR", str(exc))
+        raise ChannelError(
+            UNAVAILABLE_CODE,
+            f"channel sink failed: {_redact(str(exc))[:160]}") from exc
+    _audit("ingest", "channel-ingress",
+           {"channel": info["channel"], "event": info["event"]})
+    return {"state": "DELIVERED", "schema": SCHEMA,
+            "channel": info["channel"], "event": info["event"],
+            "verified": True, "message": normalized,
+            "sink_result": result if isinstance(
+                result, (dict, list, str, int, float, bool, type(None)))
+            else None,
+            "note": "authenticated delivery handed to the injected sink"}
+
+
+def run_ingress(cfg: Any, *, channel: str, receiver: Any, sink: Any,
+                max_items: int = MAX_INGRESS_BATCH,
+                event: str = "message") -> Dict[str, Any]:
+    """Bounded inbound loop over an operator-injected receiver (OC-20).
+
+    ``receiver()`` returns the next delivery mapping (or ``None``/raises
+    ``StopIteration`` to end). Each item is authenticated through
+    :func:`ingest` and handed to ``sink``. Qubit opens no socket: the receiver
+    owns the transport, and the loop is capped at :data:`MAX_INGRESS_BATCH`.
+    """
+    if not callable(receiver) or not callable(sink):
+        return {"state": "UNAVAILABLE", "code": UNAVAILABLE_CODE,
+                "schema": SCHEMA, "channel": (channel or "").strip().lower(),
+                "detail": "a receiver and sink callable are required",
+                "owner": "qubit-policy",
+                "rollback": "no listener started; nothing to roll back"}
+    try:
+        budget = max(1, min(int(max_items), MAX_INGRESS_BATCH))
+    except (TypeError, ValueError):
+        budget = MAX_INGRESS_BATCH
+    delivered = 0
+    failed = 0
+    results: List[Dict[str, Any]] = []
+    for _ in range(budget):
+        try:
+            item = receiver()
+        except StopIteration:
+            break
+        except Exception as exc:
+            failed += 1
+            results.append({"state": "FAILED", "code": UNAVAILABLE_CODE,
+                            "detail": _redact(str(exc))[:160]})
+            break
+        if item is None:
+            break
+        if not isinstance(item, dict):
+            failed += 1
+            results.append({"state": "FAILED", "code": BAD_INPUT_CODE,
+                            "detail": "receiver item must be a mapping"})
+            continue
+        payload = item.get("payload", b"")
+        if isinstance(payload, str):
+            payload = payload.encode("utf-8")
+        try:
+            out = ingest(cfg, channel=item.get("channel", channel),
+                         payload=payload,
+                         signature=str(item.get("signature", "")),
+                         timestamp=item.get("timestamp"),
+                         delivery_id=str(item.get("delivery_id", "")),
+                         sender=str(item.get("sender", "")),
+                         event=str(item.get("event", event)), sink=sink)
+            delivered += 1
+            results.append({"state": out["state"], "channel": out["channel"]})
+        except ChannelError as exc:
+            failed += 1
+            results.append({"state": "FAILED", "code": exc.code})
+    state = ("OK" if delivered and not failed else
+             "DEGRADED" if delivered or failed else "OK")
+    return {"state": state, "schema": SCHEMA,
+            "channel": (channel or "").strip().lower(),
+            "delivered": delivered, "failed": failed, "results": results,
+            "authority": "operator-injected receiver/sink; Qubit opens no "
+                         "socket"}
+
+
+# ---------------------------------------------------------------------------
+# OC-25: Gmail Pub/Sub push transport
+# ---------------------------------------------------------------------------
+import base64 as _base64  # noqa: E402  (local to this section)
+
+GMAIL_PUBSUB_BAD_CODE = "CHANNEL_GMAIL_BAD_ENVELOPE"
+
+
+def decode_pubsub_envelope(envelope: Any) -> Dict[str, Any]:
+    """Decode a Pub/Sub push envelope into its mailbox notification facts.
+
+    Accepts the canonical push shape
+    ``{"message": {"data": <b64>, "messageId": ..., "publishTime": ...},
+    "subscription": ...}``. Returns the decoded data bytes and message id; a
+    malformed envelope is a typed ``CHANNEL_GMAIL_BAD_ENVELOPE`` and never a
+    traceback. No network call is made.
+    """
+    if not isinstance(envelope, dict):
+        raise ChannelError(GMAIL_PUBSUB_BAD_CODE,
+                           "Pub/Sub envelope must be a JSON object")
+    message = envelope.get("message")
+    if not isinstance(message, dict):
+        raise ChannelError(GMAIL_PUBSUB_BAD_CODE,
+                           "Pub/Sub envelope has no message object")
+    data_b64 = message.get("data")
+    if not isinstance(data_b64, str) or not data_b64:
+        raise ChannelError(GMAIL_PUBSUB_BAD_CODE,
+                           "Pub/Sub message has no data")
+    try:
+        payload = _base64.b64decode(data_b64, validate=True)
+    except Exception:
+        raise ChannelError(GMAIL_PUBSUB_BAD_CODE,
+                           "Pub/Sub message data is not valid base64") from None
+    if len(payload) > MAX_BODY_BYTES:
+        raise ChannelError(TOO_LARGE_CODE,
+                           f"Pub/Sub payload exceeds {MAX_BODY_BYTES} bytes")
+    return {"payload": payload,
+            "message_id": str(message.get("messageId", ""))[:200],
+            "publish_time": str(message.get("publishTime", ""))[:64],
+            "subscription": str(envelope.get("subscription", ""))[:200]}
+
+
+def gmail_pubsub(cfg: Any, envelope: Any, *, token: str = "",
+                 event: str = "message",
+                 sender: str = "") -> Dict[str, Any]:
+    """Verify a Gmail Pub/Sub push delivery (OC-25).
+
+    The verification-token boundary (an OIDC bearer in production) is
+    compared constant-time against the configured channel secret; the decoded
+    mailbox notification is then replay-checked and recorded. As with every
+    channel, a fully verified delivery still resolves to the typed
+    ``CHANNEL_UNAVAILABLE`` gate because Qubit runs no mailbox watcher, and
+    nothing is dispatched.
+    """
+    if estop_engaged(cfg):
+        raise ChannelError(ESTOP_CODE, "emergency stop is latched")
+    decoded = decode_pubsub_envelope(envelope)
+    rec = _get(cfg, "gmail")
+    if rec.get("enabled") is False:
+        raise ChannelError(UNAVAILABLE_CODE, "channel 'gmail' is disabled")
+    from .providers.credentials import resolve_key
+
+    key, code = resolve_key("channel", _resolve_ref(rec))
+    if code or not key:
+        raise ChannelError(NO_CREDENTIAL_CODE,
+                           "Gmail channel credential reference unresolvable")
+    presented = str(token or "").strip()
+    if not presented or not hmac.compare_digest(presented, str(key)):
+        _receipt(cfg, "gmail", "BAD_SIGNATURE",
+                 "Pub/Sub verification token mismatch")
+        raise ChannelError(BAD_SIGNATURE_CODE,
+                           "Pub/Sub verification token mismatch")
+    nonce = hashlib.sha256(
+        f"gmail:{decoded['message_id']}".encode()).hexdigest()
+    if decoded["message_id"] and _nonce_seen(cfg, nonce):
+        _receipt(cfg, "gmail", "REPLAY", "Pub/Sub message replayed")
+        raise ChannelError(REPLAY_CODE, "duplicate Pub/Sub delivery (replay)")
+    if event not in rec.get("events", []):
+        raise ChannelError(EVENT_REFUSED_CODE,
+                           f"event {event!r} is not accepted by 'gmail'")
+    _receipt(cfg, "gmail", "VERIFIED_UNAVAILABLE",
+             f"{len(decoded['payload'])} bytes; Pub/Sub token valid, no "
+             "mailbox watcher")
+    _audit("gmail_pubsub", "channel-ingress",
+           {"channel": "gmail", "bytes": len(decoded["payload"])})
+    return {"state": "UNAVAILABLE", "code": UNAVAILABLE_CODE,
+            "schema": SCHEMA, "channel": "gmail", "event": event,
+            "verified": True, "bytes": len(decoded["payload"]),
+            "message_id": decoded["message_id"],
+            "publish_time": decoded["publish_time"],
+            "subscription": decoded["subscription"],
+            "sender": _redact(sender)[:MAX_SENDER_LEN],
+            "transport": "pubsub-push",
+            "note": "Pub/Sub envelope decoded, token verified, replay "
+                    "checked; no mailbox watcher transport exists, nothing "
+                    "dispatched or executed"}
+
+
+def gmail_watch(cfg: Any, *, topic: str = "", transport: Any = None,
+                requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Register/renew a Gmail Pub/Sub watch over an injected transport (OC-25).
+
+    The watch is the push-path half of the Pub/Sub transport: without an
+    injected mailbox transport Qubit cannot reach Gmail and returns a typed
+    ``CHANNEL_UNAVAILABLE``. With one, the watch reply's id/expiration/
+    historyId are recorded on the channel record and reported back (bounded
+    and redacted). No credential value is stored.
+    """
+    if estop_engaged(cfg):
+        raise ChannelError(ESTOP_CODE, "emergency stop is latched")
+    rec = _get(cfg, "gmail")
+    if rec.get("enabled") is False:
+        raise ChannelError(UNAVAILABLE_CODE, "channel 'gmail' is disabled")
+    if transport is None:
+        return {"state": "UNAVAILABLE", "code": UNAVAILABLE_CODE,
+                "schema": SCHEMA, "channel": "gmail",
+                "detail": "Gmail watch needs an injected mailbox transport; "
+                          "no watch was registered",
+                "owner": "qubit-policy",
+                "rollback": "no watch registered; nothing to roll back"}
+    request = {"type": "gmail.watch", "channel": "gmail",
+               "topic": str(topic or "")[:300],
+               "events": list(rec.get("events", []))}
+    try:
+        response = transport(request)
+    except Exception as exc:
+        return {"state": "FAILED", "code": UNAVAILABLE_CODE,
+                "schema": SCHEMA, "channel": "gmail",
+                "detail": _redact(str(exc))[:200], "owner": "qubit-policy",
+                "rollback": "no watch registered; nothing to roll back"}
+    if not isinstance(response, dict) or not response.get("watch_id"):
+        return {"state": "FAILED", "code": UNAVAILABLE_CODE,
+                "schema": SCHEMA, "channel": "gmail",
+                "detail": "transport returned no watch id",
+                "owner": "qubit-policy",
+                "rollback": "no watch registered; nothing to roll back"}
+    expiration = response.get("expiration", "")
+    state = _load(cfg)
+    stored = state["channels"].get("gmail")
+    if stored is not None:
+        stored["watch"] = {
+            "watch_id": _redact(str(response["watch_id"]))[:120],
+            "expiration": str(expiration)[:64],
+            "history_id": str(response.get("history_id", ""))[:64],
+            "topic": str(topic or "")[:300],
+            "registered_at": _now(),
+            "registered_by": requested_by}
+        _save(cfg, state)
+    _audit("gmail_watch", requested_by, {"topic": str(topic or "")[:120]})
+    return {"state": "OK", "schema": SCHEMA, "channel": "gmail",
+            "watch_id": _redact(str(response["watch_id"]))[:120],
+            "expiration": str(expiration)[:64],
+            "history_id": str(response.get("history_id", ""))[:64],
+            "authority": "injected mailbox transport; no credentials stored"}
+
+
+def gmail_watch_status(cfg: Any) -> Dict[str, Any]:
+    """Read-only view of the recorded Gmail watch (never a fabricated one)."""
+    try:
+        state = _load(cfg)
+    except ChannelError as exc:
+        return {"state": "DEGRADED", "code": exc.code, "watch": None}
+    stored = state["channels"].get("gmail") or {}
+    watch = stored.get("watch")
+    return {"state": "OK" if watch else "UNCONFIGURED", "schema": SCHEMA,
+            "channel": "gmail", "watch": watch}

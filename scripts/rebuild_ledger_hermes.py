@@ -61,6 +61,15 @@ QH = "qubit_hermes/"
 GENERATED = "2026-09-12"
 OUT_PATH = ROOT / "docs" / "QUBIT_GAP_LEDGER.hermes.json"
 
+# Fork-forward tables owned by voicebridge/cli_hermes_forward.py.  A forwarded
+# pair is a real production caller (the read-only table never routes a
+# gated/mutating surface; the confirm table requires explicit --confirm and the
+# whole-family table separates read-only from confirm subcommands), so they
+# override a stale audit ``surface`` column exactly like a native subcommand.
+_FWD_TABLE = _fwd.FORWARD_TABLE
+_CONFIRM_TABLE = getattr(_fwd, "CONFIRM_TABLE", {})
+_FAMILY_FORWARD = getattr(_fwd, "FAMILY_FORWARD", {})
+
 UPSTREAM_GLOBS = (
     "hermes_cli/web_routers/*.py",
     "hermes_cli/web_server*.py",
@@ -123,7 +132,7 @@ GATE_HANDLERS = {
 # Wire-shape stubs: handlers that only echo an honest empty/static shape (no
 # live read, no write).  Kept as a small explicit allowlist.
 STUB_HANDLERS = {
-    "h_mcp", "h_mcp_catalog", "h_auth_providers", "mem_prov",
+    "h_mcp", "h_mcp_catalog", "mem_prov",
     "mcp_test", "msg_test", "plugin_visibility",
 }
 
@@ -328,9 +337,10 @@ ROUTE_EVIDENCE: Dict[Tuple[str, str], Dict[str, str]] = {
               "SSE/JSON) and does not run a second WebSocket event server; "
               "the WS dialect is a typed single-event-path policy gate, not a "
               "wire-shape gap.")),
-    ("WEBSOCKET", "/api/pub"): dict(status="MISSING", note=(
-        "No Qubit pub/sub WebSocket; no GET/POST gate row exists, so the "
-        "upgrade 404s.")),
+    ("WEBSOCKET", "/api/pub"): dict(status="GATED", code="WS_SINGLE_PATH",
+        note=("The live WS upgrade is refused with HTTP 426 by webui.py "
+              "(single event path); only the POST /api/pub publish verb is "
+              "served, so the WEBSOCKET row stays GATED.")),
     ("WEBSOCKET", "/api/pty"): dict(status="GATED", code="PTY_NO_SHELL", note=(
         "WS not served; HTTP GET/POST /api/pty gated, but the WS upgrade "
         "itself is unanswered.")),
@@ -343,12 +353,6 @@ ROUTE_EVIDENCE: Dict[Tuple[str, str], Dict[str, str]] = {
     ("WEBSOCKET", "/api/audio/speak-stream"): dict(
         status="GATED", code="AUDIO_STREAM_LOCAL", note=(
             "Streaming PCM TTS WS not served; typed gate on HTTP verbs only.")),
-    ("GET", "/api/mcp/servers"): dict(status="PARTIAL", note=(
-        "Wire-shape stub: returns servers=[] with a mount policy; no real MCP "
-        "inventory is read.")),
-    ("GET", "/api/mcp/catalog"): dict(status="PARTIAL", note=(
-        "Stub: returns entries=[] with a refusal diagnostic; no remote/local "
-        "catalog read.")),
     ("GET", "/api/memory"): dict(note=(
         "h_memory reads the live local active-memory + brain principal store "
         "(MemoryStatus shape); qubit-local is the only provider.")),
@@ -358,9 +362,6 @@ ROUTE_EVIDENCE: Dict[Tuple[str, str], Dict[str, str]] = {
     ("GET", "/api/model/auxiliary"): dict(note=(
         "Served from the active Qubit profile (_qubit_model); no auxiliary "
         "model pins exist.")),
-    ("GET", "/api/auth/providers"): dict(status="PARTIAL", note=(
-        "Returns providers=[] for wire-shape safety; loopback identity has no "
-        "OAuth providers.")),
     ("GET", "/api/memory/providers/{name}/config"): dict(note=(
         "mem_config reads the persisted local-store settings.")),
     ("PUT", "/api/memory/providers/{name}/config"): dict(note=(
@@ -392,9 +393,6 @@ ROUTE_EVIDENCE: Dict[Tuple[str, str], Dict[str, str]] = {
         test="tests/test_hermes_serve8tf.py",
         note=("Served by webui.py _serve_hermes_plugin (static assets), "
               "outside the ROUTES table.")),
-    ("POST", "/api/gateway/drain"): dict(status="MISSING", note=(
-        "No drain route/handler; gateway start/stop/restart are gated "
-        "GATEWAY_NO_SUPERVISION but drain 404s.")),
     ("GET", "/api/memory/providers/{provider}/oauth/status"): dict(
         note=("Provider OAuth status is a credential surface: the fork polls "
               "a live OAuth flow, which Qubit never starts. The explicit "
@@ -643,25 +641,35 @@ class ApiIndex:
             if not fn.name.startswith("test_"):
                 continue
             hit = f"{rel}::{fn.name}"
-            strings = [n.value for n in ast.walk(fn)
-                       if isinstance(n, ast.Constant)
-                       and isinstance(n.value, str)]
+            literal_strings = [n.value for n in ast.walk(fn)
+                               if isinstance(n, ast.Constant)
+                               and isinstance(n.value, str)]
+            strings = list(literal_strings)
             for name_node in ast.walk(fn):
                 if isinstance(name_node, ast.Name) and name_node.id in consts:
                     strings.extend(consts[name_node.id])
+            literal_paths = [s for s in literal_strings if s.startswith("/")]
             paths = [s for s in strings if s.startswith("/")]
             methods = {s for s in strings
                        if s in ("GET", "POST", "PUT", "PATCH", "DELETE",
                                 "HEAD", "OPTIONS")}
-            if not methods:
-                methods = {"GET", "POST", "PUT", "PATCH", "DELETE"}
-            for method in methods:
-                for candidate in paths:
-                    route, _params = _hc.match(method, candidate)
-                    if route and route["handler"] != "__gate__" and \
-                            _asserts_success(fn):
-                        self.handler_hits.setdefault(
-                            route["handler"], set()).add(hit)
+            if methods:
+                candidates = [(m, p) for m in methods for p in paths]
+            else:
+                # No explicit method: only a path literal written inside the
+                # test body may imply the default verbs.  A path pulled from a
+                # module-level table (e.g. a page -> GET-route map) must not
+                # cross-product onto every verb, which would falsely credit a
+                # mutating handler (PUT /api/config) to a GET-only test.
+                candidates = [(m, p) for m in ("GET", "POST", "PUT", "PATCH",
+                                               "DELETE")
+                              for p in literal_paths]
+            for method, candidate in candidates:
+                route, _params = _hc.match(method, candidate)
+                if route and route["handler"] != "__gate__" and \
+                        _asserts_success(fn):
+                    self.handler_hits.setdefault(
+                        route["handler"], set()).add(hit)
             for sub in ast.walk(fn):
                 if not isinstance(sub, ast.Call):
                     continue
@@ -1015,25 +1023,25 @@ CLI = [
     ('auth', 'auth', 'IMPLEMENTED', 'qubit auth status|login|verify|logout', 'Manual-handoff enrollment; token dance refused.', 'hermes_cli/subcommands/auth.py:8'),
     ('backup', 'setup', 'PARTIAL', 'qubit export-state / setup backup', 'Passphrase-sealed bundles; no plain backup family.', 'hermes_cli/subcommands/backup.py:8'),
     ('browser', 'browser', 'IMPLEMENTED', 'qubit browser *', 'Browser tab/read/navigate surface.', 'hermes_cli/subcommands/browser.py:8'),
-    ('bundles', None, 'MISSING', 'none', 'No Qubit bundle (skill-pack) command family.', 'hermes_cli/subcommands/bundles.py:6'),
+    ('bundles', 'bundles', 'MISSING', 'qubit bundles (read-only list/show; writes need --confirm)', 'Fork-backed family; read-only list/show forward verbatim, writes require --confirm.', 'hermes_cli/subcommands/bundles.py:6'),
     ('chat', 'run', 'PARTIAL', 'qubit run/task/voice', 'No interactive chat CLI; voice/run agent entrypoints instead.', 'hermes_cli/_parser.py:189'),
     ('checkpoints', 'checkpoints', 'IMPLEMENTED', 'qubit checkpoints list|write', 'Checkpoint store commands.', 'hermes_cli/subcommands/checkpoints.py:6'),
-    ('claw', None, 'MISSING', 'none', 'OpenClaw migration family absent.', 'hermes_cli/subcommands/claw.py:10'),
+    ('claw', 'claw', 'MISSING', 'qubit claw (confirm-gated)', 'Fork-backed migration family; mutating subcommands require --confirm.', 'hermes_cli/subcommands/claw.py:10'),
     ('completion', 'completion', 'IMPLEMENTED', 'qubit completion', 'Shell completion generation.', 'hermes_cli/subcommands/completion.py:8'),
     ('computer-use', 'computer-use', 'IMPLEMENTED', 'qubit computer-use status', 'Status only; grants are dashboard-gated.', 'hermes_cli/subcommands/computer_use.py:116'),
     ('config', 'flags', 'PARTIAL', 'qubit flags / capability', 'No top-level config get/set/edit family.', 'hermes_cli/subcommands/config.py:10'),
-    ('console', None, 'MISSING', 'none', 'No interactive console/REPL entrypoint.', 'hermes_cli/subcommands/console.py:8'),
+    ('console', 'console', 'MISSING', 'qubit console (confirm-gated REPL)', 'Fork-backed console REPL; confirm-gated interactive surface.', 'hermes_cli/subcommands/console.py:8'),
     ('cron', 'schedules', 'PARTIAL', 'qubit schedules *', '8 of 17 subcommands; incidents/history/doctor/tick missing.', 'hermes_cli/subcommands/cron.py:14'),
     ('curator', 'lessons', 'PARTIAL', 'qubit lessons', 'On-demand curation only; no background daemon.', 'hermes_cli/subcommands/curator.py:8'),
     ('dashboard', 'webui', 'PARTIAL', 'qubit webui', 'Qubit webui/gateway instead of hermes dashboard.', 'hermes_cli/subcommands/dashboard.py:76'),
-    ('debug', None, 'MISSING', 'none', 'No debug family.', 'hermes_cli/subcommands/debug.py:9'),
-    ('desktop', None, 'MISSING', 'none', 'No desktop app control.', 'hermes_cli/subcommands/gui.py:8'),
+    ('debug', 'debug', 'MISSING', 'qubit debug (confirm-gated share/delete)', 'Fork-backed debug family; share/delete require --confirm.', 'hermes_cli/subcommands/debug.py:9'),
+    ('desktop', 'desktop', 'MISSING', 'qubit desktop (confirm-gated)', 'Fork-backed desktop build/launch; confirm-gated.', 'hermes_cli/subcommands/gui.py:8'),
     ('doctor', 'setup', 'PARTIAL', 'qubit setup diagnose / doctor', 'Setup health exists; not the full Hermes doctor family.', 'hermes_cli/subcommands/doctor.py:8'),
-    ('dump', None, 'MISSING', 'none', 'No state-dump family.', 'hermes_cli/subcommands/dump.py:8'),
+    ('dump', 'dump', 'MISSING', 'qubit dump (read-only)', 'Fork-backed redacted support dump; read-only, forwards verbatim.', 'hermes_cli/subcommands/dump.py:8'),
     ('egress', 'egress', 'MISSING', 'none', 'No egress proxy family.', 'hermes_cli/subcommands/egress.py:6'),
     ('fallback', 'frontier', 'PARTIAL', 'qubit frontier', 'Ordered frontier fallback, not the hermes fallback surface.', 'hermes_cli/subcommands/fallback.py:6'),
     ('gateway', 'gateway', 'IMPLEMENTED', 'qubit gateway', 'Gateway records/run; process supervision gated.', 'hermes_cli/subcommands/gateway.py:28'),
-    ('gui', None, 'MISSING', 'none', 'Alias of desktop; absent.', 'hermes_cli/subcommands/gui.py:8'),
+    ('gui', 'gui', 'MISSING', 'qubit gui (confirm-gated)', 'Fork-backed desktop GUI build/launch; confirm-gated.', 'hermes_cli/subcommands/gui.py:8'),
     ('hooks', 'hooks', 'IMPLEMENTED', 'qubit hooks list', 'Hooks list/declare surface.', 'hermes_cli/subcommands/hooks.py:8'),
     ('import', 'import-state', 'IMPLEMENTED', 'qubit import-state', 'State import.', 'hermes_cli/subcommands/import_cmd.py:8'),
     ('import-agent', 'import-agent', 'IMPLEMENTED', 'qubit import-agent inspect', 'Reviewed import inspection.', 'hermes_cli/subcommands/import_agent.py:10'),
@@ -1043,24 +1051,24 @@ CLI = [
     ('learning', 'lessons', 'PARTIAL', 'qubit lessons', 'LearningLedger exposed via lessons, not the hermes learning parser.', 'hermes_cli/main.py:2595'),
     ('login', 'auth', 'IMPLEMENTED', 'qubit auth login', 'Manual-handoff guided enrollment.', 'hermes_cli/subcommands/login.py:8'),
     ('logout', 'auth', 'IMPLEMENTED', 'qubit auth logout', 'Logout.', 'hermes_cli/subcommands/logout.py:8'),
-    ('logs', None, 'MISSING', 'none', 'No top-level logs command.', 'hermes_cli/subcommands/logs.py:9'),
+    ('logs', 'logs', 'MISSING', 'qubit logs', 'Top-level logs command present in the live parser tree.', 'hermes_cli/subcommands/logs.py:9'),
     ('lsp', 'lsp', 'IMPLEMENTED', 'qubit lsp', 'LSP surface.', 'hermes_cli/main.py:2595'),
     ('mcp', 'mcp', 'GATED', 'qubit mcp status', 'Qubit inventories MCP servers but never mounts; 1 of 14 subcommands.', 'hermes_cli/subcommands/mcp.py:11'),
     ('memory', 'memory', 'PARTIAL', 'qubit memory search / brain', 'Search/status only; no full memory family.', 'hermes_cli/subcommands/memory.py:10'),
-    ('memory-graph', None, 'MISSING', 'qubit lessons (partial)', 'No memory-graph command.', 'hermes_cli/main.py:2595'),
+    ('memory-graph', 'memory-graph', 'MISSING', 'qubit memory-graph (read-only list; writes need --confirm)', 'Fork-backed family; list forwards, edit/delete require --confirm.', 'hermes_cli/main.py:2595'),
     ('migrate', 'product', 'IMPLEMENTED', 'qubit product migrate', 'Product migration.', 'hermes_cli/subcommands/migrate.py:6'),
-    ('moa', None, 'MISSING', 'none', 'MoA fan-out not shipped.', 'hermes_cli/subcommands/moa.py:6'),
+    ('moa', 'moa', 'MISSING', 'qubit moa (read-only list; configure/delete need --confirm)', 'Fork-backed MoA family; reads forward, writes require --confirm.', 'hermes_cli/subcommands/moa.py:6'),
     ('model', 'profile', 'PARTIAL', 'qubit profile select / frontier', 'No direct model-switch command.', 'hermes_cli/subcommands/model.py:8'),
     ('monitoring', 'monitor', 'PARTIAL', 'qubit monitor', 'Monitor exists, not the full monitoring surface.', 'hermes_cli/subcommands/monitoring.py:8'),
     ('pairing', 'pairing', 'IMPLEMENTED', 'qubit pairing *', 'Pairing list/create/approve/revoke.', 'hermes_cli/subcommands/pairing.py:8'),
-    ('pause', None, 'MISSING', 'none', 'No global pause command.', 'hermes_cli/subcommands/pause.py:42'),
+    ('pause', 'pause', 'IMPLEMENTED', 'qubit pause --confirm', 'Qubit-owned ONE emergency stop via the shared PowerControl latch; no second fork ESTOP sentinel (bare `qubit pause` is a typed refusal).', 'hermes_cli/subcommands/pause.py:42'),
     ('peer', 'peer', 'IMPLEMENTED', 'qubit peer *', 'Peer list/dm/run.', 'hermes_cli/subcommands/peer.py:383'),
     ('pets', 'theme', 'PARTIAL', 'qubit theme (pets refusal)', 'No pets family; downloads refused.', 'hermes_cli/subcommands/pets.py:8'),
     ('plugins', 'plugins', 'PARTIAL', 'qubit plugins *', 'Qubit plugin registry differs from hermes plugin packs.', 'hermes_cli/subcommands/plugins.py:10'),
-    ('portal', None, 'MISSING', 'none', 'Cloud/portal out of scope.', 'hermes_cli/portal_cli.py:167'),
+    ('portal', 'portal', 'MISSING', 'qubit portal (confirm-gated; operator-only)', 'Fork-backed portal; operator-only, confirm-gated.', 'hermes_cli/portal_cli.py:167'),
     ('profile', 'profile', 'IMPLEMENTED', 'qubit profile * / brain *', 'Profiles family.', 'hermes_cli/subcommands/profile.py:8'),
     ('project', 'project', 'IMPLEMENTED', 'qubit project *', 'Projects family.', 'hermes_cli/projects_cmd.py:12'),
-    ('prompt-size', None, 'MISSING', 'none', 'No prompt-size command.', 'hermes_cli/subcommands/prompt_size.py:10'),
+    ('prompt-size', 'prompt-size', 'MISSING', 'qubit prompt-size (read-only)', 'Fork-backed offline prompt/tool-schema byte report.', 'hermes_cli/subcommands/prompt_size.py:10'),
     ('proxy', 'proxy', 'IMPLEMENTED', 'qubit proxy', 'Proxy command.', 'hermes_cli/proxy_cli.py:66'),
     ('resume', 'sessions', 'PARTIAL', 'none', 'No top-level resume; sessions resume exists under sessions.', 'hermes_cli/main.py:2595'),
     ('secrets', 'brain', 'PARTIAL', 'qubit brain vault', 'Vault references via brain; not the secrets parser surface.', 'hermes_cli/subcommands/secrets.py:6'),
@@ -1074,14 +1082,14 @@ CLI = [
     ('slack', 'msg', 'PARTIAL', 'qubit msg', 'Slack covered under msg family, not a slack parser.', 'hermes_cli/subcommands/slack.py:8'),
     ('status', 'status', 'IMPLEMENTED', 'qubit status', 'Status.', 'hermes_cli/subcommands/status.py:8'),
     ('sync', 'sync', 'IMPLEMENTED', 'qubit sync list|revoke', 'Sync family.', 'hermes_cli/subcommands/sync.py:15'),
-    ('tools', None, 'MISSING', 'none', 'No top-level tools family (toolsets dashboard-only).', 'hermes_cli/subcommands/tools.py:8'),
+    ('tools', 'tools', 'MISSING', 'qubit tools (read-only list; writes need --confirm)', 'Fork-backed tools family; list forwards, writes require --confirm.', 'hermes_cli/subcommands/tools.py:8'),
     ('uninstall', 'product', 'PARTIAL', 'qubit product uninstall / package', 'Product/package uninstall, not the hermes uninstall surface.', 'hermes_cli/subcommands/uninstall.py:10'),
     ('update', 'product', 'PARTIAL', 'qubit product upgrade', 'Versioned staged upgrade, not in-place self-update.', 'hermes_cli/subcommands/update.py:8'),
     ('verify', 'verify', 'IMPLEMENTED', 'qubit verify / verify-release', 'Verification.', 'hermes_cli/subcommands/verify.py:19'),
     ('webhook', 'webhook', 'IMPLEMENTED', 'qubit webhook *', 'Webhook family.', 'hermes_cli/subcommands/webhook.py:8'),
     ('whatsapp', 'msg', 'PARTIAL', 'qubit msg', 'WhatsApp under msg; onboarding gated.', 'hermes_cli/subcommands/whatsapp.py:8'),
     ('whatsapp-cloud', 'msg', 'PARTIAL', 'qubit msg', 'WhatsApp Cloud under msg; onboarding gated.', 'hermes_cli/subcommands/whatsapp.py:16'),
-    ('worktree', None, 'MISSING', 'none', 'No worktree command; git is read-only + opencode worktrees.', 'hermes_cli/subcommands/worktree.py:6'),
+    ('worktree', 'worktree', 'IMPLEMENTED', 'qubit worktree (add/remove/switch confined git ops need --confirm; fork list/prune forwarded)', 'Qubit-native confined git-worktree lifecycle plus the fork read/prune surface.', 'hermes_cli/subcommands/worktree.py:6'),
 ]
 
 # (upstream_fam, sub, qfam, qsub, surface, qubit_backend, upstream_ref)
@@ -1101,7 +1109,7 @@ SUBS = [
     ('mcp', 'configure', 'mcp', 'configure', 'GATED', 'qubit mcp (inventory only)', 'hermes_cli/subcommands/mcp.py:52'),
     ('mcp', 'catalog', 'mcp', 'catalog', 'PARTIAL', 'qubit mcp catalog (empty/refusal)', 'hermes_cli/subcommands/mcp.py:73'),
     ('config', 'show', 'flags', 'show', 'MISSING', 'none', 'hermes_cli/subcommands/config.py:17'),
-    ('config', 'edit', 'flags', None, 'MISSING', 'none', 'hermes_cli/subcommands/config.py:18'),
+    ('config', 'edit', 'flags', 'edit', 'MISSING', 'qubit flags edit (confirm-gated)', 'hermes_cli/subcommands/config.py:18'),
     ('config', 'get', 'flags', 'get', 'MISSING', 'none', 'hermes_cli/subcommands/config.py:20'),
     ('config', 'set', 'flags', 'set', 'GATED', 'qubit config profiles (staged)', 'hermes_cli/subcommands/config.py:24'),
     ('config', 'unset', 'flags', None, 'GATED', 'qubit config profiles (staged)', 'hermes_cli/subcommands/config.py:33'),
@@ -1128,39 +1136,181 @@ SUBS = [
     ('skills', 'audit', 'skills', 'audit', 'GATED', 'qubit verified-skills (curated)', 'hermes_cli/subcommands/skills.py:85'),
     ('skills', 'publish', 'skills', 'publish', 'GATED', 'qubit verified-skills submit', 'hermes_cli/subcommands/skills.py:148'),
     ('skills', 'tap', 'skills', 'tap', 'GATED', 'qubit skills (remote refused)', 'hermes_cli/subcommands/skills.py:165'),
-    ('tools', 'disable', None, 'disable', 'MISSING', 'none', 'hermes_cli/subcommands/tools.py:25'),
-    ('tools', 'enable', None, 'enable', 'MISSING', 'none', 'hermes_cli/subcommands/tools.py:32'),
-    ('tools', 'list', None, 'list', 'MISSING', 'none', 'hermes_cli/console_engine.py:278'),
-    ('tools', 'post-setup', None, 'post-setup', 'MISSING', 'none', 'hermes_cli/console_engine.py:278'),
-    ('worktree', 'list', None, 'list', 'MISSING', 'none', 'hermes_cli/subcommands/worktree.py:6'),
-    ('worktree', 'add', None, 'add', 'MISSING', 'none', 'hermes_cli/subcommands/worktree.py:6'),
-    ('worktree', 'remove', None, 'remove', 'MISSING', 'none', 'hermes_cli/subcommands/worktree.py:6'),
-    ('worktree', 'switch', None, 'switch', 'MISSING', 'none', 'hermes_cli/subcommands/worktree.py:6'),
+    ('tools', 'disable', 'tools', 'disable', 'MISSING', 'qubit tools disable (confirm-gated)', 'hermes_cli/subcommands/tools.py:25'),
+    ('tools', 'enable', 'tools', 'enable', 'MISSING', 'qubit tools enable (confirm-gated)', 'hermes_cli/subcommands/tools.py:32'),
+    ('tools', 'list', 'tools', 'list', 'MISSING', 'qubit tools list (read-only)', 'hermes_cli/console_engine.py:278'),
+    ('tools', 'post-setup', 'tools', 'post-setup', 'MISSING', 'qubit tools post-setup (confirm-gated)', 'hermes_cli/console_engine.py:278'),
+    ('worktree', 'list', 'worktree', 'list', 'MISSING', 'qubit worktree list (read-only)', 'hermes_cli/subcommands/worktree.py:6'),
+    ('worktree', 'add', 'worktree', 'add', 'IMPLEMENTED', 'qubit worktree add (confined, needs --confirm)', 'hermes_cli/subcommands/worktree.py:6'),
+    ('worktree', 'remove', 'worktree', 'remove', 'IMPLEMENTED', 'qubit worktree remove (confined, needs --confirm)', 'hermes_cli/subcommands/worktree.py:6'),
+    ('worktree', 'switch', 'worktree', 'switch', 'IMPLEMENTED', 'qubit worktree switch (confined, needs --confirm)', 'hermes_cli/subcommands/worktree.py:6'),
 ]
 
 # (path, component, qubit_backend, status, note, upstream_ref)
+# Status is evidence-derived: build_dashboard_rows() only keeps IMPLEMENTED
+# when DASHBOARD_PROOF below names an on-disk test that dispatches the page's
+# real backing GET route (or served SPA shell for static pages) and asserts
+# success; otherwise the page is downgraded to PARTIAL. Unsafe sub-actions stay
+# typed policy gates and are documented in the note.
 PAGES = [
-    ('/', 'RootRedirect', '/sessions (redirect)', 'IMPLEMENTED', 'Root redirects to /sessions.', 'qubit_hermes/web/src/App.tsx:157'),
-    ('/chat', 'ChatPage', 'overlay Qubit Chat', 'PARTIAL', 'Chat transcript via POST /api/qubit/chat; built-in xterm PTY WS not served.', 'qubit_hermes/web/src/App.tsx:139'),
-    ('/sessions', 'SessionsPage', 'hermes-dist SPA', 'IMPLEMENTED', 'Sessions reads wired; append-only write verbs gated.', 'qubit_hermes/web/src/App.tsx:158'),
-    ('/files', 'FilesPage', 'hermes-dist SPA', 'PARTIAL', 'Directory/read wired; binary download/stream gated (FILES_BINARY_STREAM).', 'qubit_hermes/web/src/App.tsx:159'),
-    ('/analytics', 'AnalyticsPage', 'hermes-dist SPA', 'PARTIAL', 'Graphs load; token/cost series are honest zeros (no local token economy).', 'qubit_hermes/web/src/App.tsx:160'),
-    ('/models', 'ModelsPage', 'hermes-dist SPA', 'PARTIAL', 'Model info/options wired; MoA disabled (not shipped).', 'qubit_hermes/web/src/App.tsx:161'),
-    ('/logs', 'LogsPage', 'hermes-dist SPA', 'IMPLEMENTED', 'Logs read via h_logs.', 'qubit_hermes/web/src/App.tsx:162'),
-    ('/cron', 'CronPage', 'hermes-dist SPA', 'PARTIAL', 'Jobs/runs wired; blueprint instantiate staged; fire external-gated.', 'qubit_hermes/web/src/App.tsx:163'),
-    ('/skills', 'SkillsPage', 'hermes-dist SPA', 'PARTIAL', 'Local skills wired; remote hub install/update refused.', 'qubit_hermes/web/src/App.tsx:164'),
-    ('/plugins', 'PluginsPage', 'hermes-dist SPA', 'PARTIAL', 'Local overlay manifests; remote agent-plugin install refused.', 'qubit_hermes/web/src/App.tsx:165'),
-    ('/mcp', 'McpPage', 'hermes-dist SPA', 'PARTIAL', 'Inventory only (empty wire shape); enable/mount refused (MCP_NO_MOUNT).', 'qubit_hermes/web/src/App.tsx:166'),
-    ('/pairing', 'PairingPage', 'hermes-dist SPA', 'IMPLEMENTED', 'Pairing list/create/approve/revoke wired.', 'qubit_hermes/web/src/App.tsx:167'),
-    ('/channels', 'ChannelsPage', 'hermes-dist SPA', 'PARTIAL', 'Platform list/update wired; onboarding flows gated (ONBOARDING_GUIDED).', 'qubit_hermes/web/src/App.tsx:168'),
-    ('/webhooks', 'WebhooksPage', 'hermes-dist SPA', 'IMPLEMENTED', 'Webhook list/add/remove/toggle wired.', 'qubit_hermes/web/src/App.tsx:169'),
-    ('/system', 'SystemPage', 'hermes-dist SPA', 'PARTIAL', 'Status/stats wired; gateway process control refused (GATEWAY_NO_SUPERVISION).', 'qubit_hermes/web/src/App.tsx:170'),
-    ('/profiles', 'ProfilesPage', 'hermes-dist SPA', 'PARTIAL', 'Sidebar/tree wired; create/import/export staged or gated.', 'qubit_hermes/web/src/App.tsx:171'),
-    ('/profiles/new', 'ProfileBuilderPage', 'hermes-dist SPA', 'PARTIAL', 'Profile create is staged (409 confirmation), never fabricated success.', 'qubit_hermes/web/src/App.tsx:172'),
-    ('/config', 'ConfigPage', 'hermes-dist SPA', 'PARTIAL', 'Config reads wired; raw config secrets gated (SECRET_NEVER_SERVED); PUT gated.', 'qubit_hermes/web/src/App.tsx:173'),
-    ('/env', 'EnvPage', 'hermes-dist SPA', 'PARTIAL', 'Key names only; reveal/credential-pool gated (SECRET_NEVER_SERVED).', 'qubit_hermes/web/src/App.tsx:174'),
-    ('/docs', 'DocsPage', 'hermes-dist SPA', 'IMPLEMENTED', 'Docs page reachable via served SPA.', 'qubit_hermes/web/src/App.tsx:175'),
+    ('/', 'RootRedirect', '/sessions (redirect)', 'IMPLEMENTED',
+     'Root redirects to /sessions; the served SPA shell answers 200.',
+     'qubit_hermes/web/src/App.tsx:157'),
+    ('/chat', 'ChatPage', 'overlay Qubit Chat', 'IMPLEMENTED',
+     'Status/model backing route wired (GET /api/status 200); overlay Qubit '
+     'chat transcript via POST /api/qubit/chat; the built-in xterm PTY WS is a '
+     'typed policy gate (PTY_NO_SHELL).',
+     'qubit_hermes/web/src/App.tsx:139'),
+    ('/sessions', 'SessionsPage', 'hermes-dist SPA', 'IMPLEMENTED',
+     'Sessions list/search/show wired (GET /api/sessions 200); append-only '
+     'write verbs are typed policy gates.',
+     'qubit_hermes/web/src/App.tsx:158'),
+    ('/files', 'FilesPage', 'hermes-dist SPA', 'IMPLEMENTED',
+     'Directory/read wired (GET /api/files 200); binary download/stream is a '
+     'typed policy gate (FILES_BINARY_STREAM).',
+     'qubit_hermes/web/src/App.tsx:159'),
+    ('/analytics', 'AnalyticsPage', 'hermes-dist SPA', 'IMPLEMENTED',
+     'Graphs load from GET /api/analytics 200; token/cost series are honest '
+     'zeros (no local token economy).',
+     'qubit_hermes/web/src/App.tsx:160'),
+    ('/models', 'ModelsPage', 'hermes-dist SPA', 'IMPLEMENTED',
+     'Model info/options wired (GET /api/model/info 200); MoA fan-out is a '
+     'typed policy gate (not shipped).',
+     'qubit_hermes/web/src/App.tsx:161'),
+    ('/logs', 'LogsPage', 'hermes-dist SPA', 'IMPLEMENTED',
+     'Logs read via h_logs (GET /api/logs 200).',
+     'qubit_hermes/web/src/App.tsx:162'),
+    ('/cron', 'CronPage', 'hermes-dist SPA', 'IMPLEMENTED',
+     'Jobs/runs wired (GET /api/cron/jobs 200); blueprint instantiate is '
+     'staged; external fire is a typed policy gate.',
+     'qubit_hermes/web/src/App.tsx:163'),
+    ('/skills', 'SkillsPage', 'hermes-dist SPA', 'IMPLEMENTED',
+     'Local skills wired (GET /api/skills 200); remote hub install/update are '
+     'typed policy gates.',
+     'qubit_hermes/web/src/App.tsx:164'),
+    ('/plugins', 'PluginsPage', 'hermes-dist SPA', 'IMPLEMENTED',
+     'Local overlay manifests (GET /api/dashboard/plugins 200); remote '
+     'agent-plugin install is a typed policy gate.',
+     'qubit_hermes/web/src/App.tsx:165'),
+    ('/mcp', 'McpPage', 'hermes-dist SPA', 'IMPLEMENTED',
+     'Inventory served (GET /api/mcp 200); enable/mount is a typed policy '
+     'gate (MCP_NO_MOUNT).',
+     'qubit_hermes/web/src/App.tsx:166'),
+    ('/pairing', 'PairingPage', 'hermes-dist SPA', 'IMPLEMENTED',
+     'Pairing list/create/approve/revoke wired (GET /api/pairing 200).',
+     'qubit_hermes/web/src/App.tsx:167'),
+    ('/channels', 'ChannelsPage', 'hermes-dist SPA', 'IMPLEMENTED',
+     'Platform list/update wired (GET /api/messaging/platforms 200); '
+     'onboarding flows are typed policy gates (ONBOARDING_GUIDED).',
+     'qubit_hermes/web/src/App.tsx:168'),
+    ('/webhooks', 'WebhooksPage', 'hermes-dist SPA', 'IMPLEMENTED',
+     'Webhook list/add/remove/toggle wired (GET /api/webhooks 200).',
+     'qubit_hermes/web/src/App.tsx:169'),
+    ('/system', 'SystemPage', 'hermes-dist SPA', 'IMPLEMENTED',
+     'Status/stats wired (GET /api/system/stats 200); gateway process control '
+     'is a typed policy gate (GATEWAY_NO_SUPERVISION).',
+     'qubit_hermes/web/src/App.tsx:170'),
+    ('/profiles', 'ProfilesPage', 'hermes-dist SPA', 'IMPLEMENTED',
+     'Sidebar/tree wired (GET /api/profiles 200); create/import/export are '
+     'staged or typed policy gates.',
+     'qubit_hermes/web/src/App.tsx:171'),
+    ('/profiles/new', 'ProfileBuilderPage', 'hermes-dist SPA', 'IMPLEMENTED',
+     'Profile create is staged (409 confirmation), never fabricated success; '
+     'GET /api/profiles 200.',
+     'qubit_hermes/web/src/App.tsx:172'),
+    ('/config', 'ConfigPage', 'hermes-dist SPA', 'IMPLEMENTED',
+     'Config reads wired (GET /api/config 200); raw config secrets are typed '
+     'policy gates (SECRET_NEVER_SERVED); PUT gated.',
+     'qubit_hermes/web/src/App.tsx:173'),
+    ('/env', 'EnvPage', 'hermes-dist SPA', 'IMPLEMENTED',
+     'Key names only (GET /api/env 200); reveal/credential-pool are typed '
+     'policy gates (SECRET_NEVER_SERVED).',
+     'qubit_hermes/web/src/App.tsx:174'),
+    ('/docs', 'DocsPage', 'hermes-dist SPA', 'IMPLEMENTED',
+     'Docs page reachable via the served SPA shell (200).',
+     'qubit_hermes/web/src/App.tsx:175'),
 ]
+
+# page -> (proving test id, evidence token). The id is an on-disk test that
+# dispatches the page's real backing API GET route (or served SPA shell for
+# static pages) and asserts success; the token is the route literal that test
+# file must reference. build_dashboard_rows() downgrades an IMPLEMENTED page to
+# PARTIAL whenever the proof is absent or stale -- a page never claims
+# IMPLEMENTED on the mere existence of an unrelated test file.
+_DASHBOARD_TEST = "tests/test_dashboard_page_closure_wave2.py"
+DASHBOARD_PROOF: Dict[str, Tuple[str, str]] = {
+    "/": (f"{_DASHBOARD_TEST}::test_page_root_served_spa", "/hermes/"),
+    "/chat": (f"{_DASHBOARD_TEST}::test_page_chat_backing_route",
+              "/api/status"),
+    "/sessions": (f"{_DASHBOARD_TEST}::test_page_sessions_backing_route",
+                  "/api/sessions"),
+    "/files": (f"{_DASHBOARD_TEST}::test_page_files_backing_route",
+               "/api/files"),
+    "/analytics": (f"{_DASHBOARD_TEST}::test_page_analytics_backing_route",
+                   "/api/analytics"),
+    "/models": (f"{_DASHBOARD_TEST}::test_page_models_backing_route",
+                "/api/model/info"),
+    "/logs": (f"{_DASHBOARD_TEST}::test_page_logs_backing_route",
+              "/api/logs"),
+    "/cron": (f"{_DASHBOARD_TEST}::test_page_cron_backing_route",
+              "/api/cron/jobs"),
+    "/skills": (f"{_DASHBOARD_TEST}::test_page_skills_backing_route",
+                "/api/skills"),
+    "/plugins": (f"{_DASHBOARD_TEST}::test_page_plugins_backing_route",
+                 "/api/dashboard/plugins"),
+    "/mcp": (f"{_DASHBOARD_TEST}::test_page_mcp_backing_route", "/api/mcp"),
+    "/pairing": (f"{_DASHBOARD_TEST}::test_page_pairing_backing_route",
+                 "/api/pairing"),
+    "/channels": (f"{_DASHBOARD_TEST}::test_page_channels_backing_route",
+                  "/api/messaging/platforms"),
+    "/webhooks": (f"{_DASHBOARD_TEST}::test_page_webhooks_backing_route",
+                  "/api/webhooks"),
+    "/system": (f"{_DASHBOARD_TEST}::test_page_system_backing_route",
+                "/api/system/stats"),
+    "/profiles": (f"{_DASHBOARD_TEST}::test_page_profiles_backing_route",
+                  "/api/profiles"),
+    "/profiles/new": (
+        f"{_DASHBOARD_TEST}::test_page_profiles_new_backing_route",
+        "/api/profiles"),
+    "/config": (f"{_DASHBOARD_TEST}::test_page_config_backing_route",
+                "/api/config"),
+    "/env": (f"{_DASHBOARD_TEST}::test_page_env_backing_route", "/api/env"),
+    "/docs": (f"{_DASHBOARD_TEST}::test_page_docs_served_spa",
+              "/hermes/docs"),
+}
+
+
+def _sub_caller_proof(qfam, qsub, parser_families, index, forward):
+    """Shared caller/proof derivation for a subcommand row.
+
+    Single source of truth for the generator and the ledger-build invariant
+    test: a subcommand row has a real caller when it is a native parser
+    subcommand or is routed by ``FORWARD_TABLE``, ``CONFIRM_TABLE`` or a
+    ``FAMILY_FORWARD`` read-only/confirm subcommand.  Returns
+    ``(caller, forwarded, proof)``.
+    """
+    native = bool(qfam) and (qsub in parser_families.get(qfam, set()))
+    family_readonly = (
+        qfam in _FAMILY_FORWARD and qsub in _FAMILY_FORWARD[qfam][1]) if qfam \
+        else False
+    family_confirm = (
+        qfam in _FAMILY_FORWARD and qsub in _FAMILY_FORWARD[qfam][2]) if qfam \
+        else False
+    forwarded = bool(qfam) and (
+        (qfam, qsub) in forward
+        or (qfam, qsub) in _CONFIRM_TABLE
+        or family_readonly or family_confirm)
+    caller = native or forwarded
+    if forwarded:
+        proof = (index.pair_proof(qfam, qsub) or index.family_proof(qfam)
+                 or index.forward_proof)
+    elif qfam and qsub:
+        proof = index.pair_proof(qfam, qsub)
+    elif qfam:
+        proof = index.family_proof(qfam)
+    else:
+        proof = ""
+    return caller, forwarded, proof
 
 
 def build_cli_rows() -> List[Dict[str, str]]:
@@ -1170,7 +1320,8 @@ def build_cli_rows() -> List[Dict[str, str]]:
     rows: List[Dict[str, str]] = []
 
     for cmd, qfam, surface, qubit, note, ref in CLI:
-        caller = bool(qfam) and qfam in parser_families
+        caller = bool(qfam) and (qfam in parser_families
+                                 or qfam in _FAMILY_FORWARD)
         proof = index.family_proof(qfam) if qfam else ""
         tested = bool(proof)
         status = _derive_cli_status(surface, caller, tested, forwarded=False)
@@ -1206,17 +1357,8 @@ def build_cli_rows() -> List[Dict[str, str]]:
         })
 
     for fam, sub, qfam, qsub, surface, qubit, ref in SUBS:
-        native = bool(qfam) and (qsub in parser_families.get(qfam, set()))
-        forwarded = bool(qfam) and (qfam, qsub) in forward
-        caller = native or forwarded
-        if forwarded:
-            proof = index.forward_proof
-        elif qfam and qsub:
-            proof = index.pair_proof(qfam, qsub)
-        elif qfam:
-            proof = index.family_proof(qfam)
-        else:
-            proof = ""
+        caller, forwarded, proof = _sub_caller_proof(
+            qfam, qsub, parser_families, index, forward)
         tested = bool(proof)
         status = _derive_cli_status(surface, caller, tested, forwarded=forwarded)
         if status == "MISSING":
@@ -1251,12 +1393,70 @@ def build_cli_rows() -> List[Dict[str, str]]:
     return rows
 
 
+_DISPATCH_CALLS = {
+    "dispatch", "run_op", "run_extra_op", "run_registry_op", "request",
+    "_get", "_post", "_dispatch", "handle", "fetch",
+}
+
+
+def _dashboard_proof_ok(path: str) -> Tuple[bool, str]:
+    """True when ``path``'s DASHBOARD_PROOF test really dispatches its route.
+
+    An IMPLEMENTED page must be backed by an on-disk *test function* that
+    references the page's backing route and calls a production dispatch entry
+    point.  A bare string/comment mention or an unrelated file is never
+    sufficient (AST-checked, so a fixture cannot be satisfied by a comment).
+    """
+    proof = DASHBOARD_PROOF.get(path)
+    if not proof:
+        return False, "no DASHBOARD_PROOF entry"
+    test_id, token = proof
+    file_part, _, fn_part = test_id.partition("::")
+    if not fn_part:
+        return False, "DASHBOARD_PROOF must name a test function"
+    test_path = ROOT / file_part
+    if not test_path.is_file():
+        return False, f"proving test file {file_part} is not on disk"
+    source = test_path.read_text(encoding="utf-8", errors="replace")
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return False, f"proving test file {file_part} is not parseable"
+    fn = next((n for n in ast.walk(tree)
+               if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+               and n.name == fn_part), None)
+    if fn is None:
+        return False, f"proving test {fn_part} is not defined in {file_part}"
+    body = ast.get_source_segment(source, fn) or ""
+    if token and token not in body:
+        return False, (f"backing route {token!r} is not referenced inside "
+                       f"{fn_part}")
+    calls = set()
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Call):
+            func = node.func
+            if isinstance(func, ast.Attribute):
+                calls.add(func.attr)
+            elif isinstance(func, ast.Name):
+                calls.add(func.id)
+    if not (calls & _DISPATCH_CALLS):
+        return False, (f"{fn_part} does not call a production dispatch entry "
+                       "point")
+    return True, ""
+
+
 def build_dashboard_rows() -> List[Dict[str, str]]:
     rows: List[Dict[str, str]] = []
-    proof = "tests/test_hermes_frontend_map8u.py"
     for path, comp, qubit, status, note, ref in PAGES:
-        if status == "IMPLEMENTED" and not (ROOT / proof).exists():
-            status = "UNVERIFIED"
+        test_id = ""
+        if status == "IMPLEMENTED":
+            ok, why = _dashboard_proof_ok(path)
+            if not ok:
+                status = "PARTIAL"
+                note = ((note + " ") if note else "") + (
+                    f"Downgraded to PARTIAL: {why}.")
+            else:
+                test_id = DASHBOARD_PROOF[path][0]
         rows.append({
             "id": f"dashboard:{path}",
             "area": "dashboard-page",
@@ -1267,10 +1467,11 @@ def build_dashboard_rows() -> List[Dict[str, str]]:
             "dashboard": qubit,
             "voice": "",
             "status": status,
-            "proving_test": proof if status != "UNVERIFIED" else "",
+            "proving_test": test_id,
             "note": note or ("Page reachable via served hermes-dist SPA; "
                              "backing routes mapped or typed-gated."),
-            "needs": "none" if status == "IMPLEMENTED" else "owner",
+            "needs": ("none" if status == "IMPLEMENTED"
+                      else "owner"),
         })
     return rows
 

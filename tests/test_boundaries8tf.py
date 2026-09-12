@@ -14,8 +14,11 @@ from __future__ import annotations
 CONVERTED_TOKENS = ("pairing", "webhook", "peer", "gateway-manage",
                     "gateway", "whatsapp", "whatsapp-cloud", "slack", "send")
 
-ABSENT_COMMANDS = ("portal", "login", "logout", "pets", "skin", "serve",
-                   "desktop", "gui", "dashboard")
+ABSENT_COMMANDS = ("login", "logout", "pets", "skin", "serve", "dashboard")
+# Formerly absent surfaces now served by the Qubit-owned fork CLI (not stubs):
+# a real routed command with upstream parser/behaviour, confirm-gated where the
+# operation is mutating.
+ROUTED_FORK_COMMANDS = ("portal", "desktop", "gui")
 
 
 def test_converted_names_are_typed_implemented():
@@ -41,6 +44,15 @@ def test_no_stub_commands_for_blocked_rows():
     for absent in ABSENT_COMMANDS:
         assert absent not in names, \
             f"{absent!r} must not exist as a CLI command (no stubs)"
+    # The fork-backed families are real routes to the vendored CLI, never a
+    # fabricated stub: each resolves to a forward/needs-confirm route.
+    from voicebridge import cli_hermes_forward as HF
+
+    for routed in ROUTED_FORK_COMMANDS:
+        assert routed in names, routed
+        resolved = HF.route_family([routed])
+        assert resolved is not None and resolved.kind in (
+            "forward", "needs-confirm"), (routed, resolved)
 
 
 def test_import_agent_inspect_only_contract():

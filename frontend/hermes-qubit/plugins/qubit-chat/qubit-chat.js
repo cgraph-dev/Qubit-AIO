@@ -197,7 +197,7 @@
       e("h2", null, "Qubit Chat"),
       e("p", {style: {opacity: 0.75}},
         "Native agent turns on the shared Qubit backend (same module as CLI and voice). ",
-        "The built-in Chat tab keeps the Hermes xterm surface; raw PTY attach is refused by Qubit shell policy."),
+        "The built-in Chat tab keeps the Qubit xterm surface; raw PTY attach is refused by Qubit shell policy."),
       e("label", null, "Session ",
         e(C.Input || "input", {value: session, onChange: function (ev) { setSession(ev.target.value); },
           style: {maxWidth: 260}})),
@@ -235,7 +235,7 @@
     return e("div", {role: "note", style: {margin: 12, padding: 10,
       border: "1px solid", borderRadius: 8, fontSize: 13}},
       e("strong", null, "Qubit note: "),
-      e("span", null, "the Hermes xterm session needs a raw PTY, which Qubit " +
+      e("span", null, "the Qubit xterm session needs a raw PTY, which Qubit " +
         "refuses by shell policy. Use the Qubit Chat tab for native agent " +
         "turns on the same backend as CLI and voice."));
   }

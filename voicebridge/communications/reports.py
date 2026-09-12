@@ -930,6 +930,127 @@ def _assets_list_html(assets: Optional[List[Dict[str, Any]]]) -> str:
     return '<ul>' + "".join(rows) + '</ul>'
 
 
+# ---------------------------------------------------------------------------
+# OC-D01: Team Reports aggregator (GitHub / Discord activity)
+# ---------------------------------------------------------------------------
+# The upstream team-reports plugin aggregates GitHub + explicitly configured
+# Discord activity into a stored, optionally summarized history. Qubit adds the
+# local read model here: it validates sources, calls an *injected* provider
+# transport (the external credential/network boundary), normalizes bounded
+# activity rows, and builds a deterministic summary. Without a transport the
+# call is a typed TEAM_REPORTS_UNAVAILABLE -- never a fabricated report.
+TEAM_REPORTS_SCHEMA = "qubit-team-reports/1"
+TEAM_REPORTS_UNAVAILABLE = "TEAM_REPORTS_UNAVAILABLE"
+TEAM_REPORTS_BAD_SOURCE = "TEAM_REPORTS_BAD_SOURCE"
+MAX_TEAM_SOURCES = 16
+MAX_TEAM_ITEMS = 500
+_TEAM_SOURCE_PLATFORMS = ("github", "discord")
+
+
+def _check_team_sources(sources: Any) -> List[Dict[str, str]]:
+    if not isinstance(sources, (list, tuple)) or not sources:
+        raise ReportValidationError("at least one team-report source required")
+    if len(sources) > MAX_TEAM_SOURCES:
+        raise ReportValidationError(
+            f"at most {MAX_TEAM_SOURCES} sources per report")
+    clean: List[Dict[str, str]] = []
+    for src in sources:
+        if not isinstance(src, dict):
+            raise ReportValidationError("each source must be a mapping")
+        platform = str(src.get("platform", "")).strip().lower()
+        if platform not in _TEAM_SOURCE_PLATFORMS:
+            raise ReportValidationError(
+                f"source platform must be one of {_TEAM_SOURCE_PLATFORMS}")
+        account = str(src.get("account", "")).strip()[:120]
+        target = str(src.get("target", "")).strip()[:200]
+        if not account:
+            raise ReportValidationError("source account is required")
+        clean.append({"platform": platform, "account": account,
+                      "target": target})
+    return clean
+
+
+def team_reports(cfg: Any, sources: Any, *, transport: Any = None,
+                 window_start: Optional[float] = None,
+                 window_end: Optional[float] = None,
+                 retention_days: int = 90,
+                 requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Aggregate configured GitHub/Discord activity into a team report.
+
+    ``transport`` is the injected provider boundary: a callable
+    ``(request) -> {"items": [...]}``. The aggregator itself (validation,
+    bounds, redaction, deterministic summary) is real and tested with a mocked
+    transport; the live API call is the credential-gated last mile.
+    """
+    try:
+        clean_sources = _check_team_sources(sources)
+    except ReportValidationError as exc:
+        return {"state": "FAILED", "code": TEAM_REPORTS_BAD_SOURCE,
+                "schema": TEAM_REPORTS_SCHEMA, "detail": str(exc),
+                "owner": "qubit-policy",
+                "rollback": "nothing aggregated; nothing to roll back"}
+    if transport is None:
+        return {"state": "UNAVAILABLE", "code": TEAM_REPORTS_UNAVAILABLE,
+                "schema": TEAM_REPORTS_SCHEMA,
+                "detail": "team reports need a GitHub/Discord transport; "
+                          "inject one or run `qubit monitor` for local "
+                          "communications evidence",
+                "owner": "qubit-policy",
+                "rollback": "nothing aggregated; nothing to roll back"}
+    now = time.time()
+    start = float(window_start) if window_start is not None else now - 86400.0
+    end = float(window_end) if window_end is not None else now
+    if end < start:
+        return {"state": "FAILED", "code": TEAM_REPORTS_BAD_SOURCE,
+                "schema": TEAM_REPORTS_SCHEMA,
+                "detail": "window_end precedes window_start",
+                "owner": "qubit-policy",
+                "rollback": "nothing aggregated; nothing to roll back"}
+    rows: List[Dict[str, Any]] = []
+    failures: List[str] = []
+    for src in clean_sources:
+        request = {"kind": "team.activity", "platform": src["platform"],
+                   "account": src["account"], "target": src["target"],
+                   "window_start": start, "window_end": end,
+                   "limit": MAX_TEAM_ITEMS}
+        try:
+            response = transport(request)
+        except Exception as exc:
+            failures.append(f"{src['platform']}:{redact_text(str(exc))[:120]}")
+            continue
+        items = response.get("items") if isinstance(response, dict) else None
+        if not isinstance(items, list):
+            failures.append(f"{src['platform']}: no items returned")
+            continue
+        for item in items[:MAX_TEAM_ITEMS]:
+            if not isinstance(item, dict):
+                continue
+            rows.append({
+                "platform": src["platform"], "account": src["account"],
+                "actor": redact_text(str(item.get("actor", "")))[:120],
+                "summary": redact_text(str(item.get("summary", "")))[:240],
+                "ts": item.get("ts"),
+                "url": safe_source_link(str(item.get("url", ""))) or "",
+                "channel": redact_text(str(item.get("channel", "")))[:120],
+            })
+    by_platform: Dict[str, int] = {}
+    for row in rows:
+        by_platform[row["platform"]] = by_platform.get(row["platform"], 0) + 1
+    return {
+        "state": "SUCCESS" if rows and not failures else (
+            "PARTIAL" if rows else "DEGRADED"),
+        "schema": TEAM_REPORTS_SCHEMA,
+        "window_start": start, "window_end": end,
+        "retention_days": int(retention_days),
+        "counts": {"total": len(rows), "by_platform": by_platform},
+        "items": sorted(rows, key=lambda r: r.get("ts") or 0,
+                        reverse=True)[:MAX_TEAM_ITEMS],
+        "partial_failures": failures,
+        "requested_by": str(requested_by)[:64],
+        "authority": "injected provider transport; bounded redacted rows",
+    }
+
+
 _HTML_TEMPLATE = """<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">

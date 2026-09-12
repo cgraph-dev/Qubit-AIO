@@ -80,6 +80,7 @@ REMOTE_CAPABILITIES = (
     "camera", "camera.capture",
     "media_playback", "media.playback",
     "desktop.control", "computer.act",
+    "browser.cdp",
 )
 UNSAFE_CAPABILITIES = (
     "shell", "shell.run", "exec", "process.spawn", "file.write", "apply_patch",
@@ -523,10 +524,17 @@ def _shared_backend(cfg: Any, capability: str,
 
 
 def dispatch(cfg: Any, node_id: str, capability: str, args: Any = None, *,
-             confirmed: bool = False,
+             confirmed: bool = False, transport: Any = None,
              requested_by: str = "user") -> Dict[str, Any]:
     """Route a capability; only local-safe reads execute, everything else is
-    a typed refusal. A remote shell is never executed."""
+    a typed refusal. A remote shell is never executed.
+
+    ``transport`` is an optional operator-injected node boundary
+    ``(request) -> result`` used for remote actuators (screen/audio/camera/
+    media_playback/...). Without it those capabilities stay typed UNAVAILABLE;
+    with it, dispatch requires explicit confirmation (availability is never
+    authorization). Qubit itself never spawns a node process.
+    """
     if estop_engaged(cfg):
         return refuse_estop("node dispatch")
     try:
@@ -544,12 +552,44 @@ def dispatch(cfg: Any, node_id: str, capability: str, args: Any = None, *,
         return _refusal("dispatch", NODE_DISPATCH_REFUSED,
                         "process/write capabilities are never executed by the "
                         "node host (no shell)")
-    if cap in REMOTE_CAPABILITIES:
-        return _refusal("dispatch", NODE_DISPATCH_REFUSED,
-                        f"{cap} requires a live remote node-host actuator; "
-                        "none is running")
     try:
         clean_args = _check_args(args)
+    except NodeHostError as exc:
+        return _refusal("dispatch", exc.code, exc.detail)
+    if cap in REMOTE_CAPABILITIES:
+        if transport is None:
+            return _refusal("dispatch", NODE_DISPATCH_REFUSED,
+                            f"{cap} requires a live remote node-host actuator; "
+                            "none is running")
+        if not confirmed:
+            return _refusal("dispatch", NODE_DISPATCH_REFUSED,
+                            f"{cap} requires explicit confirmation before the "
+                            "injected node transport is invoked")
+        if not callable(transport):
+            return _refusal("dispatch", NODE_DISPATCH_REFUSED,
+                            "transport must be callable")
+        try:
+            result = transport({"type": "node.invoke", "node": rec["id"],
+                                "capability": cap, "args": clean_args})
+        except Exception as exc:
+            return _refusal("dispatch", NODE_HOST_UNAVAILABLE,
+                            "node transport failed: "
+                            f"{_redact(str(exc))[:160]}")
+        if not isinstance(result, dict):
+            return _refusal("dispatch", NODE_HOST_UNAVAILABLE,
+                            "node transport returned a non-mapping")
+        try:
+            rec["last_outcome"] = "DISPATCH_OK"
+            _save(cfg, state)
+        except NodeHostError:
+            pass
+        _audit("dispatch", requested_by,
+               {"node": rec["id"], "cap": cap, "transport": "injected"})
+        return {"state": "OK", "node": rec["id"], "capability": cap,
+                "result": result,
+                "authority": "operator-injected node transport; availability "
+                             "is not authorization"}
+    try:
         result = _shared_backend(cfg, cap, clean_args)
     except NodeHostError as exc:
         return _refusal("dispatch", exc.code, exc.detail)

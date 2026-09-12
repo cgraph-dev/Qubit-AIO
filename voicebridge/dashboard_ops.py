@@ -726,7 +726,10 @@ def _extra_sync_accept(cfg: Any, args: Dict[str, Any],
 
 @extra("sync_revoke", group="sync", title="Sync revoke",
        help="Revoke (tombstone) a sync offer.",
-       args=(_req("offer_id"),), parity=("sync",))
+       args=(_req("offer_id"),),
+       interfaces=INTERFACES_NO_VOICE,
+       interface_reason=REASON_VOICE_CANONICAL,
+       voice_guard="sync_revoke_voice", parity=("sync",))
 def _extra_sync_revoke(cfg: Any, args: Dict[str, Any],
                        actor: str) -> Dict[str, Any]:
     from . import sync as SY

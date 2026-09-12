@@ -599,6 +599,32 @@ def build_request(provider: str, kind: str, prompt: str,
     return shaper((prompt or "").strip(), dict(options or {}))
 
 
+def shape_media_request(provider: str, kind: str, prompt: str,
+                        options: Optional[Dict[str, Any]] = None
+                        ) -> Dict[str, Any]:
+    """Shape a bounded request for any supported kind (OC-64/OC-D18).
+
+    Uses the shipped shaper when one exists; otherwise returns a normalized,
+    provider-neutral request for an operator-injected transport. This is the
+    adapter contract for the kinds without a shipped live adapter
+    (music/video and non-OpenAI providers): no network is touched and no
+    endpoint is invented. The injected transport owns the vendor call.
+    """
+    shaper = SHAPERS.get((provider, kind))
+    if shaper is not None:
+        return shaper((prompt or "").strip(), dict(options or {}))
+    if kind not in KINDS:
+        raise MediaGenError(KIND_UNKNOWN_CODE, f"kind must be one of {KINDS}")
+    clean = dict(options or {})
+    body: Dict[str, Any] = {"provider": provider, "kind": kind,
+                            "prompt": (prompt or "").strip()}
+    for key in _OPTION_KEYS.get(kind, ()):  # only bounded, validated keys
+        if key in clean:
+            body[key] = clean[key]
+    return {"method": "POST", "endpoint": f"{provider}:{kind}", "url": "",
+            "body": body}
+
+
 def _mime_for(kind: str) -> str:
     return {"image": "image/png", "music": "audio/mpeg", "video": "video/mp4",
             "speech": "audio/mpeg"}.get(kind, "application/octet-stream")
@@ -632,8 +658,27 @@ def _extract_asset(kind: str, data: Any) -> Dict[str, Any]:
     return asset
 
 
-def _transport(request: Dict[str, Any], key: str) -> Dict[str, Any]:
-    """Bounded HTTPS POST; key travels in the Authorization header only."""
+def _transport(request: Dict[str, Any], key: str,
+               transport: Any = None) -> Dict[str, Any]:
+    """Bounded HTTPS POST; key travels in the Authorization header only.
+
+    When ``transport`` is supplied it is the operator-injected boundary: the
+    shaped request is handed to ``transport(request)`` and Qubit opens no
+    socket. The secret is never part of the request mapping.
+    """
+    if transport is not None:
+        try:
+            data = transport(request)
+        except MediaGenError:
+            raise
+        except Exception as exc:
+            detail = str(exc)
+            if key:
+                detail = detail.replace(key, "<redacted>")
+            raise MediaGenError(
+                UPSTREAM_CODE,
+                f"provider request failed: {detail}") from exc
+        return data
     url = str(request.get("url") or "")
     host = urlparse(url).hostname or ""
     if host not in _ALLOWED_HOSTS:
@@ -677,7 +722,8 @@ def _default_provider(cfg: Any, kind: str) -> str:
 def generate(cfg: Any, *, kind: str, provider: Optional[str] = None,
              prompt: str, options: Optional[Dict[str, Any]] = None,
              confirmation_id: str = "", confirmed: bool = False,
-             source: str = "user") -> Dict[str, Any]:
+             source: str = "user",
+             transport: Any = None) -> Dict[str, Any]:
     """Validate, gate and (only with a real transport) execute generation.
 
     Gate order mirrors :func:`voicebridge.messaging.send`: emergency stop →
@@ -734,7 +780,7 @@ def generate(cfg: Any, *, kind: str, provider: Optional[str] = None,
             f"{pid} credential reference is not configured; set "
             f"media_gen.providers.{pid}.key_ref (env:/file:) or the provider "
             f"env reference; nothing attempted")
-    if not cap.get("available", False):
+    if not cap.get("available", False) and transport is None:
         raise MediaGenError(
             UNAVAILABLE_CODE,
             f"{PROVIDER_CAPS[pid].get('label', pid)} has no Qubit transport "
@@ -750,8 +796,11 @@ def generate(cfg: Any, *, kind: str, provider: Optional[str] = None,
             UNAVAILABLE_CODE,
             "credential reference unresolvable at call time; nothing attempted")
 
-    request = build_request(pid, clean_kind, clean_prompt, clean_options)
-    data = _transport(request, key)
+    request = (shape_media_request(pid, clean_kind, clean_prompt,
+                                   clean_options)
+               if transport is not None
+               else build_request(pid, clean_kind, clean_prompt, clean_options))
+    data = _transport(request, key, transport)
     asset = _extract_asset(clean_kind, data)
 
     clean_source = (source or "user").strip()[:MAX_SOURCE_CHARS] or "user"

@@ -247,38 +247,44 @@ ROW_EVIDENCE: Dict[str, Dict[str, str]] = {
         "dashboard": "",
         "voice": "",
         "status": "PARTIAL",
-        "proving_test": "tests/test_oc_state_agent9_workspace.py",
+        "proving_test": "tests/test_openclaw_closure_wave2_webmedia.py",
         "needs": "creds",
-        "note": ("Local markdown workspace memory + dreaming are real and "
-                 "local-only (torn-index recovery, confirmation, e-stop); "
-                 "external providers (LanceDB/Wiki/Honcho) stay typed-"
-                 "unavailable, so the cloud/provider side remains open."),
+        "note": ("Local markdown workspace memory + dreaming are complete and "
+                 "local-only (torn-index recovery, confirmation, e-stop); the "
+                 "external providers (LanceDB/Wiki/Honcho) the audit names stay "
+                 "typed-unavailable by local-only policy, so the provider side "
+                 "remains an explicit credential/owner gate."),
     },
     "OC-51": {
         "qubit_backend": ("voicebridge/evaluation/logbook.py Logbook/"
-                          "LogbookEntry/summary/journal_from_items/capture"),
+                          "LogbookEntry/summary/journal_from_items/"
+                          "capture_to/capture_series/capture"),
         "cli": "",
         "dashboard": "",
         "voice": "",
         "status": "PARTIAL",
-        "proving_test": "tests/test_oc_reports_agent10_logbook.py",
+        "proving_test": "tests/test_openclaw_closure_wave2_webmedia.py",
         "needs": "hardware",
-        "note": ("Append-only, redacted work-journal + windowed summaries and a "
-                 "typed screen-capture refusal are real; a live screen-capture "
-                 "loop still needs hardware/vision."),
+        "note": ("Hardware-free work journal is complete: append-only redacted "
+                 "entries, windowed summaries, and a bounded capture_series "
+                 "loop over an injected grabber (capture() is a typed "
+                 "unavailable without a display actuator). The live screen "
+                 "grabber + vision model remain the operator hardware gate."),
     },
     "OC-D16": {
-        "qubit_backend": ("voicebridge/channels_inbound.py CHANNELS; "
-                          "voicebridge/messaging.py PROVIDERS"),
+        "qubit_backend": ("voicebridge/channels_inbound.py CHANNELS/ingest; "
+                          "voicebridge/messaging.py PROVIDERS/send"),
         "cli": "msg",
         "dashboard": "",
         "voice": "channels_*",
         "status": "PARTIAL",
-        "proving_test": "tests/test_oc_messaging_agent6_ingress.py",
+        "proving_test": "tests/test_openclaw_closure_wave2_messaging.py",
         "needs": "creds",
-        "note": ("Feishu is recognized in both registries with an honest typed "
-                 "UNAVAILABLE state and no fabricated transport; the live "
-                 "open-platform adapter remains credential-gated."),
+        "note": ("Feishu send + receive adapter contracts are real over an "
+                 "injected transport (dynamic-agent routing/permissions and "
+                 "the live open-platform app secret stay credential-gated), so "
+                 "the row remains PARTIAL rather than claiming the hosted "
+                 "open-platform agent is shipped."),
     },
     "OC-D31": {
         "qubit_backend": ("voicebridge/runtime_inventory.py runtime_inventory; "
@@ -297,16 +303,19 @@ ROW_EVIDENCE: Dict[str, Dict[str, str]] = {
     },
     "OC-58": {
         "qubit_backend": ("voicebridge/acp_client.py HARNESSES + "
+                          "adapters/shape_method/adapter_session + "
                           "voicebridge/acp_lsp.py acp_refuse_serve"),
         "cli": "acp",
         "dashboard": "",
         "voice": "acp_client_*",
-        "status": "PARTIAL",
-        "proving_test": "tests/test_oc_skills_agent8_acp.py",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_closure_wave2_runtime.py",
         "needs": "hardware",
-        "note": ("Real per-harness adapter contract, PATH probe and transport-"
-                 "injected session loop with named refusals; Qubit never "
-                 "spawns a harness, so execution stays hardware/harness-gated."),
+        "note": ("Real per-harness adapter contract, PATH probe, method "
+                 "shaping, and a transport-injected initialize + session/prompt "
+                 "exchange (typed refusal without one); Qubit never spawns a "
+                 "harness, so the shipped harness binary is the operator "
+                 "hardware gate."),
     },
     # ---- D4 wave: reports / policy / ide / dashboard / skills / browser ----
     "OC-50": {
@@ -649,6 +658,393 @@ ROW_EVIDENCE: Dict[str, Dict[str, str]] = {
                  "validated (symlink escapes typed), cleanup deregisters it, "
                  "and the orphan sweep reaps only stale bases. No cloud "
                  "session repository or remote artifacts are fabricated."),
+    },
+    # ---- Wave 1 parity (tests/test_openclaw_parity_wave1.py) ----
+    "OC-05": {
+        "qubit_backend": ("voicebridge/device.py token_issue/token_approve/"
+                          "token_rotate/token_revoke/token_verify/token_list"),
+        "cli": "device",
+        "dashboard": "qubit-devices",
+        "voice": "device, device_enroll",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_parity_wave1.py",
+        "needs": "none",
+        "note": ("Real device-scoped token store: issue (secret shown once, "
+                 "stored hashed), pending-approval, rotate, revoke, and "
+                 "scope-checked verify; unknown/expired/revoked/wrong-scope "
+                 "all typed-refused."),
+    },
+    "OC-01": {
+        "qubit_backend": ("voicebridge/gateway_peers.py protocol_version/"
+                          "negotiate_protocol/serve_refusal/protocol_doctor"),
+        "cli": "gateway",
+        "dashboard": "qubit-gateway",
+        "voice": "gateway",
+        "status": "GATED",
+        "proving_test": "tests/test_openclaw_parity_wave1.py",
+        "needs": "owner",
+        "note": ("RPC v4 protocol version/negotiation and doctor are real, but "
+                 "Qubit deliberately runs no standalone gateway listener "
+                 "(single-event-path policy): serve_refusal is a typed "
+                 "GATEWAY_NO_SERVER refusal, not a second server."),
+    },
+    "OC-03": {
+        "qubit_backend": "voicebridge/gateway_peers.py peer_control_link",
+        "cli": "gateway, peer",
+        "dashboard": "qubit-gateway",
+        "voice": "gateway*, peer*",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_parity_wave1.py",
+        "needs": "creds",
+        "note": ("Real peer records + a transport-injected control-channel "
+                 "handshake (link/stale/missing-peer typed); no live network "
+                 "transport is opened, so a live peer link stays "
+                 "credential/transport gated."),
+    },
+    "OC-12": {
+        "qubit_backend": ("voicebridge/browser_tabs.py remote_attach/"
+                          "extension_attach"),
+        "cli": "browser",
+        "dashboard": "qubit-devices",
+        "voice": "browser_*",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_parity_wave1.py",
+        "needs": "hardware",
+        "note": ("Remote CDP attach plan via a paired node host and validated "
+                 "Chrome-extension attach over the loopback bridge; missing "
+                 "node/extension are typed, and the live attach needs a "
+                 "running Chromium/node (operator hardware)."),
+    },
+    "OC-D27": {
+        "qubit_backend": ("voicebridge/browser_tabs.py inspect_element/"
+                          "annotate/clear_annotation/screencast/screenshot"),
+        "cli": "browser screenshot",
+        "dashboard": "qubit-devices",
+        "voice": "browser_screenshot",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_parity_wave1.py",
+        "needs": "hardware",
+        "note": ("Element Inspect and confirmation-gated Annotate/Clear over "
+                 "the real CDP session, with the bounded screenshot fallback "
+                 "present; live screencast streaming needs a running Chromium."),
+    },
+    "OC-16": {
+        "qubit_backend": ("voicebridge/computer_use.py snapshot/snapshot_journal "
+                          "+ voicebridge/evaluation/logbook.py capture_to"),
+        "cli": "",
+        "dashboard": "qubit-devices",
+        "voice": "",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_parity_wave1.py",
+        "needs": "hardware",
+        "note": ("Screen snapshot work journal: a real capture path with an "
+                 "injected grabber appends redacted entries to the logbook; "
+                 "the live screen grabber needs an operator desktop session."),
+    },
+    "OC-17": {
+        "qubit_backend": "voicebridge/computer_use.py cua_browser_state",
+        "cli": "",
+        "dashboard": "qubit-devices",
+        "voice": "",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_parity_wave1.py",
+        "needs": "hardware",
+        "note": ("CUA browser-state descriptor with a typed unavailable state "
+                 "when the live actuator/display is absent; never fabricates "
+                 "a browser state."),
+    },
+    "OC-25": {
+        "qubit_backend": ("voicebridge/channels_inbound.py "
+                          "gmail_watch/gmail_watch_status/gmail_pubsub/"
+                          "decode_pubsub_envelope"),
+        "cli": "channels gmail-watch",
+        "dashboard": "/api/channels/gmail/watch",
+        "voice": "channels_*",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_closure_wave2_messaging.py",
+        "needs": "creds",
+        "note": ("Complete Gmail Pub/Sub path over an injected mailbox "
+                 "transport: watch registration/renewal records "
+                 "id/expiration/historyId, and push envelopes are decoded, "
+                 "token-verified, and replay-checked; the live OIDC mailbox "
+                 "transport stays credential-gated."),
+    },
+    "OC-D01": {
+        "qubit_backend": "voicebridge/communications/reports.py team_reports",
+        "cli": "monitor",
+        "dashboard": "qubit-reports",
+        "voice": "reports_list",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_closure_wave2_webmedia.py",
+        "needs": "creds",
+        "note": ("Transport-injected GitHub+Discord activity aggregation with "
+                 "validated sources, bounded/redacted rows, and partial-failure "
+                 "accounting; the live GitHub/Discord transports stay "
+                 "credential-gated."),
+    },
+    "OC-54": {
+        "qubit_backend": ("voicebridge/runtime_images.py cells/cell_admit/"
+                          "cell_release/refuse_container"),
+        "cli": "runtime",
+        "dashboard": "qubit-runtime",
+        "voice": "runtime_*",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_parity_wave1.py",
+        "needs": "owner",
+        "note": ("Qubit-safe equivalent of containerized fleet cells: bounded "
+                 "local admitted process cells (no Docker/K8s), while "
+                 "container/cloud placement is a typed refusal. Enabling "
+                 "container runtimes remains an explicit owner policy "
+                 "decision, not a code gap."),
+    },
+    "OC-D06": {
+        "qubit_backend": "voicebridge/runtime_images.py cloud_worker_admission",
+        "cli": "runtime, node",
+        "dashboard": "qubit-runtime",
+        "voice": "runtime_*, node_host_*",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_closure_wave2_runtime.py",
+        "needs": "creds",
+        "note": ("Worker admission validates the prepared local image set and "
+                 "dispatches a placement request over an injected provider "
+                 "transport (typed RUNTIME_CLOUD_UNAVAILABLE without one); the "
+                 "live cloud placement stays credential-gated."),
+    },
+    "OC-63": {
+        "qubit_backend": ("voicebridge/web_tool.py search/x_search/run/"
+                          "_search_via_transport/_x_search_via_transport"),
+        "cli": "websites fetch/search",
+        "dashboard": "",
+        "voice": "web_fetch/web_search",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_closure_wave2_webmedia.py",
+        "needs": "creds",
+        "note": ("SSRF-safe fetch is real; search and x_search both have a "
+                 "bounded request contract over an injected provider transport "
+                 "(x_search is a typed unavailable without one). Live provider "
+                 "credentials/transport remain the gate."),
+    },
+    "OC-64": {
+        "qubit_backend": ("voicebridge/media_gen.py shape_media_request/"
+                          "build_request/generate/_transport/KINDS"),
+        "cli": "media",
+        "dashboard": "",
+        "voice": "media_gen_*",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_closure_wave2_webmedia.py",
+        "needs": "creds",
+        "note": ("Request shaping + dispatch for image/music/video/speech: the "
+                 "shipped shaper runs for OpenAI images and every kind has a "
+                 "bounded provider-neutral request over an injected transport "
+                 "(typed unavailable without one/without a credential). Live "
+                 "generation stays provider-credential gated."),
+    },
+    "OC-D18": {
+        "qubit_backend": ("voicebridge/media_gen.py shape_media_request/"
+                          "build_request/generate/_transport"),
+        "cli": "media",
+        "dashboard": "",
+        "voice": "media_gen_*",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_closure_wave2_webmedia.py",
+        "needs": "creds",
+        "note": ("Image/music/video generation tools share the complete "
+                 "shaping+dispatch contract; the GPT Image model variant is "
+                 "selected through bounded options, while live provider "
+                 "execution stays credential-gated."),
+    },
+    "OC-65": {
+        "qubit_backend": ("voicebridge/vision.py describe_batch/describe/"
+                          "analyzer"),
+        "cli": "vision",
+        "dashboard": "qubit-devices",
+        "voice": "vision_describe/status",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_closure_wave2_webmedia.py",
+        "needs": "creds",
+        "note": ("Bounded multi-attachment understanding (count/type limits "
+                 "typed) with per-item typed failures and an injected analyzer "
+                 "boundary so the batch contract runs without the local model; "
+                 "the vision model itself stays an operator-provided backend."),
+    },
+    "OC-67": {
+        "qubit_backend": "voicebridge/vision.py transcribe/meeting_bot",
+        "cli": "",
+        "dashboard": "",
+        "voice": "",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_closure_wave2_webmedia.py",
+        "needs": "creds",
+        "note": ("Bounded transcription and meeting-join contracts over an "
+                 "injected ASR/telephony transport (typed "
+                 "VISION_MEDIA_UNAVAILABLE without one, no raw audio stored); "
+                 "the authenticated ASR/meeting provider stays credential-"
+                 "gated."),
+    },
+    "OC-D28": {
+        "qubit_backend": ("voicebridge/local_models.py fallback_chain/"
+                          "resolve_fallback + voicebridge/brain.py "
+                          "account_add/account_list"),
+        "cli": "local-models, brain account-*",
+        "dashboard": ("/api/local-models*, /api/providers/custom-endpoints "
+                      "(gated)"),
+        "voice": "local_models_*",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_closure_wave2_webmedia.py",
+        "needs": "creds",
+        "note": ("Real provider-account records plus a deterministic ordered "
+                 "fallback chain/picker over the loopback runtime; custom-"
+                 "endpoint network probes stay typed gated and require an "
+                 "operator credential/transport."),
+    },
+    # ---- Wave 2 closure: channel adapters + node/runtime boundaries ----
+    "OC-06": {
+        "qubit_backend": ("voicebridge/node_host.py enroll/capabilities/"
+                          "dispatch"),
+        "cli": "node",
+        "dashboard": "qubit-devices",
+        "voice": "node_host_*",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_closure_wave2_runtime.py",
+        "needs": "hardware",
+        "note": ("Node pairing/enrollment is real (validated endpoint, human-"
+                 "source + confirmation gate, redacted audit) and remote "
+                 "capability dispatch has a bounded injected boundary; a live "
+                 "paired device is the operator hardware gate."),
+    },
+    "OC-19": {
+        "qubit_backend": ("voicebridge/messaging.py send/_provider_request/"
+                          "_transport + voicebridge/channels_inbound.py "
+                          "ingest/normalize_event"),
+        "cli": "msg, channels",
+        "dashboard": "",
+        "voice": "channels_*, msg_*",
+        "status": "PARTIAL",
+        "proving_test": "tests/test_openclaw_closure_wave2_messaging.py",
+        "needs": "creds",
+        "note": ("Discord/Telegram/Matrix/Feishu send + receive adapter "
+                 "contracts are real over an injected transport; Signal/Teams/"
+                 "iMessage have no runnable Qubit transport and stay typed "
+                 "unavailable, so the breadth row remains an explicit per-"
+                 "channel credential/transport gate."),
+    },
+    "OC-20": {
+        "qubit_backend": ("voicebridge/channels_inbound.py "
+                          "ingest/run_ingress/normalize_event"),
+        "cli": "channels receive",
+        "dashboard": "",
+        "voice": "channels_*",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_closure_wave2_messaging.py",
+        "needs": "creds",
+        "note": ("Bounded inbound ingress: per-channel normalization plus a "
+                 "receiver/sink-injected loop through the HMAC/freshness/replay "
+                 "kernel. Qubit still opens no socket; the live channel "
+                 "transport stays credential-gated."),
+    },
+    "OC-21": {
+        "qubit_backend": ("voicebridge/pairing.py channel_binding/"
+                          "channel_dm_pairings/encode_setup/accept + "
+                          "voicebridge/messaging.py account_add"),
+        "cli": "pairing, msg account-*",
+        "dashboard": "",
+        "voice": "msg_account*",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_closure_wave2_messaging.py",
+        "needs": "creds",
+        "note": ("Accepted setup codes bind a channel DM account to a scoped "
+                 "grant; channel_binding resolves the binding and refuses an "
+                 "unpaired account (typed PAIRING_NOT_BOUND). The live channel "
+                 "credential remains the gate."),
+    },
+    "OC-56": {
+        "qubit_backend": ("voicebridge/node_host.py capabilities/dispatch/"
+                          "status"),
+        "cli": "node",
+        "dashboard": "qubit-devices",
+        "voice": "node_host_*",
+        "status": "PARTIAL",
+        "proving_test": "tests/test_openclaw_closure_wave2_runtime.py",
+        "needs": "hardware",
+        "note": ("Declared remote capabilities (screen/audio/camera/media "
+                 "playback) have a confirmation-gated injected transport "
+                 "boundary and honest typed availability; a live paired node "
+                 "with real actuators remains the operator hardware gate."),
+    },
+    "OC-D12": {
+        "qubit_backend": ("voicebridge/messaging.py send/_provider_request + "
+                          "voicebridge/channels_inbound.py "
+                          "normalize_event/ingest"),
+        "cli": "msg",
+        "dashboard": "",
+        "voice": "channels_*",
+        "status": "PARTIAL",
+        "proving_test": "tests/test_openclaw_closure_wave2_messaging.py",
+        "needs": "creds",
+        "note": ("Generic Discord send shaper + receive normalizer are real "
+                 "over an injected bot transport, but the row's named "
+                 "voice-channel/voice-follow/transcript/rich-media features are "
+                 "NOT implemented; live bot credentials and voice media are the "
+                 "external gate."),
+    },
+    "OC-D13": {
+        "qubit_backend": ("voicebridge/messaging.py send/_provider_request + "
+                          "voicebridge/channels_inbound.py "
+                          "normalize_event/ingest"),
+        "cli": "msg",
+        "dashboard": "",
+        "voice": "channels_*",
+        "status": "PARTIAL",
+        "proving_test": "tests/test_openclaw_closure_wave2_messaging.py",
+        "needs": "creds",
+        "note": ("Generic Telegram sendMessage shaper + update normalizer are "
+                 "real over an injected bot transport, but the row's named "
+                 "mini-app/photo-album/rich-message features are NOT "
+                 "implemented; live bot credentials and app hosting are the "
+                 "external gate."),
+    },
+    "OC-D14": {
+        "qubit_backend": ("voicebridge/messaging.py "
+                          "send/_provider_request/slack"),
+        "cli": "msg",
+        "dashboard": "qubit-gateway",
+        "voice": "msg_*",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_openclaw_closure_wave2_messaging.py",
+        "needs": "creds",
+        "note": ("Slack chat.postMessage transport is live and also drivable "
+                 "over an injected boundary; Enterprise-Grid/multi-workspace "
+                 "routing is an account/origin configuration over the same "
+                 "adapter, with the live bot token the gate."),
+    },
+    "OC-D15": {
+        "qubit_backend": "voicebridge/messaging.py imessage (typed UNAVAILABLE)",
+        "cli": "msg",
+        "dashboard": "",
+        "voice": "channels_*",
+        "status": "PARTIAL",
+        "proving_test": "tests/test_openclaw_closure_wave2_messaging.py",
+        "needs": "creds",
+        "note": ("Deliberately open: iMessage requires the macOS Messages "
+                 "private API/local bridge, which cannot run on this Linux "
+                 "host. Qubit reports an honest typed UNAVAILABLE and never "
+                 "fabricates a transport; a macOS bridge is the external gate."),
+    },
+    "OC-D17": {
+        "qubit_backend": ("voicebridge/messaging.py send/_provider_request + "
+                          "voicebridge/channels_inbound.py "
+                          "normalize_event/ingest"),
+        "cli": "msg",
+        "dashboard": "",
+        "voice": "channels_*",
+        "status": "PARTIAL",
+        "proving_test": "tests/test_openclaw_closure_wave2_messaging.py",
+        "needs": "creds",
+        "note": ("Generic Matrix client-server send shaper (homeserver+room) + "
+                 "event normalizer are real over an injected access-token "
+                 "transport, but the row's named E2EE and multi-account "
+                 "homeserver features are NOT implemented; live homeserver "
+                 "credentials/E2EE are the external gate."),
     },
 }
 

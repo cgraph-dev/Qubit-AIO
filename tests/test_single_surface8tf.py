@@ -30,8 +30,17 @@ def test_no_second_server_commands():
     for action in build_parser()._actions:
         if isinstance(action, argparse._SubParsersAction):
             names.update(action.choices.keys())
-    for absent in ("serve", "dashboard", "desktop", "gui"):
+    for absent in ("serve", "dashboard"):
         assert absent not in names, f"no second-server stub: {absent}"
+    # `desktop`/`gui` are Qubit-owned fork CLI families (native desktop app
+    # build/launch), confirm-gated mutating routes, never a second server.
+    from voicebridge import cli_hermes_forward as HF
+
+    for family in ("desktop", "gui"):
+        assert family in names, family
+        resolved = HF.route_family([family])
+        assert resolved is not None and resolved.kind == "needs-confirm", \
+            (family, resolved)
     assert "run" in names and "webui" in names, \
         "the single serving path owns the surface"
 

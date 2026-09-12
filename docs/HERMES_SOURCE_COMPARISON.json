@@ -53,9 +53,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "77d48392ecc8eb3e82aa6f1fbef80dd734c323055cf0e409ffa2069c54a9c895",
       "qubit": "frontend/hermes-web/index.html",
-      "qubit_sha256": "77d48392ecc8eb3e82aa6f1fbef80dd734c323055cf0e409ffa2069c54a9c895",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "194982f56fd2fd1cef848761b7f45b34fc9b6d3462fcff85235dc42d362de616",
+      "patch": "Qubit product rebrand: document title -> 'Qubit Agent - Command Center'",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -196,9 +196,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "5f72d97b2f3c952118df3920fa6075e9c349dc58d16f9cc00df0dbc9839d3b0e",
       "qubit": "frontend/hermes-web/src/App.tsx",
-      "qubit_sha256": "5f72d97b2f3c952118df3920fa6075e9c349dc58d16f9cc00df0dbc9839d3b0e",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "61e64abdb8832ab9a5c6c4ebf8ab4abc505770a2df2406cf74c49df302a36372",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -295,9 +295,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "776f58d89d2e2bbd50f2dc950f61dffc416b5e1f4be25f30871102f1bdb8cb81",
       "qubit": "frontend/hermes-web/src/components/HermesConsoleModal.tsx",
-      "qubit_sha256": "776f58d89d2e2bbd50f2dc950f61dffc416b5e1f4be25f30871102f1bdb8cb81",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "4465d33a56088a7736f0366876703604c1e45dbf8cb3ac0bbbc8f757a5165ba2",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -658,9 +658,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "acfb4ae554327d35010e8d255209c151f4e3efef1e27eb2187fb6e62e21e6397",
       "qubit": "frontend/hermes-web/src/i18n/af.ts",
-      "qubit_sha256": "acfb4ae554327d35010e8d255209c151f4e3efef1e27eb2187fb6e62e21e6397",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "f90d7fc0085e41370cbf09c83be4250da98e2587abb785c13129e974711a22fe",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -669,9 +669,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "7c88de5e5cb35fc661cd2e609e1ae9786a111cd321d20e19fa512af5b3a3b282",
       "qubit": "frontend/hermes-web/src/i18n/ar.ts",
-      "qubit_sha256": "7c88de5e5cb35fc661cd2e609e1ae9786a111cd321d20e19fa512af5b3a3b282",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "9558d000502eeffca8a5cc72b6a50abf24f81979873a6363b075129c44df868b",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -691,9 +691,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "2ab2afe3270eb92ed7b7c5eb0886f92ef7406489d345991659895032a4c8b22b",
       "qubit": "frontend/hermes-web/src/i18n/de.ts",
-      "qubit_sha256": "2ab2afe3270eb92ed7b7c5eb0886f92ef7406489d345991659895032a4c8b22b",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "46fdfad2c8f697b96a3ba39749e2c8db8d37e96edca6257587ff32ffd0868064",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -713,9 +713,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "82ffe1cfe23cfdaf1b15fb6e043090ce4f30e24e71115b7a9c2066d0c49a5f40",
       "qubit": "frontend/hermes-web/src/i18n/en.ts",
-      "qubit_sha256": "3aa3d6cc59abde6458c2f85a3385228544d3b3f2c244b3d64bc241eaca18e43e",
+      "qubit_sha256": "5d4182bd53cdafca0628276e22687b8e4c6ef1d3cb2b5cea7bc8f2c5849b5a87",
       "patch": "product-string rebrand: 'Update Hermes'/'Updating Hermes'/'Update Hermes?' -> Qubit; confirm text hermes->qubit (owner rebrand)",
-      "reason": "Qubit rebrand of product-facing English dashboard strings; translation keys unchanged."
+      "reason": "Qubit rebrand of product-facing English dashboard strings; translation keys unchanged; no logic or route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -724,9 +724,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "afcfec650bfa5f45ef3b483a3d895af335f340b348c7004febbc0547a9fd8bba",
       "qubit": "frontend/hermes-web/src/i18n/es.ts",
-      "qubit_sha256": "afcfec650bfa5f45ef3b483a3d895af335f340b348c7004febbc0547a9fd8bba",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "0c3310a213ebd38a69313ece6682d9481ea6d7635bcbf2e99b5f3ddd477db8e7",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -735,9 +735,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "178d4909dd59cffb9fb0ef73358201eebbeb4e4a8bb6c70e18eceae8c07bf9fe",
       "qubit": "frontend/hermes-web/src/i18n/fr.ts",
-      "qubit_sha256": "178d4909dd59cffb9fb0ef73358201eebbeb4e4a8bb6c70e18eceae8c07bf9fe",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "44dbb690d26503b03a2982e1fd166b961ffb9bc7eb4f44e1e4d28eddb829224a",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -746,9 +746,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "40c417b8f5f2501a7ea3327c64947cfecbcd1559477b9b90353b3ad3cf618cb3",
       "qubit": "frontend/hermes-web/src/i18n/ga.ts",
-      "qubit_sha256": "40c417b8f5f2501a7ea3327c64947cfecbcd1559477b9b90353b3ad3cf618cb3",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "21846e56ca3c862ca549e8fad58c9ae47ecc9e3e7e14acf0b426956f400c7e0a",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -757,9 +757,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "3555b41649df15ab0adc4ca8454193046b2e575d9a5a88f420b82207fc038eeb",
       "qubit": "frontend/hermes-web/src/i18n/hu.ts",
-      "qubit_sha256": "3555b41649df15ab0adc4ca8454193046b2e575d9a5a88f420b82207fc038eeb",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "b765181a09a56f01b4ec1d5f0ae4fec2cf2fb44e3aadf0236ebea25f7b6084df",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -779,9 +779,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "276e9fb741a3bf79ab5545d73afd584024d3e855f2c745baee87b719866d64ac",
       "qubit": "frontend/hermes-web/src/i18n/it.ts",
-      "qubit_sha256": "276e9fb741a3bf79ab5545d73afd584024d3e855f2c745baee87b719866d64ac",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "45e2e0e05c12baeaaee482f6cd131c4821baddd048924e50d10c31b09951e4ed",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -790,9 +790,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "6bc01e590b1af4ce2fe268c0085decbd9aa2b06b6e698bd43359faeaf869d023",
       "qubit": "frontend/hermes-web/src/i18n/ja.ts",
-      "qubit_sha256": "6bc01e590b1af4ce2fe268c0085decbd9aa2b06b6e698bd43359faeaf869d023",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "0b0ba8971090d3be1e728424829f394d9e31833c8e8ce25ed17f4791404a6422",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -801,9 +801,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "3fd8cf1fef086a4bab972b407d0b96628aba5eb2cf55ed7b28c1dd21dcdca75f",
       "qubit": "frontend/hermes-web/src/i18n/ko.ts",
-      "qubit_sha256": "3fd8cf1fef086a4bab972b407d0b96628aba5eb2cf55ed7b28c1dd21dcdca75f",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "cbcdb9de4cd1a62fc9f71b071639a9f05f25d5e9be96e88d395b014d8202c8d1",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -812,9 +812,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "c009197a4a88dc77b19286a6751790378ab5b8f50f3e55cd88748358b416ee74",
       "qubit": "frontend/hermes-web/src/i18n/pt.ts",
-      "qubit_sha256": "c009197a4a88dc77b19286a6751790378ab5b8f50f3e55cd88748358b416ee74",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "df5d9ba8b776db1cc0551c19a4c5ecd873cdfaf7f63d5ef806b45aa260efbaa9",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -823,9 +823,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "3dc86a29bdfd77c8aae1119db5187007333ecb946a14cfbf1a64d39fb4e391a0",
       "qubit": "frontend/hermes-web/src/i18n/ru.ts",
-      "qubit_sha256": "3dc86a29bdfd77c8aae1119db5187007333ecb946a14cfbf1a64d39fb4e391a0",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "89dc09445fc2e105bad26225bd1a8d9cdfed538432a1e8c155e9097e795ad2ab",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -834,9 +834,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "a63db5030b48b2b5c9fa6cf951f2de83a0d3ec66b2cd83d9585f7dbcdff39796",
       "qubit": "frontend/hermes-web/src/i18n/tr.ts",
-      "qubit_sha256": "a63db5030b48b2b5c9fa6cf951f2de83a0d3ec66b2cd83d9585f7dbcdff39796",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "a6bf8d61089acc5fa308fc042be338db93f6fb97c464df90c0d932de18d4f945",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -856,9 +856,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "a22136f03d37eac4499df724e5acada2f242ffc5ee79b48a000eebf3a94e3813",
       "qubit": "frontend/hermes-web/src/i18n/uk.ts",
-      "qubit_sha256": "a22136f03d37eac4499df724e5acada2f242ffc5ee79b48a000eebf3a94e3813",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "1cbf195ffa4143b03852168e50fe26a09d38d64f1ff36806c8e57d33d465127d",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -867,9 +867,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "78506a0d97eaf1e2af618a04bac6f81f0492a25c06b4813c62382a3f73377f5e",
       "qubit": "frontend/hermes-web/src/i18n/zh-hant.ts",
-      "qubit_sha256": "78506a0d97eaf1e2af618a04bac6f81f0492a25c06b4813c62382a3f73377f5e",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "8d1e17934598a51aa8202908499ba47d4630225816d621945de5baf540b0c8de",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -878,9 +878,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "bf11533fcbf17f460cc72906ce477a9300f82eb32ad4cf910ff29a532c86a80c",
       "qubit": "frontend/hermes-web/src/i18n/zh.ts",
-      "qubit_sha256": "bf11533fcbf17f460cc72906ce477a9300f82eb32ad4cf910ff29a532c86a80c",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "605275786ebea0d4097b9897a76b3840bcdd0ddf4143fdd9b6886b36b01478f3",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -1197,9 +1197,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "0117fbccf3e4955ae918782cfc11bf4b5320690f50985c0abc1d3fcd63326b64",
       "qubit": "frontend/hermes-web/src/lib/gatewayClient.ts",
-      "qubit_sha256": "0117fbccf3e4955ae918782cfc11bf4b5320690f50985c0abc1d3fcd63326b64",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "acfd6921c54644311b37c35bf384d0678868ba101bd13eb991dbb1fbd1623dec",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -1692,9 +1692,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "d51af1ff281eb69b053b4ab2901c6b6f923f2265214d1f241038096351a85bb1",
       "qubit": "frontend/hermes-web/src/pages/ChannelsPage.tsx",
-      "qubit_sha256": "d51af1ff281eb69b053b4ab2901c6b6f923f2265214d1f241038096351a85bb1",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "ff580aa08547b3ffb12fc77fa050f5fd0cf91f36ed897be7e42636e4c04108bd",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -1714,9 +1714,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "e0195bc46b650594803fefe896fa8fffa64c44848db4a1c074ffd72125113fea",
       "qubit": "frontend/hermes-web/src/pages/ChatPage.tsx",
-      "qubit_sha256": "e0195bc46b650594803fefe896fa8fffa64c44848db4a1c074ffd72125113fea",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "5ee686ba4cf14e8766da6b1d0e0264818f8b293a47f08505af81c0f389ddf904",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -1725,9 +1725,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "aa61c2de5e9b903b97718a111c53286832439606df628d12329da6fe841ac367",
       "qubit": "frontend/hermes-web/src/pages/ConfigPage.tsx",
-      "qubit_sha256": "aa61c2de5e9b903b97718a111c53286832439606df628d12329da6fe841ac367",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "893a2d9f435219b1d8d03586e8d6d5f48f89bf7b97e63e9388f20f30dd6f3ac8",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -1791,9 +1791,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "c21108ca49ba80024a8714e25a91f00ebb97e3342dfa457d5f15d9040b3a2b1a",
       "qubit": "frontend/hermes-web/src/pages/McpPage.tsx",
-      "qubit_sha256": "c21108ca49ba80024a8714e25a91f00ebb97e3342dfa457d5f15d9040b3a2b1a",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "a0db243621cd1f885a8029b7d6bbb5c6ce8be4d5a407baee611f8ab5fbc19cd5",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -1824,9 +1824,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "72c8f2448648cda43313329039070a4778edc4b929ae5b64767b67cbcf75c894",
       "qubit": "frontend/hermes-web/src/pages/PluginsPage.tsx",
-      "qubit_sha256": "72c8f2448648cda43313329039070a4778edc4b929ae5b64767b67cbcf75c894",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "69f064d7b2228857a532036dbdfcbf4982524792ef56f3518c41b228dfd49d62",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -1879,9 +1879,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "0dea99c29201b20c3d9eaf53bff90a3d3f41f34bab98e41adf8369bc1989a102",
       "qubit": "frontend/hermes-web/src/pages/SkillsPage.tsx",
-      "qubit_sha256": "0dea99c29201b20c3d9eaf53bff90a3d3f41f34bab98e41adf8369bc1989a102",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "3e8c74024a57c114f8424b6b48c00128c919254eb3baae9d0217b7054dcfdf36",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -1890,9 +1890,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "01b9bdc6adecf2406e5156c17da4f132e7b4c70133f00a9fa2c968b8e36a630b",
       "qubit": "frontend/hermes-web/src/pages/SystemPage.tsx",
-      "qubit_sha256": "01b9bdc6adecf2406e5156c17da4f132e7b4c70133f00a9fa2c968b8e36a630b",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "44ab1ab2d1d3a70c8faa5d559b664fdbe058f6e4bfdf3f1a2aeca55253b9109b",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -2044,9 +2044,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "9fe5354d4f0c72bc462e61767fc1c757e1a55caea95301dedd43b7dc904f2231",
       "qubit": "frontend/hermes-web/src/themes/presets.ts",
-      "qubit_sha256": "9fe5354d4f0c72bc462e61767fc1c757e1a55caea95301dedd43b7dc904f2231",
-      "patch": null,
-      "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline."
+      "qubit_sha256": "7962b2b16e0380267cb89fcde28518fb163a67d876099f722df0eee68b364b96",
+      "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+      "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change."
     },
     {
       "scope": "hermes-agent/web",
@@ -2242,9 +2242,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "a18dbcffedae4772d082c38b3c58c2e59e74f2b4919ca99e45ad3492ebc4421b",
       "qubit": "frontend/hermes-shared/src/json-rpc-gateway.ts",
-      "qubit_sha256": "a18dbcffedae4772d082c38b3c58c2e59e74f2b4919ca99e45ad3492ebc4421b",
-      "patch": null,
-      "reason": "Shared @hermes/shared lib imported by web/; vendored byte-identical."
+      "qubit_sha256": "88c5f3af93c2162b3c6c3fff26c7da0265a048bcdacd687a56ab060bc3b197e4",
+      "patch": "@@ -450,7 +450,7 @@\n       if (frame.error) {\n         call.reject(\n-          new JsonRpcGatewayError(frame.error.message || 'Hermes RPC failed', {\n+          new JsonRpcGatewayError(frame.error.message || 'Qubit RPC failed', {\n             code: typeof frame.error.code === 'number' ? frame.error.code : undefined,\n             data: frame.error.data",
+      "reason": "Owner-approved Qubit rebrand: the only user-visible gateway error string is relabelled 'Qubit RPC failed'; no behavior change."
     },
     {
       "scope": "hermes-agent/apps/shared",
@@ -2297,9 +2297,9 @@
       "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
       "upstream_sha256": "a4282b7d610d3c022a8dbcb77597b85497885eec606f6f09a354d373fea3d10c",
       "qubit": "frontend/hermes-shared/src/websocket-url.ts",
-      "qubit_sha256": "a4282b7d610d3c022a8dbcb77597b85497885eec606f6f09a354d373fea3d10c",
-      "patch": null,
-      "reason": "Shared @hermes/shared lib imported by web/; vendored byte-identical."
+      "qubit_sha256": "bd795c17d2dc329b340ce77cae935c72494af4c0998ac98195be487493f7e81f",
+      "patch": "@@ -42,7 +42,7 @@\n   if (conn.authMode === 'oauth') {\n     if (!mint) {\n-      throw new Error('This Desktop build cannot refresh OAuth WebSocket tickets. Update Hermes Desktop and try again.')\n+      throw new Error('This Desktop build cannot refresh OAuth WebSocket tickets. Update Qubit Desktop and try again.')\n     }",
+      "reason": "Owner-approved Qubit rebrand: the desktop OAuth-ticket error is relabelled 'Qubit Desktop'; no behavior change."
     },
     {
       "scope": "hermes-agent/apps/shared",

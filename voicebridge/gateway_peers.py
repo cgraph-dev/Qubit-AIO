@@ -709,3 +709,168 @@ def refuse_estop(operation: str) -> Dict[str, Any]:
                            "is latched; reset it before gateway/peer changes.",
             "owner": "qubit-policy",
             "rollback": "registries untouched; nothing delivered"}
+
+
+# ---------------------------------------------------------------------------
+# OC-01: Gateway protocol v4 negotiation (no standalone listener)
+# ---------------------------------------------------------------------------
+# The upstream wire protocol did not change across the audited pins:
+# PROTOCOL_VERSION = 4, MIN_CLIENT_PROTOCOL_VERSION = 4,
+# MIN_NODE_PROTOCOL_VERSION = 3. Qubit speaks that protocol over the single
+# in-process bridge event path; it never opens a second gateway listener.
+PROTOCOL_VERSION = 4
+MIN_CLIENT_PROTOCOL_VERSION = 4
+MIN_NODE_PROTOCOL_VERSION = 3
+GATEWAY_NO_SERVER_CODE = "GATEWAY_NO_SERVER"
+GATEWAY_NO_TRANSPORT_CODE = "GATEWAY_NO_TRANSPORT"
+GATEWAY_CONTROL_REFUSED_CODE = "GATEWAY_CONTROL_REFUSED"
+
+
+def protocol_version() -> Dict[str, Any]:
+    """Advertise the supported gateway protocol versions (read-only)."""
+    return {"state": "OK", "protocol": PROTOCOL_VERSION,
+            "min_client": MIN_CLIENT_PROTOCOL_VERSION,
+            "min_node": MIN_NODE_PROTOCOL_VERSION,
+            "server": "in-process-bridge",
+            "listeners": 1,
+            "authority": "the one Qubit bridge event path; no second "
+                         "gateway process or socket is started"}
+
+
+def negotiate_protocol(client_version: Any, *, node_version: Any = None,
+                       role: str = "client") -> Dict[str, Any]:
+    """Deterministic v4 handshake negotiation (no socket is opened).
+
+    Returns the accepted protocol and capability flags, or a typed refusal
+    when the peer is too old (``role=client`` -> min 4, ``role=node`` -> min
+    3). This is the same version gate the upstream server applies, exposed on
+    the single bridge path.
+    """
+    try:
+        version = int(client_version)
+    except (TypeError, ValueError):
+        return {"state": "REFUSED", "code": BAD_INPUT_CODE,
+                "detail": "client protocol version must be an integer"}
+    clean_role = str(role or "client").strip().lower()
+    minimum = (MIN_NODE_PROTOCOL_VERSION if clean_role == "node"
+               else MIN_CLIENT_PROTOCOL_VERSION)
+    if version < minimum:
+        return {"state": "REFUSED", "code": "GATEWAY_VERSION_UNSUPPORTED",
+                "detail": f"{clean_role} protocol {version} < required "
+                          f"{minimum}",
+                "protocol": PROTOCOL_VERSION, "min_required": minimum}
+    if version > PROTOCOL_VERSION:
+        return {"state": "REFUSED", "code": "GATEWAY_VERSION_UNSUPPORTED",
+                "detail": f"{clean_role} protocol {version} is newer than "
+                          f"this bridge supports ({PROTOCOL_VERSION})",
+                "protocol": PROTOCOL_VERSION, "min_required": minimum}
+    accepted_node = None
+    if node_version is not None:
+        try:
+            nv = int(node_version)
+        except (TypeError, ValueError):
+            return {"state": "REFUSED", "code": BAD_INPUT_CODE,
+                    "detail": "node protocol version must be an integer"}
+        if nv < MIN_NODE_PROTOCOL_VERSION or nv > PROTOCOL_VERSION:
+            return {"state": "REFUSED",
+                    "code": "GATEWAY_VERSION_UNSUPPORTED",
+                    "detail": f"node protocol {nv} unsupported",
+                    "protocol": PROTOCOL_VERSION}
+        accepted_node = nv
+    return {"state": "OK", "protocol": PROTOCOL_VERSION,
+            "accepted": version, "role": clean_role,
+            "node_protocol": accepted_node,
+            "features": ["frames", "rpc", "events"],
+            "authority": "in-process bridge; no standalone listener"}
+
+
+def serve_refusal(action: str = "serve") -> Dict[str, Any]:
+    """Typed ``GATEWAY_NO_SERVER`` refusal for binding a second listener.
+
+    Qubit's architecture keeps exactly one event path (the in-process bridge).
+    Binding a standalone gateway socket would duplicate that authority, so the
+    operation is refused with a complete, typed reason instead of an
+    unrestricted bypass.
+    """
+    return {"state": "REFUSED", "code": GATEWAY_NO_SERVER_CODE,
+            "action": action,
+            "explanation": "Qubit Agent cannot do this: a standalone gateway "
+                           "listener would create a second event/policy "
+                           "authority. Gateway RPC v4 is served in-process on "
+                           "the single bridge path; use `qubit gateway "
+                           "protocol` and `qubit gateway negotiate`.",
+            "owner": "qubit-policy",
+            "rollback": "no socket bound; nothing to roll back"}
+
+
+def protocol_doctor() -> Dict[str, Any]:
+    """Read-only protocol + RPC inventory (OC-01/OC-D09)."""
+    methods: List[str] = []
+    try:
+        from .gateway.rpc import default_registry
+
+        methods = list(default_registry().names())
+    except Exception:
+        methods = []
+    return {"state": "OK", "schema": SCHEMA,
+            "protocol": protocol_version(),
+            "rpc_methods": methods,
+            "server": "in-process-bridge",
+            "authority": "one bridge event path; no standalone gateway"}
+
+
+# ---------------------------------------------------------------------------
+# OC-03: peer link state + an injected control-channel handshake
+# ---------------------------------------------------------------------------
+def peer_control_link(cfg: Any, peer_id: str, *, transport: Any = None,
+                      timeout_s: float = 8.0,
+                      requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Open a peer control link over an *injected* transport (OC-03).
+
+    ``transport`` is the external network boundary: a callable
+    ``(url, message) -> response`` used only here. With no transport the call
+    returns the typed ``GATEWAY_NO_TRANSPORT`` state (the code path is
+    complete; live sockets stay operator-side). A version-mismatched or
+    malformed ``welcome`` refuses and records the outcome; a valid handshake
+    records ``LINKED`` on the peer.
+    """
+    try:
+        rec = _get_peer(_load(cfg), peer_id)
+    except GatewayError as exc:
+        return {"state": "NO_PEER", "code": NOT_FOUND_CODE,
+                "detail": exc.detail[:160]}
+    if transport is None:
+        return {"state": "UNAVAILABLE", "code": GATEWAY_NO_TRANSPORT_CODE,
+                "peer": rec["id"],
+                "detail": "no control transport injected; call "
+                          "peer_control_link(..., transport=callable)",
+                "owner": "qubit-policy",
+                "rollback": "no connection attempted; nothing to roll back"}
+    hello = {"type": "hello", "protocol": PROTOCOL_VERSION,
+             "role": "qubit", "peer": rec["id"]}
+    try:
+        response = transport(rec["url"], hello)
+    except Exception as exc:
+        _note_outcome(cfg, rec["id"], "FAILED")
+        return {"state": "UNREACHABLE", "peer": rec["id"],
+                "detail": _redact(str(exc))[:160]}
+    if not isinstance(response, dict):
+        _note_outcome(cfg, rec["id"], "FAILED")
+        return {"state": "UNREACHABLE", "peer": rec["id"],
+                "detail": "control transport returned a non-mapping"}
+    if response.get("type") != "welcome":
+        _note_outcome(cfg, rec["id"], "FAILED")
+        return {"state": "REFUSED", "code": GATEWAY_CONTROL_REFUSED_CODE,
+                "peer": rec["id"], "detail": "peer sent no welcome frame"}
+    negotiated = negotiate_protocol(response.get("protocol", 0),
+                                    node_version=response.get("node_protocol"))
+    if negotiated.get("state") != "OK":
+        _note_outcome(cfg, rec["id"], "FAILED")
+        return {"state": "REFUSED", "code": negotiated.get("code", ""),
+                "peer": rec["id"], "detail": negotiated.get("detail", "")}
+    _note_outcome(cfg, rec["id"], "LINKED")
+    _audit("peer.control-link", requested_by, {"peer": rec["id"]})
+    return {"state": "LINKED", "peer": rec["id"],
+            "protocol": negotiated["protocol"],
+            "capabilities": response.get("capabilities", []),
+            "control": "injected-transport"}

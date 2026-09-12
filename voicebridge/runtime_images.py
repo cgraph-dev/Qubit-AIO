@@ -661,5 +661,180 @@ def refuse_estop(operation: str) -> Dict[str, Any]:
             "rollback": "runtimes untouched; nothing to roll back"}
 
 
+# ---------------------------------------------------------------------------
+# OC-54 / OC-D06: Qubit-safe fleet equivalent (process cells, no Docker)
+# ---------------------------------------------------------------------------
+# Docker/Kubernetes are forbidden by the stack contract. The Qubit-safe
+# equivalent is a *local process cell*: one confined one-shot runtime bound to
+# a pinned, digest-verified image with explicit admission, audit, e-stop, and
+# release. A cloud worker admission boundary exists but requires an injected
+# provider transport; without one it is an honest typed UNAVAILABLE.
+RUNTIME_CONTAINER_FORBIDDEN = "RUNTIME_CONTAINER_FORBIDDEN"
+RUNTIME_CLOUD_UNAVAILABLE = "RUNTIME_CLOUD_UNAVAILABLE"
+RUNTIME_CELL_NOT_READY = "RUNTIME_CELL_NOT_READY"
+CELL_SCHEMA = "qubit-runtime-cells/1"
+CELL_ADMISSION_SCHEMA = "qubit-worker-admission/1"
+
+
+def refuse_container(action: str = "container") -> Dict[str, Any]:
+    """Typed refusal for Docker/Kubernetes fleet operations (OC-54)."""
+    return {"state": "REFUSED", "code": RUNTIME_CONTAINER_FORBIDDEN,
+            "action": action,
+            "explanation": "Qubit Agent cannot do this: container daemons "
+                           "(Docker/Kubernetes) are forbidden by the stack "
+                           "contract. The supported equivalent is a local "
+                           "confined process cell (`qubit runtime cells`).",
+            "owner": "qubit-policy",
+            "rollback": "no daemon contacted; nothing to roll back"}
+
+
+def _cells(state: Dict[str, Any]) -> Dict[str, Any]:
+    cells = state.get("cells")
+    if not isinstance(cells, dict):
+        cells = {}
+    return cells
+
+
+def _image_state(cfg: Any, name: str) -> str:
+    for item in status(cfg).get("runtimes", []):
+        if item.get("name") == name:
+            return str(item.get("state", "MISSING"))
+    return "MISSING"
+
+
+def cells(cfg: Any) -> Dict[str, Any]:
+    """Read-only local process-cell inventory (Qubit-safe fleet equivalent)."""
+    state = _load(cfg)
+    admitted = _cells(state)
+    out = []
+    for entry in REGISTRY:
+        name = entry["name"]
+        rec = admitted.get(name) if isinstance(admitted, dict) else None
+        out.append({"cell": f"cell:{name}", "image": name,
+                    "backend": "process", "pin": entry["pin"],
+                    "confinement": entry["confinement"],
+                    "state": "ADMITTED" if rec else "OFFLINE",
+                    "admitted_at": (rec or {}).get("admitted_at"),
+                    "admitted_by": (rec or {}).get("admitted_by", "")})
+    return {"state": "OK", "schema": CELL_SCHEMA, "cells": out,
+            "backend": "local-process",
+            "daemon": "none-required",
+            "detail": "process-isolated local cells; no Docker daemon, no "
+                      "Kubernetes, no network image pulls"}
+
+
+def cell_admit(cfg: Any, name: str, *, requested_by: str = "cli:user",
+               confirmed: bool = False) -> Dict[str, Any]:
+    """Admit one pinned runtime as a local process cell (confirmed).
+
+    Admission requires the pinned image to be READY (digest-verified); a
+    missing/degraded image is a typed ``RUNTIME_CELL_NOT_READY``. No container
+    runtime is contacted.
+    """
+    if estop_engaged(cfg):
+        return refuse_estop(f"cell admit {name}")
+    if not confirmed:
+        return {"state": "denied", "code": CONFIRM_CODE,
+                "detail": "admitting a runtime cell requires explicit "
+                          "--confirm", "owner": "qubit-policy",
+                "rollback": "no cell admitted; nothing to roll back"}
+    try:
+        entry = _check_name(name)
+    except RuntimeImageError as exc:
+        return {"state": "FAILED", "code": exc.code, "detail": exc.detail,
+                "owner": "qubit-policy",
+                "rollback": "no cell admitted; nothing to roll back"}
+    image_state = _image_state(cfg, entry["name"])
+    if image_state != "READY":
+        return {"state": "UNAVAILABLE", "code": RUNTIME_CELL_NOT_READY,
+                "detail": f"image {entry['name']!r} is {image_state}; install "
+                          "the pinned artifact before admitting a cell",
+                "owner": "qubit-policy",
+                "rollback": "no cell admitted; nothing to roll back"}
+    state = _load(cfg)
+    cells_map = _cells(state)
+    cells_map[entry["name"]] = {"admitted_at": _now(),
+                                "admitted_by": _redact(requested_by)[:64],
+                                "confinement": entry["confinement"]}
+    state["cells"] = cells_map
+    _save(cfg, state)
+    _append_history(cfg, entry["name"], "cell-admit", requested_by, {})
+    _audit("cell_admit", requested_by, {"image": entry["name"]})
+    return {"state": "OK", "schema": CELL_SCHEMA,
+            "cell": f"cell:{entry['name']}", "image": entry["name"],
+            "backend": "process", "confinement": entry["confinement"],
+            "detail": "cell admitted; no container runtime contacted"}
+
+
+def cell_release(cfg: Any, name: str, *, requested_by: str = "cli:user",
+                 confirmed: bool = False) -> Dict[str, Any]:
+    """Release an admitted process cell (confirmed, idempotent)."""
+    if estop_engaged(cfg):
+        return refuse_estop(f"cell release {name}")
+    if not confirmed:
+        return {"state": "denied", "code": CONFIRM_CODE,
+                "detail": "releasing a runtime cell requires explicit "
+                          "--confirm", "owner": "qubit-policy",
+                "rollback": "cell unchanged; nothing to roll back"}
+    try:
+        entry = _check_name(name)
+    except RuntimeImageError as exc:
+        return {"state": "FAILED", "code": exc.code, "detail": exc.detail,
+                "owner": "qubit-policy",
+                "rollback": "cell unchanged; nothing to roll back"}
+    state = _load(cfg)
+    cells_map = _cells(state)
+    existed = entry["name"] in cells_map
+    cells_map.pop(entry["name"], None)
+    state["cells"] = cells_map
+    _save(cfg, state)
+    _append_history(cfg, entry["name"], "cell-release", requested_by, {})
+    _audit("cell_release", requested_by, {"image": entry["name"]})
+    return {"state": "OK", "schema": CELL_SCHEMA,
+            "cell": f"cell:{entry['name']}", "released": existed}
+
+
+def cloud_worker_admission(cfg: Any, *, provider: str = "",
+                           transport: Any = None,
+                           requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Cloud-worker admission over an injected provider transport (OC-D06).
+
+    Local prepared-image reuse already exists (``status``/``cells``). Cloud
+    admission needs a provider; without an injected transport the call is a
+    typed ``RUNTIME_CLOUD_UNAVAILABLE`` instead of a fabricated placement.
+    """
+    if estop_engaged(cfg):
+        return refuse_estop("cloud worker admission")
+    if transport is None:
+        return {"state": "UNAVAILABLE", "code": RUNTIME_CLOUD_UNAVAILABLE,
+                "provider": provider,
+                "schema": CELL_ADMISSION_SCHEMA,
+                "detail": "cloud worker admission needs a provider transport; "
+                          "inject one or use local process cells",
+                "owner": "qubit-policy",
+                "rollback": "no worker placed; nothing to roll back"}
+    request = {"type": "admission.request", "provider": provider,
+               "local_images": [i["name"] for i in status(cfg)["runtimes"]]}
+    try:
+        response = transport(request)
+    except Exception as exc:
+        return {"state": "FAILED", "code": RUNTIME_CLOUD_UNAVAILABLE,
+                "provider": provider, "schema": CELL_ADMISSION_SCHEMA,
+                "detail": _redact(str(exc))[:200], "owner": "qubit-policy",
+                "rollback": "no worker placed; nothing to roll back"}
+    if not isinstance(response, dict) or response.get("admitted") is not True:
+        return {"state": "REFUSED", "code": RUNTIME_CLOUD_UNAVAILABLE,
+                "provider": provider, "schema": CELL_ADMISSION_SCHEMA,
+                "detail": "provider did not admit a worker",
+                "owner": "qubit-policy",
+                "rollback": "no worker placed; nothing to roll back"}
+    return {"state": "OK", "schema": CELL_ADMISSION_SCHEMA,
+            "provider": provider,
+            "worker": _redact(str(response.get("worker", "")))[:120],
+            "warm_images": response.get("warm_images", []),
+            "authority": "injected provider transport; no daemon or inbound "
+                         "listener"}
+
+
 def redact_spec(text: str) -> str:
     return _redact(text)

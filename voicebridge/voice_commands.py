@@ -2654,22 +2654,97 @@ def _b_commands(ctx, args):
         for e in sorted(REGISTRY.values(), key=lambda e: e.id)]}
 
 
+def _audio_asr_hw(cfg):
+    """ASR hardware capability: the REAL configured-provider identity plus a
+    bounded dependency probe (no model download/load).
+
+    A transcription test needs a WAV the voice pipeline cannot carry, so the
+    result is a typed gate that names the operator CLI; it is resolved from the
+    real configured provider and never fabricates a transcript.
+    """
+    from importlib.util import find_spec
+
+    from .audio.qualify import provider_identity
+
+    identity = provider_identity(cfg).get("asr", {})
+    provider = str(identity.get("actual_provider")
+                   or identity.get("configured_provider") or "")
+    module = {"whisper": "faster_whisper", "sherpa": "sherpa_onnx",
+              "personaplex": "personaplex"}.get(provider, "")
+    present = bool(module) and find_spec(module) is not None
+    return {"state": "NEEDS_AUDIO", "code": "ASR_TEST_NEEDS_WAV",
+            "action": "asr_test", "provider": identity,
+            "dependency": module, "dependency_present": present,
+            "operator_cli": "qubit asr-test <file.wav>",
+            "detail": "transcription test needs a WAV file; the configured "
+                      "provider identity is resolved (no fake transcript)"}
+
+
+def _audio_voice_id_hw(cfg, *, enroll):
+    """Real voice-ID backend state (sherpa-onnx ``SpeakerVerifier``).
+
+    Loads the configured enrollment state and reports whether the speaker model
+    is present and how many voices are enrolled. Enroll/verify themselves need
+    live recorded audio, so the credential-independent result is a typed gate
+    that never fabricates an enrollment score.
+    """
+    from .voice_id import SpeakerUnavailable, SpeakerVerifier
+
+    verifier = SpeakerVerifier(
+        model_dir=cfg.model_dir(), state_dir=cfg.state_dir(),
+        name=str(cfg.get("speaker_verify", "name", default="user")),
+        threshold=float(cfg.get("speaker_verify", "threshold", default=0.65)))
+    model_present = bool(verifier.model_path.exists())
+    loaded, error = False, ""
+    try:
+        verifier.load()
+        loaded = True
+    except SpeakerUnavailable as exc:
+        error = str(exc)[:160]
+    except Exception as exc:  # bounded: never a traceback on the voice path
+        error = str(exc)[:160]
+    if not loaded:
+        state, code = "MODEL_MISSING", "VOICE_ID_MODEL_MISSING"
+    elif verifier.num_speakers:
+        state, code = "READY", "VOICE_ID_ENROLLED"
+    else:
+        state, code = "READY", "VOICE_ID_NO_ENROLLMENT"
+    return {"state": state, "code": code,
+            "action": "enroll" if enroll else "verify",
+            "model": "sherpa-onnx", "model_present": model_present,
+            "enrolled_speakers": int(verifier.num_speakers),
+            "operator_cli": "qubit enroll" if enroll
+                            else "qubit verify <file.wav>",
+            "error": error}
+
+
 def _b_audio_hw(ctx, args):
-    """Guidance for audio-hardware operations (operator-only by nature:
-    microphones, speakers, and live audio models cannot be spoken into
-    existence — the exact CLI spelling is returned, never fake success)."""
-    action = args.get("action", "")
-    spell = {
-        "mic_test": "`qubit mic-test` records five seconds and reports levels",
-        "asr_test": "`qubit asr-test <file.wav>` transcribes one WAV file",
-        "tts_test": "`qubit tts-test \"hello\"` synthesizes and plays speech",
-        "enroll": "`qubit enroll` records five seconds of your voice for voice-ID",
-        "verify": "`qubit verify <file.wav>` scores audio against enrollment",
-        "roundtrip": "`qubit roundtrip` runs synth speech, ASR, gateway, "
-                     "summarize, and TTS end to end",
-    }.get(action, "`qubit status` shows the audio stack state")
-    return {"guidance": f"that needs real audio hardware: run {spell} "
-                        f"from a terminal (physical mic/speaker, operator-only)"}
+    """Audio-hardware operations through the real bounded audio backend.
+
+    Each action drives the production probe the operator qualification path
+    uses (``voicebridge.audio.qualify``) or the real provider/voice-ID classes
+    — never fake success. Physical mic/speaker work is operator-gated
+    (``VOICE_BRIDGE_QUALIFY=1``); with the gate (or the device/model) absent
+    the result is a typed gate/degraded state.
+    """
+    from .audio import qualify as Q
+
+    action = str(args.get("action", "") or "")
+    cfg = ctx.cfg
+    if action == "mic_test":
+        return {"audio_hw": Q.capture_probe(cfg, live=True)}
+    if action == "tts_test":
+        return {"audio_hw": Q.playback_probe(cfg, live=True)}
+    if action == "roundtrip":
+        return {"audio_hw": Q.run_qualification(cfg, dry_run=True)}
+    if action == "asr_test":
+        return {"audio_hw": _audio_asr_hw(cfg)}
+    if action == "enroll":
+        return {"audio_hw": _audio_voice_id_hw(cfg, enroll=True)}
+    if action == "verify":
+        return {"audio_hw": _audio_voice_id_hw(cfg, enroll=False)}
+    return {"audio_hw": {"state": "UNKNOWN", "code": "UNKNOWN_AUDIO_ACTION",
+                         "action": action}}
 
 
 def _b_loop(ctx, args):
@@ -3693,6 +3768,43 @@ def _sum_guidance(result):
     return guidance if guidance else "See the help text."
 
 
+def _sum_audio_hw(result):
+    """Spoken summary of a real bounded audio-hardware probe (Qubit naming)."""
+    body = result.get("audio_hw", {}) if isinstance(result, dict) else {}
+    state = str(body.get("state", "?") or "?")
+    code = str(body.get("code", "") or "")
+    if code == "LIVE_NOT_AUTHORIZED":
+        return ("qubit audio hardware is operator-gated: run the matching "
+                "`qubit` audio command from a terminal with "
+                "VOICE_BRIDGE_QUALIFY=1.")
+    if code == "ASR_TEST_NEEDS_WAV":
+        return ("qubit transcription test needs a WAV file: run "
+                "`qubit asr-test <file.wav>` from a terminal.")
+    if code == "VOICE_ID_MODEL_MISSING":
+        return ("qubit voice-ID model is not installed: run `qubit enroll` "
+                "from a terminal.")
+    if code == "VOICE_ID_NO_ENROLLMENT":
+        return ("qubit voice-ID model is ready but no voice is enrolled: say "
+                "`qubit enroll my voice`.")
+    if code == "VOICE_ID_ENROLLED":
+        return (f"qubit voice-ID ready with "
+                f"{int(body.get('enrolled_speakers', 0) or 0)} enrolled voice(s).")
+    if state == "HEALTHY":
+        return "qubit microphone check: healthy signal chain."
+    if state == "SILENT":
+        return "qubit microphone check: silent (check phantom/gain)."
+    if state == "DEGRADED":
+        return "qubit microphone check: degraded level (raise the input gain)."
+    if state == "UNAVAILABLE":
+        return "qubit audio device unavailable (check the input/output)."
+    if "audible" in body:
+        return ("qubit speech check: audible." if body.get("audible")
+                else "qubit speech check: no audible output.")
+    if "qualify_version" in body:
+        return f"qubit voice self-test: {state}."
+    return f"qubit audio hardware: {state}{(' ' + code) if code else ''}."
+
+
 def _sum_capabilities(result):
     caps = result.get("capabilities", {}) if isinstance(result, dict) else {}
     total = caps.get("total", 0)
@@ -3981,6 +4093,7 @@ _SUMMARIES = {
     "wake": _sum_wake,
     "permissions": _sum_permissions,
     "guidance": _sum_guidance,
+    "audio_hw": _sum_audio_hw,
 }
 
 
@@ -6160,8 +6273,8 @@ _E("mic_test", "Microphone test",
    ("microphone test", "mic test", "check mic levels"),
    "audio_hw", ("status",), fixed=(("action", "mic_test"),),
    examples=("qubit, microphone test",),
-   help="Hardware how-to (operator-only).",
-   summary="guidance")
+   help="Real bounded audio-hardware probe (operator-gated live run).",
+   summary="audio_hw")
 _E("wake_status", "Wake-word status",
    ("wake word status", "is wake word ready", "wake status",
     "hands free status", "wake word"),
@@ -6173,32 +6286,32 @@ _E("asr_test", "Transcription test",
    ("transcription test", "test transcription"),
    "audio_hw", ("status",), fixed=(("action", "asr_test"),),
    examples=("qubit, transcription test",),
-   help="Hardware how-to (operator-only).",
-   summary="guidance")
+   help="Real bounded audio-hardware probe (operator-gated live run).",
+   summary="audio_hw")
 _E("tts_test", "Speech test",
    ("speech test", "test speech", "test voice output"),
    "audio_hw", ("status",), fixed=(("action", "tts_test"),),
    examples=("qubit, speech test",),
-   help="Hardware how-to (operator-only).",
-   summary="guidance")
+   help="Real bounded audio-hardware probe (operator-gated live run).",
+   summary="audio_hw")
 _E("enroll_voice", "Enroll my voice",
    ("enroll my voice", "voice enrollment", "learn my voice"),
    "audio_hw", ("status",), fixed=(("action", "enroll"),),
    examples=("qubit, enroll my voice",),
-   help="Hardware how-to (operator-only).",
-   summary="guidance")
+   help="Real bounded audio-hardware probe (operator-gated live run).",
+   summary="audio_hw")
 _E("verify_voice", "Verify my voice",
    ("verify my voice", "check my voice"),
    "audio_hw", ("status",), fixed=(("action", "verify"),),
    examples=("qubit, verify my voice",),
-   help="Hardware how-to (operator-only).",
-   summary="guidance")
+   help="Real bounded audio-hardware probe (operator-gated live run).",
+   summary="audio_hw")
 _E("roundtrip_test", "Voice self-test",
    ("voice self test", "test yourself", "self test"),
    "audio_hw", ("status",), fixed=(("action", "roundtrip"),),
    examples=("qubit, test yourself",),
-   help="Hardware how-to (operator-only).",
-   summary="guidance")
+   help="Real bounded audio-hardware probe (operator-gated live run).",
+   summary="audio_hw")
 _E("loop_start", "Start the voice loop",
    ("start listening", "start voice loop", "begin push to talk"),
    "loop", ("chat",), fixed=(("action", "start"),),
@@ -7261,6 +7374,9 @@ VOICE_CLI_FAMILY = {
     "insights": "sessions",
     "update_status": "product",
     "worktree": "opencode",
+    # Secret-reference status: `qubit auth status` is the same
+    # auth_status.auth_status backend (reference kinds, never values).
+    "secrets": "auth",
 }
 for _voice_id, _voice_family in VOICE_CLI_FAMILY.items():
     CLI_COVERAGE[_voice_family] = tuple(

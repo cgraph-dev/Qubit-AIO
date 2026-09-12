@@ -4,6 +4,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Dict
@@ -132,6 +134,31 @@ _OP_LEAF_CLI = (
     ("prompt-budget", "prompt_budget", "context budget report (read-only)"),
 )
 
+# Whole Hermes CLI families served by the vendored fork (Wave 1). The
+# real dispatch is the pre-parse route in main() (same pattern as `agent` /
+# `hermes`), which preserves upstream argv/help/errors/exit status; these
+# entries declare the family in the live parser tree, help, completions and the
+# gap ledger. Read-only subcommands forward verbatim, mutating subcommands
+# require Qubit's --confirm, and unclassified subcommands are typed refusals.
+_FAMILY_FORWARD_HELP = (
+    ("bundles", "list/show/create/delete/reload skill bundles "
+                "(read-only list/show; writes need --confirm)"),
+    ("claw", "OpenClaw migration tools (confirm-gated; no silent secret import)"),
+    ("console", "safe command console REPL (confirm-gated interactive)"),
+    ("debug", "diagnostics share/delete (confirm-gated; nothing uploaded "
+              "without confirmation)"),
+    ("desktop", "native desktop app build/launch (confirm-gated)"),
+    ("dump", "redacted setup summary for support (read-only)"),
+    ("gui", "desktop app alias (confirm-gated)"),
+    ("memory-graph", "memory-graph list/edit/delete "
+                     "(read-only list; writes need --confirm)"),
+    ("moa", "Mixture-of-Agents slots (read-only list; configure/delete "
+            "need --confirm)"),
+    ("portal", "cloud portal access (confirm-gated; operator-only)"),
+    ("prompt-size", "system-prompt + tool-schema byte breakdown "
+                    "(read-only, offline)"),
+)
+
 # The CLI families above are the surface for catalog ops that previously had
 # no `qubit` binding. Declare that coverage to the voice registry so the
 # single-clear invariant (`voice_commands.CLI_COVERAGE` == live CLI families)
@@ -145,10 +172,51 @@ _CLI_COVERAGE = {
     "reports": ("reports_list",),
     "marketplace": ("marketplace_discovery",),
     "backup": (),   # passphrase-sealed: extra ops only, never spoken
+    # Wave 1 fork-backed families: no voice execution surface yet, so they
+    # carry an explicit voice-impossible reason (CLI/dashboard only).
+    "bundles": (),
+    "claw": (),
+    "console": (),
+    "debug": (),
+    "desktop": (),
+    "dump": (),
+    "gui": (),
+    "memory-graph": (),
+    "moa": (),
+    "pause": (),
+    "portal": (),
+    "prompt-size": (),
+    "worktree": (),
 }
 _CLI_VOICE_IMPOSSIBLE = {
     "backup.voice": "passphrase-sealed backups: use `qubit backup create` / "
                     "`qubit backup restore` in a terminal or the dashboard form",
+    "bundles.voice": "skill-bundle bundles are a CLI/dashboard operation; no "
+                     "spoken command mutates the bundle registry",
+    "claw.voice": "OpenClaw migration is an attended CLI/dashboard operation "
+                  "and never runs from a spoken command",
+    "console.voice": "an interactive console REPL cannot run over the voice "
+                     "surface; use `qubit console --confirm` in a terminal",
+    "debug.voice": "debug bundles may contain logs; sharing is a confirm-gated "
+                   "CLI/dashboard action only",
+    "desktop.voice": "building/launching the native desktop app is an attended "
+                     "hardware action, not a spoken command",
+    "dump.voice": "the support dump is a copy-paste CLI read; no spoken form "
+                  "is required",
+    "gui.voice": "building/launching the desktop GUI is an attended hardware "
+                 "action, not a spoken command",
+    "memory-graph.voice": "memory-graph writes are confirm-gated CLI/dashboard "
+                          "actions; only the read list is speakable elsewhere",
+    "moa.voice": "MoA preset configuration is an interactive CLI/dashboard "
+                 "action; no spoken command mutates the preset store",
+    "pause.voice": "the emergency stop is owned by `qubit power emergency-stop`; "
+                   "voice uses the same Qubit e-stop authority",
+    "portal.voice": "the cloud portal is operator-only (credentials) and is "
+                    "not exposed to spoken commands",
+    "prompt-size.voice": "prompt-size is an offline diagnostic report for a "
+                         "terminal; no spoken form is required",
+    "worktree.voice": "git worktree reclaim is an attended, confirm-gated "
+                      "CLI/dashboard action never run from voice",
 }
 
 
@@ -2588,11 +2656,57 @@ def build_parser() -> argparse.ArgumentParser:
                    "opencode": oc_sub, "backup": bk_sub, "reports": rp_sub,
                    "marketplace": mk_sub,
                    "plugins": pl_sub}
-    for fam, sub, op_id, help_text, specs in _OP_CLI:
-        op_sp = _integ(_op_parsers[fam], sub, help_text, specs)
+    for fam, sub_name, op_id, help_text, specs in _OP_CLI:
+        op_sp = _integ(_op_parsers[fam], sub_name, help_text, specs)
         op_sp.set_defaults(
             _op_id=op_id,
             _op_argnames=[s[0].lstrip("-") for s in specs])
+
+    # Wave 1 Hermes CLI parity: whole families served by the vendored fork.
+    # These parser entries declare each family in the live parser tree (help,
+    # completions, ledger); main() routes the family pre-parse so upstream
+    # argv/help/errors/exit status are preserved, exactly like `agent`.
+    for _ff_name, _ff_help in _FAMILY_FORWARD_HELP:
+        _ffp = add(_ff_name, help=_ff_help)
+        _ffp.add_argument(
+            "fork_args", nargs=argparse.REMAINDER,
+            help=f"arguments forwarded to the Qubit-owned Hermes {_ff_name} "
+                 "command (read-only subcommands forward verbatim; mutating "
+                 "subcommands require --confirm)")
+
+    # Wave 2 Qubit-native commands for fork-absent surfaces. The pinned fork's
+    # `pause` writes a second ESTOP sentinel (Qubit owns ONE e-stop) and its
+    # `worktree` has only list/prune; add/remove/switch are Qubit-native,
+    # confirmation-gated, and confined to a registered project root.
+    pause_p = add("pause", help="Engage the ONE Qubit emergency stop latch "
+                                "(halts new work; requires --confirm)")
+    pause_p.add_argument("--confirm", action="store_true",
+                         help="explicitly confirm the emergency stop")
+    wt_p = add("worktree", help="Confined git-worktree lifecycle in a "
+                                "registered project root (add/remove/switch; "
+                                "needs --confirm)")
+    wt_sub = wt_p.add_subparsers(dest="worktree_command")
+    wt_add = wt_sub.add_parser("add", parents=[common],
+                               help="create <root>/.worktrees/<name> via git "
+                                    "worktree add (needs --confirm)")
+    wt_add.add_argument("name")
+    wt_add.add_argument("--root", default="")
+    wt_add.add_argument("--branch", default="")
+    wt_add.add_argument("--base", default="")
+    wt_add.add_argument("--confirm", action="store_true")
+    wt_rm = wt_sub.add_parser("remove", parents=[common],
+                              help="remove <root>/.worktrees/<name> via git "
+                                   "worktree remove (needs --confirm)")
+    wt_rm.add_argument("name")
+    wt_rm.add_argument("--root", default="")
+    wt_rm.add_argument("--force", action="store_true")
+    wt_rm.add_argument("--confirm", action="store_true")
+    wt_sw = wt_sub.add_parser("switch", parents=[common],
+                              help="switch the checked-out branch in the "
+                                   "resolved project root (needs --confirm)")
+    wt_sw.add_argument("branch")
+    wt_sw.add_argument("--root", default="")
+    wt_sw.add_argument("--confirm", action="store_true")
     return p
 
 
@@ -3056,10 +3170,21 @@ def main(argv=None) -> int:
     # Agent 1: forward supported `<family> <sub>` pairs to the real vendored
     # fork (same in-process runtime as `qubit agent`). Only pairs the Qubit
     # parser does not own are routed, so native commands are never shadowed.
+    # Wave 1 whole-family routes are resolved here too: read-only subcommands
+    # forward verbatim, mutating subcommands need Qubit's --confirm, and
+    # unclassified subcommands are typed refusals (never a raw bypass).
     from . import cli_hermes_forward as _hermes_forward
-    _forwarded = _hermes_forward.maybe_forward(raw)
-    if _forwarded is not None:
-        return _forwarded
+    _route = _hermes_forward.route(raw)
+    if _route is not None:
+        if _route.kind in ("needs-confirm", "refused"):
+            envelope = {"state": _route.kind, "code": _route.code,
+                        "detail": _route.detail}
+            if _route.argv:
+                envelope["argv"] = _route.argv
+            print(json.dumps(envelope, indent=2, sort_keys=True))
+            return 3
+        from . import hermes_runtime
+        return hermes_runtime.run(_route.argv)
     args = build_parser().parse_args(argv)
     command = args.command or "run"
 
@@ -3190,6 +3315,10 @@ def main(argv=None) -> int:
         return _cmd_ghost(cfg, args)
     if command == "power":
         return _cmd_power(cfg, args)
+    if command == "pause":
+        return _cmd_pause(cfg, args)
+    if command == "worktree":
+        return _cmd_worktree(cfg, args)
     if command == "verified-skills":
         return _cmd_verified_skills(cfg, args)
     if command == "experiments":
@@ -6733,6 +6862,41 @@ def _cmd_ghost(cfg, args) -> int:
         return 2
 
 
+def _cmd_pause(cfg, args) -> int:
+    """`qubit pause --confirm` -> the ONE Qubit emergency stop latch.
+
+    The pinned fork's ``pause`` writes a second ESTOP sentinel; Qubit owns a
+    single emergency-stop authority, so this engages the shared
+    :class:`voicebridge.power.PowerControl` latch used by CLI/dashboard/voice.
+    Without ``--confirm`` the router already returns a typed refusal; this
+    handler also enforces confirmation defensively.
+    """
+    import json as _json
+    if not getattr(args, "confirm", False):
+        print(_json.dumps({
+            "state": "refused", "code": "ESTOP_QUBIT_OWNED",
+            "detail": "qubit pause is the ONE Qubit emergency stop and "
+                      "requires --confirm; use `qubit pause --confirm` (no "
+                      "second fork ESTOP sentinel)"}, indent=2,
+            sort_keys=True))
+        return 3
+    from . import power as PW
+    try:
+        out = PW.power_control(cfg).emergency_stop(issued_by="cli:user")
+    except PW.PowerDenied as exc:
+        print(_json.dumps({"state": "denied", "code": exc.code,
+                           "detail": exc.detail}, indent=2, sort_keys=True))
+        return 3
+    except Exception as exc:  # typed boundary: never a traceback
+        print(_json.dumps({
+            "state": "failed",
+            "code": str(getattr(exc, "code", None) or "POWER_ERROR"),
+            "detail": str(exc)[:200]}, indent=2, sort_keys=True))
+        return 2
+    print(_json.dumps(out, indent=2, sort_keys=True))
+    return 0
+
+
 def _cmd_power(cfg, args) -> int:
     """voicebridge power profile/status/circuits/show/check/grant/revoke/
     reset-grant/emergency-stop/reset/disable/enable.
@@ -7284,6 +7448,170 @@ def _cmd_files(cfg, args) -> int:
                                        "patch is reversible with files rollback"},
                           indent=2))
         return 2
+
+
+_WORKTREE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+_WORKTREE_MAX_OUTPUT = 8192
+
+
+def _worktree_git(root, argv, timeout=120):
+    """Run one git command confined to ``root`` (clean env, no shell).
+
+    Never falls back to a host path: ``root`` is already resolved inside an
+    approved project folder by :func:`voicebridge.git_scope.resolve_root`.
+    """
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env["LC_ALL"] = "C"
+    return subprocess.run(
+        ["git", "--no-pager", "-C", str(root), *argv],
+        capture_output=True, text=True, timeout=timeout, env=env)
+
+
+def _worktree_out(proc):
+    text = (proc.stdout or "") + (("\n" + proc.stderr) if proc.stderr else "")
+    text = text.strip()
+    return text[:_WORKTREE_MAX_OUTPUT], len(text) > _WORKTREE_MAX_OUTPUT
+
+
+def _cmd_worktree(cfg, args) -> int:
+    """Qubit-native, confined git-worktree add/remove/switch.
+
+    The pinned fork has only ``worktree list|prune``. Qubit adds the missing
+    lifecycle verbs as real, confirmation-gated git operations confined to a
+    registered project root. No host-write fallback: an unregistered / non-repo
+    / escaping target is a typed refusal and nothing is written.
+    """
+    import json as _json
+
+    sub = getattr(args, "worktree_command", None)
+
+    def _refuse(code, detail):
+        print(_json.dumps({"state": "refused", "code": code,
+                           "detail": detail}, indent=2, sort_keys=True))
+        return 3
+
+    def _fail(code, detail):
+        print(_json.dumps({"state": "failed", "code": code,
+                           "detail": str(detail)[:300]}, indent=2,
+                          sort_keys=True))
+        return 2
+
+    if sub not in ("add", "remove", "switch"):
+        return _refuse(
+            "FORK_SUB_UNCLASSIFIED",
+            "qubit worktree expects add|remove|switch here; list/prune are "
+            "owned by the fork router")
+    if not getattr(args, "confirm", False):
+        return _refuse(
+            "FORK_SUB_UNCLASSIFIED",
+            f"qubit worktree {sub} is a mutating git operation and requires "
+            "--confirm (explicit human authorization)")
+    from . import git_scope as GS
+    try:
+        root = GS.resolve_root(cfg, getattr(args, "root", "") or "")
+    except GS.GitError as exc:
+        return _refuse(exc.code, exc.detail)
+
+    def _confined(name):
+        target = root / ".worktrees" / name
+        try:
+            target.resolve().relative_to(root)
+        except (OSError, ValueError):
+            return None
+        return target
+
+    try:
+        if sub == "add":
+            name = str(getattr(args, "name", "") or "")
+            if not _WORKTREE_NAME_RE.match(name):
+                return _refuse(
+                    "GIT_BAD_INPUT",
+                    "name must match [A-Za-z0-9][A-Za-z0-9._-]{0,127}")
+            branch = str(getattr(args, "branch", "") or "")
+            base = str(getattr(args, "base", "") or "")
+            for label, value in (("branch", branch), ("base", base)):
+                if value and (value.startswith("-") or ".." in value
+                              or len(value) > 256):
+                    return _refuse("GIT_BAD_INPUT", f"bad {label}")
+            target = _confined(name)
+            if target is None:
+                return _refuse("GIT_SCOPE_REFUSED",
+                               "worktree target escapes the project root")
+            if target.exists():
+                return _refuse("GIT_WORKTREE_EXISTS",
+                               f"{target} already exists")
+            argv = ["worktree", "add"]
+            if branch:
+                argv += ["-b", branch, str(target)]
+            else:
+                argv += ["--detach", str(target)]
+            if base:
+                argv.append(base)
+            proc = _worktree_git(root, argv)
+            if proc.returncode != 0:
+                return _fail("GIT_WORKTREE_ADD_FAILED",
+                             _worktree_out(proc)[0]
+                             or "git worktree add failed")
+            out, trunc = _worktree_out(proc)
+            print(_json.dumps({
+                "state": "OK", "root": str(root), "path": str(target),
+                "branch": branch or None, "detail": out, "truncated": trunc,
+                "rollback": f"git worktree remove --force {target}"},
+                indent=2, sort_keys=True))
+            return 0
+
+        if sub == "remove":
+            name = str(getattr(args, "name", "") or "")
+            if not _WORKTREE_NAME_RE.match(name):
+                return _refuse(
+                    "GIT_BAD_INPUT",
+                    "name must match [A-Za-z0-9][A-Za-z0-9._-]{0,127}")
+            target = _confined(name)
+            if target is None:
+                return _refuse("GIT_SCOPE_REFUSED",
+                               "worktree target escapes the project root")
+            argv = ["worktree", "remove"]
+            if getattr(args, "force", False):
+                argv.append("--force")
+            argv.append(str(target))
+            proc = _worktree_git(root, argv)
+            if proc.returncode != 0:
+                return _fail("GIT_WORKTREE_REMOVE_FAILED",
+                             _worktree_out(proc)[0]
+                             or "git worktree remove failed")
+            _worktree_git(root, ["worktree", "prune"])
+            out, trunc = _worktree_out(proc)
+            print(_json.dumps({
+                "state": "OK", "root": str(root), "path": str(target),
+                "removed": not target.exists(), "detail": out,
+                "truncated": trunc,
+                "rollback": "re-create with `qubit worktree add`"},
+                indent=2, sort_keys=True))
+            return 0
+
+        branch = str(getattr(args, "branch", "") or "")
+        if not branch or branch.startswith("-") or ".." in branch or \
+                len(branch) > 256:
+            return _refuse("GIT_BAD_INPUT", "bad branch")
+        proc = _worktree_git(root, ["switch", branch])
+        if proc.returncode != 0:
+            return _fail("GIT_SWITCH_FAILED",
+                         _worktree_out(proc)[0] or "git switch failed")
+        out, trunc = _worktree_out(proc)
+        print(_json.dumps({
+            "state": "OK", "root": str(root), "branch": branch,
+            "detail": out, "truncated": trunc,
+            "rollback": "switch back with `qubit worktree switch <prev>`"},
+            indent=2, sort_keys=True))
+        return 0
+    except subprocess.TimeoutExpired:
+        return _fail("GIT_TIMEOUT", "git operation timed out")
+    except FileNotFoundError:
+        return _fail("GIT_FAILED", "git executable not found")
+    except GS.GitError as exc:
+        return _refuse(exc.code, exc.detail)
+    except Exception as exc:  # typed boundary: never a traceback
+        return _fail("GIT_FAILED", str(exc)[:200])
 
 
 def _cmd_git(cfg, args) -> int:

@@ -245,6 +245,31 @@ def h_events(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                count=len(items))
 
 
+def h_pub(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST/WEBSOCKET /api/pub -> publish into the single Qubit event journal.
+
+    The upstream ``/api/pub`` is a WebSocket channel broadcaster. Qubit keeps
+    one event path and never starts a second WS server, so the Qubit-safe
+    equivalent appends the redacted, validated event to the same
+    ``<state_dir>/typed-events.jsonl`` journal the dashboard feed and
+    communications runtime read. It returns the durable ``seq``.
+    """
+    channel = str(b.get("channel", b.get("name", "dashboard")) or "dashboard")
+    message = b.get("data", b.get("message", b.get("text", "")))
+    try:
+        from .events.journal import EventJournal
+        journal = EventJournal(_store_path(cfg, "typed-events.jsonl"))
+        record = journal.append("CUSTOM", name=channel, value=message)
+    except Exception as exc:
+        return _fail(exc)
+    _audit("pub", "dashboard:user", {"channel": channel,
+                                     "seq": record.get("seq")})
+    return _ok(ok=True, channel=channel, seq=record.get("seq"),
+               published=True,
+               detail="published to the single Qubit event journal")
+
+
 def h_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     from .auth_status import recent_sessions, session_store
@@ -877,8 +902,13 @@ def _cron_mutate(fn_name: str, cfg: Any, p: Dict[str, str]) -> Tuple[int, Dict[s
         if fn_name == "run_due":
             res = S.run_due(cfg, requested_by="dashboard:user")
             return 200, {"ok": True, "result": res}
-        res = getattr(S, fn_name)(cfg, int(p.get("id", "0")),
-                                  requested_by="dashboard:user")
+        if fn_name in ("pause", "resume"):
+            res = getattr(S, fn_name)(cfg, int(p.get("id", "0")),
+                                      requested_by="dashboard:user",
+                                      confirmed=True)
+        else:
+            res = getattr(S, fn_name)(cfg, int(p.get("id", "0")),
+                                      requested_by="dashboard:user")
     except Exception as exc:
         return _fail(exc)
     ok = not (isinstance(res, dict) and res.get("ok") is False)
@@ -937,6 +967,33 @@ def h_mcp(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                detail="inventory + mount policy; Qubit never mounts MCP servers")
 
 
+def h_mcp_servers(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/mcp/servers -> real configured MCP inventory (names only).
+
+    Reads the same ``voicebridge.integration_status.mcp_status`` the CLI and
+    voice surfaces use. Qubit never mounts a server, so each row is
+    inventory-only with the mount policy attached; no command, URL, or
+    credential reference is exposed.
+    """
+    from . import integration_status as IS
+    try:
+        status = IS.mcp_status(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    servers = []
+    for name in status.get("servers", []):
+        servers.append({
+            "name": str(name), "enabled": False, "connected": False,
+            "status": "inventory-only", "source": "qubit-config",
+            "policy": status.get("mount_policy", ""),
+        })
+    return _ok(servers=servers, state=str(status.get("state", "OK")),
+               mount_policy=status.get("mount_policy", ""),
+               detail="configured inventory (names only); Qubit never mounts "
+                      "MCP servers")
+
+
 def h_mcp_catalog(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     return _ok(entries=[],
@@ -945,6 +1002,63 @@ def h_mcp_catalog(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                    "level": "info",
                    "message": "remote catalog fetch refused; install local "
                               "reviewed manifests only"}])
+
+
+def h_mcp_catalog_live(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/mcp/catalog -> real local MCP inventory as the catalog.
+
+    No remote catalog is fetched (network probe refused by policy); the
+    catalog is the configured local inventory from
+    ``integration_status.mcp_status``, each entry flagged as self-hosted and
+    inventory-only, with the refusal recorded as a diagnostic.
+    """
+    from . import integration_status as IS
+    try:
+        status = IS.mcp_status(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    entries = [{
+        "name": str(name), "title": str(name), "source": "local-config",
+        "installed": True, "on_disk": True, "install_action": None,
+        "auth": "none", "policy": "inventory-only; never mounted",
+    } for name in status.get("servers", [])]
+    return _ok(entries=entries, total=len(entries),
+               diagnostics=[{
+                   "name": "catalog",
+                   "level": "info",
+                   "message": "remote catalog fetch refused; serving the "
+                              "reviewed local inventory only"}],
+               mount_policy=status.get("mount_policy", ""))
+
+
+def h_mcp_test_local(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str], ) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/mcp/servers/{name}/test -> local inventory test (no probe).
+
+    Qubit never mounts or connects to an MCP server, so there is no network
+    probe to run. This reports the real local inventory state: an unknown
+    server is a typed 404; a configured server is reported as inventory-only
+    with no tools, explicitly not connected. It never fabricates a live
+    connection.
+    """
+    from . import integration_status as IS
+    name = str(p.get("name", p.get("id", "")) or "")
+    try:
+        status = IS.mcp_status(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    configured = [str(s) for s in status.get("servers", [])]
+    if not name or name not in configured:
+        return 404, {"ok": False, "state": "NOT_FOUND",
+                     "code": "MCP_NOT_FOUND",
+                     "detail": f"MCP server {_redact(name)!r} is not in the "
+                               "Qubit inventory",
+                     "qubit_counterpart": "CLI `qubit mcp status`"}
+    return _ok(ok=True, name=name, tools=[], connected=False,
+               probe="local-inventory", network_probe=False,
+               detail="inventory-only: Qubit never mounts or connects to MCP "
+                      "servers")
 
 
 def h_pairing_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -974,19 +1088,51 @@ def h_pairing_mutate(fn_name: str, cfg: Any, b: Dict[str, Any]) -> Tuple[int, Di
         if fn_name == "create":
             res = P.create(cfg, str(b.get("label", "dashboard")),
                            list(b.get("scopes", ["chat"])),
-                           account=str(b.get("account", "")))
+                           account=str(b.get("account", "")),
+                           requested_by="dashboard:user", confirmed=True)
         elif fn_name == "approve":
             res = P.approve(cfg, str(b.get("code", "")),
-                            requested_by="dashboard:user")
+                            requested_by="dashboard:user", confirmed=True)
         elif fn_name == "revoke":
             res = P.revoke(cfg, str(b.get("code_id", b.get("id", ""))),
-                           requested_by="dashboard:user")
+                           requested_by="dashboard:user", confirmed=True)
         else:
             res = {"ok": True, "cleared": True}
     except Exception as exc:
         return _fail(exc)
     ok = not (isinstance(res, dict) and res.get("ok") is False)
     return (200 if ok else 400), {"ok": ok, "result": res}
+
+
+def h_pairing_clear_pending(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/pairing/clear-pending -> revoke every live pending code.
+
+    Uses the same ``pairing`` store the CLI/voice use: each non-approved,
+    unused, unrevoked code is tombstoned (confirmed + audited), so pending
+    device requests are cleared without touching approved grants.
+    """
+    from . import pairing as P
+    try:
+        codes = P.list_codes(cfg).get("codes", [])
+    except Exception as exc:
+        return _fail(exc)
+    revoked: List[str] = []
+    for rec in codes if isinstance(codes, list) else []:
+        if not isinstance(rec, dict):
+            continue
+        if rec.get("approved") or rec.get("used") or rec.get("revoked"):
+            continue
+        code_id = str(rec.get("id", "") or "")
+        if not code_id:
+            continue
+        try:
+            P.revoke(cfg, code_id, requested_by="dashboard:user",
+                     confirmed=True)
+            revoked.append(code_id)
+        except Exception:
+            continue
+    return _ok(ok=True, cleared=len(revoked), revoked=revoked)
 
 
 def h_webhooks_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -1029,10 +1175,11 @@ def h_webhooks_mutate(fn_name: str, cfg: Any, b: Dict[str, Any],
         if fn_name == "add":
             res = W.add(cfg, str(b.get("id", b.get("sub_id", ""))),
                         str(b.get("url", "")), list(b.get("events", [])),
-                        str(b.get("secret_ref", "")))
+                        str(b.get("secret_ref", "")),
+                        requested_by="dashboard:user", confirmed=True)
         elif fn_name == "remove":
             res = W.remove(cfg, str(b.get("id", p.get("id", ""))),
-                           requested_by="dashboard:user")
+                           requested_by="dashboard:user", confirmed=True)
         elif fn_name == "test":
             res = W.test_plan(cfg, str(b.get("id", p.get("id", ""))))
         else:
@@ -1224,6 +1371,49 @@ def h_gateway(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(gateway=_res(out), state=out.get("state"),
                supervision="GATEWAY_NO_SUPERVISION: process start/stop/restart "
                            "is refused; the operator supervises processes")
+
+
+def h_gateway_drain(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/gateway/drain -> real reversible Qubit drain marker.
+
+    Mirrors the upstream drain control channel without a second listener or
+    process supervision: ``action: "drain"`` atomically writes a redacted
+    ``<state_dir>/gateway_drain.json`` marker (audited); ``action: "cancel"``
+    removes it. It never starts/stops a process (supervision stays
+    GATEWAY_NO_SUPERVISION) and is idempotent.
+    """
+    action = str(b.get("action", "drain") or "drain").strip().lower()
+    if action not in ("drain", "cancel"):
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": f"unknown drain action {action!r}; expected "
+                               "'drain' or 'cancel'",
+                     "qubit_counterpart": "CLI `qubit gateway` + operator"}
+    path = _store_path(cfg, "gateway_drain.json")
+    if action == "cancel":
+        existed = False
+        try:
+            existed = path.exists()
+            if existed:
+                path.unlink()
+        except OSError as exc:
+            return _fail(exc)
+        _audit("gateway_drain", "dashboard:user", {"action": "cancel",
+                                                   "existed": existed})
+        return _ok(ok=True, action="cancel", was_draining=existed,
+                   draining=False)
+    payload = {"schema": "qubit-gateway-drain/1",
+               "requested_at": time.time(), "requested_by": "dashboard:user",
+               "suppress_notification": bool(b.get("suppress_notification",
+                                                   False))}
+    try:
+        _save_json_store(path, payload)
+    except Exception as exc:
+        return _fail(exc)
+    _audit("gateway_drain", "dashboard:user", {"action": "drain"})
+    return _ok(ok=True, action="drain", requested_at=payload["requested_at"],
+               draining=True,
+               suppress_notification=payload["suppress_notification"])
 
 
 def h_gateway_supervision(action: str) -> Handler:
@@ -3228,12 +3418,359 @@ def h_learning_node_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                qubit_counterpart="CLI `qubit lessons forget <id>`")
 
 
+# ---------------------------------------------------------------------------
+# Qubit-owned dashboard auth: loopback identity + RFC 8252 native handshake.
+#
+# The vendored dashboard ships an OAuth round trip
+# (qubit_hermes/hermes_cli/dashboard_auth/routes.py). Qubit has no external
+# IDP: its dashboard identity is the loopback operator with a loopback
+# session token (voicebridge/webui.py:token_ok). These handlers are the
+# Qubit-safe local equivalent: provider listing and manual-handoff guidance
+# come from voicebridge.auth_status / voicebridge.auth_login, and the native
+# loopback handshake (RFC 8252 + PKCE S256, single-use codes, short TTL,
+# hashed at rest) is served locally by Qubit itself. No outbound request, no
+# external credential capture, no query-string token, no second listener.
+# Raw tokens are returned once; only their SHA-256 hash is persisted (0600).
+# ---------------------------------------------------------------------------
+
+_AUTH_SCHEMA = "qubit-dashboard-auth/1"
+_AUTH_CODE_TTL = 300.0
+_AUTH_ACCESS_TTL = 12 * 3600.0
+_AUTH_REFRESH_TTL = 30 * 86400.0
+_AUTH_LOOPBACK_HOSTS = ("127.0.0.1", "::1")
+
+
+def _auth_store_path(cfg: Any) -> Path:
+    return _store_path(cfg, "hermes_dashboard_auth.json")
+
+
+def _auth_store(cfg: Any) -> Dict[str, Any]:
+    state = _load_json_store(_auth_store_path(cfg))
+    state.setdefault("schema", _AUTH_SCHEMA)
+    for key in ("pending", "codes", "session", "refresh"):
+        if not isinstance(state.get(key), dict):
+            state[key] = {}
+    return state
+
+
+def _auth_flush(cfg: Any, state: Dict[str, Any]) -> None:
+    path = _auth_store_path(cfg)
+    _save_json_store(path, state)
+    try:
+        import os as _os
+        _os.chmod(path, 0o600)
+    except OSError:
+        pass
+
+
+def _auth_hash(value: Any) -> str:
+    import base64 as _b64
+    import hashlib as _hl
+    return _b64.urlsafe_b64encode(
+        _hl.sha256(str(value).encode("utf-8")).digest()).decode("ascii")
+
+
+def _auth_ct_eq(a: Any, b: Any) -> bool:
+    import hmac as _hmac
+    return bool(a) and bool(b) and _hmac.compare_digest(str(a), str(b))
+
+
+def _auth_new_token(nbytes: int = 32) -> str:
+    import secrets as _secrets
+    return _secrets.token_urlsafe(nbytes)
+
+
+def _auth_prune(state: Dict[str, Any], now: Optional[float] = None) -> None:
+    moment = time.time() if now is None else now
+    for key in ("pending", "codes"):
+        recs = state.get(key) or {}
+        for rid in list(recs):
+            rec = recs.get(rid) or {}
+            if float(rec.get("expires_at", 0) or 0) < moment:
+                recs.pop(rid, None)
+
+
+def _auth_issue(state: Dict[str, Any], provider: str, now: float,
+                user_id: str = "local-operator") -> Tuple[str, str]:
+    access = _auth_new_token()
+    refresh = _auth_new_token()
+    state["session"] = {"token_hash": _auth_hash(access), "provider": provider,
+                        "user_id": user_id, "issued_at": now,
+                        "expires_at": now + _AUTH_ACCESS_TTL}
+    state["refresh"] = {"token_hash": _auth_hash(refresh), "provider": provider,
+                        "user_id": user_id, "issued_at": now,
+                        "expires_at": now + _AUTH_REFRESH_TTL}
+    return access, refresh
+
+
+def _auth_bearer(access: str, refresh: str, provider: str,
+                 now: float) -> Dict[str, Any]:
+    return {"access_token": access, "refresh_token": refresh,
+            "token_type": "Bearer", "expires_at": now + _AUTH_ACCESS_TTL,
+            "provider": provider, "user_id": "local-operator"}
+
+
+def _auth_providers(cfg: Any) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    try:
+        from .auth_status import auth_status as _inv
+        for rec in _inv(cfg).get("providers", []):
+            name = str(rec.get("provider", "") or "")
+            if not name:
+                continue
+            rows.append({"name": name, "display_name": name,
+                         "supports_password": False,
+                         "configured": bool(rec.get("configured")),
+                         "key_ref": str(rec.get("key_ref", ""))})
+    except Exception:
+        pass
+    return rows
+
+
 def h_auth_providers(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """GET /api/auth/providers -> empty provider list (loopback identity)."""
-    return _ok(providers=[],
-               detail="loopback session-token identity; no OAuth providers "
-                      "registered")
+    """GET /api/auth/providers -> real local provider inventory.
+
+    Reports the loopback identity plus every configured frontier provider
+    (names + credential-reference kind only, never values). External
+    provider sign-in is manual-handoff, so ``supports_password`` is False.
+    """
+    return _ok(providers=_auth_providers(cfg),
+               identity="local-operator", mode="loopback-token",
+               detail="Qubit loopback dashboard identity; external provider "
+                      "sign-in is manual-handoff (no OAuth token dance)")
+
+
+def h_login_page(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /login -> real Qubit loopback login bootstrap (no IDP redirect)."""
+    return _ok(ok=True, identity="local-operator", mode="loopback-token",
+               loopback=True, providers=_auth_providers(cfg),
+               next=str(q.get("next", "") or ""),
+               detail="Qubit loopback login; no external IDP redirect")
+
+
+def h_auth_login(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /auth/login -> real manual-handoff enrollment plan for a provider."""
+    from .auth_login import login_plan
+    provider = str(q.get("provider", "") or "")
+    plan = login_plan(cfg, provider)
+    if plan.get("state") != "OK":
+        return 404, {
+            "ok": False, "code": plan.get("code", "AUTH_UNKNOWN_PROVIDER"),
+            "detail": _redact(plan.get("detail", "unknown provider"))[:300],
+            "qubit_counterpart": "CLI `qubit auth login --provider`",
+            "known_providers": plan.get("known_providers", []),
+        }
+    return _ok(ok=True, provider=plan.get("provider", provider),
+               next=str(q.get("next", "") or ""), handoff=plan,
+               detail="manual-handoff enrollment; Qubit never performs the "
+                      "provider login or captures the credential")
+
+
+def h_auth_native_authorize(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /auth/native/authorize -> Qubit-local RFC 8252 + PKCE S256 start.
+
+    Only ``http://`` loopback redirect URIs are accepted (an open redirect
+    would leak a live code), the challenge method must be S256, and the
+    one-time code/verifier challenge is stored hashed with a short TTL.
+    """
+    from urllib.parse import urlencode, urlparse
+    method = str(q.get("code_challenge_method", "") or "").upper()
+    challenge = str(q.get("code_challenge", "") or "")
+    redirect_uri = str(q.get("redirect_uri", "") or "")
+    if method != "S256":
+        return 400, {"ok": False, "code": "AUTH_BAD_CHALLENGE_METHOD",
+                     "detail": "code_challenge_method must be S256",
+                     "qubit_counterpart": "GET /login (loopback session)"}
+    if not challenge:
+        return 400, {"ok": False, "code": "AUTH_BAD_CHALLENGE",
+                     "detail": "code_challenge required",
+                     "qubit_counterpart": "GET /login (loopback session)"}
+    parsed = urlparse(redirect_uri)
+    if parsed.scheme != "http" or \
+            (parsed.hostname or "").lower() not in _AUTH_LOOPBACK_HOSTS:
+        return 400, {"ok": False, "code": "AUTH_BAD_REDIRECT",
+                     "detail": "native redirect_uri must be http:// on the "
+                               "loopback interface (127.0.0.1 / ::1)",
+                     "qubit_counterpart": "GET /login (loopback session)"}
+    provider = str(q.get("provider", "") or "loopback").strip() or "loopback"
+    client_state = str(q.get("state", "") or "")
+    now = time.time()
+    state = _auth_store(cfg)
+    _auth_prune(state, now)
+    broker_state = _auth_new_token(16)
+    code = _auth_new_token(24)
+    state["codes"][_auth_hash(code)] = {
+        "challenge": challenge, "redirect_uri": redirect_uri,
+        "client_state": client_state, "provider": provider,
+        "broker_state": broker_state, "expires_at": now + _AUTH_CODE_TTL,
+        "used": False,
+    }
+    _auth_flush(cfg, state)
+    sep = "&" if "?" in redirect_uri else "?"
+    authorize_url = redirect_uri + sep + urlencode(
+        {"code": code, "state": broker_state})
+    _audit("auth_authorize", "dashboard:user",
+           {"provider": provider, "redirect_host": parsed.hostname or ""})
+    return _ok(ok=True, broker_state=broker_state, provider=provider,
+               redirect_uri=redirect_uri, authorize_url=authorize_url,
+               code=code, expires_in=_AUTH_CODE_TTL,
+               detail="Qubit-local loopback authorization "
+                      "(RFC 8252 + PKCE S256); no external IDP")
+
+
+def h_auth_callback(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /auth/callback -> redeem a Qubit-local code into a session."""
+    raw = str(q.get("code", "") or "")
+    state_param = str(q.get("state", "") or "")
+    if not raw:
+        return 400, {"ok": False, "code": "AUTH_MISSING_CODE",
+                     "detail": "Missing authorization code",
+                     "qubit_counterpart": "GET /login"}
+    now = time.time()
+    state = _auth_store(cfg)
+    _auth_prune(state, now)
+    key = _auth_hash(raw)
+    rec = state["codes"].get(key)
+    if not rec or rec.get("used"):
+        return 400, {"ok": False, "code": "AUTH_BAD_CODE",
+                     "detail": "Invalid or expired authorization code",
+                     "qubit_counterpart": "GET /login"}
+    if state_param and rec.get("broker_state") and \
+            not _auth_ct_eq(state_param, rec["broker_state"]):
+        return 400, {"ok": False, "code": "AUTH_STATE_MISMATCH",
+                     "detail": "OAuth state mismatch (CSRF check failed)",
+                     "qubit_counterpart": "GET /login"}
+    rec["used"] = True
+    provider = str(rec.get("provider", "loopback") or "loopback")
+    access, refresh = _auth_issue(state, provider, now)
+    _auth_flush(cfg, state)
+    _audit("auth_callback", "dashboard:user", {"provider": provider})
+    return _ok(ok=True, next="/", provider=provider,
+               session=_auth_bearer(access, refresh, provider, now))
+
+
+def h_auth_native_token(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /auth/native/token -> verify PKCE and exchange the code for tokens.
+
+    The code is consumed on every path (no verifier oracle, no replay); any
+    failure is a generic typed 400. Tokens go in the JSON body.
+    """
+    raw = str(b.get("code", "") or "")
+    verifier = str(b.get("code_verifier", "") or "")
+    if not raw or not verifier:
+        return 400, {"ok": False, "code": "AUTH_MISSING_CODE",
+                     "detail": "Invalid or expired authorization code.",
+                     "qubit_counterpart": "GET /login"}
+    now = time.time()
+    state = _auth_store(cfg)
+    _auth_prune(state, now)
+    key = _auth_hash(raw)
+    rec = state["codes"].get(key)
+    if not rec or rec.get("used"):
+        return 400, {"ok": False, "code": "AUTH_BAD_CODE",
+                     "detail": "Invalid or expired authorization code.",
+                     "qubit_counterpart": "GET /login"}
+    state["codes"].pop(key, None)
+    if not _auth_ct_eq(_auth_hash(verifier), rec.get("challenge", "")):
+        _auth_flush(cfg, state)
+        return 400, {"ok": False, "code": "AUTH_BAD_CODE",
+                     "detail": "Invalid or expired authorization code.",
+                     "qubit_counterpart": "GET /login"}
+    provider = str(rec.get("provider", "loopback") or "loopback")
+    access, refresh = _auth_issue(state, provider, now)
+    _auth_flush(cfg, state)
+    _audit("auth_native_token", "dashboard:user", {"provider": provider})
+    return _ok(ok=True, **_auth_bearer(access, refresh, provider, now))
+
+
+def h_auth_native_refresh(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /auth/native/refresh -> rotate a desktop-held refresh token."""
+    raw = str(b.get("refresh_token", "") or "")
+    provider_hint = str(b.get("provider", "") or "")
+    if not raw:
+        return 400, {"ok": False, "code": "AUTH_MISSING_REFRESH",
+                     "detail": "refresh_token required",
+                     "qubit_counterpart": "GET /login"}
+    now = time.time()
+    state = _auth_store(cfg)
+    _auth_prune(state, now)
+    rec = state.get("refresh") or {}
+    valid = (rec and float(rec.get("expires_at", 0) or 0) >= now
+             and _auth_ct_eq(_auth_hash(raw), rec.get("token_hash", ""))
+             and (not provider_hint or provider_hint == rec.get("provider", "")))
+    if not valid:
+        return 401, {"ok": False, "state": "UNAUTHORIZED",
+                     "code": "AUTH_SESSION_EXPIRED",
+                     "detail": "Refresh token expired or invalid; start a new "
+                               "sign-in.",
+                     "qubit_counterpart": "GET /login"}
+    provider = str(rec.get("provider", "loopback") or "loopback")
+    access, refresh = _auth_issue(state, provider, now)
+    _auth_flush(cfg, state)
+    _audit("auth_native_refresh", "dashboard:user", {"provider": provider})
+    return _ok(ok=True, **_auth_bearer(access, refresh, provider, now))
+
+
+def h_auth_password_login(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /auth/password-login -> verify the Qubit loopback credential.
+
+    Qubit keeps no password store. The local equivalent accepts either a
+    token previously issued by the loopback native flow or the configured
+    dashboard token (``webui.token_ok``, constant-time, never a query-string
+    token). Unknown/mismatched credentials are a generic 401.
+    """
+    supplied = str(b.get("token", b.get("password", "")) or "")
+    provider = str(b.get("provider", "") or "loopback") or "loopback"
+    now = time.time()
+    state = _auth_store(cfg)
+    _auth_prune(state, now)
+    sess = state.get("session") or {}
+    ok = bool(supplied) and _auth_ct_eq(_auth_hash(supplied),
+                                        sess.get("token_hash", ""))
+    if not ok and supplied:
+        try:
+            from .webui import token_ok
+            cfg_token = str(getattr(cfg, "api_token", "") or "")
+            if cfg_token:
+                ok, _reason = token_ok(cfg_token, supplied, False)
+        except Exception:
+            ok = False
+    if not ok:
+        return 401, {"ok": False, "state": "UNAUTHORIZED",
+                     "code": "AUTH_INVALID_CREDENTIALS",
+                     "detail": "Invalid credentials",
+                     "qubit_counterpart": "GET /login (loopback session)"}
+    access, refresh = _auth_issue(state, provider, now)
+    _auth_flush(cfg, state)
+    _audit("auth_password_login", "dashboard:user", {"provider": provider})
+    return _ok(ok=True, next="/", **_auth_bearer(access, refresh, provider,
+                                                now))
+
+
+def h_auth_logout(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /auth/logout -> revoke the loopback session + credential check."""
+    from .integration_status import logout_check
+    state = _auth_store(cfg)
+    revoked = bool(state.get("session") or state.get("refresh")
+                   or state.get("codes") or state.get("pending"))
+    state["session"] = {}
+    state["refresh"] = {}
+    state["pending"] = {}
+    state["codes"] = {}
+    _auth_flush(cfg, state)
+    _audit("auth_logout", "dashboard:user", {"revoked": revoked})
+    return _ok(ok=True, logged_out=True, revoked=revoked, next="/login",
+               check=logout_check(cfg),
+               detail="loopback session revoked; no server-side cookie")
 
 
 # ---------------------------------------------------------------------------
@@ -3429,15 +3966,17 @@ _r("POST", r"/api/cron/jobs/(?P<id>[^/]+)/trigger", "cron_trigger")
 _r("GET", r"/api/logs", "h_logs")
 _r("GET", r"/api/system/stats", "h_system_stats")
 _r("GET", r"/api/mcp", "h_mcp")
-_r("GET", r"/api/mcp/servers", "h_mcp")
+_r("GET", r"/api/mcp/servers", "h_mcp_servers")
 _r("POST", r"/api/mcp/servers", "mcp_create")
 _r("DELETE", r"/api/mcp/servers/(?P<id>[^/]+)", "mcp_delete")
-_r("GET", r"/api/mcp/catalog", "h_mcp_catalog")
+_r("GET", r"/api/mcp/catalog", "h_mcp_catalog_live")
+_r("POST", r"/api/pub", "h_pub")
+_r("WEBSOCKET", r"/api/pub", "h_pub")
 _r("GET", r"/api/pairing", "h_pairing_list")
 _r("POST", r"/api/pairing", "pairing_create")
 _r("POST", r"/api/pairing/approve", "pairing_approve")
 _r("POST", r"/api/pairing/revoke", "pairing_revoke")
-_r("POST", r"/api/pairing/clear-pending", "pairing_revoke")
+_r("POST", r"/api/pairing/clear-pending", "pairing_clear_pending")
 _r("GET", r"/api/webhooks", "h_webhooks_list")
 _r("POST", r"/api/webhooks", "webhooks_add")
 _r("POST", r"/api/webhooks/enable", "webhooks_enable")
@@ -3456,6 +3995,7 @@ _r("GET", r"/api/files", "h_files")
 _r("GET", r"/api/files/read", "h_files_read")
 _r("DELETE", r"/api/files", "files_delete")
 _r("GET", r"/api/gateway", "h_gateway")
+_r("POST", r"/api/gateway/drain", "h_gateway_drain")
 _r("GET", r"/api/curator", "h_curator")
 _r("GET", r"/api/env", "h_env")
 _r("GET", r"/api/ops/hooks", "h_hooks")
@@ -3535,6 +4075,15 @@ _r("GET", r"/api/learning/node", "h_learning_node")
 _r("PUT", r"/api/learning/node", "h_learning_node_update")
 _r("DELETE", r"/api/learning/node", "h_learning_node_delete")
 _r("GET", r"/api/auth/providers", "h_auth_providers")
+# Qubit-owned dashboard auth flow (loopback identity + native handshake).
+_r("GET", r"/login", "h_login_page")
+_r("GET", r"/auth/login", "h_auth_login")
+_r("GET", r"/auth/native/authorize", "h_auth_native_authorize")
+_r("GET", r"/auth/callback", "h_auth_callback")
+_r("POST", r"/auth/password-login", "h_auth_password_login")
+_r("POST", r"/auth/logout", "h_auth_logout")
+_r("POST", r"/auth/native/token", "h_auth_native_token")
+_r("POST", r"/auth/native/refresh", "h_auth_native_refresh")
 
 # OpenClaw delta Wave 3 (D3/D4/D20/D21/D24): file transfer, active recall,
 # document extraction, question prompts, and session sharing. Specific paths
@@ -3726,8 +4275,8 @@ GATED: List[Dict[str, Any]] = [
     ("POST", r"/api/messaging/.*/onboarding.*", _g("ONBOARDING_GUIDED",
         "Channel onboarding runs as guided manual enrollment, not an automatic token flow.",
         "CLI `qubit auth login` + msg account ops")),
-    ("POST", r"/api/messaging/platforms/[^/]+/test", "msg_test"),
-    ("POST", r"/api/mcp/servers/[^/]+/test", "mcp_test"),
+    ("POST", r"/api/messaging/platforms/(?P<id>[^/]+)/test", "h_msg_test_live"),
+    ("POST", r"/api/mcp/servers/(?P<name>[^/]+)/test", "h_mcp_test_local"),
     ("POST", r"/api/mcp/servers/[^/]+/enabled", "mcp_enabled"),
     ("PUT", r"/api/mcp/servers/[^/]+/enabled", "mcp_enabled"),
     ("PUT", r"/api/mcp/servers", "mcp_create"),
@@ -3738,7 +4287,7 @@ GATED: List[Dict[str, Any]] = [
     ("POST", r"/api/dashboard/agent-plugins/(?P<id>[^/]+)/enable", "agent_enable"),
     ("POST", r"/api/dashboard/agent-plugins/(?P<id>[^/]+)/disable", "agent_disable"),
     ("POST", r"/api/dashboard/agent-plugins/(?P<id>[^/]+)/update", "agent_update"),
-    ("DELETE", r"/api/dashboard/agent-plugins/(?P<id>[^/]+)", "agent_remove"),
+    ("DELETE", r"/api/dashboard/agent-plugins/(?P<id>.+)", "agent_remove"),
     ("PUT", r"/api/dashboard/plugin-providers", "toolset_write"),
     ("GET", r"/api/dashboard/plugins/hub", "plugins_hub"),
     ("DELETE", r"/api/providers/oauth/(?P<id>[^/]+)", "oauth_delete"),
@@ -3749,7 +4298,7 @@ GATED: List[Dict[str, Any]] = [
     ("PUT", r"/api/memory/providers/(?P<id>[^/]+)/config", "mem_config_write"),
     ("POST", r"/api/memory/providers/(?P<id>[^/]+)/setup", "mem_config_write"),
     ("GET", r"/api/dashboard/plugins/rescan", "plugins_rescan"),
-    ("POST", r"/api/dashboard/plugins/[^/]+/visibility", "plugin_visibility"),
+    ("POST", r"/api/dashboard/plugins/(?P<id>.+)/visibility", "h_plugin_visibility_set"),
     ("POST", r"/api/ops/debug-share", "debug_share"),
     ("POST", r"/api/ops/import-upload", "import_upload"),
     ("POST", r"/api/ops/checkpoints/prune", "ckpt_prune"),
@@ -3871,6 +4420,33 @@ def h_msg_test(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                       "credential reference present (MSG_NO_CREDENTIAL otherwise)")
 
 
+def h_msg_test_live(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/messaging/platforms/{platform_id}/test -> real link state.
+
+    Runs the same ``messaging.link`` credential/transport probe the CLI and
+    dashboard platform list use: it reports LINKED / DEGRADED /
+    NO_CREDENTIAL / UNAVAILABLE from the vault reference and transport
+    availability. It never sends a message and never opens a provider socket.
+    """
+    from . import messaging as M
+    platform_id = str(p.get("id", p.get("platform_id", "")) or "")
+    if not platform_id:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "platform_id required",
+                     "qubit_counterpart": "CLI `qubit msg accounts`"}
+    try:
+        linked = M.link(cfg, platform_id)
+    except Exception as exc:
+        return _fail(exc)
+    state = str(linked.get("state", "UNAVAILABLE") or "UNAVAILABLE")
+    reachable = state in ("LINKED", "DEGRADED")
+    return _ok(ok=True, platform=platform_id, state=state.lower(),
+               reachable=reachable, link=linked,
+               error_code=linked.get("code"),
+               detail="credential/transport link state; no message sent")
+
+
 def h_mcp_test(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     # McpTestResult wire shape; mounts never happen so tools stay empty.
@@ -3942,8 +4518,31 @@ def h_plugins_rescan(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 def h_plugin_visibility(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    return _ok(name=p.get("id"), visible=bool(b.get("visible", True)),
-               detail="visibility is session-local; manifests remain installed")
+    """POST /api/dashboard/plugins/{name}/visibility -> real persisted toggle.
+
+    The per-user hidden set is persisted in ``<state_dir>/hermes_hidden.json``
+    (the same store ``plugins_hub`` reads) with an atomic write + audit, so a
+    hidden overlay plugin stays hidden across dashboard reloads.
+    """
+    name = str(p.get("id", "") or b.get("name", "") or "")
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "plugin name required",
+                     "qubit_counterpart": "CLI `qubit plugins`"}
+    hidden = _hidden_set(cfg)
+    if bool(b.get("visible", True)):
+        hidden.discard(name)
+    else:
+        hidden.add(name)
+    try:
+        _hidden_save(cfg, hidden)
+    except Exception as exc:
+        return _fail(exc)
+    _audit("plugin_visibility", "dashboard:user",
+           {"name": name, "visible": name not in hidden})
+    return _ok(name=name, visible=name not in hidden,
+               hidden=sorted(hidden),
+               detail="persisted per-user visibility")
 
 
 def h_debug_share(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -4049,12 +4648,28 @@ def h_actions_read(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(actions=_res(out), state=out.get("state"))
 
 
+def _prefs_path(cfg: Any) -> Path:
+    return _store_path(cfg, "hermes_dashboard_prefs.json")
+
+
+def _prefs(cfg: Any) -> Dict[str, Any]:
+    return _load_json_store(_prefs_path(cfg))
+
+
 def h_font(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
            p: Dict[str, str], setter: bool = False) -> Tuple[int, Dict[str, Any]]:
+    """GET/PUT /api/dashboard/font -> real persisted dashboard font pref."""
+    prefs = _prefs(cfg)
     if setter:
-        return _ok(font=str(b.get("font", "system")),
-                    detail="font preference is session-local in this packet")
-    return _ok(font="system")
+        font = str(b.get("font", "system") or "system").strip() or "system"
+        prefs["font"] = font
+        try:
+            _save_json_store(_prefs_path(cfg), prefs)
+        except Exception as exc:
+            return _fail(exc)
+        _audit("dashboard_font", "dashboard:user", {"font": font})
+        return _ok(font=font, persisted=True)
+    return _ok(font=str(prefs.get("font", "system") or "system"))
 
 
 def h_plugins(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -4065,17 +4680,30 @@ def h_plugins(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 def h_themes(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    return _ok(**themes_response(cfg))
+    out = themes_response(cfg)
+    active = str(_prefs(cfg).get("theme", "") or "").strip()
+    if active and any(t.get("name") == active for t in out.get("themes", [])):
+        out["active"] = active
+    return _ok(**out)
 
 
 def h_theme_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    name = str(b.get("theme", "qubit") or "qubit")
-    if name != "qubit":
-        return _ok(ok=True, theme="qubit",
+    """PUT /api/dashboard/theme -> real persisted theme selection."""
+    name = str(b.get("theme", "qubit") or "qubit").strip() or "qubit"
+    available = {t.get("name") for t in themes_response(cfg).get("themes", [])}
+    if name not in available:
+        return _ok(ok=True, theme="qubit", persisted=False,
                    detail=f"only the Qubit theme ships in this packet; "
                           f"{name!r} is not installed (session keeps qubit)")
-    return _ok(ok=True, theme="qubit")
+    prefs = _prefs(cfg)
+    prefs["theme"] = name
+    try:
+        _save_json_store(_prefs_path(cfg), prefs)
+    except Exception as exc:
+        return _fail(exc)
+    _audit("dashboard_theme", "dashboard:user", {"theme": name})
+    return _ok(ok=True, theme=name, persisted=True)
 
 
 def _need_confirm(action: str) -> Tuple[int, Dict[str, Any]]:
@@ -6184,6 +6812,22 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "h_git_worktree_remove": h_git_write("worktree-remove"),
     "h_git_branch_switch": h_git_write("branch-switch"),
     "h_blueprint_instantiate": h_blueprint_instantiate,
+    "pairing_clear_pending": h_pairing_clear_pending,
+    "h_mcp_servers": h_mcp_servers,
+    "h_mcp_catalog_live": h_mcp_catalog_live,
+    "h_mcp_test_local": h_mcp_test_local,
+    "h_msg_test_live": h_msg_test_live,
+    "h_pub": h_pub,
+    "h_gateway_drain": h_gateway_drain,
+    "h_plugin_visibility_set": h_plugin_visibility,
+    "h_login_page": h_login_page,
+    "h_auth_login": h_auth_login,
+    "h_auth_native_authorize": h_auth_native_authorize,
+    "h_auth_callback": h_auth_callback,
+    "h_auth_password_login": h_auth_password_login,
+    "h_auth_logout": h_auth_logout,
+    "h_auth_native_token": h_auth_native_token,
+    "h_auth_native_refresh": h_auth_native_refresh,
 }
 
 HANDLERS: Dict[str, Handler] = {
