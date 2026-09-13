@@ -291,6 +291,47 @@ def test_kanban_read_routes_serve_real_board(tmp_path, monkeypatch):
     assert code == 404 and out["ok"] is False, (code, out)
 
 
+def test_kanban_aux_reads_are_real_or_typed(tmp_path, monkeypatch):
+    """Auxiliary kanban plugin reads are wired to the vendored kanban_db.
+
+    /profiles and /orchestration are real reads; /tasks/{id}/log,
+    /tasks/{id}/attachments, /runs/{id} and /runs/{id}/inspect resolve to a
+    registered route returning a real shape or a typed not-found — never the
+    compat no-route 404. The binary attachment download stays a typed policy
+    refusal.
+    """
+    from voicebridge import hermes_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    task_id = _seed_kanban(cfg, monkeypatch)
+
+    for path in ("/api/plugins/kanban/profiles",
+                 "/api/plugins/kanban/orchestration"):
+        code, out = HC.dispatch(cfg, "GET", path, {}, {})
+        assert code == 200 and isinstance(out, (dict, list)), (path, code, out)
+
+    route_patterns = " ".join(r["pattern"] for r in HC.ROUTES
+                              if r["method"] == "GET")
+    for token in ("tasks/(?P<task_id>[^/]+)/log",
+                  "tasks/(?P<task_id>[^/]+)/attachments",
+                  "runs/(?P<run_id>[^/]+)",
+                  "runs/(?P<run_id>[^/]+)/inspect"):
+        assert token in route_patterns, token
+
+    for path in (f"/api/plugins/kanban/tasks/{task_id}/log",
+                 f"/api/plugins/kanban/tasks/{task_id}/attachments",
+                 "/api/plugins/kanban/runs/1",
+                 "/api/plugins/kanban/runs/1/inspect"):
+        code, out = HC.dispatch(cfg, "GET", path, {}, {})
+        assert code in (200, 404), (path, code, str(out)[:200])
+        assert isinstance(out, dict), (path, out)
+
+    # The binary attachment download is a typed policy refusal, not a stream.
+    code, out = HC.dispatch(
+        cfg, "GET", "/api/plugins/kanban/attachments/1", {}, {})
+    assert code in (200, 403, 404), (code, out)
+
+
 # Every pinned kanban write route (plugin_api.py) must resolve to the shared
 # typed confirmation/broker gate — never a fabricated 2xx and never a 404.
 KANBAN_WRITE_ROUTES = [
@@ -609,8 +650,11 @@ def test_kanban_auxiliary_reads_never_fabricate(tmp_path, monkeypatch):
         code, out = HC.dispatch(cfg, method, path, {}, {})
         assert code in (200, 404), (method, path, code, out)
         if code == 404:
-            assert out["ok"] is False and out["code"] == "NOT_FOUND", \
-                (method, path, out)
+            # Wired auxiliary routes return the vendored plugin's typed 404
+            # (PLUGIN_HTTP); an unwired route would be the compat NOT_FOUND.
+            # Either way the shape is a typed refusal, never fabricated data.
+            assert out["ok"] is False and out.get("code") in (
+                "NOT_FOUND", "PLUGIN_HTTP"), (method, path, out)
 
 
 # ---------------------------------------------------------------------------

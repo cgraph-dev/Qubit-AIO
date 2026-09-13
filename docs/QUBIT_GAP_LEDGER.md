@@ -23,33 +23,32 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
   - upstream_pin: 3a9d69db306cd7f081e06254cb89c4bcc14a7107
   - upstream_tag: v2026.9.4
   - upstream_tree: /tmp/opencode/pinned/openclaw (read via git show 3a9d69db306cd7f081e06254cb89c4bcc14a7107, shallow clone)
-- `docs/QUBIT_GAP_LEDGER.qubit.json` — schema `qubit-gap-ledger-section/1`, source `qubit-surface`, 740 rows
-  - generated_from: cli_families=106, dashboard_ops.EXTRA_OPS=34, dashboard_ops.catalog=510, hermes_compat.GATED=102, hermes_compat.ROUTES=361, source_inventory.dispositioned=141, source_inventory.dispositioned_gated=25, source_inventory.dispositioned_implemented=116, source_inventory.distinct_uncovered=1, source_inventory.items=6776, source_inventory.parented_covered=1054, source_inventory.parented_uncovered=26, source_inventory.surface_items=1819, voice_commands.CLI_COVERAGE=106, voice_commands.REGISTRY=476
+- `docs/QUBIT_GAP_LEDGER.qubit.json` — schema `qubit-gap-ledger-section/1`, source `qubit-surface`, 713 rows
+  - generated_from: cli_families=106, dashboard_ops.EXTRA_OPS=34, dashboard_ops.catalog=510, hermes_compat.GATED=102, hermes_compat.ROUTES=367, source_inventory.dispositioned=141, source_inventory.dispositioned_gated=24, source_inventory.dispositioned_implemented=117, source_inventory.distinct_uncovered=0, source_inventory.items=6776, source_inventory.parented_covered=1081, source_inventory.parented_uncovered=0, source_inventory.surface_items=1819, voice_commands.CLI_COVERAGE=106, voice_commands.REGISTRY=476
   - evidence: production backend + declared interfaces + live CLI tree + voice registry + linked tests/ AST proofs + direct source inventory
   - generator: scripts/rebuild_ledger_qubit.py
   - backend_flags: []
   - generated: 2026-09-12
-  - inventory: {"by_category": {"hermes_backend_route": 1, "hermes_cli_option": 23, "hermes_cli_positional": 3}, "by_parent": {"cli:computer-use install": 1, "cli:config set": 1, "cli:gateway install": 3, "cli:gateway run": 2, "cli:mcp add": 7, "cli:plugins install": 6, "cli:skills install": 3, "cli:skills publish": 3}, "covered": 1651, "covered_by_parent": {"OC-02": 5, "OC-16": 1, "OC-19": 5, "OC-30": 1, "OC-34
+  - inventory: {"by_category": {}, "by_parent": {}, "covered": 1678, "covered_by_parent": {"OC-02": 5, "OC-16": 1, "OC-19": 5, "OC-30": 1, "OC-34": 1, "OC-35": 1, "OC-46": 5, "OC-53": 10, "OC-63": 10, "OC-64": 4, "OC-66": 10, "OC-67": 1, "OC-D01": 1, "OC-D03": 1, "OC-D08": 5, "OC-D12": 1, "OC-D15": 1, "OC-D16": 1, "OC-D20": 1, "OC-D28": 58, "browser_status": 24, "channels_status": 8, "cli:acp": 6, "cli:approvals
   - method: Evidence-based regeneration. Catalog rows derive their status from the live production backend (voice_commands.REGISTRY / _BACKENDS + dashboard_ops.EXTRA_OPS), the declared interfaces (catalog), the live CLI parser tree, the registry voice surface, and an AST scan of tests/ for a proving caller. A plugin/page row declares only the dashboard surface (no CLI/voice by design); it is IMPLEMENTED when
   - sources_reconciled: ["voicebridge/voice_commands.py (REGISTRY/_BACKENDS/CLI_COVERAGE)", "voicebridge/dashboard_ops.py (catalog/EXTRA_OPS)", "voicebridge/cli.py (build_parser)", "voicebridge/hermes_compat.py (ROUTES/GATED)", "voicebridge/hermes_plugins.py (vendored plugin fleet wrapper)", "qubit_hermes/toolsets.py + tools/registry.py (fork tool runtime)", "qubit_hermes/skills + optional-skills (fork skill runtime)", "
 
 ## Counts
 
-- Total rows: **1417**
-- Open rows (status != IMPLEMENTED): **213**
+- Total rows: **1390**
+- Open rows (status != IMPLEMENTED): **184**
 
 ### By status
 
-- GATED: 174
-- IMPLEMENTED: 1204
-- MISSING: 28
+- GATED: 173
+- IMPLEMENTED: 1206
 - PARTIAL: 11
 
 ### By source
 
 - hermes: 573
 - openclaw: 104
-- qubit: 740
+- qubit: 713
 
 ### By area
 
@@ -115,9 +114,6 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
 - gateway-actions: 6
 - ghost: 20
 - git: 25
-- hermes_backend_route: 1
-- hermes_cli_option: 23
-- hermes_cli_positional: 3
 - hermes_gated: 30
 - hermes_plugin: 9
 - hermes_skill: 29
@@ -208,12 +204,12 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
 ## Source-inventory reconciliation
 
 - Inventory present: **True**
-- Unexplained omissions: **27**
-- `qubit`: present=True, items=6776, matched=1792, unmatched=27, unexplained=27
+- Unexplained omissions: **0**
+- `qubit`: present=True, items=6776, matched=1819, unmatched=0, unexplained=0
 
 ## Open rows (status != IMPLEMENTED)
 
-### source: hermes (116 open)
+### source: hermes (115 open)
 
 #### hermes / analytics-config (2)
 
@@ -301,11 +297,10 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
 | `api:POST /api/dashboard/agent-plugins/install` | GATED | owner | POST /api/dashboard/agent-plugins/install | — |
 | `api:POST /api/dashboard/agent-plugins/{name:path}/update` | GATED | owner | POST /api/dashboard/agent-plugins/{name:path}/update | — |
 
-#### hermes / dashboard_plugin (2)
+#### hermes / dashboard_plugin (1)
 
 | id | status | needs | capability | proving test |
 | --- | --- | --- | --- | --- |
-| `plugin:kanban-extra-reads` | MISSING | owner | hermes dashboard plugin kanban auxiliary reads (routes pending) | — |
 | `plugin:kanban-write-gate` | GATED | owner | hermes dashboard plugin kanban write surface (typed gate) | tests/test_hermes_plugins.py::test_kanban_writes_stay_on_policy_gate |
 
 #### hermes / files-fs (7)
@@ -493,7 +488,7 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
 | --- | --- | --- | --- | --- |
 | `OC-48` | PARTIAL | creds | Markdown workspace memory / dreaming / external providers (LanceDB/Wiki/Honcho) | tests/test_openclaw_closure_wave2_webmedia.py |
 
-### source: qubit (87 open)
+### source: qubit (59 open)
 
 #### qubit / browser (2)
 
@@ -509,48 +504,6 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
 | `computer_doctor` | PARTIAL | hardware | Desktop health | tests/test_computer_use8tf.py::test_doctor_checklist_typed |
 | `computer_install_refusal` | PARTIAL | hardware | Desktop driver install | tests/test_computer_use8tf.py::test_doctor_checklist_typed |
 | `computer_permissions` | PARTIAL | hardware | Desktop permissions | tests/test_computer_use8tf.py::test_permissions_record |
-
-#### qubit / hermes_backend_route (1)
-
-| id | status | needs | capability | proving test |
-| --- | --- | --- | --- | --- |
-| `inv:api:GET_/assets/{filename}.css` | MISSING | owner | GET /assets/{filename}.css | — |
-
-#### qubit / hermes_cli_option (23)
-
-| id | status | needs | capability | proving test |
-| --- | --- | --- | --- | --- |
-| `inv:hermes_computer-use_install_--upgrade` | MISSING | hardware | --upgrade | — |
-| `inv:hermes_config_set_--force` | MISSING | owner | --force | — |
-| `inv:hermes_gateway_install_--no-start-now` | MISSING | owner | --no-start-now | — |
-| `inv:hermes_gateway_install_--no-start-on-login` | MISSING | owner | --no-start-on-login | — |
-| `inv:hermes_gateway_install_--run-as-user` | MISSING | owner | --run-as-user | — |
-| `inv:hermes_gateway_run_--verbose` | MISSING | owner | --verbose | — |
-| `inv:hermes_gateway_run_-v` | MISSING | owner | -v | — |
-| `inv:hermes_mcp_add_--args` | MISSING | owner | --args | — |
-| `inv:hermes_mcp_add_--auth` | MISSING | creds | --auth | — |
-| `inv:hermes_mcp_add_--command` | MISSING | owner | --command | — |
-| `inv:hermes_mcp_add_--connect-timeout` | MISSING | owner | --connect-timeout | — |
-| `inv:hermes_mcp_add_--env` | MISSING | owner | --env | — |
-| `inv:hermes_mcp_add_--preset` | MISSING | owner | --preset | — |
-| `inv:hermes_mcp_add_--url` | MISSING | owner | --url | — |
-| `inv:hermes_plugins_install_--enable` | MISSING | owner | --enable | — |
-| `inv:hermes_plugins_install_--force` | MISSING | owner | --force | — |
-| `inv:hermes_plugins_install_--no-enable` | MISSING | owner | --no-enable | — |
-| `inv:hermes_plugins_install_--ref` | MISSING | owner | --ref | — |
-| `inv:hermes_plugins_install_-f` | MISSING | owner | -f | — |
-| `inv:hermes_skills_install_--category` | MISSING | owner | --category | — |
-| `inv:hermes_skills_install_--name` | MISSING | owner | --name | — |
-| `inv:hermes_skills_publish_--repo` | MISSING | owner | --repo | — |
-| `inv:hermes_skills_publish_--to` | MISSING | owner | --to | — |
-
-#### qubit / hermes_cli_positional (3)
-
-| id | status | needs | capability | proving test |
-| --- | --- | --- | --- | --- |
-| `inv:hermes_plugins_install_identifier` | MISSING | owner | identifier | — |
-| `inv:hermes_skills_install_identifier` | MISSING | owner | identifier | — |
-| `inv:hermes_skills_publish_skill_path` | MISSING | owner | skill_path | — |
 
 #### qubit / hermes_gated (30)
 
@@ -593,7 +546,7 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
 | --- | --- | --- | --- | --- |
 | `inv:skill:skills/index-cache` | GATED | owner | index-cache | — |
 
-#### qubit / openclaw_extension (24)
+#### qubit / openclaw_extension (23)
 
 | id | status | needs | capability | proving test |
 | --- | --- | --- | --- | --- |
@@ -615,7 +568,6 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
 | `inv:openclaw-ext:reef` | GATED | creds | reef | tests/test_openclaw_extensions_wave5.py |
 | `inv:openclaw-ext:sms` | GATED | creds | sms | tests/test_openclaw_extensions_wave5.py |
 | `inv:openclaw-ext:synology-chat` | GATED | creds | synology-chat | tests/test_openclaw_extensions_wave5.py |
-| `inv:openclaw-ext:test-support` | GATED | none | test-support | tests/test_openclaw_extensions_wave5.py |
 | `inv:openclaw-ext:tlon` | GATED | creds | tlon | tests/test_openclaw_extensions_wave5.py |
 | `inv:openclaw-ext:twitch` | GATED | creds | twitch | tests/test_openclaw_extensions_wave5.py |
 | `inv:openclaw-ext:visitor-access` | GATED | creds | visitor-access | tests/test_openclaw_parity_wave1.py |

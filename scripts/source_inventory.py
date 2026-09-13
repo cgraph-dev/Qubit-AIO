@@ -336,7 +336,14 @@ def _openclaw_disposition(item: dict) -> dict | None:
     if not isinstance(form, dict):
         return None
     kind = str(disp.get("disposition") or "")
-    status = "IMPLEMENTED" if kind in ("parent", "distinct") else "GATED"
+    gate = str(disp.get("gate") or "")
+    if gate == "TEST_SUPPORT_ONLY":
+        # Upstream test-only scaffolding: no product capability exists to
+        # gate or implement, so it is dispositioned IMPLEMENTED (Qubit ships
+        # its own test suite).
+        status = "IMPLEMENTED"
+    else:
+        status = "IMPLEMENTED" if kind in ("parent", "distinct") else "GATED"
     return {
         "status": status,
         "capability": f"openclaw extension {name}",
@@ -394,6 +401,13 @@ def _parent_for(item: dict) -> tuple[str | None, str]:
         return (None, coverage)
     if cat in ("hermes_i18n_key", "hermes_locale_key"):
         return (_DASHBOARD_PARENT, coverage)
+    if cat == "hermes_backend_route":
+        path = str(item.get("name") or item.get("path") or "")
+        if "/assets/" in path or path.endswith((".css", ".js", ".svg")):
+            # Static SPA assets are served by the dashboard static handler,
+            # not by a compat API row.
+            return (_DASHBOARD_PARENT, "static-asset")
+        return (None, coverage)
     return (None, coverage)
 
 
@@ -1710,8 +1724,11 @@ def build_inventory(repo: Path, hermes: Path, openclaw: Path,
         it["parent_resolved"] = resolved
         it["parent_status"] = (status_by_id.get(resolved)
                                if resolved else None)
+        # A parented surface is covered when its parent is IMPLEMENTED or a
+        # typed policy GATE (a flag of an intentionally-refused command is part
+        # of that refusal, not an independent missing capability).
         it["parent_covered"] = bool(
-            resolved and status_by_id.get(resolved) == "IMPLEMENTED")
+            resolved and status_by_id.get(resolved) in ("IMPLEMENTED", "GATED"))
 
     # Wave 5: explicit fork-runtime disposition for every tool/skill/plugin
     # item.  These are not separate Qubit modules; the fork is executed

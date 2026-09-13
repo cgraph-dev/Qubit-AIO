@@ -1317,7 +1317,13 @@ def build_inventory_rows(report: Dict[str, object], known_ids: Set[str],
                 parent_status = "IMPLEMENTED"
             else:
                 parent_status = str(item.get("parent_status") or "")
-            if parent_status == "IMPLEMENTED":
+            # A parented surface (CLI option/positional, plugin asset, model
+            # entry) is covered when its parent capability is IMPLEMENTED, and
+            # also when the parent is a typed policy GATE: a flag of an
+            # intentionally-refused command is part of that refusal, not an
+            # independent missing capability.  Surfaced as parent-gated
+            # coverage, never as IMPLEMENTED.
+            if parent_status in ("IMPLEMENTED", "GATED"):
                 covered = True
         if covered:
             covered_count += 1

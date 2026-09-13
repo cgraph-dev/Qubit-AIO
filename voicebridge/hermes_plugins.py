@@ -483,6 +483,56 @@ def h_plugin_kanban_home_channels(
                         board=q.get("board") or None)
 
 
+def _kanban_int(value: Any) -> Any:
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return value
+
+
+def h_plugin_kanban_task_log(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                             p: Dict[str, str]) -> Tuple[int, Any]:
+    tail = q.get("tail")
+    return _kanban_read(
+        cfg, "get_task_log", task_id=str(p.get("task_id") or ""),
+        tail=_kanban_int(tail) if tail else None,
+        board=q.get("board") or None)
+
+
+def h_plugin_kanban_task_attachments(
+        cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+        p: Dict[str, str]) -> Tuple[int, Any]:
+    return _kanban_read(
+        cfg, "list_task_attachments",
+        task_id=str(p.get("task_id") or ""), board=q.get("board") or None)
+
+
+def h_plugin_kanban_run(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Any]:
+    return _kanban_read(
+        cfg, "get_run_endpoint",
+        run_id=_kanban_int(p.get("run_id")), board=q.get("board") or None)
+
+
+def h_plugin_kanban_run_inspect(
+        cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+        p: Dict[str, str]) -> Tuple[int, Any]:
+    return _kanban_read(
+        cfg, "inspect_run_endpoint",
+        run_id=_kanban_int(p.get("run_id")), board=q.get("board") or None)
+
+
+def h_plugin_kanban_profiles(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                             p: Dict[str, str]) -> Tuple[int, Any]:
+    return _kanban_read(cfg, "list_profile_roster")
+
+
+def h_plugin_kanban_orchestration(
+        cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+        p: Dict[str, str]) -> Tuple[int, Any]:
+    return _kanban_read(cfg, "get_orchestration_settings")
+
+
 # ---------------------------------------------------------------------------
 # Plugin fleet discovery
 # ---------------------------------------------------------------------------

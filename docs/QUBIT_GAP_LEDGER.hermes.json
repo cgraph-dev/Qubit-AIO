@@ -119,8 +119,7 @@
   "total": 573,
   "by_status": {
    "GATED": 115,
-   "IMPLEMENTED": 457,
-   "MISSING": 1
+   "IMPLEMENTED": 458
   },
   "by_area": {
    "analytics-config": 4,
@@ -8149,15 +8148,15 @@
   {
    "id": "plugin:kanban-extra-reads",
    "area": "dashboard_plugin",
-   "capability": "hermes dashboard plugin kanban auxiliary reads (routes pending)",
+   "capability": "hermes dashboard plugin kanban auxiliary reads",
    "upstream_ref": "qubit_hermes/plugins/kanban/dashboard/plugin_api.py:400",
-   "qubit_backend": "",
-   "cli": "",
-   "dashboard": "hermes-dist Kanban drawers (runs/attachments/profile/orchestration)",
-   "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "Honest open row: the pinned plugin_api.py also serves GET /tasks/{id}/attachments, /attachments/{id} (binary download), /tasks/{id}/log, /runs/{id}, /runs/{id}/inspect, /profiles and GET/PUT /orchestration. The Qubit compat table routes the required kanban read surfaces (board/tasks/comments/links/boards/config/projects/workers/diagnostics/model-options/home-channels) and gates every write, but these auxiliary reads are not yet registered, so they 404 rather than fabricate. Route wiring lives in voicebridge/hermes_compat.py (not this module).",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_plugin_kanban_task_log",
+   "cli": "qubit kanban *",
+   "dashboard": "hermes-dist Kanban drawers (runs/attachments/log/profile/orchestration)",
+   "voice": "voice kanban_*",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_hermes_plugins.py::test_kanban_aux_reads_are_real_or_typed",
+   "note": "GET /tasks/{id}/attachments, /tasks/{id}/log, /runs/{id}, /runs/{id}/inspect, /profiles and GET /orchestration are wired to the vendored kanban_db through voicebridge/hermes_plugins.py. The binary attachment download (/attachments/{id}) stays a typed FILES_BINARY_STREAM policy refusal (the JSON dispatcher serves no binary), and PUT /orchestration is the KANBAN_WRITE_BROKERED confirmation gate; both are documented gate surfaces, not fabricated successes.",
    "needs": "owner"
   },
   {

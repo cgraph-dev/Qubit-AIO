@@ -11,18 +11,18 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 
 - Ledger comparison baseline: `working-tree` (verified waves-1-2 revision; the live working-tree ledger is edited by concurrent agents, so the comparison is pinned to a reproducible revision).
 - Inventory items (all categories): **6776**
-- Candidate omissions (uncovered surface items): **6**
+- Candidate omissions (uncovered surface items): **0**
 - Distinct capability gaps (no parent row): **0**
-- Parented surfaces needing parent closure (parent not IMPLEMENTED): **6**
-- Parented surfaces covered by an IMPLEMENTED parent: **1074**
-- Distinct capabilities total: **739**; parented surfaces total: **1080**
-- Fork-runtime dispositions (tools/skills/plugins): **177** (IMPLEMENTED 152, GATED 25)
+- Parented surfaces needing parent closure (parent not IMPLEMENTED): **0**
+- Parented surfaces covered by an IMPLEMENTED parent: **1081**
+- Distinct capabilities total: **738**; parented surfaces total: **1081**
+- Fork-runtime dispositions (tools/skills/plugins): **177** (IMPLEMENTED 153, GATED 24)
 - Ledger IMPLEMENTED rows with unreproducible evidence: **0**
 - Hermes byte diff vs `qubit_hermes/`: upstream=12173 local=12173 identical=12173 missing=0 extra=0 changed=0
 
 ### Omission counts by category (all uncovered)
 
-- `hermes_cli_option`: 6
+- (none)
 
 ### Evidence-only surface counts (not candidate rows)
 
@@ -34,29 +34,11 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 
 No parent capability row exists; these remain explicit open rows.
 
-## Parented surfaces needing parent closure (6)
+## Parented surfaces needing parent closure (0)
 
 These belong to a parent capability row that is missing or not IMPLEMENTED; close the parent (or wire the surface) to resolve them. They are not distinct capabilities.
 
-### parent `cli:computer-use install` (1; status=GATED)
-
-- `hermes computer-use install --upgrade` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/computer_use.py`; parent `cli:computer-use install` status `GATED`.
-
-### parent `cli:gateway install` (3; status=GATED)
-
-- `hermes gateway install --no-start-now` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway install` status `GATED`.
-- `hermes gateway install --no-start-on-login` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway install` status `GATED`.
-- `hermes gateway install --run-as-user` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway install` status `GATED`.
-
-### parent `cli:gateway run` (1; status=GATED)
-
-- `hermes gateway run -v` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway run` status `GATED`.
-
-### parent `cli:plugins install` (1; status=GATED)
-
-- `hermes plugins install -f` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins install` status `GATED`.
-
-## Parented surfaces covered by an IMPLEMENTED parent (1074)
+## Parented surfaces covered by an IMPLEMENTED parent (1081)
 
 These are coverage evidence for their parent, not separate gaps.
 
@@ -101,6 +83,7 @@ These are coverage evidence for their parent, not separate gaps.
 - `cli:claw migrate`: 8 surface(s) — coverage `cli-option`
 - `cli:completion`: 1 surface(s) — coverage `cli-option`
 - `cli:computer-use doctor`: 2 surface(s) — coverage `cli-option`
+- `cli:computer-use install`: 1 surface(s) — coverage `cli-option`
 - `cli:config get`: 1 surface(s) — coverage `cli-option`
 - `cli:config set`: 3 surface(s) — coverage `cli-option`
 - `cli:config unset`: 1 surface(s) — coverage `cli-option`
@@ -123,7 +106,8 @@ These are coverage evidence for their parent, not separate gaps.
 - `cli:fallback list`: 1 surface(s) — coverage `cli-alias`
 - `cli:fallback remove`: 1 surface(s) — coverage `cli-alias`
 - `cli:gateway enroll`: 4 surface(s) — coverage `cli-option`
-- `cli:gateway run`: 1 surface(s) — coverage `cli-option`
+- `cli:gateway install`: 3 surface(s) — coverage `cli-option`
+- `cli:gateway run`: 2 surface(s) — coverage `cli-option`
 - `cli:hooks list`: 1 surface(s) — coverage `cli-alias`
 - `cli:hooks revoke`: 3 surface(s) — coverage `cli-option`
 - `cli:hooks test`: 3 surface(s) — coverage `cli-option`
@@ -161,7 +145,7 @@ These are coverage evidence for their parent, not separate gaps.
 - `cli:plugins disable`: 1 surface(s) — coverage `cli-option`
 - `cli:plugins doctor`: 2 surface(s) — coverage `cli-option`
 - `cli:plugins enable`: 3 surface(s) — coverage `cli-option`
-- `cli:plugins install`: 5 surface(s) — coverage `cli-option`
+- `cli:plugins install`: 6 surface(s) — coverage `cli-option`
 - `cli:plugins list`: 5 surface(s) — coverage `cli-option`
 - `cli:plugins pack export`: 2 surface(s) — coverage `cli-option`
 - `cli:plugins pack install`: 3 surface(s) — coverage `cli-option`
@@ -253,7 +237,7 @@ These are coverage evidence for their parent, not separate gaps.
 - `reports_list`: 1 surface(s) — coverage `workflow-surface`
 - `runtime_status`: 19 surface(s) — coverage `workflow-surface`
 - `schedules_list`: 22 surface(s) — coverage `workflow-surface`
-- `webui_status`: 45 surface(s) — coverage `dashboard-surface`
+- `webui_status`: 46 surface(s) — coverage `static-asset`
 
 ## Fork-runtime dispositions for tools / skills / plugins (177)
 
@@ -511,9 +495,9 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 
 - `openclaw-ext:synology-chat` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'synology-chat' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
-### `openclaw extension test-support` (1; IMPLEMENTED 0, GATED 1)
+### `openclaw extension test-support` (1; IMPLEMENTED 1, GATED 0)
 
-- `openclaw-ext:test-support` — **GATED**; backend `tests/ (upstream test scaffolding only)`; OpenClaw extension 'test-support' -> gate (parent=distinct, gate=TEST_SUPPORT_ONLY) via tests/ (upstream test scaffolding only).; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:test-support` — **IMPLEMENTED**; backend `tests/ (upstream test scaffolding only)`; OpenClaw extension 'test-support' -> gate (parent=distinct, gate=TEST_SUPPORT_ONLY) via tests/ (upstream test scaffolding only).; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension tlon` (1; IMPLEMENTED 0, GATED 1)
 

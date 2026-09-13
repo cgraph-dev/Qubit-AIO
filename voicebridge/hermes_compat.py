@@ -4088,6 +4088,17 @@ _r("GET", r"/api/plugins/kanban/workers/active", "h_plugin_kanban_workers")
 _r("GET", r"/api/plugins/kanban/diagnostics", "h_plugin_kanban_diagnostics")
 _r("GET", r"/api/plugins/kanban/model-options", "h_plugin_kanban_model_options")
 _r("GET", r"/api/plugins/kanban/home-channels", "h_plugin_kanban_home_channels")
+_r("GET", r"/api/plugins/kanban/tasks/(?P<task_id>[^/]+)/log",
+   "h_plugin_kanban_task_log")
+_r("GET", r"/api/plugins/kanban/tasks/(?P<task_id>[^/]+)/attachments",
+   "h_plugin_kanban_task_attachments")
+_r("GET", r"/api/plugins/kanban/runs/(?P<run_id>[^/]+)/inspect",
+   "h_plugin_kanban_run_inspect")
+_r("GET", r"/api/plugins/kanban/runs/(?P<run_id>[^/]+)",
+   "h_plugin_kanban_run")
+_r("GET", r"/api/plugins/kanban/profiles", "h_plugin_kanban_profiles")
+_r("GET", r"/api/plugins/kanban/orchestration",
+   "h_plugin_kanban_orchestration")
 # Discovery for the vendored plugin fleet. The existing
 # /api/dashboard/plugins response stays fixed to the Qubit overlay set; this
 # additive view reports the vendored manifests without changing that contract.
@@ -6983,6 +6994,15 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
         _hermes_plugins.h_plugin_kanban_model_options,
     "h_plugin_kanban_home_channels":
         _hermes_plugins.h_plugin_kanban_home_channels,
+    "h_plugin_kanban_task_log": _hermes_plugins.h_plugin_kanban_task_log,
+    "h_plugin_kanban_task_attachments":
+        _hermes_plugins.h_plugin_kanban_task_attachments,
+    "h_plugin_kanban_run": _hermes_plugins.h_plugin_kanban_run,
+    "h_plugin_kanban_run_inspect":
+        _hermes_plugins.h_plugin_kanban_run_inspect,
+    "h_plugin_kanban_profiles": _hermes_plugins.h_plugin_kanban_profiles,
+    "h_plugin_kanban_orchestration":
+        _hermes_plugins.h_plugin_kanban_orchestration,
     "h_plugin_fleet": _hermes_plugins.h_plugin_fleet,
 }
 

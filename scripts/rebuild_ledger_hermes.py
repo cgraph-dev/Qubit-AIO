@@ -1704,18 +1704,18 @@ PLUGINS = [
      "is `qubit kanban` + the pending-approvals banner.",
      "qubit_hermes/plugins/kanban/dashboard/plugin_api.py:373"),
     ("kanban-extra-reads", "dashboard_plugin",
-     "hermes dashboard plugin kanban auxiliary reads (routes pending)",
-     "", "MISSING", "", "owner",
-     "hermes-dist Kanban drawers (runs/attachments/profile/orchestration)",
-     "", "",
-     "Honest open row: the pinned plugin_api.py also serves GET "
-     "/tasks/{id}/attachments, /attachments/{id} (binary download), "
-     "/tasks/{id}/log, /runs/{id}, /runs/{id}/inspect, /profiles and GET/PUT "
-     "/orchestration. The Qubit compat table routes the required kanban read "
-     "surfaces (board/tasks/comments/links/boards/config/projects/workers/"
-     "diagnostics/model-options/home-channels) and gates every write, but these "
-     "auxiliary reads are not yet registered, so they 404 rather than fabricate. "
-     "Route wiring lives in voicebridge/hermes_compat.py (not this module).",
+     "hermes dashboard plugin kanban auxiliary reads",
+     "voicebridge/hermes_compat.py:h_plugin_kanban_task_log", "IMPLEMENTED",
+     "tests/test_hermes_plugins.py::test_kanban_aux_reads_are_real_or_typed",
+     "owner", "hermes-dist Kanban drawers (runs/attachments/log/profile/"
+     "orchestration)", "qubit kanban *", "voice kanban_*",
+     "GET /tasks/{id}/attachments, /tasks/{id}/log, /runs/{id}, "
+     "/runs/{id}/inspect, /profiles and GET /orchestration are wired to the "
+     "vendored kanban_db through voicebridge/hermes_plugins.py. The binary "
+     "attachment download (/attachments/{id}) stays a typed FILES_BINARY_STREAM "
+     "policy refusal (the JSON dispatcher serves no binary), and PUT "
+     "/orchestration is the KANBAN_WRITE_BROKERED confirmation gate; both are "
+     "documented gate surfaces, not fabricated successes.",
      "qubit_hermes/plugins/kanban/dashboard/plugin_api.py:400"),
     ("fleet-discovery", "dashboard_plugin",
      "hermes dashboard plugin fleet discovery",

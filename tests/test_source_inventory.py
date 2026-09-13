@@ -237,8 +237,10 @@ def test_omissions_report_consistent(inventory, omissions_text):
     assert "## Summary" in omissions_text
     assert "candidate work rows" in omissions_text
     total = inventory["omissions"]["total"]
+    # Zero omissions is the goal (every surface is dispositioned); the report
+    # must still state the same total as the inventory.
     assert f"**{total}**" in omissions_text or str(total) in omissions_text
-    assert total > 0
+    assert total >= 0
 
 
 @pytest.mark.skipif(not _pins_available(),
@@ -246,7 +248,14 @@ def test_omissions_report_consistent(inventory, omissions_text):
 def test_committed_inventory_in_sync(tmp_path):
     out = tmp_path / "inv.json"
     om = tmp_path / "om.md"
-    proc = _build(out, om)
+    # Rebuild with the same ledger revision the committed artifact records, so
+    # the check is stable regardless of whether it pinned a commit or the
+    # working tree.
+    committed_meta = json.loads(INV_JSON.read_text(encoding="utf-8"))
+    rev = ((committed_meta.get("ledger_comparison") or {})
+           .get("ledger_revision") or "working")
+    rev = "working" if rev == "working-tree" else rev
+    proc = _build(out, om, ledger_rev=rev)
     assert proc.returncode == 0, proc.stderr
     committed = INV_JSON.read_text(encoding="utf-8")
     assert out.read_text(encoding="utf-8") == committed, (
@@ -265,10 +274,11 @@ def test_regeneration_is_deterministic(tmp_path):
     assert am.read_bytes() == bm.read_bytes()
 
 
-def test_achievements_plugin_represented_and_absent_from_ledger(inventory,
-                                                               omissions_text):
+def test_achievements_plugin_represented_and_closed_in_ledger(inventory,
+                                                              omissions_text):
     """The mandatory example: a full dashboard plugin (manifest + API +
-    dist assets + test) with no ledger row anywhere."""
+    dist assets + test) represented in the inventory and now closed with a
+    real live-ledger row."""
     items = [i for i in inventory["items"]
              if "hermes-achievements" in json.dumps(i)]
     cats = {i["category"] for i in items}
@@ -278,12 +288,20 @@ def test_achievements_plugin_represented_and_absent_from_ledger(inventory,
     assert "hermes_plugin_asset" in cats
     assert "hermes_plugin_test" in cats
 
-    # Confirmed absent from the verified waves-1-2 ledger baseline: no
-    # matching baseline row for any achievements item.
-    assert all(i.get("ledger_match") is None for i in items), (
-        "hermes-achievements unexpectedly matched a baseline ledger row")
+    # The example the directive named is now CLOSED: the live Hermes ledger
+    # carries a real plugin:hermes-achievements row with a backend and an
+    # on-disk proving test, and the inventory surfaces reconcile to it.
+    hermes_rows = json.loads(
+        (REPO_ROOT / "docs" / "QUBIT_GAP_LEDGER.hermes.json").read_text(
+            encoding="utf-8"))["rows"]
+    row = next((r for r in hermes_rows
+                if r["id"] == "plugin:hermes-achievements"), None)
+    assert row is not None, "achievements plugin has no live ledger row"
+    assert row["status"] == "IMPLEMENTED", row
+    assert row["qubit_backend"] and row["proving_test"], row
+    assert (REPO_ROOT / row["proving_test"].split("::", 1)[0]).is_file(), row
 
-    # And no baseline ledger JSON mentions it at all.
+    # Historical evidence preserved: the waves-1-2 baseline did not mention it.
     baseline = _baseline_ledger_text()
     assert all("achievement" not in text.lower()
                for text in baseline.values()), (
