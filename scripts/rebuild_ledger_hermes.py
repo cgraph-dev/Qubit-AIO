@@ -157,8 +157,8 @@ _GATE_CODE_NEEDS = {
     "AUDIO_ACTION_LOCAL": "hardware",
     "LOCAL_MODEL_BROKERED": "hardware",
     "LOCAL_MODEL_UNAVAILABLE": "hardware",
-    "MEDIA_NOT_SERVED": "hardware",
-    "FILES_BINARY_STREAM": "hardware",
+    "MEDIA_NOT_SERVED": "owner",
+    "FILES_BINARY_STREAM": "owner",
 }
 
 _GATE_RETURN_HELPERS = {"_gate", "_need_confirm"}
@@ -1007,10 +1007,13 @@ def _derive_cli_status(surface: str, caller: bool, tested: bool,
     never an implementation.  Otherwise IMPLEMENTED requires both a real caller
     and an on-disk test that exercises it.
     """
-    if forwarded and tested:
-        return "IMPLEMENTED"
+    # An explicit GATED surface is the audited policy relationship: a real
+    # Qubit-safe refusal is never counted as implementation just because a
+    # read-only forward or native caller exists.
     if surface == "GATED":
         return "GATED"
+    if forwarded and tested:
+        return "IMPLEMENTED"
     if caller and tested:
         return "IMPLEMENTED"
     if not caller:
@@ -1112,9 +1115,9 @@ SUBS = [
     ('sessions', 'clean-markers', 'sessions', 'clean-markers', 'MISSING', 'none', 'hermes_cli/subcommands/sessions.py:129'),
     ('mcp', 'add', 'mcp', 'add', 'GATED', 'qubit mcp (inventory only)', 'hermes_cli/subcommands/mcp.py:27'),
     ('mcp', 'remove', 'mcp', 'remove', 'GATED', 'qubit mcp (inventory only)', 'hermes_cli/subcommands/mcp.py:44'),
-    ('mcp', 'test', 'mcp', 'test', 'PARTIAL', 'qubit mcp test (MCP_NO_MOUNT)', 'hermes_cli/subcommands/mcp.py:49'),
+    ('mcp', 'test', 'mcp', 'test', 'GATED', 'qubit mcp test (MCP_NO_MOUNT; never mounts)', 'hermes_cli/subcommands/mcp.py:49'),
     ('mcp', 'configure', 'mcp', 'configure', 'GATED', 'qubit mcp (inventory only)', 'hermes_cli/subcommands/mcp.py:52'),
-    ('mcp', 'catalog', 'mcp', 'catalog', 'PARTIAL', 'qubit mcp catalog (empty/refusal)', 'hermes_cli/subcommands/mcp.py:73'),
+    ('mcp', 'catalog', 'mcp', 'catalog', 'GATED', 'qubit mcp catalog (MCP_NO_MOUNT; empty/refusal)', 'hermes_cli/subcommands/mcp.py:73'),
     ('config', 'show', 'flags', 'show', 'MISSING', 'none', 'hermes_cli/subcommands/config.py:17'),
     ('config', 'edit', 'flags', 'edit', 'MISSING', 'qubit flags edit (confirm-gated)', 'hermes_cli/subcommands/config.py:18'),
     ('config', 'get', 'flags', 'get', 'MISSING', 'none', 'hermes_cli/subcommands/config.py:20'),
@@ -1708,14 +1711,17 @@ PLUGINS = [
      "voicebridge/hermes_compat.py:h_plugin_kanban_task_log", "IMPLEMENTED",
      "tests/test_hermes_plugins.py::test_kanban_aux_reads_are_real_or_typed",
      "owner", "hermes-dist Kanban drawers (runs/attachments/log/profile/"
-     "orchestration)", "qubit kanban *", "voice kanban_*",
+     "orchestration)", "qubit kanban *", "",
      "GET /tasks/{id}/attachments, /tasks/{id}/log, /runs/{id}, "
      "/runs/{id}/inspect, /profiles and GET /orchestration are wired to the "
-     "vendored kanban_db through voicebridge/hermes_plugins.py. The binary "
-     "attachment download (/attachments/{id}) stays a typed FILES_BINARY_STREAM "
-     "policy refusal (the JSON dispatcher serves no binary), and PUT "
-     "/orchestration is the KANBAN_WRITE_BROKERED confirmation gate; both are "
-     "documented gate surfaces, not fabricated successes.",
+     "vendored kanban_db through voicebridge/hermes_plugins.py. These are "
+     "dashboard-only drawers (declared in the voice-coverage "
+     "DASHBOARD_ONLY_PLUGIN_ROUTES audit); the spoken `kanban_fleet_*` surface "
+     "covers board/task/stats/config/projects. The binary attachment download "
+     "(/attachments/{id}) stays a typed FILES_BINARY_STREAM policy refusal (the "
+     "JSON dispatcher serves no binary), and PUT /orchestration is the "
+     "KANBAN_WRITE_BROKERED confirmation gate; both are documented gate "
+     "surfaces, not fabricated successes.",
      "qubit_hermes/plugins/kanban/dashboard/plugin_api.py:400"),
     ("fleet-discovery", "dashboard_plugin",
      "hermes dashboard plugin fleet discovery",

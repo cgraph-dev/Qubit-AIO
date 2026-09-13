@@ -14600,7 +14600,7 @@
    "parent_id": "cli:mcp test",
    "coverage": "cli-option",
    "parent_resolved": "cli:mcp test",
-   "parent_status": "IMPLEMENTED",
+   "parent_status": "GATED",
    "parent_covered": true
   },
   {
@@ -15382,7 +15382,7 @@
    "parent_id": "cli:skills audit",
    "coverage": "cli-option",
    "parent_resolved": "cli:skills audit",
-   "parent_status": "IMPLEMENTED",
+   "parent_status": "GATED",
    "parent_covered": true
   },
   {
@@ -17191,7 +17191,7 @@
    "aliases": [],
    "ledger_match": "cli:mcp catalog",
    "ledger_source": "hermes",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_status": "GATED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
@@ -17404,7 +17404,7 @@
    "aliases": [],
    "ledger_match": "cli:mcp test",
    "ledger_source": "hermes",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_status": "GATED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
@@ -18923,7 +18923,7 @@
    "aliases": [],
    "ledger_match": "cli:skills audit",
    "ledger_source": "hermes",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_status": "GATED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
@@ -19229,7 +19229,7 @@
    "aliases": [],
    "ledger_match": "cli:skills tap",
    "ledger_source": "hermes",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_status": "GATED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,

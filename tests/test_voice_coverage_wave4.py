@@ -38,11 +38,23 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-# The one vendored plugin compat route whose UI is a dashboard-only control and
+# Vendored plugin compat routes whose UI is a dashboard-only control and
 # therefore has no natural spoken form. Declared here so the audit can assert
-# it is the *only* unspoken plugin route (an explicit impossibility, not a
-# silent omission). The route stays reachable from the dashboard SPA.
-DASHBOARD_ONLY_PLUGIN_ROUTES = {"h_plugin_visibility_set"}
+# every unspoken plugin route is an explicit impossibility, not a silent
+# omission. Each route stays reachable from the dashboard SPA.
+DASHBOARD_ONLY_PLUGIN_ROUTES = {
+    "h_plugin_visibility_set",
+    # Kanban auxiliary drawers: raw task logs, binary attachment listings,
+    # worker-run internals, profile roster and orchestration knobs. These are
+    # inspected in the dashboard, not driven by voice; the spoken kanban
+    # surface (`kanban_fleet_*`) covers board/task/stats/config/projects.
+    "h_plugin_kanban_task_log",
+    "h_plugin_kanban_task_attachments",
+    "h_plugin_kanban_run",
+    "h_plugin_kanban_run_inspect",
+    "h_plugin_kanban_profiles",
+    "h_plugin_kanban_orchestration",
+}
 
 # Representative fleet reads: (spoken alias, voice entry id, compat handler).
 _FLEET_READ_BATTERY = (

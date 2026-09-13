@@ -240,7 +240,9 @@ def test_omissions_report_consistent(inventory, omissions_text):
     # Zero omissions is the goal (every surface is dispositioned); the report
     # must still state the same total as the inventory.
     assert f"**{total}**" in omissions_text or str(total) in omissions_text
-    assert total >= 0
+    # Zero unexplained omissions is the code-ready target for the direct
+    # inventory; any new omission must fail this gate.
+    assert total == 0
 
 
 @pytest.mark.skipif(not _pins_available(),

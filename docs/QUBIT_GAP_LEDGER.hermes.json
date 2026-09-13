@@ -118,8 +118,8 @@
  "counts": {
   "total": 573,
   "by_status": {
-   "GATED": 115,
-   "IMPLEMENTED": 458
+   "GATED": 119,
+   "IMPLEMENTED": 454
   },
   "by_area": {
    "analytics-config": 4,
@@ -1241,7 +1241,7 @@
    "status": "GATED",
    "proving_test": "",
    "note": "Typed policy gate MEDIA_NOT_SERVED via compat dispatcher.",
-   "needs": "hardware"
+   "needs": "owner"
   },
   {
    "id": "api:POST /api/chat/image-upload",
@@ -1297,7 +1297,7 @@
    "status": "GATED",
    "proving_test": "",
    "note": "Typed policy gate FILES_BINARY_STREAM via compat dispatcher.",
-   "needs": "hardware"
+   "needs": "owner"
   },
   {
    "id": "api:GET /api/files/stream",
@@ -1311,7 +1311,7 @@
    "status": "GATED",
    "proving_test": "",
    "note": "Typed policy gate FILES_BINARY_STREAM via compat dispatcher.",
-   "needs": "hardware"
+   "needs": "owner"
   },
   {
    "id": "api:HEAD /api/files/stream",
@@ -1325,7 +1325,7 @@
    "status": "GATED",
    "proving_test": "",
    "note": "Typed policy gate FILES_BINARY_STREAM via compat dispatcher.",
-   "needs": "hardware"
+   "needs": "owner"
   },
   {
    "id": "api:POST /api/files/upload",
@@ -1451,7 +1451,7 @@
    "status": "GATED",
    "proving_test": "",
    "note": "Typed policy gate FILES_BINARY_STREAM via compat dispatcher.",
-   "needs": "hardware"
+   "needs": "owner"
   },
   {
    "id": "api:GET /api/fs/git-root",
@@ -5182,14 +5182,14 @@
    "area": "cli-subcommand",
    "capability": "hermes mcp test",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/mcp.py:49",
-   "qubit_backend": "qubit mcp test (MCP_NO_MOUNT)",
-   "cli": "qubit mcp test (MCP_NO_MOUNT)",
+   "qubit_backend": "qubit mcp test (MCP_NO_MOUNT; never mounts)",
+   "cli": "qubit mcp test (MCP_NO_MOUNT; never mounts)",
    "dashboard": "",
    "voice": "",
-   "status": "IMPLEMENTED",
+   "status": "GATED",
    "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_table_argv_evidence",
    "note": "Subcommand-surface gap inside the mcp family.",
-   "needs": "none"
+   "needs": "creds"
   },
   {
    "id": "cli:mcp configure",
@@ -5210,14 +5210,14 @@
    "area": "cli-subcommand",
    "capability": "hermes mcp catalog",
    "upstream_ref": "qubit_hermes/hermes_cli/subcommands/mcp.py:73",
-   "qubit_backend": "qubit mcp catalog (empty/refusal)",
-   "cli": "qubit mcp catalog (empty/refusal)",
+   "qubit_backend": "qubit mcp catalog (MCP_NO_MOUNT; empty/refusal)",
+   "cli": "qubit mcp catalog (MCP_NO_MOUNT; empty/refusal)",
    "dashboard": "",
    "voice": "",
-   "status": "IMPLEMENTED",
+   "status": "GATED",
    "proving_test": "tests/test_cli_agent1_forward.py::test_translate_maps_family_and_preserves_trailing_args",
    "note": "Subcommand-surface gap inside the mcp family.",
-   "needs": "none"
+   "needs": "creds"
   },
   {
    "id": "cli:config show",
@@ -5578,10 +5578,10 @@
    "cli": "qubit verified-skills (curated)",
    "dashboard": "",
    "voice": "",
-   "status": "IMPLEMENTED",
+   "status": "GATED",
    "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
    "note": "Subcommand-surface gap inside the skills family.",
-   "needs": "none"
+   "needs": "creds"
   },
   {
    "id": "cli:skills publish",
@@ -5606,10 +5606,10 @@
    "cli": "qubit skills (remote refused)",
    "dashboard": "",
    "voice": "",
-   "status": "IMPLEMENTED",
+   "status": "GATED",
    "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_confirm_routes_require_confirm_then_forward",
    "note": "Subcommand-surface gap inside the skills family.",
-   "needs": "none"
+   "needs": "creds"
   },
   {
    "id": "cli:tools disable",
@@ -8153,10 +8153,10 @@
    "qubit_backend": "voicebridge/hermes_compat.py:h_plugin_kanban_task_log",
    "cli": "qubit kanban *",
    "dashboard": "hermes-dist Kanban drawers (runs/attachments/log/profile/orchestration)",
-   "voice": "voice kanban_*",
+   "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_hermes_plugins.py::test_kanban_aux_reads_are_real_or_typed",
-   "note": "GET /tasks/{id}/attachments, /tasks/{id}/log, /runs/{id}, /runs/{id}/inspect, /profiles and GET /orchestration are wired to the vendored kanban_db through voicebridge/hermes_plugins.py. The binary attachment download (/attachments/{id}) stays a typed FILES_BINARY_STREAM policy refusal (the JSON dispatcher serves no binary), and PUT /orchestration is the KANBAN_WRITE_BROKERED confirmation gate; both are documented gate surfaces, not fabricated successes.",
+   "note": "GET /tasks/{id}/attachments, /tasks/{id}/log, /runs/{id}, /runs/{id}/inspect, /profiles and GET /orchestration are wired to the vendored kanban_db through voicebridge/hermes_plugins.py. These are dashboard-only drawers (declared in the voice-coverage DASHBOARD_ONLY_PLUGIN_ROUTES audit); the spoken `kanban_fleet_*` surface covers board/task/stats/config/projects. The binary attachment download (/attachments/{id}) stays a typed FILES_BINARY_STREAM policy refusal (the JSON dispatcher serves no binary), and PUT /orchestration is the KANBAN_WRITE_BROKERED confirmation gate; both are documented gate surfaces, not fabricated successes.",
    "needs": "owner"
   },
   {

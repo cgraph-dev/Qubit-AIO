@@ -36,12 +36,12 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
 ## Counts
 
 - Total rows: **1390**
-- Open rows (status != IMPLEMENTED): **184**
+- Open rows (status != IMPLEMENTED): **188**
 
 ### By status
 
-- GATED: 173
-- IMPLEMENTED: 1206
+- GATED: 177
+- IMPLEMENTED: 1202
 - PARTIAL: 11
 
 ### By source
@@ -209,7 +209,7 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
 
 ## Open rows (status != IMPLEMENTED)
 
-### source: hermes (115 open)
+### source: hermes (119 open)
 
 #### hermes / analytics-config (2)
 
@@ -244,7 +244,7 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
 | `cli:sessions` | GATED | owner | hermes sessions | tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv |
 | `cli:skills` | GATED | owner | hermes skills | tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv |
 
-#### hermes / cli-subcommand (21)
+#### hermes / cli-subcommand (25)
 
 | id | status | needs | capability | proving test |
 | --- | --- | --- | --- | --- |
@@ -258,16 +258,20 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
 | `cli:gateway start` | GATED | creds | hermes gateway start | tests/test_cli_agent1_wiring.py::test_gateway_supervision_and_discovery |
 | `cli:gateway stop` | GATED | creds | hermes gateway stop | tests/test_cli_agent1_wiring.py::test_gateway_supervision_and_discovery |
 | `cli:mcp add` | GATED | creds | hermes mcp add | tests/test_cli_agent1_forward.py::test_translate_maps_family_and_preserves_trailing_args |
+| `cli:mcp catalog` | GATED | creds | hermes mcp catalog | tests/test_cli_agent1_forward.py::test_translate_maps_family_and_preserves_trailing_args |
 | `cli:mcp configure` | GATED | creds | hermes mcp configure | tests/test_cli_agent1_forward.py::test_translate_maps_family_and_preserves_trailing_args |
 | `cli:mcp remove` | GATED | creds | hermes mcp remove | tests/test_cli_agent1_forward.py::test_translate_maps_family_and_preserves_trailing_args |
+| `cli:mcp test` | GATED | creds | hermes mcp test | tests/test_cli_parity_wave1.py::test_inline_confirm_table_argv_evidence |
 | `cli:plugins install` | GATED | creds | hermes plugins install | tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv |
 | `cli:plugins update` | GATED | creds | hermes plugins update | tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv |
 | `cli:sessions archive` | GATED | creds | hermes sessions archive | tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv |
 | `cli:sessions delete` | GATED | creds | hermes sessions delete | tests/test_session_lifecycle8u.py::test_cli_sessions_subcommands_roundtrip |
 | `cli:sessions prune` | GATED | creds | hermes sessions prune | tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv |
 | `cli:sessions rename` | GATED | creds | hermes sessions rename | tests/test_session_lifecycle8u.py::test_cli_sessions_subcommands_roundtrip |
+| `cli:skills audit` | GATED | creds | hermes skills audit | tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv |
 | `cli:skills install` | GATED | creds | hermes skills install | tests/test_cli_agent1_forward.py::test_translate_ignores_unmapped_and_short_calls |
 | `cli:skills publish` | GATED | creds | hermes skills publish | tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv |
+| `cli:skills tap` | GATED | creds | hermes skills tap | tests/test_cli_closure_wave5.py::test_wave5_confirm_routes_require_confirm_then_forward |
 | `cli:skills update` | GATED | creds | hermes skills update | tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv |
 
 #### hermes / config-env (3)
@@ -308,11 +312,11 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
 | id | status | needs | capability | proving test |
 | --- | --- | --- | --- | --- |
 | `api:DELETE /api/files` | GATED | owner | DELETE /api/files | — |
-| `api:GET /api/files/download` | GATED | hardware | GET /api/files/download | — |
-| `api:GET /api/files/stream` | GATED | hardware | GET /api/files/stream | — |
-| `api:GET /api/fs/download` | GATED | hardware | GET /api/fs/download | — |
-| `api:GET /api/media` | GATED | hardware | GET /api/media | — |
-| `api:HEAD /api/files/stream` | GATED | hardware | HEAD /api/files/stream | — |
+| `api:GET /api/files/download` | GATED | owner | GET /api/files/download | — |
+| `api:GET /api/files/stream` | GATED | owner | GET /api/files/stream | — |
+| `api:GET /api/fs/download` | GATED | owner | GET /api/fs/download | — |
+| `api:GET /api/media` | GATED | owner | GET /api/media | — |
+| `api:HEAD /api/files/stream` | GATED | owner | HEAD /api/files/stream | — |
 | `api:POST /api/chat/image-upload` | GATED | owner | POST /api/chat/image-upload | — |
 
 #### hermes / gateway-actions (4)

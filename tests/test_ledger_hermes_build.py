@@ -180,9 +180,10 @@ def test_cli_derive_never_returns_partial_when_proven() -> None:
             "IMPLEMENTED", surface
     # A policy gate always wins over caller/test evidence.
     assert rebuild._derive_cli_status("GATED", True, True, False) == "GATED"
-    # A forwarded read is a real caller; it overrides a stale surface.
-    assert rebuild._derive_cli_status("GATED", True, True, True) == \
-        "IMPLEMENTED"
+    # An explicit GATED surface is a policy refusal: it is never counted as
+    # IMPLEMENTED even when a read-only forward or native caller exists (a
+    # forwarded gated surface would be a bypass).
+    assert rebuild._derive_cli_status("GATED", True, True, True) == "GATED"
     # No caller keeps the honest open status.
     assert rebuild._derive_cli_status("PARTIAL", False, False, False) == \
         "PARTIAL"
