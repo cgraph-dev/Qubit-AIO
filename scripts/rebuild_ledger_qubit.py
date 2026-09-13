@@ -1534,6 +1534,8 @@ TERMINAL_EVIDENCE: Dict[str, Dict[str, str]] = {
         "note": ("Typed refusal: COMPUTER_USE_NO_DRIVER — drivers are never "
                  "auto-installed; desktop control arrives via the operator-"
                  "provisioned pinned 8V actuator."),
+        "proving_test": (
+            "tests/test_computer_use8tf.py::test_install_refused"),
     },
     "computer_permissions": {
         "status": "OPERATOR_ONLY",

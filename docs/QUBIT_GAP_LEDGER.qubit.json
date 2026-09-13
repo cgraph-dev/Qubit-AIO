@@ -2018,7 +2018,7 @@
    "dashboard": "qubit-devices:/devices",
    "voice": "computer_install_refusal",
    "status": "OPERATOR_ONLY",
-   "proving_test": "tests/test_computer_use8tf.py::test_doctor_checklist_typed",
+   "proving_test": "tests/test_computer_use8tf.py::test_install_refused",
    "note": "Typed refusal: COMPUTER_USE_NO_DRIVER \u2014 drivers are never auto-installed; desktop control arrives via the operator-provisioned pinned 8V actuator.",
    "needs": "hardware"
   },
@@ -10153,7 +10153,7 @@
    "voice": "",
    "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_openclaw_closure_wave2_webmedia.py",
-   "note": "OpenClaw extension 'image-generation-core' -> gate (parent=OC-64, gate=MEDIA_PROVIDER_CREDENTIAL_REQUIRED) via voicebridge/media_gen.py shape_media_request/generate.",
+   "note": "OpenClaw extension 'image-generation-core' -> gate (parent=OC-64, gate=MEDIA_GEN_UNAVAILABLE) via voicebridge/media_gen.py shape_media_request/generate.",
    "needs": "creds"
   },
   {
@@ -10167,7 +10167,7 @@
    "voice": "",
    "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_openclaw_extensions_wave5.py",
-   "note": "OpenClaw extension 'imap' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+   "note": "OpenClaw extension 'imap' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
    "needs": "creds"
   },
   {
@@ -10237,7 +10237,7 @@
    "voice": "",
    "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_openclaw_parity_wave1.py",
-   "note": "OpenClaw extension 'visitor-access' -> gate (parent=OC-05, gate=VISITOR_ACCESS_CREDENTIAL_REQUIRED) via voicebridge/device.py token_issue (expiring grant).",
+   "note": "OpenClaw extension 'visitor-access' -> gate (parent=OC-05, gate=DEVICE_TOKEN_PENDING_APPROVAL) via voicebridge/device.py token_issue (expiring grant).",
    "needs": "creds"
   }
  ]

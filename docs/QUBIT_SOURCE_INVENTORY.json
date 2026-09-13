@@ -108507,7 +108507,7 @@
     "capability": "openclaw extension a2a",
     "backend": "voicebridge/channels_inbound.py normalize_event",
     "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'a2a' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+    "reason": "OpenClaw extension 'a2a' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
   },
@@ -108908,7 +108908,7 @@
     "capability": "openclaw extension buzz",
     "backend": "voicebridge/channels_inbound.py normalize_event",
     "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'buzz' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+    "reason": "OpenClaw extension 'buzz' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
   },
@@ -109065,7 +109065,7 @@
     "capability": "openclaw extension clickclack",
     "backend": "voicebridge/channels_inbound.py normalize_event",
     "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'clickclack' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+    "reason": "OpenClaw extension 'clickclack' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
   },
@@ -109962,7 +109962,7 @@
     "capability": "openclaw extension googlechat",
     "backend": "voicebridge/channels_inbound.py normalize_event",
     "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'googlechat' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+    "reason": "OpenClaw extension 'googlechat' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
   },
@@ -110066,7 +110066,7 @@
     "capability": "openclaw extension image-generation-core",
     "backend": "voicebridge/media_gen.py shape_media_request/generate",
     "proving_test": "tests/test_openclaw_closure_wave2_webmedia.py",
-    "reason": "OpenClaw extension 'image-generation-core' -> gate (parent=OC-64, gate=MEDIA_PROVIDER_CREDENTIAL_REQUIRED) via voicebridge/media_gen.py shape_media_request/generate.",
+    "reason": "OpenClaw extension 'image-generation-core' -> gate (parent=OC-64, gate=MEDIA_GEN_UNAVAILABLE) via voicebridge/media_gen.py shape_media_request/generate.",
     "needs": "creds"
    }
   },
@@ -110099,7 +110099,7 @@
     "capability": "openclaw extension imap",
     "backend": "voicebridge/channels_inbound.py normalize_event",
     "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'imap' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+    "reason": "OpenClaw extension 'imap' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
   },
@@ -110184,7 +110184,7 @@
     "capability": "openclaw extension irc",
     "backend": "voicebridge/channels_inbound.py normalize_event",
     "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'irc' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+    "reason": "OpenClaw extension 'irc' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
   },
@@ -110266,7 +110266,7 @@
     "capability": "openclaw extension line",
     "backend": "voicebridge/channels_inbound.py normalize_event",
     "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'line' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+    "reason": "OpenClaw extension 'line' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
   },
@@ -110544,7 +110544,7 @@
     "capability": "openclaw extension mattermost",
     "backend": "voicebridge/channels_inbound.py normalize_event",
     "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'mattermost' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+    "reason": "OpenClaw extension 'mattermost' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
   },
@@ -110858,7 +110858,7 @@
     "capability": "openclaw extension msteams",
     "backend": "voicebridge/channels_inbound.py normalize_event",
     "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'msteams' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+    "reason": "OpenClaw extension 'msteams' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
   },
@@ -110917,7 +110917,7 @@
     "capability": "openclaw extension nextcloud-talk",
     "backend": "voicebridge/channels_inbound.py normalize_event",
     "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'nextcloud-talk' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+    "reason": "OpenClaw extension 'nextcloud-talk' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
   },
@@ -110951,7 +110951,7 @@
     "capability": "openclaw extension nostr",
     "backend": "voicebridge/channels_inbound.py normalize_event",
     "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'nostr' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+    "reason": "OpenClaw extension 'nostr' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
   },
@@ -111351,7 +111351,7 @@
     "capability": "openclaw extension qa-channel",
     "backend": "voicebridge/channels_inbound.py normalize_event",
     "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'qa-channel' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+    "reason": "OpenClaw extension 'qa-channel' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
   },
@@ -111461,7 +111461,7 @@
     "capability": "openclaw extension raft",
     "backend": "voicebridge/channels_inbound.py normalize_event",
     "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'raft' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+    "reason": "OpenClaw extension 'raft' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
   },
@@ -111498,7 +111498,7 @@
     "capability": "openclaw extension reef",
     "backend": "voicebridge/channels_inbound.py normalize_event",
     "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'reef' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+    "reason": "OpenClaw extension 'reef' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
   },
@@ -111682,7 +111682,7 @@
     "capability": "openclaw extension sms",
     "backend": "voicebridge/channels_inbound.py normalize_event",
     "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'sms' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+    "reason": "OpenClaw extension 'sms' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
   },
@@ -111740,7 +111740,7 @@
     "capability": "openclaw extension synology-chat",
     "backend": "voicebridge/channels_inbound.py normalize_event",
     "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'synology-chat' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+    "reason": "OpenClaw extension 'synology-chat' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
   },
@@ -111984,7 +111984,7 @@
     "capability": "openclaw extension tlon",
     "backend": "voicebridge/channels_inbound.py normalize_event",
     "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'tlon' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+    "reason": "OpenClaw extension 'tlon' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
   },
@@ -112091,7 +112091,7 @@
     "capability": "openclaw extension twitch",
     "backend": "voicebridge/channels_inbound.py normalize_event",
     "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'twitch' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+    "reason": "OpenClaw extension 'twitch' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
   },
@@ -112200,7 +112200,7 @@
     "capability": "openclaw extension visitor-access",
     "backend": "voicebridge/device.py token_issue (expiring grant)",
     "proving_test": "tests/test_openclaw_parity_wave1.py",
-    "reason": "OpenClaw extension 'visitor-access' -> gate (parent=OC-05, gate=VISITOR_ACCESS_CREDENTIAL_REQUIRED) via voicebridge/device.py token_issue (expiring grant).",
+    "reason": "OpenClaw extension 'visitor-access' -> gate (parent=OC-05, gate=DEVICE_TOKEN_PENDING_APPROVAL) via voicebridge/device.py token_issue (expiring grant).",
     "needs": "creds"
    }
   },
@@ -112544,7 +112544,7 @@
     "capability": "openclaw extension zalo",
     "backend": "voicebridge/channels_inbound.py normalize_event",
     "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'zalo' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+    "reason": "OpenClaw extension 'zalo' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
   },
@@ -112579,7 +112579,7 @@
     "capability": "openclaw extension zalouser",
     "backend": "voicebridge/channels_inbound.py normalize_event",
     "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'zalouser' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.",
+    "reason": "OpenClaw extension 'zalouser' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
   },

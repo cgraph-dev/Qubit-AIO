@@ -38,11 +38,11 @@ below rather than hidden.
 | Field | Count |
 | --- | --- |
 | OPERATOR_ONLY rows (all three ledgers) | **11** |
-| from `QUBIT_GAP_LEDGER.qubit.json` | 5 |
+| from `QUBIT_GAP_LEDGER.qubit.json` | 3 |
 | from `QUBIT_GAP_LEDGER.openclaw.json` | 8 |
 | from `QUBIT_GAP_LEDGER.hermes.json` | 0 |
-| live prerequisite = `hardware` | 8 |
-| live prerequisite = `creds` | 5 |
+| live prerequisite = `hardware` | 7 |
+| live prerequisite = `creds` | 4 |
 | live prerequisite = `owner` | 0 |
 
 Authoritative count is produced at runtime by `scripts/gap_ledger.py`
@@ -62,7 +62,7 @@ asserts it equals 11 (the browser-close rows moved to SAFE_EQUIVALENT) and that 
 | `OC-D15` | openclaw | creds | `MSG_TRANSPORT_UNAVAILABLE` | tests/test_openclaw_closure_wave3.py |
 | `OC-D16` | openclaw | creds | `MSG_NO_CREDENTIAL` / `MSG_TRANSPORT_UNAVAILABLE` | tests/test_openclaw_closure_wave3.py |
 | `computer_doctor` | qubit | hardware | `state=DEGRADED/MISSING`, `driver=MISSING` (no code literal; see report) | tests/test_computer_use8tf.py::test_doctor_checklist_typed |
-| `computer_install_refusal` | qubit | hardware | `COMPUTER_USE_NO_DRIVER` | tests/test_computer_use8tf.py::test_doctor_checklist_typed |
+| `computer_install_refusal` | qubit | hardware | `COMPUTER_USE_NO_DRIVER` | tests/test_computer_use8tf.py::test_install_refused |
 | `computer_permissions` | qubit | hardware | `control=DISABLED` (no code literal; see report) | tests/test_computer_use8tf.py::test_permissions_record |
 
 ## Criteria compliance report
@@ -80,7 +80,7 @@ recorded here and asserted by `tests/test_operator_only_evidence.py`.
 | `OC-56` | no (says “honest typed availability”) | `voicebridge/node_host.py:58` — `NODE_CAPABILITY_UNAVAILABLE`; `:59` `NODE_DISPATCH_REFUSED` | remote actuators unavailable; local reads `READY` |
 | `OC-D16` | no (says “credential-gated”) | `voicebridge/messaging.py:172` — `MSG_NO_CREDENTIAL`; `:175` `MSG_TRANSPORT_UNAVAILABLE` | hosted open-platform secret/hosting gate |
 
-No row `needs` is `none`; all eight `hardware` and five `creds` prerequisites
+No row `needs` is `none`; all seven `hardware` and four `creds` prerequisites
 are genuine live dependencies.
 
 ## Per-row qualification procedures
@@ -397,7 +397,7 @@ Moved with `browser_close`; typed `BROWSER_CLOSE_REFUSED` refusal.
   `DEGRADED` when no actuator exists (`voicebridge/computer_use.py:117-126`).
   There is no error-code literal for this diagnostic surface (see compliance
   report).
-- **Hermetic proof:** `tests/test_computer_use8tf.py::test_doctor_checklist_typed`
+- **Hermetic proof:** `tests/test_computer_use8tf.py::test_install_refused`
   (asserts four typed checks and the overall state).
 - **Procedure:**
   1. On the graphical host, invoke the voice command “desktop health”.

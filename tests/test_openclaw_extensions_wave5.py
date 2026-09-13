@@ -124,7 +124,7 @@ def _records() -> dict:
 
 def _channel_names() -> list:
     return [r["name"] for r in rebuild.wave5_records()
-            if r["gate"] == "CHANNEL_CREDENTIAL_REQUIRED"]
+            if r["gate"] == "CHANNEL_NO_CREDENTIAL"]
 
 
 # ---------------------------------------------------------------------------

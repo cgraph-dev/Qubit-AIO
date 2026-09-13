@@ -400,15 +400,15 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 
 ### `openclaw extension a2a` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:a2a` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'a2a' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:a2a` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'a2a' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension buzz` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:buzz` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'buzz' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:buzz` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'buzz' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension clickclack` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:clickclack` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'clickclack' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:clickclack` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'clickclack' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension cua-computer` (1; IMPLEMENTED 0, GATED 1)
 
@@ -428,23 +428,23 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 
 ### `openclaw extension googlechat` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:googlechat` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'googlechat' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:googlechat` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'googlechat' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension image-generation-core` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:image-generation-core` — **GATED**; backend `voicebridge/media_gen.py shape_media_request/generate`; OpenClaw extension 'image-generation-core' -> gate (parent=OC-64, gate=MEDIA_PROVIDER_CREDENTIAL_REQUIRED) via voicebridge/media_gen.py shape_media_request/generate.; proof `tests/test_openclaw_closure_wave2_webmedia.py`
+- `openclaw-ext:image-generation-core` — **GATED**; backend `voicebridge/media_gen.py shape_media_request/generate`; OpenClaw extension 'image-generation-core' -> gate (parent=OC-64, gate=MEDIA_GEN_UNAVAILABLE) via voicebridge/media_gen.py shape_media_request/generate.; proof `tests/test_openclaw_closure_wave2_webmedia.py`
 
 ### `openclaw extension imap` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:imap` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'imap' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:imap` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'imap' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension irc` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:irc` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'irc' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:irc` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'irc' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension line` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:line` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'line' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:line` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'line' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension llm-task` (1; IMPLEMENTED 1, GATED 0)
 
@@ -456,19 +456,19 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 
 ### `openclaw extension mattermost` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:mattermost` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'mattermost' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:mattermost` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'mattermost' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension msteams` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:msteams` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'msteams' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:msteams` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'msteams' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension nextcloud-talk` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:nextcloud-talk` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'nextcloud-talk' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:nextcloud-talk` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'nextcloud-talk' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension nostr` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:nostr` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'nostr' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:nostr` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'nostr' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension oc-path` (1; IMPLEMENTED 1, GATED 0)
 
@@ -476,23 +476,23 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 
 ### `openclaw extension qa-channel` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:qa-channel` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'qa-channel' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:qa-channel` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'qa-channel' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension raft` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:raft` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'raft' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:raft` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'raft' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension reef` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:reef` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'reef' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:reef` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'reef' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension sms` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:sms` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'sms' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:sms` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'sms' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension synology-chat` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:synology-chat` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'synology-chat' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:synology-chat` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'synology-chat' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension test-support` (1; IMPLEMENTED 1, GATED 0)
 
@@ -500,23 +500,23 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 
 ### `openclaw extension tlon` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:tlon` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'tlon' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:tlon` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'tlon' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension twitch` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:twitch` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'twitch' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:twitch` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'twitch' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension visitor-access` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:visitor-access` — **GATED**; backend `voicebridge/device.py token_issue (expiring grant)`; OpenClaw extension 'visitor-access' -> gate (parent=OC-05, gate=VISITOR_ACCESS_CREDENTIAL_REQUIRED) via voicebridge/device.py token_issue (expiring grant).; proof `tests/test_openclaw_parity_wave1.py`
+- `openclaw-ext:visitor-access` — **GATED**; backend `voicebridge/device.py token_issue (expiring grant)`; OpenClaw extension 'visitor-access' -> gate (parent=OC-05, gate=DEVICE_TOKEN_PENDING_APPROVAL) via voicebridge/device.py token_issue (expiring grant).; proof `tests/test_openclaw_parity_wave1.py`
 
 ### `openclaw extension zalo` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:zalo` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'zalo' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:zalo` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'zalo' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension zalouser` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:zalouser` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'zalouser' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:zalouser` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'zalouser' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ## Ledger rows with unreproducible evidence
 

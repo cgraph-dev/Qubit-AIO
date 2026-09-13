@@ -112,7 +112,7 @@ EXPECTED = {
         "source": "qubit",
         "needs": "hardware",
         "proving_test":
-            "tests/test_computer_use8tf.py::test_doctor_checklist_typed",
+            "tests/test_computer_use8tf.py::test_install_refused",
         "typed": ("COMPUTER_USE_NO_DRIVER",),
     },
     "computer_permissions": {

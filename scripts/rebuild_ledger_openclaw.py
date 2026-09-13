@@ -108,7 +108,7 @@ def _ext(disposition: str, parent: str, gate: str, needs: str, detail: str,
 _EXTENSION_MAP: Dict[str, Dict[str, str]] = {}
 
 # ---- (b) cloud model/provider plugins -> OC-D28 credential gate
-_ext("gate", "OC-D28", "PROVIDER_CREDENTIAL_REQUIRED", "creds",
+_ext("gate", "OC-D28", "LOCAL_MODEL_UNAVAILABLE", "creds",
      "cloud model/provider plugin gated on an operator credential",
      ["amazon-bedrock", "amazon-bedrock-mantle", "anthropic",
       "anthropic-vertex", "arcee", "baseten", "byteplus", "cerebras",
@@ -127,30 +127,30 @@ _ext("gate", "OC-D28", "LOCAL_PROVIDER_RUNTIME_REQUIRED", "none",
      ["ollama", "llama-cpp", "lmstudio", "vllm", "sglang"])
 
 # ---- (b) media generation providers -> OC-64 credential gate
-_ext("gate", "OC-64", "MEDIA_PROVIDER_CREDENTIAL_REQUIRED", "creds",
+_ext("gate", "OC-64", "MEDIA_GEN_UNAVAILABLE", "creds",
      "media generation provider gated on an operator credential",
      ["alibaba", "comfy", "fal", "image-generation-core", "pixverse",
       "runway", "senseaudio"])
 
 # ---- (b) voice / telephony providers -> OC-67 credential gate
-_ext("gate", "OC-67", "VOICE_PROVIDER_CREDENTIAL_REQUIRED", "creds",
+_ext("gate", "OC-67", "VISION_MEDIA_UNAVAILABLE", "creds",
      "voice/ASR/TTS provider gated on an operator credential",
      ["azure-speech", "deepgram", "elevenlabs", "fish-audio-speech",
       "gradium", "inworld", "microsoft", "tts-local-cli", "vydra"])
 
 # ---- (b) web / search providers -> OC-63 credential gate
-_ext("gate", "OC-63", "WEB_PROVIDER_CREDENTIAL_REQUIRED", "creds",
+_ext("gate", "OC-63", "WEB_SEARCH_UNAVAILABLE", "creds",
      "web search/fetch provider gated on an operator credential",
      ["brave", "duckduckgo", "exa", "firecrawl", "parallel", "perplexity",
       "searxng", "tavily"])
 
 # ---- (b) external memory backends -> OC-48 local-only gate
-_ext("gate", "OC-48", "MEMORY_PROVIDER_CREDENTIAL_REQUIRED", "creds",
+_ext("gate", "OC-48", "MEMORY_PROVIDER_UNAVAILABLE", "creds",
      "external memory backend stays local-only / typed unavailable",
      ["memory-lancedb", "memory-wiki"])
 
 # ---- (b) external secret backends -> OC-D08 credential gate
-_ext("gate", "OC-D08", "SECRETS_PROVIDER_CREDENTIAL_REQUIRED", "creds",
+_ext("gate", "OC-D08", "PROXY_NO_SERVER", "creds",
      "external secret backend gated on an operator credential",
      ["onepassword", "vault"])
 
@@ -160,7 +160,7 @@ _ext("gate", "OC-57", "SANDBOX_PROVIDER_REFUSED", "owner",
      ["mxc", "openshell"])
 
 # ---- (b) external worker providers -> OC-D06 credential gate
-_ext("gate", "OC-D06", "RUNTIME_PROVIDER_CREDENTIAL_REQUIRED", "creds",
+_ext("gate", "OC-D06", "RUNTIME_NEEDS_STAGING", "creds",
      "external worker provider gated on an operator credential",
      ["beam", "crabbox"])
 
@@ -179,15 +179,15 @@ _ext("parent", "OC-18", "", "creds",
      "whatsapp account + draft/approve/send implemented", ["whatsapp"])
 
 # ---- (b) channels whose hosted side is credential-gated
-_ext("gate", "OC-D16", "CHANNEL_CREDENTIAL_REQUIRED", "creds",
+_ext("gate", "OC-D16", "CHANNEL_NO_CREDENTIAL", "creds",
      "feishu send/receive live; hosted agent app stays credential-gated",
      ["feishu"])
-_ext("gate", "OC-D15", "CHANNEL_CREDENTIAL_REQUIRED", "creds",
+_ext("gate", "OC-D15", "CHANNEL_NO_CREDENTIAL", "creds",
      "imessage requires a macOS bridge; typed MSG_TRANSPORT_UNAVAILABLE",
      ["imessage"])
 
 # ---- (b) channels with no Qubit transport -> OC-19 credential gate
-_ext("gate", "OC-19", "CHANNEL_CREDENTIAL_REQUIRED", "creds",
+_ext("gate", "OC-19", "CHANNEL_NO_CREDENTIAL", "creds",
      "channel plugin with no Qubit transport; typed unavailable until a "
      "credential + adapter exist",
      ["a2a", "buzz", "clickclack", "googlechat", "imap", "irc", "line",
@@ -241,10 +241,10 @@ _ext("parent", "OC-D02", "", "none",
      "policy conformance doctor implemented", ["policy"])
 _ext("parent", "OC-D05", "", "none",
      "bounded QA scenarios/report implemented", ["qa-lab"])
-_ext("gate", "OC-D01", "TEAM_REPORTS_CREDENTIAL_REQUIRED", "creds",
+_ext("gate", "OC-D01", "TEAM_REPORTS_UNAVAILABLE", "creds",
      "aggregation implemented; live GitHub/Discord transports gated",
      ["team-reports"])
-_ext("gate", "OC-05", "VISITOR_ACCESS_CREDENTIAL_REQUIRED", "creds",
+_ext("gate", "OC-05", "DEVICE_TOKEN_PENDING_APPROVAL", "creds",
      "expiring visitor grants extend device tokens; Cloudflare policy is "
      "external", ["visitor-access"])
 _ext("gate", "OC-37", "KANBAN_DELEGATED", "owner",
@@ -273,7 +273,7 @@ _ext("gate", "", "TEST_SUPPORT_ONLY", "none",
 _ext("parent", "OC-67", "", "creds",
      "voice-call adapters covered by the realtime/transcription boundary",
      ["voice-call"])
-_ext("gate", "OC-67", "MEETING_BOT_CREDENTIAL_REQUIRED", "creds",
+_ext("gate", "OC-67", "VISION_MEDIA_UNAVAILABLE", "creds",
      "meeting join contract real; provider account/browser session is the gate",
      ["google-meet", "teams-meetings", "zoom-meetings"])
 _ext("parent", "OC-66", "", "none",

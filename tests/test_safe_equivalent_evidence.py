@@ -310,3 +310,39 @@ def test_positive_compliant_fabricated_row_passes_all_validators() -> None:
     assert _need_errors(row) == []
     assert _backend_errors(row) == []
     assert "EXAMPLE_GATE" in _row_codes(row)
+
+
+_STATUS_WORDS = frozenset({
+    "SAFE_EQUIVALENT", "OPERATOR_ONLY", "IMPLEMENTED", "GATED", "PARTIAL",
+    "MISSING", "UNVERIFIED", "CLI_ONLY", "DASHBOARD_ONLY", "VOICE_ONLY",
+})
+
+
+@functools.lru_cache(maxsize=1)
+def _production_corpus() -> str:
+    """Concatenated production Python source (voicebridge/**)."""
+    parts: list[str] = []
+    for path in sorted((REPO_ROOT / "voicebridge").rglob("*.py")):
+        try:
+            parts.append(path.read_text(encoding="utf-8", errors="replace"))
+        except OSError:
+            continue
+    return "\n".join(parts)
+
+
+def test_named_refusal_codes_are_emitted_by_production_source() -> None:
+    """Every code a SAFE_EQUIVALENT row names must exist in production code.
+
+    Guards against a phantom gate label (a code named in the ledger note that no
+    Qubit module ever emits).
+    """
+    corpus = _production_corpus()
+    missing: dict[str, list[str]] = {}
+    for row in _rows():
+        codes = {c for c in CODE_RE.findall(str(row.get("note", "")))
+                 if c not in _STATUS_WORDS
+                 and not c.startswith(("QUBIT_", "HERMES_", "OPENCLAW_"))}
+        absent = sorted(c for c in codes if c not in corpus)
+        if absent:
+            missing[row["id"]] = absent
+    assert missing == {}, missing
