@@ -140,8 +140,9 @@ def test_cli_family_rows_are_caller_and_test_derived() -> None:
         assert row is not None, cmd
         caller = bool(qfam) and qfam in families
         proof = index.family_proof(qfam) if qfam else ""
-        expected = rebuild._derive_cli_status(surface, caller, bool(proof),
-                                              forwarded=False)
+        expected = rebuild._terminal_status(
+            rebuild._derive_cli_status(surface, caller, bool(proof),
+                                       forwarded=False), row["needs"])
         if row["status"] != expected:
             offenders.append((cmd, row["status"], expected))
     assert offenders == [], offenders
@@ -169,6 +170,7 @@ def test_cli_subcommand_rows_are_caller_and_test_derived() -> None:
                                               forwarded=forwarded)
         if expected == "IMPLEMENTED" and not proof:
             expected = "UNVERIFIED"
+        expected = rebuild._terminal_status(expected, row["needs"])
         if row["status"] != expected:
             offenders.append((fam, sub, row["status"], expected))
     assert offenders == [], offenders
@@ -239,16 +241,78 @@ def test_implemented_api_rows_use_real_handlers_and_evidence() -> None:
     assert offenders == [], offenders
 
 
-def test_gated_api_rows_have_honest_needs() -> None:
+def test_all_rows_are_terminal_or_open() -> None:
+    """No row may keep a pre-terminal status once the generator finalizes."""
+    rows = _section()["rows"]
+    non_terminal = [(r["id"], r["status"]) for r in rows
+                    if r["status"] not in gap_ledger.TERMINAL_STATUSES]
+    assert non_terminal == [], non_terminal
+    # The pre-2026-09-13 gate statuses must not leak into the committed section.
+    for stale in ("GATED", "PARTIAL", "MISSING", "UNVERIFIED", "CLI_ONLY",
+                  "DASHBOARD_ONLY", "VOICE_ONLY"):
+        assert not [r["id"] for r in rows if r["status"] == stale], stale
+
+
+def test_terminal_rows_have_honest_needs_and_proof() -> None:
+    """SAFE_EQUIVALENT / OPERATOR_ONLY rows stay visible with real evidence."""
     allowed = {"creds", "hardware", "owner"}
-    offenders = [(r["id"], r["needs"]) for r in _section()["rows"]
-                 if r["status"] == "GATED" and r["needs"] not in allowed]
-    assert offenders == [], offenders
+    for row in _section()["rows"]:
+        if row["status"] not in ("SAFE_EQUIVALENT", "OPERATOR_ONLY"):
+            continue
+        assert row["needs"] in allowed, (row["id"], row["needs"])
+        assert row["needs"] != "none", row["id"]
+        proving = row["proving_test"]
+        assert proving, (row["id"], "empty proving_test")
+        assert (REPO_ROOT / proving.split("::", 1)[0]).is_file(), \
+            (row["id"], proving)
+
+
+def test_terminal_status_mapping_follows_owner_decision() -> None:
+    """GATED -> SAFE_EQUIVALENT; PARTIAL(creds/hardware + typed note) -> OPERATOR_ONLY."""
+    typed = "Typed refusal: COMPUTER_USE_NO_DRIVER."
+    assert rebuild._terminal_status("GATED", "owner") == "SAFE_EQUIVALENT"
+    assert rebuild._terminal_status("GATED", "creds") == "SAFE_EQUIVALENT"
+    assert rebuild._terminal_status("GATED", "hardware") == "SAFE_EQUIVALENT"
+    assert rebuild._terminal_status("PARTIAL", "creds", typed) == "OPERATOR_ONLY"
+    assert rebuild._terminal_status("PARTIAL", "hardware", typed) == \
+        "OPERATOR_ONLY"
+    # A PARTIAL with no genuine live prerequisite is not silently closed.
+    assert rebuild._terminal_status("PARTIAL", "owner", typed) == "PARTIAL"
+    assert rebuild._terminal_status("PARTIAL", "none", typed) == "PARTIAL"
+    assert rebuild._terminal_status("UNVERIFIED", "creds", typed) == \
+        "UNVERIFIED"
+    assert rebuild._terminal_status("IMPLEMENTED", "none") == "IMPLEMENTED"
     # Per-route gate needs: secrets => creds, hardware => hardware, else owner.
     assert rebuild._needs_for("GATED", {}, "", "SECRET_NEVER_SERVED") == "creds"
     assert rebuild._needs_for("GATED", {}, "", "LOCAL_MODEL_BROKERED") == \
         "hardware"
     assert rebuild._needs_for("GATED", {}, "", "MCP_NO_MOUNT") == "owner"
+
+
+def test_partial_remap_requires_a_typed_code_in_the_note() -> None:
+    """A PARTIAL/stub row must stay open unless its note records a typed code.
+
+    Guards the owner criterion that PARTIAL -> OPERATOR_ONLY is only for a
+    code-complete, typed live-prerequisite path, never a bare stub.
+    """
+    # needs=creds but the note is a bare stub: stays open, not OPERATOR_ONLY.
+    assert rebuild._terminal_status("PARTIAL", "creds", "stub") == "PARTIAL"
+    assert rebuild._terminal_status("PARTIAL", "hardware", "") == "PARTIAL"
+    # A typed state token also counts (the amendment allows a typed state).
+    assert rebuild._terminal_status(
+        "PARTIAL", "hardware", "driver state MISSING") == "OPERATOR_ONLY"
+    # needs=none never closes even with a typed code.
+    assert rebuild._terminal_status(
+        "PARTIAL", "none", "Typed refusal: FOO_BAR.") == "PARTIAL"
+    # End to end through the finalizer.
+    rows = [
+        {"id": "stub", "status": "PARTIAL", "needs": "creds",
+         "proving_test": "", "note": "Subcommand-surface gap.", "backend": ""},
+        {"id": "typed", "status": "PARTIAL", "needs": "hardware",
+         "proving_test": "x", "note": "Typed refusal: FOO_BAR."},
+    ]
+    out = rebuild._finalize_statuses([dict(r) for r in rows])
+    assert [r["status"] for r in out] == ["PARTIAL", "OPERATOR_ONLY"]
 
 
 if __name__ == "__main__":  # pragma: no cover

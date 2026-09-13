@@ -396,14 +396,62 @@ def test_inventory_summary_is_internally_consistent() -> None:
     assert inv["evidence_only"] + inv["surface_items"] == inv["items_total"]
 
 
+def _read_inventory() -> dict:
+    path = REPO_ROOT / "docs" / "QUBIT_SOURCE_INVENTORY.json"
+    assert path.is_file(), path
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_committed_inventory_is_at_the_terminal_fixed_point() -> None:
+    """source_inventory(working) ⇄ rebuild_ledger_qubit is a stable fixed point.
+
+    The committed inventory is reconciled against the working-tree ledger, so
+    every recorded status is a declared ledger status.  All recorded statuses
+    are terminal; the vendored ``skills/index-cache`` asset cache is excluded
+    from the surface inventory as a non-capability, so there is no open row.
+    """
+    data = _read_inventory()
+    comparison = data.get("ledger_comparison") or {}
+    assert comparison.get("ledger_revision") == "working-tree", comparison
+    statuses = set(gap_ledger.STATUS_VALUES)
+    terminal = set(gap_ledger.TERMINAL_STATUSES)
+    recorded = set()
+    non_terminal_items = []
+    for item in data["items"]:
+        for key in ("ledger_status", "parent_status"):
+            value = item.get(key)
+            if value is not None:
+                assert value in statuses, (item.get("id"), key, value)
+                recorded.add(value)
+                if value not in terminal:
+                    non_terminal_items.append((item.get("id"), key, value))
+    assert recorded, "inventory records no ledger statuses at all"
+    # No non-terminal status may be recorded: every surface is terminal.
+    assert non_terminal_items == [], non_terminal_items
+
+
+def test_inventory_parent_coverage_treats_terminal_gate_as_covering() -> None:
+    """A SAFE_EQUIVALENT / OPERATOR_ONLY parent covers its child surfaces."""
+    data = _read_inventory()
+    covered = [
+        item for item in data["items"]
+        if item.get("parent_covered")
+        and item.get("parent_status") in ("SAFE_EQUIVALENT", "OPERATOR_ONLY")
+    ]
+    assert covered, ("no parented surface was covered by a terminal gate "
+                     "parent; source_inventory parent coverage may be stale")
+
+
 # ---------------------------------------------------------------------------
 # gap_ledger --require-inventory-complete + omissions summary
 # ---------------------------------------------------------------------------
-def _write_sections(docs: Path, inventory: dict) -> None:
+def _write_sections(docs: Path, inventory: dict,
+                    status: str = "IMPLEMENTED",
+                    needs: str = "none") -> None:
     docs.mkdir(parents=True, exist_ok=True)
     row = {key: "" for key in gap_ledger.ROW_KEYS}
     row.update({"id": "seed", "area": "seed", "capability": "seed",
-                "status": "IMPLEMENTED", "needs": "none"})
+                "status": status, "needs": needs})
     section = {"schema": "qubit-gap-ledger-section/1",
                "source": "qubit-surface", "rows": [row]}
     if inventory is not None:
@@ -450,6 +498,70 @@ def test_require_inventory_complete_fails_when_inventory_absent(tmp_path) -> Non
         "--docs-dir", str(docs), "--out", str(tmp_path / "LEDGER.md"),
         "--require-inventory-complete"])
     assert rc == 1
+
+
+# ---------------------------------------------------------------------------
+# gap_ledger --require-code-ready
+# ---------------------------------------------------------------------------
+# The vendored ``skills/index-cache`` JSON asset cache is excluded from the
+# surface inventory as a non-capability, so the committed ledger has no open row.
+DOCUMENTED_OPEN_ROW = None
+
+
+def test_committed_ledgers_have_no_open_rows() -> None:
+    """The committed sections are code-complete: zero open rows."""
+    sections, missing, _ = gap_ledger.load_sections(REPO_ROOT / "docs")
+    assert missing == [], missing
+    summary = gap_ledger.build_summary(sections, missing)
+    assert summary["open_rows"] == 0, summary["by_status"]
+    assert summary["code_ready"] is True
+    assert summary["safe_equivalent_rows"] > 0
+    assert summary["operator_qualification_rows"] > 0
+    assert summary["complete"] is False
+
+
+def test_require_code_ready_passes_on_committed_ledgers(tmp_path) -> None:
+    rc = gap_ledger.main([
+        "--docs-dir", str(REPO_ROOT / "docs"),
+        "--out", str(tmp_path / "LEDGER.md"),
+        "--require-code-ready"])
+    assert rc == 0
+
+
+def test_require_code_ready_fails_on_non_terminal_row(tmp_path) -> None:
+    docs = tmp_path / "docs"
+    _write_sections(docs, None, status="MISSING", needs="owner")
+    rc = gap_ledger.main([
+        "--docs-dir", str(docs), "--out", str(tmp_path / "LEDGER.md"),
+        "--require-code-ready"])
+    assert rc == 1
+
+
+def test_require_code_ready_accepts_terminal_gate_rows(tmp_path) -> None:
+    for status, needs in (("SAFE_EQUIVALENT", "owner"),
+                          ("OPERATOR_ONLY", "hardware")):
+        docs = tmp_path / f"docs_{status}"
+        _write_sections(docs, None, status=status, needs=needs)
+        rc = gap_ledger.main([
+            "--docs-dir", str(docs), "--out", str(tmp_path / "LEDGER.md"),
+            "--require-code-ready"])
+        assert rc == 0, status
+
+
+def test_code_ready_check_reports_every_offender() -> None:
+    rows = []
+    for i, status in enumerate(("MISSING", "PARTIAL", "UNVERIFIED")):
+        row = {key: "" for key in gap_ledger.ROW_KEYS}
+        row.update({"id": f"open{i}", "area": "a", "capability": "c",
+                    "status": status, "needs": "owner"})
+        row["_source"] = "qubit"
+        rows.append(row)
+    ok, reason = gap_ledger.code_ready_check([{"rows": rows}])
+    assert ok is False
+    assert "3 non-terminal row" in reason
+    assert "open0(MISSING)" in reason
+    ok, reason = gap_ledger.code_ready_check([{"rows": []}])
+    assert ok is True and reason == ""
 
 
 def test_omissions_summary_in_json_output(tmp_path, capsys) -> None:

@@ -10,13 +10,13 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 ## Summary
 
 - Ledger comparison baseline: `working-tree` (verified waves-1-2 revision; the live working-tree ledger is edited by concurrent agents, so the comparison is pinned to a reproducible revision).
-- Inventory items (all categories): **6776**
+- Inventory items (all categories): **6775**
 - Candidate omissions (uncovered surface items): **0**
 - Distinct capability gaps (no parent row): **0**
 - Parented surfaces needing parent closure (parent not IMPLEMENTED): **0**
 - Parented surfaces covered by an IMPLEMENTED parent: **1081**
-- Distinct capabilities total: **738**; parented surfaces total: **1081**
-- Fork-runtime dispositions (tools/skills/plugins): **177** (IMPLEMENTED 153, GATED 24)
+- Distinct capabilities total: **737**; parented surfaces total: **1081**
+- Fork-runtime dispositions (tools/skills/plugins): **176** (IMPLEMENTED 153, GATED 23)
 - Ledger IMPLEMENTED rows with unreproducible evidence: **0**
 - Hermes byte diff vs `qubit_hermes/`: upstream=12173 local=12173 identical=12173 missing=0 extra=0 changed=0
 
@@ -239,7 +239,7 @@ These are coverage evidence for their parent, not separate gaps.
 - `schedules_list`: 22 surface(s) — coverage `workflow-surface`
 - `webui_status`: 46 surface(s) — coverage `static-asset`
 
-## Fork-runtime dispositions for tools / skills / plugins (177)
+## Fork-runtime dispositions for tools / skills / plugins (176)
 
 Qubit executes the complete pinned Hermes fork in-process, so these are not separate Qubit modules: the fork tool/toolset registry, skill tree, and plugin fleet are the real backing surface. Every item carries an explicit typed disposition (no silent drop).
 
@@ -264,7 +264,7 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 - `plugin:video_gen` — **IMPLEMENTED**; backend `voicebridge.hermes_plugins.plugin_fleet_audit`; vendored under qubit_hermes/plugins/ and wrapped by voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
 - `plugin:web` — **IMPLEMENTED**; backend `voicebridge.hermes_plugins.plugin_fleet_audit`; vendored under qubit_hermes/plugins/ and wrapped by voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
 
-### `fork_skill_runtime` (35; IMPLEMENTED 34, GATED 1)
+### `fork_skill_runtime` (34; IMPLEMENTED 34, GATED 0)
 
 - `skill:optional-skills/autonomous-ai-agents` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/autonomous-ai-agents; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
 - `skill:optional-skills/blockchain` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/blockchain; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
@@ -293,7 +293,6 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 - `skill:skills/creative` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for skills/creative; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
 - `skill:skills/devops` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for skills/devops; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
 - `skill:skills/email` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for skills/email; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
-- `skill:skills/index-cache` — **GATED**; backend `—`; vendored skill path 'skills/index-cache' has no loadable SKILL.md (cache/asset directory), so no skill runtime surface exists.
 - `skill:skills/media` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for skills/media; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
 - `skill:skills/note-taking` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for skills/note-taking; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
 - `skill:skills/productivity` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for skills/productivity; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`

@@ -130,10 +130,11 @@ def test_agent_wave_rows_are_derived() -> None:
     for rid in ("OC-29", "OC-D23", "OC-36", "OC-D31"):
         assert rows[rid]["status"] == "IMPLEMENTED", rid
         assert rows[rid]["proving_test"], rid
-    # External dependency remains: the local part is proven but stays PARTIAL.
+    # External dependency remains: the local part is proven; the code path is
+    # complete and typed, so it is OPERATOR_ONLY (owner decision 2026-09-13).
     for rid, need in (("OC-48", "creds"), ("OC-51", "hardware"),
                       ("OC-D16", "creds")):
-        assert rows[rid]["status"] == "PARTIAL", rid
+        assert rows[rid]["status"] == "OPERATOR_ONLY", rid
         assert rows[rid]["needs"] == need, rid
         assert rows[rid]["proving_test"], rid
 
@@ -155,7 +156,7 @@ def test_f2_rows_closed_or_honestly_reclassified() -> None:
     # Workboard dispatch cannot close without rewriting the frozen acceptance
     # test, so it is honestly owner-policy-gated (not a code-side gap).
     oc37 = rows["OC-37"]
-    assert oc37["status"] == "GATED"
+    assert oc37["status"] == "SAFE_EQUIVALENT"
     assert oc37["needs"] == "owner"
     assert oc37["proving_test"] == "tests/test_kanban8tf.py"
     assert "frozen" in oc37["note"].lower()
@@ -163,19 +164,65 @@ def test_f2_rows_closed_or_honestly_reclassified() -> None:
 
 def test_genuine_gates_stay_open() -> None:
     rows = {r["id"]: r for r in _section()["rows"]}
-    # Credential / hardware / owner gates must not be flipped to IMPLEMENTED.
-    assert rows["OC-13"]["status"] == "GATED" and rows["OC-13"]["needs"] == \
-        "hardware"
-    assert rows["OC-19"]["status"] == "PARTIAL" and rows["OC-19"]["needs"] == \
-        "creds"
-    assert rows["OC-56"]["status"] == "PARTIAL" and rows["OC-56"]["needs"] == \
-        "hardware"
+    # Credential / hardware / owner gates must not be flipped to IMPLEMENTED;
+    # they are the owner-approved terminal statuses.
+    assert rows["OC-13"]["status"] == "OPERATOR_ONLY" and \
+        rows["OC-13"]["needs"] == "hardware"
+    assert rows["OC-19"]["status"] == "OPERATOR_ONLY" and \
+        rows["OC-19"]["needs"] == "creds"
+    assert rows["OC-56"]["status"] == "OPERATOR_ONLY" and \
+        rows["OC-56"]["needs"] == "hardware"
     # OC-01 closed its protocol surface but stays an owner-policy gate: Qubit
     # runs one event path and never starts a standalone gateway listener, so it
-    # is a typed GATEWAY_NO_SERVER refusal, never IMPLEMENTED.
-    assert rows["OC-01"]["status"] == "GATED" and rows["OC-01"]["needs"] == \
-        "owner"
+    # is a typed GATEWAY_NO_SERVER SAFE_EQUIVALENT, never IMPLEMENTED.
+    assert rows["OC-01"]["status"] == "SAFE_EQUIVALENT" and \
+        rows["OC-01"]["needs"] == "owner"
     assert "GATEWAY_NO_SERVER" in rows["OC-01"]["note"]
+
+
+def test_all_rows_are_terminal() -> None:
+    """Every committed row is a code-ready terminal status."""
+    rows = _section()["rows"]
+    non_terminal = [(r["id"], r["status"]) for r in rows
+                    if r["status"] not in gap_ledger.TERMINAL_STATUSES]
+    assert non_terminal == [], non_terminal
+    for stale in ("GATED", "PARTIAL", "MISSING", "UNVERIFIED", "CLI_ONLY",
+                  "DASHBOARD_ONLY", "VOICE_ONLY"):
+        assert not [r["id"] for r in rows if r["status"] == stale], stale
+
+
+def test_terminal_rows_have_proof_and_live_needs() -> None:
+    """SAFE_EQUIVALENT / OPERATOR_ONLY rows keep a real proof and live need."""
+    allowed = {"creds", "hardware", "owner"}
+    for row in _section()["rows"]:
+        if row["status"] not in ("SAFE_EQUIVALENT", "OPERATOR_ONLY"):
+            continue
+        assert row["needs"] in allowed, (row["id"], row["needs"])
+        assert row["needs"] != "none", row["id"]
+        proving = row["proving_test"]
+        assert proving, (row["id"], "empty proving_test")
+        assert (REPO_ROOT / proving.split("::", 1)[0]).is_file(), \
+            (row["id"], proving)
+
+
+def test_terminal_status_mapping_follows_owner_decision() -> None:
+    """GATED(hardware) -> OPERATOR_ONLY; other GATED -> SAFE_EQUIVALENT;
+    PARTIAL(creds/hardware) -> OPERATOR_ONLY; everything else is untouched."""
+    rows = [
+        {"status": "GATED", "needs": "hardware"},
+        {"status": "GATED", "needs": "owner"},
+        {"status": "GATED", "needs": "creds"},
+        {"status": "PARTIAL", "needs": "creds"},
+        {"status": "PARTIAL", "needs": "hardware"},
+        {"status": "PARTIAL", "needs": "owner"},
+        {"status": "MISSING", "needs": "owner"},
+        {"status": "IMPLEMENTED", "needs": "none"},
+    ]
+    out = rebuild._finalize_terminal_statuses([dict(r) for r in rows])
+    assert [r["status"] for r in out] == [
+        "OPERATOR_ONLY", "SAFE_EQUIVALENT", "SAFE_EQUIVALENT",
+        "OPERATOR_ONLY", "OPERATOR_ONLY", "PARTIAL", "MISSING", "IMPLEMENTED",
+    ]
 
 
 def test_upgrade_requires_production_dispatcher(tmp_path, monkeypatch) -> None:

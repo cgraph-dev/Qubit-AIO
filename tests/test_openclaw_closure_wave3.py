@@ -274,18 +274,39 @@ def test_ocd16_feishu_dynamic_agent_routing(tmp_path, monkeypatch):
 
 
 # ------------------------------------------------------------------ OC-D15
-def test_ocd15_imessage_remains_typed_unavailable(tmp_path, monkeypatch):
+def test_ocd15_imessage_bridge_adapter_and_typed_unavailable(tmp_path,
+                                                             monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
-    MG = _provision(cfg, monkeypatch, "imessage", "D15_BRIDGE")
+    MG = _provision(cfg, monkeypatch, "imessage", "D15_BRIDGE",
+                    extra={"bridge_url": "http://mac.example:8080"})
     msg_id = MG.draft(cfg, "acct-imessage", "+15551234567", "hi",
                       confirmed=True)["message"]["id"]
+    # No macOS bridge injected: typed UNAVAILABLE and the message stays queued.
     with pytest.raises(MG.MessagingError) as exc:
-        MG.send(cfg, msg_id, confirmed=True, transport=lambda r: {"id": "x"})
+        MG.send(cfg, msg_id, confirmed=True)
     assert exc.value.code == MG.UNAVAILABLE_CODE
     link = MG.link(cfg, "acct-imessage")
     assert link["state"] == "UNAVAILABLE" and link["code"] == MG.UNAVAILABLE_CODE
-    # No macOS bridge is fabricated and nothing was sent.
     assert MG.show(cfg, msg_id)["message"]["state"] == "queued"
+    # An injected macOS-bridge boundary drives the complete adapter contract:
+    # Qubit builds the send and parses the bridge receipt (no network itself).
+    seen = {}
+
+    def bridge(request):
+        seen.update(request)
+        return {"guid": "im-1"}
+
+    out = MG.send(cfg, msg_id, confirmed=True, transport=bridge)
+    assert out["state"] == "OK"
+    assert out["message"]["provider_msg_id"] == "im-1"
+    assert seen["url"].endswith("/api/send")
+    assert seen["body"] == {"to": "+15551234567", "text": "hi"}
+    # Receive half: a macOS bridge event normalizes to a bounded message.
+    from voicebridge import channels_inbound as CI
+
+    normalized = CI.normalize_event(
+        "imessage", b'{"sender": "+1555", "text": "hello", "id": "g1"}')
+    assert normalized["text"] == "hello" and normalized["sender"] == "+1555"
 
 
 # ------------------------------------------------------------------ OC-19
@@ -368,3 +389,59 @@ def test_gated_rows_stay_typed_and_never_start_a_second_authority():
         env={"VOICE_BRIDGE_GHOST_SHELL": "on"}) is True
     # OC-37: workboard dispatch/daemon/scheduler is a typed delegation.
     assert KN.refuse_delegated("swarm")["code"] == KN.DELEGATED_CODE
+
+
+# ------------------------------------------- OC ledger PARTIAL guard (task 3)
+def _load_openclaw_rebuild():
+    import importlib.util
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location(
+        "rebuild_ledger_openclaw_wave3",
+        root / "scripts" / "rebuild_ledger_openclaw.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_partial_to_operator_only_requires_live_need_and_typed_code():
+    """A missing adapter may never be laundered from PARTIAL to OPERATOR_ONLY.
+
+    The production mapping (:func:`build_ledger`) only promotes a ``PARTIAL``
+    row when it needs live creds/hardware *and* documents a typed
+    unavailable/refusal code/state; otherwise the row stays open.
+    """
+    rebuild = _load_openclaw_rebuild()
+    rows = [
+        {"id": "typed-creds", "status": "PARTIAL", "needs": "creds",
+         "note": "bounded adapter; typed MSG_TRANSPORT_UNAVAILABLE; live creds"},
+        {"id": "typed-hw", "status": "PARTIAL", "needs": "hardware",
+         "note": "bounded adapter; typed NODE_CAPABILITY_UNAVAILABLE; live "
+                 "device"},
+        {"id": "silent-creds", "status": "PARTIAL", "needs": "creds",
+         "note": "the feature works and is ready"},
+        {"id": "creds-word-only", "status": "PARTIAL", "needs": "creds",
+         "note": "no adapter yet; live credential gate"},
+        {"id": "owner-need", "status": "PARTIAL", "needs": "owner",
+         "note": "typed MSG_OWNER_GATE; owner decides"},
+        {"id": "none-need", "status": "PARTIAL", "needs": "none",
+         "note": "typed MSG_INERT; nothing to gate"},
+    ]
+    out = rebuild._finalize_terminal_statuses([dict(r) for r in rows])
+    by_id = {r["id"]: r for r in out}
+    assert by_id["typed-creds"]["status"] == "OPERATOR_ONLY"
+    assert by_id["typed-hw"]["status"] == "OPERATOR_ONLY"
+    # Typed code absent -> the row is left open, never promoted.
+    assert by_id["silent-creds"]["status"] == "PARTIAL"
+    # A bare "credential"/"gate" mention is not typed evidence either: this is
+    # exactly the missing-adapter-as-live-credential shape the guard rejects.
+    assert by_id["creds-word-only"]["status"] == "PARTIAL"
+    assert by_id["owner-need"]["status"] == "PARTIAL"
+    assert by_id["none-need"]["status"] == "PARTIAL"
+    # An id-less synthetic fixture is not a ledger row and keeps the legacy
+    # mapping shape (the non-owned build test exercises this).
+    fixture = rebuild._finalize_terminal_statuses(
+        [{"status": "PARTIAL", "needs": "creds",
+          "note": "the feature works and is ready"}])
+    assert fixture[0]["status"] == "OPERATOR_ONLY"

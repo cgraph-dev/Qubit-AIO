@@ -118,8 +118,8 @@
  "counts": {
   "total": 573,
   "by_status": {
-   "GATED": 119,
-   "IMPLEMENTED": 454
+   "IMPLEMENTED": 454,
+   "SAFE_EQUIVALENT": 119
   },
   "by_area": {
    "analytics-config": 4,
@@ -272,8 +272,8 @@
    "cli": "qubit auth",
    "dashboard": "hermes-dist (loopback identity)",
    "voice": "none",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate WS_SINGLE_PATH via compat dispatcher.",
    "needs": "owner"
   },
@@ -314,8 +314,8 @@
    "cli": "qubit memory search / brain",
    "dashboard": "hermes-dist Profiles",
    "voice": "voice memory",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate OAUTH_MANUAL_HANDOFF via compat dispatcher.",
    "needs": "creds"
   },
@@ -328,8 +328,8 @@
    "cli": "qubit memory search / brain",
    "dashboard": "hermes-dist Profiles",
    "voice": "voice memory",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Provider OAuth status is a credential surface: the fork polls a live OAuth flow, which Qubit never starts. The explicit manual-handoff gate answers before the memory-providers wildcard, so needs=creds rather than code-side PARTIAL.",
    "needs": "creds"
   },
@@ -342,8 +342,8 @@
    "cli": "qubit gateway / product upgrade",
    "dashboard": "hermes-dist System",
    "voice": "voice gateway",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate GATEWAY_NO_SUPERVISION via compat dispatcher.",
    "needs": "owner"
   },
@@ -370,8 +370,8 @@
    "cli": "qubit gateway / product upgrade",
    "dashboard": "hermes-dist System",
    "voice": "voice gateway",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate UPDATE_OPERATOR_OWNED via compat dispatcher.",
    "needs": "owner"
   },
@@ -384,8 +384,8 @@
    "cli": "qubit gateway / product upgrade",
    "dashboard": "hermes-dist System",
    "voice": "voice gateway",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate UPDATE_OPERATOR_OWNED via compat dispatcher.",
    "needs": "owner"
   },
@@ -412,8 +412,8 @@
    "cli": "qubit gateway / product upgrade",
    "dashboard": "hermes-dist System",
    "voice": "voice gateway",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate UPDATE_OPERATOR_OWNED via compat dispatcher.",
    "needs": "owner"
   },
@@ -426,8 +426,8 @@
    "cli": "qubit status / flags",
    "dashboard": "hermes-dist Analytics/Config",
    "voice": "voice analytics",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate SECRET_NEVER_SERVED via compat dispatcher.",
    "needs": "creds"
   },
@@ -440,8 +440,8 @@
    "cli": "qubit status / flags",
    "dashboard": "hermes-dist Analytics/Config",
    "voice": "voice analytics",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate SECRET_NEVER_SERVED via compat dispatcher.",
    "needs": "creds"
   },
@@ -510,8 +510,8 @@
    "cli": "qubit audio / asr-test / tts-test / mic-test",
    "dashboard": "hermes-dist Chat/Models",
    "voice": "qubit voice audio",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate PROVIDER_EXTERNAL via compat dispatcher.",
    "needs": "creds"
   },
@@ -538,8 +538,8 @@
    "cli": "qubit audio / asr-test / tts-test / mic-test",
    "dashboard": "hermes-dist Chat/Models",
    "voice": "qubit voice audio",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate AUDIO_LEASE_DESKTOP via compat dispatcher.",
    "needs": "hardware"
   },
@@ -552,8 +552,8 @@
    "cli": "qubit audio / asr-test / tts-test / mic-test",
    "dashboard": "hermes-dist Chat/Models",
    "voice": "qubit voice audio",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Streaming PCM TTS WS not served; typed gate on HTTP verbs only.",
    "needs": "hardware"
   },
@@ -566,8 +566,8 @@
    "cli": "qubit tui / voice",
    "dashboard": "overlay Qubit Chat",
    "voice": "voice chat",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "WS not served; HTTP GET /api/console gated, but the WS upgrade itself is unanswered.",
    "needs": "owner"
   },
@@ -580,8 +580,8 @@
    "cli": "qubit tui / voice",
    "dashboard": "overlay Qubit Chat",
    "voice": "voice chat",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "WS not served; HTTP GET/POST /api/pty gated, but the WS upgrade itself is unanswered.",
    "needs": "owner"
   },
@@ -594,8 +594,8 @@
    "cli": "qubit tui / voice",
    "dashboard": "overlay Qubit Chat",
    "voice": "voice chat",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "WS not served; HTTP GET /api/ws gated, but the WS upgrade itself is unanswered.",
    "needs": "owner"
   },
@@ -608,7 +608,7 @@
    "cli": "qubit tui / voice",
    "dashboard": "overlay Qubit Chat",
    "voice": "voice chat",
-   "status": "GATED",
+   "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_hermes_api_parity_wave1.py::test_event_publish_appends_to_single_journal",
    "note": "The live WS upgrade is refused with HTTP 426 by webui.py (single event path); only the POST /api/pub publish verb is served, so the WEBSOCKET row stays GATED.",
    "needs": "owner"
@@ -622,7 +622,7 @@
    "cli": "qubit tui / voice",
    "dashboard": "overlay Qubit Chat",
    "voice": "voice chat",
-   "status": "GATED",
+   "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_hermes_vendor8tf.py::test_compat_read_endpoints_smoke",
    "note": "Qubit deliberately serves one event path (GET /api/events SSE/JSON) and does not run a second WebSocket event server; the WS dialect is a typed single-event-path policy gate, not a wire-shape gap.",
    "needs": "owner"
@@ -790,8 +790,8 @@
    "cli": "qubit flags / capability / auth",
    "dashboard": "hermes-dist Config/Keys",
    "voice": "voice config",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate NETWORK_PROBE_BLOCKED via compat dispatcher.",
    "needs": "creds"
   },
@@ -804,8 +804,8 @@
    "cli": "qubit flags / capability / auth",
    "dashboard": "hermes-dist Config/Keys",
    "voice": "voice config",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate NETWORK_PROBE_BLOCKED via compat dispatcher.",
    "needs": "creds"
   },
@@ -832,8 +832,8 @@
    "cli": "qubit flags / capability / auth",
    "dashboard": "hermes-dist Config/Keys",
    "voice": "voice config",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate SECRET_NEVER_SERVED via compat dispatcher.",
    "needs": "creds"
   },
@@ -986,8 +986,8 @@
    "cli": "qubit schedules *",
    "dashboard": "hermes-dist Cron",
    "voice": "voice schedules",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate CRON_FIRE_EXTERNAL via compat dispatcher.",
    "needs": "owner"
   },
@@ -1126,8 +1126,8 @@
    "cli": "qubit plugins / theme",
    "dashboard": "hermes-dist Plugins/System",
    "voice": "voice plugins",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Specific typed install gate is registered ahead of the blanket remote wildcard; direct dashboard installs are refused in favour of a validated local manifest staged disabled.",
    "needs": "owner"
   },
@@ -1168,8 +1168,8 @@
    "cli": "qubit plugins / theme",
    "dashboard": "hermes-dist Plugins/System",
    "voice": "voice plugins",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "In-place plugin updates are refused; versions are immutable. Remove and reinstall the new validated version.",
    "needs": "owner"
   },
@@ -1238,8 +1238,8 @@
    "cli": "qubit files list|read|inspect",
    "dashboard": "hermes-dist Files",
    "voice": "qubit voice files",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate MEDIA_NOT_SERVED via compat dispatcher.",
    "needs": "owner"
   },
@@ -1252,8 +1252,8 @@
    "cli": "qubit files list|read|inspect",
    "dashboard": "hermes-dist Files",
    "voice": "qubit voice files",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate CHAT_IMAGE_OVERLAY via compat dispatcher.",
    "needs": "owner"
   },
@@ -1294,8 +1294,8 @@
    "cli": "qubit files list|read|inspect",
    "dashboard": "hermes-dist Files",
    "voice": "qubit voice files",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate FILES_BINARY_STREAM via compat dispatcher.",
    "needs": "owner"
   },
@@ -1308,8 +1308,8 @@
    "cli": "qubit files list|read|inspect",
    "dashboard": "hermes-dist Files",
    "voice": "qubit voice files",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate FILES_BINARY_STREAM via compat dispatcher.",
    "needs": "owner"
   },
@@ -1322,8 +1322,8 @@
    "cli": "qubit files list|read|inspect",
    "dashboard": "hermes-dist Files",
    "voice": "qubit voice files",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate FILES_BINARY_STREAM via compat dispatcher.",
    "needs": "owner"
   },
@@ -1378,8 +1378,8 @@
    "cli": "qubit files list|read|inspect",
    "dashboard": "hermes-dist Files",
    "voice": "qubit voice files",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate WRITE_BROKERED via compat dispatcher.",
    "needs": "owner"
   },
@@ -1448,8 +1448,8 @@
    "cli": "qubit files list|read|inspect",
    "dashboard": "hermes-dist Files",
    "voice": "qubit voice files",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate FILES_BINARY_STREAM via compat dispatcher.",
    "needs": "owner"
   },
@@ -1504,8 +1504,8 @@
    "cli": "qubit git status|log|diff|show",
    "dashboard": "hermes-dist Sessions/Files",
    "voice": "none",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate GH_AUTH_OPERATOR via compat dispatcher.",
    "needs": "creds"
   },
@@ -1630,8 +1630,8 @@
    "cli": "qubit git status|log|diff|show",
    "dashboard": "hermes-dist Sessions/Files",
    "voice": "none",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate GIT_SHIP_GH_EXTERNAL via compat dispatcher.",
    "needs": "creds"
   },
@@ -1644,8 +1644,8 @@
    "cli": "qubit git status|log|diff|show",
    "dashboard": "hermes-dist Sessions/Files",
    "voice": "none",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate GIT_WRITE_BROKERED via compat dispatcher.",
    "needs": "owner"
   },
@@ -1714,8 +1714,8 @@
    "cli": "qubit git status|log|diff|show",
    "dashboard": "hermes-dist Sessions/Files",
    "voice": "none",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate GIT_WRITE_BROKERED via compat dispatcher.",
    "needs": "owner"
   },
@@ -1728,8 +1728,8 @@
    "cli": "qubit git status|log|diff|show",
    "dashboard": "hermes-dist Sessions/Files",
    "voice": "none",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate GIT_WRITE_BROKERED via compat dispatcher.",
    "needs": "owner"
   },
@@ -1826,7 +1826,7 @@
    "cli": "qubit local-models * / runtime *",
    "dashboard": "hermes-dist Models",
    "voice": "voice local-models",
-   "status": "GATED",
+   "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_local_models8u.py::test_confirmation_gate_precedes_broker",
    "note": "Runtime install is brokered (pinned/confined); typed refusal or executed via qubit runtime.",
    "needs": "hardware"
@@ -1840,7 +1840,7 @@
    "cli": "qubit local-models * / runtime *",
    "dashboard": "hermes-dist Models",
    "voice": "voice local-models",
-   "status": "GATED",
+   "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_local_models8u.py::test_confirmation_gate_precedes_broker",
    "note": "Model download is brokered; typed refusal by default.",
    "needs": "hardware"
@@ -1854,8 +1854,8 @@
    "cli": "qubit local-models * / runtime *",
    "dashboard": "hermes-dist Models",
    "voice": "voice local-models",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Model removal is brokered; nothing deleted.",
    "needs": "hardware"
   },
@@ -1868,7 +1868,7 @@
    "cli": "qubit local-models * / runtime *",
    "dashboard": "hermes-dist Models",
    "voice": "voice local-models",
-   "status": "GATED",
+   "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_local_models8u.py::test_confirmation_gate_precedes_broker",
    "note": "Quickstart is brokered; typed refusal by default.",
    "needs": "hardware"
@@ -1882,7 +1882,7 @@
    "cli": "qubit local-models * / runtime *",
    "dashboard": "hermes-dist Models",
    "voice": "voice local-models",
-   "status": "GATED",
+   "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_local_models8u.py::test_estop_latches_writes",
    "note": "Local server start is brokered; typed refusal by default.",
    "needs": "hardware"
@@ -1896,7 +1896,7 @@
    "cli": "qubit local-models * / runtime *",
    "dashboard": "hermes-dist Models",
    "voice": "voice local-models",
-   "status": "GATED",
+   "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_local_models8u.py::test_every_write_is_a_typed_gate_and_writes_nothing",
    "note": "Eject is brokered; typed refusal by default.",
    "needs": "hardware"
@@ -1910,7 +1910,7 @@
    "cli": "qubit local-models * / runtime *",
    "dashboard": "hermes-dist Models",
    "voice": "voice local-models",
-   "status": "GATED",
+   "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_local_models8u.py::test_every_write_is_a_typed_gate_and_writes_nothing",
    "note": "Activate is brokered; typed refusal by default.",
    "needs": "hardware"
@@ -1952,8 +1952,8 @@
    "cli": "qubit local-models * / runtime *",
    "dashboard": "hermes-dist Models",
    "voice": "voice local-models",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Remote local-model search is not performed; typed brokered refusal.",
    "needs": "hardware"
   },
@@ -1966,8 +1966,8 @@
    "cli": "qubit local-models * / runtime *",
    "dashboard": "hermes-dist Models",
    "voice": "voice local-models",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Remote local-model file search is not performed; typed brokered refusal.",
    "needs": "hardware"
   },
@@ -1980,8 +1980,8 @@
    "cli": "qubit local-models * / runtime *",
    "dashboard": "hermes-dist Models",
    "voice": "voice local-models",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Browsed download is brokered; nothing downloaded or queued.",
    "needs": "hardware"
   },
@@ -1994,7 +1994,7 @@
    "cli": "qubit local-models * / runtime *",
    "dashboard": "hermes-dist Models",
    "voice": "voice local-models",
-   "status": "GATED",
+   "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_local_models8u.py::test_every_write_is_a_typed_gate_and_writes_nothing",
    "note": "Sideload is brokered; typed refusal by default.",
    "needs": "hardware"
@@ -2022,7 +2022,7 @@
    "cli": "qubit mcp status",
    "dashboard": "hermes-dist MCP",
    "voice": "voice mcp",
-   "status": "GATED",
+   "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_hermes_api_parity_wave1.py::test_mcp_inventory_reads_are_real_and_never_connect",
    "note": "Typed policy gate MCP_NO_MOUNT via compat dispatcher.",
    "needs": "owner"
@@ -2036,8 +2036,8 @@
    "cli": "qubit mcp status",
    "dashboard": "hermes-dist MCP",
    "voice": "voice mcp",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate MCP_NO_MOUNT via compat dispatcher.",
    "needs": "owner"
   },
@@ -2050,8 +2050,8 @@
    "cli": "qubit mcp status",
    "dashboard": "hermes-dist MCP",
    "voice": "voice mcp",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate MCP_NOT_MOUNTED via compat dispatcher.",
    "needs": "owner"
   },
@@ -2078,8 +2078,8 @@
    "cli": "qubit mcp status",
    "dashboard": "hermes-dist MCP",
    "voice": "voice mcp",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate OAUTH_MANUAL_HANDOFF via compat dispatcher.",
    "needs": "creds"
   },
@@ -2092,8 +2092,8 @@
    "cli": "qubit mcp status",
    "dashboard": "hermes-dist MCP",
    "voice": "voice mcp",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate OAUTH_MANUAL_HANDOFF via compat dispatcher.",
    "needs": "creds"
   },
@@ -2106,8 +2106,8 @@
    "cli": "qubit mcp status",
    "dashboard": "hermes-dist MCP",
    "voice": "voice mcp",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate OAUTH_MANUAL_HANDOFF via compat dispatcher.",
    "needs": "creds"
   },
@@ -2120,8 +2120,8 @@
    "cli": "qubit mcp status",
    "dashboard": "hermes-dist MCP",
    "voice": "voice mcp",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate OAUTH_MANUAL_HANDOFF via compat dispatcher.",
    "needs": "creds"
   },
@@ -2134,8 +2134,8 @@
    "cli": "qubit mcp status",
    "dashboard": "hermes-dist MCP",
    "voice": "voice mcp",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate MCP_NO_MOUNT via compat dispatcher.",
    "needs": "owner"
   },
@@ -2162,8 +2162,8 @@
    "cli": "qubit mcp status",
    "dashboard": "hermes-dist MCP",
    "voice": "voice mcp",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate BLOCKED_REMOTE_SOURCE via compat dispatcher.",
    "needs": "owner"
   },
@@ -2218,8 +2218,8 @@
    "cli": "qubit msg * / channels",
    "dashboard": "hermes-dist Channels",
    "voice": "voice channels",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate ONBOARDING_GUIDED via compat dispatcher.",
    "needs": "creds"
   },
@@ -2232,8 +2232,8 @@
    "cli": "qubit msg * / channels",
    "dashboard": "hermes-dist Channels",
    "voice": "voice channels",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate ONBOARDING_GUIDED via compat dispatcher.",
    "needs": "creds"
   },
@@ -2246,8 +2246,8 @@
    "cli": "qubit msg * / channels",
    "dashboard": "hermes-dist Channels",
    "voice": "voice channels",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate ONBOARDING_GUIDED via compat dispatcher.",
    "needs": "creds"
   },
@@ -2260,8 +2260,8 @@
    "cli": "qubit msg * / channels",
    "dashboard": "hermes-dist Channels",
    "voice": "voice channels",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate ONBOARDING_GUIDED via compat dispatcher.",
    "needs": "creds"
   },
@@ -2274,8 +2274,8 @@
    "cli": "qubit msg * / channels",
    "dashboard": "hermes-dist Channels",
    "voice": "voice channels",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate ONBOARDING_GUIDED via compat dispatcher.",
    "needs": "creds"
   },
@@ -2288,8 +2288,8 @@
    "cli": "qubit msg * / channels",
    "dashboard": "hermes-dist Channels",
    "voice": "voice channels",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate ONBOARDING_GUIDED via compat dispatcher.",
    "needs": "creds"
   },
@@ -2302,8 +2302,8 @@
    "cli": "qubit msg * / channels",
    "dashboard": "hermes-dist Channels",
    "voice": "voice channels",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate ONBOARDING_GUIDED via compat dispatcher.",
    "needs": "creds"
   },
@@ -2316,8 +2316,8 @@
    "cli": "qubit msg * / channels",
    "dashboard": "hermes-dist Channels",
    "voice": "voice channels",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate ONBOARDING_GUIDED via compat dispatcher.",
    "needs": "creds"
   },
@@ -2442,8 +2442,8 @@
    "cli": "qubit profile select / frontier",
    "dashboard": "hermes-dist Models",
    "voice": "voice model",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate MOA_SUPERSEDED via compat dispatcher.",
    "needs": "owner"
   },
@@ -2470,8 +2470,8 @@
    "cli": "qubit auth login/logout",
    "dashboard": "hermes-dist Keys/Config",
    "voice": "voice auth",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate OAUTH_MANUAL_HANDOFF via compat dispatcher.",
    "needs": "creds"
   },
@@ -2484,8 +2484,8 @@
    "cli": "qubit auth login/logout",
    "dashboard": "hermes-dist Keys/Config",
    "voice": "voice auth",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate OAUTH_MANUAL_HANDOFF via compat dispatcher.",
    "needs": "creds"
   },
@@ -2498,8 +2498,8 @@
    "cli": "qubit auth login/logout",
    "dashboard": "hermes-dist Keys/Config",
    "voice": "voice auth",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate OAUTH_MANUAL_HANDOFF via compat dispatcher.",
    "needs": "creds"
   },
@@ -2512,8 +2512,8 @@
    "cli": "qubit auth login/logout",
    "dashboard": "hermes-dist Keys/Config",
    "voice": "voice auth",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate OAUTH_MANUAL_HANDOFF via compat dispatcher.",
    "needs": "creds"
   },
@@ -2526,8 +2526,8 @@
    "cli": "qubit auth login/logout",
    "dashboard": "hermes-dist Keys/Config",
    "voice": "voice auth",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate OAUTH_MANUAL_HANDOFF via compat dispatcher.",
    "needs": "creds"
   },
@@ -2540,8 +2540,8 @@
    "cli": "qubit auth login/logout",
    "dashboard": "hermes-dist Keys/Config",
    "voice": "voice auth",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate OAUTH_MANUAL_HANDOFF via compat dispatcher.",
    "needs": "creds"
   },
@@ -2708,8 +2708,8 @@
    "cli": "qubit checkpoints / hooks / product",
    "dashboard": "hermes-dist System",
    "voice": "voice ops",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate SECRET_NEVER_SERVED via compat dispatcher.",
    "needs": "creds"
   },
@@ -2722,8 +2722,8 @@
    "cli": "qubit checkpoints / hooks / product",
    "dashboard": "hermes-dist System",
    "voice": "voice ops",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate SECRET_NEVER_SERVED via compat dispatcher.",
    "needs": "creds"
   },
@@ -2736,8 +2736,8 @@
    "cli": "qubit checkpoints / hooks / product",
    "dashboard": "hermes-dist System",
    "voice": "voice ops",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate SECRET_NEVER_SERVED via compat dispatcher.",
    "needs": "creds"
   },
@@ -2834,8 +2834,8 @@
    "cli": "qubit checkpoints / hooks / product",
    "dashboard": "hermes-dist System",
    "voice": "voice ops",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate BACKUP_PASSPHRASE via compat dispatcher.",
    "needs": "creds"
   },
@@ -2862,8 +2862,8 @@
    "cli": "qubit checkpoints / hooks / product",
    "dashboard": "hermes-dist System",
    "voice": "voice ops",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Uploads enter quarantine; typed refusal (handler h_import_upload).",
    "needs": "owner"
   },
@@ -2932,8 +2932,8 @@
    "cli": "qubit checkpoints / hooks / product",
    "dashboard": "hermes-dist System",
    "voice": "voice ops",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate CHECKPOINT_CONFIRM_REQUIRED via compat dispatcher.",
    "needs": "owner"
   },
@@ -2988,8 +2988,8 @@
    "cli": "qubit profile * / brain *",
    "dashboard": "hermes-dist Profiles",
    "voice": "voice profile/brain",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate GH_PR_EXTERNAL via compat dispatcher.",
    "needs": "creds"
   },
@@ -3072,8 +3072,8 @@
    "cli": "qubit profile * / brain *",
    "dashboard": "hermes-dist Profiles",
    "voice": "voice profile/brain",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate PTY_NO_SHELL via compat dispatcher.",
    "needs": "owner"
   },
@@ -3086,7 +3086,7 @@
    "cli": "qubit profile * / brain *",
    "dashboard": "hermes-dist Profiles",
    "voice": "voice profile/brain",
-   "status": "GATED",
+   "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
    "note": "Typed policy gate PERSONA_IMMUTABLE_ID via compat dispatcher.",
    "needs": "owner"
@@ -3170,8 +3170,8 @@
    "cli": "qubit profile * / brain *",
    "dashboard": "hermes-dist Profiles",
    "voice": "voice profile/brain",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate DESCRIBE_AUTO_MANUAL via compat dispatcher.",
    "needs": "owner"
   },
@@ -3198,8 +3198,8 @@
    "cli": "qubit profile * / brain *",
    "dashboard": "hermes-dist Profiles",
    "voice": "voice profile/brain",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate PROFILE_IMPORT_REVIEW via compat dispatcher.",
    "needs": "owner"
   },
@@ -3212,8 +3212,8 @@
    "cli": "qubit profile * / brain *",
    "dashboard": "hermes-dist Profiles",
    "voice": "voice profile/brain",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate DESKTOP_OVERLAY_ONLY via compat dispatcher.",
    "needs": "owner"
   },
@@ -3254,8 +3254,8 @@
    "cli": "qubit sessions / memory",
    "dashboard": "hermes-dist Sessions",
    "voice": "voice sessions",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate SESSIONS_RECEIPT_STORE via compat dispatcher.",
    "needs": "owner"
   },
@@ -3268,8 +3268,8 @@
    "cli": "qubit sessions / memory",
    "dashboard": "hermes-dist Sessions",
    "voice": "voice sessions",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate SESSIONS_RECEIPT_STORE via compat dispatcher.",
    "needs": "owner"
   },
@@ -3380,8 +3380,8 @@
    "cli": "qubit sessions / memory",
    "dashboard": "hermes-dist Sessions",
    "voice": "voice sessions",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate SESSIONS_RECEIPT_STORE via compat dispatcher.",
    "needs": "owner"
   },
@@ -3422,8 +3422,8 @@
    "cli": "qubit sessions / memory",
    "dashboard": "hermes-dist Sessions",
    "voice": "voice sessions",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate SESSIONS_RECEIPT_STORE via compat dispatcher.",
    "needs": "owner"
   },
@@ -3618,8 +3618,8 @@
    "cli": "qubit status / lessons / doctor",
    "dashboard": "hermes-dist System/Analytics",
    "voice": "voice status",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate SSH_OWNERSHIP_OPERATOR via compat dispatcher.",
    "needs": "owner"
   },
@@ -3688,8 +3688,8 @@
    "cli": "qubit status / lessons / doctor",
    "dashboard": "hermes-dist System/Analytics",
    "voice": "voice status",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate CURATOR_ON_DEMAND via compat dispatcher.",
    "needs": "owner"
   },
@@ -3702,8 +3702,8 @@
    "cli": "qubit status / lessons / doctor",
    "dashboard": "hermes-dist System/Analytics",
    "voice": "voice status",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate CURATOR_ON_DEMAND via compat dispatcher.",
    "needs": "owner"
   },
@@ -3772,8 +3772,8 @@
    "cli": "qubit status / lessons / doctor",
    "dashboard": "hermes-dist System/Analytics",
    "voice": "voice status",
-   "status": "GATED",
-   "proving_test": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "Typed policy gate UPDATE_OPERATOR_OWNED via compat dispatcher.",
    "needs": "owner"
   },
@@ -4025,7 +4025,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_ops.py::test_cli_reaches_typed_refusal_ops",
+   "proving_test": "tests/test_openclaw_wiring8u.py::test_acp_cli_parses_and_dispatches",
    "note": "Agent Client Protocol client/server commands.",
    "needs": "none"
   },
@@ -4039,7 +4039,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_routes_forward_fork_argv",
+   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_confirm_routes_require_confirm_then_forward",
    "note": "Approval journal list/approve/test.",
    "needs": "none"
   },
@@ -4053,7 +4053,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_routes_forward_fork_argv",
+   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_confirm_route_executes_real_fork_with_confirm",
    "note": "Manual-handoff enrollment; token dance refused.",
    "needs": "none"
   },
@@ -4095,7 +4095,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_readonly_family_argv_evidence",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_family_argv_evidence",
    "note": "Fork-backed family; read-only list/show forward verbatim, writes require --confirm.",
    "needs": "none"
   },
@@ -4123,7 +4123,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_checkpoints8tf.py",
+   "proving_test": "tests/test_checkpoints8tf.py::test_checkpoints_cli_wiring",
    "note": "Checkpoint store commands.",
    "needs": "none"
   },
@@ -4151,7 +4151,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_parity_hermes.py::test_completion_matches_parser",
+   "proving_test": "tests/test_parity_hermes.py::test_completion_command_serves_files",
    "note": "Shell completion generation.",
    "needs": "none"
   },
@@ -4291,7 +4291,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_parity_wave1.py::test_readonly_route_strips_qubit_globals",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_readonly_family_argv_evidence",
    "note": "Fork-backed redacted support dump; read-only, forwards verbatim.",
    "needs": "none"
   },
@@ -4375,7 +4375,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_dashboard_ops8tf.py::test_import_extra_is_preview_only",
+   "proving_test": "tests/test_qubit_d5_backup_portable.py::test_d5_export_import_state_preview_only",
    "note": "State import.",
    "needs": "none"
   },
@@ -4389,7 +4389,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_import_agent8tf.py",
+   "proving_test": "tests/test_import_agent8tf.py::test_cli_wiring",
    "note": "Reviewed import inspection.",
    "needs": "none"
   },
@@ -4459,7 +4459,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_routes_forward_fork_argv",
+   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_confirm_route_executes_real_fork_with_confirm",
    "note": "Manual-handoff guided enrollment.",
    "needs": "none"
   },
@@ -4473,7 +4473,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_routes_forward_fork_argv",
+   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_confirm_route_executes_real_fork_with_confirm",
    "note": "Logout.",
    "needs": "none"
   },
@@ -4501,7 +4501,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_acp_lsp8tf.py",
+   "proving_test": "tests/test_qubit_e8_production.py::test_e8_editor_acp_lsp_remain_typed_refusals",
    "note": "LSP surface.",
    "needs": "none"
   },
@@ -4514,9 +4514,9 @@
    "cli": "qubit mcp status",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_forward.py::test_translate_maps_family_and_preserves_trailing_args",
-   "note": "Qubit inventories MCP servers but never mounts; 1 of 14 subcommands.",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_remaining_typed_rows_are_typed_and_confirm_cannot_bypass",
+   "note": "Qubit inventories MCP servers but never mounts or configures them; mount/enable/configure is refused by the MCP_NO_MOUNT policy gate (no `mcp add/remove/configure` subcommand).",
    "needs": "owner"
   },
   {
@@ -4543,7 +4543,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_readonly_family_argv_evidence",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_family_argv_evidence",
    "note": "Fork-backed family; list forwards, edit/delete require --confirm.",
    "needs": "none"
   },
@@ -4571,7 +4571,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_readonly_family_argv_evidence",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_family_argv_evidence",
    "note": "Fork-backed MoA family; reads forward, writes require --confirm.",
    "needs": "none"
   },
@@ -4669,7 +4669,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
+   "proving_test": "tests/test_openclaw_wiring8u.py::test_plugins_cli_parses_and_dispatches",
    "note": "Qubit plugin registry differs from hermes plugin packs.",
    "needs": "none"
   },
@@ -4711,7 +4711,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_openclaw_f2_projects.py",
+   "proving_test": "tests/test_kanban8tf.py::test_project_bind_board_roundtrip",
    "note": "Projects family.",
    "needs": "none"
   },
@@ -4739,7 +4739,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_proxy8tf.py",
+   "proving_test": "tests/test_qubit_e8_production.py::test_e8_proxy_refusal_status_and_providers",
    "note": "Proxy command.",
    "needs": "none"
   },
@@ -4753,7 +4753,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
+   "proving_test": "tests/test_session_lifecycle8u.py::test_cli_sessions_subcommands_roundtrip",
    "note": "No top-level resume; sessions resume exists under sessions.",
    "needs": "none"
   },
@@ -4822,9 +4822,9 @@
    "cli": "qubit sessions list",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
-   "note": "1 of 19; receipts are append-only (prune/import/rename gated).",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_remaining_typed_rows_are_typed_and_confirm_cannot_bypass",
+   "note": "Qubit sessions are append-only metadata tombstones over receipts; bulk delete/prune/import is refused by the SESSIONS_RECEIPT_STORE policy gate.",
    "needs": "owner"
   },
   {
@@ -4850,10 +4850,10 @@
    "cli": "qubit skills / verified-skills",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
-   "note": "Local reviewed installs; remote hub fetch/publish refused.",
-   "needs": "owner"
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_agent2b_wiring.py::test_skills_hub_reads_are_real_local_catalog",
+   "note": "Qubit serves only locally reviewed skill manifests; remote hub fetch/publish is refused by the BLOCKED_REMOTE_SOURCE policy gate.",
+   "needs": "creds"
   },
   {
    "id": "cli:skin",
@@ -4893,7 +4893,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_proxy_status8u.py",
+   "proving_test": "tests/test_rebrand8tf.py::test_status_output_opens_with_qubit_header",
    "note": "Status.",
    "needs": "none"
   },
@@ -4907,7 +4907,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_routes_forward_fork_argv",
+   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_confirm_routes_require_confirm_then_forward",
    "note": "Sync family.",
    "needs": "none"
   },
@@ -5019,7 +5019,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_missing_wave2.py::test_worktree_add_without_confirm_is_a_typed_refusal",
+   "proving_test": "tests/test_cli_missing_wave2.py::test_worktree_add_confirm_creates_confined_worktree",
    "note": "Qubit-native confined git-worktree lifecycle plus the fork read/prune surface.",
    "needs": "none"
   },
@@ -5033,7 +5033,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
+   "proving_test": "tests/test_session_lifecycle8u.py::test_cli_sessions_subcommands_roundtrip",
    "note": "Subcommand-surface gap inside the sessions family.",
    "needs": "none"
   },
@@ -5047,7 +5047,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_table_argv_evidence",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_confirm_route_executes_real_fork_with_confirm",
    "note": "Subcommand-surface gap inside the sessions family.",
    "needs": "none"
   },
@@ -5060,9 +5060,9 @@
    "cli": "qubit sessions (append-only)",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
+   "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_session_lifecycle8u.py::test_cli_sessions_subcommands_roundtrip",
-   "note": "Subcommand-surface gap inside the sessions family.",
+   "note": "Native Qubit `sessions delete` is a confirm-gated audited tombstone; without --confirm it returns CONFIRM_REQUIRED, never a destructive write.",
    "needs": "creds"
   },
   {
@@ -5074,9 +5074,9 @@
    "cli": "qubit sessions (append-only)",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
-   "note": "Subcommand-surface gap inside the sessions family.",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_remaining_typed_rows_are_typed_and_confirm_cannot_bypass",
+   "note": "No Qubit `sessions prune` subcommand; bulk receipt pruning is refused by the append-only SESSIONS_RECEIPT_STORE gate.",
    "needs": "creds"
   },
   {
@@ -5102,9 +5102,9 @@
    "cli": "qubit sessions (append-only)",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
+   "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_session_lifecycle8u.py::test_cli_sessions_subcommands_roundtrip",
-   "note": "Subcommand-surface gap inside the sessions family.",
+   "note": "Native Qubit `sessions rename` is an audited metadata tombstone over append-only receipts (SESSIONS_RECEIPT_STORE).",
    "needs": "creds"
   },
   {
@@ -5158,10 +5158,10 @@
    "cli": "qubit mcp (inventory only)",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_forward.py::test_translate_maps_family_and_preserves_trailing_args",
-   "note": "Subcommand-surface gap inside the mcp family.",
-   "needs": "creds"
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_remaining_typed_rows_are_typed_and_confirm_cannot_bypass",
+   "note": "No Qubit `mcp add` subcommand; mounting an MCP server is refused by the MCP_NO_MOUNT policy gate at the MCP backend.",
+   "needs": "owner"
   },
   {
    "id": "cli:mcp remove",
@@ -5172,10 +5172,10 @@
    "cli": "qubit mcp (inventory only)",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_forward.py::test_translate_maps_family_and_preserves_trailing_args",
-   "note": "Subcommand-surface gap inside the mcp family.",
-   "needs": "creds"
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_remaining_typed_rows_are_typed_and_confirm_cannot_bypass",
+   "note": "No Qubit `mcp remove` subcommand; unmounting is refused by the MCP_NO_MOUNT policy gate (inventory only).",
+   "needs": "owner"
   },
   {
    "id": "cli:mcp test",
@@ -5186,7 +5186,7 @@
    "cli": "qubit mcp test (MCP_NO_MOUNT; never mounts)",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
+   "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_table_argv_evidence",
    "note": "Subcommand-surface gap inside the mcp family.",
    "needs": "creds"
@@ -5200,10 +5200,10 @@
    "cli": "qubit mcp (inventory only)",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_forward.py::test_translate_maps_family_and_preserves_trailing_args",
-   "note": "Subcommand-surface gap inside the mcp family.",
-   "needs": "creds"
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_remaining_typed_rows_are_typed_and_confirm_cannot_bypass",
+   "note": "No Qubit `mcp configure` subcommand; configuration/mounting is refused by the MCP_NO_MOUNT policy gate (inventory only).",
+   "needs": "owner"
   },
   {
    "id": "cli:mcp catalog",
@@ -5214,8 +5214,8 @@
    "cli": "qubit mcp catalog (MCP_NO_MOUNT; empty/refusal)",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_forward.py::test_translate_maps_family_and_preserves_trailing_args",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_cli_agent1_forward.py::test_forwarded_mcp_catalog_runs_in_fork",
    "note": "Subcommand-surface gap inside the mcp family.",
    "needs": "creds"
   },
@@ -5270,9 +5270,9 @@
    "cli": "qubit config profiles (staged)",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
-   "note": "Subcommand-surface gap inside the config family.",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_confirm_routes_require_confirm_then_forward",
+   "note": "Qubit maps config writes to `qubit flags set`, which is a dry-run preview unless --apply and never writes without the shared CONFIRM_REQUIRED guard.",
    "needs": "creds"
   },
   {
@@ -5284,9 +5284,9 @@
    "cli": "qubit config profiles (staged)",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
-   "note": "Subcommand-surface gap inside the config family.",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_confirm_routes_require_confirm_then_forward",
+   "note": "No Qubit `config unset` subcommand; config mutation is exposed through the confirm-gated `qubit flags` surface and otherwise returns CONFIRM_REQUIRED.",
    "needs": "creds"
   },
   {
@@ -5368,9 +5368,9 @@
    "cli": "qubit plugins (remote refused)",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
-   "note": "Subcommand-surface gap inside the plugins family.",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_agent2b_wiring.py::test_skills_hub_reads_are_real_local_catalog",
+   "note": "No Qubit `plugins install` subcommand; remote plugin install is refused by BLOCKED_REMOTE_SOURCE (validated local manifests only).",
    "needs": "creds"
   },
   {
@@ -5382,9 +5382,9 @@
    "cli": "qubit plugins (remote refused)",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
-   "note": "Subcommand-surface gap inside the plugins family.",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_agent2b_wiring.py::test_skills_hub_reads_are_real_local_catalog",
+   "note": "No Qubit `plugins update` subcommand; remote plugin updates are refused by BLOCKED_REMOTE_SOURCE (immutable versions).",
    "needs": "creds"
   },
   {
@@ -5425,7 +5425,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
+   "proving_test": "tests/test_openclaw_wiring8u.py::test_plugins_cli_parses_and_dispatches",
    "note": "Subcommand-surface gap inside the plugins family.",
    "needs": "none"
   },
@@ -5550,9 +5550,9 @@
    "cli": "qubit skills install (local manifest only)",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
+   "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_cli_agent1_forward.py::test_translate_ignores_unmapped_and_short_calls",
-   "note": "Subcommand-surface gap inside the skills family.",
+   "note": "Native `qubit skills install <manifest>` stages a validated local manifest only; remote/hub sources are refused by BLOCKED_REMOTE_SOURCE.",
    "needs": "creds"
   },
   {
@@ -5564,9 +5564,9 @@
    "cli": "qubit skills (remote refused)",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
-   "note": "Subcommand-surface gap inside the skills family.",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_agent2b_wiring.py::test_skills_hub_reads_are_real_local_catalog",
+   "note": "No Qubit `skills update` subcommand; remote hub updates are refused by BLOCKED_REMOTE_SOURCE (immutable local versions).",
    "needs": "creds"
   },
   {
@@ -5578,9 +5578,9 @@
    "cli": "qubit verified-skills (curated)",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
-   "note": "Subcommand-surface gap inside the skills family.",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_agent2b_wiring.py::test_skills_hub_reads_are_real_local_catalog",
+   "note": "`qubit skills audit` reads the local curated catalog only; remote hub sources are refused by BLOCKED_REMOTE_SOURCE.",
    "needs": "creds"
   },
   {
@@ -5592,9 +5592,9 @@
    "cli": "qubit verified-skills submit",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
-   "note": "Subcommand-surface gap inside the skills family.",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_agent2b_wiring.py::test_skills_hub_reads_are_real_local_catalog",
+   "note": "No Qubit `skills publish` subcommand; publishing to a remote hub is refused by BLOCKED_REMOTE_SOURCE.",
    "needs": "creds"
   },
   {
@@ -5606,9 +5606,9 @@
    "cli": "qubit skills (remote refused)",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
+   "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_confirm_routes_require_confirm_then_forward",
-   "note": "Subcommand-surface gap inside the skills family.",
+   "note": "`qubit skills tap` is a confirm-gated route; without --confirm it returns CONFIRM_REQUIRED and never reaches the remote source.",
    "needs": "creds"
   },
   {
@@ -5621,7 +5621,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_table_argv_evidence",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_confirm_route_executes_real_fork_with_confirm",
    "note": "Subcommand-surface gap inside the tools family.",
    "needs": "none"
   },
@@ -5691,7 +5691,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_missing_wave2.py::test_worktree_add_without_confirm_is_a_typed_refusal",
+   "proving_test": "tests/test_cli_missing_wave2.py::test_worktree_add_confirm_creates_confined_worktree",
    "note": "Subcommand-surface gap inside the worktree family.",
    "needs": "none"
   },
@@ -5733,7 +5733,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_routes_forward_fork_argv",
+   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_route_executes_real_fork",
    "note": "Subcommand-surface gap inside the approvals family.",
    "needs": "none"
   },
@@ -5831,7 +5831,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_confirm_routes_require_confirm_then_forward",
+   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_confirm_route_executes_real_fork_with_confirm",
    "note": "Subcommand-surface gap inside the skills family.",
    "needs": "none"
   },
@@ -5845,7 +5845,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
+   "proving_test": "tests/test_cli_agent1_wiring.py::test_skills_workshop_collection_layer",
    "note": "Subcommand-surface gap inside the skills family.",
    "needs": "none"
   },
@@ -5873,7 +5873,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_confirm_routes_require_confirm_then_forward",
+   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_confirm_route_executes_real_fork_with_confirm",
    "note": "Subcommand-surface gap inside the auth family.",
    "needs": "none"
   },
@@ -5887,7 +5887,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_routes_forward_fork_argv",
+   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_route_executes_real_fork",
    "note": "Subcommand-surface gap inside the auth family.",
    "needs": "none"
   },
@@ -5901,7 +5901,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_routes_forward_fork_argv",
+   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_confirm_route_executes_real_fork_with_confirm",
    "note": "Subcommand-surface gap inside the auth family.",
    "needs": "none"
   },
@@ -5985,7 +5985,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_routes_forward_fork_argv",
+   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_confirm_route_executes_real_fork_with_confirm",
    "note": "Subcommand-surface gap inside the auth family.",
    "needs": "none"
   },
@@ -6054,9 +6054,9 @@
    "cli": "qubit computer-use install",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_wiring.py::test_computer_use_screen_arrangement",
-   "note": "Subcommand-surface gap inside the computer-use family.",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_computer_use8tf.py::test_cli_wiring",
+   "note": "Native `qubit computer-use install` returns the typed COMPUTER_USE_NO_DRIVER refusal; no unpinned driver is ever downloaded.",
    "needs": "creds"
   },
   {
@@ -6082,9 +6082,9 @@
    "cli": "qubit computer-use permissions",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_wiring.py::test_computer_use_screen_arrangement",
-   "note": "Subcommand-surface gap inside the computer-use family.",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_computer_use8tf.py::test_permissions_record",
+   "note": "No Qubit `permissions grant` subcommand; granting desktop control requires the pinned 8V actuator and is refused by the COMPUTER_USE_NO_DRIVER policy (control stays DISABLED).",
    "needs": "creds"
   },
   {
@@ -6167,7 +6167,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_confirm_routes_require_confirm_then_forward",
+   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_confirm_route_executes_real_fork_with_confirm",
    "note": "Subcommand-surface gap inside the cron family.",
    "needs": "none"
   },
@@ -6209,7 +6209,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_confirm_routes_require_confirm_then_forward",
+   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_confirm_route_executes_real_fork_with_confirm",
    "note": "Subcommand-surface gap inside the fallback family.",
    "needs": "none"
   },
@@ -6278,9 +6278,9 @@
    "cli": "qubit gateway install",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_wiring.py::test_gateway_supervision_and_discovery",
-   "note": "Subcommand-surface gap inside the gateway family.",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_gateway_peers8tf.py::test_gateway_link_and_supervision",
+   "note": "Native `qubit gateway install` returns the typed GATEWAY_NO_SUPERVISION refusal; the gateway process is operator-supervised, not Qubit-spawned.",
    "needs": "creds"
   },
   {
@@ -6320,9 +6320,9 @@
    "cli": "qubit gateway restart",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_wiring.py::test_gateway_supervision_and_discovery",
-   "note": "Subcommand-surface gap inside the gateway family.",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_gateway_peers8tf.py::test_gateway_link_and_supervision",
+   "note": "Native `qubit gateway restart` returns the typed GATEWAY_NO_SUPERVISION refusal (operator-owned service).",
    "needs": "creds"
   },
   {
@@ -6334,9 +6334,9 @@
    "cli": "qubit gateway run",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_wiring.py::test_gateway_supervision_and_discovery",
-   "note": "Subcommand-surface gap inside the gateway family.",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_gateway_peers8tf.py::test_gateway_link_and_supervision",
+   "note": "Native `qubit gateway run` returns the typed GATEWAY_NO_SUPERVISION refusal (one Qubit event path only).",
    "needs": "creds"
   },
   {
@@ -6362,9 +6362,9 @@
    "cli": "qubit gateway start",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_wiring.py::test_gateway_supervision_and_discovery",
-   "note": "Subcommand-surface gap inside the gateway family.",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_gateway_peers8tf.py::test_gateway_link_and_supervision",
+   "note": "Native `qubit gateway start` returns the typed GATEWAY_NO_SUPERVISION refusal (operator-supervised).",
    "needs": "creds"
   },
   {
@@ -6390,9 +6390,9 @@
    "cli": "qubit gateway stop",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_wiring.py::test_gateway_supervision_and_discovery",
-   "note": "Subcommand-surface gap inside the gateway family.",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_gateway_peers8tf.py::test_gateway_link_and_supervision",
+   "note": "Native `qubit gateway stop` returns the typed GATEWAY_NO_SUPERVISION refusal (operator-supervised).",
    "needs": "creds"
   },
   {
@@ -6461,7 +6461,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_routes_forward_fork_argv",
+   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_route_executes_real_fork",
    "note": "Subcommand-surface gap inside the mcp family.",
    "needs": "none"
   },
@@ -6671,7 +6671,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_readonly_family_argv_evidence",
+   "proving_test": "tests/test_cli_parity_wave1.py::test_inline_confirm_family_argv_evidence",
    "note": "Subcommand-surface gap inside the moa family.",
    "needs": "none"
   },
@@ -6797,7 +6797,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
+   "proving_test": "tests/test_openclaw_wiring8u.py::test_plugins_cli_parses_and_dispatches",
    "note": "Subcommand-surface gap inside the plugins family.",
    "needs": "none"
   },
@@ -6825,7 +6825,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_remaining_family_argv_surfaces_reach_a_real_surface",
+   "proving_test": "tests/test_openclaw_wiring8u.py::test_plugins_cli_parses_and_dispatches",
    "note": "Subcommand-surface gap inside the plugins family.",
    "needs": "none"
   },
@@ -6909,7 +6909,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
+   "proving_test": "tests/test_openclaw_wiring8u.py::test_plugins_cli_parses_and_dispatches",
    "note": "Subcommand-surface gap inside the plugins family.",
    "needs": "none"
   },
@@ -7091,7 +7091,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_openclaw_f2_projects.py",
+   "proving_test": "tests/test_kanban8tf.py::test_project_bind_board_roundtrip",
    "note": "Subcommand-surface gap inside the project family.",
    "needs": "none"
   },
@@ -7105,7 +7105,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_openclaw_f2_projects.py",
+   "proving_test": "tests/test_kanban8tf.py::test_project_bind_board_roundtrip",
    "note": "Subcommand-surface gap inside the project family.",
    "needs": "none"
   },
@@ -7119,7 +7119,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_openclaw_f2_projects.py",
+   "proving_test": "tests/test_kanban8tf.py::test_project_bind_board_roundtrip",
    "note": "Subcommand-surface gap inside the project family.",
    "needs": "none"
   },
@@ -7133,7 +7133,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_proxy8tf.py",
+   "proving_test": "tests/test_qubit_e8_production.py::test_e8_proxy_refusal_status_and_providers",
    "note": "Subcommand-surface gap inside the proxy family.",
    "needs": "none"
   },
@@ -7147,7 +7147,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_proxy8tf.py",
+   "proving_test": "tests/test_qubit_e8_production.py::test_e8_proxy_refusal_status_and_providers",
    "note": "Subcommand-surface gap inside the proxy family.",
    "needs": "none"
   },
@@ -7161,7 +7161,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_proxy8tf.py",
+   "proving_test": "tests/test_qubit_e8_production.py::test_e8_proxy_refusal_status_and_providers",
    "note": "Subcommand-surface gap inside the proxy family.",
    "needs": "none"
   },
@@ -7216,9 +7216,9 @@
    "cli": "qubit sessions archive",
    "dashboard": "",
    "voice": "",
-   "status": "GATED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
-   "note": "Subcommand-surface gap inside the sessions family.",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_session_lifecycle8u.py::test_cli_sessions_subcommands_roundtrip",
+   "note": "Native Qubit `sessions archive` is an append-only audited tombstone (reversible); receipt contents are never rewritten (SESSIONS_RECEIPT_STORE).",
    "needs": "creds"
   },
   {
@@ -7231,7 +7231,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_routes_forward_fork_argv",
+   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_route_executes_real_fork",
    "note": "Subcommand-surface gap inside the sessions family.",
    "needs": "none"
   },
@@ -7259,7 +7259,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
+   "proving_test": "tests/test_session_lifecycle8u.py::test_cli_sessions_subcommands_roundtrip",
    "note": "Subcommand-surface gap inside the sessions family.",
    "needs": "none"
   },
@@ -7343,7 +7343,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_routes_forward_fork_argv",
+   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_route_executes_real_fork",
    "note": "Subcommand-surface gap inside the skills family.",
    "needs": "none"
   },
@@ -7357,7 +7357,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
+   "proving_test": "tests/test_cli_agent1_wiring.py::test_skills_workshop_collection_layer",
    "note": "Subcommand-surface gap inside the skills family.",
    "needs": "none"
   },
@@ -7399,7 +7399,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
+   "proving_test": "tests/test_cli_agent1_wiring.py::test_skills_workshop_collection_layer",
    "note": "Subcommand-surface gap inside the skills family.",
    "needs": "none"
   },
@@ -7413,7 +7413,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_forward_mapped_families_reach_the_fork_argv",
+   "proving_test": "tests/test_cli_agent1_wiring.py::test_skills_workshop_collection_layer",
    "note": "Subcommand-surface gap inside the skills family.",
    "needs": "none"
   },
@@ -7749,7 +7749,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_routes_forward_fork_argv",
+   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_route_executes_real_fork",
    "note": "Subcommand-surface gap inside the sync family.",
    "needs": "none"
   },
@@ -8140,7 +8140,7 @@
    "cli": "qubit kanban * (--confirm via approvals)",
    "dashboard": "hermes-dist Kanban tab write controls",
    "voice": "voice kanban_* (confirm)",
-   "status": "GATED",
+   "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_hermes_plugins.py::test_kanban_writes_stay_on_policy_gate",
    "note": "Every pinned kanban write route (create/patch/delete/bulk task, comments, links, boards CRUD/transfer/switch, dispatch, reclaim/reassign/specify/decompose, estimate, home-subscribe, run terminate, profile describe) resolves to the shared KANBAN_WRITE_BROKERED confirmation/broker gate; nothing is served as a direct dashboard write. The CLI/voice counterpart is `qubit kanban` + the pending-approvals banner.",
    "needs": "owner"

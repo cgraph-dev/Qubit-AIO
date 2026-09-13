@@ -1323,7 +1323,8 @@ def build_inventory_rows(report: Dict[str, object], known_ids: Set[str],
             # intentionally-refused command is part of that refusal, not an
             # independent missing capability.  Surfaced as parent-gated
             # coverage, never as IMPLEMENTED.
-            if parent_status in ("IMPLEMENTED", "GATED"):
+            if parent_status in ("IMPLEMENTED", "SAFE_EQUIVALENT",
+                                 "OPERATOR_ONLY", "GATED"):
                 covered = True
         if covered:
             covered_count += 1
@@ -1475,6 +1476,108 @@ def build_inventory_rows(report: Dict[str, object], known_ids: Set[str],
 # ---------------------------------------------------------------------------
 # Assemble
 # ---------------------------------------------------------------------------
+_GATE_PROOF = ("tests/test_hermes_routes_parity8u.py::"
+               "test_every_gated_route_is_typed")
+
+# A typed unavailable/refusal signal: an ALL_CAPS gate code (``FOO_BAR``) or a
+# typed state token.  A PARTIAL row may only become OPERATOR_ONLY when its note
+# records one; a ``PARTIAL``/``needs=none``/stub row stays open.
+_TYPED_CODE_RE = re.compile(r"\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b")
+_TYPED_STATE_RE = re.compile(
+    r"\b(?:OK|DEGRADED|MISSING|DISABLED|REFUSED|REJECTED|UNAVAILABLE|"
+    r"NEEDS_CONFIRM)\b")
+
+
+def _has_typed_evidence(note: str) -> bool:
+    text = note or ""
+    return bool(_TYPED_CODE_RE.search(text) or _TYPED_STATE_RE.search(text))
+
+
+# Per-row canonical evidence for the terminal gate rows whose raw audit surface
+# is ``PARTIAL``/``GATED``.  Determined from the live production path and the
+# on-disk test that exercises it (docs/OPERATOR_QUALIFICATION.md and
+# docs/QUBIT_SAFE_EQUIVALENTS.md):
+#
+# * ``browser_close`` / ``browser_close_refusal`` are a typed refusal of the
+#   unsafe raw upstream behavior (closing a personal browser profile) ->
+#   SAFE_EQUIVALENT, no hardware gate (``needs=owner``).
+# * the three desktop rows are code-complete typed refusals/diagnostics that
+#   need a live graphical/actuator prerequisite -> OPERATOR_ONLY.
+TERMINAL_EVIDENCE: Dict[str, Dict[str, str]] = {
+    "browser_close": {
+        "status": "SAFE_EQUIVALENT",
+        "needs": "owner",
+        "note": ("Typed refusal: BROWSER_CLOSE_REFUSED — personal browser "
+                 "profiles are never touched; Qubit only owns dedicated "
+                 "profiles."),
+        "proving_test": (
+            "tests/test_browser8tf.py::test_close_profile_refuses_real_user_profiles"),
+    },
+    "browser_close_refusal": {
+        "status": "SAFE_EQUIVALENT",
+        "needs": "owner",
+        "note": ("Typed refusal: BROWSER_CLOSE_REFUSED — the voice close "
+                 "command never touches a profile."),
+        "proving_test": (
+            "tests/test_browser8tf.py::test_close_profile_refuses_real_user_profiles"),
+    },
+    "computer_doctor": {
+        "status": "OPERATOR_ONLY",
+        "needs": "hardware",
+        "note": ("Typed diagnostic state: driver=MISSING, overall DEGRADED — "
+                 "display/accessibility/driver probes only; no unpinned driver "
+                 "(COMPUTER_USE_NO_DRIVER policy)."),
+    },
+    "computer_install_refusal": {
+        "status": "OPERATOR_ONLY",
+        "needs": "hardware",
+        "note": ("Typed refusal: COMPUTER_USE_NO_DRIVER — drivers are never "
+                 "auto-installed; desktop control arrives via the operator-"
+                 "provisioned pinned 8V actuator."),
+    },
+    "computer_permissions": {
+        "status": "OPERATOR_ONLY",
+        "needs": "hardware",
+        "note": ("Typed policy state: control=DISABLED — bounded desktop "
+                 "scope; granting control requires the pinned actuator "
+                 "(COMPUTER_USE_NO_DRIVER policy)."),
+    },
+}
+
+
+def _finalize_terminal_statuses(rows: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    """Owner 2026-09-13 terminal-status decision.
+
+    A Qubit policy gate (``GATED``) *that names a real backend* is a
+    SAFE_EQUIVALENT (the unsafe raw upstream behavior is explicitly refused
+    under the shared policy); a ``GATED`` row with no backend path is **not** a
+    safe equivalent and stays open.  A ``PARTIAL`` row whose note records a
+    typed refusal/unavailable code and that needs live credentials/hardware is
+    OPERATOR_ONLY; a ``PARTIAL``/``needs=none``/stub row stays open.  The
+    browser/desktop terminal rows use the explicit canonical evidence above.
+    """
+    proof_file = (ROOT / _GATE_PROOF.split("::")[0])
+    for row in rows:
+        evidence = TERMINAL_EVIDENCE.get(row["id"])
+        if evidence:
+            for key, value in evidence.items():
+                if key in row:
+                    row[key] = value
+            continue
+        status = row["status"]
+        if status == "GATED":
+            if not row.get("qubit_backend"):
+                # No real backend path: not a safe equivalent.  Keep it open.
+                continue
+            row["status"] = "SAFE_EQUIVALENT"
+            if not row["proving_test"] and proof_file.is_file():
+                row["proving_test"] = _GATE_PROOF
+        elif (status == "PARTIAL" and row.get("needs") in ("creds", "hardware")
+              and _has_typed_evidence(row.get("note", ""))):
+            row["status"] = "OPERATOR_ONLY"
+    return rows
+
+
 def build_ledger(inventory_path: Optional[Path] = None) -> Dict[str, object]:
     tree = _parser_tree()
     index = build_test_index()
@@ -1492,7 +1595,7 @@ def build_ledger(inventory_path: Optional[Path] = None) -> Dict[str, object]:
     known_status.update(_load_section_status(ROOT / "docs"))
     inventory_rows, inventory_summary = build_inventory_rows(
         inventory, known_ids, known_status)
-    rows = rows + inventory_rows
+    rows = _finalize_terminal_statuses(rows + inventory_rows)
 
     no_backend = [r["id"] for r in rows
                   if r["status"] == "IMPLEMENTED" and not r["qubit_backend"]]

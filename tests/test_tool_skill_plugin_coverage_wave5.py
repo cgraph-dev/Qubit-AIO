@@ -37,7 +37,17 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 INVENTORY_PATH = REPO_ROOT / "docs" / "QUBIT_SOURCE_INVENTORY.json"
 COVERED_CATEGORIES = frozenset({"hermes_tool", "hermes_skill", "hermes_plugin"})
+# Source-inventory ``fork_disposition`` statuses (unchanged by the owner's
+# terminal-status decision).
 DISPOSITION_STATUSES = frozenset({"IMPLEMENTED", "GATED"})
+# Owner decision 2026-09-13: the gap ledger emits terminal statuses. An
+# IMPLEMENTED disposition stays IMPLEMENTED; a GATED policy refusal is a
+# SAFE_EQUIVALENT ledger row.
+LEDGER_STATUS_FOR_DISPOSITION = {
+    "IMPLEMENTED": "IMPLEMENTED",
+    "GATED": "SAFE_EQUIVALENT",
+}
+LEDGER_DISPOSITION_STATUSES = frozenset(LEDGER_STATUS_FOR_DISPOSITION.values())
 CAPABILITY_BY_CATEGORY = {
     "hermes_tool": "fork_tool_runtime",
     "hermes_skill": "fork_skill_runtime",
@@ -278,7 +288,7 @@ def test_ledger_emits_a_typed_row_for_every_dispositioned_item(inventory):
     disposition_rows = [
         r for r in data["rows"]
         if r["id"].startswith("inv:")
-        and r["status"] in DISPOSITION_STATUSES]
+        and r["status"] in LEDGER_DISPOSITION_STATUSES]
     assert len(disposition_rows) == summary["dispositioned"], (
         len(disposition_rows), summary["dispositioned"])
 
@@ -302,7 +312,8 @@ def test_ledger_emits_a_typed_row_for_every_dispositioned_item(inventory):
             offenders.append((it["id"], row_id))
     assert offenders == [], offenders
 
-    # Every emitted disposition row matches its inventory disposition status.
+    # Every emitted disposition row carries the terminal status that the
+    # owner's decision maps its inventory disposition to.
     by_row_id = {rebuild._inventory_row_id(it["id"]): it
                  for it in _covered_items(inventory)}
     for row in disposition_rows:
@@ -312,5 +323,6 @@ def test_ledger_emits_a_typed_row_for_every_dispositioned_item(inventory):
             # are asserted by their own wave-5 suite; this test owns the fork
             # tool/skill/plugin disposition path.
             continue
-        expected = (item.get("fork_disposition") or {}).get("status")
+        disposition = (item.get("fork_disposition") or {}).get("status")
+        expected = LEDGER_STATUS_FOR_DISPOSITION[disposition]
         assert row["status"] == expected, (row["id"], row["status"], expected)

@@ -9,9 +9,11 @@ adapter; the live network is the last mile and stays credential-gated:
   | ``signal`` | ``matrix`` | ``msteams`` | ``imessage``) with label,
   endpoint (provider allowlist enforced, lookalike hosts refused), origin
   binding, and a vault-only key reference (never a value). Explicit
-  ``--confirm``. See :data:`PROVIDER_CAPS`: a channel with no Qubit
-  transport adapter is recorded honestly and reports a typed
-  ``UNAVAILABLE`` state (``MSG_TRANSPORT_UNAVAILABLE``), never a fake send.
+  ``--confirm``. See :data:`PROVIDER_CAPS`: every recognized channel ships a
+  bounded send/receive adapter seam (build the provider request, parse the
+  event) behind an operator-injected transport. Without that transport (or
+  with an unresolvable credential) the call is a typed ``UNAVAILABLE`` state
+  (``MSG_TRANSPORT_UNAVAILABLE`` / ``MSG_NO_CREDENTIAL``), never a fake send.
 * ``provider-catalog`` — :func:`provider_catalog` typed read of the channel
   set: which transports exist and which are unavailable, no credential read.
 * ``draft`` — stage an outbox message (recipient + body caps, preview
@@ -117,39 +119,45 @@ PROVIDER_CAPS: Dict[str, Dict[str, Any]] = {
         "transport": "signal-cli",
         "available": False,
         "credential_kind": "linked-device",
-        "detail": "Signal needs a local signal-cli linked device; no adapter "
-                  "exists in Qubit",
+        "detail": "Qubit ships a bounded signal-cli send/receive adapter over "
+                  "an injected transport; the live signal-cli linked device is "
+                  "the credential/bridge gate",
     },
     "matrix": {
         "label": "Matrix",
         "transport": "client-server",
         "available": False,
         "credential_kind": "access-token",
-        "detail": "no Matrix client-server adapter exists in Qubit",
+        "detail": "Qubit ships a bounded Matrix client-server send/receive "
+                  "adapter (client helper + E2EE seam) over an injected "
+                  "transport; the live homeserver credential is the gate",
     },
     "msteams": {
         "label": "Microsoft Teams",
         "transport": "bot-framework",
         "available": False,
         "credential_kind": "bot-credentials",
-        "detail": "Teams needs an Azure Bot Framework registration; no "
-                  "adapter exists in Qubit",
+        "detail": "Qubit ships a bounded Bot Framework send/receive adapter "
+                  "over an injected transport; the Azure Bot registration/"
+                  "credential is the gate",
     },
     "imessage": {
         "label": "iMessage",
         "transport": "local-bridge",
         "available": False,
         "credential_kind": "local-bridge",
-        "detail": "iMessage needs a macOS Messages bridge; no adapter exists "
-                  "in Qubit",
+        "detail": "Qubit ships a bounded macOS Messages bridge send/receive "
+                  "adapter over an injected transport; the macOS bridge is the "
+                  "gate",
     },
     "feishu": {
         "label": "Feishu / Lark",
         "transport": "webhook",
         "available": False,
         "credential_kind": "app-secret",
-        "detail": "Feishu dynamic agents need an open-platform event adapter; "
-                  "Qubit recognizes the channel but has no Feishu transport",
+        "detail": "Qubit ships a bounded open-platform send/receive adapter and "
+                  "dynamic-agent routing over an injected transport; the hosted "
+                  "app credential is the gate",
     },
 }
 
@@ -601,11 +609,14 @@ MAX_GRANT_SKEW_S = 86400.0
 
 
 # Provider transports that may be driven over an operator-injected boundary
-# (the injected callable is the credential/network adapter). Classic WhatsApp
-# stays session-based and iMessage/Signal/Teams require host-specific bridges
-# Qubit does not ship, so they stay typed UNAVAILABLE even with an injection.
+# (the injected callable is the credential/network/bridge adapter). Every
+# recognized channel that has a bounded Qubit send shaper is injectable; the
+# remaining prerequisite is the live credential/bridge, never missing Qubit
+# code. Classic WhatsApp stays session-based and is the only recognized channel
+# with no request shaper at all.
 _INJECTABLE_TRANSPORTS = frozenset({
-    "slack", "whatsapp-cloud", "discord", "telegram", "matrix", "feishu"})
+    "slack", "whatsapp-cloud", "discord", "telegram", "matrix", "feishu",
+    "signal", "msteams", "imessage"})
 
 
 def _provider_request(account_provider: str, endpoint: str,
@@ -655,6 +666,30 @@ def _provider_request(account_provider: str, endpoint: str,
         return {"provider": "feishu", "method": "POST", "url": webhook,
                 "headers": {"Content-Type": "application/json"},
                 "body": {"msg_type": "text", "content": {"text": body}}}
+    if account_provider == "signal":
+        base = (str(fields.get("signal_cli_url", "")).strip().rstrip("/")
+                or "http://127.0.0.1:8080")
+        return {"provider": "signal", "type": "send", "method": "POST",
+                "url": f"{base}/api/v1/rpc",
+                "headers": {"Content-Type": "application/json"},
+                "body": {"jsonrpc": "2.0", "method": "send",
+                         "params": {"recipient": [str(to)], "message": body},
+                         "id": uuid.uuid4().hex}}
+    if account_provider == "msteams":
+        service = (str(fields.get("service_url", "")).strip().rstrip("/")
+                   or "https://smba.trafficmanager.net/teams")
+        return {"provider": "msteams", "type": "message", "method": "POST",
+                "url": (f"{service}/v3/conversations/"
+                        f"{urllib.parse.quote(str(to), safe='')}/activities"),
+                "headers": {"Content-Type": "application/json"},
+                "body": {"type": "message", "text": body}}
+    if account_provider == "imessage":
+        base = (str(fields.get("bridge_url", "")).strip().rstrip("/")
+                or "http://127.0.0.1:8080")
+        return {"provider": "imessage", "type": "send", "method": "POST",
+                "url": f"{base}/api/send",
+                "headers": {"Content-Type": "application/json"},
+                "body": {"to": str(to), "text": body}}
     return {}
 
 
@@ -683,6 +718,18 @@ def _receipt_from(account_provider: str, data: Any) -> Dict[str, Any]:
                else data.get("message_id"))
         if mid:
             return {"provider_msg_id": str(mid)}
+    if account_provider == "signal":
+        result = data.get("result") if isinstance(data.get("result"), dict) \
+            else data
+        for key in ("timestamp", "id", "message_id"):
+            if result.get(key) is not None:
+                return {"provider_msg_id": str(result[key])[:120]}
+    if account_provider == "msteams" and data.get("id"):
+        return {"provider_msg_id": str(data["id"])[:120]}
+    if account_provider == "imessage":
+        for key in ("id", "guid", "message_id"):
+            if data.get(key):
+                return {"provider_msg_id": str(data[key])[:120]}
     msgs = data.get("messages")
     if isinstance(msgs, list) and msgs and isinstance(msgs[0], dict) \
             and "id" in msgs[0]:

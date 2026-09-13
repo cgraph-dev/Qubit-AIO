@@ -226,6 +226,100 @@ def test_page_plugin_evidence_rule_branches(tmp_path) -> None:
     assert unproven_plugin["proving_test"] == "", unproven_plugin
 
 
+def test_all_rows_are_terminal_or_documented_open() -> None:
+    """Every committed row is terminal except the one documented open row.
+
+    ``skills/index-cache`` is a vendored JSON asset cache with no loadable
+    ``SKILL.md``; it is a non-capability and is excluded from the surface
+    inventory entirely, so the committed ledger has no open row.  Any
+    non-terminal row fails this gate.
+    """
+    rows = _section()["rows"]
+    allowed_open = set()
+    non_terminal = [(r["id"], r["status"]) for r in rows
+                    if r["status"] not in gap_ledger.TERMINAL_STATUSES]
+    assert sorted(r[0] for r in non_terminal) == sorted(allowed_open)
+    # The pre-2026-09-13 gate statuses must not leak in for any other row.
+    for stale in ("GATED", "PARTIAL", "MISSING", "UNVERIFIED", "CLI_ONLY",
+                  "DASHBOARD_ONLY", "VOICE_ONLY"):
+        offenders = [r["id"] for r in rows if r["status"] == stale]
+        assert set(offenders) <= allowed_open, (stale, offenders)
+
+
+def test_terminal_rows_have_proof_and_valid_needs() -> None:
+    """SAFE_EQUIVALENT / OPERATOR_ONLY rows keep real evidence and a live need."""
+    allowed = {"creds", "hardware", "owner"}
+    for row in _section()["rows"]:
+        if row["status"] not in ("SAFE_EQUIVALENT", "OPERATOR_ONLY"):
+            continue
+        assert row["needs"] in allowed, (row["id"], row["needs"])
+        assert row["needs"] != "none", row["id"]
+        proving = row["proving_test"]
+        assert proving, (row["id"], "empty proving_test")
+        assert (REPO_ROOT / proving.split("::", 1)[0]).is_file(), \
+            (row["id"], proving)
+
+
+def test_browser_close_rows_are_safe_equivalents() -> None:
+    """The browser close rows are typed refusals, not hardware-gated manual rows."""
+    rows = {r["id"]: r for r in _section()["rows"]}
+    for rid in ("browser_close", "browser_close_refusal"):
+        row = rows[rid]
+        assert row["status"] == "SAFE_EQUIVALENT", (rid, row["status"])
+        assert row["needs"] == "owner", (rid, row["needs"])
+        assert "BROWSER_CLOSE_REFUSED" in row["note"], rid
+        assert row["proving_test"], rid
+        assert (REPO_ROOT / row["proving_test"].split("::", 1)[0]).is_file()
+
+
+def test_terminal_status_mapping_follows_owner_decision() -> None:
+    """GATED(+backend) -> SAFE_EQUIVALENT; PARTIAL(creds/hw + typed) -> OPERATOR_ONLY."""
+    rows = [
+        {"id": "a", "status": "GATED", "needs": "owner", "proving_test": "x",
+         "qubit_backend": "b", "note": "gate"},
+        {"id": "b", "status": "GATED", "needs": "creds", "proving_test": "x",
+         "qubit_backend": "b", "note": "gate"},
+        {"id": "c", "status": "GATED", "needs": "hardware", "proving_test": "x",
+         "qubit_backend": "b", "note": "gate"},
+        {"id": "d", "status": "PARTIAL", "needs": "creds", "proving_test": "x",
+         "note": "Typed refusal: FOO_BAR."},
+        {"id": "e", "status": "PARTIAL", "needs": "hardware", "proving_test": "x",
+         "note": "driver state MISSING"},
+        {"id": "f", "status": "PARTIAL", "needs": "owner", "proving_test": "x",
+         "note": "Typed refusal: FOO_BAR."},
+        {"id": "g", "status": "MISSING", "needs": "owner", "proving_test": "",
+         "note": ""},
+        {"id": "h", "status": "IMPLEMENTED", "needs": "none", "proving_test": "x",
+         "note": ""},
+    ]
+    out = rebuild._finalize_terminal_statuses([dict(r) for r in rows])
+    assert [r["status"] for r in out] == [
+        "SAFE_EQUIVALENT", "SAFE_EQUIVALENT", "SAFE_EQUIVALENT",
+        "OPERATOR_ONLY", "OPERATOR_ONLY", "PARTIAL", "MISSING", "IMPLEMENTED",
+    ]
+
+
+def test_partial_remap_requires_a_typed_code_and_a_backend() -> None:
+    """A PARTIAL/stub or a backend-less GATED row stays open (negative guard)."""
+    # PARTIAL needs=creds but the note is a bare stub: stays open.
+    assert rebuild._finalize_terminal_statuses([{
+        "id": "stub", "status": "PARTIAL", "needs": "creds",
+        "proving_test": "", "qubit_backend": "", "note": "stub",
+    }])[0]["status"] == "PARTIAL"
+    # needs=none never closes even with a typed code.
+    assert rebuild._finalize_terminal_statuses([{
+        "id": "nones", "status": "PARTIAL", "needs": "none",
+        "proving_test": "", "qubit_backend": "", "note": "Typed refusal: FOO_BAR.",
+    }])[0]["status"] == "PARTIAL"
+    # A GATED row with no backend path is not a safe equivalent.
+    gated = rebuild._finalize_terminal_statuses([{
+        "id": "no-backend", "status": "GATED", "needs": "owner",
+        "proving_test": "", "qubit_backend": "",
+        "note": "no loadable manifest",
+    }])[0]
+    assert gated["status"] == "GATED", gated
+
+
 def test_missing_registry_entry_is_flagged_not_fatal() -> None:
     """A catalog id with no registry/extra entry is flagged, never faked."""
     qualified, has_backend, _key, _fixed = rebuild.resolve_backend(

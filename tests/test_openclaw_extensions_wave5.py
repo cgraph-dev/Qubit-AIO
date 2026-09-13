@@ -3,7 +3,8 @@
 The wave-4 extension map covered all 154 ``extensions/*`` plugins, but the
 direct source inventory still carried 30 ``inv:openclaw-ext:*`` rows as
 ``MISSING`` because the categorizer resolves an extension's parent from the
-*pinned* ledger (where ``OC-19`` "Broad channel set" is honestly ``PARTIAL``)
+*pinned* ledger (where ``OC-19`` "Broad channel set" is a code-complete,
+credential-gated ``OPERATOR_ONLY`` row)
 and from the upstream plugin category -- it cannot see the wave-4 map.
 
 This test pins the authoritative disposition for exactly those 30. Every one

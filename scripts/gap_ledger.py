@@ -19,6 +19,8 @@ Usage:
     python scripts/gap_ledger.py
     python scripts/gap_ledger.py --docs-dir docs --json
     python scripts/gap_ledger.py --require-all
+    python scripts/gap_ledger.py --require-code-ready
+    python scripts/gap_ledger.py --require-inventory-complete
 """
 from __future__ import annotations
 
@@ -55,11 +57,30 @@ STATUS_VALUES = (
     "GATED",
     "MISSING",
     "UNVERIFIED",
+    # Owner decision 2026-09-13: SAFE_EQUIVALENT and OPERATOR_ONLY are valid
+    # terminal statuses for code readiness. SAFE_EQUIVALENT = a real Qubit
+    # backend path exists and the unsafe raw upstream behavior is explicitly
+    # refused under full policy/audit/redaction/confirmation/e-stop/resource
+    # limits, with positive/negative/regression tests. OPERATOR_ONLY = the code
+    # path is complete and tested but execution requires a genuine live
+    # prerequisite (credentials, hardware, accounts, OAuth, CAPTCHA/2FA) with a
+    # documented manual procedure and typed unavailable state.
+    "SAFE_EQUIVALENT",
+    "OPERATOR_ONLY",
 )
 
 NEEDS_VALUES = ("none", "creds", "hardware", "owner")
 
-COMPLETION_GATE = "NOT COMPLETE while any row has status != IMPLEMENTED"
+# Code-side statuses that are closed for code readiness.
+TERMINAL_STATUSES = ("IMPLEMENTED", "SAFE_EQUIVALENT", "OPERATOR_ONLY")
+# Statuses that additionally require live operator qualification before the
+# whole product may be called complete.
+OPERATOR_STATUSES = ("OPERATOR_ONLY",)
+
+COMPLETION_GATE = (
+    "CODE-READY while every row is IMPLEMENTED, SAFE_EQUIVALENT, or "
+    "OPERATOR_ONLY; OPERATOR_ONLY rows remain manual/operator qualification "
+    "items and are not counted as 100% until completed and verified")
 
 
 class SchemaError(Exception):
@@ -214,6 +235,28 @@ def inventory_complete(sections) -> tuple:
     return True, ""
 
 
+def code_ready_check(sections) -> tuple:
+    """Return ``(ok, reason)`` for ``--require-code-ready``.
+
+    Code readiness closes when every merged row is one of ``TERMINAL_STATUSES``
+    (``IMPLEMENTED`` / ``SAFE_EQUIVALENT`` / ``OPERATOR_ONLY``).  ``OPERATOR_ONLY``
+    rows remain visible as manual/operator qualification items and do not make
+    the product complete, but they do not block code readiness.
+    """
+    merged = []
+    for section in sections:
+        merged.extend(section["rows"])
+    open_rows = [r for r in merged if r["status"] not in TERMINAL_STATUSES]
+    if open_rows:
+        preview = ", ".join(
+            f"{r['_source']}:{r['id']}({r['status']})"
+            for r in sorted(open_rows,
+                            key=lambda r: (r["_source"], r["id"]))[:10])
+        suffix = "" if len(open_rows) <= 10 else ", ..."
+        return False, (f"{len(open_rows)} non-terminal row(s): {preview}{suffix}")
+    return True, ""
+
+
 def build_summary(sections, missing) -> dict:
     merged = []
     for section in sections:
@@ -222,7 +265,11 @@ def build_summary(sections, missing) -> dict:
     by_source = counts_by(merged, "_source")
     by_area = counts_by(merged, "area")
     total = len(merged)
-    open_rows = [r for r in merged if r["status"] != "IMPLEMENTED"]
+    open_rows = [r for r in merged if r["status"] not in TERMINAL_STATUSES]
+    operator_rows = [r for r in merged
+                     if r["status"] in OPERATOR_STATUSES]
+    safe_rows = [r for r in merged if r["status"] == "SAFE_EQUIVALENT"]
+    code_ready = not open_rows
     return {
         "sections_present": [s["file_section"] for s in sections],
         "sections_missing": list(missing),
@@ -231,7 +278,10 @@ def build_summary(sections, missing) -> dict:
         "by_source": by_source,
         "by_area": by_area,
         "open_rows": len(open_rows),
-        "complete": not open_rows,
+        "code_ready": code_ready,
+        "safe_equivalent_rows": len(safe_rows),
+        "operator_qualification_rows": len(operator_rows),
+        "complete": code_ready and not operator_rows,
         "inventory": inventory_omissions(sections),
     }
 
@@ -286,7 +336,18 @@ def render_markdown(sections, missing, summary) -> str:
     lines.append("## Counts")
     lines.append("")
     lines.append(f"- Total rows: **{summary['total_rows']}**")
-    lines.append(f"- Open rows (status != IMPLEMENTED): **{summary['open_rows']}**")
+    lines.append(
+        f"- Code-side open rows (not terminal): "
+        f"**{summary['open_rows']}**")
+    lines.append(
+        f"- SAFE_EQUIVALENT (closed for code readiness): "
+        f"**{summary.get('safe_equivalent_rows', 0)}**")
+    lines.append(
+        f"- OPERATOR_ONLY (manual/operator qualification): "
+        f"**{summary.get('operator_qualification_rows', 0)}**")
+    lines.append(
+        f"- Code-ready: **{summary.get('code_ready')}**; "
+        f"fully complete (all manual qualified): **{summary['complete']}**")
     lines.append("")
     lines.append("### By status")
     lines.append("")
@@ -326,14 +387,16 @@ def render_markdown(sections, missing, summary) -> str:
                 f"unexplained={report.get('unexplained_omissions', 0)}")
         lines.append("")
 
-    # ---- open rows grouped by source then area
-    lines.append("## Open rows (status != IMPLEMENTED)")
+    # ---- code-side open rows (not terminal) grouped by source then area
+    lines.append("## Code-side open rows (not IMPLEMENTED/SAFE_EQUIVALENT/"
+                 "OPERATOR_ONLY)")
     lines.append("")
     sources = sorted({r["_source"] for r in merged})
     any_open = False
     for source in sources:
         source_rows = [r for r in merged if r["_source"] == source]
-        open_rows = [r for r in source_rows if r["status"] != "IMPLEMENTED"]
+        open_rows = [r for r in source_rows
+                     if r["status"] not in TERMINAL_STATUSES]
         if not open_rows:
             continue
         any_open = True
@@ -355,7 +418,33 @@ def render_markdown(sections, missing, summary) -> str:
                 )
             lines.append("")
     if not any_open:
-        lines.append("No open rows: every row is IMPLEMENTED.")
+        lines.append("No code-side open rows: every row is terminal "
+                     "(IMPLEMENTED / SAFE_EQUIVALENT / OPERATOR_ONLY).")
+        lines.append("")
+
+    # ---- terminal gate rows (closed for code readiness, kept visible)
+    lines.append("## Terminal gate rows (SAFE_EQUIVALENT / OPERATOR_ONLY)")
+    lines.append("")
+    for status in ("SAFE_EQUIVALENT", "OPERATOR_ONLY"):
+        gate_rows = [r for r in merged if r["status"] == status]
+        if not gate_rows:
+            continue
+        heading = {
+            "SAFE_EQUIVALENT": ("Qubit-safe equivalents (closed; unsafe raw "
+                                "behavior explicitly refused)"),
+            "OPERATOR_ONLY": ("Operator-only qualification items (code complete "
+                              "and tested; require live prerequisite)"),
+        }[status]
+        lines.append(f"### {status} — {heading} ({len(gate_rows)})")
+        lines.append("")
+        lines.append("| id | source | needs | capability | proving test |")
+        lines.append("| --- | --- | --- | --- | --- |")
+        for row in sorted(gate_rows, key=lambda r: r["id"]):
+            capability = row["capability"].replace("|", "\\|")[:100]
+            proving = row["proving_test"] or "—"
+            lines.append(
+                f"| `{row['id']}` | {row['_source']} | {row['needs']} | "
+                f"{capability} | {proving} |")
         lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"
@@ -386,6 +475,13 @@ def main(argv=None) -> int:
         dest="require_inventory_complete",
         help=("fail (exit 1) unless the direct source inventory is present, "
               "readable, and reports zero unexplained omissions"),
+    )
+    parser.add_argument(
+        "--require-code-ready", action="store_true",
+        dest="require_code_ready",
+        help=("fail (exit 1) unless every row is a terminal status "
+              "(IMPLEMENTED / SAFE_EQUIVALENT / OPERATOR_ONLY); OPERATOR_ONLY "
+              "rows stay counted as manual/operator qualification items"),
     )
     parser.add_argument(
         "--omissions-out", default=None,
@@ -433,6 +529,12 @@ def main(argv=None) -> int:
                   file=sys.stderr)
             return 1
 
+    if args.require_code_ready:
+        ok, reason = code_ready_check(sections)
+        if not ok:
+            print(f"NOT CODE-READY: {reason}", file=sys.stderr)
+            return 1
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(render_markdown(sections, missing, summary),
                         encoding="utf-8")
@@ -443,7 +545,12 @@ def main(argv=None) -> int:
     print(f"  total rows: {summary['total_rows']}")
     print(f"  by status: {summary['by_status']}")
     print(f"  by source: {summary['by_source']}")
-    print(f"  open rows: {summary['open_rows']}")
+    print(f"  code-side open rows: {summary['open_rows']}")
+    print(f"  safe-equivalent rows: {summary['safe_equivalent_rows']}")
+    print(f"  operator-qualification rows: "
+          f"{summary['operator_qualification_rows']}")
+    print(f"  code-ready: {summary['code_ready']}")
+    print(f"  complete: {summary['complete']}")
     print(f"  completion gate: {COMPLETION_GATE}")
     if args.json:
         print(json.dumps(summary, indent=2, sort_keys=True))

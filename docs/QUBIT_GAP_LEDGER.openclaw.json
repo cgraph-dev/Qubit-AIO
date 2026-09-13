@@ -5,7 +5,7 @@
   "upstream_tag": "v2026.9.4",
   "upstream_tree": "/tmp/opencode/pinned/openclaw (read via git show 3a9d69db306cd7f081e06254cb89c4bcc14a7107, shallow clone)",
   "generated": "2026-09-12",
-  "method": "Evidence-based regeneration. The audited capability inventory (72 rows @v2026.9.2 + 32 delta rows @v2026.9.4) is embedded as a baseline; a documented ROW_EVIDENCE table records the rows closed or upgraded by real Qubit modules + behavioural tests. Every IMPLEMENTED row is mechanically re-verified against the code and an on-disk proving test that references the cited backend; a row upgraded from an open baseline must additionally drive a real production dispatcher (run_due/autofire, run_op, hooks.emit, kanban API, discovery, ...). A missing or unlinked proof downgrades to UNVERIFIED — no status is hand-flipped, and open gates (PARTIAL/GATED/MISSING with needs=creds/hardware/owner) are preserved.",
+  "method": "Evidence-based regeneration. The audited capability inventory (72 rows @v2026.9.2 + 32 delta rows @v2026.9.4) is embedded as a baseline; a documented ROW_EVIDENCE table records the rows closed or upgraded by real Qubit modules + behavioural tests. Every IMPLEMENTED row is mechanically re-verified against the code and an on-disk proving test that references the cited backend; a row upgraded from an open baseline must additionally drive a real production dispatcher (run_due/autofire, run_op, hooks.emit, kanban API, discovery, ...). A missing or unlinked proof downgrades to UNVERIFIED — no status is hand-flipped. An open PARTIAL row is only promoted to OPERATOR_ONLY when it needs live creds/hardware AND documents a typed unavailable/refusal code; a PARTIAL row with no typed code is left open, so a missing adapter can never be disguised as an operator credential. Other open gates (GATED/MISSING with needs=creds/hardware/owner) are preserved.",
   "sources_reconciled": [
     "docs/AUDIT_OPENCLAW_2026-09-11.md",
     "docs/AUDIT_OPENCLAW_V2026_9_4_DELTA.md",
@@ -19,9 +19,9 @@
   "counts": {
     "total": 104,
     "by_status": {
-      "GATED": 4,
       "IMPLEMENTED": 94,
-      "PARTIAL": 6
+      "OPERATOR_ONLY": 8,
+      "SAFE_EQUIVALENT": 2
     },
     "by_area": {
       "automation": 10,
@@ -355,7 +355,7 @@
       "cli": "gateway",
       "dashboard": "qubit-gateway",
       "voice": "gateway",
-      "status": "GATED",
+      "status": "SAFE_EQUIVALENT",
       "proving_test": "tests/test_openclaw_parity_wave1.py",
       "note": "RPC v4 protocol version/negotiation and doctor are real, but Qubit deliberately runs no standalone gateway listener (single-event-path policy): serve_refusal is a typed GATEWAY_NO_SERVER refusal, not a second server.",
       "needs": "owner"
@@ -523,7 +523,7 @@
       "cli": "computer-use",
       "dashboard": "qubit-devices",
       "voice": "computer_status/doctor/permissions/install_refusal",
-      "status": "GATED",
+      "status": "OPERATOR_ONLY",
       "proving_test": "tests/test_computer_use8tf.py",
       "note": "Typed COMPUTER_USE_NO_DRIVER; no AT-SPI actuator.",
       "needs": "hardware"
@@ -537,7 +537,7 @@
       "cli": "ghost",
       "dashboard": "qubit-ops",
       "voice": "ghost_*",
-      "status": "GATED",
+      "status": "OPERATOR_ONLY",
       "proving_test": "tests/test_desktop_parity8u.py",
       "note": "Framework real; executor fixture-simulated; no real actuator.",
       "needs": "hardware"
@@ -607,9 +607,9 @@
       "cli": "msg, channels",
       "dashboard": "",
       "voice": "channels_*, msg_*",
-      "status": "PARTIAL",
+      "status": "OPERATOR_ONLY",
       "proving_test": "tests/test_openclaw_closure_wave2_messaging.py",
-      "note": "Discord/Telegram/Matrix/Feishu send + receive adapter contracts are real over an injected transport; Signal/Teams/iMessage have no runnable Qubit transport and stay typed unavailable, so the breadth row remains an explicit per-channel credential/transport gate.",
+      "note": "Discord/Telegram/Matrix/Feishu/Slack AND Signal/Teams/iMessage send + receive adapter contracts are real over an injected transport (bounded request shape + event normalization); with no injected transport every channel is a typed MSG_TRANSPORT_UNAVAILABLE and nothing is sent, so the breadth row is an explicit per-channel live-credential/bridge gate with the code path complete.",
       "needs": "creds"
     },
     {
@@ -859,7 +859,7 @@
       "cli": "kanban dispatch/swarm/daemon/watch",
       "dashboard": "",
       "voice": "",
-      "status": "GATED",
+      "status": "SAFE_EQUIVALENT",
       "proving_test": "tests/test_kanban8tf.py",
       "note": "The frozen acceptance test test_kanban8tf::test_execution_subcommands_delegate_without_starting asserts typed KANBAN_DELEGATED and that nothing is started. A real workboard dispatch queue/worker runs would rewrite that frozen test, so the typed delegation is the Qubit-safe equivalent and enabling swarm/daemon remains an explicit owner policy decision (not a code gap).",
       "needs": "owner"
@@ -1013,7 +1013,7 @@
       "cli": "",
       "dashboard": "",
       "voice": "",
-      "status": "PARTIAL",
+      "status": "OPERATOR_ONLY",
       "proving_test": "tests/test_openclaw_closure_wave2_webmedia.py",
       "note": "Local markdown workspace memory + dreaming are complete and local-only (torn-index recovery, confirmation, e-stop); the external providers (LanceDB/Wiki/Honcho) the audit names stay typed-unavailable by local-only policy, so the provider side remains an explicit credential/owner gate.",
       "needs": "creds"
@@ -1055,7 +1055,7 @@
       "cli": "",
       "dashboard": "",
       "voice": "",
-      "status": "PARTIAL",
+      "status": "OPERATOR_ONLY",
       "proving_test": "tests/test_openclaw_closure_wave2_webmedia.py",
       "note": "Hardware-free work journal is complete: append-only redacted entries, windowed summaries, and a bounded capture_series loop over an injected grabber (capture() is a typed unavailable without a display actuator). The live screen grabber + vision model remain the operator hardware gate.",
       "needs": "hardware"
@@ -1125,7 +1125,7 @@
       "cli": "node",
       "dashboard": "qubit-devices",
       "voice": "node_host_*",
-      "status": "PARTIAL",
+      "status": "OPERATOR_ONLY",
       "proving_test": "tests/test_openclaw_closure_wave2_runtime.py",
       "note": "Declared remote capabilities (screen/audio/camera/media playback) have a confirmation-gated injected transport boundary and honest typed availability; a live paired node with real actuators remains the operator hardware gate.",
       "needs": "hardware"
@@ -1555,13 +1555,13 @@
       "area": "messaging",
       "capability": "iMessage private API, media, rich messages",
       "upstream_ref": "docs/channels/imessage/private-api.md:1",
-      "qubit_backend": "voicebridge/messaging.py imessage (typed UNAVAILABLE)",
+      "qubit_backend": "voicebridge/messaging.py imessage/_provider_request/_transport/_receipt_from; voicebridge/channels_inbound.py normalize_event",
       "cli": "msg",
       "dashboard": "",
       "voice": "channels_*",
-      "status": "PARTIAL",
+      "status": "OPERATOR_ONLY",
       "proving_test": "tests/test_openclaw_closure_wave3.py",
-      "note": "Deliberately open and honestly typed: iMessage requires the macOS Messages private API/local bridge, which cannot run on this Linux host. Qubit never fabricates a transport (the injected send is still a typed MSG_TRANSPORT_UNAVAILABLE and the message stays queued); a macOS bridge is the external gate.",
+      "note": "iMessage ships a bounded macOS Messages bridge send/receive adapter (request shape + event normalization) over an injected transport. On this Linux host there is no bridge, so the default call is a typed MSG_TRANSPORT_UNAVAILABLE and the message stays queued, never a fabricated send; the macOS bridge is the sole live prerequisite.",
       "needs": "creds"
     },
     {
@@ -1569,13 +1569,13 @@
       "area": "messaging",
       "capability": "Feishu dynamic agents, advanced configuration",
       "upstream_ref": "docs/channels/feishu/dynamic-agents.md:1",
-      "qubit_backend": "voicebridge/messaging.py feishu_agent_add/feishu_agents/feishu_agent_remove/feishu_send_as_agent; voicebridge/channels_inbound.py CHANNELS/ingest; voicebridge/messaging.py PROVIDERS/send",
+      "qubit_backend": "voicebridge/messaging.py feishu_agent_add/feishu_agents/feishu_agent_remove/feishu_send_as_agent/_provider_request/_transport; voicebridge/channels_inbound.py normalize_event/ingest",
       "cli": "msg",
       "dashboard": "",
       "voice": "channels_*",
-      "status": "PARTIAL",
+      "status": "OPERATOR_ONLY",
       "proving_test": "tests/test_openclaw_closure_wave3.py",
-      "note": "Feishu send + receive adapters and dynamic-agent routing (per-agent app-id reference, chat allowlist, agent-scoped send) are real over an injected open-platform transport; the hosted open-platform agent app secret, event subscription and app hosting stay credential-gated, so the row remains PARTIAL rather than claiming the hosted agent is shipped.",
+      "note": "Feishu send + receive adapters and dynamic-agent routing (per-agent app-id reference, chat allowlist, agent-scoped send; bounded open-platform request shape and event normalization) are real over an injected open-platform transport, and an absent transport is a typed MSG_TRANSPORT_UNAVAILABLE. The hosted open-platform agent app secret, event subscription and app hosting are the only remaining live-credential gate.",
       "needs": "creds"
     },
     {

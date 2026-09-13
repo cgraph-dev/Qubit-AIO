@@ -953,13 +953,18 @@ def extract_hermes_skills(repo: Path) -> list[dict]:
         if not root.is_dir():
             continue
         for entry in sorted(root.iterdir()):
-            if entry.is_dir():
-                items.append({
-                    "id": f"skill:{root_name}/{entry.name}",
-                    "source": "hermes", "category": "hermes_skill",
-                    "name": entry.name, "path": _rel(repo, entry),
-                    "root": root_name,
-                })
+            if not entry.is_dir():
+                continue
+            # `skills/index-cache` is a vendored JSON asset cache, not a
+            # loadable skill (no SKILL.md); exclude it as a non-capability.
+            if entry.name == "index-cache":
+                continue
+            items.append({
+                "id": f"skill:{root_name}/{entry.name}",
+                "source": "hermes", "category": "hermes_skill",
+                "name": entry.name, "path": _rel(repo, entry),
+                "root": root_name,
+            })
     return items
 
 
@@ -1728,7 +1733,8 @@ def build_inventory(repo: Path, hermes: Path, openclaw: Path,
         # typed policy GATE (a flag of an intentionally-refused command is part
         # of that refusal, not an independent missing capability).
         it["parent_covered"] = bool(
-            resolved and status_by_id.get(resolved) in ("IMPLEMENTED", "GATED"))
+            resolved and status_by_id.get(resolved) in (
+                "IMPLEMENTED", "SAFE_EQUIVALENT", "OPERATOR_ONLY", "GATED"))
 
     # Wave 5: explicit fork-runtime disposition for every tool/skill/plugin
     # item.  These are not separate Qubit modules; the fork is executed

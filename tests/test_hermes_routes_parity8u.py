@@ -246,6 +246,48 @@ def test_new_gates_dispatch_exact_typed_code(tmp_path, monkeypatch):
         assert out.get("rollback"), (method, path, out)
 
 
+def _gate_sample(pattern: str) -> str:
+    import re as _re
+    p = _re.sub(r"\(\?P<[^>]+>", "", pattern)
+    p = p.replace("[^/]+", "x").replace(".+", "x")
+    p = _re.sub(r"/\.\*", "/x", p)      # a trailing /.* needs a segment
+    p = p.replace(".*", "")             # bare .* widens a prefix
+    return p.replace("(", "").replace(")", "").replace("?", "")
+
+
+def test_every_gated_route_is_typed(tmp_path, monkeypatch):
+    """Every registered compat GATED route returns a typed refusal.
+
+    This is the row-level proof for the SAFE_EQUIVALENT hermes API rows: no
+    gated route 200s, 404s, or 500s; each carries a typed code and a documented
+    Qubit counterpart.
+    """
+    from voicebridge import hermes_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    checked = 0
+    for route in HC.ROUTES:
+        if route.get("disposition") != "gated":
+            continue
+        method, pattern = route["method"], route["pattern"]
+        path = _gate_sample(pattern)
+        code, out = HC.dispatch(cfg, method, path, {}, {})
+        # A registered gate route returns a typed refusal: never a 200
+        # success and never a 500.  A 404 is only acceptable when it carries a
+        # typed gate code with a documented counterpart (e.g. the manual-
+        # handoff OAuth gate), not a phantom "no route" 404.
+        assert code not in (200, 500), (method, path, code, str(out)[:200])
+        assert isinstance(out, dict), (method, path, out)
+        assert out.get("code"), (method, path, out)
+        if code == 404:
+            assert out.get("detail") or out.get("qubit_counterpart"), \
+                (method, path, out)
+        else:
+            assert out.get("ok") is False, (method, path, out)
+        checked += 1
+    assert checked >= 30, checked
+
+
 # --------------------------------------------------------- wrong-verb closure
 def test_wrong_verb_rows_now_typed_not_404(tmp_path, monkeypatch):
     from voicebridge import hermes_compat as HC

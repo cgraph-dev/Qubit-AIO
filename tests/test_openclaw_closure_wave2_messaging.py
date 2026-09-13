@@ -7,9 +7,10 @@ production function (``messaging.send``/``_provider_request``,
 network/credential boundary via an injected transport. No live provider call
 is made and no secret value is written to any store or receipt.
 
-Rows: OC-19, OC-20, OC-21, OC-25, OC-D12, OC-D13, OC-D14, OC-D16, OC-D17.
-OC-D15 (iMessage) is deliberately not closed: it needs the macOS Messages
-private API and has no runnable transport on this Linux host.
+Rows: OC-19, OC-20, OC-21, OC-25, OC-D12, OC-D13, OC-D14, OC-D15, OC-D16,
+OC-D17. Every recognized send channel ships a bounded request shaper and every
+recognized receive channel ships a bounded normalizer; the live transport (and
+for OC-D15 the macOS Messages bridge) remains the operator credential gate.
 """
 from __future__ import annotations
 
@@ -76,14 +77,122 @@ def test_oc19_breadth_send_adapters_and_honest_gaps(tmp_path, monkeypatch):
     assert seen["discord"]["provider"] == "discord"
     assert seen["discord"]["url"].endswith("/channels/12345/messages")
 
-    # A channel with no runnable adapter still refuses even when injected.
-    MG, msg2 = _provision(cfg, monkeypatch, "imessage", "+1555",
-                          env="IMESSAGE_W2")
-    try:
-        MG.send(cfg, msg2, confirmed=True, transport=lambda req: {"id": "x"})
-        raise AssertionError("iMessage must stay typed UNAVAILABLE")
-    except MG.MessagingError as exc:
-        assert exc.code == MG.UNAVAILABLE_CODE
+
+def test_oc19_every_channel_ships_a_send_and_receive_adapter(tmp_path,
+                                                              monkeypatch):
+    """OC-19: the full recognized channel set has a real bounded adapter.
+
+    For every send channel: without an injected transport the send is a typed
+    ``MSG_TRANSPORT_UNAVAILABLE`` (nothing sent); with one the provider request
+    is built and the shaped response is parsed to a provider message id. Every
+    receive channel normalizes its native event with the documented fields.
+    """
+    from voicebridge import messaging as MG
+    from voicebridge import channels_inbound as CI
+
+    cfg = _cfg(tmp_path, monkeypatch)
+
+    # provider -> (shaped response, expected provider_msg_id)
+    responses = {
+        "slack": ({"ok": True, "ts": "1700000000.000100"},
+                  "1700000000.000100"),
+        "whatsapp-cloud": ({"messages": [{"id": "wamid.1"}]}, "wamid.1"),
+        "discord": ({"id": "d-1"}, "d-1"),
+        "telegram": ({"ok": True, "result": {"message_id": 7}}, "7"),
+        "matrix": ({"event_id": "$evt-1"}, "$evt-1"),
+        "feishu": ({"data": {"message_id": "om_1"}}, "om_1"),
+        "signal": ({"result": {"timestamp": 111}}, "111"),
+        "msteams": ({"id": "a-1"}, "a-1"),
+        "imessage": ({"guid": "g-1"}, "g-1"),
+    }
+    cases = {
+        "slack": {"to": "#ops"},
+        "whatsapp-cloud": {"extra": {"phone_number_id": "123456"},
+                           "to": "15551234567"},
+        "discord": {"to": "12345"},
+        "telegram": {"to": "42"},
+        "matrix": {"extra": {"homeserver": "https://matrix.example.org"},
+                   "to": "!room:example.org"},
+        "feishu": {"extra": {"webhook_url": "https://open.feishu.cn/hook/x"},
+                   "to": "ops"},
+        "signal": {"extra": {"signal_cli_url": "http://signal.example:8080"},
+                   "to": "+15550001111"},
+        "msteams": {"extra": {"service_url": "https://smba.example/teams"},
+                    "to": "conv-1"},
+        "imessage": {"extra": {"bridge_url": "http://mac.example:8080"},
+                     "to": "+15550002222"},
+    }
+    for provider, case in cases.items():
+        response, expected_id = responses[provider]
+        env = "ADAPTER_" + provider.upper().replace("-", "_")
+        MG, msg = _provision(cfg, monkeypatch, provider, case["to"], env=env,
+                             extra=case.get("extra"))
+        # No injected transport on a channel with no shipped network path:
+        # typed UNAVAILABLE, the message stays queued. (Slack/WhatsApp Cloud
+        # have a real shipped HTTPS path, so they are injectable-only here.)
+        if not MG.PROVIDER_CAPS[provider].get("available", False):
+            try:
+                MG.send(cfg, msg, confirmed=True)
+                raise AssertionError(f"{provider} must be typed UNAVAILABLE")
+            except MG.MessagingError as exc:
+                assert exc.code == MG.UNAVAILABLE_CODE, provider
+            assert MG.show(cfg, msg)["message"]["state"] == "queued", provider
+
+        seen = {}
+
+        def transport(req):
+            seen.update(req)
+            return dict(response)
+
+        out = _send_and_assert(cfg, MG, msg, transport)
+        assert seen["provider"] == provider, (provider, seen["provider"])
+        if expected_id is not None:
+            assert out["message"]["provider_msg_id"] == expected_id, provider
+        if provider == "slack":
+            assert seen["body"]["channel"] == "#ops"
+        elif provider == "whatsapp-cloud":
+            assert seen["body"]["messaging_product"] == "whatsapp"
+        elif provider == "discord":
+            assert seen["url"].endswith("/channels/12345/messages")
+        elif provider == "telegram":
+            assert seen["body"]["chat_id"] == "42"
+        elif provider == "matrix":
+            assert "/send/m.room.message/" in seen["url"]
+        elif provider == "feishu":
+            assert seen["body"]["msg_type"] == "text"
+        elif provider == "signal":
+            assert seen["url"].endswith("/api/v1/rpc")
+            assert seen["body"]["params"]["recipient"] == ["+15550001111"]
+        elif provider == "msteams":
+            assert seen["url"].endswith("/v3/conversations/conv-1/activities")
+        elif provider == "imessage":
+            assert seen["body"] == {"to": "+15550002222",
+                                    "text": "hello imessage"}
+
+    # ---- receive halves: native event -> bounded normalized message ----
+    payloads = {
+        "discord": b'{"id":"m1","content":"hi","author":{"id":"u1"}}',
+        "telegram": b'{"message":{"message_id":7,"text":"hi",'
+                    b'"from":{"id":42}}}',
+        "matrix": b'{"event_id":"$e1","sender":"@u:x",'
+                  b'"content":{"body":"hi"}}',
+        "feishu": b'{"event":{"event_id":"e1",'
+                  b'"sender":{"sender_id":{"open_id":"ou_1"}},'
+                  b'"message":{"message_id":"om_1",'
+                  b'"content":"{\\"text\\":\\"hi\\"}"}}}',
+        "slack": b'{"event_id":"Ev1","event":{"type":"message","user":"U1",'
+                 b'"text":"hi","ts":"1.2"}}',
+        "signal": b'{"envelope":{"source":"+1555","timestamp":5,'
+                  b'"dataMessage":{"message":"hi"}}}',
+        "msteams": b'{"from":{"id":"u1"},"text":"hi","id":"a1"}',
+        "imessage": b'{"sender":"+1555","text":"hi","id":"g1"}',
+    }
+    for channel, payload in payloads.items():
+        normalized = CI.normalize_event(channel, payload)
+        assert normalized["channel"] == channel, channel
+        assert normalized["sender"], channel
+        assert normalized["text"] == "hi", (channel, normalized)
+        assert normalized["event_id"], channel
 
 
 # ---------------------------------------------------------------- OC-D12

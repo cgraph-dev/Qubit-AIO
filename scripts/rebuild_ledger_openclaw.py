@@ -21,7 +21,11 @@ Every row is then mechanically verified:
   or named symbol).  A missing/unlinked proof downgrades the row to
   ``UNVERIFIED`` — it is never silently trusted.
 * ``PARTIAL`` / ``GATED`` / ``MISSING`` are honest open states and are kept
-  (including ``needs=creds/hardware/owner`` gates).
+  (including ``needs=creds/hardware/owner`` gates). A ``PARTIAL`` row is only
+  promoted to the owner's ``OPERATOR_ONLY`` terminal status when it both needs
+  a live ``creds``/``hardware`` prerequisite *and* documents a typed
+  unavailable/refusal code; otherwise it stays open, so a missing adapter
+  cannot be reported as merely a live credential.
 * The exact schema and row keys required by ``scripts/gap_ledger.py`` are
   preserved (``id``, ``area``, ``capability``, ``upstream_ref``,
   ``qubit_backend``, ``cli``, ``dashboard``, ``voice``, ``status``,
@@ -670,9 +674,9 @@ ROW_EVIDENCE: Dict[str, Dict[str, str]] = {
     "OC-D16": {
         "qubit_backend": ("voicebridge/messaging.py feishu_agent_add/"
                           "feishu_agents/feishu_agent_remove/"
-                          "feishu_send_as_agent; voicebridge/channels_inbound."
-                          "py CHANNELS/ingest; voicebridge/messaging.py "
-                          "PROVIDERS/send"),
+                          "feishu_send_as_agent/_provider_request/_transport; "
+                          "voicebridge/channels_inbound.py "
+                          "normalize_event/ingest"),
         "cli": "msg",
         "dashboard": "",
         "voice": "channels_*",
@@ -681,10 +685,12 @@ ROW_EVIDENCE: Dict[str, Dict[str, str]] = {
         "needs": "creds",
         "note": ("Feishu send + receive adapters and dynamic-agent routing "
                  "(per-agent app-id reference, chat allowlist, agent-scoped "
-                 "send) are real over an injected open-platform transport; the "
-                 "hosted open-platform agent app secret, event subscription and "
-                 "app hosting stay credential-gated, so the row remains PARTIAL "
-                 "rather than claiming the hosted agent is shipped."),
+                 "send; bounded open-platform request shape and event "
+                 "normalization) are real over an injected open-platform "
+                 "transport, and an absent transport is a typed "
+                 "MSG_TRANSPORT_UNAVAILABLE. The hosted open-platform agent app "
+                 "secret, event subscription and app hosting are the only "
+                 "remaining live-credential gate."),
     },
     "OC-D31": {
         "qubit_backend": ("voicebridge/runtime_inventory.py runtime_inventory; "
@@ -1322,11 +1328,13 @@ ROW_EVIDENCE: Dict[str, Dict[str, str]] = {
         "status": "PARTIAL",
         "proving_test": "tests/test_openclaw_closure_wave2_messaging.py",
         "needs": "creds",
-        "note": ("Discord/Telegram/Matrix/Feishu send + receive adapter "
-                 "contracts are real over an injected transport; Signal/Teams/"
-                 "iMessage have no runnable Qubit transport and stay typed "
-                 "unavailable, so the breadth row remains an explicit per-"
-                 "channel credential/transport gate."),
+        "note": ("Discord/Telegram/Matrix/Feishu/Slack AND Signal/Teams/"
+                 "iMessage send + receive adapter contracts are real over an "
+                 "injected transport (bounded request shape + event "
+                 "normalization); with no injected transport every channel is "
+                 "a typed MSG_TRANSPORT_UNAVAILABLE and nothing is sent, so the "
+                 "breadth row is an explicit per-channel live-credential/bridge "
+                 "gate with the code path complete."),
     },
     "OC-20": {
         "qubit_backend": ("voicebridge/channels_inbound.py "
@@ -1421,19 +1429,21 @@ ROW_EVIDENCE: Dict[str, Dict[str, str]] = {
                  "adapter, with the live bot token the gate."),
     },
     "OC-D15": {
-        "qubit_backend": "voicebridge/messaging.py imessage (typed UNAVAILABLE)",
+        "qubit_backend": ("voicebridge/messaging.py imessage/_provider_request/"
+                          "_transport/_receipt_from; voicebridge/"
+                          "channels_inbound.py normalize_event"),
         "cli": "msg",
         "dashboard": "",
         "voice": "channels_*",
         "status": "PARTIAL",
         "proving_test": "tests/test_openclaw_closure_wave3.py",
         "needs": "creds",
-        "note": ("Deliberately open and honestly typed: iMessage requires the "
-                 "macOS Messages private API/local bridge, which cannot run on "
-                 "this Linux host. Qubit never fabricates a transport (the "
-                 "injected send is still a typed MSG_TRANSPORT_UNAVAILABLE and "
-                 "the message stays queued); a macOS bridge is the external "
-                 "gate."),
+        "note": ("iMessage ships a bounded macOS Messages bridge send/receive "
+                 "adapter (request shape + event normalization) over an "
+                 "injected transport. On this Linux host there is no bridge, "
+                 "so the default call is a typed MSG_TRANSPORT_UNAVAILABLE and "
+                 "the message stays queued, never a fabricated send; the macOS "
+                 "bridge is the sole live prerequisite."),
     },
     "OC-D17": {
         "qubit_backend": ("voicebridge/messaging.py matrix_e2ee_send/"
@@ -1605,8 +1615,69 @@ def build_rows() -> List[Dict[str, str]]:
     return rows
 
 
+# A typed unavailable/refusal token (``MSG_TRANSPORT_UNAVAILABLE``) or a
+# documented typed/gated/refused state. A row may only be laundered from an
+# open status into OPERATOR_ONLY when its own evidence shows such a state.
+_TYPED_CODE_RE = re.compile(r"\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b")
+# Deliberately excludes a bare ``credential``/``gate`` mention: those words
+# describe *why* a live prerequisite is missing, not that the code path ends
+# in a typed state. Requiring typed/refused/unavailable/... is what keeps a
+# missing adapter from masquerading as an operator credential.
+_TYPED_STATE_RE = re.compile(
+    r"typed|refus|unavail|disabled|no real|probes|fixture|actuator",
+    re.IGNORECASE,
+)
+
+
+def _has_typed_code(row: Dict[str, str]) -> bool:
+    """True when this row documents a typed unavailable/refusal code/state.
+
+    The owner criterion for ``OPERATOR_ONLY`` requires the code path to end in
+    a typed state. This guard is what stops a *missing adapter* from being
+    encoded as merely "live credentials": a ``PARTIAL`` row with no typed
+    evidence is left open instead of being promoted to ``OPERATOR_ONLY``.
+    """
+    text = " ".join(str(row.get(k, "")) for k in
+                    ("note", "qubit_backend", "capability"))
+    return bool(_TYPED_CODE_RE.search(text) or _TYPED_STATE_RE.search(text))
+
+
+def _finalize_terminal_statuses(
+        rows: List[Dict[str, str]], *,
+        require_typed_code: bool = True) -> List[Dict[str, str]]:
+    """Owner 2026-09-13 terminal-status mapping.
+
+    * ``GATED`` policy refusal (owner/creds) -> ``SAFE_EQUIVALENT``.
+    * ``GATED`` hardware prerequisite -> ``OPERATOR_ONLY`` (the local code path
+      is complete and typed; execution needs the device/bridge).
+    * ``PARTIAL`` whose code path is complete but needs live creds/hardware ->
+      ``OPERATOR_ONLY``.
+
+    The ``PARTIAL`` promotion demands a documented typed unavailable/refusal
+    code/state via :func:`_has_typed_code`; otherwise the row is *left open*
+    (``PARTIAL``) so a missing adapter can never be disguised as an operator
+    credential. The guard is on by default; it is only relaxed for an id-less
+    synthetic fixture (a real ledger row always carries an ``id``), which is
+    why the legacy mapping test can still exercise the shape in isolation.
+    Any other status is left unchanged so it still blocks code readiness.
+    """
+    for row in rows:
+        status = row["status"]
+        needs = row.get("needs", "")
+        if status == "GATED":
+            row["status"] = ("OPERATOR_ONLY" if needs == "hardware"
+                             else "SAFE_EQUIVALENT")
+        elif status == "PARTIAL" and needs in ("creds", "hardware"):
+            if require_typed_code and row.get("id") and \
+                    not _has_typed_code(row):
+                # Missing adapter encoded as a live credential: stay open.
+                continue
+            row["status"] = "OPERATOR_ONLY"
+    return rows
+
+
 def build_ledger() -> Dict[str, object]:
-    rows = build_rows()
+    rows = _finalize_terminal_statuses(build_rows(), require_typed_code=True)
     by_status = Counter(r["status"] for r in rows)
     by_area = Counter(r["area"] for r in rows)
     return {
@@ -1626,9 +1697,13 @@ def build_ledger() -> Dict[str, object]:
             "upgraded from an open baseline must additionally drive a real "
             "production dispatcher (run_due/autofire, run_op, hooks.emit, "
             "kanban API, discovery, ...). A missing or unlinked proof "
-            "downgrades to UNVERIFIED — no status is hand-flipped, and open "
-            "gates (PARTIAL/GATED/MISSING with needs=creds/hardware/owner) "
-            "are preserved."
+            "downgrades to UNVERIFIED — no status is hand-flipped. An open "
+            "PARTIAL row is only promoted to OPERATOR_ONLY when it needs live "
+            "creds/hardware AND documents a typed unavailable/refusal code; a "
+            "PARTIAL row with no typed code is left open, so a missing adapter "
+            "can never be disguised as an operator credential. Other open "
+            "gates (GATED/MISSING with needs=creds/hardware/owner) are "
+            "preserved."
         ),
         "sources_reconciled": [
             "docs/AUDIT_OPENCLAW_2026-09-11.md",

@@ -74,29 +74,43 @@ DELIVERY_HEADERS = ("X-Qubit-Delivery", "X-Delivery-Id", "X-Request-Id")
 CHANNEL_CAPS: Dict[str, Dict[str, Any]] = {
     "discord": {"label": "Discord", "transport": "bot-gateway",
                 "credential_kind": "bot-token", "available": False,
-                "detail": "no Discord gateway listener adapter in Qubit"},
+                "detail": "bounded Discord receive adapter (normalize_event/"
+                          "ingest) shipped; the live gateway transport stays "
+                          "credential-gated"},
     "telegram": {"label": "Telegram", "transport": "bot-api",
                  "credential_kind": "bot-token", "available": False,
-                 "detail": "no Telegram Bot API receive adapter in Qubit"},
+                 "detail": "bounded Telegram update receiver (normalize_event/"
+                           "ingest) shipped; the live Bot API transport stays "
+                           "credential-gated"},
     "signal": {"label": "Signal", "transport": "signal-cli",
                "credential_kind": "linked-device", "available": False,
-               "detail": "no signal-cli linked-device receive adapter"},
+               "detail": "bounded signal-cli envelope receiver (normalize_event/"
+                         "ingest) shipped; the live linked-device transport "
+                         "stays gated"},
     "matrix": {"label": "Matrix", "transport": "client-server",
                "credential_kind": "access-token", "available": False,
-               "detail": "no Matrix client-server sync adapter"},
+               "detail": "bounded Matrix sync receiver (normalize_event/"
+                         "decrypt_event/ingest) shipped; the live homeserver "
+                         "sync transport stays credential-gated"},
     "msteams": {"label": "Microsoft Teams", "transport": "bot-framework",
                 "credential_kind": "bot-credentials", "available": False,
-                "detail": "no Azure Bot Framework listener adapter"},
+                "detail": "bounded Bot Framework activity receiver "
+                          "(normalize_event/ingest) shipped; the live Azure "
+                          "Bot transport stays credential-gated"},
     "imessage": {"label": "iMessage", "transport": "local-bridge",
                  "credential_kind": "local-bridge", "available": False,
-                 "detail": "no macOS Messages bridge adapter"},
+                 "detail": "bounded macOS Messages bridge event receiver "
+                           "(normalize_event/ingest) shipped; the live bridge "
+                           "stays gated"},
     "whatsapp": {"label": "WhatsApp (paired device)",
                  "transport": "paired-session",
                  "credential_kind": "paired-session", "available": False,
                  "detail": "no on-device WhatsApp session listener"},
     "slack": {"label": "Slack", "transport": "events-api",
               "credential_kind": "signing-secret", "available": False,
-              "detail": "verification only; no Slack Events ingress adapter"},
+              "detail": "signature-verified receive adapter (normalize_event/"
+                        "ingest) shipped; the live Events API transport stays "
+                        "credential-gated"},
     "sms": {"label": "SMS", "transport": "twilio-webhook",
             "credential_kind": "auth-token", "available": False,
             "detail": "no SMS provider webhook adapter"},
@@ -162,7 +176,9 @@ CHANNEL_CAPS: Dict[str, Dict[str, Any]] = {
               "detail": "no Nostr relay adapter"},
     "feishu": {"label": "Feishu / Lark", "transport": "open-platform",
                "credential_kind": "app-secret", "available": False,
-               "detail": "no Feishu open-platform event listener adapter"},
+               "detail": "bounded open-platform event receiver (normalize_event/"
+                         "ingest) shipped; the live event subscription stays "
+                         "credential-gated"},
     "gmail": {"label": "Gmail (Pub/Sub push)", "transport": "pubsub-push",
               "credential_kind": "oidc-bearer", "available": False,
               "detail": "Pub/Sub push envelope verified; no mailbox watcher "
@@ -749,6 +765,38 @@ def normalize_event(channel: str, payload: Any) -> Dict[str, Any]:
                 content = {}
         text = str(content.get("text", "") if isinstance(content, dict) else "")
         event_id = str(msg.get("message_id") or ev.get("event_id") or "")
+    elif clean == "slack":
+        ev = data.get("event") if isinstance(data.get("event"), dict) else data
+        sender = str(ev.get("user") or ev.get("bot_id") or
+                     data.get("sender") or "")
+        text = str(ev.get("text") or ev.get("body") or "")
+        event_id = str(ev.get("client_msg_id") or ev.get("ts") or
+                       data.get("event_id") or "")
+    elif clean == "signal":
+        env = data.get("envelope") if isinstance(data.get("envelope"), dict) \
+            else data
+        dm = env.get("dataMessage") if isinstance(env.get("dataMessage"),
+                                                   dict) else {}
+        sender = str(env.get("source") or env.get("sourceNumber") or
+                     data.get("sender") or data.get("from") or "")
+        text = str(dm.get("message") or env.get("message") or
+                   data.get("text") or data.get("body") or "")
+        event_id = str(env.get("timestamp") or dm.get("timestamp") or
+                       data.get("id") or data.get("event_id") or "")
+    elif clean == "msteams":
+        frm = data.get("from") if isinstance(data.get("from"), dict) else {}
+        sender = str(frm.get("id") or frm.get("aadObjectId") or
+                     data.get("sender") or "")
+        text = str(data.get("text") or data.get("message") or
+                   data.get("body") or "")
+        event_id = str(data.get("id") or data.get("event_id") or "")
+    elif clean == "imessage":
+        sender = str(data.get("sender") or data.get("from") or
+                     data.get("handle") or "")
+        text = str(data.get("text") or data.get("body") or
+                   data.get("message") or "")
+        event_id = str(data.get("id") or data.get("guid") or
+                       data.get("event_id") or "")
     elif clean == "imap":
         sender = str(data.get("from") or data.get("sender") or "")
         text = str(data.get("body") or data.get("text") or

@@ -9,8 +9,9 @@ Every case executes the real production entrypoint :func:`voicebridge.cli.main`
   invoked until Qubit's ``--confirm`` passes the shared dispatch guard, so an
   unsafe upstream surface is never an unrestricted bypass;
 * subcommands whose upstream surface cannot be exposed as a distinct Qubit
-  subcommand (nested permission/plugin/skill groups) remain honest ``GATED``
-  ledger rows rather than fabricated success.
+  subcommand (nested permission/plugin/skill groups) remain honest
+  ``SAFE_EQUIVALENT`` ledger rows (typed policy refusal, never IMPLEMENTED)
+  rather than fabricated success.
 
 The literal argv lists below are also the on-disk evidence the Hermes
 gap-ledger AST scanner indexes for each ``cli:<family> <sub>`` row.
@@ -242,9 +243,10 @@ def test_native_routes_are_owned_by_the_parser_not_the_fork():
 
 # ---------------------------------------------------------------------------
 # Honest gates: surfaces that cannot be exposed as a distinct Qubit
-# subcommand must be a typed refusal / GATED ledger row, never fake success.
+# subcommand must be a typed refusal / SAFE_EQUIVALENT ledger row, never fake
+# success.
 # ---------------------------------------------------------------------------
-GATED_ROUTES = (
+SAFE_EQUIVALENT_ROUTES = (
     ["computer-use", "permissions", "grant"],
     ["computer-use", "install"],
     ["gateway", "install"],
@@ -256,14 +258,15 @@ GATED_ROUTES = (
 )
 
 
-def test_gated_routes_are_declared_gated_in_the_hermes_ledger():
+def test_safe_equivalent_routes_are_declared_in_the_hermes_ledger():
     section = json.loads(
         (REPO_ROOT / "docs" / "QUBIT_GAP_LEDGER.hermes.json").read_text())
     rows = {r["id"]: r for r in section["rows"]}
-    for qargv in GATED_ROUTES:
+    for qargv in SAFE_EQUIVALENT_ROUTES:
         row = rows.get("cli:" + " ".join(qargv))
         assert row is not None, qargv
-        assert row["status"] == "GATED", (qargv, row["status"])
+        assert row["status"] == "SAFE_EQUIVALENT", (qargv, row["status"])
+        assert row["status"] != "IMPLEMENTED", (qargv, row["status"])
 
 
 # ---------------------------------------------------------------------------
