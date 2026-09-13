@@ -34,14 +34,22 @@ if [ ! -x "$VENV/bin/python" ]; then
 fi
 # The dashboard bundle (frontend/hermes-dist) is a build artifact and is not
 # tracked in git; a fresh checkout/sdist without it would install a package
-# that cannot serve the dashboard. Build it once when node/npm are available;
-# otherwise record a typed warning instead of aborting the whole install.
+# that cannot serve the dashboard. Build it deterministically when node/npm are
+# available; otherwise record a typed DEGRADED state that fails loudly at the
+# end of the install (never a silent skip, never a dashboard-less PASS).
+DASHBOARD_STATE="present"
 if [ ! -f "$PROJECT_DIR/frontend/hermes-dist/index.html" ]; then
   if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
     echo "==> building dashboard (frontend/hermes-dist missing)"
-    "$PROJECT_DIR/scripts/build_dashboard.sh" \
-      || echo "    WARNING: dashboard build failed — packaged dashboard unavailable; re-run scripts/build_dashboard.sh"
+    if "$PROJECT_DIR/scripts/build_dashboard.sh"; then
+      DASHBOARD_STATE="built"
+    else
+      DASHBOARD_STATE="build_failed"
+      echo "    WARNING: frontend/hermes-dist missing — the dashboard build failed;"
+      echo "             re-run scripts/build_dashboard.sh once the toolchain/network is fixed"
+    fi
   else
+    DASHBOARD_STATE="toolchain_missing"
     echo "    WARNING: frontend/hermes-dist missing and node/npm not found —"
     echo "             the dashboard will be unavailable until you run scripts/build_dashboard.sh"
   fi
@@ -200,6 +208,23 @@ EOF
   echo "==> personal-knowledge.md created: edit it, then restart the bridge"
 else
   echo "==> personal-knowledge.md exists (leave as-is)"
+fi
+
+# ------------------------------------------------- dashboard availability gate
+# A missing dashboard build is a TYPED DEGRADED install (exit 4), never a
+# silent success: the CLI/runtime work, but the dashboard cannot be served.
+# The systemd unit is not installed in that state so a broken dashboard is
+# never auto-started.
+if [ "$DASHBOARD_STATE" = "toolchain_missing" ] || \
+   [ "$DASHBOARD_STATE" = "build_failed" ]; then
+  echo
+  echo "DASHBOARD_UNAVAILABLE: the dashboard bundle is missing ($DASHBOARD_STATE)."
+  echo "  The Qubit CLI and runtime are installed, but the dashboard cannot be served."
+  echo "  Action: install node/npm and run:"
+  echo "      $PROJECT_DIR/scripts/build_dashboard.sh"
+  echo "  or install from a release archive that already contains frontend/hermes-dist."
+  echo "  Typed DEGRADED install (exit 4)."
+  exit 4
 fi
 
 # ------------------------------------------------------------- systemd (opt)

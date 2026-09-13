@@ -82,6 +82,15 @@ GENERIC_PATH_TOKENS = {"/home" + "/example", "/home" + "/...", "Projects"}
 # so the release qualifier filters vendored members before gating.
 VENDORED_MEMBER = "_data/qubit_hermes/"
 
+# The built dashboard (frontend/hermes-dist) is a git-ignored build artifact.
+# A clean clone builds a wheel/sdist silently without it, so a release
+# artifact must be rejected unless it actually ships the dashboard bundle.
+DASHBOARD_SUFFIX = "frontend/hermes-dist/index.html"
+
+
+def _has_dashboard(members: list[str]) -> bool:
+    return any(m.replace("\\", "/").endswith(DASHBOARD_SUFFIX) for m in members)
+
 
 def _is_vendored_member(name: str) -> bool:
     # Match the fork at either layout: <pkg>/_data/qubit_hermes/ (wheel) or
@@ -227,7 +236,23 @@ def inspect_artifacts(build_dir: Path) -> dict:
                     if any(tok not in GENERIC_PATH_TOKENS for tok in toks)}
         bad_noncore = {rel: toks for rel, toks in noncore.items()
                        if any(tok not in GENERIC_PATH_TOKENS for tok in toks)}
-        dirty_private = bool(forbidden or secrets or bad_core or bad_noncore)
+        # A release artifact must ship the built dashboard; a clean clone built
+        # without frontend/hermes-dist is a typed FAIL, never a silent OK.
+        has_dashboard = _has_dashboard(members)
+        reasons = []
+        if not has_dashboard:
+            reasons.append(
+                "dashboard bundle missing (frontend/hermes-dist index.html "
+                "not shipped; build it before packaging)")
+        if forbidden:
+            reasons.append("forbidden members present")
+        if secrets:
+            reasons.append("secret shapes in members")
+        if bad_core or bad_noncore:
+            reasons.append(
+                f"non-generic personal path in core/docs/tests: "
+                f"core={bad_core} noncore={bad_noncore}")
+        dirty_private = bool(reasons)
         # Packet 8K closure: verify the ACTUAL detached signature (never
         # fabricate one). NOT_SIGNED is a typed result, not a pass.
         sig = R.verify_artifact_signature(art)
@@ -245,13 +270,16 @@ def inspect_artifacts(build_dir: Path) -> dict:
             "machine_paths_in_noncore_members": noncore,
             "core_personal_paths_blocked": bad_core,
             "noncore_personal_paths_blocked": bad_noncore,
+            "dashboard": {
+                "state": "OK" if has_dashboard else "MISSING",
+                "detail": ("built dashboard shipped in the artifact"
+                           if has_dashboard else
+                           "frontend/hermes-dist/index.html not shipped; the "
+                           "dashboard cannot be served from this artifact"),
+            },
             "signature": sig,
             "state": "OK" if not dirty_private else "FAIL",
-            "detail": "clean" if not dirty_private else
-                      (f"non-generic personal path in core/docs/tests: "
-                       f"core={bad_core} noncore={bad_noncore}"
-                       if (bad_core or bad_noncore) else
-                       "forbidden/secret/machine-path members present"),
+            "detail": "clean" if not dirty_private else "; ".join(reasons),
         })
         if dirty_private:
             all_ok = False

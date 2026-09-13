@@ -54,7 +54,7 @@ upstream installation is not the final product.
 
 ## 2. Canonical locations and names
 
-- Reference checkout: `/home/trick/Projects/Repos/qubit-voicebridge`
+- Reference checkout: `$HOME/Projects/Repos/qubit-voicebridge`
 - Canonical product: **Qubit Agent**
 - Voice subsystem: **Qubit VoiceBridge**
 - Canonical repository/install identity: `qubit-voicebridge`

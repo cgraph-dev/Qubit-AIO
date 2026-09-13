@@ -1,7 +1,7 @@
 # Change report — Packet 7D finish: Qubit branding migration + Scarlett/AT2020 live PTT
 
 Generated: 2026-08-27 18:07 EEST
-Repository: /home/trick/Projects/Repos/openclaw-voice-bridge
+Repository: $HOME/Projects/Repos/openclaw-voice-bridge
 
 ## Files changed
 ```

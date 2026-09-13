@@ -8,18 +8,49 @@
 # additions live in frontend/hermes-qubit/ and are NOT part of this build --
 # they are served as runtime plugins from frontend/hermes-qubit/plugins/.
 #
-# Usage:  scripts/build_dashboard.sh
+# Usage:  scripts/build_dashboard.sh [--check]
+#
+# Typed exit codes (never a silent skip):
+#   0  bundle present (--check) or build succeeded
+#   3  DASHBOARD_UNAVAILABLE: node/npm missing and the bundle is not built
+#   4  DASHBOARD_BUILD_FAILED: dependency install or vite build failed
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WEB_DIR="$REPO_ROOT/frontend/hermes-web"
 APPS_DIR="$REPO_ROOT/frontend/apps"
 DIST_DIR="$REPO_ROOT/frontend/hermes-dist"
+DIST_INDEX="$DIST_DIR/index.html"
 
-command -v node >/dev/null 2>&1 || {
-  echo "ERROR: node is required to build the dashboard" >&2; exit 1; }
-command -v npm >/dev/null 2>&1 || {
-  echo "ERROR: npm is required to build the dashboard" >&2; exit 1; }
+unavailable() {
+  echo "DASHBOARD_UNAVAILABLE: $*" >&2
+  echo "  run scripts/build_dashboard.sh on a host with node/npm + network," >&2
+  echo "  or install from a release archive that ships frontend/hermes-dist" >&2
+  exit 3
+}
+build_failed() {
+  echo "DASHBOARD_BUILD_FAILED: $*" >&2
+  exit 4
+}
+
+# --check is a hermetic preflight: it never installs or builds anything, it
+# only reports whether the bundle exists or can be built on this host.
+if [ "${1:-}" = "--check" ]; then
+  if [ -f "$DIST_INDEX" ]; then
+    echo "DASHBOARD_PRESENT: $DIST_INDEX"
+    exit 0
+  fi
+  if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+    echo "DASHBOARD_BUILDABLE: bundle missing; node+npm available to build it"
+    exit 0
+  fi
+  unavailable "frontend/hermes-dist is not built and node/npm are not installed"
+fi
+
+command -v node >/dev/null 2>&1 || \
+  unavailable "node is required to build the dashboard"
+command -v npm >/dev/null 2>&1 || \
+  unavailable "npm is required to build the dashboard"
 
 # The shared workspace package is imported as @hermes/shared; the monorepo
 # layout expects frontend/apps/shared -> ../hermes-shared.
@@ -27,9 +58,11 @@ mkdir -p "$APPS_DIR"
 ln -sfn ../hermes-shared "$APPS_DIR/shared"
 
 cd "$WEB_DIR"
-npm install --legacy-peer-deps --no-audit --no-fund
-npx tsc -p . --noEmit
-npx vite build --base=/hermes/ --outDir "$DIST_DIR" --emptyOutDir
+npm install --legacy-peer-deps --no-audit --no-fund \
+  || build_failed "npm install failed (network/registry unavailable?)"
+npx tsc -p . --noEmit || build_failed "TypeScript typecheck failed"
+npx vite build --base=/hermes/ --outDir "$DIST_DIR" --emptyOutDir \
+  || build_failed "vite build failed"
 
 # node_modules is a build-only dependency, but pyproject.toml force-includes
 # the whole frontend/ tree into the wheel; leaving it in place would ship
@@ -40,4 +73,5 @@ if [ "${KEEP_NODE_MODULES:-0}" != "1" ]; then
   echo "removed $WEB_DIR/node_modules (KEEP_NODE_MODULES=1 to keep)"
 fi
 
+echo "DASHBOARD_BUILT: $DIST_DIR"
 echo "dashboard built -> $DIST_DIR"

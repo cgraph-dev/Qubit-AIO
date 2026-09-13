@@ -56,6 +56,10 @@ MAX_FILE_BYTES = 2_000_000
 MCP_SCHEMA = "qubit-mcp-grants/1"
 MCP_STORE_NAME = "mcp-grants.json"
 MCP_HOST = "127.0.0.1"
+# Wave 5: the MCP endpoint is an *accounted bounded loopback helper*, not a
+# second product listener/authority. It may only ever bind a loopback literal;
+# a non-loopback host is refused even if ``MCP_HOST`` is tampered with.
+MCP_LOOPBACK_HOSTS = ("127.0.0.1", "::1", "localhost")
 MCP_MAX_GRANTS = 64
 MCP_MAX_BODY_BYTES = 65536
 MCP_MAX_CAPABILITIES = 16
@@ -906,7 +910,8 @@ class McpLoopbackHost:
         """JSON-safe view of the running endpoint (the handle stays live)."""
         return {"state": "OK", "schema": "qubit-mcp-host/1", "host": self.host,
                 "port": self.port, "url": self.url, "grants": list(self.grants),
-                "bound": self.bound}
+                "bound": self.bound, "listener_scope": "loopback-helper",
+                "second_listener": False}
 
     def __enter__(self) -> "McpLoopbackHost":
         return self
@@ -991,6 +996,10 @@ def mcp_serve(cfg: Any, app_id: str = "", *, port: int = 0) -> McpLoopbackHost:
     """
     if estop_engaged(cfg):
         raise PluginRuntimeError(MCP_ESTOP_CODE, "emergency stop is latched")
+    if MCP_HOST not in MCP_LOOPBACK_HOSTS:
+        raise PluginRuntimeError(
+            MCP_REFUSED_CODE,
+            f"refusing non-loopback MCP bind host {MCP_HOST!r}")
     try:
         port_num = int(port)
     except (TypeError, ValueError):
@@ -1039,6 +1048,9 @@ def mcp_doctor(cfg: Any) -> Dict[str, Any]:
             "active_grants": sorted(active),
             "tools": sorted(_HANDLERS), "tool_kinds": kinds,
             "outbound_network": "NONE",
+            "listener": "loopback-helper",
+            "one_listener_rule": "accounted-exception",
+            "bind": "127.0.0.1:ephemeral",
             "estop": estop_engaged(cfg), "warnings": warnings}
 
 

@@ -1,7 +1,7 @@
 # Change report — Packet 7C
 
 Generated: 2026-08-27 02:26 EEST
-Repository: /home/trick/Projects/Repos/openclaw-voice-bridge
+Repository: $HOME/Projects/Repos/openclaw-voice-bridge
 
 ## Files changed
 ```

@@ -87,7 +87,7 @@ The implementation plan must run on this existing stack unless a phase explicitl
 - the bridge runs as `python -m voicebridge run` in a user-level systemd service;
 - the installed service currently has `MemoryHigh=1.5G`, `MemoryMax=2G`, `Restart=always`, and machine-specific graphical-session variables, while the repository service template does not match it;
 - the web UI is a Python `ThreadingHTTPServer` serving static HTML/JavaScript; no React, FastAPI, Uvicorn, Node server, or separate application server is required;
-- the current dashboard lookup contains an absolute `/home/trick/.../voice-dashboard/frontend` path and must become configured or repository-relative;
+- the current dashboard lookup contains an absolute `$HOME/.../voice-dashboard/frontend` path and must become configured or repository-relative;
 - OpenClaw uses the existing WebSocket gateway, Hermes uses the existing backend, and browser automation uses Playwright/Chromium; preserve these boundaries rather than adding another agent runtime;
 - Playwright 1.62.0 remains the declared library for isolated browser tasks and local report-UI tests, but it must not launch or own the monitored Gmail/Instagram/Messenger sessions. Hourly inbox observation attaches through loopback Chrome DevTools Protocol to the user's already running, logged-in real Chromium profile. It must reuse existing tabs or open a background tab only when allowed, never close user tabs, steal focus, clear cookies, or start a competing profile;
 - user-systemd 255 is the durable local scheduler for hourly activation. Do not add cron wrappers, Celery, APScheduler, a second browser daemon, or another application server;

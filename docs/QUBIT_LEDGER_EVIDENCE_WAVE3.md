@@ -354,3 +354,130 @@ Restore the pre-change copies from the agent's external backup (the committed
   `docs/QUBIT_SOURCE_INVENTORY.json`, `docs/QUBIT_SOURCE_OMISSIONS.md`,
   `docs/QUBIT_LEDGER_EVIDENCE_WAVE3.md`, `tests/test_source_inventory.py`,
   `tests/test_ledger_ingestion_wave3.py`, `docs/QUBIT_GAP_LEDGER.qubit.json`.
+
+---
+
+# Wave 5 — tool / skill / plugin coverage (agent 2, 2026-09-13)
+
+Status: **append-only evidence report.** Requirements are unchanged. This
+section records the fork-runtime dispositions for the last open tool/skill/
+plugin inventory rows and their executed proving tests.
+
+## Problem
+
+After wave 3b the Qubit section still carried 112 distinct-uncovered
+tool/skill/plugin rows: 73 `inv:tool:*` (upstream Hermes agent tools), 29
+`inv:skill:*` (`optional-skills/*` + `skills/*`), and 10 `inv:plugin:*`
+(non-dashboard vendored plugins). They were `MISSING` because they are not
+separate Qubit modules. Qubit executes the complete pinned Hermes fork
+in-process, so the fork's tool/toolset registry, skill tree, and plugin fleet
+are the real backing surface.
+
+## Disposition rule (mechanical, no hand-flips; no fabricated per-tool modules)
+
+`scripts/source_inventory.py` now computes an explicit typed
+`fork_disposition` for every `hermes_tool` / `hermes_skill` / `hermes_plugin`
+item and includes it in `_is_covered`:
+
+| category | IMPLEMENTED when | capability row |
+| --- | --- | --- |
+| `hermes_tool` | the vendored fork tool/toolset source declares the name | `fork_tool_runtime` |
+| `hermes_skill` | the vendored skill path carries a loadable `SKILL.md` | `fork_skill_runtime` |
+| `hermes_plugin` | the plugin is vendored under `qubit_hermes/plugins/` and wrapped by `voicebridge.hermes_plugins` | `fork_plugin_runtime` |
+
+Anything not proven is a typed `GATED` disposition with a reason — never a
+silent drop. `scripts/rebuild_ledger_qubit.py` ingests the field and emits an
+explicit `inv:` row (IMPLEMENTED with the fork capability backend + proving
+test, or GATED), and counts dispositioned rows as *explained*, so they are
+never counted as unexplained omissions. Three aggregate fork-runtime capability
+rows (`fork_tool_runtime`, `fork_skill_runtime`, `fork_plugin_runtime`) are
+also emitted.
+
+## Proving tests
+
+All three proofs live in `tests/test_tool_skill_plugin_coverage_wave5.py`:
+
+- `test_fork_tool_registry_exposes_inventory_tools` imports the live vendored
+  fork `tools.registry` (via `voicebridge.hermes_runtime`), discovers built-in
+  tools, and asserts every inventory tool/toolset is exposed and every
+  registered tool has a callable handler (dispatchable).
+- `test_all_inventory_skills_vendored_and_loadable` asserts every IMPLEMENTED
+  skill is vendored with a real `SKILL.md`.
+- `test_all_vendored_plugin_items_have_a_wrapper` asserts every plugin item is
+  in `VENDORED_PLUGIN_FLEET` and covered by `plugin_fleet_audit()`.
+
+Supporting invariants: every item has a typed disposition; every IMPLEMENTED
+disposition cites an executable test; the Qubit runtime resolves to the fork
+and `model_tools.registry` is the exact fork registry object; the generator
+emits a typed row for every dispositioned item and leaves no IMPLEMENTED
+disposition `MISSING`.
+
+## Counts
+
+### Before (committed at `b79089d5`)
+
+| metric | value |
+| --- | --- |
+| Qubit section rows | 907 |
+| MISSING (`inv:`) | 338 |
+| distinct-uncovered tools/skills/plugins | 112 |
+| unexplained omissions | 338 |
+
+### After (live working tree)
+
+| metric | value |
+| --- | --- |
+| Qubit section rows | 910 |
+| MISSING (`inv:`) | 226 |
+| unexplained omissions | 226 |
+| dispositioned tool/skill/plugin rows | 112 (IMPLEMENTED 111, GATED 1) |
+
+`skill:skills/index-cache` is the single typed `GATED` item: the vendored
+directory is a skill-index cache with no loadable `SKILL.md`, so it has no
+skill-runtime surface (reason recorded, `needs=owner`).
+
+Source-inventory side (baseline-pinned `f5fc5776`):
+
+| metric | before | after |
+| --- | --- | --- |
+| candidate omissions | 346 | 233 |
+| distinct capability gaps | 272 | 159 |
+| fork-runtime dispositions | 0 | 147 (IMPLEMENTED 146, GATED 1) |
+
+## Reproduce
+
+```bash
+python scripts/source_inventory.py        # inventory + omissions (fork dispositions)
+python scripts/rebuild_ledger_qubit.py    # live fork coverage -> ledger section
+python scripts/rebuild_ledger_qubit.py --check
+python -m pytest tests/test_tool_skill_plugin_coverage_wave5.py \
+    tests/test_source_inventory.py tests/test_ledger_ingestion_wave3.py \
+    tests/test_ledger_qubit_build.py -q
+```
+
+## Rollback
+
+Restore the pre-wave-5 copies from
+`/tmp/opencode/wave5_backup/` (the committed `b79089d5` state) and re-run both
+generators:
+
+```bash
+cp /tmp/opencode/wave5_backup/QUBIT_SOURCE_INVENTORY.json docs/
+cp /tmp/opencode/wave5_backup/QUBIT_SOURCE_OMISSIONS.md docs/
+cp /tmp/opencode/wave5_backup/QUBIT_GAP_LEDGER.qubit.json docs/
+git checkout -- scripts/source_inventory.py scripts/rebuild_ledger_qubit.py
+rm -f tests/test_tool_skill_plugin_coverage_wave5.py
+```
+
+## Owned files
+
+- `scripts/source_inventory.py` — fork-runtime disposition + coverage.
+- `scripts/rebuild_ledger_qubit.py` — fork capability rows + disposition
+  ingestion and accounting.
+- `docs/QUBIT_SOURCE_OMISSIONS.md` — regenerated (owned).
+- `docs/QUBIT_GAP_LEDGER.qubit.json` — regenerated by the owned generator.
+- `docs/QUBIT_LEDGER_EVIDENCE_WAVE3.md` — this report.
+- `tests/test_tool_skill_plugin_coverage_wave5.py` — new proving tests.
+
+The hermes/openclaw sections and the merged `docs/QUBIT_GAP_LEDGER.md` are not
+written by this workstream (concurrent agents own them).

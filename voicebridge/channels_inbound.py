@@ -167,6 +167,53 @@ CHANNEL_CAPS: Dict[str, Dict[str, Any]] = {
               "credential_kind": "oidc-bearer", "available": False,
               "detail": "Pub/Sub push envelope verified; no mailbox watcher "
                         "transport runs in Qubit"},
+    # ---- OpenClaw wave-5 extension breadth (extensions/* bridges) ----
+    # Every remaining OpenClaw channel extension is recognized with a real
+    # bounded receive adapter (normalize_event + the injected ingest sink) and
+    # an honest, typed credential/transport gate. No listener starts and no
+    # channel is ever reported connected.
+    "a2a": {"label": "A2A (agent-to-agent)", "transport": "agent-bridge",
+            "credential_kind": "agent-card", "available": False,
+            "detail": "bounded agent-card envelope normalized; live peer "
+                      "transport stays credential/owner gated"},
+    "buzz": {"label": "Buzz", "transport": "relay",
+             "credential_kind": "relay-token", "available": False,
+             "detail": "bounded relay envelope normalized; no relay transport"},
+    "clickclack": {"label": "ClickClack", "transport": "workspace-api",
+                   "credential_kind": "app-token", "available": False,
+                   "detail": "bounded workspace event normalized; no transport"},
+    "imap": {"label": "IMAP mailbox", "transport": "imap",
+             "credential_kind": "imap-password", "available": False,
+             "detail": "bounded mail envelope normalized; no IMAP poller runs"},
+    "nextcloud-talk": {"label": "Nextcloud Talk", "transport": "ocs-api",
+                       "credential_kind": "app-password", "available": False,
+                       "detail": "bounded OCS activity normalized; no adapter"},
+    "qa-channel": {"label": "QA channel harness", "transport": "test-harness",
+                   "credential_kind": "test-fixture", "available": False,
+                   "detail": "bounded QA fixture envelope; live channel is a "
+                             "credential/owner gate"},
+    "raft": {"label": "Raft", "transport": "relay",
+             "credential_kind": "relay-token", "available": False,
+             "detail": "bounded relay envelope normalized; no relay transport"},
+    "reef": {"label": "Reef", "transport": "relay",
+             "credential_kind": "relay-token", "available": False,
+             "detail": "bounded relay envelope normalized; no relay transport"},
+    "synology-chat": {"label": "Synology Chat", "transport": "webhook",
+                      "credential_kind": "bot-token", "available": False,
+                      "detail": "bounded webhook envelope normalized; no "
+                                "inbound webhook adapter"},
+    "tlon": {"label": "Tlon / Urbit", "transport": "urbit",
+             "credential_kind": "urbit-code", "available": False,
+             "detail": "bounded Urbit message normalized; no ship transport"},
+    "twitch": {"label": "Twitch", "transport": "irc-socket",
+               "credential_kind": "oauth", "available": False,
+               "detail": "bounded IRC chat message normalized; no socket"},
+    "zalo": {"label": "Zalo", "transport": "oa-webhook",
+             "credential_kind": "oa-token", "available": False,
+             "detail": "bounded OA message normalized; no Zalo transport"},
+    "zalouser": {"label": "Zalo User", "transport": "oa-webhook",
+                 "credential_kind": "oa-token", "available": False,
+                 "detail": "bounded user message normalized; no Zalo transport"},
 }
 
 # Single source of truth for channel membership (order preserved).
@@ -702,6 +749,38 @@ def normalize_event(channel: str, payload: Any) -> Dict[str, Any]:
                 content = {}
         text = str(content.get("text", "") if isinstance(content, dict) else "")
         event_id = str(msg.get("message_id") or ev.get("event_id") or "")
+    elif clean == "imap":
+        sender = str(data.get("from") or data.get("sender") or "")
+        text = str(data.get("body") or data.get("text") or
+                   data.get("subject") or "")
+        event_id = str(data.get("uid") or data.get("message_id") or
+                       data.get("id") or "")
+    elif clean == "twitch":
+        sender = str(data.get("username") or data.get("sender") or "")
+        text = str(data.get("message") or data.get("text") or "")
+        event_id = str(data.get("id") or data.get("event_id") or "")
+    elif clean in ("zalo", "zalouser"):
+        sender = str(data.get("from_id") or data.get("sender") or
+                     data.get("from") or "")
+        text = str(data.get("message") or data.get("text") or "")
+        event_id = str(data.get("message_id") or data.get("id") or "")
+    elif clean == "tlon":
+        sender = str(data.get("author") or data.get("sender") or "")
+        text = str(data.get("content") or data.get("text") or "")
+        event_id = str(data.get("id") or data.get("event_id") or "")
+    elif clean == "nextcloud-talk":
+        actor = data.get("actor") if isinstance(data.get("actor"), dict) else {}
+        sender = str(actor.get("id") or data.get("sender") or "")
+        text = str(data.get("message") or data.get("text") or "")
+        event_id = str(data.get("id") or data.get("event_id") or "")
+    elif clean == "a2a":
+        sender = str(data.get("from") or data.get("sender") or "")
+        text = str(data.get("text") or data.get("message") or "")
+        event_id = str(data.get("task_id") or data.get("id") or "")
+    elif clean in ("buzz", "raft", "reef"):
+        sender = str(data.get("from") or data.get("sender") or "")
+        text = str(data.get("text") or data.get("message") or "")
+        event_id = str(data.get("id") or data.get("event_id") or "")
     else:
         sender = str(data.get("sender") or data.get("from") or "")
         text = str(data.get("text") or data.get("body") or "")

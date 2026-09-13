@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import struct
 import threading
 import time
@@ -39,13 +40,67 @@ from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional
 
 from .logging_setup import log_event, get_logger
-from .redaction import redact_obj
+from .redaction import redact_obj, redact_text
 from . import resources
 
 log = get_logger()
 
 PCM_RATE = 16000
 PCM_WIDTH = 2  # Int16
+
+# --------------------------------------------------------------------------
+# Transport-boundary redaction (Wave 5, G2).
+#
+# Secrets are masked when a response is serialized, NOT on the internal
+# receipt object: the CLI / dashboard / voice backend-parity tests compare
+# ``dashboard_ops.run_op(...)["receipt"]["result"]`` byte-for-byte against the
+# direct backend dict, so the receipt must stay intact. Only the served JSON is
+# scrubbed.
+#
+# Unlike ``redaction.redact_obj`` this walk does not cap container item counts
+# (the operations catalog is 500+ entries and must be served whole); it is
+# depth-bounded and cycle-safe. String values are gated cheaply so ordinary
+# prose is untouched, and a *string* value under a credential-named key is
+# masked even when it is not itself secret-shaped (``{"password": "hunter2"}``).
+# Non-string values under such keys (e.g. the catalog's ``"secret": false``
+# schema flag) are schema, not credentials, and pass through.
+# --------------------------------------------------------------------------
+_SERVED_SECRET_GATE = re.compile(
+    r"(?i)(sk-|eyJ|bearer[ \t]|basic[ \t]|token|secret|password|passwd|"
+    r"api[_-]?key|authorization|cookie|://)")
+_SERVED_SECRET_KEY = re.compile(
+    r"(?i)\b(token|secret|password|passwd|api[_-]?key|authorization|"
+    r"cookie|credential)\b")
+_SERVED_REDACT_DEPTH = 12
+
+
+def _redact_served(obj: Any, _depth: int = 0,
+                   _seen: Optional[set] = None) -> Any:
+    """Recursively mask secret-shaped strings for a served response."""
+    if _depth > _SERVED_REDACT_DEPTH:
+        return "[REDACTED]"
+    if isinstance(obj, str):
+        return redact_text(obj) if _SERVED_SECRET_GATE.search(obj) else obj
+    if isinstance(obj, dict):
+        if _seen is None:
+            _seen = set()
+        if id(obj) in _seen:
+            return "[REDACTED]"
+        _seen.add(id(obj))
+        out: Dict[Any, Any] = {}
+        for key, value in obj.items():
+            if (isinstance(key, str) and isinstance(value, str)
+                    and _SERVED_SECRET_KEY.search(key)):
+                out[key] = "[REDACTED]"
+            else:
+                out[key] = _redact_served(value, _depth + 1, _seen)
+        return out
+    if isinstance(obj, (list, tuple)):
+        # Return a plain list: JSON treats tuples as arrays, and a tuple
+        # subclass (namedtuple) cannot be rebuilt from a single iterable.
+        return [_redact_served(v, _depth + 1, _seen) for v in obj]
+    return obj
+
 
 # --------------------------------------------------------------------------
 # Activity feed (ring buffer) + persistence through events.jsonl
@@ -831,7 +886,10 @@ class WebUIHandler(BaseHTTPRequestHandler):
         return True
 
     def _json(self, obj: Any, code: int = 200) -> None:
-        self._send(code, json.dumps(obj).encode(), "application/json")
+        # G2: redact at the transport/JSON boundary so a served response can
+        # never carry a secret, while the internal receipt stays intact.
+        self._send(code, json.dumps(_redact_served(obj)).encode(),
+                   "application/json")
 
     def _html(self, page: str, code: int = 200) -> None:
         self._send(code, page.encode(), "text/html; charset=utf-8")

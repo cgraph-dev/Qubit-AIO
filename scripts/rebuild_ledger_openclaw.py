@@ -296,6 +296,145 @@ EXTENSION_MAP["llm-task"]["impl"] = \
 EXTENSION_MAP["geolocation"]["impl"] = "voicebridge/node_host.py geolocate"
 
 
+# ---------------------------------------------------------------------------
+# Wave 5: explicit disposition for every remaining extension
+# ---------------------------------------------------------------------------
+# After the wave-4 extension map the direct source inventory still carried 30
+# ``inv:openclaw-ext:*`` rows as MISSING because the inventory categorizer
+# resolves an extension's parent from the *pinned* ledger and the item
+# categories -- it cannot see the wave-4 map, and the audited parent
+# (OC-19 Broad channel set) stays PARTIAL while a live transport is gated.
+#
+# This table is the authoritative, machine-checkable disposition for exactly
+# those 30. Every one is either:
+#   * (a) mapped to an audited Qubit capability row (``parent``), using an
+#     implementation that already exists and is proven by the parent's test;
+#   * (b) a real bounded adapter behind an injected boundary, with a typed
+#     credential/hardware/owner gate (``gate``); or
+#   * (c) a distinct Qubit form proven by its own test (``distinct``).
+# No extension is left unmapped, no second gateway/router/listener/scheduler/
+# policy authority is created, and no OpenClaw source is copied. ``resolved``
+# repeats the wave-4 disposition; a mismatch fails the proving test.
+WAVE5_EXTENSIONS = (
+    "a2a", "buzz", "clickclack", "cua-computer", "device-pair", "diffs",
+    "geolocation", "googlechat", "image-generation-core", "imap", "irc",
+    "line", "llm-task", "lobster", "mattermost", "msteams",
+    "nextcloud-talk", "nostr", "oc-path", "qa-channel", "raft", "reef",
+    "sms", "synology-chat", "test-support", "tlon", "twitch",
+    "visitor-access", "zalo", "zalouser",
+)
+
+# name -> the concrete Qubit form (file:symbol) and the behavioural proof.
+# The disposition/parent/gate/needs are read from :data:`EXTENSION_MAP` so the
+# two tables can never drift (enforced by the wave-5 test).
+WAVE5_FORMS: Dict[str, Dict[str, str]] = {
+    "a2a": {"form": "voicebridge/channels_inbound.py normalize_event",
+            "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "buzz": {"form": "voicebridge/channels_inbound.py normalize_event",
+             "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "clickclack": {"form": "voicebridge/channels_inbound.py normalize_event",
+                   "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "cua-computer": {"form": "voicebridge/computer_use.py status/refuse_install",
+                     "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "device-pair": {
+        "form": ("voicebridge/device.py token_issue/token_approve/"
+                 "token_rotate/token_revoke/token_verify"),
+        "proving": "tests/test_openclaw_parity_wave1.py"},
+    "diffs": {"form": "voicebridge/file_patch.py apply_patch",
+              "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "geolocation": {"form": "voicebridge/node_host.py geolocate",
+                    "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "googlechat": {"form": "voicebridge/channels_inbound.py normalize_event",
+                   "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "image-generation-core": {
+        "form": "voicebridge/media_gen.py shape_media_request/generate",
+        "proving": "tests/test_openclaw_closure_wave2_webmedia.py"},
+    "imap": {"form": "voicebridge/channels_inbound.py normalize_event",
+             "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "irc": {"form": "voicebridge/channels_inbound.py normalize_event",
+            "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "line": {"form": "voicebridge/channels_inbound.py normalize_event",
+             "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "llm-task": {"form": "voicebridge/local_models.py structured_task",
+                 "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "lobster": {"form": "voicebridge/automation.py run_directive/order_add",
+                "proving": "tests/test_openclaw_e5_directives.py"},
+    "mattermost": {"form": "voicebridge/channels_inbound.py normalize_event",
+                   "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "msteams": {"form": "voicebridge/channels_inbound.py normalize_event",
+                "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "nextcloud-talk": {"form": "voicebridge/channels_inbound.py normalize_event",
+                       "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "nostr": {"form": "voicebridge/channels_inbound.py normalize_event",
+              "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "oc-path": {"form": "voicebridge/files.py list_dir/read_file/inspect",
+                "proving": "tests/test_files_ide8u.py"},
+    "qa-channel": {"form": "voicebridge/channels_inbound.py normalize_event",
+                   "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "raft": {"form": "voicebridge/channels_inbound.py normalize_event",
+             "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "reef": {"form": "voicebridge/channels_inbound.py normalize_event",
+             "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "sms": {"form": "voicebridge/channels_inbound.py normalize_event",
+            "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "synology-chat": {"form": "voicebridge/channels_inbound.py normalize_event",
+                      "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "test-support": {"form": "tests/ (upstream test scaffolding only)",
+                     "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "tlon": {"form": "voicebridge/channels_inbound.py normalize_event",
+             "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "twitch": {"form": "voicebridge/channels_inbound.py normalize_event",
+               "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "visitor-access": {
+        "form": "voicebridge/device.py token_issue (expiring grant)",
+        "proving": "tests/test_openclaw_parity_wave1.py"},
+    "zalo": {"form": "voicebridge/channels_inbound.py normalize_event",
+             "proving": "tests/test_openclaw_extensions_wave5.py"},
+    "zalouser": {"form": "voicebridge/channels_inbound.py normalize_event",
+                 "proving": "tests/test_openclaw_extensions_wave5.py"},
+}
+
+
+def wave5_records() -> List[Dict[str, str]]:
+    """Merge the wave-5 forms with the authoritative wave-4 dispositions."""
+    records: List[Dict[str, str]] = []
+    for name in WAVE5_EXTENSIONS:
+        disposition = EXTENSION_MAP.get(name)
+        form = WAVE5_FORMS.get(name)
+        if disposition is None or form is None:  # pragma: no cover - guarded
+            records.append({"name": name, "disposition": "UNMAPPED",
+                            "parent": "", "gate": "", "needs": "",
+                            "form": "", "proving": ""})
+            continue
+        records.append({
+            "name": name,
+            "disposition": disposition["disposition"],
+            "parent": disposition["parent"],
+            "gate": disposition["gate"],
+            "needs": disposition["needs"],
+            "form": form["form"],
+            "proving": form["proving"],
+        })
+    return records
+
+
+def wave5_summary() -> Dict[str, object]:
+    """Deterministic coverage of the 30 remaining OpenClaw extensions."""
+    records = wave5_records()
+    dispositions = Counter(r["disposition"] for r in records)
+    needs = Counter(r["needs"] for r in records)
+    return {
+        "total": len(records),
+        "by_disposition": {k: dispositions[k]
+                           for k in EXTENSION_DISPOSITIONS},
+        "by_needs": {k: needs.get(k, 0) for k in EXTENSION_NEEDS},
+        "unmapped": [r["name"] for r in records
+                     if r["disposition"] == "UNMAPPED"],
+        "covered": all(r["disposition"] != "UNMAPPED" for r in records),
+        "extensions": records,
+    }
+
+
 def extension_map_summary() -> Dict[str, object]:
     """Deterministic counts + coverage of the OpenClaw extension map."""
     by_disposition = Counter(v["disposition"] for v in EXTENSION_MAP.values())
@@ -1507,6 +1646,7 @@ def build_ledger() -> Dict[str, object]:
             "by_area": dict(sorted(by_area.items())),
         },
         "extension_map": extension_map_summary(),
+        "extension_wave5": wave5_summary(),
         "rows": rows,
     }
 

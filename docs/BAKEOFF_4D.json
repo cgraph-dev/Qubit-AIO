@@ -412,7 +412,7 @@
       "sha256": "3605803b982cb64aead44f6c1b2ae36e3acdb41d8e46c8a94c6533bc4c67e597",
       "license": "Apache-2.0",
       "size_mib": 2381.6,
-      "delete_command": "ollama rm qubit-cand-q4 && rm \"/home/trick/.cache/voicebridge/bakeoff-4d/Qwen3-4B-Instruct-2507-Q4_K_M.gguf\""
+      "delete_command": "ollama rm qubit-cand-q4 && rm \"$HOME/.cache/voicebridge/bakeoff-4d/Qwen3-4B-Instruct-2507-Q4_K_M.gguf\""
     },
     {
       "alias": "qubit-cand-q5",
@@ -421,7 +421,7 @@
       "sha256": "5bde5e9d883622acb02bf77fe7dcbc56a8b9a9ad4be78a72ca23a532658b4ecb",
       "license": "Apache-2.0",
       "size_mib": 2755.7,
-      "delete_command": "ollama rm qubit-cand-q5 && rm \"/home/trick/.cache/voicebridge/bakeoff-4d/Qwen3-4B-Instruct-2507-Q5_K_M.gguf\""
+      "delete_command": "ollama rm qubit-cand-q5 && rm \"$HOME/.cache/voicebridge/bakeoff-4d/Qwen3-4B-Instruct-2507-Q5_K_M.gguf\""
     }
   ],
   "recommendation": "NOT APPLIED \u2014 VERIFIER ROUND 5: Q5 is currently the ONLY candidate passing all corrected candidate gates; Q4 must not be promoted. LIMITATION: Q5 passes the defined WARM-audio gate only \u2014 verifier observed cold-start first audio up to 8608 ms from a completely unloaded state; a strict \u2264800 ms cold requirement would fail Q5 (open user decision). Production alias unchanged; promotion requires explicit user approval.",

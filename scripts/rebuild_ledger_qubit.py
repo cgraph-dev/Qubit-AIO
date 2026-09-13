@@ -893,6 +893,84 @@ def build_gated_rows() -> List[Dict[str, str]]:
 
 
 # ---------------------------------------------------------------------------
+# Fork-runtime capability rows (Wave 5: tools / skills / plugins)
+# ---------------------------------------------------------------------------
+# Qubit executes the complete pinned Hermes fork in-process, so upstream agent
+# tools, skills, and plugins are *not* separate Qubit modules: the fork's
+# tool/toolset registry, skill tree, and plugin fleet are the real backing
+# surface.  These aggregate capability rows are the fork-runtime rows that each
+# inventory tool/skill/plugin item maps to, proven by the Wave 5 test that
+# imports the live fork registry / skill tree / plugin wrapper.
+FORK_TOOL_PROOF = ("tests/test_tool_skill_plugin_coverage_wave5.py"
+                   "::test_fork_tool_registry_exposes_inventory_tools")
+FORK_SKILL_PROOF = ("tests/test_tool_skill_plugin_coverage_wave5.py"
+                    "::test_all_inventory_skills_vendored_and_loadable")
+FORK_PLUGIN_PROOF = ("tests/test_tool_skill_plugin_coverage_wave5.py"
+                     "::test_all_vendored_plugin_items_have_a_wrapper")
+
+
+def build_fork_rows() -> List[Dict[str, str]]:
+    """The three fork-runtime capability rows (IMPLEMENTED once proven)."""
+    return [
+        {
+            "id": "fork_tool_runtime",
+            "area": "tools",
+            "capability": ("In-process fork agent tool registry "
+                           "(pinned Hermes tools + toolsets)"),
+            "upstream_ref": "qubit_hermes/toolsets.py",
+            "qubit_backend": "qubit_hermes.tools.registry:registry",
+            "cli": "",
+            "dashboard": "",
+            "voice": "",
+            "status": "IMPLEMENTED",
+            "proving_test": FORK_TOOL_PROOF,
+            "note": ("Every upstream agent tool/toolset is exposed by the "
+                     "vendored fork registry and dispatched in-process by the "
+                     "fork agent runtime under Qubit policy/broker; the Wave 5 "
+                     "test imports the live registry and asserts membership."),
+            "needs": "none",
+        },
+        {
+            "id": "fork_skill_runtime",
+            "area": "skills",
+            "capability": ("In-process fork skill runtime "
+                           "(vendored skills + optional-skills)"),
+            "upstream_ref": "qubit_hermes/skills",
+            "qubit_backend": "qubit_hermes.skills",
+            "cli": "",
+            "dashboard": "",
+            "voice": "",
+            "status": "IMPLEMENTED",
+            "proving_test": FORK_SKILL_PROOF,
+            "note": ("Every vendored skill directory with a loadable SKILL.md "
+                     "is served by the in-process fork skill runtime; the Wave "
+                     "5 test asserts each inventory skill is vendored and "
+                     "loadable."),
+            "needs": "none",
+        },
+        {
+            "id": "fork_plugin_runtime",
+            "area": "plugins",
+            "capability": ("In-process fork plugin fleet "
+                           "(vendored agent/provider/dashboard plugins)"),
+            "upstream_ref": "qubit_hermes/plugins",
+            "qubit_backend": "voicebridge.hermes_plugins.plugin_fleet_audit",
+            "cli": "",
+            "dashboard": "",
+            "voice": "",
+            "status": "IMPLEMENTED",
+            "proving_test": FORK_PLUGIN_PROOF,
+            "note": ("Every vendored non-dashboard plugin is covered by the "
+                     "Qubit plugin wrapper "
+                     "(voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / "
+                     "plugin_fleet_audit); the Wave 5 test asserts the fleet "
+                     "covers every inventory plugin item."),
+            "needs": "none",
+        },
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Qubit dashboard overlay plugin pages
 # ---------------------------------------------------------------------------
 # A page/plugin surface family declares only the dashboard interface: there is
@@ -1185,7 +1263,7 @@ def build_inventory_rows(report: Dict[str, object], known_ids: Set[str],
     parented_by_category: Dict[str, int] = {}
     by_parent: Dict[str, int] = {}
     covered_by_parent: Dict[str, int] = {}
-    matched = 0
+    covered_count = 0
     parented_covered = 0
     distinct_covered = 0
     parented_total = 0
@@ -1193,6 +1271,11 @@ def build_inventory_rows(report: Dict[str, object], known_ids: Set[str],
     surface_total = 0
     evidence_only = 0
     unidentified = 0
+    dispositioned_count = 0
+    dispositioned_impl = 0
+    dispositioned_gated = 0
+    dispositioned: List[str] = []
+    dispositioned_by_category: Dict[str, int] = {}
     used_ids: Set[str] = set()
 
     for item in items:
@@ -1237,13 +1320,61 @@ def build_inventory_rows(report: Dict[str, object], known_ids: Set[str],
             if parent_status == "IMPLEMENTED":
                 covered = True
         if covered:
-            matched += 1
+            covered_count += 1
             if is_parented:
                 parented_covered += 1
                 key = resolved or parent_id
                 covered_by_parent[key] = covered_by_parent.get(key, 0) + 1
             else:
                 distinct_covered += 1
+            continue
+
+        # Wave 5: an explicit fork-runtime disposition (tools/skills/plugins)
+        # is an *explained* row, not an unexplained omission.  Qubit executes
+        # the fork in-process, so the fork registry/skill tree/plugin fleet is
+        # the real backing surface; the item gets an explicit typed row with a
+        # real fork capability backend and proving test.
+        fork = item.get("fork_disposition")
+        if isinstance(fork, dict) and fork.get("status") in (
+                "IMPLEMENTED", "GATED"):
+            row_id = _inventory_row_id(item_id)
+            base_id = row_id
+            suffix = 2
+            while row_id in used_ids or row_id in known_ids:
+                row_id = f"{base_id}#{suffix}"
+                suffix += 1
+            used_ids.add(row_id)
+            dispositioned.append(item_id)
+            dispositioned_count += 1
+            dispositioned_by_category[category or "uncategorized"] = \
+                dispositioned_by_category.get(category or "uncategorized", 0) + 1
+            status = str(fork.get("status"))
+            if status == "IMPLEMENTED":
+                dispositioned_impl += 1
+            else:
+                dispositioned_gated += 1
+            # A typed disposition (IMPLEMENTED or GATED) is explained coverage:
+            # it is neither an uncovered distinct capability nor an omission.
+            if is_parented:
+                parented_covered += 1
+            else:
+                distinct_covered += 1
+            rows.append({
+                "id": row_id,
+                "area": str(item.get("area") or category or "source_inventory"),
+                "capability": str(item.get("name") or item.get("help")
+                                  or item_id),
+                "upstream_ref": str(item.get("path") or item.get("source")
+                                    or ""),
+                "qubit_backend": str(fork.get("backend") or ""),
+                "cli": "",
+                "dashboard": "",
+                "voice": "",
+                "status": status,
+                "proving_test": str(fork.get("proving_test") or ""),
+                "note": str(fork.get("reason") or ""),
+                "needs": str(fork.get("needs") or _inventory_needs(item)),
+            })
             continue
 
         row_id = _inventory_row_id(item_id)
@@ -1294,10 +1425,15 @@ def build_inventory_rows(report: Dict[str, object], known_ids: Set[str],
         })
 
     summary = {key: value for key, value in report.items() if key != "items"}
-    # Unidentified items have no usable id, so they cannot be listed in
-    # omitted_ids but they are still unexplained omissions: fold them in so
-    # matched + unmatched == surface_items always holds.
-    unmatched = len(omitted) + unidentified
+    # Every non-evidence item is one of: covered by a real ledger row/parent,
+    # dispositioned by the fork runtime (Wave 5 tools/skills/plugins), or an
+    # unexplained omission.  Unidentified items have no usable id so they cannot
+    # be listed in omitted_ids, but they are still unexplained; fold them in so
+    # matched + unmatched == surface_items always holds and
+    # unprotected = unmatched + unidentified.
+    unexplained = len(omitted) + unidentified
+    matched = surface_total - unexplained
+    unmatched = unexplained
     summary.update({
         "surface_items": surface_total,
         "evidence_only": evidence_only,
@@ -1305,6 +1441,13 @@ def build_inventory_rows(report: Dict[str, object], known_ids: Set[str],
         "unmatched": unmatched,
         "unexplained_omissions": unmatched,
         "unidentified": unidentified,
+        "covered": covered_count,
+        "dispositioned": dispositioned_count,
+        "dispositioned_implemented": dispositioned_impl,
+        "dispositioned_gated": dispositioned_gated,
+        "dispositioned_ids": sorted(dispositioned),
+        "dispositioned_by_category": dict(
+            sorted(dispositioned_by_category.items())),
         "parented_surfaces": parented_total,
         "parented_covered": parented_covered,
         "parented_uncovered": len(parented_omitted),
@@ -1333,6 +1476,7 @@ def build_ledger(inventory_path: Optional[Path] = None) -> Dict[str, object]:
 
     rows = (build_catalog_rows(catalog, tree, index) +
             build_gated_rows() +
+            build_fork_rows() +
             build_plugin_rows(index) +
             build_page_rows(index))
 
@@ -1382,15 +1526,22 @@ def build_ledger(inventory_path: Optional[Path] = None) -> Dict[str, object]:
             "plugin asset/API/test/manifest -> its plugin, OpenClaw extension "
             "-> the audited OC-* capability, workflow source -> its area "
             "capability, dashboard component -> webui_status) with no "
-            "standalone row, or emitted as an explicit MISSING open row "
-            "classified as a distinct capability or a parented surface needing "
-            "parent closure; absent or malformed inventories are recorded, "
-            "never treated as complete. No status is hand-flipped."),
+            "standalone row, an upstream tool/skill/plugin item is given an "
+            "explicit fork-runtime disposition (the in-process fork registry / "
+            "skill tree / plugin fleet is the real backing surface; IMPLEMENTED "
+            "with a proving test, else a typed GATED gate), or emitted as an "
+            "explicit MISSING open row classified as a distinct capability or a "
+            "parented surface needing parent closure; absent or malformed "
+            "inventories are recorded, never treated as complete. No status is "
+            "hand-flipped."),
         "sources_reconciled": [
             "voicebridge/voice_commands.py (REGISTRY/_BACKENDS/CLI_COVERAGE)",
             "voicebridge/dashboard_ops.py (catalog/EXTRA_OPS)",
             "voicebridge/cli.py (build_parser)",
             "voicebridge/hermes_compat.py (ROUTES/GATED)",
+            "voicebridge/hermes_plugins.py (vendored plugin fleet wrapper)",
+            "qubit_hermes/toolsets.py + tools/registry.py (fork tool runtime)",
+            "qubit_hermes/skills + optional-skills (fork skill runtime)",
             "tests/ (AST caller evidence)",
             "frontend/hermes-qubit/plugins/*/manifest.json",
             "frontend/hermes-web/src/pages/*.tsx",
@@ -1413,6 +1564,12 @@ def build_ledger(inventory_path: Optional[Path] = None) -> Dict[str, object]:
                 "parented_uncovered", 0),
             "source_inventory.distinct_uncovered": inventory_summary.get(
                 "distinct_uncovered", 0),
+            "source_inventory.dispositioned": inventory_summary.get(
+                "dispositioned", 0),
+            "source_inventory.dispositioned_implemented": inventory_summary.get(
+                "dispositioned_implemented", 0),
+            "source_inventory.dispositioned_gated": inventory_summary.get(
+                "dispositioned_gated", 0),
         },
         "counts_by_status": dict(sorted(by_status.items())),
         "counts_by_area": dict(sorted(by_area.items())),

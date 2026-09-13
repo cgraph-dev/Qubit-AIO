@@ -3,7 +3,7 @@
 Read-only delta audit. The only repo file created/modified is this document.
 All OpenClaw evidence is cited against the v2026.9.4 tree at commit
 `3a9d69db306cd7f081e06254cb89c4bcc14a7107`; all Qubit evidence is against
-`/home/trick/Projects/Repos/qubit-voicebridge` at the working tree.
+`$HOME/Projects/Repos/qubit-voicebridge` at the working tree.
 
 The predecessor audit (`docs/AUDIT_OPENCLAW_2026-09-11.md`) was anchored at
 v2026.9.2 (`3928bad9…`). This document records only what changed between those
@@ -25,7 +25,7 @@ two pins and how each delta maps to Qubit's current capability modules.
 | License | MIT, Copyright (c) 2026 OpenClaw Foundation (`LICENSE:1-3`) | same |
 | Local clone | `/tmp/opencode/pinned/openclaw` (shallow) | same clone, `v2026.9.4` fetched as a shallow tag object |
 
-Qubit repo: `/home/trick/Projects/Repos/qubit-voicebridge` at
+Qubit repo: `$HOME/Projects/Repos/qubit-voicebridge` at
 `cb2619f4d412bcedc6fc89fa6b10a1b2808e6114`.
 Note: the Qubit working tree already contained unrelated uncommitted edits to
 `docs/NATIVE_EQUIVALENTS_8U.{json,md}`, `tests/test_hermes_readsurfaces8u.py`,

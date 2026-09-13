@@ -1,7 +1,7 @@
 # Change report — Packet 7D remediation
 
 Generated: 2026-08-27 04:27 EEST
-Repository: /home/trick/Projects/Repos/openclaw-voice-bridge
+Repository: $HOME/Projects/Repos/openclaw-voice-bridge
 
 ## Files changed
 ```

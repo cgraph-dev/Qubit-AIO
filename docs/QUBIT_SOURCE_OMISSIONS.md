@@ -9,30 +9,20 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 
 ## Summary
 
-- Ledger comparison baseline: `f5fc5776` (verified waves-1-2 revision; the live working-tree ledger is edited by concurrent agents, so the comparison is pinned to a reproducible revision).
+- Ledger comparison baseline: `working-tree` (verified waves-1-2 revision; the live working-tree ledger is edited by concurrent agents, so the comparison is pinned to a reproducible revision).
 - Inventory items (all categories): **6776**
-- Candidate omissions (uncovered surface items): **346**
-- Distinct capability gaps (no parent row): **272**
-- Parented surfaces needing parent closure (parent not IMPLEMENTED): **74**
-- Parented surfaces covered by an IMPLEMENTED parent: **1006**
+- Candidate omissions (uncovered surface items): **6**
+- Distinct capability gaps (no parent row): **0**
+- Parented surfaces needing parent closure (parent not IMPLEMENTED): **6**
+- Parented surfaces covered by an IMPLEMENTED parent: **1074**
 - Distinct capabilities total: **739**; parented surfaces total: **1080**
+- Fork-runtime dispositions (tools/skills/plugins): **177** (IMPLEMENTED 152, GATED 25)
 - Ledger IMPLEMENTED rows with unreproducible evidence: **0**
 - Hermes byte diff vs `qubit_hermes/`: upstream=12173 local=12173 identical=12173 missing=0 extra=0 changed=0
 
 ### Omission counts by category (all uncovered)
 
-- `hermes_backend_route`: 1
-- `hermes_cli_option`: 37
-- `hermes_cli_positional`: 8
-- `hermes_cli_subcommand`: 150
-- `hermes_dashboard_plugin`: 1
-- `hermes_plugin`: 11
-- `hermes_plugin_api`: 1
-- `hermes_plugin_asset`: 4
-- `hermes_plugin_test`: 1
-- `hermes_skill`: 29
-- `hermes_tool`: 73
-- `openclaw_extension`: 30
+- `hermes_cli_option`: 6
 
 ### Evidence-only surface counts (not candidate rows)
 
@@ -40,424 +30,39 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 - `hermes_locale_key`: 366
 - `hermes_upstream_test`: 3876
 
-## Distinct capability gaps (272)
+## Distinct capability gaps (0)
 
 No parent capability row exists; these remain explicit open rows.
 
-### hermes_backend_route (1)
-
-- `api:GET /assets/{filename}.css` — source `hermes_cli/web_server_dashboard.py:177`; category `hermes_backend_route`; CLI=none; dashboard=`hermes_cli/web_server_dashboard.py:177`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes backend route is a distinct capability with no implementing ledger row.
-
-### hermes_cli_subcommand (147)
-
-- `hermes approvals suggest` — source `hermes_cli/subcommands/approvals.py`; category `hermes_cli_subcommand`; CLI=`hermes approvals suggest`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes approvals test` — source `hermes_cli/subcommands/approvals.py`; category `hermes_cli_subcommand`; CLI=`hermes approvals test`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes auth add` — source `hermes_cli/subcommands/auth.py`; category `hermes_cli_subcommand`; CLI=`hermes auth add`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes auth list` — source `hermes_cli/subcommands/auth.py`; category `hermes_cli_subcommand`; CLI=`hermes auth list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes auth logout` — source `hermes_cli/subcommands/auth.py`; category `hermes_cli_subcommand`; CLI=`hermes auth logout`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes auth priority` — source `hermes_cli/subcommands/auth.py`; category `hermes_cli_subcommand`; CLI=`hermes auth priority`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes auth refresh` — source `hermes_cli/subcommands/auth.py`; category `hermes_cli_subcommand`; CLI=`hermes auth refresh`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes auth remove` — source `hermes_cli/subcommands/auth.py`; category `hermes_cli_subcommand`; CLI=`hermes auth remove`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes auth reset` — source `hermes_cli/subcommands/auth.py`; category `hermes_cli_subcommand`; CLI=`hermes auth reset`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes auth spotify` — source `hermes_cli/subcommands/auth.py`; category `hermes_cli_subcommand`; CLI=`hermes auth spotify`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes auth status` — source `hermes_cli/subcommands/auth.py`; category `hermes_cli_subcommand`; CLI=`hermes auth status`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes browser close-profile` — source `hermes_cli/subcommands/browser.py`; category `hermes_cli_subcommand`; CLI=`hermes browser close-profile`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes claw cleanup` — source `hermes_cli/subcommands/claw.py`; category `hermes_cli_subcommand`; CLI=`hermes claw cleanup`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes claw migrate` — source `hermes_cli/subcommands/claw.py`; category `hermes_cli_subcommand`; CLI=`hermes claw migrate`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes computer-use doctor` — source `hermes_cli/subcommands/computer_use.py`; category `hermes_cli_subcommand`; CLI=`hermes computer-use doctor`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes computer-use install` — source `hermes_cli/subcommands/computer_use.py`; category `hermes_cli_subcommand`; CLI=`hermes computer-use install`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes computer-use permissions` — source `hermes_cli/subcommands/computer_use.py`; category `hermes_cli_subcommand`; CLI=`hermes computer-use permissions`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes computer-use permissions grant` — source `hermes_cli/subcommands/computer_use.py`; category `hermes_cli_subcommand`; CLI=`hermes computer-use permissions grant`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes computer-use permissions status` — source `hermes_cli/subcommands/computer_use.py`; category `hermes_cli_subcommand`; CLI=`hermes computer-use permissions status`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes computer-use status` — source `hermes_cli/subcommands/computer_use.py`; category `hermes_cli_subcommand`; CLI=`hermes computer-use status`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes cron create` — source `hermes_cli/subcommands/cron.py`; category `hermes_cli_subcommand`; CLI=`hermes cron create`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes cron incidents` — source `hermes_cli/subcommands/cron.py`; category `hermes_cli_subcommand`; CLI=`hermes cron incidents`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes cron notepad` — source `hermes_cli/subcommands/cron.py`; category `hermes_cli_subcommand`; CLI=`hermes cron notepad`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes cron remove` — source `hermes_cli/subcommands/cron.py`; category `hermes_cli_subcommand`; CLI=`hermes cron remove`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes cron runs` — source `hermes_cli/subcommands/cron.py`; category `hermes_cli_subcommand`; CLI=`hermes cron runs`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes dashboard register` — source `hermes_cli/subcommands/dashboard.py`; category `hermes_cli_subcommand`; CLI=`hermes dashboard register`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes debug delete` — source `hermes_cli/subcommands/debug.py`; category `hermes_cli_subcommand`; CLI=`hermes debug delete`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes debug share` — source `hermes_cli/subcommands/debug.py`; category `hermes_cli_subcommand`; CLI=`hermes debug share`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes fallback add` — source `hermes_cli/subcommands/fallback.py`; category `hermes_cli_subcommand`; CLI=`hermes fallback add`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes fallback clear` — source `hermes_cli/subcommands/fallback.py`; category `hermes_cli_subcommand`; CLI=`hermes fallback clear`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes fallback list` — source `hermes_cli/subcommands/fallback.py`; category `hermes_cli_subcommand`; CLI=`hermes fallback list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes fallback remove` — source `hermes_cli/subcommands/fallback.py`; category `hermes_cli_subcommand`; CLI=`hermes fallback remove`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway enroll` — source `hermes_cli/subcommands/gateway.py`; category `hermes_cli_subcommand`; CLI=`hermes gateway enroll`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway install` — source `hermes_cli/subcommands/gateway.py`; category `hermes_cli_subcommand`; CLI=`hermes gateway install`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway list` — source `hermes_cli/subcommands/gateway.py`; category `hermes_cli_subcommand`; CLI=`hermes gateway list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway migrate-legacy` — source `hermes_cli/subcommands/gateway.py`; category `hermes_cli_subcommand`; CLI=`hermes gateway migrate-legacy`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway restart` — source `hermes_cli/subcommands/gateway.py`; category `hermes_cli_subcommand`; CLI=`hermes gateway restart`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway run` — source `hermes_cli/subcommands/gateway.py`; category `hermes_cli_subcommand`; CLI=`hermes gateway run`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway setup` — source `hermes_cli/subcommands/gateway.py`; category `hermes_cli_subcommand`; CLI=`hermes gateway setup`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway start` — source `hermes_cli/subcommands/gateway.py`; category `hermes_cli_subcommand`; CLI=`hermes gateway start`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway status` — source `hermes_cli/subcommands/gateway.py`; category `hermes_cli_subcommand`; CLI=`hermes gateway status`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway stop` — source `hermes_cli/subcommands/gateway.py`; category `hermes_cli_subcommand`; CLI=`hermes gateway stop`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway uninstall` — source `hermes_cli/subcommands/gateway.py`; category `hermes_cli_subcommand`; CLI=`hermes gateway uninstall`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes hooks doctor` — source `hermes_cli/subcommands/hooks.py`; category `hermes_cli_subcommand`; CLI=`hermes hooks doctor`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes hooks list` — source `hermes_cli/subcommands/hooks.py`; category `hermes_cli_subcommand`; CLI=`hermes hooks list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes hooks revoke` — source `hermes_cli/subcommands/hooks.py`; category `hermes_cli_subcommand`; CLI=`hermes hooks revoke`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes hooks test` — source `hermes_cli/subcommands/hooks.py`; category `hermes_cli_subcommand`; CLI=`hermes hooks test`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes mcp install` — source `hermes_cli/subcommands/mcp.py`; category `hermes_cli_subcommand`; CLI=`hermes mcp install`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes mcp list` — source `hermes_cli/subcommands/mcp.py`; category `hermes_cli_subcommand`; CLI=`hermes mcp list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes mcp login` — source `hermes_cli/subcommands/mcp.py`; category `hermes_cli_subcommand`; CLI=`hermes mcp login`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes mcp picker` — source `hermes_cli/subcommands/mcp.py`; category `hermes_cli_subcommand`; CLI=`hermes mcp picker`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes mcp reauth` — source `hermes_cli/subcommands/mcp.py`; category `hermes_cli_subcommand`; CLI=`hermes mcp reauth`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes mcp serve` — source `hermes_cli/subcommands/mcp.py`; category `hermes_cli_subcommand`; CLI=`hermes mcp serve`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes memory off` — source `hermes_cli/subcommands/memory.py`; category `hermes_cli_subcommand`; CLI=`hermes memory off`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes memory reset` — source `hermes_cli/subcommands/memory.py`; category `hermes_cli_subcommand`; CLI=`hermes memory reset`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes memory setup` — source `hermes_cli/subcommands/memory.py`; category `hermes_cli_subcommand`; CLI=`hermes memory setup`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes memory status` — source `hermes_cli/subcommands/memory.py`; category `hermes_cli_subcommand`; CLI=`hermes memory status`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes migrate xai` — source `hermes_cli/subcommands/migrate.py`; category `hermes_cli_subcommand`; CLI=`hermes migrate xai`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes moa configure` — source `hermes_cli/subcommands/moa.py`; category `hermes_cli_subcommand`; CLI=`hermes moa configure`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes moa delete` — source `hermes_cli/subcommands/moa.py`; category `hermes_cli_subcommand`; CLI=`hermes moa delete`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes moa list` — source `hermes_cli/subcommands/moa.py`; category `hermes_cli_subcommand`; CLI=`hermes moa list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes monitoring status` — source `hermes_cli/subcommands/monitoring.py`; category `hermes_cli_subcommand`; CLI=`hermes monitoring status`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes pairing approve` — source `hermes_cli/subcommands/pairing.py`; category `hermes_cli_subcommand`; CLI=`hermes pairing approve`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes pairing clear-pending` — source `hermes_cli/subcommands/pairing.py`; category `hermes_cli_subcommand`; CLI=`hermes pairing clear-pending`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes pairing list` — source `hermes_cli/subcommands/pairing.py`; category `hermes_cli_subcommand`; CLI=`hermes pairing list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes pairing revoke` — source `hermes_cli/subcommands/pairing.py`; category `hermes_cli_subcommand`; CLI=`hermes pairing revoke`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes peer add` — source `hermes_cli/subcommands/peer.py`; category `hermes_cli_subcommand`; CLI=`hermes peer add`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes peer list` — source `hermes_cli/subcommands/peer.py`; category `hermes_cli_subcommand`; CLI=`hermes peer list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes peer remove` — source `hermes_cli/subcommands/peer.py`; category `hermes_cli_subcommand`; CLI=`hermes peer remove`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins compat` — source `hermes_cli/subcommands/plugins.py`; category `hermes_cli_subcommand`; CLI=`hermes plugins compat`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins disable` — source `hermes_cli/subcommands/plugins.py`; category `hermes_cli_subcommand`; CLI=`hermes plugins disable`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins list` — source `hermes_cli/subcommands/plugins.py`; category `hermes_cli_subcommand`; CLI=`hermes plugins list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins pack` — source `hermes_cli/subcommands/plugins.py`; category `hermes_cli_subcommand`; CLI=`hermes plugins pack`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins pack export` — source `hermes_cli/subcommands/plugins.py`; category `hermes_cli_subcommand`; CLI=`hermes plugins pack export`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins pack install` — source `hermes_cli/subcommands/plugins.py`; category `hermes_cli_subcommand`; CLI=`hermes plugins pack install`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins pack show` — source `hermes_cli/subcommands/plugins.py`; category `hermes_cli_subcommand`; CLI=`hermes plugins pack show`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins search` — source `hermes_cli/subcommands/plugins.py`; category `hermes_cli_subcommand`; CLI=`hermes plugins search`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins show` — source `hermes_cli/subcommands/plugins.py`; category `hermes_cli_subcommand`; CLI=`hermes plugins show`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile alias` — source `hermes_cli/subcommands/profile.py`; category `hermes_cli_subcommand`; CLI=`hermes profile alias`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile create` — source `hermes_cli/subcommands/profile.py`; category `hermes_cli_subcommand`; CLI=`hermes profile create`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile delete` — source `hermes_cli/subcommands/profile.py`; category `hermes_cli_subcommand`; CLI=`hermes profile delete`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile describe` — source `hermes_cli/subcommands/profile.py`; category `hermes_cli_subcommand`; CLI=`hermes profile describe`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile export` — source `hermes_cli/subcommands/profile.py`; category `hermes_cli_subcommand`; CLI=`hermes profile export`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile import` — source `hermes_cli/subcommands/profile.py`; category `hermes_cli_subcommand`; CLI=`hermes profile import`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile info` — source `hermes_cli/subcommands/profile.py`; category `hermes_cli_subcommand`; CLI=`hermes profile info`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile install` — source `hermes_cli/subcommands/profile.py`; category `hermes_cli_subcommand`; CLI=`hermes profile install`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile list` — source `hermes_cli/subcommands/profile.py`; category `hermes_cli_subcommand`; CLI=`hermes profile list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile rename` — source `hermes_cli/subcommands/profile.py`; category `hermes_cli_subcommand`; CLI=`hermes profile rename`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile show` — source `hermes_cli/subcommands/profile.py`; category `hermes_cli_subcommand`; CLI=`hermes profile show`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile update` — source `hermes_cli/subcommands/profile.py`; category `hermes_cli_subcommand`; CLI=`hermes profile update`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile use` — source `hermes_cli/subcommands/profile.py`; category `hermes_cli_subcommand`; CLI=`hermes profile use`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes project create` — source `hermes_cli/projects_cmd.py`; category `hermes_cli_subcommand`; CLI=`hermes project create`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes project list` — source `hermes_cli/projects_cmd.py`; category `hermes_cli_subcommand`; CLI=`hermes project list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes project use` — source `hermes_cli/projects_cmd.py`; category `hermes_cli_subcommand`; CLI=`hermes project use`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes proxy providers` — source `hermes_cli/subcommands/gateway.py`; category `hermes_cli_subcommand`; CLI=`hermes proxy providers`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes proxy start` — source `hermes_cli/subcommands/gateway.py`; category `hermes_cli_subcommand`; CLI=`hermes proxy start`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes proxy status` — source `hermes_cli/subcommands/gateway.py`; category `hermes_cli_subcommand`; CLI=`hermes proxy status`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes secrets bitwarden` — source `hermes_cli/subcommands/secrets.py`; category `hermes_cli_subcommand`; CLI=`hermes secrets bitwarden`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes secrets onepassword` — source `hermes_cli/subcommands/secrets.py`; category `hermes_cli_subcommand`; CLI=`hermes secrets onepassword`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes security audit` — source `hermes_cli/subcommands/security.py`; category `hermes_cli_subcommand`; CLI=`hermes security audit`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions archive` — source `hermes_cli/subcommands/sessions.py`; category `hermes_cli_subcommand`; CLI=`hermes sessions archive`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions browse` — source `hermes_cli/subcommands/sessions.py`; category `hermes_cli_subcommand`; CLI=`hermes sessions browse`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions import` — source `hermes_cli/subcommands/sessions.py`; category `hermes_cli_subcommand`; CLI=`hermes sessions import`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions pinned` — source `hermes_cli/subcommands/sessions.py`; category `hermes_cli_subcommand`; CLI=`hermes sessions pinned`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions recover` — source `hermes_cli/subcommands/sessions.py`; category `hermes_cli_subcommand`; CLI=`hermes sessions recover`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions repair` — source `hermes_cli/subcommands/sessions.py`; category `hermes_cli_subcommand`; CLI=`hermes sessions repair`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions repair-routing` — source `hermes_cli/subcommands/sessions.py`; category `hermes_cli_subcommand`; CLI=`hermes sessions repair-routing`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions retitle-skills` — source `hermes_cli/subcommands/sessions.py`; category `hermes_cli_subcommand`; CLI=`hermes sessions retitle-skills`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions unpin` — source `hermes_cli/subcommands/sessions.py`; category `hermes_cli_subcommand`; CLI=`hermes sessions unpin`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills browse` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills browse`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills check` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills check`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills config` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills config`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills diff` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills diff`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills inspect` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills inspect`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills list` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills list-modified` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills list-modified`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills opt-in` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills opt-in`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills opt-out` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills opt-out`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills repair-official` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills repair-official`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills reset` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills reset`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills search` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills search`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills snapshot` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills snapshot`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills snapshot export` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills snapshot export`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills snapshot import` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills snapshot import`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills tap add` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills tap add`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills tap list` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills tap list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills tap remove` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills tap remove`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills trust` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills trust`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills uninstall` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills uninstall`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills untrust` — source `hermes_cli/subcommands/skills.py`; category `hermes_cli_subcommand`; CLI=`hermes skills untrust`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skin list` — source `hermes_cli/subcommands/skin.py`; category `hermes_cli_subcommand`; CLI=`hermes skin list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skin set` — source `hermes_cli/subcommands/skin.py`; category `hermes_cli_subcommand`; CLI=`hermes skin set`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skin use` — source `hermes_cli/subcommands/skin.py`; category `hermes_cli_subcommand`; CLI=`hermes skin use`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes slack manifest` — source `hermes_cli/subcommands/slack.py`; category `hermes_cli_subcommand`; CLI=`hermes slack manifest`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sync device` — source `hermes_cli/subcommands/sync.py`; category `hermes_cli_subcommand`; CLI=`hermes sync device`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sync disable` — source `hermes_cli/subcommands/sync.py`; category `hermes_cli_subcommand`; CLI=`hermes sync disable`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sync enable` — source `hermes_cli/subcommands/sync.py`; category `hermes_cli_subcommand`; CLI=`hermes sync enable`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sync now` — source `hermes_cli/subcommands/sync.py`; category `hermes_cli_subcommand`; CLI=`hermes sync now`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sync propose` — source `hermes_cli/subcommands/sync.py`; category `hermes_cli_subcommand`; CLI=`hermes sync propose`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sync pull` — source `hermes_cli/subcommands/sync.py`; category `hermes_cli_subcommand`; CLI=`hermes sync pull`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sync push` — source `hermes_cli/subcommands/sync.py`; category `hermes_cli_subcommand`; CLI=`hermes sync push`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sync status` — source `hermes_cli/subcommands/sync.py`; category `hermes_cli_subcommand`; CLI=`hermes sync status`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes webhook list` — source `hermes_cli/subcommands/webhook.py`; category `hermes_cli_subcommand`; CLI=`hermes webhook list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes webhook remove` — source `hermes_cli/subcommands/webhook.py`; category `hermes_cli_subcommand`; CLI=`hermes webhook remove`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes webhook subscribe` — source `hermes_cli/subcommands/webhook.py`; category `hermes_cli_subcommand`; CLI=`hermes webhook subscribe`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes webhook test` — source `hermes_cli/subcommands/webhook.py`; category `hermes_cli_subcommand`; CLI=`hermes webhook test`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes worktree prune` — source `hermes_cli/subcommands/worktree.py`; category `hermes_cli_subcommand`; CLI=`hermes worktree prune`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream hermes cli subcommand is a distinct capability with no implementing ledger row.
-
-### hermes_plugin (11)
-
-- `plugin:context_engine` — source `plugins/context_engine`; category `hermes_plugin`; CLI=none; dashboard=`plugins/context_engine`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes plugin is a distinct capability with no implementing ledger row.
-- `plugin:cron_providers` — source `plugins/cron_providers`; category `hermes_plugin`; CLI=none; dashboard=`plugins/cron_providers`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes plugin is a distinct capability with no implementing ledger row.
-- `plugin:disk-cleanup` — source `plugins/disk-cleanup`; category `hermes_plugin`; CLI=none; dashboard=`plugins/disk-cleanup`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes plugin is a distinct capability with no implementing ledger row.
-- `plugin:google_meet` — source `plugins/google_meet`; category `hermes_plugin`; CLI=none; dashboard=`plugins/google_meet`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes plugin is a distinct capability with no implementing ledger row.
-- `plugin:hermes-achievements` — source `plugins/hermes-achievements`; category `hermes_plugin`; CLI=none; dashboard=`plugins/hermes-achievements`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes plugin is a distinct capability with no implementing ledger row.
-- `plugin:image_gen` — source `plugins/image_gen`; category `hermes_plugin`; CLI=none; dashboard=`plugins/image_gen`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes plugin is a distinct capability with no implementing ledger row.
-- `plugin:observability` — source `plugins/observability`; category `hermes_plugin`; CLI=none; dashboard=`plugins/observability`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes plugin is a distinct capability with no implementing ledger row.
-- `plugin:security-guidance` — source `plugins/security-guidance`; category `hermes_plugin`; CLI=none; dashboard=`plugins/security-guidance`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes plugin is a distinct capability with no implementing ledger row.
-- `plugin:spotify` — source `plugins/spotify`; category `hermes_plugin`; CLI=none; dashboard=`plugins/spotify`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes plugin is a distinct capability with no implementing ledger row.
-- `plugin:teams_pipeline` — source `plugins/teams_pipeline`; category `hermes_plugin`; CLI=none; dashboard=`plugins/teams_pipeline`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes plugin is a distinct capability with no implementing ledger row.
-- `plugin:video_gen` — source `plugins/video_gen`; category `hermes_plugin`; CLI=none; dashboard=`plugins/video_gen`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes plugin is a distinct capability with no implementing ledger row.
-
-### hermes_skill (29)
-
-- `skill:optional-skills/autonomous-ai-agents` — source `optional-skills/autonomous-ai-agents`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:optional-skills/blockchain` — source `optional-skills/blockchain`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:optional-skills/communication` — source `optional-skills/communication`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:optional-skills/creative` — source `optional-skills/creative`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:optional-skills/data-science` — source `optional-skills/data-science`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:optional-skills/devops` — source `optional-skills/devops`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:optional-skills/dogfood` — source `optional-skills/dogfood`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:optional-skills/email` — source `optional-skills/email`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:optional-skills/finance` — source `optional-skills/finance`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:optional-skills/gaming` — source `optional-skills/gaming`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:optional-skills/mlops` — source `optional-skills/mlops`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:optional-skills/payments` — source `optional-skills/payments`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:optional-skills/productivity` — source `optional-skills/productivity`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:optional-skills/research` — source `optional-skills/research`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:optional-skills/smart-home` — source `optional-skills/smart-home`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:optional-skills/software-development` — source `optional-skills/software-development`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:optional-skills/web-development` — source `optional-skills/web-development`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:optional-skills/yuanbao` — source `optional-skills/yuanbao`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:skills/apple` — source `skills/apple`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:skills/autonomous-ai-agents` — source `skills/autonomous-ai-agents`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:skills/creative` — source `skills/creative`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:skills/devops` — source `skills/devops`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:skills/email` — source `skills/email`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:skills/index-cache` — source `skills/index-cache`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:skills/note-taking` — source `skills/note-taking`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:skills/productivity` — source `skills/productivity`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:skills/research` — source `skills/research`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:skills/social-media` — source `skills/social-media`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-- `skill:skills/software-development` — source `skills/software-development`; category `hermes_skill`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes skill is a distinct capability with no implementing ledger row.
-
-### hermes_tool (73)
-
-- `tool:annotate_preview` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:apply_layout` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:browser_back` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:browser_cdp` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:browser_console` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:browser_dialog` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:browser_exec` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:browser_get_images` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:browser_press` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:browser_scroll` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:browser_snapshot` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:browser_type` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:browser_vision` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:clarify` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:close_terminal` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:cronjob_manage` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:delegate_task` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:desktop_preview` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:desktop_project` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:discord_admin` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:drive_preview` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:execute_code` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:feishu_doc_read` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:feishu_drive_add_comment` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:feishu_drive_list_comment_replies` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:feishu_drive_list_comments` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:feishu_drive_reply_comment` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:focus_pane` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:gui_tour` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:ha_call_service` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:ha_get_state` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:ha_list_entities` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:ha_list_services` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:image_gen` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:image_generate` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:kanban_attach` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:kanban_attach_url` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:kanban_attachments` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:kanban_heartbeat` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:kanban_link` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:kanban_request_changes` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:kanban_request_review` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:process_manage` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:react_to_message` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:read_terminal` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:read_window_below` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:search_files` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:session_search` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:setup_mcp` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:show_tip` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:skill_manage` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:skill_view` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:spotify_albums` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:spotify_devices` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:spotify_library` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:spotify_playback` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:spotify_playlists` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:spotify_queue` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:spotify_search` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:text_to_speech` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:todo_list` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:video_analyze` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:video_generate` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:vision_analyze` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:web_extract` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:write_file` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:xai_video_edit` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:xai_video_extend` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:yb_query_group_info` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:yb_query_group_members` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:yb_search_sticker` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:yb_send_dm` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-- `tool:yb_send_sticker` — source `tools/*.py`; category `hermes_tool`; CLI=none; dashboard=none; voice=none; no parent row and no ledger row. Reason: upstream hermes tool is a distinct capability with no implementing ledger row.
-
-### openclaw_extension (11)
-
-- `openclaw-ext:cua-computer` — source `extensions/cua-computer/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/cua-computer/`; voice=candidate; no parent row and no ledger row categories=tools manifest=extensions/cua-computer/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:device-pair` — source `extensions/device-pair/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/device-pair/`; voice=candidate; no parent row and no ledger row categories=tools manifest=extensions/device-pair/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:diffs` — source `extensions/diffs/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/diffs/`; voice=candidate; no parent row and no ledger row categories=tools manifest=extensions/diffs/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:geolocation` — source `extensions/geolocation/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/geolocation/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=tools manifest=extensions/geolocation/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:image-generation-core` — source `extensions/image-generation-core/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/image-generation-core/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=none. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:imap` — source `extensions/imap/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/imap/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=tools manifest=extensions/imap/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:llm-task` — source `extensions/llm-task/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/llm-task/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=tools manifest=extensions/llm-task/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:lobster` — source `extensions/lobster/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/lobster/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=tools manifest=extensions/lobster/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:oc-path` — source `extensions/oc-path/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/oc-path/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=tools manifest=extensions/oc-path/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:test-support` — source `extensions/test-support/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/test-support/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=none. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:visitor-access` — source `extensions/visitor-access/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/visitor-access/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=tools manifest=extensions/visitor-access/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-
-## Parented surfaces needing parent closure (74)
+## Parented surfaces needing parent closure (6)
 
 These belong to a parent capability row that is missing or not IMPLEMENTED; close the parent (or wire the surface) to resolve them. They are not distinct capabilities.
 
-### parent `OC-19` (19; status=PARTIAL)
+### parent `cli:computer-use install` (1; status=GATED)
 
-- `openclaw-ext:a2a` — category `openclaw_extension`; coverage `openclaw-capability`; source `extensions/a2a/`; parent `OC-19` status `PARTIAL`.
-- `openclaw-ext:buzz` — category `openclaw_extension`; coverage `openclaw-capability`; source `extensions/buzz/`; parent `OC-19` status `PARTIAL`.
-- `openclaw-ext:clickclack` — category `openclaw_extension`; coverage `openclaw-capability`; source `extensions/clickclack/`; parent `OC-19` status `PARTIAL`.
-- `openclaw-ext:googlechat` — category `openclaw_extension`; coverage `openclaw-capability`; source `extensions/googlechat/`; parent `OC-19` status `PARTIAL`.
-- `openclaw-ext:irc` — category `openclaw_extension`; coverage `openclaw-capability`; source `extensions/irc/`; parent `OC-19` status `PARTIAL`.
-- `openclaw-ext:line` — category `openclaw_extension`; coverage `openclaw-capability`; source `extensions/line/`; parent `OC-19` status `PARTIAL`.
-- `openclaw-ext:mattermost` — category `openclaw_extension`; coverage `openclaw-capability`; source `extensions/mattermost/`; parent `OC-19` status `PARTIAL`.
-- `openclaw-ext:msteams` — category `openclaw_extension`; coverage `openclaw-capability`; source `extensions/msteams/`; parent `OC-19` status `PARTIAL`.
-- `openclaw-ext:nextcloud-talk` — category `openclaw_extension`; coverage `openclaw-capability`; source `extensions/nextcloud-talk/`; parent `OC-19` status `PARTIAL`.
-- `openclaw-ext:nostr` — category `openclaw_extension`; coverage `openclaw-capability`; source `extensions/nostr/`; parent `OC-19` status `PARTIAL`.
-- `openclaw-ext:qa-channel` — category `openclaw_extension`; coverage `openclaw-capability`; source `extensions/qa-channel/`; parent `OC-19` status `PARTIAL`.
-- `openclaw-ext:raft` — category `openclaw_extension`; coverage `openclaw-capability`; source `extensions/raft/`; parent `OC-19` status `PARTIAL`.
-- `openclaw-ext:reef` — category `openclaw_extension`; coverage `openclaw-capability`; source `extensions/reef/`; parent `OC-19` status `PARTIAL`.
-- `openclaw-ext:sms` — category `openclaw_extension`; coverage `openclaw-capability`; source `extensions/sms/`; parent `OC-19` status `PARTIAL`.
-- `openclaw-ext:synology-chat` — category `openclaw_extension`; coverage `openclaw-capability`; source `extensions/synology-chat/`; parent `OC-19` status `PARTIAL`.
-- `openclaw-ext:tlon` — category `openclaw_extension`; coverage `openclaw-capability`; source `extensions/tlon/`; parent `OC-19` status `PARTIAL`.
-- `openclaw-ext:twitch` — category `openclaw_extension`; coverage `openclaw-capability`; source `extensions/twitch/`; parent `OC-19` status `PARTIAL`.
-- `openclaw-ext:zalo` — category `openclaw_extension`; coverage `openclaw-capability`; source `extensions/zalo/`; parent `OC-19` status `PARTIAL`.
-- `openclaw-ext:zalouser` — category `openclaw_extension`; coverage `openclaw-capability`; source `extensions/zalouser/`; parent `OC-19` status `PARTIAL`.
+- `hermes computer-use install --upgrade` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/computer_use.py`; parent `cli:computer-use install` status `GATED`.
 
-### parent `cli:config set` (1; status=GATED)
+### parent `cli:gateway install` (3; status=GATED)
 
-- `hermes config set --force` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/config.py`; parent `cli:config set` status `GATED`.
+- `hermes gateway install --no-start-now` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway install` status `GATED`.
+- `hermes gateway install --no-start-on-login` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway install` status `GATED`.
+- `hermes gateway install --run-as-user` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway install` status `GATED`.
 
-### parent `cli:mcp` (6; status=GATED)
+### parent `cli:gateway run` (1; status=GATED)
 
-- `hermes mcp install identifier` — category `hermes_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp` status `GATED`.
-- `hermes mcp login --flow` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp` status `GATED`.
-- `hermes mcp ls` — category `hermes_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp` status `GATED`.
-- `hermes mcp reauth --all` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp` status `GATED`.
-- `hermes mcp serve --verbose` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp` status `GATED`.
-- `hermes mcp serve -v` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp` status `GATED`.
+- `hermes gateway run -v` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway run` status `GATED`.
 
-### parent `cli:mcp add` (7; status=GATED)
+### parent `cli:plugins install` (1; status=GATED)
 
-- `hermes mcp add --args` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp add` status `GATED`.
-- `hermes mcp add --auth` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp add` status `GATED`.
-- `hermes mcp add --command` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp add` status `GATED`.
-- `hermes mcp add --connect-timeout` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp add` status `GATED`.
-- `hermes mcp add --env` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp add` status `GATED`.
-- `hermes mcp add --preset` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp add` status `GATED`.
-- `hermes mcp add --url` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp add` status `GATED`.
-
-### parent `cli:mcp configure` (1; status=GATED)
-
-- `hermes mcp config` — category `hermes_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp configure` status `GATED`.
-
-### parent `cli:mcp remove` (1; status=GATED)
-
-- `hermes mcp rm` — category `hermes_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp remove` status `GATED`.
-
-### parent `cli:plugins install` (6; status=GATED)
-
-- `hermes plugins install --enable` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins install` status `GATED`.
-- `hermes plugins install --force` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins install` status `GATED`.
-- `hermes plugins install --no-enable` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins install` status `GATED`.
-- `hermes plugins install --ref` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins install` status `GATED`.
 - `hermes plugins install -f` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins install` status `GATED`.
-- `hermes plugins install identifier` — category `hermes_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins install` status `GATED`.
 
-### parent `cli:sessions` (11; status=GATED)
-
-- `hermes sessions browse --limit` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions` status `GATED`.
-- `hermes sessions browse --source` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions` status `GATED`.
-- `hermes sessions import --from` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions` status `GATED`.
-- `hermes sessions recover --chunk-size` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions` status `GATED`.
-- `hermes sessions recover --output` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions` status `GATED`.
-- `hermes sessions recover --report` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions` status `GATED`.
-- `hermes sessions recover --source` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions` status `GATED`.
-- `hermes sessions recover --work-dir` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions` status `GATED`.
-- `hermes sessions repair-routing --max-gap-seconds` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions` status `GATED`.
-- `hermes sessions retitle-skills --limit` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions` status `GATED`.
-- `hermes sessions unpin session_ids` — category `hermes_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions` status `GATED`.
-
-### parent `cli:skills` (9; status=GATED)
-
-- `hermes skills browse --page` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills` status `GATED`.
-- `hermes skills browse --size` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills` status `GATED`.
-- `hermes skills browse --source` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills` status `GATED`.
-- `hermes skills inspect identifier` — category `hermes_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills` status `GATED`.
-- `hermes skills list --source` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills` status `GATED`.
-- `hermes skills search --limit` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills` status `GATED`.
-- `hermes skills search --source` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills` status `GATED`.
-- `hermes skills search query` — category `hermes_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills` status `GATED`.
-- `hermes skills snapshot import input` — category `hermes_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills` status `GATED`.
-
-### parent `cli:skills install` (3; status=GATED)
-
-- `hermes skills install --category` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills install` status `GATED`.
-- `hermes skills install --name` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills install` status `GATED`.
-- `hermes skills install identifier` — category `hermes_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills install` status `GATED`.
-
-### parent `cli:skills publish` (3; status=GATED)
-
-- `hermes skills publish --repo` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills publish` status `GATED`.
-- `hermes skills publish --to` — category `hermes_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills publish` status `GATED`.
-- `hermes skills publish skill_path` — category `hermes_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills publish` status `GATED`.
-
-### parent `plugin:hermes-achievements` (5; status=absent)
-
-- `plugin-api:hermes-achievements` — category `hermes_plugin_api`; coverage `plugin-surface`; source `plugins/hermes-achievements/dashboard/plugin_api.py`; parent `plugin:hermes-achievements` status `absent`.
-- `plugin-asset:hermes-achievements:index.js` — category `hermes_plugin_asset`; coverage `plugin-surface`; source `plugins/hermes-achievements/dashboard/dist/index.js`; parent `plugin:hermes-achievements` status `absent`.
-- `plugin-asset:hermes-achievements:style.css` — category `hermes_plugin_asset`; coverage `plugin-surface`; source `plugins/hermes-achievements/dashboard/dist/style.css`; parent `plugin:hermes-achievements` status `absent`.
-- `plugin-manifest:hermes-achievements` — category `hermes_dashboard_plugin`; coverage `plugin-surface`; source `plugins/hermes-achievements/dashboard/manifest.json`; parent `plugin:hermes-achievements` status `absent`.
-- `plugin-test:hermes-achievements:test_achievement_engine.py` — category `hermes_plugin_test`; coverage `plugin-surface`; source `plugins/hermes-achievements/tests/test_achievement_engine.py`; parent `plugin:hermes-achievements` status `absent`.
-
-### parent `plugin:kanban` (2; status=absent)
-
-- `plugin-asset:kanban:index.js` — category `hermes_plugin_asset`; coverage `plugin-surface`; source `plugins/kanban/dashboard/dist/index.js`; parent `plugin:kanban` status `absent`.
-- `plugin-asset:kanban:style.css` — category `hermes_plugin_asset`; coverage `plugin-surface`; source `plugins/kanban/dashboard/dist/style.css`; parent `plugin:kanban` status `absent`.
-
-## Parented surfaces covered by an IMPLEMENTED parent (1006)
+## Parented surfaces covered by an IMPLEMENTED parent (1074)
 
 These are coverage evidence for their parent, not separate gaps.
 
 - `OC-02`: 5 surface(s) — coverage `openclaw-capability`
 - `OC-16`: 1 surface(s) — coverage `openclaw-capability`
-- `OC-19`: 5 surface(s) — coverage `openclaw-capability`
+- `OC-19`: 24 surface(s) — coverage `openclaw-capability`
 - `OC-30`: 1 surface(s) — coverage `openclaw-capability`
 - `OC-34`: 1 surface(s) — coverage `openclaw-capability`
 - `OC-35`: 1 surface(s) — coverage `openclaw-capability`
@@ -478,30 +83,50 @@ These are coverage evidence for their parent, not separate gaps.
 - `browser_status`: 24 surface(s) — coverage `workflow-surface`
 - `channels_status`: 8 surface(s) — coverage `workflow-surface`
 - `cli:acp`: 6 surface(s) — coverage `cli-option`
-- `cli:approvals`: 7 surface(s) — coverage `cli-option`
-- `cli:auth`: 31 surface(s) — coverage `cli-option`
+- `cli:approvals suggest`: 5 surface(s) — coverage `cli-option`
+- `cli:approvals test`: 2 surface(s) — coverage `cli-option`
+- `cli:auth add`: 13 surface(s) — coverage `cli-option`
+- `cli:auth list`: 1 surface(s) — coverage `cli-option`
+- `cli:auth logout`: 1 surface(s) — coverage `cli-option`
+- `cli:auth priority`: 3 surface(s) — coverage `cli-option`
+- `cli:auth refresh`: 2 surface(s) — coverage `cli-option`
+- `cli:auth remove`: 2 surface(s) — coverage `cli-option`
+- `cli:auth reset`: 2 surface(s) — coverage `cli-option`
+- `cli:auth spotify`: 6 surface(s) — coverage `cli-option`
+- `cli:auth status`: 1 surface(s) — coverage `cli-option`
 - `cli:backup`: 6 surface(s) — coverage `cli-option`
-- `cli:browser`: 1 surface(s) — coverage `cli-option`
+- `cli:browser close-profile`: 1 surface(s) — coverage `cli-option`
 - `cli:chat`: 39 surface(s) — coverage `cli-option`
-- `cli:claw`: 11 surface(s) — coverage `cli-option`
+- `cli:claw cleanup`: 3 surface(s) — coverage `cli-option`
+- `cli:claw migrate`: 8 surface(s) — coverage `cli-option`
 - `cli:completion`: 1 surface(s) — coverage `cli-option`
-- `cli:computer-use`: 3 surface(s) — coverage `cli-option`
+- `cli:computer-use doctor`: 2 surface(s) — coverage `cli-option`
 - `cli:config get`: 1 surface(s) — coverage `cli-option`
-- `cli:config set`: 2 surface(s) — coverage `cli-option`
+- `cli:config set`: 3 surface(s) — coverage `cli-option`
 - `cli:config unset`: 1 surface(s) — coverage `cli-option`
-- `cli:cron`: 30 surface(s) — coverage `cli-option`
+- `cli:cron create`: 17 surface(s) — coverage `cli-option`
 - `cli:cron edit`: 21 surface(s) — coverage `cli-option`
+- `cli:cron incidents`: 3 surface(s) — coverage `cli-option`
+- `cli:cron notepad`: 4 surface(s) — coverage `cli-option`
 - `cli:cron pause`: 1 surface(s) — coverage `cli-option`
+- `cli:cron remove`: 3 surface(s) — coverage `cli-option`
 - `cli:cron resume`: 2 surface(s) — coverage `cli-option`
 - `cli:cron run`: 1 surface(s) — coverage `cli-option`
-- `cli:dashboard`: 5 surface(s) — coverage `cli-option`
-- `cli:debug`: 8 surface(s) — coverage `cli-option`
+- `cli:cron runs`: 3 surface(s) — coverage `cli-option`
+- `cli:dashboard`: 2 surface(s) — coverage `cli-option`
+- `cli:dashboard register`: 3 surface(s) — coverage `cli-option`
+- `cli:debug delete`: 1 surface(s) — coverage `cli-option`
+- `cli:debug share`: 7 surface(s) — coverage `cli-option`
 - `cli:desktop`: 11 surface(s) — coverage `cli-option`
 - `cli:doctor`: 3 surface(s) — coverage `cli-option`
 - `cli:dump`: 1 surface(s) — coverage `cli-option`
-- `cli:fallback`: 2 surface(s) — coverage `cli-alias`
-- `cli:gateway`: 9 surface(s) — coverage `cli-option`
-- `cli:hooks`: 7 surface(s) — coverage `cli-option`
+- `cli:fallback list`: 1 surface(s) — coverage `cli-alias`
+- `cli:fallback remove`: 1 surface(s) — coverage `cli-alias`
+- `cli:gateway enroll`: 4 surface(s) — coverage `cli-option`
+- `cli:gateway run`: 1 surface(s) — coverage `cli-option`
+- `cli:hooks list`: 1 surface(s) — coverage `cli-alias`
+- `cli:hooks revoke`: 3 surface(s) — coverage `cli-option`
+- `cli:hooks test`: 3 surface(s) — coverage `cli-option`
 - `cli:import`: 3 surface(s) — coverage `cli-option`
 - `cli:import-agent`: 4 surface(s) — coverage `cli-option`
 - `cli:insights`: 2 surface(s) — coverage `cli-option`
@@ -509,45 +134,101 @@ These are coverage evidence for their parent, not separate gaps.
 - `cli:login`: 9 surface(s) — coverage `cli-option`
 - `cli:logout`: 1 surface(s) — coverage `cli-option`
 - `cli:logs`: 9 surface(s) — coverage `cli-option`
-- `cli:mcp`: 2 surface(s) — coverage `cli-option`
-- `cli:mcp add`: 1 surface(s) — coverage `cli-option`
-- `cli:mcp configure`: 1 surface(s) — coverage `cli-option`
-- `cli:mcp remove`: 1 surface(s) — coverage `cli-option`
+- `cli:mcp add`: 8 surface(s) — coverage `cli-option`
+- `cli:mcp configure`: 2 surface(s) — coverage `cli-option`
+- `cli:mcp install`: 1 surface(s) — coverage `cli-option`
+- `cli:mcp list`: 1 surface(s) — coverage `cli-alias`
+- `cli:mcp login`: 2 surface(s) — coverage `cli-option`
+- `cli:mcp reauth`: 2 surface(s) — coverage `cli-option`
+- `cli:mcp remove`: 2 surface(s) — coverage `cli-option`
+- `cli:mcp serve`: 2 surface(s) — coverage `cli-option`
 - `cli:mcp test`: 1 surface(s) — coverage `cli-option`
-- `cli:memory`: 2 surface(s) — coverage `cli-option`
-- `cli:migrate`: 2 surface(s) — coverage `cli-option`
-- `cli:moa`: 5 surface(s) — coverage `cli-option`
+- `cli:memory reset`: 1 surface(s) — coverage `cli-option`
+- `cli:memory setup`: 1 surface(s) — coverage `cli-option`
+- `cli:migrate xai`: 2 surface(s) — coverage `cli-option`
+- `cli:moa configure`: 2 surface(s) — coverage `cli-option`
+- `cli:moa delete`: 2 surface(s) — coverage `cli-option`
+- `cli:moa list`: 1 surface(s) — coverage `cli-alias`
 - `cli:model`: 9 surface(s) — coverage `cli-option`
-- `cli:pairing`: 4 surface(s) — coverage `cli-option`
+- `cli:pairing approve`: 2 surface(s) — coverage `cli-option`
+- `cli:pairing revoke`: 2 surface(s) — coverage `cli-option`
 - `cli:pause`: 1 surface(s) — coverage `cli-option`
-- `cli:peer`: 8 surface(s) — coverage `cli-option`
-- `cli:plugins`: 19 surface(s) — coverage `cli-option`
+- `cli:peer add`: 5 surface(s) — coverage `cli-option`
+- `cli:peer list`: 1 surface(s) — coverage `cli-alias`
+- `cli:peer remove`: 2 surface(s) — coverage `cli-option`
 - `cli:plugins capabilities`: 1 surface(s) — coverage `cli-option`
+- `cli:plugins compat`: 2 surface(s) — coverage `cli-option`
+- `cli:plugins disable`: 1 surface(s) — coverage `cli-option`
 - `cli:plugins doctor`: 2 surface(s) — coverage `cli-option`
 - `cli:plugins enable`: 3 surface(s) — coverage `cli-option`
+- `cli:plugins install`: 5 surface(s) — coverage `cli-option`
+- `cli:plugins list`: 5 surface(s) — coverage `cli-option`
+- `cli:plugins pack export`: 2 surface(s) — coverage `cli-option`
+- `cli:plugins pack install`: 3 surface(s) — coverage `cli-option`
+- `cli:plugins pack show`: 1 surface(s) — coverage `cli-option`
 - `cli:plugins remove`: 3 surface(s) — coverage `cli-option`
+- `cli:plugins search`: 3 surface(s) — coverage `cli-option`
+- `cli:plugins show`: 2 surface(s) — coverage `cli-option`
 - `cli:plugins update`: 1 surface(s) — coverage `cli-option`
-- `cli:profile`: 38 surface(s) — coverage `cli-option`
-- `cli:project`: 9 surface(s) — coverage `cli-option`
+- `cli:profile alias`: 3 surface(s) — coverage `cli-option`
+- `cli:profile create`: 7 surface(s) — coverage `cli-option`
+- `cli:profile delete`: 3 surface(s) — coverage `cli-option`
+- `cli:profile describe`: 5 surface(s) — coverage `cli-option`
+- `cli:profile export`: 3 surface(s) — coverage `cli-option`
+- `cli:profile import`: 2 surface(s) — coverage `cli-option`
+- `cli:profile info`: 1 surface(s) — coverage `cli-option`
+- `cli:profile install`: 6 surface(s) — coverage `cli-option`
+- `cli:profile rename`: 2 surface(s) — coverage `cli-option`
+- `cli:profile show`: 1 surface(s) — coverage `cli-option`
+- `cli:profile update`: 4 surface(s) — coverage `cli-option`
+- `cli:profile use`: 1 surface(s) — coverage `cli-option`
+- `cli:project create`: 6 surface(s) — coverage `cli-option`
+- `cli:project list`: 2 surface(s) — coverage `cli-option`
+- `cli:project use`: 1 surface(s) — coverage `cli-option`
 - `cli:prompt-size`: 1 surface(s) — coverage `cli-option`
-- `cli:proxy`: 3 surface(s) — coverage `cli-option`
-- `cli:secrets`: 3 surface(s) — coverage `cli-alias`
-- `cli:security`: 4 surface(s) — coverage `cli-option`
-- `cli:sessions`: 1 surface(s) — coverage `cli-option`
+- `cli:proxy start`: 3 surface(s) — coverage `cli-option`
+- `cli:secrets bitwarden`: 1 surface(s) — coverage `cli-alias`
+- `cli:secrets onepassword`: 2 surface(s) — coverage `cli-alias`
+- `cli:security audit`: 4 surface(s) — coverage `cli-option`
+- `cli:sessions browse`: 2 surface(s) — coverage `cli-option`
 - `cli:sessions delete`: 1 surface(s) — coverage `cli-option`
 - `cli:sessions export`: 5 surface(s) — coverage `cli-option`
+- `cli:sessions import`: 2 surface(s) — coverage `cli-option`
 - `cli:sessions list`: 3 surface(s) — coverage `cli-option`
 - `cli:sessions pin`: 1 surface(s) — coverage `cli-option`
+- `cli:sessions recover`: 5 surface(s) — coverage `cli-option`
 - `cli:sessions rename`: 2 surface(s) — coverage `cli-option`
+- `cli:sessions repair-routing`: 1 surface(s) — coverage `cli-option`
+- `cli:sessions retitle-skills`: 1 surface(s) — coverage `cli-option`
+- `cli:sessions unpin`: 1 surface(s) — coverage `cli-option`
 - `cli:setup`: 6 surface(s) — coverage `cli-option`
-- `cli:skills`: 8 surface(s) — coverage `cli-option`
 - `cli:skills audit`: 1 surface(s) — coverage `cli-option`
-- `cli:skills tap`: 2 surface(s) — coverage `cli-option`
+- `cli:skills browse`: 3 surface(s) — coverage `cli-option`
+- `cli:skills check`: 1 surface(s) — coverage `cli-option`
+- `cli:skills diff`: 1 surface(s) — coverage `cli-option`
+- `cli:skills inspect`: 1 surface(s) — coverage `cli-option`
+- `cli:skills install`: 3 surface(s) — coverage `cli-option`
+- `cli:skills list`: 1 surface(s) — coverage `cli-option`
+- `cli:skills publish`: 3 surface(s) — coverage `cli-option`
+- `cli:skills repair-official`: 1 surface(s) — coverage `cli-option`
+- `cli:skills reset`: 1 surface(s) — coverage `cli-option`
+- `cli:skills search`: 3 surface(s) — coverage `cli-option`
+- `cli:skills snapshot export`: 1 surface(s) — coverage `cli-option`
+- `cli:skills snapshot import`: 1 surface(s) — coverage `cli-option`
+- `cli:skills tap add`: 1 surface(s) — coverage `cli-option`
+- `cli:skills tap remove`: 1 surface(s) — coverage `cli-option`
+- `cli:skills trust`: 1 surface(s) — coverage `cli-option`
+- `cli:skills uninstall`: 1 surface(s) — coverage `cli-option`
+- `cli:skills untrust`: 1 surface(s) — coverage `cli-option`
 - `cli:skills update`: 1 surface(s) — coverage `cli-option`
-- `cli:skin`: 4 surface(s) — coverage `cli-option`
-- `cli:slack`: 8 surface(s) — coverage `cli-option`
+- `cli:skin set`: 3 surface(s) — coverage `cli-option`
+- `cli:skin use`: 1 surface(s) — coverage `cli-option`
+- `cli:slack manifest`: 8 surface(s) — coverage `cli-option`
 - `cli:status`: 2 surface(s) — coverage `cli-option`
-- `cli:sync`: 6 surface(s) — coverage `cli-option`
+- `cli:sync device`: 1 surface(s) — coverage `cli-option`
+- `cli:sync disable`: 1 surface(s) — coverage `cli-option`
+- `cli:sync enable`: 1 surface(s) — coverage `cli-option`
+- `cli:sync propose`: 3 surface(s) — coverage `cli-option`
 - `cli:tools`: 1 surface(s) — coverage `cli-option`
 - `cli:tools disable`: 2 surface(s) — coverage `cli-option`
 - `cli:tools enable`: 2 surface(s) — coverage `cli-option`
@@ -556,19 +237,303 @@ These are coverage evidence for their parent, not separate gaps.
 - `cli:uninstall`: 4 surface(s) — coverage `cli-option`
 - `cli:update`: 12 surface(s) — coverage `cli-option`
 - `cli:verify`: 8 surface(s) — coverage `cli-option`
-- `cli:webhook`: 16 surface(s) — coverage `cli-option`
-- `cli:worktree`: 4 surface(s) — coverage `cli-option`
+- `cli:webhook list`: 1 surface(s) — coverage `cli-alias`
+- `cli:webhook remove`: 2 surface(s) — coverage `cli-option`
+- `cli:webhook subscribe`: 11 surface(s) — coverage `cli-option`
+- `cli:webhook test`: 2 surface(s) — coverage `cli-option`
 - `cli:worktree list`: 3 surface(s) — coverage `cli-option`
+- `cli:worktree prune`: 4 surface(s) — coverage `cli-option`
 - `computer_status`: 4 surface(s) — coverage `workflow-surface`
 - `memory_search`: 23 surface(s) — coverage `workflow-surface`
 - `model`: 221 surface(s) — coverage `model-entry`
 - `opencode_status`: 7 surface(s) — coverage `workflow-surface`
-- `plugin:kanban`: 2 surface(s) — coverage `plugin-surface`
+- `plugin:hermes-achievements`: 5 surface(s) — coverage `plugin-surface`
+- `plugin:kanban`: 4 surface(s) — coverage `plugin-surface`
 - `proxy_providers`: 39 surface(s) — coverage `provider-entry`
 - `reports_list`: 1 surface(s) — coverage `workflow-surface`
 - `runtime_status`: 19 surface(s) — coverage `workflow-surface`
 - `schedules_list`: 22 surface(s) — coverage `workflow-surface`
 - `webui_status`: 45 surface(s) — coverage `dashboard-surface`
+
+## Fork-runtime dispositions for tools / skills / plugins (177)
+
+Qubit executes the complete pinned Hermes fork in-process, so these are not separate Qubit modules: the fork tool/toolset registry, skill tree, and plugin fleet are the real backing surface. Every item carries an explicit typed disposition (no silent drop).
+
+### `fork_plugin_runtime` (18; IMPLEMENTED 18, GATED 0)
+
+- `plugin:browser` — **IMPLEMENTED**; backend `voicebridge.hermes_plugins.plugin_fleet_audit`; vendored under qubit_hermes/plugins/ and wrapped by voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
+- `plugin:context_engine` — **IMPLEMENTED**; backend `voicebridge.hermes_plugins.plugin_fleet_audit`; vendored under qubit_hermes/plugins/ and wrapped by voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
+- `plugin:cron_providers` — **IMPLEMENTED**; backend `voicebridge.hermes_plugins.plugin_fleet_audit`; vendored under qubit_hermes/plugins/ and wrapped by voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
+- `plugin:dashboard_auth` — **IMPLEMENTED**; backend `voicebridge.hermes_plugins.plugin_fleet_audit`; vendored under qubit_hermes/plugins/ and wrapped by voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
+- `plugin:disk-cleanup` — **IMPLEMENTED**; backend `voicebridge.hermes_plugins.plugin_fleet_audit`; vendored under qubit_hermes/plugins/ and wrapped by voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
+- `plugin:google_meet` — **IMPLEMENTED**; backend `voicebridge.hermes_plugins.plugin_fleet_audit`; vendored under qubit_hermes/plugins/ and wrapped by voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
+- `plugin:hermes-achievements` — **IMPLEMENTED**; backend `voicebridge.hermes_plugins.plugin_fleet_audit`; vendored under qubit_hermes/plugins/ and wrapped by voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
+- `plugin:image_gen` — **IMPLEMENTED**; backend `voicebridge.hermes_plugins.plugin_fleet_audit`; vendored under qubit_hermes/plugins/ and wrapped by voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
+- `plugin:kanban` — **IMPLEMENTED**; backend `voicebridge.hermes_plugins.plugin_fleet_audit`; vendored under qubit_hermes/plugins/ and wrapped by voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
+- `plugin:memory` — **IMPLEMENTED**; backend `voicebridge.hermes_plugins.plugin_fleet_audit`; vendored under qubit_hermes/plugins/ and wrapped by voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
+- `plugin:model-providers` — **IMPLEMENTED**; backend `voicebridge.hermes_plugins.plugin_fleet_audit`; vendored under qubit_hermes/plugins/ and wrapped by voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
+- `plugin:observability` — **IMPLEMENTED**; backend `voicebridge.hermes_plugins.plugin_fleet_audit`; vendored under qubit_hermes/plugins/ and wrapped by voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
+- `plugin:platforms` — **IMPLEMENTED**; backend `voicebridge.hermes_plugins.plugin_fleet_audit`; vendored under qubit_hermes/plugins/ and wrapped by voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
+- `plugin:security-guidance` — **IMPLEMENTED**; backend `voicebridge.hermes_plugins.plugin_fleet_audit`; vendored under qubit_hermes/plugins/ and wrapped by voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
+- `plugin:spotify` — **IMPLEMENTED**; backend `voicebridge.hermes_plugins.plugin_fleet_audit`; vendored under qubit_hermes/plugins/ and wrapped by voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
+- `plugin:teams_pipeline` — **IMPLEMENTED**; backend `voicebridge.hermes_plugins.plugin_fleet_audit`; vendored under qubit_hermes/plugins/ and wrapped by voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
+- `plugin:video_gen` — **IMPLEMENTED**; backend `voicebridge.hermes_plugins.plugin_fleet_audit`; vendored under qubit_hermes/plugins/ and wrapped by voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
+- `plugin:web` — **IMPLEMENTED**; backend `voicebridge.hermes_plugins.plugin_fleet_audit`; vendored under qubit_hermes/plugins/ and wrapped by voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
+
+### `fork_skill_runtime` (35; IMPLEMENTED 34, GATED 1)
+
+- `skill:optional-skills/autonomous-ai-agents` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/autonomous-ai-agents; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/blockchain` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/blockchain; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/communication` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/communication; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/creative` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/creative; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/data-science` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/data-science; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/devops` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/devops; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/dogfood` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/dogfood; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/email` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/email; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/finance` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/finance; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/gaming` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/gaming; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/health` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/health; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/mcp` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/mcp; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/migration` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/migration; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/mlops` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/mlops; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/payments` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/payments; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/productivity` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/productivity; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/research` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/research; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/security` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/security; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/smart-home` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/smart-home; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/software-development` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/software-development; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/web-development` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/web-development; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:optional-skills/yuanbao` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for optional-skills/yuanbao; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:skills/apple` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for skills/apple; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:skills/autonomous-ai-agents` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for skills/autonomous-ai-agents; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:skills/creative` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for skills/creative; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:skills/devops` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for skills/devops; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:skills/email` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for skills/email; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:skills/index-cache` — **GATED**; backend `—`; vendored skill path 'skills/index-cache' has no loadable SKILL.md (cache/asset directory), so no skill runtime surface exists.
+- `skill:skills/media` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for skills/media; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:skills/note-taking` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for skills/note-taking; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:skills/productivity` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for skills/productivity; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:skills/research` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for skills/research; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:skills/social-media` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for skills/social-media; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:skills/software-development` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for skills/software-development; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+- `skill:skills/web` — **IMPLEMENTED**; backend `qubit_hermes.skills`; vendored under qubit_hermes/ with a loadable SKILL.md for skills/web; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
+
+### `fork_tool_runtime` (94; IMPLEMENTED 94, GATED 0)
+
+- `tool:annotate_preview` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'annotate_preview'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:apply_layout` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'apply_layout'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_back` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_back'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_cdp` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_cdp'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_click` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_click'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_console` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_console'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_dialog` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_dialog'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_exec` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_exec'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_get_images` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_get_images'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_navigate` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_navigate'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_press` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_press'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_scroll` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_scroll'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_snapshot` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_snapshot'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_type` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_type'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_vision` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_vision'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:clarify` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'clarify'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:close_terminal` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'close_terminal'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:computer_use` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'computer_use'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:cronjob_manage` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'cronjob_manage'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:delegate_task` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'delegate_task'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:desktop_preview` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'desktop_preview'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:desktop_project` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'desktop_project'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:discord` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'discord'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:discord_admin` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'discord_admin'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:drive_preview` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'drive_preview'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:execute_code` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'execute_code'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:feishu_doc_read` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'feishu_doc_read'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:feishu_drive_add_comment` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'feishu_drive_add_comment'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:feishu_drive_list_comment_replies` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'feishu_drive_list_comment_replies'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:feishu_drive_list_comments` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'feishu_drive_list_comments'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:feishu_drive_reply_comment` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'feishu_drive_reply_comment'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:file` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'file'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:focus_pane` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'focus_pane'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:gui_tour` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'gui_tour'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:ha_call_service` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'ha_call_service'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:ha_get_state` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'ha_get_state'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:ha_list_entities` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'ha_list_entities'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:ha_list_services` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'ha_list_services'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:image_gen` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'image_gen'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:image_generate` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'image_generate'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:kanban_attach` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'kanban_attach'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:kanban_attach_url` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'kanban_attach_url'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:kanban_attachments` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'kanban_attachments'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:kanban_block` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'kanban_block'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:kanban_comment` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'kanban_comment'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:kanban_complete` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'kanban_complete'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:kanban_create` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'kanban_create'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:kanban_heartbeat` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'kanban_heartbeat'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:kanban_link` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'kanban_link'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:kanban_list` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'kanban_list'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:kanban_request_changes` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'kanban_request_changes'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:kanban_request_review` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'kanban_request_review'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:kanban_show` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'kanban_show'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:kanban_unblock` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'kanban_unblock'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:memory` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'memory'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:patch` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'patch'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:process_manage` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'process_manage'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:react_to_message` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'react_to_message'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:read_file` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'read_file'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:read_terminal` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'read_terminal'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:read_window_below` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'read_window_below'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:search_files` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'search_files'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:session_search` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'session_search'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:setup_mcp` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'setup_mcp'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:show_tip` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'show_tip'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:skill_manage` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'skill_manage'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:skill_view` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'skill_view'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:skills_list` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'skills_list'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:spotify_albums` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'spotify_albums'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:spotify_devices` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'spotify_devices'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:spotify_library` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'spotify_library'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:spotify_playback` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'spotify_playback'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:spotify_playlists` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'spotify_playlists'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:spotify_queue` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'spotify_queue'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:spotify_search` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'spotify_search'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:terminal` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'terminal'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:text_to_speech` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'text_to_speech'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:todo_list` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'todo_list'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:video_analyze` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'video_analyze'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:video_generate` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'video_generate'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:vision` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'vision'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:vision_analyze` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'vision_analyze'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:web` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'web'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:web_extract` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'web_extract'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:web_search` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'web_search'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:write_file` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'write_file'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:x_search` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'x_search'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:xai_video_edit` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'xai_video_edit'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:xai_video_extend` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'xai_video_extend'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:yb_query_group_info` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'yb_query_group_info'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:yb_query_group_members` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'yb_query_group_members'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:yb_search_sticker` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'yb_search_sticker'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:yb_send_dm` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'yb_send_dm'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:yb_send_sticker` — **IMPLEMENTED**; backend `qubit_hermes.tools.registry:registry`; vendored fork tool/toolset registry exposes 'yb_send_sticker'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+
+### `openclaw extension a2a` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:a2a` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'a2a' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension buzz` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:buzz` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'buzz' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension clickclack` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:clickclack` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'clickclack' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension cua-computer` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:cua-computer` — **GATED**; backend `voicebridge/computer_use.py status/refuse_install`; OpenClaw extension 'cua-computer' -> gate (parent=OC-13, gate=COMPUTER_USE_NO_DRIVER) via voicebridge/computer_use.py status/refuse_install.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension device-pair` (1; IMPLEMENTED 1, GATED 0)
+
+- `openclaw-ext:device-pair` — **IMPLEMENTED**; backend `voicebridge/device.py token_issue/token_approve/token_rotate/token_revoke/token_verify`; OpenClaw extension 'device-pair' -> parent (parent=OC-05, gate=none) via voicebridge/device.py token_issue/token_approve/token_rotate/token_revoke/token_verify.; proof `tests/test_openclaw_parity_wave1.py`
+
+### `openclaw extension diffs` (1; IMPLEMENTED 1, GATED 0)
+
+- `openclaw-ext:diffs` — **IMPLEMENTED**; backend `voicebridge/file_patch.py apply_patch`; OpenClaw extension 'diffs' -> parent (parent=OC-62, gate=none) via voicebridge/file_patch.py apply_patch.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension geolocation` (1; IMPLEMENTED 1, GATED 0)
+
+- `openclaw-ext:geolocation` — **IMPLEMENTED**; backend `voicebridge/node_host.py geolocate`; OpenClaw extension 'geolocation' -> distinct (parent=OC-56, gate=none) via voicebridge/node_host.py geolocate.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension googlechat` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:googlechat` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'googlechat' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension image-generation-core` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:image-generation-core` — **GATED**; backend `voicebridge/media_gen.py shape_media_request/generate`; OpenClaw extension 'image-generation-core' -> gate (parent=OC-64, gate=MEDIA_PROVIDER_CREDENTIAL_REQUIRED) via voicebridge/media_gen.py shape_media_request/generate.; proof `tests/test_openclaw_closure_wave2_webmedia.py`
+
+### `openclaw extension imap` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:imap` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'imap' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension irc` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:irc` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'irc' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension line` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:line` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'line' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension llm-task` (1; IMPLEMENTED 1, GATED 0)
+
+- `openclaw-ext:llm-task` — **IMPLEMENTED**; backend `voicebridge/local_models.py structured_task`; OpenClaw extension 'llm-task' -> distinct (parent=OC-31, gate=none) via voicebridge/local_models.py structured_task.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension lobster` (1; IMPLEMENTED 1, GATED 0)
+
+- `openclaw-ext:lobster` — **IMPLEMENTED**; backend `voicebridge/automation.py run_directive/order_add`; OpenClaw extension 'lobster' -> parent (parent=OC-31, gate=none) via voicebridge/automation.py run_directive/order_add.; proof `tests/test_openclaw_e5_directives.py`
+
+### `openclaw extension mattermost` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:mattermost` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'mattermost' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension msteams` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:msteams` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'msteams' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension nextcloud-talk` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:nextcloud-talk` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'nextcloud-talk' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension nostr` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:nostr` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'nostr' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension oc-path` (1; IMPLEMENTED 1, GATED 0)
+
+- `openclaw-ext:oc-path` — **IMPLEMENTED**; backend `voicebridge/files.py list_dir/read_file/inspect`; OpenClaw extension 'oc-path' -> parent (parent=OC-61, gate=none) via voicebridge/files.py list_dir/read_file/inspect.; proof `tests/test_files_ide8u.py`
+
+### `openclaw extension qa-channel` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:qa-channel` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'qa-channel' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension raft` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:raft` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'raft' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension reef` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:reef` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'reef' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension sms` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:sms` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'sms' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension synology-chat` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:synology-chat` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'synology-chat' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension test-support` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:test-support` — **GATED**; backend `tests/ (upstream test scaffolding only)`; OpenClaw extension 'test-support' -> gate (parent=distinct, gate=TEST_SUPPORT_ONLY) via tests/ (upstream test scaffolding only).; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension tlon` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:tlon` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'tlon' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension twitch` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:twitch` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'twitch' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension visitor-access` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:visitor-access` — **GATED**; backend `voicebridge/device.py token_issue (expiring grant)`; OpenClaw extension 'visitor-access' -> gate (parent=OC-05, gate=VISITOR_ACCESS_CREDENTIAL_REQUIRED) via voicebridge/device.py token_issue (expiring grant).; proof `tests/test_openclaw_parity_wave1.py`
+
+### `openclaw extension zalo` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:zalo` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'zalo' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension zalouser` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:zalouser` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'zalouser' -> gate (parent=OC-19, gate=CHANNEL_CREDENTIAL_REQUIRED) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
 ## Ledger rows with unreproducible evidence
 

@@ -47,6 +47,24 @@ unset PYTHONPATH || true
 degrade() { echo "DEGRADED: $*" >&2; exit 4; }
 fail() { echo "FAIL: $*" >&2; exit 2; }
 
+SYS_PY="${PYTHON:-python3}"
+
+# ------------------------------------------------- dashboard reproducibility
+# frontend/hermes-dist is a git-ignored build artifact: a clean clone cannot
+# ship it, so the wheel would silently install a package with no dashboard.
+# Build it deterministically here when node/npm are available; otherwise stop
+# with a typed DEGRADED (never build a dashboard-less wheel and report PASS).
+if [ ! -f "$REPO_ROOT/frontend/hermes-dist/index.html" ]; then
+  if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+    echo "== dashboard bundle missing — building deterministically =="
+    if ! "$REPO_ROOT/scripts/build_dashboard.sh" >"$WORK/dashboard-build.log" 2>&1; then
+      degrade "dashboard build failed (node/npm present but build/network failed); see $WORK/dashboard-build.log"
+    fi
+  else
+    degrade "dashboard bundle frontend/hermes-dist missing and node/npm not found — cannot build from a clean clone; install node/npm or use a release sdist that ships the built dashboard (docs/CLEAN_CLONE_AUDIT_WAVE5.md)"
+  fi
+fi
+
 # ---------------------------------------------------------------- toolchain
 BUILD_CMD=()
 VENV_CMD=()
@@ -75,6 +93,22 @@ fi
 WHEEL="$(ls "$DIST"/*.whl 2>/dev/null | head -1 || true)"
 [ -n "$WHEEL" ] || fail "wheel not produced by the build"
 echo "wheel: $(basename "$WHEEL")"
+
+# The wheel must actually carry the built dashboard; a dashboard-less wheel is
+# a typed FAIL, never a PASS.
+if ! "$SYS_PY" - "$WHEEL" <<'PY'
+import sys
+import zipfile
+
+with zipfile.ZipFile(sys.argv[1]) as z:
+    names = z.namelist()
+assert any(n.endswith("_data/frontend/hermes-dist/index.html") for n in names), \
+    "wheel is missing voicebridge/_data/frontend/hermes-dist/index.html"
+PY
+then
+  fail "wheel built without the dashboard bundle (frontend/hermes-dist missing at build time)"
+fi
+echo "  dashboard bundle shipped in wheel"
 
 # ---------------------------------------------------------------- venv + install
 echo "== throwaway venv (under $VENV) =="

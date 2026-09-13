@@ -1,8 +1,10 @@
 # Security audit — Wave 4 (Agent I)
 
-Status: **AUDITED — in-scope gaps G1/G3/G5 fixed; out-of-scope gaps recorded**
+Status: **AUDITED — all six gaps fixed (G2 by Wave 5); out-of-scope gap notes kept**
 Baseline: commit `539649d4` (waves 1–3 not regressed).
 Owner: Agent I (security / permissions / audit / e-stop / resource parity).
+Wave 5 follow-up (Agent 4): see §7 — G2 transport-boundary redaction, privacy
+sanitization, and the MCP loopback classification.
 
 This wave closes the six gaps recorded at the end of
 [`SECURITY_AUDIT_WAVE3.md`](SECURITY_AUDIT_WAVE3.md). Three of them live inside
@@ -20,7 +22,7 @@ this file and `tests/test_security_parity_wave4.py` (23 adversarial tests).
 | Gap | Concern | Status | Fix / owner |
 | --- | --- | --- | --- |
 | **G1** | CLI fork `--confirm` routes bypassed policy/audit/e-stop | **FIXED** | `cli_hermes_forward.guard_confirm` + `dispatch_guard.WorkerGuard.authorize` |
-| **G2** | Receipts served unredacted | **OPEN (design constraint)** | A receipt-level redaction was attempted in `voice_commands.execute/confirm_pending` but reverted: it breaks the frozen CLI/dashboard/voice backend-parity tests (`test_capability_wiring8u`, `test_voice_coverage_wave4`) that compare the receipt payload to the direct backend dict. Redaction must move to the transport/JSON serialization boundary (webui response / audit writer), not the receipt object. Tracked here, not silently waived. |
+| **G2** | Receipts served unredacted | **FIXED (Wave 5)** | A receipt-level redaction was attempted in `voice_commands.execute/confirm_pending` but reverted: it breaks the frozen CLI/dashboard/voice backend-parity tests (`test_capability_wiring8u`, `test_voice_coverage_wave4`) that compare the receipt payload to the direct backend dict. Wave 5 moved redaction to the transport/JSON boundary: `webui.WebUIHandler._json` scrubs the serialized response (`_redact_served`), leaving the internal receipt untouched. The audit writer (`logging_setup.log_event`) already redacts via `redact_obj`. See §7.1. |
 | **G3** | Second adapter-private e-stop latches | **FIXED** | `opencode/runner.py`, `ghost.py` delegate to the shared `PowerControl` |
 | **G4** | Permission scopes opt-in (empty scopes skip binding) | **FIXED (orchestrator)** | `voicebridge/permissions.py::PermissionPolicy.decide` now denies a scoped capability with an empty scope set, and `_matching_grant` refuses a scoped grant when the caller declares no scopes. |
 | **G5** | Plugin/OpenClaw boolean `confirmed` vs shared journal | **FIXED** | `plugin_runtime._authorize_mutation` over the durable `ApprovalJournal` |
@@ -131,16 +133,12 @@ agent's uncommitted file (not owned by Agent I) and is left untouched.
 
 ## 4. Gaps outside owned files (for the orchestrator — NOT edited)
 
-* **G2 — receipts returned unredacted.** `voice_commands.execute`
-  (`voice_commands.py:7996-7998`) and `voice_commands.confirm_pending`
-  (`voice_commands.py:8052-8054`) build
-  `receipt = {..., "result": result}` without `redact_obj`, and
-  `dashboard_ops.run_registry_op` (`dashboard_ops.py:273`) /
-  `confirm_registry_op` (`dashboard_ops.py:292`) serve it back. A backend
-  result carrying a secret under an unlabelled key can be served. **Owner:
-  voice/dashboard agent.** Wrap the receipt with `redaction.redact_obj` at
-  those boundaries (and the staged `{entry, session}` fields are already
-  non-sensitive).
+* **G2 — receipts returned unredacted. FIXED (Wave 5).** `voice_commands.execute`
+  and `voice_commands.confirm_pending` build `receipt = {..., "result": result}`
+  without `redact_obj`, and `dashboard_ops.run_registry_op` /
+  `confirm_registry_op` serve it back. Wave 5 fixed this at the transport/JSON
+  boundary (`webui.WebUIHandler._json` → `_redact_served`) so the internal
+  receipt the parity tests compare stays byte-identical. See §7.1.
 * **G4 — permission scopes are opt-in.** `PermissionPolicy.decide` checks the
   requested scopes only when truthy (`permissions.py:632`) and
   `_matching_grant` narrows only when scopes are supplied
@@ -156,9 +154,9 @@ agent's uncommitted file (not owned by Agent I) and is left untouched.
 
 ## 5. Residual risks
 
-* G2/G4/G6 remain open until their owning agents land the changes; the shared
-  contract is not yet uniform across the receipt, permission-scope, and
-  hermes-compat boundaries.
+* G4/G6 remain open until their owning agents land the changes; the shared
+  contract is not yet uniform across the permission-scope and hermes-compat
+  boundaries. G2 is closed in Wave 5 at the transport boundary (§7.1).
 * G1 still authorizes a fresh human `--confirm` invocation by issuing and
   immediately consuming a single-use record; replay protection is per-record
   (a new invocation mints a new record). The guard is no longer a raw bypass,
@@ -182,3 +180,129 @@ All edits are confined to owned modules; revert individually:
 No commit was made; no other module, state file, credential, or live service
 was touched. Reverting restores the Wave-3 behaviour (unguarded fork
 `--confirm`, adapter-private e-stop latches, boolean plugin confirmations).
+
+## 7. Wave 5 follow-up (Agent 4)
+
+Baseline: commit `b79089d5`. Owned files edited:
+`voicebridge/webui.py`, `voicebridge/plugin_runtime.py`; new evidence:
+`tests/test_transport_redaction_wave5.py`, `docs/PIN_RECONCILIATION_WAVE5.md`,
+`scripts/sanitize_docs.py`, plus the sanitized tracked docs listed in §7.2.
+
+### 7.1 G2 — transport/JSON-boundary redaction (FIXED)
+
+The receipt object is the shared CLI/dashboard/voice parity artifact and must
+stay byte-identical (`tests/test_capability_wiring8u.py::test_dashboard_runs_same_backend`
+compares `out["receipt"]["result"]` to the direct backend dict). Redaction
+therefore moved to the one place every served JSON response passes through:
+
+* `voicebridge/webui.py` — new module helper `_redact_served(obj)` masks
+  secret-shaped strings recursively at serialization; `WebUIHandler._json`
+  applies it before `json.dumps`. It is full-fidelity (no
+  `redaction.MAX_ITEMS` cap, so the 500+ entry operations catalog is served
+  whole), depth-bounded, and cycle-safe. A string value under a
+  credential-named key is masked even when not itself secret-shaped; a
+  non-string value under such a key (the catalog's `"secret": false` schema
+  flag) is left intact. Because `_hermes_api` also terminates in `self._json`,
+  both `/api/ops/*` and `/hermes/api/ops/*` receipts are covered.
+* Audit writer: `logging_setup.log_event` already redacts every field through
+  `redaction.redact_obj` before it touches `events.jsonl`; Wave 5 adds a
+  regression test for it (secret under an unlabelled key) rather than a second
+  redaction pass.
+
+Invariant proven: `dashboard_ops.run_op(...)` still returns the secret-bearing
+internal receipt (parity intact), while the same call served over HTTP returns
+`[REDACTED]`.
+
+### 7.2 Privacy — developer home path sanitized
+
+`scripts/sanitize_docs.py` deterministically replaces the real developer home
+path literal with the portable placeholder `$HOME` across tracked `docs/` only,
+and is idempotent (`--check` exits 0 when clean). It never touches frozen
+contracts, owner amendments, the execution directive, the agent prompt pack, or
+untracked developer docs.
+
+Sanitized (17 files, 19 occurrences):
+
+```
+docs/8TF_COMPLETE_MIGRATION_PLAN.md
+docs/8TF_SOURCE_OF_TRUTH.md
+docs/AUDIT_OPENCLAW_2026-09-11.md
+docs/AUDIT_OPENCLAW_V2026_9_4_DELTA.md
+docs/BAKEOFF_4D.json
+docs/CHANGE_REPORTS/hotkey_xinput_listener_robustness_(right-ctrl_ptt).md
+docs/CHANGE_REPORTS/packet_7b.md
+docs/CHANGE_REPORTS/packet_7c.md
+docs/CHANGE_REPORTS/packet_7c_audio-identifier_audit_fix.md
+docs/CHANGE_REPORTS/packet_7c_remediation.md
+docs/CHANGE_REPORTS/packet_7d.md
+docs/CHANGE_REPORTS/packet_7d_finish:_qubit_branding_migration_+_scarlett_at2020_live_ptt.md
+docs/CHANGE_REPORTS/packet_7d_remediation.md
+docs/CHANGE_REPORTS/scarlett_2i2_+_at2020_audio_reconfigure.md
+docs/OPERATIONS_8S.md
+docs/QUBIT_COMPLETION_EVIDENCE.md
+docs/UNIFIED_AGENT_PLAN.md
+```
+
+`docs/QUBIT_FINAL_CODE_READY_PROMPT.md` is untracked and was left untouched;
+the frozen/owner docs contained no home literal. Pin reconciliation is recorded
+separately in `docs/PIN_RECONCILIATION_WAVE5.md` (the OpenClaw audits were
+scrubbed for the home path but their findings and pins were not changed).
+
+### 7.3 MCP loopback server — classification (accounted bounded helper)
+
+`voicebridge/plugin_runtime.py` can start a bounded loopback MCP endpoint
+(`mcp_serve` → `McpLoopbackHost`). Classified against the frozen "one listener /
+no second server" rule, it is an **explicitly-accounted-for bounded loopback
+helper**, not a second listener or authority:
+
+* **On demand only.** It is not started by the WebUI/Orchestrator startup path
+  and has no production CLI/voice/dashboard caller; it only begins when an
+  operator/explicit caller invokes `mcp_serve`.
+* **Bind scope.** Binds `MCP_HOST = 127.0.0.1` on an ephemeral port by default;
+  Wave 5 adds a guard that refuses any bind host outside
+  `MCP_LOOPBACK_HOSTS = ("127.0.0.1", "::1", "localhost")` even if the constant
+  is tampered with. No outbound network (`mcp_doctor` reports
+  `outbound_network: NONE`).
+* **Authority scope.** It cannot dispatch arbitrary code: `tools/call` resolves
+  only `_HANDLERS`, i.e. plugin ids the host already bound in-process; an
+  unknown name is typed-refused.
+* **Auth/audit controls.** Every request needs a bearer token matching an active
+  hashed attach grant (`mcp_authenticate`, constant-time); body size is capped
+  (`MCP_MAX_BODY_BYTES`); `mcp_attach`/`mcp_revoke`/`mcp_serve` all probe the
+  one durable e-stop and the shared approval journal, and every call is audited
+  (`mcp_attach`, `mcp_revoke`, `mcp_serve`, `mcp_call`).
+* **Stoppable.** `McpLoopbackHost.stop()` shuts down, closes, and joins the
+  serving thread; `mcp_doctor` now reports
+  `listener: loopback-helper` / `one_listener_rule: accounted-exception`.
+
+It is documented here as an accounted exception rather than removed, because
+MCP hosted apps (OpenClaw delta D10) require a transport and the loopback
+endpoint is the Qubit-safe equivalent; it never competes for the product
+listener, session, memory, scheduler, broker, audit, or policy authority.
+
+### 7.4 Tests and evidence
+
+New hermetic suite `tests/test_transport_redaction_wave5.py`:
+
+* a secret-shaped value under an unlabelled key in a served `/api/ops/run`
+  response is `[REDACTED]`, while the same op's internal `run_op` receipt keeps
+  the raw value (parity / backend contract unchanged);
+* `{"password": "…"}`-style keyed strings are masked, while the catalog's
+  boolean `"secret": false` schema flag is not;
+* the operations catalog is served **whole** through `_json` (proves the
+  transport redactor does not truncate at `MAX_ITEMS`, unlike `redact_obj`);
+* the audit writer (`logging_setup.log_event`) redacts a secret-shaped value
+  under a benign key into `events.jsonl`;
+* the MCP loopback binds loopback only, refuses a tampered non-loopback host,
+  and `mcp_doctor` reports the accounted-helper classification.
+
+### 7.5 Rollback (Wave 5)
+
+* `git checkout -- voicebridge/webui.py` (G2 transport redaction)
+* `git checkout -- voicebridge/plugin_runtime.py` (MCP loopback scoping)
+* `git checkout -- docs/SECURITY_AUDIT_WAVE4.md` (Wave 5 notes)
+* `git checkout -- $(git diff --name-only -- docs/)` (privacy scrub; restores
+  the developer home literal in the 17 docs)
+* `rm tests/test_transport_redaction_wave5.py docs/PIN_RECONCILIATION_WAVE5.md scripts/sanitize_docs.py`
+
+No commit was made; no state file, credential, or live service was touched.

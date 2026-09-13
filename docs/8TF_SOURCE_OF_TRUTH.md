@@ -33,7 +33,7 @@ executed source/module/process identity.
 
 ## Canonical names and locations
 
-- Current reference/rollback checkout: `/home/trick/Projects/Repos/qubit-voicebridge`
+- Current reference/rollback checkout: `$HOME/Projects/Repos/qubit-voicebridge`
 - Intended canonical product identity: **Qubit Agent**
 - Voice subsystem identity: **Qubit VoiceBridge**
 - Intended repository/install identity: `qubit-voicebridge`

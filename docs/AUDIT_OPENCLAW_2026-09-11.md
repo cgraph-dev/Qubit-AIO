@@ -3,7 +3,7 @@
 Read-only audit. No repo file was modified. Report written to
 `/tmp/opencode/audit_openclaw.md`.
 
-- Qubit repo: `/home/trick/Projects/Repos/qubit-voicebridge`
+- Qubit repo: `$HOME/Projects/Repos/qubit-voicebridge`
 - Pinned OpenClaw source (read-only): `/tmp/opencode/pinned/openclaw`
   at revision `3928bad9badfcb6c7d140530435e806fb8092190`
   (verified with `git rev-parse HEAD`)

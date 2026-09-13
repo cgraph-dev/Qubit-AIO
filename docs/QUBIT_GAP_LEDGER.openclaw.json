@@ -57,6 +57,294 @@
     "unexplained": [],
     "covered": true
   },
+  "extension_wave5": {
+    "total": 30,
+    "by_disposition": {
+      "parent": 4,
+      "gate": 24,
+      "distinct": 2
+    },
+    "by_needs": {
+      "none": 6,
+      "creds": 23,
+      "hardware": 1,
+      "owner": 0
+    },
+    "unmapped": [],
+    "covered": true,
+    "extensions": [
+      {
+        "name": "a2a",
+        "disposition": "gate",
+        "parent": "OC-19",
+        "gate": "CHANNEL_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/channels_inbound.py normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "buzz",
+        "disposition": "gate",
+        "parent": "OC-19",
+        "gate": "CHANNEL_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/channels_inbound.py normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "clickclack",
+        "disposition": "gate",
+        "parent": "OC-19",
+        "gate": "CHANNEL_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/channels_inbound.py normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "cua-computer",
+        "disposition": "gate",
+        "parent": "OC-13",
+        "gate": "COMPUTER_USE_NO_DRIVER",
+        "needs": "hardware",
+        "form": "voicebridge/computer_use.py status/refuse_install",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "device-pair",
+        "disposition": "parent",
+        "parent": "OC-05",
+        "gate": "",
+        "needs": "creds",
+        "form": "voicebridge/device.py token_issue/token_approve/token_rotate/token_revoke/token_verify",
+        "proving": "tests/test_openclaw_parity_wave1.py"
+      },
+      {
+        "name": "diffs",
+        "disposition": "parent",
+        "parent": "OC-62",
+        "gate": "",
+        "needs": "none",
+        "form": "voicebridge/file_patch.py apply_patch",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "geolocation",
+        "disposition": "distinct",
+        "parent": "OC-56",
+        "gate": "",
+        "needs": "none",
+        "form": "voicebridge/node_host.py geolocate",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "googlechat",
+        "disposition": "gate",
+        "parent": "OC-19",
+        "gate": "CHANNEL_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/channels_inbound.py normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "image-generation-core",
+        "disposition": "gate",
+        "parent": "OC-64",
+        "gate": "MEDIA_PROVIDER_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/media_gen.py shape_media_request/generate",
+        "proving": "tests/test_openclaw_closure_wave2_webmedia.py"
+      },
+      {
+        "name": "imap",
+        "disposition": "gate",
+        "parent": "OC-19",
+        "gate": "CHANNEL_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/channels_inbound.py normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "irc",
+        "disposition": "gate",
+        "parent": "OC-19",
+        "gate": "CHANNEL_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/channels_inbound.py normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "line",
+        "disposition": "gate",
+        "parent": "OC-19",
+        "gate": "CHANNEL_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/channels_inbound.py normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "llm-task",
+        "disposition": "distinct",
+        "parent": "OC-31",
+        "gate": "",
+        "needs": "none",
+        "form": "voicebridge/local_models.py structured_task",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "lobster",
+        "disposition": "parent",
+        "parent": "OC-31",
+        "gate": "",
+        "needs": "none",
+        "form": "voicebridge/automation.py run_directive/order_add",
+        "proving": "tests/test_openclaw_e5_directives.py"
+      },
+      {
+        "name": "mattermost",
+        "disposition": "gate",
+        "parent": "OC-19",
+        "gate": "CHANNEL_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/channels_inbound.py normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "msteams",
+        "disposition": "gate",
+        "parent": "OC-19",
+        "gate": "CHANNEL_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/channels_inbound.py normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "nextcloud-talk",
+        "disposition": "gate",
+        "parent": "OC-19",
+        "gate": "CHANNEL_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/channels_inbound.py normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "nostr",
+        "disposition": "gate",
+        "parent": "OC-19",
+        "gate": "CHANNEL_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/channels_inbound.py normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "oc-path",
+        "disposition": "parent",
+        "parent": "OC-61",
+        "gate": "",
+        "needs": "none",
+        "form": "voicebridge/files.py list_dir/read_file/inspect",
+        "proving": "tests/test_files_ide8u.py"
+      },
+      {
+        "name": "qa-channel",
+        "disposition": "gate",
+        "parent": "OC-19",
+        "gate": "CHANNEL_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/channels_inbound.py normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "raft",
+        "disposition": "gate",
+        "parent": "OC-19",
+        "gate": "CHANNEL_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/channels_inbound.py normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "reef",
+        "disposition": "gate",
+        "parent": "OC-19",
+        "gate": "CHANNEL_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/channels_inbound.py normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "sms",
+        "disposition": "gate",
+        "parent": "OC-19",
+        "gate": "CHANNEL_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/channels_inbound.py normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "synology-chat",
+        "disposition": "gate",
+        "parent": "OC-19",
+        "gate": "CHANNEL_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/channels_inbound.py normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "test-support",
+        "disposition": "gate",
+        "parent": "",
+        "gate": "TEST_SUPPORT_ONLY",
+        "needs": "none",
+        "form": "tests/ (upstream test scaffolding only)",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "tlon",
+        "disposition": "gate",
+        "parent": "OC-19",
+        "gate": "CHANNEL_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/channels_inbound.py normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "twitch",
+        "disposition": "gate",
+        "parent": "OC-19",
+        "gate": "CHANNEL_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/channels_inbound.py normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "visitor-access",
+        "disposition": "gate",
+        "parent": "OC-05",
+        "gate": "VISITOR_ACCESS_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/device.py token_issue (expiring grant)",
+        "proving": "tests/test_openclaw_parity_wave1.py"
+      },
+      {
+        "name": "zalo",
+        "disposition": "gate",
+        "parent": "OC-19",
+        "gate": "CHANNEL_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/channels_inbound.py normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      },
+      {
+        "name": "zalouser",
+        "disposition": "gate",
+        "parent": "OC-19",
+        "gate": "CHANNEL_CREDENTIAL_REQUIRED",
+        "needs": "creds",
+        "form": "voicebridge/channels_inbound.py normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py"
+      }
+    ]
+  },
   "rows": [
     {
       "id": "OC-01",

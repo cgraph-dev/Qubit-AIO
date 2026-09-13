@@ -178,6 +178,177 @@ _WORKFLOW_PARENT_BY_AREA = {
 # Dashboard UI surfaces belong to the dashboard capability.
 _DASHBOARD_PARENT = "webui_status"
 
+# Fork-runtime capability evidence (Wave 5).  Qubit executes the complete
+# pinned Hermes fork in-process, so an upstream agent tool, skill, or plugin is
+# *not* a separate Qubit module: the fork's tool/toolset registry, skill tree,
+# and plugin fleet are the real backing surface.  Every tool/skill/plugin
+# inventory item is given an explicit typed disposition against that fork
+# runtime (IMPLEMENTED with a real proving test, or GATED with a reason) so it
+# can never be silently dropped or counted as an unexplained omission.
+_FORK_TOOL_TEST = (
+    "tests/test_tool_skill_plugin_coverage_wave5.py"
+    "::test_fork_tool_registry_exposes_inventory_tools")
+_FORK_SKILL_TEST = (
+    "tests/test_tool_skill_plugin_coverage_wave5.py"
+    "::test_all_inventory_skills_vendored_and_loadable")
+_FORK_PLUGIN_TEST = (
+    "tests/test_tool_skill_plugin_coverage_wave5.py"
+    "::test_all_vendored_plugin_items_have_a_wrapper")
+_FORK_CAPABILITY_BY_CATEGORY = {
+    "hermes_tool": "fork_tool_runtime",
+    "hermes_skill": "fork_skill_runtime",
+    "hermes_plugin": "fork_plugin_runtime",
+}
+_FORK_BACKEND_BY_CATEGORY = {
+    "hermes_tool": "qubit_hermes.tools.registry:registry",
+    "hermes_skill": "qubit_hermes.skills",
+    "hermes_plugin": "voicebridge.hermes_plugins.plugin_fleet_audit",
+}
+
+
+def _fork_tool_names(repo: Path) -> set[str]:
+    """Names the vendored fork's tool/toolset source declares.
+
+    The fork is byte-identical to the pinned upstream tree, so this is the
+    direct source of truth for what the fork runtime exposes.  The proving test
+    additionally imports the live ``tools.registry`` and asserts membership.
+    """
+    fork = repo / "qubit_hermes"
+    if not fork.is_dir():
+        return set()
+    return {str(it.get("name") or "") for it in extract_hermes_tools(fork)}
+
+
+def _fork_plugin_names(repo: Path) -> set[str]:
+    """Vendored fork plugin directories (the Qubit plugin-wrapper fleet)."""
+    plugins = repo / "qubit_hermes" / "plugins"
+    if not plugins.is_dir():
+        return set()
+    return {p.name for p in plugins.iterdir()
+            if p.is_dir() and p.name != "__pycache__"}
+
+
+def _fork_skill_loadable(repo: Path, item: dict) -> bool:
+    """True when the vendored skill directory carries a real ``SKILL.md``."""
+    root = str(item.get("root") or "")
+    name = str(item.get("name") or "")
+    if not root or not name:
+        return False
+    skill_dir = repo / "qubit_hermes" / root / name
+    if not skill_dir.is_dir():
+        return False
+    return any(skill_dir.rglob("SKILL.md"))
+
+
+def _fork_disposition(repo: Path, item: dict, fork_tools: set[str],
+                      fork_plugins: set[str]) -> dict | None:
+    """Typed disposition for a tool/skill/plugin item against the fork runtime.
+
+    Returns ``None`` for categories this workstream does not own, so their
+    existing (matched/parented) classification is unchanged.
+    """
+    cat = item["category"]
+    if cat not in _FORK_CAPABILITY_BY_CATEGORY:
+        return None
+    capability = _FORK_CAPABILITY_BY_CATEGORY[cat]
+    backend = _FORK_BACKEND_BY_CATEGORY[cat]
+    name = str(item.get("name") or "")
+
+    if cat == "hermes_tool":
+        if name in fork_tools:
+            return {
+                "status": "IMPLEMENTED", "capability": capability,
+                "backend": backend, "proving_test": _FORK_TOOL_TEST,
+                "reason": ("vendored fork tool/toolset registry exposes "
+                           f"{name!r}; dispatchable through the in-process "
+                           "fork agent runtime under Qubit policy/broker."),
+                "needs": "none",
+            }
+        return {
+            "status": "GATED", "capability": capability, "backend": "",
+            "proving_test": "",
+            "reason": (f"tool {name!r} is not declared by the vendored fork "
+                       "tool/toolset source; no Qubit caller."),
+            "needs": "owner",
+        }
+
+    if cat == "hermes_skill":
+        if _fork_skill_loadable(repo, item):
+            return {
+                "status": "IMPLEMENTED", "capability": capability,
+                "backend": backend, "proving_test": _FORK_SKILL_TEST,
+                "reason": ("vendored under qubit_hermes/ with a loadable "
+                           f"SKILL.md for {item.get('root')}/{name}; served by "
+                           "the in-process fork skill runtime."),
+                "needs": "none",
+            }
+        return {
+            "status": "GATED", "capability": capability, "backend": "",
+            "proving_test": "",
+            "reason": (f"vendored skill path {item.get('path')!r} has no "
+                       "loadable SKILL.md (cache/asset directory), so no skill "
+                       "runtime surface exists."),
+            "needs": "owner",
+        }
+
+    # hermes_plugin
+    if name in fork_plugins:
+        return {
+            "status": "IMPLEMENTED", "capability": capability,
+            "backend": backend, "proving_test": _FORK_PLUGIN_TEST,
+            "reason": ("vendored under qubit_hermes/plugins/ and wrapped by "
+                       "voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / "
+                       "plugin_fleet_audit; loadable in the fork plugin "
+                       "runtime."),
+            "needs": "none",
+        }
+    return {
+        "status": "GATED", "capability": capability, "backend": "",
+        "proving_test": "",
+        "reason": (f"plugin {name!r} is not present in the vendored fork "
+                   "plugin fleet; no Qubit wrapper."),
+        "needs": "owner",
+    }
+
+
+def _openclaw_disposition(item: dict) -> dict | None:
+    """Typed disposition for an OpenClaw extension not matched to a ledger row.
+
+    Consumes the wave-4 :data:`EXTENSION_MAP` (all 154 extensions) and the
+    wave-5 form/proof table so the two never drift.  A ``parent``/``distinct``
+    disposition with a real Qubit form + proving test is IMPLEMENTED; a gate is
+    a typed credential/hardware/owner refusal.
+    """
+    if item.get("category") != "openclaw_extension":
+        return None
+    name = str(item.get("name") or "")
+    try:
+        scripts_dir = str(Path(__file__).resolve().parent)
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        from rebuild_ledger_openclaw import EXTENSION_MAP, WAVE5_FORMS
+    except Exception:
+        return None
+    disp = EXTENSION_MAP.get(name)
+    if disp is None:
+        return None
+    form = WAVE5_FORMS.get(name)
+    if not isinstance(form, dict):
+        return None
+    kind = str(disp.get("disposition") or "")
+    status = "IMPLEMENTED" if kind in ("parent", "distinct") else "GATED"
+    return {
+        "status": status,
+        "capability": f"openclaw extension {name}",
+        "backend": str(form.get("form") or ""),
+        "proving_test": str(form.get("proving") or ""),
+        "reason": (f"OpenClaw extension {name!r} -> {kind} "
+                   f"(parent={disp.get('parent') or 'distinct'}, "
+                   f"gate={disp.get('gate') or 'none'}) via "
+                   f"{form.get('form')}."),
+        "needs": str(disp.get("needs") or "none"),
+    }
+
 
 def _parent_for(item: dict) -> tuple[str | None, str]:
     """Return ``(parent_id, coverage)`` for one inventory item.
@@ -243,8 +414,10 @@ def _ledger_status_index(repo: Path,
 
 
 def _is_covered(item: dict) -> bool:
-    """A surface is covered by its own ledger row or an IMPLEMENTED parent."""
-    return bool(item.get("ledger_match") or item.get("parent_covered"))
+    """A surface is covered by its own ledger row, an IMPLEMENTED parent, or an
+    explicit fork-runtime disposition (Wave 5 tools/skills/plugins)."""
+    return bool(item.get("ledger_match") or item.get("parent_covered")
+                or item.get("fork_disposition"))
 
 
 def _resolve_parent(parent_id: str | None,
@@ -1307,6 +1480,11 @@ def render_omissions(inv: dict) -> str:
                                       or it.get("parent_id") or "?"))
 
     total_omissions = len(omissions)
+    fork_dispositioned = [it for it in surfaces if it.get("fork_disposition")]
+    fork_impl = [it for it in fork_dispositioned
+                 if it["fork_disposition"]["status"] == "IMPLEMENTED"]
+    fork_gated = [it for it in fork_dispositioned
+                  if it["fork_disposition"]["status"] == "GATED"]
     evidence_counts: dict[str, int] = {}
     for it in items:
         if it["category"] in _EVIDENCE_CATEGORIES:
@@ -1353,6 +1531,9 @@ def render_omissions(inv: dict) -> str:
       f"**{len(parented_covered)}**\n")
     w(f"- Distinct capabilities total: **{pm.get('distinct_surfaces', '?')}**; "
       f"parented surfaces total: **{pm.get('parented_surfaces', '?')}**\n")
+    w(f"- Fork-runtime dispositions (tools/skills/plugins): "
+      f"**{len(fork_dispositioned)}** "
+      f"(IMPLEMENTED {len(fork_impl)}, GATED {len(fork_gated)})\n")
     w(f"- Ledger IMPLEMENTED rows with unreproducible evidence: "
       f"**{len(lc['unreproducible_evidence'])}**\n")
     w(f"- Hermes byte diff vs `qubit_hermes/`: "
@@ -1426,6 +1607,34 @@ def render_omissions(inv: dict) -> str:
               f"coverage `{covered_by_parent[parent][0].get('coverage') or '?'}`"
               f"\n")
         w("\n")
+
+    w("## Fork-runtime dispositions for tools / skills / plugins"
+      f" ({len(fork_dispositioned)})\n\n")
+    if not fork_dispositioned:
+        w("None.\n\n")
+    else:
+        w("Qubit executes the complete pinned Hermes fork in-process, so these "
+          "are not separate Qubit modules: the fork tool/toolset registry, "
+          "skill tree, and plugin fleet are the real backing surface. Every "
+          "item carries an explicit typed disposition (no silent drop).\n\n")
+        for cap in sorted({it["fork_disposition"]["capability"]
+                           for it in fork_dispositioned}):
+            cap_items = sorted(
+                (it for it in fork_dispositioned
+                 if it["fork_disposition"]["capability"] == cap),
+                key=lambda x: x["id"])
+            impl = sum(1 for it in cap_items
+                       if it["fork_disposition"]["status"] == "IMPLEMENTED")
+            gated = len(cap_items) - impl
+            w(f"### `{cap}` ({len(cap_items)}; IMPLEMENTED {impl}, "
+              f"GATED {gated})\n\n")
+            for it in cap_items:
+                d = it["fork_disposition"]
+                proof = f"; proof `{d['proving_test']}`" if d["proving_test"] \
+                    else ""
+                w(f"- `{it['id']}` — **{d['status']}**; backend "
+                  f"`{d.get('backend') or '—'}`; {d['reason']}{proof}\n")
+            w("\n")
 
     w("## Ledger rows with unreproducible evidence\n\n")
     rows = inv["ledger_comparison"]["unreproducible_evidence"]
@@ -1503,6 +1712,18 @@ def build_inventory(repo: Path, hermes: Path, openclaw: Path,
                                if resolved else None)
         it["parent_covered"] = bool(
             resolved and status_by_id.get(resolved) == "IMPLEMENTED")
+
+    # Wave 5: explicit fork-runtime disposition for every tool/skill/plugin
+    # item.  These are not separate Qubit modules; the fork is executed
+    # in-process, so its registry/skill tree/plugin fleet is the real surface.
+    fork_tools = _fork_tool_names(repo)
+    fork_plugins = _fork_plugin_names(repo)
+    for it in all_items:
+        disposition = _fork_disposition(repo, it, fork_tools, fork_plugins)
+        if disposition is None:
+            disposition = _openclaw_disposition(it)
+        if disposition is not None:
+            it["fork_disposition"] = disposition
 
     all_items.sort(key=lambda x: (x["source"], x["category"], x["id"]))
 

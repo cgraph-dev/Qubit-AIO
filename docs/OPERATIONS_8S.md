@@ -42,7 +42,7 @@ writing another.
 
 ## 3. Repository-folder migration (performed 2026-09-07)
 
-The canonical folder is `/home/trick/Projects/Repos/qubit-voicebridge`.
+The canonical folder is `$HOME/Projects/Repos/qubit-voicebridge`.
 The migration was performed WITHOUT `git reset --hard`, `git clean`, broad
 checkout, mass deletion, or destructive overwrite:
 

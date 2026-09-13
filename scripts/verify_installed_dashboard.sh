@@ -17,6 +17,21 @@ PY="${PYTHON:-$REPO_ROOT/.venv/bin/python}"
 command -v uv >/dev/null 2>&1 || {
   echo "ERROR: uv is required for the isolated install gate" >&2; exit 1; }
 
+# frontend/hermes-dist is a git-ignored build artifact; without it the wheel
+# would silently install with no dashboard. Build it deterministically when
+# node/npm are available, otherwise stop with a typed DEGRADED (exit 4).
+if [ ! -f "$REPO_ROOT/frontend/hermes-dist/index.html" ]; then
+  if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+    echo "== dashboard bundle missing — building deterministically =="
+    "$REPO_ROOT/scripts/build_dashboard.sh" || {
+      echo "DEGRADED: dashboard build failed (node/npm present)" >&2; exit 4; }
+  else
+    echo "DEGRADED: frontend/hermes-dist missing and node/npm not found —" >&2
+    echo "          install node/npm or use a release sdist that ships it" >&2
+    exit 4
+  fi
+fi
+
 echo "== build wheel =="
 uv build --wheel --out-dir "$WORK/dist" >/dev/null
 WHEEL="$(ls "$WORK"/dist/*.whl)"

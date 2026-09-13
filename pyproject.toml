@@ -88,6 +88,15 @@ packages = ["voicebridge"]
 # is listed under `artifacts` (hatchling only ships VCS-ignored paths when
 # they are declared here) — a clean wheel install then serves the real
 # dashboard without any checkout or untracked file.
+#
+# Reproducibility (Wave 5): a clean git clone does NOT contain
+# frontend/hermes-dist (it is git-ignored), so a wheel/sdist built from a bare
+# clone is dashboard-less. scripts/install.sh and scripts/clean_install_check.sh
+# therefore build it deterministically when node/npm are available and fail
+# with a TYPED degradation otherwise; scripts/release_qualify.py rejects a
+# dashboard-less artifact. The release sdist (built from a tree that already
+# carries frontend/hermes-dist) ships the bundle, so downstream wheel rebuilds
+# need no npm. See docs/CLEAN_CLONE_AUDIT_WAVE5.md.
 artifacts = ["frontend/hermes-dist"]
 
 # Ship the runtime resources inside the wheel so a clean install (no checkout)
@@ -187,7 +196,10 @@ artifacts = ["frontend/hermes-dist"]
 
 [tool.hatch.build.targets.sdist]
 # The generated dashboard build ships in the sdist too (reproducible build
-# from the sdist without a separate npm build).
+# from the sdist without a separate npm build). Requires the bundle to have
+# been built before packaging; scripts/install.sh builds it deterministically
+# from a clean clone when node/npm are available and otherwise fails typed
+# (see the wheel comment above and docs/CLEAN_CLONE_AUDIT_WAVE5.md).
 artifacts = ["frontend/hermes-dist"]
 # NEVER ship the developer's live config, private browser state, or accidental
 # dirty/untracked files (Packet 8K "no private developer state in the release").
@@ -219,6 +231,7 @@ exclude = [
   "docs/OPERATIONS_8S.md",
   "docs/QUBIT_COMPLETION_EVIDENCE.md",
   "docs/QUBIT_FINAL_CODE_READY_PROMPT.md",
+  "docs/SECURITY_AUDIT_WAVE4.md",
   "tests/test_new_features.py",
   "scripts/browser_profiles",
   "scripts/browser_auto_state",

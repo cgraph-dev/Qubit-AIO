@@ -115,7 +115,7 @@ Audit method: `dashboard_ops.catalog()` Tier-2 extras (EXTRA_OPS) with
 - Repo-owned launcher `.venv/bin/qubit` (`voicebridge.cli:main`):
   `status` reports `agent runtime : qubit-native (qubit-brain4)`.
   Environment note (operator-owned, not modified):
-  `/home/trick/.local/bin/qubit` is a stale user shim pointing at
+  `$HOME/.local/bin/qubit` is a stale user shim pointing at
   `~/Projects/Repos/Qubit (2)` + `voice-dashboard/open.sh` and shadows
   the repo launcher on PATH; removal/relink is an operator action.
 
