@@ -87,7 +87,7 @@ are genuine live dependencies.
 
 Common conventions:
 
-- Repo root: `/home/trick/Projects/Repos/qubit-voicebridge`.
+- Repo root: `$HOME/Projects/Repos/qubit-voicebridge`.
 - Canonical CLI: `.venv/bin/qubit` (entry point `qubit = voicebridge.cli:main`,
   `pyproject.toml:72`).
 - Hermetic proof (safe on any host, no live dependency):
@@ -183,8 +183,10 @@ Common conventions:
      linked device, Teams Bot registration, macOS Messages bridge).
   2. `.venv/bin/qubit channels doctor` — expect the channel `AVAILABLE` and
      credential resolvable.
-  3. `.venv/bin/qubit msg send --account <acct> --to <target> "<text>" --confirm`
-     — expect a real delivery with a provider message id.
+  3. `.venv/bin/qubit msg draft --account <acct> --to <target> --body "<text>" --confirm`,
+     then `.venv/bin/qubit msg approve <msg_id> --confirm`, then
+     `.venv/bin/qubit msg send <msg_id> --confirm` — expect a real delivery
+     with a provider message id.
   4. Before the live credential/transport is present, the same send must be a
      typed `MSG_TRANSPORT_UNAVAILABLE` with the message left queued.
 - **Evidence:** catalogue status per channel, delivery receipt for each
@@ -260,14 +262,14 @@ Common conventions:
 - **Hermetic proof:** `tests/test_openclaw_closure_wave2_runtime.py::test_oc06_oc56_node_pairing_capabilities_and_media_transport`,
   `tests/test_openclaw_closure_wave3.py::test_oc56_node_media_transport_needs_confirmation`.
 - **Procedure:**
-  1. `.venv/bin/qubit node enroll --name studio --endpoint https://<host>:8443`
-     against a real paired device and confirm.
+  1. `.venv/bin/qubit node register --name studio --endpoint https://<host>:8443 --confirm`
+     against a real paired device.
   2. `.venv/bin/qubit node capabilities <id>` — expect local reads `READY` and
      remote actuators `UNAVAILABLE` + `NODE_CAPABILITY_UNAVAILABLE` until the
      live transport is present.
-  3. `.venv/bin/qubit node dispatch <id> screen --confirm` with the operator
-     transport — expect a real capture receipt; without confirmation or
-     transport expect `NODE_DISPATCH_REFUSED`.
+  3. `.venv/bin/qubit node dispatch <id> screen` with the operator transport —
+     expect a real capture receipt; without the live transport expect
+     `NODE_DISPATCH_REFUSED`.
 - **Evidence:** enrollment record, capability rows, refusal receipts, live
   dispatch result with `node.invoke` fields and confirmation id.
 - **Rollback:** remove the node record / revoke the pairing; nothing was
@@ -291,7 +293,7 @@ Common conventions:
 - **Procedure:**
   1. On the macOS host, install/run the approved Messages private-API bridge
      and record its base URL on the account (gateway/bridge field).
-  2. `.venv/bin/qubit msg link --provider imessage` — expect `link.state` to
+  2. `.venv/bin/qubit msg link <account_id>` — expect `link.state` to
      become available once the bridge is reachable.
   3. Send a message to a known iMessage target with confirmation and capture
      the delivery receipt.
@@ -324,9 +326,14 @@ Common conventions:
   1. Provision the real Feishu open-platform app id/secret, configure the
      agent record (app-id reference + allowlist) and host the app/event
      subscription.
-  2. `.venv/bin/qubit msg feishu-agent add ...` then
-     `.venv/bin/qubit msg send-as-agent ... --confirm` and capture a real
-     agent-scoped delivery receipt.
+  2. Send through the brokered Feishu account with the generic flow
+     (`.venv/bin/qubit msg draft --account <acct> --to <chat> --body "<text>" --confirm`,
+     then approve, then send) and capture a real delivery receipt. The
+     dynamic-agent record operations (`feishu_agent_add`/`feishu_agents`/
+     `feishu_agent_remove`/`feishu_send_as_agent` in `voicebridge/messaging.py`)
+     are backend-complete and tested but have no first-class `qubit msg`
+     subcommand yet: that is a tracked code-side surface gap, not a credential
+     gate.
   3. Without the secret expect `MSG_NO_CREDENTIAL`; without the transport
      expect `MSG_TRANSPORT_UNAVAILABLE`; with a chat outside the allowlist
      expect a refusal before any transport call.
@@ -457,7 +464,7 @@ Moved with `browser_close`; typed `BROWSER_CLOSE_REFUSED` refusal.
 ## Running the evidence test
 
 ```bash
-cd /home/trick/Projects/Repos/qubit-voicebridge
+cd $HOME/Projects/Repos/qubit-voicebridge
 .venv/bin/pytest -q tests/test_operator_only_evidence.py
 ```
 

@@ -5,7 +5,7 @@ dispatcher, that the Qubit overlay and the vendored dashboard expose real
 operations and honest, typed states rather than fake boxes, status-only tiles,
 wrong labels, dead controls, or placeholder pages:
 
-* the ten overlay plugin bundles still register their components and still call
+* the eleven overlay plugin bundles still register their components and still call
   only real backend routes (the same ``/api/ops`` broker, ``/api/qubit/chat``,
   ``/api/logs``... as CLI and voice);
 * the Runtime tab is no longer a raw-JSON status box (it renders the real
@@ -40,8 +40,8 @@ PUBLIC_PLUGINS = REPO_ROOT / "frontend" / "hermes-web" / "public" / "plugins"
 
 EXPECTED_PLUGINS = [
     "qubit-approvals", "qubit-boards", "qubit-brand", "qubit-chat",
-    "qubit-devices", "qubit-gateway", "qubit-memory", "qubit-ops",
-    "qubit-reports", "qubit-runtime",
+    "qubit-devices", "qubit-gateway", "qubit-memory", "qubit-models",
+    "qubit-ops", "qubit-reports", "qubit-runtime",
 ]
 
 # Real backend literals each overlay page is allowed to call. Kept as a guard

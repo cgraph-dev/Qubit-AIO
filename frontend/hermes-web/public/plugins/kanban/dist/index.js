@@ -2,8 +2,10 @@
  * Qubit Kanban — Dashboard Plugin
  *
  * Board view for the multi-agent collaboration board backed by
- * ~/.hermes/kanban.db. Calls the plugin's backend at /api/plugins/kanban/
- * and tails task_events over a WebSocket for live updates.
+ * ~/.qubit/kanban.db. Calls the plugin's backend at /api/plugins/kanban/
+ * and polls GET /api/plugins/kanban/events for live updates — the Qubit-safe
+ * read route on the single event path (WebSocket upgrades are refused with
+ * the typed WS_SINGLE_PATH gate).
  *
  * Plain IIFE, no build step. Uses window.__HERMES_PLUGIN_SDK__ for React +
  * shadcn primitives; HTML5 drag-and-drop for card movement on desktop and
@@ -264,11 +266,12 @@
   const API = "/api/plugins/kanban";
   const MIME_TASK = "text/x-hermes-task";
 
-  // Docs link — surfaced as a `?` icon next to the board switcher and as
-  // `title=` hints on unlabelled controls. Kept in one place so rebrands or
-  // path changes are a single edit.
+  // Upstream vendor documentation. The real URLs are kept for provenance; the
+  // in-product affordance labels them as upstream/vendor docs, not as Qubit's
+  // own documentation.
   const DOCS_URL = "https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban";
   const DOCS_TUTORIAL_URL = "https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban-tutorial";
+  const DOCS_UPSTREAM_LABEL = "Upstream vendor Kanban docs (Nous Research)";
 
   // localStorage key for the user's selected board. Independent of the
   // CLI's on-disk ``<root>/kanban/current`` pointer so browser users
@@ -646,6 +649,8 @@
     const wsRef = useRef(null);
     const wsBackoffRef = useRef(1000);
     const wsClosedRef = useRef(false);
+    // Qubit single-event-path live poll: last-seen newest event marker.
+    const lastEventMarkerRef = useRef(null);
 
     // --- load config once ---------------------------------------------------
     useEffect(function () {
@@ -722,73 +727,45 @@
       };
     }, [loadBoard]);
 
-    // --- WebSocket ---------------------------------------------------------
+    // --- Live updates (Qubit single event path) ----------------------------
+    // Upstream tailed task events over a WebSocket. Qubit serves ONE event
+    // path and refuses every WebSocket dialect with the typed gate
+    // ``WS_SINGLE_PATH`` (see voicebridge.webui:HERMES_WS_GATE_CODES). That
+    // gate is correct and is NOT weakened here: live updates poll the real
+    // Qubit read route ``GET /api/plugins/kanban/events`` (backed by the
+    // shared ``kanban_log`` op), the same broker as CLI/voice. No raw shell,
+    // no bypass, no second listener.
     useEffect(function () {
       if (!boardData) return undefined;
-      wsClosedRef.current = false;
-      function openWs() {
-        if (wsClosedRef.current) return;
-        // Build the WS URL via the host SDK so the correct auth param is used
-        // in BOTH modes: single-use ?ticket= in gated OAuth mode, ?token= in
-        // loopback. Reading window.__HERMES_SESSION_TOKEN__ directly (the old
-        // path) sends an empty token and is rejected in gated mode. buildWsUrl
-        // also applies the dashboard base-path prefix for reverse-proxied
-        // deployments, which the old inline URL did not. It's async (gated
-        // mode mints a fresh ticket per connect), so resolve then open.
-        const wsParams = { since: String(cursorRef.current || 0) };
-        // Pin the WS stream to the currently-selected board so events
-        // from other boards don't bleed in. Includes "default" so the
-        // dashboard's own board pin always wins over the server-side
-        // ``current`` file — same rationale as ``withBoard()`` above.
-        // Regression: #20879.
-        if (board) wsParams.board = board;
-        SDK.buildWsUrl(`${API}/events`, wsParams).then(function (url) {
-          if (wsClosedRef.current) return;
-          let ws;
-          try { ws = new WebSocket(url); } catch (_e) { return; }
-          wsRef.current = ws;
-          ws.onopen = function () { wsBackoffRef.current = 1000; };
-          ws.onmessage = function (ev) {
-            try {
-              const msg = JSON.parse(ev.data);
-              if (msg && Array.isArray(msg.events) && msg.events.length > 0) {
-                cursorRef.current = msg.cursor || cursorRef.current;
-                // Stamp per-task signal so the TaskDrawer can reload itself.
-                setTaskEventTick(function (prev) {
-                  const next = Object.assign({}, prev);
-                  for (const e of msg.events) {
-                    if (e && e.task_id) next[e.task_id] = (next[e.task_id] || 0) + 1;
-                  }
-                  return next;
-                });
-                scheduleReload();
+      let alive = true;
+      let timer = null;
+      function poll() {
+        SDK.fetchJSON(withBoard(`${API}/events`, board))
+          .then(function (msg) {
+            if (!alive) return;
+            const events = (msg && msg.events) || [];
+            if (!Array.isArray(events) || events.length === 0) return;
+            const newest = events[0] || {};
+            const marker = `${newest.created_at || 0}:${newest.task_id || 0}:${newest.kind || ""}`;
+            if (marker === lastEventMarkerRef.current) return;
+            lastEventMarkerRef.current = marker;
+            // Stamp per-task signal so the TaskDrawer can reload itself.
+            setTaskEventTick(function (prev) {
+              const next = Object.assign({}, prev);
+              for (const e of events) {
+                if (e && e.task_id) next[e.task_id] = (next[e.task_id] || 0) + 1;
               }
-            } catch (_e) { /* ignore */ }
-          };
-          ws.onclose = function (ev) {
-            if (wsClosedRef.current) return;
-            if (ev && ev.code === 1008) {
-              setError(tx(t, "wsAuthFailed",
-                "WebSocket auth failed — reload the page to refresh the session token."));
-              return;
-            }
-            const delay = Math.min(wsBackoffRef.current, 30000);
-            wsBackoffRef.current = Math.min(wsBackoffRef.current * 2, 30000);
-            setTimeout(openWs, delay);
-          };
-        }).catch(function () {
-          // Ticket mint / URL build failed (e.g. session expired). Back off
-          // and retry; a hard auth failure surfaces via the 1008 close path.
-          if (wsClosedRef.current) return;
-          const delay = Math.min(wsBackoffRef.current, 30000);
-          wsBackoffRef.current = Math.min(wsBackoffRef.current * 2, 30000);
-          setTimeout(openWs, delay);
-        });
+              return next;
+            });
+            scheduleReload();
+          })
+          .catch(function () { /* non-fatal; the next poll retries */ });
       }
-      openWs();
+      poll();
+      timer = setInterval(poll, 5000);
       return function () {
-        wsClosedRef.current = true;
-        try { wsRef.current && wsRef.current.close(); } catch (_e) { /* noop */ }
+        alive = false;
+        if (timer) clearInterval(timer);
       };
     }, [!!boardData, board, scheduleReload]);
 
@@ -1779,8 +1756,8 @@
       target: "_blank",
       rel: "noopener noreferrer",
       className: "hermes-kanban-docs-link",
-      title: "Open Qubit Kanban docs in a new tab",
-      "aria-label": "Qubit Kanban documentation",
+      title: "Open " + DOCS_UPSTREAM_LABEL + " in a new tab",
+      "aria-label": DOCS_UPSTREAM_LABEL,
     }, "?");
   }
 
@@ -3777,9 +3754,27 @@
       setDlErr(null);
       SDK.authedFetch(url)
         .then(function (resp) {
+          var ctype = (resp.headers.get("content-type") || "").toLowerCase();
           if (!resp.ok) {
             return resp.text().then(function (txt) {
               throw new Error(parseApiErrorMessage(new Error(resp.status + ": " + txt)));
+            });
+          }
+          // The Qubit compat backend serves the attachment as JSON with the
+          // real bytes base64-encoded (the JSON dispatcher has no binary
+          // channel); decode that into a Blob. A binary stream response is
+          // still accepted for forward compatibility.
+          if (ctype.indexOf("application/json") !== -1) {
+            return resp.json().then(function (payload) {
+              if (!payload || !payload.data_base64) {
+                throw new Error((payload && payload.detail) || "attachment data unavailable");
+              }
+              var bin = atob(payload.data_base64);
+              var bytes = new Uint8Array(bin.length);
+              for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+              return new Blob([bytes], {
+                type: payload.content_type || a.content_type || "application/octet-stream",
+              });
             });
           }
           return resp.blob();

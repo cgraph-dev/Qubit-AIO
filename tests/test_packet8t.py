@@ -622,7 +622,7 @@ def test_setup_page_served_without_token_leak(tmp_path):
         resp = conn.getresponse()
         resp.read()
         assert resp.status == 302, resp.status
-        assert resp.getheader("Location") == "/hermes/system"
+        assert resp.getheader("Location") == "/system"
         # The labelled /classic/ fallback still serves the static setup page
         # and carries no secret.
         status, body = _dash_http(port, "GET", "/classic/setup", token="")

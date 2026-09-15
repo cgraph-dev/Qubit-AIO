@@ -877,14 +877,35 @@ def delivery_history(cfg: Any, job_id: int = 0,
 
 # --------------------------------------------------------------- execution
 def _default_executor(task_text: str, *, session: str,
-                      estop_engaged: Callable[[], bool]) -> Dict[str, Any]:
-    """Dispatch one due job through the Qubit-native agent (same agent the
-    CLI ``task`` path uses). Typed unavailable states, never fake OK."""
+                      estop_engaged: Callable[[], bool],
+                      cfg: Any = None) -> Dict[str, Any]:
+    """Dispatch one due job through the canonical Qubit operation path.
+
+    When a ``cfg`` is supplied (all real callers), the job runs through
+    :func:`voicebridge.chat_transport.turn` so the selected model/provider
+    profile, resolver, gateway policy, and one session store are honored —
+    the same path CLI/dashboard/voice use. A direct ``agent.turn`` is used
+    only for the legacy no-config test seam. Typed unavailable states, never
+    fake OK."""
     from .agent import AgentDenied, turn as agent_turn
 
     if estop_engaged():
         return {"state": "UNAVAILABLE", "code": "EMERGENCY_STOP",
                 "detail": "emergency stop latched"}
+    if cfg is not None:
+        try:
+            from . import chat_transport as CT
+            res = CT.turn(cfg, task_text, session=session, role="coding")
+        except Exception as exc:  # noqa: BLE001 — fail closed, typed
+            return {"state": "UNAVAILABLE", "code": "AGENT_ERROR",
+                    "detail": str(exc)[:200]}
+        if not isinstance(res, dict) or not res.get("ok"):
+            return {"state": "UNAVAILABLE",
+                    "code": str((res or {}).get("code", "AGENT_ERROR")),
+                    "detail": str((res or {}).get("detail")
+                                  or (res or {}).get("error", ""))[:200]}
+        return {"state": "OK", "code": "OK",
+                "detail": str(res.get("reply", ""))[:300]}
     try:
         res = agent_turn(None, task_text, session=session,
                          estop_engaged=estop_engaged)
@@ -938,7 +959,10 @@ def run_due(cfg: Any, *, requested_by: str = "cli:user",
 
     moment = now if now is not None else _now()
     stop = estop_engaged or (lambda: bool(_engaged(cfg)))
-    run = executor or _default_executor
+    run = executor or (
+        lambda task_text, *, session, estop_engaged: _default_executor(
+            task_text, session=session, estop_engaged=estop_engaged,
+            cfg=cfg))
     conn = _connect(cfg)
     try:
         _migrate(conn)
@@ -1082,9 +1106,11 @@ def autofire(cfg: Any, *, now: Optional[float] = None,
         if estop_engaged():
             return {"state": "UNAVAILABLE", "code": "EMERGENCY_STOP",
                     "detail": "emergency stop latched"}
-        target = executor or _default_executor
-        return target(task_text, session=session,
-                      estop_engaged=estop_engaged)
+        if executor is not None:
+            return executor(task_text, session=session,
+                            estop_engaged=estop_engaged)
+        return _default_executor(task_text, session=session,
+                                 estop_engaged=estop_engaged, cfg=cfg)
 
     try:
         out = run_due(cfg, requested_by=MONITOR_ACTOR, executor=_guarded,

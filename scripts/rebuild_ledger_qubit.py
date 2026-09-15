@@ -164,6 +164,8 @@ def op_candidates(backend: str, fixed) -> Set[Tuple[str, str]]:
     fn = VC._BACKENDS.get(backend)
     if fn is None:
         spec = DO.EXTRA_OPS.get(backend)
+        if spec is None:
+            spec = DO.MODEL_PROFILE_OPS.get(backend)
         if spec is not None:
             fn = getattr(spec, "run", None)
     cands = bridge_candidates(fn) if callable(fn) else set()
@@ -195,6 +197,8 @@ def resolve_backend(op_id: str) -> Tuple[str, bool, str, tuple]:
                     backend, fixed)
         return ("", False, backend, fixed)
     spec = DO.EXTRA_OPS.get(op_id)
+    if spec is None:
+        spec = DO.MODEL_PROFILE_OPS.get(op_id)
     if spec is not None:
         run = getattr(spec, "run", None)
         if callable(run):
@@ -585,7 +589,18 @@ def _cli_tables(tree: Dict[str, List[str]]):
         for op_id in ids:
             reverse_cov.setdefault(op_id, family)
     extra_cli = {"export_state": "export-state",
-                 "import_state": "import-state"}
+                 "import_state": "import-state",
+                 # Canonical model/provider profile ops (dashboard_ops
+                 # .MODEL_PROFILE_OPS) are the `qubit profile model ...` family.
+                 "list_model_profiles": "profile model list",
+                 "show_model_profile": "profile model show",
+                 "test_model_profile": "profile model test",
+                 "create_model_profile": "profile model create",
+                 "clone_model_profile": "profile model clone",
+                 "remove_model_profile": "profile model remove",
+                 "select_session_model": "profile model activate",
+                 "clear_session_model": "profile model deactivate",
+                 "rollback_model_profile": "profile model rollback"}
     return join, reverse_cov, extra_cli
 
 
@@ -630,6 +645,7 @@ PLUGIN = {
     "lessons": "qubit-memory:/memory", "curator": "qubit-memory:/memory",
     "active_memory": "qubit-memory:/memory",
     "kanban": "qubit-boards:/qubit-boards",
+    "profile": "qubit-models:/qubit-models",
     "gateway": "qubit-gateway:/qubit-gateway",
     "peer": "qubit-gateway:/qubit-gateway",
     "runtime": "qubit-devices:/devices", "browser": "qubit-devices:/devices",
@@ -698,7 +714,7 @@ def build_catalog_rows(catalog: Dict[str, Dict[str, object]],
     for op_id, item in sorted(catalog.items()):
         qualified, has_backend, backend_key, fixed = resolve_backend(op_id)
         entry = VC.REGISTRY.get(op_id)
-        spec = DO.EXTRA_OPS.get(op_id)
+        spec = DO.EXTRA_OPS.get(op_id) or DO.MODEL_PROFILE_OPS.get(op_id)
         if entry is not None:
             upstream = ",".join((getattr(entry, "parity", ()) or ())[:1])
         elif spec is not None:

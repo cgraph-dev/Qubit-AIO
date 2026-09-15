@@ -10,9 +10,9 @@
  "adaptation_rule": "Per the owner amendment 2026-09-11 and docs/QUBIT_DASHBOARD_REBUILD_PLAN.md, the pinned Hermes React/Vite/Node frontend is vendored into frontend/hermes-web (from hermes-agent/web) and frontend/hermes-shared (from hermes-agent/apps/shared) and is built with Vite; React/TS is a supported Qubit dashboard runtime and the former static-only runtime constraint no longer applies. Every upstream file maps to a byte-identical vendored file or a documented Qubit patch/rebrand carrying upstream+Qubit hashes, a reason, and an affected regression test in docs/HERMES_SOURCE_COMPARISON.json; routes/endpoints additionally map to shared Qubit backend operations, tested policy refusals, or documented omissions.",
  "routes": {
   "/chat": {
-   "qubit": "/",
+   "qubit": "/chat",
    "disposition": "adapted",
-   "note": "Talk workspace: streaming transcript, PTT voice, text turns, approvals via stream; Hermes xterm PTY spawn refused (shell policy) \u2014 transcript streaming is the equivalent."
+   "note": "Qubit-safe native chat: POST /api/qubit/chat (voicebridge.agent.turn, the same module as CLI text and voice PTT) with typed loading/empty/error/retry states, browser speech input, per-session transcript persistence, and the sessions switcher. /api/pty is refused (PTY_NO_SHELL); the page no longer opens or retries it."
   },
   "/sessions": {
    "qubit": "/sessions",
@@ -347,8 +347,8 @@
    "disposition": "adapted"
   },
   "/api/plugins/kanban/events": {
-   "qubit": "kanban",
-   "disposition": "adapted:board+journal"
+   "qubit": "qubit-boards (ops) + /api/events SSE",
+   "disposition": "partial: plugin WS upgrade refused by the single event path; board reads stay live via /api/plugins/kanban/board and all mutations run through /api/ops/* + /api/ops/confirm"
   },
   "/api/portal": {
    "qubit": "\u2014",
@@ -363,8 +363,8 @@
    "disposition": "adapted:key-refs,live-dance-provider-side"
   },
   "/api/pty": {
-   "qubit": "\u2014",
-   "disposition": "OMITTED:PTY (browser PTY spawn refused; transcript+TUI equivalent)"
+   "qubit": "POST /api/qubit/chat",
+   "disposition": "REFUSED:PTY_NO_SHELL (Qubit-safe equivalent = native chat turn; frontend no longer connects the raw WS)"
   },
   "/api/sessions": {
    "qubit": "sessions/memory",
@@ -1606,5 +1606,1031 @@
    "affected_regression_test"
   ],
   "pinned_revision": "2237be355906fbe6065ce1815711eee52b2d646e"
+ },
+ "inventory": {
+  "generated": "2026-09-13",
+  "source_pin": "2237be355906fbe6065ce1815711eee52b2d646e",
+  "counts": {
+   "upstream_web_src_files": 170,
+   "overlay_web_src_files": 171,
+   "baseline_pages": 19,
+   "baseline_routes": 19,
+   "nav_items": 20,
+   "dialogs": 8,
+   "forms": 2,
+   "i18n_locales": 19,
+   "pinned_dashboard_plugins": 2,
+   "overlay_plugins": 11,
+   "achievements_catalog": 60,
+   "achievements_api_routes": 6,
+   "static_qubit_pages": 19,
+   "tables": 7,
+   "workflows": 5,
+   "routes": 19,
+   "endpoints": 73
+  },
+  "pages": [
+   {
+    "upstream": "web/src/pages/AnalyticsPage.tsx",
+    "upstream_sha256": "b52abfe58b7b58556f837c0f3ecedf6f327160c8a9e76cae2de1a60e3b073b64",
+    "qubit_route": "/analytics",
+    "qubit_file": "frontend/hermes-web/src/pages/AnalyticsPage.tsx",
+    "vendored_file": "qubit_hermes/web/src/pages/AnalyticsPage.tsx",
+    "backend_route": "/api/analytics",
+    "status": "adapted",
+    "evidence": "frontend/hermes-web/src/pages/AnalyticsPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/ChannelsPage.tsx",
+    "upstream_sha256": "d51af1ff281eb69b053b4ab2901c6b6f923f2265214d1f241038096351a85bb1",
+    "qubit_route": "/channels",
+    "qubit_file": "frontend/hermes-web/src/pages/ChannelsPage.tsx",
+    "vendored_file": "qubit_hermes/web/src/pages/ChannelsPage.tsx",
+    "backend_route": "/api/messaging/platforms",
+    "status": "adapted",
+    "evidence": "frontend/hermes-web/src/pages/ChannelsPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/ChatPage.tsx",
+    "upstream_sha256": "e0195bc46b650594803fefe896fa8fffa64c44848db4a1c074ffd72125113fea",
+    "qubit_route": "/chat",
+    "qubit_file": "frontend/hermes-web/src/pages/ChatPage.tsx",
+    "vendored_file": "qubit_hermes/web/src/pages/ChatPage.tsx",
+    "backend_route": "/api/status",
+    "status": "adapted",
+    "evidence": "frontend/hermes-web/src/pages/ChatPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/ConfigPage.tsx",
+    "upstream_sha256": "aa61c2de5e9b903b97718a111c53286832439606df628d12329da6fe841ac367",
+    "qubit_route": "/config",
+    "qubit_file": "frontend/hermes-web/src/pages/ConfigPage.tsx",
+    "vendored_file": "qubit_hermes/web/src/pages/ConfigPage.tsx",
+    "backend_route": "/api/config",
+    "status": "adapted",
+    "evidence": "frontend/hermes-web/src/pages/ConfigPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/CronPage.tsx",
+    "upstream_sha256": "dfdc719993f3d823908c66739f6fa9f83fd307b50d90013b941ee9d0d2972dab",
+    "qubit_route": "/cron",
+    "qubit_file": "frontend/hermes-web/src/pages/CronPage.tsx",
+    "vendored_file": "qubit_hermes/web/src/pages/CronPage.tsx",
+    "backend_route": "/api/cron/jobs",
+    "status": "adapted",
+    "evidence": "frontend/hermes-web/src/pages/CronPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/DocsPage.tsx",
+    "upstream_sha256": "99a72b939db339c0749678cf3ef2262d2fbd634ee162314a663cc05e7b77a13e",
+    "qubit_route": "/docs",
+    "qubit_file": "frontend/hermes-web/src/pages/DocsPage.tsx",
+    "vendored_file": "qubit_hermes/web/src/pages/DocsPage.tsx",
+    "backend_route": "(served SPA shell)",
+    "status": "adapted",
+    "evidence": "frontend/hermes-web/src/pages/DocsPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/EnvPage.tsx",
+    "upstream_sha256": "b8aad15b638c009486b20a398f71dcadb7cf42e7b3b2143538c19b5cdda8bf97",
+    "qubit_route": "/env",
+    "qubit_file": "frontend/hermes-web/src/pages/EnvPage.tsx",
+    "vendored_file": "qubit_hermes/web/src/pages/EnvPage.tsx",
+    "backend_route": "/api/env",
+    "status": "adapted",
+    "evidence": "frontend/hermes-web/src/pages/EnvPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/FilesPage.tsx",
+    "upstream_sha256": "1b844d04eae25194514889a4fd53b7b6dda0b56fda551b0c374d1f040c6b6d15",
+    "qubit_route": "/files",
+    "qubit_file": "frontend/hermes-web/src/pages/FilesPage.tsx",
+    "vendored_file": "qubit_hermes/web/src/pages/FilesPage.tsx",
+    "backend_route": "/api/files",
+    "status": "adapted",
+    "evidence": "frontend/hermes-web/src/pages/FilesPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/LogsPage.tsx",
+    "upstream_sha256": "3cc1186530f6bf9eba8b0c3c074f59e3b5570d14b12ad14b8e08bc6a86ea28bd",
+    "qubit_route": "/logs",
+    "qubit_file": "frontend/hermes-web/src/pages/LogsPage.tsx",
+    "vendored_file": "qubit_hermes/web/src/pages/LogsPage.tsx",
+    "backend_route": "/api/logs",
+    "status": "adapted",
+    "evidence": "frontend/hermes-web/src/pages/LogsPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/McpPage.tsx",
+    "upstream_sha256": "c21108ca49ba80024a8714e25a91f00ebb97e3342dfa457d5f15d9040b3a2b1a",
+    "qubit_route": "/mcp",
+    "qubit_file": "frontend/hermes-web/src/pages/McpPage.tsx",
+    "vendored_file": "qubit_hermes/web/src/pages/McpPage.tsx",
+    "backend_route": "/api/mcp",
+    "status": "adapted",
+    "evidence": "frontend/hermes-web/src/pages/McpPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/ModelsPage.tsx",
+    "upstream_sha256": "78733577fe04e4608872b7e2061b5332b35062a1709624763a9c1b32c7a52ad2",
+    "qubit_route": "/models",
+    "qubit_file": "frontend/hermes-web/src/pages/ModelsPage.tsx",
+    "vendored_file": "qubit_hermes/web/src/pages/ModelsPage.tsx",
+    "backend_route": "/api/model/info",
+    "status": "adapted",
+    "evidence": "frontend/hermes-web/src/pages/ModelsPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/PairingPage.tsx",
+    "upstream_sha256": "57ffb2aa70884bb7a036dce8b4c6e857a77493cc863b5c5dc591eb016a1408a3",
+    "qubit_route": "/pairing",
+    "qubit_file": "frontend/hermes-web/src/pages/PairingPage.tsx",
+    "vendored_file": "qubit_hermes/web/src/pages/PairingPage.tsx",
+    "backend_route": "/api/pairing",
+    "status": "adapted",
+    "evidence": "frontend/hermes-web/src/pages/PairingPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/PluginsPage.tsx",
+    "upstream_sha256": "72c8f2448648cda43313329039070a4778edc4b929ae5b64767b67cbcf75c894",
+    "qubit_route": "/plugins",
+    "qubit_file": "frontend/hermes-web/src/pages/PluginsPage.tsx",
+    "vendored_file": "qubit_hermes/web/src/pages/PluginsPage.tsx",
+    "backend_route": "/api/dashboard/plugins",
+    "status": "adapted",
+    "evidence": "frontend/hermes-web/src/pages/PluginsPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/ProfilesPage.tsx",
+    "upstream_sha256": "a3fc373b77d6b247d85e72bfb7e91b8807cfd176f5fa1588ab25741d3707735e",
+    "qubit_route": "/profiles",
+    "qubit_file": "frontend/hermes-web/src/pages/ProfilesPage.tsx",
+    "vendored_file": "qubit_hermes/web/src/pages/ProfilesPage.tsx",
+    "backend_route": "/api/profiles",
+    "status": "adapted",
+    "evidence": "frontend/hermes-web/src/pages/ProfilesPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/ProfileBuilderPage.tsx",
+    "upstream_sha256": "821fb1c3b60c5df9d8c00d3f82fdc8546ca19df8d88cbb80ef4d811849319b7f",
+    "qubit_route": "/profiles/new",
+    "qubit_file": "frontend/hermes-web/src/pages/ProfileBuilderPage.tsx",
+    "vendored_file": "qubit_hermes/web/src/pages/ProfileBuilderPage.tsx",
+    "backend_route": "/api/profiles",
+    "status": "adapted",
+    "evidence": "frontend/hermes-web/src/pages/ProfileBuilderPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/SessionsPage.tsx",
+    "upstream_sha256": "a919556cc0848f0fe7ca14ab33d253071615753c6711a74b06bf0bdab10105ff",
+    "qubit_route": "/sessions",
+    "qubit_file": "frontend/hermes-web/src/pages/SessionsPage.tsx",
+    "vendored_file": "qubit_hermes/web/src/pages/SessionsPage.tsx",
+    "backend_route": "/api/sessions",
+    "status": "adapted",
+    "evidence": "frontend/hermes-web/src/pages/SessionsPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/SkillsPage.tsx",
+    "upstream_sha256": "0dea99c29201b20c3d9eaf53bff90a3d3f41f34bab98e41adf8369bc1989a102",
+    "qubit_route": "/skills",
+    "qubit_file": "frontend/hermes-web/src/pages/SkillsPage.tsx",
+    "vendored_file": "qubit_hermes/web/src/pages/SkillsPage.tsx",
+    "backend_route": "/api/skills",
+    "status": "adapted",
+    "evidence": "frontend/hermes-web/src/pages/SkillsPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/SystemPage.tsx",
+    "upstream_sha256": "01b9bdc6adecf2406e5156c17da4f132e7b4c70133f00a9fa2c968b8e36a630b",
+    "qubit_route": "/system",
+    "qubit_file": "frontend/hermes-web/src/pages/SystemPage.tsx",
+    "vendored_file": "qubit_hermes/web/src/pages/SystemPage.tsx",
+    "backend_route": "/api/system/stats",
+    "status": "adapted",
+    "evidence": "frontend/hermes-web/src/pages/SystemPage.tsx:1"
+   },
+   {
+    "upstream": "web/src/pages/WebhooksPage.tsx",
+    "upstream_sha256": "5375f8eeb05de315c6f0d41572c57e14ff680fb87605fc3d644ad5ba3ebca2a6",
+    "qubit_route": "/webhooks",
+    "qubit_file": "frontend/hermes-web/src/pages/WebhooksPage.tsx",
+    "vendored_file": "qubit_hermes/web/src/pages/WebhooksPage.tsx",
+    "backend_route": "/api/webhooks",
+    "status": "adapted",
+    "evidence": "frontend/hermes-web/src/pages/WebhooksPage.tsx:1"
+   }
+  ],
+  "navigation": [
+   {
+    "path": "/chat",
+    "label": "Chat",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/sessions",
+    "label": "Sessions",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/files",
+    "label": "Files",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/analytics",
+    "label": "Analytics",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/models",
+    "label": "Models",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/logs",
+    "label": "Logs",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/cron",
+    "label": "Cron",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/skills",
+    "label": "Skills",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/plugins",
+    "label": "Plugins",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/mcp",
+    "label": "MCP",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/channels",
+    "label": "Channels",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/webhooks",
+    "label": "Webhooks",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/pairing",
+    "label": "Pairing",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/profiles",
+    "label": "Profiles",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/config",
+    "label": "Config",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/env",
+    "label": "Keys",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/system",
+    "label": "System",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/docs",
+    "label": "Documentation",
+    "plugin_owned": false,
+    "source": "overlay App.tsx BUILTIN_NAV_REST/CHAT_NAV_ITEM"
+   },
+   {
+    "path": "/achievements",
+    "label": "Achievements",
+    "plugin_owned": true,
+    "source": "frontend/hermes-web/public/plugins/fleet.json"
+   },
+   {
+    "path": "/kanban",
+    "label": "Kanban",
+    "plugin_owned": true,
+    "source": "frontend/hermes-web/public/plugins/fleet.json"
+   }
+  ],
+  "dialogs": [
+   {
+    "upstream": "web/src/components/ConfirmDialog.tsx",
+    "qubit_file": "frontend/hermes-web/src/components/ConfirmDialog.tsx",
+    "status": "adapted",
+    "kind": "modal",
+    "evidence": "frontend/hermes-web/src/components/ConfirmDialog.tsx:1"
+   },
+   {
+    "upstream": "web/src/components/DeleteConfirmDialog.tsx",
+    "qubit_file": "frontend/hermes-web/src/components/DeleteConfirmDialog.tsx",
+    "status": "adapted",
+    "kind": "modal",
+    "evidence": "frontend/hermes-web/src/components/DeleteConfirmDialog.tsx:1"
+   },
+   {
+    "upstream": "web/src/components/HermesConsoleModal.tsx",
+    "qubit_file": "frontend/hermes-web/src/components/HermesConsoleModal.tsx",
+    "status": "adapted",
+    "kind": "console",
+    "evidence": "frontend/hermes-web/src/components/HermesConsoleModal.tsx:1"
+   },
+   {
+    "upstream": "web/src/components/ModelPickerDialog.tsx",
+    "qubit_file": "frontend/hermes-web/src/components/ModelPickerDialog.tsx",
+    "status": "adapted",
+    "kind": "modal",
+    "evidence": "frontend/hermes-web/src/components/ModelPickerDialog.tsx:1"
+   },
+   {
+    "upstream": "web/src/components/ModelReloadConfirm.tsx",
+    "qubit_file": "frontend/hermes-web/src/components/ModelReloadConfirm.tsx",
+    "status": "adapted",
+    "kind": "modal",
+    "evidence": "frontend/hermes-web/src/components/ModelReloadConfirm.tsx:1"
+   },
+   {
+    "upstream": "web/src/components/OAuthLoginModal.tsx",
+    "qubit_file": "frontend/hermes-web/src/components/OAuthLoginModal.tsx",
+    "status": "adapted",
+    "kind": "modal",
+    "evidence": "frontend/hermes-web/src/components/OAuthLoginModal.tsx:1"
+   },
+   {
+    "upstream": "web/src/components/SkillEditorDialog.tsx",
+    "qubit_file": "frontend/hermes-web/src/components/SkillEditorDialog.tsx",
+    "status": "adapted",
+    "kind": "modal",
+    "evidence": "frontend/hermes-web/src/components/SkillEditorDialog.tsx:1"
+   },
+   {
+    "upstream": "web/src/components/ToolsetConfigDrawer.tsx",
+    "qubit_file": "frontend/hermes-web/src/components/ToolsetConfigDrawer.tsx",
+    "status": "adapted",
+    "kind": "drawer",
+    "evidence": "frontend/hermes-web/src/components/ToolsetConfigDrawer.tsx:1"
+   }
+  ],
+  "forms": [
+   {
+    "upstream": "web/src/components/AutoField.tsx",
+    "qubit_file": "frontend/hermes-web/src/components/AutoField.tsx",
+    "status": "adapted"
+   },
+   {
+    "upstream": "web/src/components/ScheduleBuilder.tsx",
+    "qubit_file": "frontend/hermes-web/src/components/ScheduleBuilder.tsx",
+    "status": "adapted"
+   }
+  ],
+  "tables": [
+   {
+    "page": "/sessions",
+    "widget": "session table + search/stats",
+    "qubit_file": "frontend/hermes-web/src/pages/SessionsPage.tsx",
+    "backend_route": "/api/sessions",
+    "status": "adapted"
+   },
+   {
+    "page": "/files",
+    "widget": "file tree + preview",
+    "qubit_file": "frontend/hermes-web/src/pages/FilesPage.tsx",
+    "backend_route": "/api/files",
+    "status": "adapted"
+   },
+   {
+    "page": "/cron",
+    "widget": "job/run table",
+    "qubit_file": "frontend/hermes-web/src/pages/CronPage.tsx",
+    "backend_route": "/api/cron/jobs",
+    "status": "adapted"
+   },
+   {
+    "page": "/logs",
+    "widget": "log stream table",
+    "qubit_file": "frontend/hermes-web/src/pages/LogsPage.tsx",
+    "backend_route": "/api/logs",
+    "status": "adapted"
+   },
+   {
+    "page": "/models",
+    "widget": "model/provider inventory",
+    "qubit_file": "frontend/hermes-web/src/pages/ModelsPage.tsx",
+    "backend_route": "/api/model/info",
+    "status": "adapted"
+   },
+   {
+    "page": "/achievements",
+    "widget": "catalog grid + per-category filters + scan status",
+    "qubit_file": "frontend/hermes-web/public/plugins/hermes-achievements/dist/index.js",
+    "backend_route": "/api/plugins/hermes-achievements/achievements",
+    "status": "adapted"
+   },
+   {
+    "page": "/qubit-boards",
+    "widget": "board/tab/card/widget tables with confirm-gated mutations",
+    "qubit_file": "frontend/hermes-qubit/plugins/qubit-boards/qubit-boards.js",
+    "backend_route": "/api/ops/kanban + /api/ops/boards + /api/ops/run",
+    "status": "adapted"
+   }
+  ],
+  "plugins": {
+   "pinned": [
+    {
+     "name": "hermes-achievements",
+     "label": "Achievements",
+     "tab": {
+      "path": "/achievements",
+      "position": "after:analytics"
+     },
+     "entry": "dist/index.js",
+     "css": "dist/style.css",
+     "api": "plugin_api.py",
+     "manifest": "qubit_hermes/plugins/hermes-achievements/dashboard/manifest.json",
+     "bundle_served": "frontend/hermes-web/public/plugins/hermes-achievements/dist/index.js"
+    },
+    {
+     "name": "kanban",
+     "label": "Kanban",
+     "tab": {
+      "path": "/kanban",
+      "position": "after:skills"
+     },
+     "entry": "dist/index.js",
+     "css": "dist/style.css",
+     "api": "plugin_api.py",
+     "manifest": "qubit_hermes/plugins/kanban/dashboard/manifest.json",
+     "bundle_served": "frontend/hermes-web/public/plugins/kanban/dist/index.js"
+    }
+   ],
+   "overlay": [
+    {
+     "name": "qubit-approvals",
+     "label": "Qubit Approvals",
+     "tab": {
+      "path": "/qubit-approvals",
+      "hidden": true
+     },
+     "entry": "qubit-approvals.js",
+     "manifest": "frontend/hermes-qubit/plugins/qubit-approvals/manifest.json",
+     "js": "frontend/hermes-qubit/plugins/qubit-approvals/qubit-approvals.js"
+    },
+    {
+     "name": "qubit-boards",
+     "label": "Boards",
+     "tab": {
+      "path": "/qubit-boards",
+      "position": "after:cron"
+     },
+     "entry": "qubit-boards.js",
+     "manifest": "frontend/hermes-qubit/plugins/qubit-boards/manifest.json",
+     "js": "frontend/hermes-qubit/plugins/qubit-boards/qubit-boards.js"
+    },
+    {
+     "name": "qubit-brand",
+     "label": "Qubit Brand",
+     "tab": {
+      "path": "/qubit-brand",
+      "hidden": true
+     },
+     "entry": "qubit-brand.js",
+     "manifest": "frontend/hermes-qubit/plugins/qubit-brand/manifest.json",
+     "js": "frontend/hermes-qubit/plugins/qubit-brand/qubit-brand.js"
+    },
+    {
+     "name": "qubit-chat",
+     "label": "Qubit Chat",
+     "tab": {
+      "path": "/qubit-chat",
+      "position": "after:chat"
+     },
+     "entry": "qubit-chat.js",
+     "manifest": "frontend/hermes-qubit/plugins/qubit-chat/manifest.json",
+     "js": "frontend/hermes-qubit/plugins/qubit-chat/qubit-chat.js"
+    },
+    {
+     "name": "qubit-devices",
+     "label": "Devices",
+     "tab": {
+      "path": "/devices",
+      "position": "after:qubit-runtime"
+     },
+     "entry": "qubit-devices.js",
+     "manifest": "frontend/hermes-qubit/plugins/qubit-devices/manifest.json",
+     "js": "frontend/hermes-qubit/plugins/qubit-devices/qubit-devices.js"
+    },
+    {
+     "name": "qubit-gateway",
+     "label": "Gateway",
+     "tab": {
+      "path": "/qubit-gateway",
+      "position": "after:mcp"
+     },
+     "entry": "qubit-gateway.js",
+     "manifest": "frontend/hermes-qubit/plugins/qubit-gateway/manifest.json",
+     "js": "frontend/hermes-qubit/plugins/qubit-gateway/qubit-gateway.js"
+    },
+    {
+     "name": "qubit-memory",
+     "label": "Memory",
+     "tab": {
+      "path": "/memory",
+      "position": "after:profiles"
+     },
+     "entry": "qubit-memory.js",
+     "manifest": "frontend/hermes-qubit/plugins/qubit-memory/manifest.json",
+     "js": "frontend/hermes-qubit/plugins/qubit-memory/qubit-memory.js"
+    },
+    {
+     "name": "qubit-models",
+     "label": "Models & Providers",
+     "tab": {
+      "path": "/qubit-models",
+      "position": "after:models"
+     },
+     "entry": "qubit-models.js",
+     "manifest": "frontend/hermes-qubit/plugins/qubit-models/manifest.json",
+     "js": "frontend/hermes-qubit/plugins/qubit-models/qubit-models.js"
+    },
+    {
+     "name": "qubit-ops",
+     "label": "Operations",
+     "tab": {
+      "path": "/operations",
+      "position": "after:system"
+     },
+     "entry": "qubit-ops.js",
+     "manifest": "frontend/hermes-qubit/plugins/qubit-ops/manifest.json",
+     "js": "frontend/hermes-qubit/plugins/qubit-ops/qubit-ops.js"
+    },
+    {
+     "name": "qubit-reports",
+     "label": "Reports",
+     "tab": {
+      "path": "/reports",
+      "position": "after:analytics"
+     },
+     "entry": "qubit-reports.js",
+     "manifest": "frontend/hermes-qubit/plugins/qubit-reports/manifest.json",
+     "js": "frontend/hermes-qubit/plugins/qubit-reports/qubit-reports.js"
+    },
+    {
+     "name": "qubit-runtime",
+     "label": "Runtime",
+     "tab": {
+      "path": "/qubit-runtime",
+      "position": "after:system"
+     },
+     "entry": "qubit-runtime.js",
+     "manifest": "frontend/hermes-qubit/plugins/qubit-runtime/manifest.json",
+     "js": "frontend/hermes-qubit/plugins/qubit-runtime/qubit-runtime.js"
+    }
+   ],
+   "fleet": [
+    "hermes-achievements",
+    "kanban"
+   ]
+  },
+  "plugin_apis": [
+   {
+    "plugin": "hermes-achievements",
+    "backend": "voicebridge.hermes_plugins.h_plugin_achievements",
+    "routes": [
+     "GET /achievements",
+     "GET /scan-status",
+     "GET /recent-unlocks",
+     "GET /sessions/{session_id}/badges",
+     "POST /rescan",
+     "POST /reset-state"
+    ],
+    "proof": "tests/test_hermes_plugins.py::test_achievements_wire_shape_states_and_tier_progression"
+   },
+   {
+    "plugin": "kanban",
+    "backend": "voicebridge.hermes_plugins.h_plugin_kanban_board",
+    "routes": [
+     "GET /board",
+     "GET /tasks/{task_id}",
+     "GET /stats",
+     "GET /assignees",
+     "GET /boards",
+     "GET /config",
+     "GET /projects",
+     "GET /workers/active",
+     "GET /diagnostics",
+     "GET /model-options",
+     "GET /home-channels",
+     "GET /tasks/{task_id}/log",
+     "GET /tasks/{task_id}/attachments",
+     "GET /runs/{run_id}",
+     "GET /runs/{run_id}/inspect",
+     "GET /profiles",
+     "GET /orchestration",
+     "POST/PATCH/DELETE/PUT -> KANBAN_WRITE_BROKERED gate (Qubit-safe: /api/ops/run + /api/ops/confirm)"
+    ],
+    "proof": "tests/test_hermes_plugins.py::test_kanban_read_routes_serve_real_board + tests/test_qbpv2_frontend_boards.py (ops lifecycle + persistence)"
+   }
+  ],
+  "assets": [
+   {
+    "path": "frontend/hermes-web/public/favicon.ico",
+    "kind": "icon",
+    "status": "adapted"
+   },
+   {
+    "path": "frontend/hermes-web/public/fonts",
+    "kind": "display fonts",
+    "status": "adapted"
+   },
+   {
+    "path": "frontend/hermes-web/public/fonts-terminal",
+    "kind": "mono fonts",
+    "status": "adapted"
+   },
+   {
+    "path": "frontend/hermes-web/public/plugins/hermes-achievements/dist/index.js",
+    "kind": "plugin bundle",
+    "status": "adapted"
+   },
+   {
+    "path": "frontend/hermes-web/public/plugins/hermes-achievements/dist/style.css",
+    "kind": "plugin css",
+    "status": "adapted"
+   },
+   {
+    "path": "frontend/hermes-web/public/plugins/kanban/dist/index.js",
+    "kind": "plugin bundle",
+    "status": "adapted"
+   },
+   {
+    "path": "frontend/hermes-web/public/plugins/kanban/dist/style.css",
+    "kind": "plugin css",
+    "status": "adapted"
+   },
+   {
+    "path": "frontend/hermes-qubit/qubit-theme.json",
+    "kind": "theme",
+    "status": "adapted"
+   }
+  ],
+  "state_files": [
+   {
+    "name": "state.json",
+    "owner": "hermes-achievements",
+    "backend": "qubit_hermes/plugins/hermes-achievements/dashboard/plugin_api.py",
+    "status": "real"
+   },
+   {
+    "name": "scan_snapshot.json",
+    "owner": "hermes-achievements",
+    "backend": "qubit_hermes/plugins/hermes-achievements/dashboard/plugin_api.py",
+    "status": "real"
+   },
+   {
+    "name": "scan_checkpoint.json",
+    "owner": "hermes-achievements",
+    "backend": "qubit_hermes/plugins/hermes-achievements/dashboard/plugin_api.py",
+    "status": "real"
+   }
+  ],
+  "i18n": {
+   "host_namespaces": [
+    "common",
+    "app",
+    "status",
+    "sessions",
+    "analytics",
+    "models",
+    "logs",
+    "cron",
+    "profiles",
+    "pluginsPage",
+    "skills",
+    "config",
+    "env",
+    "oauth",
+    "language",
+    "theme",
+    "achievements",
+    "kanban"
+   ],
+   "locales": 19,
+   "achievements_namespace": "frontend/hermes-web/src/i18n/en.ts:576",
+   "kanban_namespace": "frontend/hermes-web/src/i18n/en.ts:660",
+   "non_english_omitted": "OMITTED:I18N (owner decision; English-first UI)",
+   "en_total_string_keys": 714,
+   "achievements_namespace_keys": 67,
+   "kanban_namespace_keys": 168
+  },
+  "workflows": [
+   {
+    "workflow": "chat/streaming",
+    "route": "/chat",
+    "backend": "POST /api/qubit/chat (voicebridge.agent.turn) + GET /api/model/info",
+    "states": "empty,loading,ready,error+retry,voice unsupported/denied/no-speech/timeout,persisted-per-session",
+    "status": "adapted"
+   },
+   {
+    "workflow": "session lifecycle",
+    "route": "/sessions",
+    "backend": "/api/sessions",
+    "states": "list,search,show,confirmation-gated write verbs",
+    "status": "adapted"
+   },
+   {
+    "workflow": "achievements scan",
+    "route": "/achievements",
+    "backend": "/api/plugins/hermes-achievements/*",
+    "states": "pending/scanning/ready/stale/error/secret/unlocked/discovered",
+    "status": "adapted"
+   },
+   {
+    "workflow": "kanban board",
+    "route": "/qubit-boards (+ /kanban)",
+    "backend": "/api/plugins/kanban/* reads (single source) + /api/ops/run (kanban_boards_create, kanban_create, kanban_move, kanban_complete, kanban_assign, kanban_block, kanban_unblock, kanban_edit, kanban_archive) resolved through /api/ops/confirm",
+    "states": "empty,loading,ready,staged-confirmation,executed,error (archive-restore has no backend op -> reported cross-boundary)",
+    "status": "adapted"
+   },
+   {
+    "workflow": "approvals",
+    "route": "/qubit-approvals (hidden banner)",
+    "backend": "/api/ops/approvals + /api/ops/confirm|cancel",
+    "states": "pending/confirm/cancel/estop",
+    "status": "adapted"
+   }
+  ]
+ },
+ "achievements_audit": {
+  "plugin": "qubit_hermes/plugins/hermes-achievements",
+  "backend_present": true,
+  "api_present": true,
+  "persistence_present": true,
+  "catalog_count": 60,
+  "catalog_min_required": 60,
+  "categories": [
+   "Agent Autonomy",
+   "Debugging Chaos",
+   "Hermes Native",
+   "Lifestyle",
+   "Model Lore",
+   "Research/Web",
+   "Tool Mastery",
+   "Vibe Coding"
+  ],
+  "dashboard_page_present": true,
+  "dashboard_page_file": "frontend/hermes-web/public/plugins/hermes-achievements/dist/index.js",
+  "dashboard_page_served": true,
+  "assets_present": [
+   "dashboard/dist/index.js",
+   "dashboard/dist/style.css",
+   "docs/assets/achievements-dashboard-hd.png",
+   "docs/assets/achievements-tier-showcase-hd.png"
+  ],
+  "states": [
+   "idle",
+   "pending",
+   "running",
+   "in_progress",
+   "failed",
+   "stale",
+   "secret",
+   "discovered",
+   "unlocked"
+  ],
+  "localization": {
+   "namespace": "achievements",
+   "host_locales": "en only namespace; other locales fall back to English"
+  },
+  "tests": [
+   "qubit_hermes/plugins/hermes-achievements/tests/test_achievement_engine.py",
+   "tests/test_hermes_plugins.py::test_achievements_wire_shape_states_and_tier_progression",
+   "tests/test_dashboard_plugin_fleet.py"
+  ],
+  "real": [
+   "61-badge tiered/multi-condition catalog",
+   "6 REST routes",
+   "durable state/snapshot/checkpoint (0600)",
+   "real session-history scan",
+   "726-line dashboard page with cards/share/scan states",
+   "tier + secret/discovered state machine"
+  ],
+  "missing": [
+   "backend catalog strings and category \"Hermes Native\" still expose the upstream product name in the rendered payload",
+   "vendored source dist copy qubit_hermes/.../dist/index.js is upstream-branded (served SPA copy is Qubit-patched)",
+   "pinned manifest description says \"agentic Hermes workflows\""
+  ],
+  "live_verified": true,
+  "live_payload_routes": {
+   "GET /api/plugins/hermes-achievements/achievements": 200,
+   "GET /api/plugins/hermes-achievements/scan-status": 200,
+   "GET /api/plugins/hermes-achievements/recent-unlocks": 200,
+   "POST /api/plugins/hermes-achievements/rescan": 200,
+   "POST /api/plugins/hermes-achievements/reset-state": "409 CONFIRM_REQUIRED without confirm=true"
+  },
+  "live_render_states": "empty, loading, ready (catalog), scanning, stale, error, secret/discovered/unlocked",
+  "render_boundary_normalizer": "frontend/hermes-web/public/plugins/hermes-achievements/dist/index.js api() applies rebrandPayload (Hermes|OpenClaw -> Qubit) to every payload"
+ },
+ "missing_paths": [
+  {
+   "kind": "branding-leak",
+   "path": "qubit_hermes/plugins/hermes-achievements/dashboard/plugin_api.py",
+   "symbol": "ACHIEVEMENTS / _ach descriptions / criteria_for / display_achievement / METRIC_LABELS",
+   "lines": "57-136, 440-502, 509-521, 524-529",
+   "detail": "GET /api/plugins/hermes-achievements/achievements returns ~50 \"Hermes\"/\"Hermes Native\" strings that the Qubit dashboard renders.",
+   "required_change": "Rebrand the catalog/category/metric text to Qubit in the vendored engine (or emit product-neutral text).",
+   "frontend_mitigation": "SPA render boundary rebrands free-text payloads via frontend/hermes-web/src/lib/rebrand.ts (MCP/Channels/Config) and the Achievements bundle rebrandPayload; live crawl shows 0 visible upstream product names. Backend payloads still author the upstream names.",
+   "cross_boundary_owner": "orchestrator/Agent 2 (voicebridge/**, qubit_hermes/**)",
+   "status": "open"
+  },
+  {
+   "kind": "branding-leak",
+   "path": "qubit_hermes/plugins/hermes-achievements/dashboard/dist/index.js",
+   "symbol": "bundle",
+   "lines": "338,446-447,478,669-670,681,690",
+   "detail": "Vendored source dist still renders \"Hermes Achievements\"/\"run Hermes more\"; the SPA-shipped copy frontend/hermes-web/public/... is Qubit-patched.",
+   "required_change": "Ship the Qubit patch in the vendored dist (or keep divergence documented in HERMES_SOURCE_COMPARISON.json).",
+   "cross_boundary_owner": "orchestrator/Agent 1",
+   "status": "open",
+   "frontend_mitigation": "SPA render boundary rebrands free-text payloads via frontend/hermes-web/src/lib/rebrand.ts (MCP/Channels/Config) and the Achievements bundle rebrandPayload; live crawl shows 0 visible upstream product names. Backend payloads still author the upstream names."
+  },
+  {
+   "kind": "branding-leak",
+   "path": "qubit_hermes/plugins/kanban/dashboard/dist/index.js",
+   "symbol": "bundle",
+   "lines": "multiple",
+   "detail": "Vendored source kanban dist renders \"Hermes profile/Hermes Kanban\"; the SPA-shipped copy is Qubit-patched.",
+   "required_change": "Same as achievements: rebrand vendored dist or document the divergence.",
+   "cross_boundary_owner": "orchestrator/Agent 1",
+   "status": "open",
+   "frontend_mitigation": "SPA render boundary rebrands free-text payloads via frontend/hermes-web/src/lib/rebrand.ts (MCP/Channels/Config) and the Achievements bundle rebrandPayload; live crawl shows 0 visible upstream product names. Backend payloads still author the upstream names."
+  },
+  {
+   "kind": "branding-leak",
+   "path": "qubit_hermes/plugins/hermes-achievements/dashboard/manifest.json",
+   "symbol": "description",
+   "lines": "4",
+   "detail": "Pinned manifest description says \"Steam-style achievements for vibe coding and agentic Hermes workflows.\" It is returned by GET /api/dashboard/plugins/fleet (h_plugin_fleet); the SPA does not consume that discovery view (the registration path uses the Qubit-branded frontend/hermes-web/public/plugins/fleet.json), so this is an API-surface leak, not a rendered one. The rendered catalog leak is fixed at the frontend render boundary.",
+   "required_change": "Rebrand the pinned manifest description.",
+   "cross_boundary_owner": "orchestrator/Agent 2",
+   "status": "open",
+   "frontend_mitigation": "SPA render boundary rebrands free-text payloads via frontend/hermes-web/src/lib/rebrand.ts (MCP/Channels/Config) and the Achievements bundle rebrandPayload; live crawl shows 0 visible upstream product names. Backend payloads still author the upstream names."
+  },
+  {
+   "kind": "provenance-refresh",
+   "path": "docs/HERMES_SOURCE_COMPARISON.json",
+   "symbol": "rows[qubit=frontend/hermes-web/public/plugins/hermes-achievements/dist/index.js].qubit_sha256",
+   "lines": "-",
+   "detail": "Frontend repairs changed three hashed overlay artifacts. Agent 1 regenerated docs/HERMES_SOURCE_COMPARISON.json and docs/QUBIT_HERMES_VENDOR_MANIFEST.json in the shared tree; the achievements-bundle row and the wave3.added fleet.ts row now match the on-disk hashes (281d55d2...c888a1 and 0c3d42bf...024eb).",
+   "required_change": "none (verified in sync at handoff)",
+   "cross_boundary_owner": "Agent 1",
+   "status": "resolved-by-agent1"
+  },
+  {
+   "kind": "i18n-gap",
+   "path": "frontend/hermes-web/src/i18n/*.ts",
+   "symbol": "achievements/kanban namespaces",
+   "lines": "en.ts:576,660",
+   "detail": "The achievements and kanban namespaces exist only in en.ts; the other 19 locales fall back to English.",
+   "required_change": "Provision translated namespaces or record the English-first owner decision.",
+   "cross_boundary_owner": "orchestrator (owner decision)",
+   "status": "open"
+  },
+  {
+   "kind": "reports-raw-json",
+   "path": "frontend/hermes-qubit/plugins/qubit-reports/qubit-reports.js",
+   "symbol": "Generated reports / Insights <pre>",
+   "detail": "/reports renders the raw backend envelope for generated reports and insights instead of a formatted table; functional but low-polish.",
+   "required_change": "render reports/insights as structured rows (owner: W3 frontend).",
+   "cross_boundary_owner": "W3",
+   "status": "open"
+  },
+  {
+   "kind": "kanban-events-ws",
+   "path": "frontend/hermes-web/public/plugins/kanban/dist/index.js",
+   "symbol": "WebSocket subscription to /api/plugins/kanban/events",
+   "detail": "Qubit serves no plugin WebSocket (single SSE path), so the pinned Kanban plugin's live-update feed fails auth/handshake; board reads and broker mutations still work.",
+   "required_change": "either expose a Qubit-safe SSE feed the plugin consumes, or patch the SPA bundle to poll /api/plugins/kanban/events.",
+   "cross_boundary_owner": "orchestrator/W2",
+   "status": "open"
+  }
+ ],
+ "frontend_repairs": [
+  {
+   "file": "frontend/hermes-web/public/plugins/hermes-achievements/dist/index.js",
+   "what": "Normalize every achievements API payload (Hermes|OpenClaw -> Qubit) in the single api() seam so the rendered catalog/category/criteria never expose the upstream product name.",
+   "proof": "tests/test_hermes_frontend_inventory8u.py::test_shipped_normalizer_rebrands_the_real_backend_payload (executes the shipped function with node against the real /api/plugins/hermes-achievements/achievements payload)"
+  },
+  {
+   "file": "frontend/hermes-web/src/plugins/fleet.ts",
+   "what": "Resolve HERMES_BASE_PATH lazily in fleetManifestPath() instead of at module load; the eager const made any test that partially mocks @/lib/api fail on transitive import (SessionsPage.test.tsx).",
+   "proof": "frontend/hermes-web: npm run typecheck + npm run test (40 files / 295 tests pass)"
+  },
+  {
+   "file": "frontend/hermes-web/src/plugins/index.ts",
+   "what": "Export the new fleetManifestPath() in place of the removed top-level FLEET_MANIFEST_PATH constant.",
+   "proof": "frontend/hermes-web: npm run typecheck + npm run test"
+  },
+  {
+   "file": "frontend/hermes-web/src/pages/ChatPage.tsx",
+   "what": "Replaced the raw /api/pty xterm transport with the Qubit-safe native chat (POST /api/qubit/chat): typed loading/empty/error/retry, browser voice input with typed VOICE_* states, per-session transcript persistence, and the sessions switcher. Removes the 1006 reconnect loop.",
+   "proof": "frontend/hermes-web: npm run typecheck + npm run test; live Playwright /hermes/chat"
+  },
+  {
+   "file": "frontend/hermes-qubit/plugins/qubit-boards/qubit-boards.js",
+   "what": "Exposed the full card lifecycle through the Qubit ops broker: assign, block, unblock, edit, archive (confirmed), alongside create/move/complete; state persists in the canonical kanban store.",
+   "proof": "tests/test_qbpv2_frontend_boards.py"
+  },
+  {
+   "file": "frontend/hermes-web/src/lib/rebrand.ts",
+   "what": "Single render-boundary normalizer (Hermes|OpenClaw -> Qubit) applied to free-text backend payloads on the MCP catalog (description/post_install/diagnostics), messaging platform descriptions and env-field help (Channels), and config schema help (AutoField). Live crawl of all 32 routes reports 0 visible upstream product names.",
+   "proof": "tests/test_qbpv2_frontend_identity.py + live Chromium crawl over frontend/hermes-dist"
+  },
+  {
+   "file": "frontend/hermes-qubit/plugins/qubit-boards/qubit-boards.js",
+   "what": "Added the archived visibility filter and a confirmed Restore action (kanban_restore), completing the archive -> restore lifecycle on the Qubit Boards page.",
+   "proof": "tests/test_qbpv2_frontend_boards.py::test_card_lifecycle_persists_through_the_broker"
+  }
+ ],
+ "kanban_audit": {
+  "dashboard_vendored_plugin": "frontend/hermes-web/public/plugins/kanban/dist/index.js (Kanban tab)",
+  "qubit_native_page": "frontend/hermes-qubit/plugins/qubit-boards/qubit-boards.js (Boards tab)",
+  "store": "voicebridge/kanban.py -> <state_dir>/kanban.db (single canonical Qubit store)",
+  "read_api": {
+   "GET /api/plugins/kanban/board": 200,
+   "GET /api/plugins/kanban/boards": 200,
+   "GET /api/plugins/kanban/stats": 200,
+   "GET /api/plugins/kanban/assignees": 200,
+   "GET /api/plugins/kanban/config": 200,
+   "GET /api/plugins/kanban/projects": 200,
+   "GET /api/plugins/kanban/workers/active": 200,
+   "GET /api/plugins/kanban/diagnostics": 200,
+   "GET /api/plugins/kanban/model-options": 200
+  },
+  "write_api": {
+   "POST/PATCH/DELETE/PUT /api/plugins/kanban/*": "KANBAN_WRITE_BROKERED (typed refusal; no direct dashboard write)",
+   "POST /api/ops/run {id: kanban_boards_create|kanban_create|kanban_move|kanban_complete|kanban_assign|kanban_block|kanban_unblock|kanban_edit|kanban_archive}": "409 NEEDS_CONFIRMATION -> POST /api/ops/confirm -> 200 executed",
+   "POST /api/ops/run {id: ...|kanban_restore}": "409 NEEDS_CONFIRMATION -> POST /api/ops/confirm -> 200 executed"
+  },
+  "live_verified_lifecycle": [
+   "create board -> /api/ops/boards lists it",
+   "create card -> /api/ops/kanban?board=<slug> lists it",
+   "move (status) -> persisted",
+   "complete -> persisted",
+   "assign -> persisted (assignee set)",
+   "block -> persisted (status blocked)",
+   "unblock -> persisted (status open)",
+   "edit -> persisted (title changed)",
+   "archive -> persisted (removed from default list)",
+   "restore -> persisted (archived card returns to its prior column)"
+  ],
+  "persistence": "all states survive a fresh dispatch/get_board read from the same DB",
+  "gaps": {
+   "plugin_live_events": "pinned kanban plugin subscribes to ws://.../api/plugins/kanban/events; the backend serves no plugin WS (single SSE event path), so live updates are degraded while reads/mutations work."
+  }
+ },
+ "live_verification": {
+  "date": "2026-09-13",
+  "method": "headless Chromium over the real WebUI serving frontend/hermes-dist (python playwright); plus voicebridge.hermes_compat.dispatch for every page backend route",
+  "routes_rendered": 32,
+  "fatal_console_errors": 0,
+  "allowed_by_design_noise": [
+   "ws:// /api/ws, /api/events, /api/pty upgrades refused (single event path)",
+   "ws:// /api/plugins/kanban/events upgrade refused (plugin WS not served)",
+   "403 policy gates (credentials pool, portal, remote update check)"
+  ],
+  "chat": "/hermes/chat sends POST /api/qubit/chat and renders a real reply; 0 /api/pty requests; no 1006 reconnect banner (tests/test_qbpv2_frontend_chat_live.py)",
+  "achievements": "GET /api/plugins/hermes-achievements/achievements 200 with the real 60+ catalog; renders 9.5k chars in /achievements",
+  "boards": "/api/ops/run + /api/ops/confirm create/move/complete/assign/block/unblock/edit/archive all persist in <state_dir>/kanban.db",
+  "served_bundle_parity": "served /hermes/dashboard-plugins/* and /hermes/plugins/* sha256 == on-disk source"
  }
 }

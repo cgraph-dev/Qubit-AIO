@@ -145,7 +145,7 @@ def test_flag_off_keeps_compat_behavior_and_rollback(tmp_path):
     ui.start()
     try:
         req = urllib.request.Request(
-            f"http://127.0.0.1:{ui._server.server_address[1]}/hermes/api/status")
+            f"http://127.0.0.1:{ui._server.server_address[1]}/agent/api/status")
         req.add_header("X-Hermes-Session-Token", "test-token")
         with urllib.request.urlopen(req, timeout=15) as r:
             out = json.loads(r.read())
@@ -188,9 +188,9 @@ def test_flag_on_serves_fork_reads_and_gates_sensitive(tmp_path):
         "    try:\n"
         "        r=urllib.request.urlopen(req,timeout=20); return r.status, r.read().decode()\n"
         "    except urllib.error.HTTPError as e: return e.code, e.read().decode()\n"
-        "st, body = get('/hermes/api/status')\n"
-        "raw_st, raw_body = get('/hermes/api/config/raw')\n"
-        "post_st, post_body = post('/hermes/api/status', {})\n"
+        "st, body = get('/agent/api/status')\n"
+        "raw_st, raw_body = get('/agent/api/config/raw')\n"
+        "post_st, post_body = post('/agent/api/status', {})\n"
         "ui.stop()\n"
         "print(json.dumps({'status': st, 'body': body, 'raw_status': raw_st,\n"
         "  'raw_body': raw_body, 'post_status': post_st, 'post_body': post_body}))\n")
@@ -299,11 +299,11 @@ def test_webui_write_middleware_proxies_only_allowlisted_writes(
 
     try:
         # Allowlisted, policy-cleared: the fork (fake) serves the write.
-        st, out = _post("/hermes/api/cron/jobs")
+        st, out = _post("/agent/api/cron/jobs")
         assert st == 200 and out.get("proxied_by_fork") is True, (st, out)
         assert calls == [("POST", "/api/cron/jobs")], calls
         # Allowlisted but Qubit-gated: the typed gate wins; no fork call.
-        st, out = _post("/hermes/api/sessions/import")
+        st, out = _post("/agent/api/sessions/import")
         assert st == 501 and out.get("code") == "SESSIONS_RECEIPT_STORE", out
         assert calls == [("POST", "/api/cron/jobs")], calls
     finally:

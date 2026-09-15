@@ -57,11 +57,28 @@ def test_wheel_installs_the_voicebridge_package():
     assert wheel.get("packages") == ["voicebridge"]
 
 
+def _frontend_tree_packaged(wheel: dict) -> bool:
+    """The frontend tree is packaged under ``voicebridge/_data/frontend``,
+    either as a direct force-include directory mapping or via the filtered
+    custom build hook (``scripts/hatch_build_qubit.py``) that prunes the
+    git-ignored dev trees (node_modules) which a raw directory mapping would
+    sweep into the wheel."""
+    if wheel.get("force-include", {}).get("frontend") == \
+            "voicebridge/_data/frontend":
+        return True
+    hook = wheel.get("hooks", {}).get("custom", {})
+    hook_path = str(hook.get("path", ""))
+    if not hook_path or not (REPO / hook_path).is_file():
+        return False
+    text = (REPO / hook_path).read_text(encoding="utf-8", errors="replace")
+    return "voicebridge/_data/frontend/" in text and "frontend" in text
+
+
 def test_dashboard_build_artifact_declared_in_both_targets():
     wheel, sdist = _targets()
     assert "frontend/hermes-dist" in wheel.get("artifacts", [])
     assert "frontend/hermes-dist" in sdist.get("artifacts", [])
-    assert wheel["force-include"].get("frontend") == "voicebridge/_data/frontend"
+    assert _frontend_tree_packaged(wheel)
 
 
 def test_every_runtime_resource_is_reachable_from_package_data():
@@ -71,6 +88,8 @@ def test_every_runtime_resource_is_reachable_from_package_data():
     force = wheel.get("force-include", {})
     mapped_dirs = {k for k in force if (REPO / k).is_dir()}
     mapped_files = {k for k in force if (REPO / k).is_file()}
+    if _frontend_tree_packaged(wheel):
+        mapped_dirs.add("frontend")
     # resource-name (as resources.resource_path sees it) -> source mapping
     required = {
         "frontend/hermes-dist": "frontend",
@@ -390,8 +409,13 @@ def _tracked_docs_with_home_paths() -> dict:
 def test_sdist_excludes_every_tracked_doc_with_a_developer_home_path():
     _, sdist = _targets()
     excluded = set(sdist.get("exclude", []))
+    # The named internal docs must stay excluded even after the privacy scrub
+    # removed the literal home path from them (scripts/sanitize_docs.py).
+    known_internal = ("docs/OPERATOR_QUALIFICATION.md",)
+    for rel in known_internal:
+        assert rel in excluded or any(
+            rel.startswith(e.rstrip("/") + "/") for e in excluded), rel
     offenders = _tracked_docs_with_home_paths()
-    assert offenders, "expected the known internal docs to still exist"
     missed = [rel for rel in offenders if rel not in excluded
               and not any(rel.startswith(e.rstrip("/") + "/") for e in excluded)]
     assert not missed, f"tracked docs with a developer home path not excluded: {missed}"

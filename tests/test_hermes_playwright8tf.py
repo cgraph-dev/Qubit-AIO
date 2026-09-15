@@ -1,6 +1,6 @@
 """Playwright interaction tests for the vendored Hermes dashboard (amendment 2026-09-11).
 
-Boots the real Qubit WebUI, loads /hermes/ in headless Chromium, and proves
+Boots the real Qubit WebUI, loads `/` in headless Chromium, and proves
 every page family renders, navigation works, the Qubit Chat control drives a
 real backend turn (typed success or typed model-unavailable — never fake),
 overlay tabs render real backend data, and narrow-mobile layout holds.
@@ -75,12 +75,12 @@ def test_dashboard_families_render_and_navigate(tmp_path):
             page.on("console", lambda m: errors.append(m.text)
                     if m.type == "error" else None)
             page.on("pageerror", lambda e: errors.append(str(e)))
-            page.goto(f"http://127.0.0.1:{port}/hermes/", timeout=30000)
+            page.goto(f"http://127.0.0.1:{port}/", timeout=30000)
             page.wait_for_selector("nav, aside, [role=navigation]", timeout=30000)
             page.wait_for_timeout(2500)
             page.screenshot(path=str(SHOTS / "qubit-shell.png"))
             for slug, label in FAMILIES:
-                page.goto(f"http://127.0.0.1:{port}/hermes/{slug}", timeout=30000)
+                page.goto(f"http://127.0.0.1:{port}/{slug}", timeout=30000)
                 page.wait_for_timeout(1800)
                 body = page.inner_text("body")
                 assert len(body.strip()) > 50, (slug, "empty render")
@@ -94,7 +94,7 @@ def test_dashboard_families_render_and_navigate(tmp_path):
     # - 403s from policy gates (credential pool, portal, remote update check).
     allowed_subs = ("ws://", "/api/ws", "/api/events?channel=", "/api/pty",
                     "/api/credentials/pool", "/api/portal",
-                    "/api/hermes/update/check", "status of 403")
+                    "/hermes/update/check", "status of 403")
     fatal = [e for e in errors
              if not any(s in e for s in allowed_subs)]
     assert not fatal, f"console/page errors: {fatal[:10]}"
@@ -107,7 +107,7 @@ def test_qubit_chat_control_drives_backend(tmp_path):
         with pw.sync_playwright() as p:
             browser = p.chromium.launch()
             page = browser.new_page(viewport={"width": 1440, "height": 900})
-            page.goto(f"http://127.0.0.1:{port}/hermes/qubit-chat", timeout=30000)
+            page.goto(f"http://127.0.0.1:{port}/qubit-chat", timeout=30000)
             page.wait_for_timeout(2000)
             box = page.get_by_label("Message Qubit")
             assert box.count() == 1
@@ -129,7 +129,7 @@ def test_narrow_mobile_layout(tmp_path):
         with pw.sync_playwright() as p:
             browser = p.chromium.launch()
             page = browser.new_page(viewport={"width": 390, "height": 844})
-            page.goto(f"http://127.0.0.1:{port}/hermes/sessions", timeout=30000)
+            page.goto(f"http://127.0.0.1:{port}/sessions", timeout=30000)
             page.wait_for_timeout(2000)
             overflow = page.evaluate(
                 "document.documentElement.scrollWidth - document.documentElement.clientWidth")
@@ -146,7 +146,7 @@ def test_rebrand_product_identity(tmp_path):
         with pw.sync_playwright() as p:
             browser = p.chromium.launch()
             page = browser.new_page(viewport={"width": 1440, "height": 900})
-            page.goto(f"http://127.0.0.1:{port}/hermes/", timeout=30000)
+            page.goto(f"http://127.0.0.1:{port}/", timeout=30000)
             page.wait_for_timeout(3000)
             assert "Qubit" in page.title(), page.title()
             visible = page.evaluate("""() => {
@@ -176,7 +176,7 @@ def test_accessibility_basics(tmp_path):
         with pw.sync_playwright() as p:
             browser = p.chromium.launch()
             page = browser.new_page(viewport={"width": 1440, "height": 900})
-            page.goto(f"http://127.0.0.1:{port}/hermes/", timeout=30000)
+            page.goto(f"http://127.0.0.1:{port}/", timeout=30000)
             page.wait_for_timeout(2500)
             assert page.locator("h1, h2").count() >= 1
             buttons = page.locator("button").count()

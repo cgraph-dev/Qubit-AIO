@@ -177,7 +177,7 @@ def test_served_spa_answers_every_page_route(tmp_path):
     ui, port = _start(tmp_path)
     try:
         for route in PAGE_BACKING:
-            status, ctype, body = _get(port, "/hermes" + route)
+            status, ctype, body = _get(port, route)
             assert status == 200, (route, status)
             assert "text/html" in ctype, (route, ctype)
             assert b'id="root"' in body, route
@@ -188,7 +188,7 @@ def test_served_spa_answers_every_page_route(tmp_path):
 def test_served_spa_shell_is_qubit_branded(tmp_path):
     ui, port = _start(tmp_path)
     try:
-        status, ctype, body = _get(port, "/hermes/")
+        status, ctype, body = _get(port, "/chat")
         assert status == 200 and "text/html" in ctype
         html = body.decode("utf-8")
         assert "<title>Qubit Agent" in html, html[:200]
@@ -308,7 +308,7 @@ def test_page_backing_routes_over_http_boundary(tmp_path):
     ui, port = _start(tmp_path)
     try:
         for page, route in PAGE_BACKING.items():
-            status, ctype, body = _get(port, "/hermes" + route)
+            status, ctype, body = _get(port, "/agent" + route)
             assert status != 404, (page, route, status, body[:200])
             assert status != 500, (page, route, status, body[:200])
             if status in (200, 202):
@@ -316,6 +316,21 @@ def test_page_backing_routes_over_http_boundary(tmp_path):
             else:
                 payload = json.loads(body)
                 assert payload.get("code"), (page, route, payload)
+    finally:
+        ui.stop()
+
+
+def test_fork_proxied_payloads_are_rebranded(tmp_path):
+    """The fork read-proxy must not surface upstream product names."""
+    ui, port = _start(tmp_path)
+    try:
+        status, _ctype, body = _get(port, "/agent/api/messaging/platforms")
+        assert status in (200, 202), (status, body[:200])
+        payload = json.loads(body)
+        blob = json.dumps(payload)
+        assert "Hermes" not in blob and "OpenClaw" not in blob, blob[:400]
+        assert payload.get("gateway_start_command") == "qubit gateway start", \
+            payload
     finally:
         ui.stop()
 

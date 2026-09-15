@@ -131,7 +131,18 @@ def test_existing_frontend_artifacts_remain_declared():
     wheel, sdist = _targets()
     assert "frontend/hermes-dist" in wheel.get("artifacts", [])
     assert "frontend/hermes-dist" in sdist.get("artifacts", [])
-    assert wheel["force-include"].get("frontend") == "voicebridge/_data/frontend"
+    # frontend tree packaged under voicebridge/_data/frontend, as a direct
+    # force-include mapping or via the filtered custom build hook.
+    force = wheel.get("force-include", {})
+    if "frontend" in force:
+        assert force["frontend"] == "voicebridge/_data/frontend"
+    else:
+        hook_path = str(wheel.get("hooks", {}).get("custom", {})
+                        .get("path", ""))
+        assert hook_path and (REPO_ROOT / hook_path).is_file(), wheel
+        text = (REPO_ROOT / hook_path).read_text(encoding="utf-8",
+                                                 errors="replace")
+        assert "voicebridge/_data/frontend/" in text, text
 
 
 def test_runtime_root_resolves_to_a_real_fork():

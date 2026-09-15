@@ -19,7 +19,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from ..logging_setup import log_event
 
 
 def _as_bool(v: Any) -> bool:

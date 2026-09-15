@@ -39,6 +39,12 @@ describe("resolvePageTitle", () => {
     expect(resolvePageTitle("/files", t, [])).toBe("Files");
   });
 
+  it("resolves the nested profile-builder route to a real label", () => {
+    // Regression: the naive fallback produced "Profiles/new".
+    expect(resolvePageTitle("/profiles/new", t, [])).toBe("New Profile");
+    expect(resolvePageTitle("/profiles/new/", t, [])).toBe("New Profile");
+  });
+
   it("prefers plugin tab labels", () => {
     expect(
       resolvePageTitle("/kanban", t, [{ path: "/kanban", label: "Kanban" }]),

@@ -1940,6 +1940,7 @@ export default function SessionsPage() {
                 )}
                 <Input
                   placeholder={t.sessions.searchPlaceholder}
+                  aria-label={t.sessions.searchPlaceholder}
                   value={search}
                   onChange={(e) => updateSearch(e.target.value)}
                   className="h-8 py-0 pr-7 pl-8 text-xs leading-none"

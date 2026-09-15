@@ -22,6 +22,7 @@ import { Card, CardContent } from "@nous-research/ui/ui/components/card";
 import { Input } from "@nous-research/ui/ui/components/input";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { usePageHeader } from "@/contexts/usePageHeader";
+import { rebrand } from "@/lib/rebrand";
 import { cn, themedBody } from "@/lib/utils";
 import {
   buildMcpServerCreate,
@@ -802,7 +803,7 @@ export default function McpPage() {
                   </div>
                   {entry.description && (
                     <p className="text-xs text-muted-foreground">
-                      {entry.description}
+                      {rebrand(entry.description)}
                     </p>
                   )}
                   {/* Connection detail: what the agent actually talks to. */}
@@ -863,7 +864,7 @@ export default function McpPage() {
                         Setup notes
                       </summary>
                       <p className="mt-1 whitespace-pre-wrap">
-                        {entry.post_install.trim()}
+                        {rebrand(entry.post_install.trim())}
                       </p>
                     </details>
                   )}
@@ -872,7 +873,7 @@ export default function McpPage() {
                       key={`${entry.name}-diag-${i}`}
                       className="text-xs text-warning mt-1"
                     >
-                      {d.message}
+                      {rebrand(d.message)}
                     </p>
                   ))}
                 </div>

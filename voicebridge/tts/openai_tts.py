@@ -18,7 +18,7 @@ import json
 import os
 import urllib.request
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from ..logging_setup import log_event
 from .base import TTSProvider, TTSUnavailable
@@ -55,11 +55,14 @@ class OpenAITTS(TTSProvider):
 
     def __init__(self, voice: str = DEFAULT_VOICE, model: str = DEFAULT_MODEL,
                  key_env: str = "~/.config/qubit-voicebridge/.env",
-                 instructions: str = DEFAULT_INSTRUCTIONS) -> None:
+                 instructions: str = DEFAULT_INSTRUCTIONS,
+                 egress_guard: Optional[Callable[[], bool]] = None) -> None:
         self.voice = voice or DEFAULT_VOICE
         self.model = model or DEFAULT_MODEL
         self.key_env = key_env
         self.instructions = instructions  # optional style instructions for gpt-4o-mini-tts
+        # Qubit egress/emergency-stop gate consulted before every network call.
+        self._egress_guard = egress_guard
         self._key: Optional[str] = None
 
     def load(self) -> None:
@@ -75,6 +78,10 @@ class OpenAITTS(TTSProvider):
     def synthesize(self, text: str, out_path: Optional[Path | str] = None) -> Path:
         if not text or not text.strip():
             raise TTSUnavailable("empty text for openai TTS")
+        if self._egress_guard is not None and not self._egress_guard():
+            raise TTSUnavailable(
+                "external OpenAI TTS refused by Qubit egress/emergency-stop "
+                "policy; use the local TTS provider or clear the stop")
         if self._key is None:
             self.load()
         assert self._key

@@ -35,6 +35,7 @@ import type {
 } from "@/lib/api";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { usePageHeader } from "@/contexts/usePageHeader";
+import { rebrand } from "@/lib/rebrand";
 import { cn, themedBody } from "@/lib/utils";
 
 // State → badge mapping. The backend emits a small, fixed vocabulary plus
@@ -131,9 +132,9 @@ function normalizeWhatsAppMode(mode: unknown): "bot" | "self-chat" | null {
 
 export default function ChannelsPage() {
   const [platforms, setPlatforms] = useState<MessagingPlatform[]>([]);
-  const [envPath, setEnvPath] = useState("~/.hermes/.env");
+  const [envPath, setEnvPath] = useState("~/.qubit/.env");
   const [gatewayStartCommand, setGatewayStartCommand] = useState(
-    "hermes gateway start",
+    "qubit gateway start",
   );
   const [loading, setLoading] = useState(true);
   const { toast, showToast } = useToast();
@@ -163,8 +164,8 @@ export default function ChannelsPage() {
       .getMessagingPlatforms()
       .then((res) => {
         setPlatforms(res.platforms);
-        setEnvPath(res.env_path || "~/.hermes/.env");
-        setGatewayStartCommand(res.gateway_start_command || "hermes gateway start");
+        setEnvPath(res.env_path || "~/.qubit/.env");
+        setGatewayStartCommand(res.gateway_start_command || "qubit gateway start");
       })
       .catch((e) => showToast(`Error: ${e}`, "error"));
   }, [showToast]);
@@ -446,7 +447,7 @@ export default function ChannelsPage() {
                 </div>
               )}
               <p className="text-xs text-muted-foreground">
-                {editing.description}
+                {rebrand(editing.description)}
               </p>
               {editing.env_vars.map((field: MessagingPlatformEnvVar) => (
                 <div className="grid gap-1.5" key={field.key}>
@@ -457,10 +458,10 @@ export default function ChannelsPage() {
                     </Label>
                     {field.help && (
                       <span
-                        aria-label={field.help}
+                        aria-label={rebrand(field.help)}
                         className="inline-flex text-muted-foreground hover:text-foreground"
                         role="img"
-                        title={field.help}
+                        title={rebrand(field.help)}
                       >
                         <Info className="h-3.5 w-3.5" />
                       </span>
@@ -468,7 +469,7 @@ export default function ChannelsPage() {
                   </div>
                   {field.description && (
                     <span className="text-xs text-muted-foreground">
-                      {field.description}
+                      {rebrand(field.description)}
                     </span>
                   )}
                   <Input
@@ -560,7 +561,7 @@ export default function ChannelsPage() {
                         <Badge tone={badge.tone}>{badge.label}</Badge>
                       </div>
                       <span className="text-xs text-muted-foreground">
-                        {platform.description}
+                        {rebrand(platform.description)}
                       </span>
                       {platform.error_message && (
                         <span className="text-xs text-destructive">
@@ -1185,7 +1186,7 @@ function TelegramOnboardingPanel({
     setNewAllowedId("");
   };
 
-  // restart_started only means the `hermes gateway restart` child spawned —
+  // restart_started only means the `qubit gateway restart` child spawned —
   // not that the restart will succeed (e.g. systemd linger missing, service
   // manager failure). Poll the action status briefly and surface a non-zero
   // exit via the manual-restart banner. Note: in no-service installs the

@@ -24,14 +24,20 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 # (path, expected typed code) for the six upstream WebSocket endpoints.
-WS_PATHS = [
-    ("/hermes/api/pty", "PTY_NO_SHELL"),
-    ("/hermes/api/console", "PTY_NO_SHELL"),
-    ("/hermes/api/ws", "WS_SINGLE_PATH"),
-    ("/hermes/api/events", "WS_SINGLE_PATH"),
-    ("/hermes/api/pub", "WS_SINGLE_PATH"),
-    ("/hermes/api/audio/speak-stream", "WS_SINGLE_PATH"),
+# The public SPA reaches the API through the Qubit-owned ``/agent`` prefix;
+# the bare ``/api`` path is the internal compat form.
+WS_API_PATHS = [
+    ("/api/pty", "PTY_NO_SHELL"),
+    ("/api/console", "PTY_NO_SHELL"),
+    ("/api/ws", "WS_SINGLE_PATH"),
+    ("/api/events", "WS_SINGLE_PATH"),
+    ("/api/pub", "WS_SINGLE_PATH"),
+    ("/api/audio/speak-stream", "WS_SINGLE_PATH"),
+    # Vendored Kanban plugin live-update socket: typed refusal, not a bare 401.
+    ("/api/plugins/kanban/events", "WS_SINGLE_PATH"),
 ]
+
+WS_PATHS = [("/agent" + path, code) for path, code in WS_API_PATHS]
 
 
 def _start(tmp_path):
@@ -99,15 +105,17 @@ def _http(port, method, path, body=None, token="test-token"):
     return status, ctype, payload
 
 
-def test_ws_gate_mapping_is_exactly_the_six_endpoints():
+def test_ws_gate_mapping_is_exactly_the_gated_endpoints():
     from voicebridge.webui import HERMES_WS_GATE_CODES, hermes_ws_gate_code
-    assert len(HERMES_WS_GATE_CODES) == len(WS_PATHS) == 6
-    assert set(HERMES_WS_GATE_CODES) == {p[len("/hermes"):] for p, _ in WS_PATHS}
-    for path, code in WS_PATHS:
+    assert len(HERMES_WS_GATE_CODES) == len(WS_API_PATHS) == 7
+    assert set(HERMES_WS_GATE_CODES) == {p for p, _ in WS_API_PATHS}
+    for path, code in WS_API_PATHS:
         assert hermes_ws_gate_code(path) == code, path
-        assert hermes_ws_gate_code(path[len("/hermes"):]) == code, path
-        assert hermes_ws_gate_code(path + "/") == code, path
+        assert hermes_ws_gate_code("/agent" + path) == code, path
+        assert hermes_ws_gate_code("/agent" + path + "/") == code, path
         assert hermes_ws_gate_code("/api/status") is None
+        # The upstream mount is gone: an upstream path is not a public gate.
+        assert hermes_ws_gate_code("/hermes" + path) is None
 
 
 @pytest.mark.parametrize("path,code", WS_PATHS)
@@ -128,7 +136,7 @@ def test_each_ws_upgrade_returns_426_typed(server, path, code):
 def test_ws_upgrade_needs_no_browser_token(server):
     # A browser WebSocket() cannot attach X-Hermes-Session-Token; the gate
     # must answer before auth (otherwise the client only sees a bare 401).
-    status, _, body = _upgrade(server, "/hermes/api/pty", token=None)
+    status, _, body = _upgrade(server, "/agent/api/pty", token=None)
     assert status == 426, (status, body[:200])
     assert json.loads(body)["code"] == "PTY_NO_SHELL"
 
@@ -139,11 +147,18 @@ def test_plain_api_alias_ws_is_gated(server):
     assert json.loads(body)["code"] == "PTY_NO_SHELL"
 
 
+def test_upstream_ws_path_is_gone(server):
+    # No public /hermes route: an upgrade to it is a plain 404, never a gate
+    # response that would confirm an upstream mount exists.
+    status, _, body = _upgrade(server, "/hermes/api/pty")
+    assert status == 404, (status, body[:200])
+
+
 def test_normal_get_to_real_route_still_works(server):
-    # Cutover stage 2: safe reads are served by the vendored Hermes backend,
-    # so /api/status carries the real Hermes status shape (version/overall),
+    # Cutover stage 2: safe reads are served by the vendored backend, so
+    # /agent/api/status carries the real status shape (version/overall),
     # not the compat wrapper's `ok`. See docs/QUBIT_HERMES_CUTOVER_MIGRATION.md.
-    status, ctype, body = _http(server, "GET", "/hermes/api/status")
+    status, ctype, body = _http(server, "GET", "/agent/api/status")
     assert status == 200, (status, body[:200])
     assert "application/json" in ctype
     served = json.loads(body)
@@ -155,12 +170,12 @@ def test_normal_get_to_real_route_still_works(server):
 def test_non_ws_get_to_same_paths_unaffected(server):
     # No Upgrade header -> the existing handler answers, never the 426 gate.
     expected = {
-        "/hermes/api/pty": 403,
-        "/hermes/api/console": 403,
-        "/hermes/api/ws": 403,
-        "/hermes/api/events": 200,
-        "/hermes/api/pub": 404,
-        "/hermes/api/audio/speak-stream": 403,
+        "/agent/api/pty": 403,
+        "/agent/api/console": 403,
+        "/agent/api/ws": 403,
+        "/agent/api/events": 200,
+        "/agent/api/pub": 404,
+        "/agent/api/audio/speak-stream": 403,
     }
     for path, want in expected.items():
         status, _, body = _http(server, "GET", path)
@@ -169,11 +184,11 @@ def test_non_ws_get_to_same_paths_unaffected(server):
 
 
 def test_non_ws_gated_codes_unchanged(server):
-    status, _, body = _http(server, "GET", "/hermes/api/pty")
+    status, _, body = _http(server, "GET", "/agent/api/pty")
     assert status == 403 and json.loads(body)["code"] == "PTY_NO_SHELL"
-    status, _, body = _http(server, "GET", "/hermes/api/ws")
+    status, _, body = _http(server, "GET", "/agent/api/ws")
     assert status == 403 and json.loads(body)["code"] == "WS_SINGLE_PATH"
-    status, _, body = _http(server, "GET", "/hermes/api/events")
+    status, _, body = _http(server, "GET", "/agent/api/events")
     assert status == 200 and "events" in json.loads(body)
 
 

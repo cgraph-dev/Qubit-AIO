@@ -6,7 +6,10 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // Built output and the vendored dashboard-plugin bundles are not source:
+  // the pinned `public/plugins/<name>/dist/*.js` ships with its own inline
+  // eslint directives and must not be linted as project source.
+  globalIgnores(['dist', '**/dist/**', '../hermes-dist/**']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

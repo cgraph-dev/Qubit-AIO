@@ -22,7 +22,9 @@ class ModelEntry:
     max_output_tokens: int = 1024
     supports_tools: bool = False
     supports_structured: bool = False
-    supports_streaming: bool = True
+    # The frontier text transport is request/response (no SSE); an entry only
+    # claims streaming when the operator's catalog explicitly declares it.
+    supports_streaming: bool = False
     price_in_per_1k: float = 0.0
     price_out_per_1k: float = 0.0
     terms_note: str = ""  # retention/terms pointer, never a promise
@@ -89,10 +91,12 @@ def build_catalog(entries: List[ModelEntry], source: str,
 def catalog_from_allowlist(allowlist: List[str]) -> ProviderCatalog:
     """Build a fresh operator-allowlist snapshot for plain-chat routing.
 
-    Entries carry conservative neutral capabilities (no tools/structured
-    claims) so capability-gated requests still fail closed unless a richer
-    catalog is supplied. Source and timestamp are recorded; staleness rules
-    apply exactly as for any other snapshot.
+    Entries carry conservative neutral capabilities (no tools/structured/
+    streaming claims) so capability-gated requests still fail closed unless a
+    richer catalog is supplied. The frontier transport does not stream, so a
+    ``require_streaming`` request against this snapshot is refused truthfully
+    instead of being handed a non-streamed response. Source and timestamp are
+    recorded; staleness rules apply exactly as for any other snapshot.
     """
     entries = []
     for item in allowlist or []:
@@ -101,5 +105,6 @@ def catalog_from_allowlist(allowlist: List[str]) -> ProviderCatalog:
         provider, model = str(item).split("/", 1)
         provider, model = provider.strip(), model.strip()
         if provider and model:
-            entries.append(ModelEntry(provider=provider, model=model))
+            entries.append(ModelEntry(provider=provider, model=model,
+                                      supports_streaming=False))
     return build_catalog(entries, source="operator-allowlist")

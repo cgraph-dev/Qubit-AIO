@@ -74,6 +74,15 @@ REASON_VOICE_CANONICAL = (
     "this Tier-2 entry is the CLI/dashboard form only"
 )
 
+# Tier-1 registry ops whose `cli` binding is a known cross-boundary handoff
+# (cli.py does not own a subparser yet). The catalog must never advertise a
+# surface that does not exist: these report dashboard+voice only, with the
+# machine-readable reason, until the CLI binding lands — at which point the
+# id is removed here and the automatic all-three interface returns. Every
+# entry must still resolve to the same shared broker backend on the surfaces
+# it does declare.
+CLI_PENDING: Dict[str, str] = {}
+
 
 def _redact(text: str) -> str:
     from .redaction import redact_text
@@ -151,6 +160,11 @@ def catalog() -> List[Dict[str, Any]]:
 
     items: List[Dict[str, Any]] = []
     for entry in sorted(VC.REGISTRY.values(), key=lambda e: e.id):
+        interfaces = list(INTERFACES_ALL)
+        interface_reason = ""
+        if entry.id in CLI_PENDING:
+            interfaces = ["dashboard", "voice"]
+            interface_reason = CLI_PENDING[entry.id]
         items.append({
             "id": entry.id,
             "tier": "registry",
@@ -166,36 +180,44 @@ def catalog() -> List[Dict[str, Any]]:
                      for a in entry.args],
             "confirm": bool(entry.confirm),
             "scope": list(entry.scope),
-            "interfaces": list(INTERFACES_ALL),
+            "interfaces": interfaces,
+            "interface_reason": interface_reason,
             "parity": list(entry.parity or ()),
         })
     for op_id in sorted(EXTRA_OPS):
-        spec = EXTRA_OPS[op_id]
-        items.append({
-            "id": op_id,
-            "tier": "extra",
-            "group": spec.group,
-            "title": spec.title,
-            "help": spec.help,
-            "aliases": [],
-            "examples": [],
-            "args": [{"name": a["name"], "type": a.get("type", "str"),
-                      "required": bool(a.get("required", False)),
-                      "choices": list(a.get("choices", ()) or ()),
-                      "clarifier": a.get("clarifier", ""),
-                      "secret": bool(a.get("secret", False))}
-                     for a in spec.args],
-            "confirm": bool(spec.confirm),
-            "scope": ["dashboard"],
-            "interfaces": list(spec.interfaces),
-            "interface_reason": spec.interface_reason,
-            "voice_guard": (spec.voice_guard
-                            or (f"guard_{op_id}"
-                                if op_id in getattr(VC, "VOICE_GUARDS", {})
-                                else "")),
-            "parity": list(spec.parity or ()),
-        })
+        items.append(_catalog_extra_item(op_id, EXTRA_OPS[op_id]))
+    for op_id in sorted(MODEL_PROFILE_OPS):
+        items.append(_catalog_extra_item(op_id, MODEL_PROFILE_OPS[op_id]))
     return items
+
+
+def _catalog_extra_item(op_id: str, spec: ExtraOp) -> Dict[str, Any]:
+    from . import voice_commands as VC
+
+    return {
+        "id": op_id,
+        "tier": "extra",
+        "group": spec.group,
+        "title": spec.title,
+        "help": spec.help,
+        "aliases": [],
+        "examples": [],
+        "args": [{"name": a["name"], "type": a.get("type", "str"),
+                  "required": bool(a.get("required", False)),
+                  "choices": list(a.get("choices", ()) or ()),
+                  "clarifier": a.get("clarifier", ""),
+                  "secret": bool(a.get("secret", False))}
+                 for a in spec.args],
+        "confirm": bool(spec.confirm),
+        "scope": ["dashboard"],
+        "interfaces": list(spec.interfaces),
+        "interface_reason": spec.interface_reason,
+        "voice_guard": (spec.voice_guard
+                        or (f"guard_{op_id}"
+                            if op_id in getattr(VC, "VOICE_GUARDS", {})
+                            else "")),
+        "parity": list(spec.parity or ()),
+    }
 
 
 def _dashboard_ctx(cfg: Any, actor: str, session: str) -> SimpleNamespace:
@@ -330,6 +352,12 @@ class ExtraOp:
 
 
 EXTRA_OPS: Dict[str, ExtraOp] = {}
+# Resolver-backed model/provider profile operations. Reads are unconfirmed,
+# mutations confirm-gated. They live in a dedicated registry (mirroring the
+# voice layer's MODEL_PROFILE_REGISTRY) so the pinned read-only ``EXTRA_OPS``
+# allowlist stays exact while every entry still flows through the SAME
+# run/confirm/audit/journal/e-stop pipeline.
+MODEL_PROFILE_OPS: Dict[str, ExtraOp] = {}
 
 
 def extra(op_id: str, group: str, title: str, help: str, *,
@@ -351,6 +379,31 @@ def extra(op_id: str, group: str, title: str, help: str, *,
         return fn
 
     return _wrap
+
+
+def model_op(op_id: str, group: str, title: str, help: str, *,
+             args: Tuple[Dict[str, Any], ...] = (),
+             confirm: bool = True,
+             interfaces: Tuple[str, ...] = INTERFACES_ALL,
+             interface_reason: str = "",
+             voice_guard: str = "",
+             parity: Tuple[str, ...] = (),
+             estop: Optional[Callable[[Any], bool]] = None) -> Callable:
+    """Register a resolver-backed model/provider profile op (same pipeline)."""
+
+    def _wrap(fn: Callable[[Any, Dict[str, Any], str], Dict[str, Any]]):
+        MODEL_PROFILE_OPS[op_id] = ExtraOp(
+            id=op_id, group=group, title=title, help=help, args=args,
+            confirm=confirm, interfaces=interfaces,
+            interface_reason=interface_reason, voice_guard=voice_guard,
+            parity=parity, run=fn, estop=estop)
+        return fn
+
+    return _wrap
+
+
+def _lookup_extra(op_id: str) -> Optional[ExtraOp]:
+    return EXTRA_OPS.get(op_id) or MODEL_PROFILE_OPS.get(op_id)
 
 
 def _sensitive_names(spec: ExtraOp) -> set:
@@ -407,7 +460,7 @@ def _coerce_extra(spec: ExtraOp, args: Dict[str, Any]) -> Dict[str, Any]:
 def run_extra_op(cfg: Any, op_id: str, args: Dict[str, Any], *,
                  actor: str = "dashboard:user",
                  session: str = "dashboard") -> Dict[str, Any]:
-    spec = EXTRA_OPS.get(op_id)
+    spec = _lookup_extra(op_id)
     if spec is None or spec.run is None:
         return {"state": "failed", "code": "UNKNOWN_OP",
                 "detail": f"unknown operation {op_id!r}"}
@@ -431,7 +484,7 @@ def run_extra_op(cfg: Any, op_id: str, args: Dict[str, Any], *,
                     "detail": _redact(str(exc))[:300]}
         _audit("executed", actor, {"op": op_id, "session": session})
         return {"state": "executed", "speech": f"{spec.title}: done.",
-                "receipt": {"op": op_id, "result": result}}
+                "receipt": {"entry": op_id, "op": op_id, "result": result}}
     journal = _journal(cfg)
     secret_names = _sensitive_names(spec)
     sensitive = sorted(k for k in coerced if k in secret_names)
@@ -478,7 +531,7 @@ def confirm_extra_op(cfg: Any, confirmation_id: str, *,
         return {"state": "failed", "code": "SESSION_MISMATCH",
                 "detail": "That confirmation belongs to another session."}
     op_id = str(meta.get("op", ""))
-    spec = EXTRA_OPS.get(op_id)
+    spec = _lookup_extra(op_id)
     if spec is None or spec.run is None:
         return {"state": "failed", "code": "STALE_OP",
                 "detail": "That confirmation is stale."}
@@ -560,7 +613,7 @@ def run_op(cfg: Any, op_id: str, args: Dict[str, Any], *,
 
     if op_id in VC.REGISTRY:
         return run_registry_op(cfg, op_id, args, actor=actor, session=session)
-    if op_id in EXTRA_OPS:
+    if op_id in EXTRA_OPS or op_id in MODEL_PROFILE_OPS:
         return run_extra_op(cfg, op_id, args, actor=actor, session=session)
     return {"state": "failed", "code": "UNKNOWN_OP",
             "detail": f"unknown operation {op_id!r}"}
@@ -1290,4 +1343,155 @@ def _extra_ghost_preview(cfg: Any, args: Dict[str, Any],
     return runner.preview(args["action_id"], _args_json(args["args_json"]),
                           target=args.get("target", "") or "desktop",
                           scope=args.get("scope", "") or "", role="")
+
+
+# ===================================================== model/provider profiles
+# Resolver-backed model/profile operations: the SAME functions the CLI
+# (``qubit profile model ...``) and the voice registry call. Reads execute
+# immediately; mutations stage on the shared confirmation journal. A raw
+# credential value is refused before it can be staged or written (secret
+# references only). These live in MODEL_PROFILE_OPS, not EXTRA_OPS, to keep
+# the pinned read-only allowlist exact; they share the one run/confirm/audit
+# pipeline by construction.
+_MODEL_ARGS = dict(
+    interfaces=INTERFACES_NO_VOICE,
+    interface_reason=REASON_VOICE_CANONICAL,
+    voice_guard="config_profiles",
+    parity=("config", "profile"),
+)
+
+
+def _choice(name: str, choices: Tuple[str, ...],
+            required: bool = False) -> Dict[str, Any]:
+    return {"name": name, "type": "choice", "required": required,
+            "choices": list(choices)}
+
+
+def _int(name: str, required: bool = False) -> Dict[str, Any]:
+    return {"name": name, "type": "int", "required": required}
+
+
+@model_op("list_model_profiles", group="profile",
+          title="List model profiles",
+          help="List the canonical model/provider profiles and their gates.",
+          confirm=False, args=(), **_MODEL_ARGS)
+def _op_list_model_profiles(cfg: Any, args: Dict[str, Any],
+                            actor: str) -> Dict[str, Any]:
+    from . import model_profiles_ops as MP
+
+    return MP.list_model_profiles(cfg)
+
+
+@model_op("show_model_profile", group="profile",
+          title="Show model profile",
+          help="Show one model profile: capabilities, locality, egress, "
+               "budgets, health and effective selection.",
+          confirm=False, args=(_req("profile_id"),), **_MODEL_ARGS)
+def _op_show_model_profile(cfg: Any, args: Dict[str, Any],
+                           actor: str) -> Dict[str, Any]:
+    from . import model_profiles_ops as MP
+
+    return MP.show_model_profile(cfg, args["profile_id"])
+
+
+@model_op("test_model_profile", group="profile",
+          title="Test model profile",
+          help="Preflight a model profile (read-only; optional local probe).",
+          confirm=False, args=(_opt("profile_id"), _opt("probe")),
+          **_MODEL_ARGS)
+def _op_test_model_profile(cfg: Any, args: Dict[str, Any],
+                           actor: str) -> Dict[str, Any]:
+    from . import model_profiles_ops as MP
+
+    return MP.test_model_profile(cfg, args.get("profile_id", ""),
+                                 probe=args.get("probe", False))
+
+
+@model_op("create_model_profile", group="profile",
+          title="Create model profile",
+          help="Register a model profile (non-secret fields only; key_ref is "
+               "an env:/file: reference, never a raw key).",
+          args=(_req("profile_id"),
+                _choice("kind", ("local", "api", "realtime")),
+                _opt("provider"), _opt("model"), _opt("base_url"),
+                {"name": "key_ref", "type": "str", "required": False,
+                 "secret": True},
+                _choice("locality", ("local", "external")),
+                _choice("egress_consent", ("deny", "allow")),
+                _int("context_tokens"), _opt("supports_tools"),
+                _opt("supports_vision"), _opt("roles"), _opt("fallback_to")),
+          **_MODEL_ARGS)
+def _op_create_model_profile(cfg: Any, args: Dict[str, Any],
+                             actor: str) -> Dict[str, Any]:
+    from . import model_profiles_ops as MP
+
+    return MP.create_model_profile(cfg, confirm=True, **args)
+
+
+@model_op("clone_model_profile", group="profile",
+          title="Clone model profile",
+          help="Clone a model profile under a new id (records the source as "
+               "the rollback target).",
+          args=(_req("source_id"), _req("new_id")), **_MODEL_ARGS)
+def _op_clone_model_profile(cfg: Any, args: Dict[str, Any],
+                            actor: str) -> Dict[str, Any]:
+    from . import model_profiles_ops as MP
+
+    return MP.clone_model_profile(cfg, args["source_id"], args["new_id"],
+                                  confirm=True)
+
+
+@model_op("remove_model_profile", group="profile",
+          title="Remove model profile",
+          help="Remove a non-default model profile (refused while a session "
+               "selects it).",
+          args=(_req("profile_id"),), **_MODEL_ARGS)
+def _op_remove_model_profile(cfg: Any, args: Dict[str, Any],
+                             actor: str) -> Dict[str, Any]:
+    from . import model_profiles_ops as MP
+
+    return MP.remove_model_profile(cfg, args["profile_id"], confirm=True)
+
+
+@model_op("select_session_model", group="profile",
+          title="Select session model",
+          help="Select a model profile for one session/role (confirmed).",
+          args=(_req("session"), _req("profile_id"), _opt("role")),
+          **_MODEL_ARGS)
+def _op_select_session_model(cfg: Any, args: Dict[str, Any],
+                             actor: str) -> Dict[str, Any]:
+    from . import model_profiles_ops as MP
+
+    return MP.select_session_model(
+        cfg, args["session"], args["profile_id"],
+        role=args.get("role", "") or "chat", confirm=True)
+
+
+@model_op("clear_session_model", group="profile",
+          title="Clear session model",
+          help="Clear this session's model override (confirmed).",
+          args=(_req("session"), _opt("role")), **_MODEL_ARGS)
+def _op_clear_session_model(cfg: Any, args: Dict[str, Any],
+                            actor: str) -> Dict[str, Any]:
+    from . import model_profiles_ops as MP
+
+    return MP.clear_session_model(cfg, args["session"],
+                                  role=args.get("role", "") or "*",
+                                  confirm=True)
+
+
+@model_op("rollback_model_profile", group="profile",
+          title="Rollback model profile",
+          help="Select a profile's declared rollback target for a session "
+               "(confirmed; typed NO_ROLLBACK when none is declared).",
+          args=(_req("profile_id"), _opt("session"), _opt("role")),
+          **_MODEL_ARGS)
+def _op_rollback_model_profile(cfg: Any, args: Dict[str, Any],
+                               actor: str) -> Dict[str, Any]:
+    from . import model_profiles_ops as MP
+
+    return MP.rollback_model_profile(
+        cfg, args["profile_id"],
+        session=args.get("session", "") or "dashboard",
+        role=args.get("role", "") or "chat", confirm=True)
 

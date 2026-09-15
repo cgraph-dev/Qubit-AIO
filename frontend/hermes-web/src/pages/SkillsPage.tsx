@@ -58,6 +58,7 @@ import {
   DialogTitle,
 } from "@nous-research/ui/ui/components/dialog";
 import { cn } from "@/lib/utils";
+import { rebrand, rebrandOptional } from "@/lib/rebrand";
 import { Input } from "@nous-research/ui/ui/components/input";
 import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
@@ -601,7 +602,7 @@ export default function SkillsPage() {
                                 </Badge>
                               </div>
                               <p className="text-xs text-text-secondary mb-2">
-                                {ts.description}
+                                {rebrand(ts.description)}
                               </p>
                               {ts.enabled && !ts.configured && (
                                 <p className="text-xs text-amber-300 mb-2">
@@ -760,7 +761,7 @@ function SkillRow({
           </span>
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
-          {skill.description || noDescriptionLabel}
+          {rebrandOptional(skill.description) || noDescriptionLabel}
         </p>
       </div>
       <Button
@@ -1177,7 +1178,7 @@ function ConnectedHubs({
     return (
       <p className="text-xs text-muted-foreground">
         Results come from the same sources as{" "}
-        <span className="font-mono">hermes skills search</span>.
+        <span className="font-mono">qubit skills search</span>.
       </p>
     );
   }
@@ -1290,7 +1291,7 @@ function HubResultCard({
             )}
           </div>
           <p className="text-xs text-text-secondary line-clamp-2">
-            {result.description}
+            {rebrand(result.description)}
           </p>
           <div className="flex flex-wrap items-center gap-1 mt-1">
             {result.tags.slice(0, 5).map((tag) => (
@@ -1409,7 +1410,7 @@ function SkillDetailDialog({
         </DialogHeader>
 
         <div className="mt-1 flex flex-col gap-1">
-          <p className="text-xs text-text-secondary">{result.description}</p>
+          <p className="text-xs text-text-secondary">{rebrand(result.description)}</p>
           <p className="text-xs font-mono text-text-tertiary truncate">
             {result.identifier}
           </p>
@@ -1623,7 +1624,7 @@ function ScanPanel({
                     {f.file}:{f.line}
                   </span>
                 </div>
-                <p className="text-xs text-text-secondary">{f.description}</p>
+                <p className="text-xs text-text-secondary">{rebrand(f.description)}</p>
               </div>
             </div>
           ))}

@@ -283,7 +283,20 @@ export default function ConfigPage() {
       await api.saveConfig(config);
       showToast(t.config.configSaved, "success");
     } catch (e) {
-      showToast(`${t.config.failedToSave}: ${e}`, "error");
+      // Qubit confirm-gates settings writes: the first PUT stages a
+      // CONFIRM_REQUIRED refusal. Confirm, then apply with confirm=true.
+      if (String(e).includes("CONFIRM_REQUIRED")) {
+        if (window.confirm("Apply these settings to Qubit?")) {
+          try {
+            await api.saveConfig(config, undefined, true);
+            showToast(t.config.configSaved, "success");
+          } catch (e2) {
+            showToast(`${t.config.failedToSave}: ${e2}`, "error");
+          }
+        }
+      } else {
+        showToast(`${t.config.failedToSave}: ${e}`, "error");
+      }
     } finally {
       setSaving(false);
     }

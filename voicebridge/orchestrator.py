@@ -31,8 +31,7 @@ from typing import Any, Dict, Iterator, List, Optional
 import numpy as np
 import sounddevice as sd
 
-from .audio.mic import (MicCapture, pin_pulse_default_source,
-                              resolve_input_device)
+from .audio.mic import MicCapture, pin_pulse_default_source
 from .audio.playback import Playback
 from .audio.vad import BargeInDetector, Endpointer, FrameSplitter
 from .config import Config
@@ -79,6 +78,25 @@ def _runner_num_ctx(cfg) -> int:
     """Packet 4B: the single canonical resident-runner context size."""
     from .runner_contract import resolve
     return resolve(cfg).num_ctx
+
+
+def _speech_override(cfg, kind: str) -> Dict[str, Any]:
+    """Resolve an explicit speech profile override for the ASR/TTS seams.
+
+    The canonical resolver owns speech selection; this returns the effective
+    profile dict only when it is an explicit user/session/role selection that
+    is executable. An empty dict means "use the existing config values", so the
+    shipped-default (and any resolver failure) never changes the hardware path.
+    """
+    try:
+        from .providers import speech as _speech
+        eff = _speech.resolve_speech(kind, cfg)
+        d = eff.to_public_dict()
+        if d.get("source") != "shipped-default" and d.get("executable"):
+            return d
+    except Exception:
+        pass
+    return {}
 
 
 def _attach_router_pipeline(classifier, cfg) -> None:
@@ -292,6 +310,37 @@ def _action_voice_text(out: dict) -> str:
     return f"{action_id} could not be completed ({code or state})."
 
 
+def _cfg_session(cfg: Any) -> str:
+    """Best-effort session key for the autonomy binding (never raises)."""
+    fn = getattr(cfg, "session_key", None)
+    try:
+        return str(fn()) if callable(fn) else ""
+    except Exception:  # noqa: BLE001 - binding context is optional
+        return ""
+
+
+def _operator_name(cfg: Any) -> str:
+    """Resolve the operator's name from local knowledge — never baked in code.
+
+    Reads the ``- Name:`` line from the operator's personal knowledge file
+    (loaded through the bounded context compiler) and falls back to the
+    optional ``identity.name`` config key. Returns "" when neither is set so
+    callers can answer honestly instead of leaking a hard-coded identity.
+    """
+    try:
+        from .context_compiler import load_core_facts
+        facts = load_core_facts() or ""
+        m = re.search(r"(?im)^\s*-\s*name:\s*(.+?)\s*$", facts)
+        if m:
+            return m.group(1).strip()[:60]
+    except Exception:  # noqa: BLE001 - identity is best-effort context
+        pass
+    try:
+        return str(cfg.get("identity", "name", default="") or "").strip()[:60]
+    except Exception:  # noqa: BLE001 - never crash on a missing key
+        return ""
+
+
 class VoiceOrchestrator:
     def __init__(self, config: Config, mic_only: bool = False,
                  no_hotkey: bool = False, dry_run: bool = False) -> None:
@@ -348,7 +397,7 @@ class VoiceOrchestrator:
         self._power_policy = PW.power_policy(self.cfg)
         try:
             self._broker = build_host_broker(
-                power_control=self._power_policy.control)
+                power_control=self._power_policy.control, cfg=self.cfg)
             register_worker_caps(self._broker.registry)
             self._worker_guard = WorkerGuard(self.cfg, engine=self._broker.engine)
         except Exception as exc:
@@ -411,24 +460,35 @@ class VoiceOrchestrator:
         from .asr.sherpa import SherpaASR
         from .asr.whisper import FasterWhisperASR
         asr_cfg = self.cfg.section("asr")
-        provider = asr_cfg.get("provider", "sherpa")
+        # Canonical speech-in profile wins when explicitly selected; otherwise
+        # the live config values remain authoritative (hardware path intact).
+        override = _speech_override(self.cfg, "speech_in")
+        provider = override.get("provider") or asr_cfg.get("provider", "sherpa")
         if provider == "personaplex":
             log_event("asr.provider", provider="personaplex", active=False,
                       detail="PersonaPlex ASR removed; falling back to sherpa")
             provider = "sherpa"
+        engine = override.get("engine") or override.get("model") \
+            or asr_cfg.get("engine", "moonshine")
+        language = override.get("language") or asr_cfg.get("language")
+        device = override.get("device") or asr_cfg.get("device", "auto")
+        wl = override.get("settings") or {}
         model_dir = self.cfg.model_dir()
         if provider == "sherpa":
-            return SherpaASR(engine=asr_cfg.get("engine", "moonshine"),
+            return SherpaASR(engine=engine,
                              model_dir=model_dir,
                              provider=asr_cfg.get("provider_ep", "cpu"),
-                             num_threads=int(asr_cfg.get("num_threads", 4)),
-                             language=asr_cfg.get("language"),
+                             num_threads=int(
+                                 wl.get("num_threads")
+                                 or asr_cfg.get("num_threads", 4)),
+                             language=language,
                              hotwords=asr_cfg.get("hotwords", ""),
                              hotwords_score=float(asr_cfg.get("hotwords_score", 1.5)))
-        return FasterWhisperASR(model=asr_cfg.get("model", "base"),
-                                device=asr_cfg.get("device", "auto"),
+        return FasterWhisperASR(model=override.get("model")
+                                or asr_cfg.get("model", "base"),
+                                device=device,
                                 compute_type=asr_cfg.get("compute_type", "float16"),
-                                language=asr_cfg.get("language"),
+                                language=language,
                                 beam_size=asr_cfg.get("beam_size", 1),
                                 model_dir=model_dir)
 
@@ -436,10 +496,21 @@ class VoiceOrchestrator:
         from .tts.edge import EdgeTTS
         from .tts.kokoro import KokoroTTS
         from .tts.piper import PiperTTS
-        provider = self.cfg.get("tts", "provider", default="piper")
+        # Canonical speech-out profile wins when explicitly selected; otherwise
+        # the live config values remain authoritative (hardware path intact).
+        override = _speech_override(self.cfg, "speech_out")
+        provider = override.get("provider") or self.cfg.get("tts", "provider",
+                                                            default="piper")
+        voice = override.get("voice") or self.cfg.get("tts", "voice",
+                                                      default="en_US-amy-medium")
+        from .providers.speech import external_speech_guard
+        _egress = external_speech_guard(self.cfg)
         if provider == "edge":
-            edge = EdgeTTS(voice=self.cfg.get("tts", "edge", "voice", default="en-US-JennyNeural"),
-                           rate=self.cfg.get("tts", "edge", "rate", default="+0%"))
+            edge = EdgeTTS(voice=override.get("voice")
+                           or self.cfg.get("tts", "edge", "voice",
+                                           default="en-US-JennyNeural"),
+                           rate=self.cfg.get("tts", "edge", "rate", default="+0%"),
+                           egress_guard=_egress)
             if edge.available():
                 return edge
         if provider == "gateway":
@@ -449,18 +520,22 @@ class VoiceOrchestrator:
             from .tts.hybrid import HybridTTS
             h = self.cfg.get("tts", "hybrid", default={}) if isinstance(self.cfg.get("tts", "hybrid", default={}), dict) else {}
             return HybridTTS(model_dir=self.cfg.model_dir(),
-                             piper_voice=h.get("piper_voice", self.cfg.get("tts", "voice", default="en_US-amy-medium")),
+                             piper_voice=h.get("piper_voice", voice),
                              openai_voice=h.get("openai_voice", "nova"),
                              openai_model=h.get("openai_model", "gpt-4o-mini-tts"),
                              key_env=self.cfg.get("tts", "openai", "key_env", default="~/.config/qubit-voicebridge/.env"),
                              instructions=self.cfg.get("tts", "openai", "instructions", default=""),
-                             threshold_words=int(h.get("threshold_words", 18)))
+                             threshold_words=int(h.get("threshold_words", 18)),
+                             egress_guard=_egress)
         if provider == "openai":
             from .tts.openai_tts import OpenAITTS
-            tts = OpenAITTS(voice=self.cfg.get("tts", "openai", "voice", default="nova"),
+            tts = OpenAITTS(voice=override.get("voice")
+                            or self.cfg.get("tts", "openai", "voice",
+                                            default="nova"),
                             model=self.cfg.get("tts", "openai", "model", default="gpt-4o-mini-tts"),
                             key_env=self.cfg.get("tts", "openai", "key_env", default="~/.config/qubit-voicebridge/.env"),
-                            instructions=self.cfg.get("tts", "openai", "instructions", default=""))
+                            instructions=self.cfg.get("tts", "openai", "instructions", default=""),
+                            egress_guard=_egress)
             if tts.available():
                 return tts
             log_event("tts.openai.unavailable", fallback="piper")
@@ -470,8 +545,7 @@ class VoiceOrchestrator:
             if tts.available():
                 return tts
             log_event("tts.kokoro.unavailable", fallback="piper")
-        return PiperTTS(model_dir=self.cfg.model_dir(),
-                        voice=self.cfg.get("tts", "voice", default="en_US-amy-medium"))
+        return PiperTTS(model_dir=self.cfg.model_dir(), voice=voice)
 
     def _resolve_silero_model(self) -> Path:
         """Silero v6 preferred (Aug 2025, ~16% fewer errors than v5 on noisy
@@ -538,6 +612,17 @@ class VoiceOrchestrator:
             self._tts.load()
         except Exception as exc:
             log_event("tts.load.failed", error=str(exc)[:200])
+        # Canonical realtime speech profile: the duplex lane was removed, but
+        # the profile is still resolved here so a user selection is observable
+        # and never silently ignored (read-only; no adapter is started).
+        try:
+            from .providers import speech as _speech
+            _rt = _speech.resolve_realtime(self.cfg)
+            log_event("speech.realtime.profile", profile=_rt.profile_id,
+                      provider=_rt.provider, voice=_rt.voice,
+                      device=_rt.device, executable=_rt.executable)
+        except Exception as exc:
+            log_event("speech.realtime.profile.failed", error=str(exc)[:120])
         # classifier
         self.classifier = Classifier(self.cfg.section("intent"),
                                      self.confirmations, self.conversation,
@@ -1011,7 +1096,8 @@ class VoiceOrchestrator:
         res = broker.execute(
             script_capability_name(tmpl.name),
             {"question": redact_text(question.replace("\n", " "))},
-            source="user", correlation_id=correlation_id)
+            source="user", correlation_id=correlation_id,
+            session=_cfg_session(self.cfg))
         raw = res.output
         if res.denied:
             log_event("local_script.denied", name=tmpl.name,
@@ -1512,6 +1598,24 @@ class VoiceOrchestrator:
         self._spawn_session_worker(session_key, task_text, t0)
         self._await_session(session_key, task_text, t0)
         return
+
+    def _progress_local_update(self, snippet: str) -> str:
+        """One brokered local-model progress sentence (canonical gateway)."""
+        from .providers import gateway as _gateway
+        _hist = ""
+        try:
+            _hist = self.shared.as_prompt(max_chars=800, max_turns=6)
+        except Exception:
+            pass
+        _res = _gateway.run_role(
+            f"Summarize this worker progress in ONE short, playful and cute "
+            f"sentence for voice (max 18 words, warm and a little flirty, no "
+            f"filler):\n{snippet[:700]}",
+            self.cfg, role="chat", timeout_s=6.0, max_tokens=40,
+            conversation_prompt=_hist, context="",
+            num_ctx=_runner_num_ctx(self.cfg))
+        return _res.text if _res.ok else ""
+
     def _progress_loop(self) -> None:
         """Periodic talk-back while a big task runs — local Qubit checks what
         the worker actually did so far and gives a real update.
@@ -1533,18 +1637,7 @@ class VoiceOrchestrator:
                             if now - float(getattr(self.task, "last_progress_spoken", 0)) >= 30:
                                 # local small brain summarizes the snippet into a 1-sentence update
                                 try:
-                                    from .local_llm import chat_local as _chat_local
-                                    _hist = ""
-                                    try:
-                                        _hist = self.shared.as_prompt(max_chars=800, max_turns=6)
-                                    except Exception:
-                                        pass
-                                    upd = _chat_local(
-                                        f"Summarize this worker progress in ONE short, playful and cute sentence for voice (max 18 words, warm and a little flirty, no filler):\n{snippet[:700]}",
-                                        _hist, model=self.cfg.get("intent", "local_llm", "model", default="qubit-brain4"),
-                                        url=self.cfg.get("intent", "local_llm", "url", default="http://127.0.0.1:11434"), timeout_s=6.0, max_tokens=40,
-                                        context="",
-                                        num_ctx=_runner_num_ctx(self.cfg))
+                                    upd = self._progress_local_update(snippet)
                                     if upd and len(upd.split()) <= 22:
                                         self.speak(upd, name="progress", barge=False)
                                         log_event("worker.progress.llm", elapsed_s=round(elapsed,1), update=upd[:160])
@@ -1961,7 +2054,8 @@ class VoiceOrchestrator:
             args = dict(payload.get("args") or {})
             rec = self._broker.issue_confirmation(cap, args, issued_by="user")
             res = self._broker.execute(cap, args, source="user",
-                                       confirmation_id=rec.id)
+                                       confirmation_id=rec.id,
+                                       session=_cfg_session(self.cfg))
             self.speak("Okay, going ahead.")
             msg = res.output if res.ok else ""
             if not res.ok:
@@ -2076,8 +2170,12 @@ class VoiceOrchestrator:
         # Covers: "whats my name", "what is my name", "my name", "who am i", "who i am" — bare "my name" is the RCtrl clipped case
         _low_identity = low
         if re.search(r"\b(my name|who am i|who i am)\b", _low_identity):
-            # Deterministic answer from memory — never ask back
-            reply = "Your name is Tricky."
+            # Deterministic answer from the operator's local personal knowledge
+            # (never a hard-coded identity baked into the product source).
+            _op_name = _operator_name(self.cfg)
+            reply = (f"Your name is {_op_name}." if _op_name else
+                     "I don't have your name on file yet; add it to your "
+                     "personal knowledge and I'll remember it.")
             # Keep per-request ctx + conversation history consistent for next turns
             _ctx_id = self._cur_ctx()
             if _ctx_id is not None:
@@ -2139,7 +2237,7 @@ class VoiceOrchestrator:
                 log_event("conversation.local.skip", error=str(exc)[:120])
             if reply:
                 # Activity feed: show what the user SAID (transcription) alongside the reply
-                # so Tricky can verify ASR quality: "You: How are you? → Bot: Sunt bine..."
+                # so the operator can verify ASR quality: "You: How are you? → Bot: Sunt bine..."
                 # text=sanitized user utterance, summary=bot reply, detail=routing reason
                 trimmed = trim_spoken(reply, 300)
                 ctx2 = self._cur_ctx()
@@ -2168,15 +2266,25 @@ class VoiceOrchestrator:
                     self.speak(trim_spoken(reply, 500))
                 return
 
-        # last-resort fallbacks when the local model is unavailable
+        # last-resort fallbacks when the local model is unavailable.
+        # Cloud (Perplexity/DeepSeek) is reached only through the canonical
+        # frontier egress gate, so the shipped local-only default never calls
+        # an external provider. Compute the decision once (each method also
+        # self-gates as defense in depth).
         reply = ""
         spoke = False
-        web_ask = self.cfg.get("intent", "perplexity_enabled", default=True) \
+        perplexity_ok = self._cloud_egress_allowed(
+            "perplexity", self._perplexity_model_name())
+        deepseek_ok = self._cloud_egress_allowed(
+            "deepseek", self._deepseek_model_name())
+        web_ask = perplexity_ok \
+            and self.cfg.get("intent", "perplexity_enabled", default=True) \
             and (_needs_web(text) or "perplexity" in text.lower())
         if web_ask:
             reply = self._chat_perplexity(text)
         if not reply:
-            if self.cfg.get("intent", "stream_speech", default=True):
+            if deepseek_ok and self.cfg.get("intent", "stream_speech",
+                                            default=True):
                 # Same live-overlap as the local path (STEAL_LIST item 6): the
                 # pump thread generates while speak_stream synthesizes each
                 # completed sentence — first audio no longer waits for the
@@ -2233,88 +2341,81 @@ class VoiceOrchestrator:
             log_event("conversation.fallback.full", text=text[:300], reply_len=len(reply), reply=reply[:2000])
         else:
             # Last resort: if even fallbacks 402/timeout, still answer greetings/identity deterministically so UX never blocks
+            _op_name = _operator_name(self.cfg)
             if re.search(r"\b(hello|hi|hey)\b", low):
-                self.speak("Hey Tricky, I\'m Qubit — I\'m here. Try again?")
+                self.speak(f"Hey {_op_name}, I\'m Qubit — I\'m here. Try again?"
+                           if _op_name else "I\'m here. Try again?")
             elif re.search(r"\b(my name|who am i)\b", low):
-                self.speak("Your name is Tricky.")
+                self.speak(f"Your name is {_op_name}." if _op_name else
+                           "I don\'t have your name on file yet.")
             else:
                 self.speak("I'm sorry, I couldn't reach the chat model.")
 
-    def _chat_deepseek_stream(self, text: str, on_sentence) -> str:
-        """Stream a DeepSeek completion; emit completed sentences via
-        on_sentence(str) as they arrive and return the full reply."""
-        import urllib.request
-        import urllib.error
-        from .local_llm import _strip_think
-        key = self._deepseek_key()
-        if not key:
-            return ""
-        url = self.cfg.get("intent", "deepseek_url",
-                           default="https://api.deepseek.com/chat/completions")
-        model = (self.cfg.get("intent", "deepseek_model", default="")
-                 or _legacy_default_model()
-                 or "deepseek-v4-flash")
-        _c = self._cur_ctx()
-        ctx = _c.conv_snapshot if _c is not None and _c.conv_snapshot else self.conversation.as_prompt()
-        system = ("You are a concise, warm voice assistant. Answer briefly in "
-                  "1-3 short sentences unless asked for detail. Be direct: "
-                  "no emojis, no pleasantries, no filler words — say only "
-                  "what's needed. "
-                  "Reply in the SAME language as the current User message — if it is English, reply in English; if Romanian, reply in Romanian. Ignore previous turns' language.")
-        payload = {
-            "model": model, "stream": True, "temperature": 0.4,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user",
-                 "content": f"Recent conversation:\n{ctx}\n\nUser: {text}"},
-            ],
-        }
-        req = urllib.request.Request(
-            url, data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json",
-                     "Authorization": f"Bearer {key}"})
+    def _deepseek_model_name(self) -> str:
+        """Configured DeepSeek model (falls back to the legacy default alias)."""
+        return (self.cfg.get("intent", "deepseek_model", default="")
+                or _legacy_default_model()
+                or "deepseek-v4-flash")
+
+    def _perplexity_model_name(self) -> str:
+        return str(self.cfg.get("intent", "perplexity_model",
+                                default="sonar-pro") or "sonar-pro")
+
+    def _cloud_egress_allowed(self, provider: str, model: str) -> bool:
+        """Canonical egress gate for the voice fallback's cloud providers.
+
+        Local-only mode is enforced technically, not by hiding a selector: the
+        raw Perplexity/DeepSeek fallbacks run only when the canonical frontier
+        policy is enabled and the exact provider/model is owner-allowlisted.
+        The shipped default (frontier disabled) refuses cloud egress with a
+        typed log, so the fallback chain can never silently call an external
+        provider. This is the same authority ``providers.gateway`` enforces.
+        """
         try:
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                buf = ""
-                full = ""
-                for raw in resp:
-                    if self._interrupt_requested:
-                        resp.close()
-                        break
-                    line = raw.decode("utf-8", "replace").strip()
-                    if not line.startswith("data: "):
-                        continue
-                    data = line[6:].strip()
-                    if data == "[DONE]":
-                        break
-                    try:
-                        delta = (json.loads(data)["choices"][0]
-                                 .get("delta", {}).get("content") or "")
-                    except Exception:
-                        continue
-                    buf += delta
-                    full += delta
-                    # emit completed sentences as they form
-                    while True:
-                        m = re.search(r"[.!?…]\s*", buf)
-                        if not m:
-                            break
-                        sentence = buf[:m.end()].strip()
-                        buf = buf[m.end():]
-                        if sentence:
-                            on_sentence(_strip_think(sentence))
-                tail = buf.strip()
-                if tail:
-                    full += ""
-                    on_sentence(_strip_think(tail))
-                return _strip_think(full.strip())
-        except Exception as exc:
-            log_event("conversation.deepseek.failed", error=str(exc)[:160])
-            return ""
+            from .providers.policy import FrontierPolicy
+            policy = FrontierPolicy.from_config(self.cfg)
+            allowed = bool(policy.is_allowed(provider, model))
+            if not allowed:
+                log_event("conversation.cloud.egress_denied",
+                          provider=provider, model=model,
+                          reason="frontier policy disabled or model not "
+                                 "allowlisted")
+            return allowed
+        except Exception as exc:  # never let a policy probe crash the loop
+            log_event("conversation.cloud.egress_denied", provider=provider,
+                      model=model, error=str(exc)[:120])
+            return False
+
+    def _chat_deepseek_stream(self, text: str, on_sentence) -> str:
+        """DeepSeek completion for the live-speech fallback, via the gateway.
+
+        The canonical frontier gateway (``providers.gateway.run`` for the
+        ``deepseek`` provider) is the only egress path. ``FrontierClient`` is
+        blocking-only — it does not implement incremental SSE — so truthful
+        streaming is not available on the frontier route: the completed reply
+        is delivered to ``on_sentence`` exactly once and the full text is
+        returned. No fabricated deltas and no direct provider request.
+        """
+        reply = self._chat_deepseek(text)
+        if reply and on_sentence is not None:
+            from .local_llm import _strip_think
+            on_sentence(_strip_think(reply))
+        return reply
 
     def _chat_deepseek(self, text: str) -> str:
-        """Fast plain chat completion via the DeepSeek API (no agent bootstrap)."""
-        import urllib.request
+        """Fast DeepSeek completion through the canonical frontier gateway.
+
+        The gateway is the single egress authority: it enforces the frontier
+        policy, exact allowlist, minimum-necessary egress, budgets, and
+        credential handling. ``_cloud_egress_allowed`` pre-checks (defense in
+        depth), so the shipped local-only default refuses with no network
+        call. No direct provider request is issued here.
+        """
+        from .providers import gateway as _gateway
+        from .providers.contracts import ProviderRequest
+        model = self._deepseek_model_name()
+        if not self._cloud_egress_allowed("deepseek", model):
+            return ""
         key = self._deepseek_key()
         if not key:
             log_event("conversation.deepseek.nokey",
@@ -2322,36 +2423,25 @@ class VoiceOrchestrator:
             return ""
         url = self.cfg.get("intent", "deepseek_url",
                            default="https://api.deepseek.com/chat/completions")
-        model = (self.cfg.get("intent", "deepseek_model", default="")
-                 or _legacy_default_model()
-                 or "deepseek-v4-flash")
         ctx = self.conversation.as_prompt()
         system = ("You are a concise, warm voice assistant. Answer briefly in "
                   "1-3 short sentences unless asked for detail. Be direct: "
                   "no emojis, no pleasantries, no filler words — say only "
                   "what's needed. "
                   "Reply in the SAME language as the current User message — if it is English, reply in English; if Romanian, reply in Romanian. Ignore previous turns' language.")
-        payload = {
-            "model": model, "stream": False, "temperature": 0.4,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user",
-                 "content": f"Recent conversation:\n{ctx}\n\nUser: {text}"},
-            ],
-        }
-        req = urllib.request.Request(
-            url, data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json",
-                     "Authorization": f"Bearer {key}"})
-        try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                body = json.loads(resp.read().decode())
-            content = body["choices"][0]["message"]["content"]
-            from .local_llm import _strip_think
-            return _strip_think((content or "").strip())
-        except Exception as exc:
-            log_event("conversation.deepseek.failed", error=str(exc)[:160])
+        prompt = f"{system}\n\nRecent conversation:\n{ctx}\n\nUser: {text}"
+        res = _gateway.run(
+            ProviderRequest(prompt=prompt, max_tokens=256, timeout_s=30.0,
+                            route="frontier", provider="deepseek",
+                            model=model),
+            self.cfg, base_url=str(url or ""), api_key=key,
+            cancel=lambda: bool(getattr(self, "_interrupt_requested", False)))
+        if not res.ok:
+            log_event("conversation.deepseek.failed", code=res.code,
+                      error=str(res.message)[:160])
             return ""
+        from .local_llm import _strip_think
+        return _strip_think((res.text or "").strip())
 
     def _deepseek_key(self) -> str:
         return self._env_key("DEEPSEEK_API_KEY")
@@ -2391,8 +2481,19 @@ class VoiceOrchestrator:
         return os.environ.get(name, "")
 
     def _chat_perplexity(self, text: str) -> str:
-        """Web-grounded answer via the Perplexity API (for 'if needed' queries)."""
-        import urllib.request
+        """Web-grounded answer through the canonical frontier gateway.
+
+        Perplexity is an external provider: the gateway enforces the frontier
+        policy, exact allowlist, minimum-necessary egress, budgets, and
+        credential handling, so no direct provider request is issued here.
+        ``_cloud_egress_allowed`` pre-checks (defense in depth) so the shipped
+        local-only default refuses with no network call.
+        """
+        from .providers import gateway as _gateway
+        from .providers.contracts import ProviderRequest
+        model = self._perplexity_model_name()
+        if not self._cloud_egress_allowed("perplexity", model):
+            return ""
         key = self._perplexity_key()
         if not key:
             log_event("conversation.perplexity.nokey",
@@ -2400,33 +2501,24 @@ class VoiceOrchestrator:
             return ""
         url = self.cfg.get("intent", "perplexity_url",
                            default="https://api.perplexity.ai/chat/completions")
-        model = self.cfg.get("intent", "perplexity_model", default="sonar-pro")
         system = ("You are a concise voice assistant answering from current web "
                   "search. Give a short, accurate, up-to-date answer in 1-4 "
                   "sentences. Prefer facts over hedging. Be direct: no emojis, "
                   "no pleasantries, no filler words. "
                   "Reply in the SAME language as the current User message.")
-        payload = {
-            "model": model, "stream": False, "temperature": 0.3,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": text},
-            ],
-        }
-        req = urllib.request.Request(
-            url, data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json",
-                     "Authorization": f"Bearer {key}"})
-        try:
-            with urllib.request.urlopen(req, timeout=45) as resp:
-                body = json.loads(resp.read().decode())
-            content = body["choices"][0]["message"]["content"]
-            log_event("conversation.perplexity", model=model)
-            from .local_llm import _strip_think
-            return _strip_think((content or "").strip())
-        except Exception as exc:
-            log_event("conversation.perplexity.failed", error=str(exc)[:160])
+        prompt = f"{system}\n\n{text}"
+        res = _gateway.run(
+            ProviderRequest(prompt=prompt, max_tokens=256, timeout_s=45.0,
+                            route="frontier", provider="perplexity",
+                            model=model),
+            self.cfg, base_url=str(url or ""), api_key=key)
+        if not res.ok:
+            log_event("conversation.perplexity.failed", code=res.code,
+                      error=str(res.message)[:160])
             return ""
+        log_event("conversation.perplexity", model=model)
+        from .local_llm import _strip_think
+        return _strip_think((res.text or "").strip())
 
     def _chat_local_reply(self, text: str, conv_prompt: str,
                           llm_cfg: Dict[str, Any], mem_ctx: str):
@@ -2436,21 +2528,19 @@ class VoiceOrchestrator:
         intent.stream_speech is on, sentences are spoken WHILE the model is
         still generating (TTS preload overlap) instead of after full reply.
         """
-        from .local_llm import chat_local, chat_local_stream
+        from .providers import gateway as _gateway
         from .runner_contract import resolve
         _rc = resolve(self.cfg)
-        model = _rc.alias if llm_cfg.get("model") in (None, "", "qubit-brain4") \
-            else llm_cfg.get("model")
-        url = llm_cfg.get("url", "http://127.0.0.1:11434")
         timeout_s = float(llm_cfg.get("timeout_s", 4.0))
         max_tokens = int(llm_cfg.get("max_tokens", 100))
         # Packet 4B: ONE canonical runner contract — no per-caller num_ctx.
         num_ctx = int(_rc.num_ctx)
         if not self.cfg.get("intent", "stream_speech", default=True):
-            reply = chat_local(text, conv_prompt, model=model, url=url,
-                               timeout_s=timeout_s, max_tokens=max_tokens,
-                               context=mem_ctx, num_ctx=num_ctx)
-            return reply, False
+            res = _gateway.run_role(
+                text, self.cfg, role="chat", max_tokens=max_tokens,
+                timeout_s=timeout_s, conversation_prompt=conv_prompt,
+                context=mem_ctx, num_ctx=num_ctx)
+            return (res.text if res.ok else ""), False
         # Streaming path: pump thread generates + feeds sentences to a queue;
         # speak_stream consumes the queue as a live iterator so synthesis of
         # sentence N+1 overlaps generation of sentence N+2.
@@ -2460,12 +2550,12 @@ class VoiceOrchestrator:
 
         def _pump() -> None:
             try:
-                holder["reply"] = chat_local_stream(
-                    text, conv_prompt, model=model, url=url,
-                    timeout_s=timeout_s, max_tokens=max_tokens,
-                    context=mem_ctx, num_ctx=num_ctx,
-                    on_sentence=sq.put,
+                res = _gateway.run_role(
+                    text, self.cfg, role="chat", max_tokens=max_tokens,
+                    timeout_s=timeout_s, conversation_prompt=conv_prompt,
+                    context=mem_ctx, num_ctx=num_ctx, on_sentence=sq.put,
                     should_stop=lambda: self._interrupt_requested)
+                holder["reply"] = res.text if res.ok else ""
             finally:
                 sq.put(None)
 
@@ -2485,33 +2575,25 @@ class VoiceOrchestrator:
         return reply, bool(spoken)
 
     def _chat_ollama(self, text: str) -> str:
-        import urllib.request
+        from .local_llm import _strip_think
+        from .providers import gateway as _gateway
         from .runner_contract import resolve
         _rc = resolve(self.cfg)
-        url = _rc.url
-        # Packet 4B: alias and runner options come ONLY from the contract.
-        model = _rc.alias
         _c = self._cur_ctx()
         ctx = _c.conv_snapshot if _c is not None and _c.conv_snapshot else self.conversation.as_prompt()
         prompt = (f"Recent conversation:\n{ctx}\n\nUser: {text}\n\n"
                   "Assistant: /no_think")
-        # NOTE: no options.think here — ollama ignores it inside options; the
-        # baked qubit-brain4 template already disables thinking at the source.
-        payload = {"model": model, "prompt": prompt, "stream": False,
-                   "keep_alive": _rc.keep_alive,
-                   "options": {"temperature": 0.4,
-                               "num_ctx": _rc.num_ctx}}
-        try:
-            req = urllib.request.Request(f"{url}/api/generate",
-                                         data=json.dumps(payload).encode(),
-                                         headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                body = json.loads(resp.read().decode())
-            from .local_llm import _strip_think
-            return _strip_think((body.get("response") or "").strip())
-        except Exception as exc:
-            log_event("conversation.ollama.failed", error=str(exc)[:160])
+        # Packet 4B: alias and runner options come ONLY from the canonical
+        # runner contract; execution is brokered by the provider gateway.
+        res = _gateway.run_role(
+            prompt, self.cfg, role="chat", max_tokens=256, timeout_s=30.0,
+            local_mode="generate", options={"temperature": 0.4},
+            keep_alive=_rc.keep_alive, num_ctx=_rc.num_ctx)
+        if not res.ok:
+            log_event("conversation.ollama.failed", code=res.code,
+                      error=res.message[:160])
             return ""
+        return _strip_think((res.text or "").strip())
 
     # ------------------------------------------- extra backends (duplex/local/agent)
     def _duck_pp(self) -> None:
@@ -2551,7 +2633,8 @@ class VoiceOrchestrator:
                        "off, so no local action can run.")
             return
         res = broker.execute(f"local.{name}", dict(params),
-                             source="user")
+                             source="user",
+                             session=_cfg_session(self.cfg))
         if res.denied == "CONFIRMATION_REQUIRED":
             # Destructive tier: spoken two-step. The broker only executes
             # after an explicit user-issued, single-use confirmation id.
@@ -3574,3 +3657,15 @@ class VoiceOrchestrator:
                   confidence=round(intent.confidence, 2), reason=intent.reason,
                   source=intent.source)
         self._route_intent(intent, text)
+
+
+def _session_id(cfg: Any) -> str:
+    """Best-effort canonical session id for the autonomy seam.
+
+    Returns "" for a cfg double that has no session_key so a
+    test/diagnostic cfg never crashes a dispatch."""
+    fn = getattr(cfg, "session_key", None)
+    try:
+        return str(fn()) if callable(fn) else ""
+    except Exception:
+        return ""

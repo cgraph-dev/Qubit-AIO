@@ -199,7 +199,7 @@ safety:
 summarizer:
   provider: ollama              # ollama (local model) | extractive (no model)
   ollama_url: http://127.0.0.1:11434
-  ollama_model: huihui_ai/llama3.2-abliterate:3b   # the bridge's local chat model
+  ollama_model: qubit-brain4   # the bridge's local chat model
   max_chars: 900
   max_words: 40             # HARD cap on every spoken response (save time)
 
@@ -210,6 +210,7 @@ webui:
   enabled: true
   speak_web_locally: false # browser plays the reply once; keep false to avoid double-speech
   host: 0.0.0.0            # 0.0.0.0 = reachable from the LAN (phone)
+  token: ""                # REQUIRED for a non-loopback host: set a long random value
   port: 8890
   script_timeout_s: 60     # local-script tools (e.g. Perplexity search) cap
 

@@ -56,12 +56,18 @@ def _model(cfg: Any) -> str:
 
 def turn(cfg: Any, text: str, *, session: str = "qubit",
          timeout_s: Optional[float] = None,
-         estop_engaged: Optional[Callable[[], bool]] = None) -> Dict[str, Any]:
+         estop_engaged: Optional[Callable[[], bool]] = None,
+         model: Optional[str] = None) -> Dict[str, Any]:
     """Run one agent turn natively and return the reply.
 
     Raises AgentDenied before execution on emergency stop / disabled
     agent. Model failure, timeout, and empty replies are typed
     ``ok=false`` results — never an exception, never fabricated text.
+
+    ``model`` is the canonical resolver's already-selected local alias. When
+    supplied it is the alias actually executed and reported; when omitted the
+    legacy ``agent.model`` default is used. This keeps the resolved profile
+    and the receipt truthful instead of recording a model that never ran.
     """
     check = estop_engaged or (lambda: False)
     if check():
@@ -74,12 +80,13 @@ def turn(cfg: Any, text: str, *, session: str = "qubit",
     if not clean:
         return {"ok": False, "code": "MALFORMED",
                 "error": "turn needs non-empty text", "session": session}
+    alias = str(model or "").strip() or _model(cfg)
     budget = timeout_s or DEFAULT_TIMEOUT_S
     started = time.monotonic()
     try:
         from .local_llm import chat_local
 
-        reply = chat_local(clean, model=_model(cfg),
+        reply = chat_local(clean, model=alias,
                            timeout_s=min(budget, 300.0), max_tokens=1024)
     except Exception as exc:
         _audit("turn_error", session=session, error=str(exc)[:160])
@@ -102,7 +109,7 @@ def turn(cfg: Any, text: str, *, session: str = "qubit",
     return {"ok": True, "reply": _redact(sanitize(reply.strip())),
             "session": session, "elapsed_ms": elapsed_ms,
             "receipt": {"runtime": "qubit-native",
-                        "model": _model(cfg),
+                        "model": alias,
                         "path": "voicebridge.agent.turn"}}
 
 

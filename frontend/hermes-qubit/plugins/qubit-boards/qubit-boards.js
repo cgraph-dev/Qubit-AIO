@@ -1,4 +1,4 @@
-/* Qubit Boards — overlay plugin bundle (OpenClaw addition, dependency-free IIFE).
+/* Qubit Boards — overlay plugin bundle (Qubit addition, dependency-free IIFE).
  * Uses only window.__HERMES_PLUGIN_SDK__ (React, hooks, fetchJSON).
  * Full board mutations on the canonical store (same voicebridge/kanban.py
  * module as `qubit kanban` CLI and voice): create board, add card, move
@@ -71,6 +71,14 @@
     return Array.isArray(result.widgets) ? result.widgets : [];
   }
 
+  /* kanban_show returns {"state","task":{...,"comments":[...]}} at the op
+   * result boundary. Accept both the direct task and a nested task shape. */
+  function commentsOf(result) {
+    if (!result) return [];
+    var task = result.task || result;
+    return Array.isArray(task.comments) ? task.comments : [];
+  }
+
   function Boards() {
     var bst = hooks.useState(null);
     var boards = bst[0], setBoards = bst[1];
@@ -114,6 +122,20 @@
     var wkTab = wtab[0], setWkTab = wtab[1];
     var pv = hooks.useState(null);
     var previewId = pv[0], setPreviewId = pv[1];
+    var sc = hooks.useState(null);
+    var selCard = sc[0], setSelCard = sc[1];
+    var ai = hooks.useState("");
+    var assignee = ai[0], setAssignee = ai[1];
+    var et = hooks.useState("");
+    var editTitle = et[0], setEditTitle = et[1];
+    var cf = hooks.useState("");
+    var cardFilter = cf[0], setCardFilter = cf[1];
+    var cm = hooks.useState([]);
+    var cardComments = cm[0], setCardComments = cm[1];
+    var cb = hooks.useState("");
+    var commentBody = cb[0], setCommentBody = cb[1];
+    var si = hooks.useState("");
+    var snapId = si[0], setSnapId = si[1];
 
     function runRead(opId, args) {
       return fetchJSON("/api/ops/run", {method: "POST",
@@ -130,7 +152,9 @@
         if (!b && list.length) setSelBoard(list[0].board);
       }).catch(function (ex) { setErr(describeError(ex)); });
       var url = "/api/ops/kanban" +
-        (b ? "?board=" + encodeURIComponent(b) : "");
+        (b ? "?board=" + encodeURIComponent(b) : "") +
+        (cardFilter ? (b ? "&" : "?") + "status=" +
+          encodeURIComponent(cardFilter) : "");
       fetchJSON(url).then(function (res) {
         var inner = (res && res.result) || {};
         setTasks(inner.tasks || inner.receipt || []);
@@ -151,7 +175,7 @@
     }
 
     hooks.useEffect(function () { load(""); }, []);
-    hooks.useEffect(function () { load(selBoard); }, [selBoard]);
+    hooks.useEffect(function () { load(selBoard); }, [selBoard, cardFilter]);
 
     /* Sync the rename/position editor to the selected tab whenever the tab
      * set or selection changes (never on every keystroke). */
@@ -226,6 +250,59 @@
       setNewTitle("");
       runMutation("/api/ops/cards-create",
         {title: t, board: selBoard || "main"}, "add card");
+    }
+
+    function selectCard(c) {
+      setSelCard(c);
+      setAssignee(c.assignee || "");
+      setEditTitle(c.title || "");
+      setCommentBody("");
+      setCardComments([]);
+      setErr("");
+      if (c && c.id != null) {
+        runRead("kanban_show", {task_id: c.id}).then(function (res) {
+          setCardComments(commentsOf(res));
+        }).catch(function (ex) { setErr(describeError(ex)); });
+      }
+    }
+
+    function cardClaim() {
+      if (!selCard) return;
+      runOp("kanban_claim", {task_id: selCard.id},
+        "claim card #" + selCard.id);
+    }
+
+    function cardComment() {
+      if (!selCard) return;
+      var body = (commentBody || "").trim();
+      if (!body) { setErr("[MALFORMED] comment body required"); return; }
+      setCommentBody("");
+      runOp("kanban_comment", {task_id: selCard.id, body: body},
+        "comment on card #" + selCard.id);
+    }
+
+    function restoreSnapshot() {
+      var n = parseInt(snapId, 10);
+      if (isNaN(n)) { setErr("[MALFORMED] snapshot id must be an integer"); return; }
+      setSnapId("");
+      runOp("kanban_snapshot_restore", {snapshot_id: n},
+        "restore snapshot #" + n);
+    }
+
+    function cardAssign() {
+      if (!selCard) return;
+      var who = (assignee || "").trim();
+      if (!who) { setErr("[MALFORMED] assignee required"); return; }
+      runOp("kanban_assign", {task_id: selCard.id, assignee: who},
+        "assign card #" + selCard.id + " to " + who);
+    }
+
+    function cardEdit() {
+      if (!selCard) return;
+      var title = (editTitle || "").trim();
+      if (!title) { setErr("[MALFORMED] card title required"); return; }
+      runOp("kanban_edit", {task_id: selCard.id, title: title},
+        "edit card #" + selCard.id);
     }
 
     function createTab() {
@@ -438,6 +515,13 @@
 
       e("h3", {style: {marginTop: 18}},
         "Cards" + (selBoard ? " on " + selBoard : "") + " (" + list.length + ")"),
+      e("label", {style: {display: "inline-block", marginTop: 6}},
+        "Show ",
+        e("select", {value: cardFilter, "aria-label": "Card visibility filter",
+          disabled: busy,
+          onChange: function (ev) { setCardFilter(ev.target.value); }},
+          e("option", {value: ""}, "Active"),
+          e("option", {value: "archived"}, "Archived"))),
       e("div", {style: {marginTop: 8, display: "flex", gap: 8}},
         e(C.Input || "input", {value: newTitle,
           "aria-label": "New card title",
@@ -469,6 +553,11 @@
                   }}, STATUSES.map(function (s) {
                     return e("option", {key: s, value: s}, s);
                   }))),
+              e("button", {"aria-label": "Select card " + id,
+                style: {marginLeft: 6},
+                disabled: busy,
+                onClick: function () { selectCard(c); }},
+                selCard && selCard.id === id ? "Selected" : "Select"),
               e("button", {"aria-label": "Complete card " + id, disabled: busy,
                 style: {marginLeft: 6},
                 onClick: function () {
@@ -476,6 +565,90 @@
                     "complete card #" + id);
                 }}, "Complete"));
           })),
+      selCard ? e("div", {role: "region",
+        "aria-label": "Actions for card " + selCard.id,
+        "data-testid": "card-actions",
+        style: {marginTop: 10, padding: "10px 12px", border: "1px solid #2a3443",
+          borderRadius: 8}},
+        e("strong", null, "Card #" + selCard.id + " actions"),
+        e("span", {style: {opacity: 0.65, marginLeft: 6, fontSize: 12}},
+          selCard.title || ""),
+        e("div", {style: {marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap",
+          alignItems: "end"}},
+          e("label", null, "Title ",
+            e(C.Input || "input", {value: editTitle,
+              "aria-label": "Edit card title",
+              onChange: function (ev) { setEditTitle(ev.target.value); },
+              style: {maxWidth: 220}})),
+          e("button", {"aria-label": "Save card title", disabled: busy,
+            onClick: cardEdit}, "Save title")),
+        e("div", {style: {marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap",
+          alignItems: "end"}},
+          e("label", null, "Assignee ",
+            e(C.Input || "input", {value: assignee,
+              "aria-label": "Card assignee",
+              onChange: function (ev) { setAssignee(ev.target.value); },
+              placeholder: "profile or user", style: {maxWidth: 200}})),
+          e("button", {"aria-label": "Assign card", disabled: busy,
+            onClick: cardAssign}, "Assign"),
+          e("button", {"aria-label": "Claim card", disabled: busy,
+            onClick: cardClaim}, "Claim"),
+          e("button", {"aria-label": "Block card", disabled: busy,
+            onClick: function () {
+              runOp("kanban_block", {task_id: selCard.id},
+                "block card #" + selCard.id);
+            }}, "Block"),
+          e("button", {"aria-label": "Unblock card", disabled: busy,
+            onClick: function () {
+              runOp("kanban_unblock", {task_id: selCard.id},
+                "unblock card #" + selCard.id);
+            }}, "Unblock"),
+          e("button", {"aria-label": "Archive card", disabled: busy,
+            onClick: function () {
+              runOp("kanban_archive", {task_id: selCard.id},
+                "archive card #" + selCard.id);
+            }}, "Archive"),
+          e("button", {"aria-label": "Restore card", disabled: busy,
+            onClick: function () {
+              runOp("kanban_restore", {task_id: selCard.id},
+                "restore card #" + selCard.id);
+            }}, "Restore"),
+          e("button", {"aria-label": "Deselect card", disabled: busy,
+            onClick: function () { setSelCard(null); }}, "Deselect")),
+        e("div", {style: {marginTop: 8}},
+          e("strong", null, "Comments (" + (cardComments || []).length + ")"),
+          !(cardComments || []).length
+            ? e("p", {"data-state": "empty",
+                style: {opacity: 0.6, margin: "4px 0"}}, "No comments yet.")
+            : e("ul", {style: {margin: "4px 0", paddingLeft: 18}},
+                (cardComments || []).map(function (cmt) {
+                  return e("li", {key: cmt.id},
+                    e("span", {style: {opacity: 0.6}},
+                      "@" + (cmt.author || "?") + ": "),
+                    e("span", null, cmt.body || ""));
+                })),
+          e("div", {style: {marginTop: 6, display: "flex", gap: 8,
+            alignItems: "end"}},
+            e("label", null, "Comment ",
+              e(C.Input || "input", {value: commentBody,
+                "aria-label": "New comment body",
+                onChange: function (ev) { setCommentBody(ev.target.value); },
+                onKeyDown: function (ev) {
+                  if (ev.key === "Enter") cardComment();
+                },
+                placeholder: "comment body", style: {maxWidth: 260}})),
+            e("button", {"aria-label": "Add comment", disabled: busy,
+              onClick: cardComment}, "Add comment"))),
+        e("div", {style: {marginTop: 8, display: "flex", gap: 8,
+          alignItems: "end"}},
+          e("label", null, "Snapshot ",
+            e(C.Input || "input", {value: snapId,
+              "aria-label": "Snapshot id to restore",
+              onChange: function (ev) { setSnapId(ev.target.value); },
+              placeholder: "snapshot id", style: {maxWidth: 120}})),
+          e("button", {"aria-label": "Restore snapshot", disabled: busy,
+            onClick: restoreSnapshot}, "Restore snapshot"))
+      ) : null,
 
       e("h3", {style: {marginTop: 18}},
         "Widgets" + (selBoard ? " on " + selBoard : "") +

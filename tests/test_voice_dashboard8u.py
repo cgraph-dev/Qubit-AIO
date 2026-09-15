@@ -58,7 +58,7 @@ def test_voice_unsupported_is_typed(tmp_path):
             page.add_init_script(
                 "delete window.SpeechRecognition; "
                 "delete window.webkitSpeechRecognition;")
-            page.goto(f"http://127.0.0.1:{port}/hermes/qubit-chat",
+            page.goto(f"http://127.0.0.1:{port}/qubit-chat",
                       timeout=30000)
             page.wait_for_timeout(2000)
             assert page.get_by_role("button", name="Voice input").count() == 1
@@ -76,7 +76,7 @@ def test_voice_listening_can_stop_without_hang(tmp_path):
         with pw.sync_playwright() as p:
             browser = p.chromium.launch()
             page = browser.new_page()
-            page.goto(f"http://127.0.0.1:{port}/hermes/qubit-chat",
+            page.goto(f"http://127.0.0.1:{port}/qubit-chat",
                       timeout=30000)
             page.wait_for_timeout(2000)
             page.get_by_role("button", name="Voice input").click()
@@ -117,7 +117,7 @@ def test_voice_transcript_executes_backend_turn(tmp_path):
               }
               window.SpeechRecognition = FakeSR;
             """)
-            page.goto(f"http://127.0.0.1:{port}/hermes/qubit-chat",
+            page.goto(f"http://127.0.0.1:{port}/qubit-chat",
                       timeout=30000)
             page.wait_for_timeout(2000)
             page.get_by_role("button", name="Voice input").click()

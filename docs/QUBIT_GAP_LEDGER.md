@@ -23,8 +23,8 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
   - upstream_pin: 3a9d69db306cd7f081e06254cb89c4bcc14a7107
   - upstream_tag: v2026.9.4
   - upstream_tree: /tmp/opencode/pinned/openclaw (read via git show 3a9d69db306cd7f081e06254cb89c4bcc14a7107, shallow clone)
-- `docs/QUBIT_GAP_LEDGER.qubit.json` — schema `qubit-gap-ledger-section/1`, source `qubit-surface`, 693 rows
-  - generated_from: cli_families=106, dashboard_ops.EXTRA_OPS=34, dashboard_ops.catalog=510, hermes_compat.GATED=102, hermes_compat.ROUTES=367, source_inventory.dispositioned=121, source_inventory.dispositioned_gated=4, source_inventory.dispositioned_implemented=117, source_inventory.distinct_uncovered=0, source_inventory.items=6775, source_inventory.parented_covered=1081, source_inventory.parented_uncovered=0, source_inventory.surface_items=1818, voice_commands.CLI_COVERAGE=106, voice_commands.REGISTRY=476
+- `docs/QUBIT_GAP_LEDGER.qubit.json` — schema `qubit-gap-ledger-section/1`, source `qubit-surface`, 707 rows
+  - generated_from: cli_families=106, dashboard_ops.EXTRA_OPS=34, dashboard_ops.catalog=523, hermes_compat.GATED=105, hermes_compat.ROUTES=385, source_inventory.dispositioned=121, source_inventory.dispositioned_gated=4, source_inventory.dispositioned_implemented=117, source_inventory.distinct_uncovered=0, source_inventory.items=6775, source_inventory.parented_covered=1081, source_inventory.parented_uncovered=0, source_inventory.surface_items=1818, voice_commands.CLI_COVERAGE=106, voice_commands.REGISTRY=480
   - evidence: production backend + declared interfaces + live CLI tree + voice registry + linked tests/ AST proofs + direct source inventory
   - generator: scripts/rebuild_ledger_qubit.py
   - backend_flags: []
@@ -35,23 +35,23 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
 
 ## Counts
 
-- Total rows: **1370**
+- Total rows: **1384**
 - Code-side open rows (not terminal): **0**
-- SAFE_EQUIVALENT (closed for code readiness): **157**
+- SAFE_EQUIVALENT (closed for code readiness): **158**
 - OPERATOR_ONLY (manual/operator qualification): **11**
 - Code-ready: **True**; fully complete (all manual qualified): **False**
 
 ### By status
 
-- IMPLEMENTED: 1202
+- IMPLEMENTED: 1215
 - OPERATOR_ONLY: 11
-- SAFE_EQUIVALENT: 157
+- SAFE_EQUIVALENT: 158
 
 ### By source
 
 - hermes: 573
 - openclaw: 104
-- qubit: 693
+- qubit: 707
 
 ### By area
 
@@ -96,7 +96,7 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
 - dashboard-auth: 11
 - dashboard-page: 20
 - dashboard-ui: 15
-- dashboard_plugin: 15
+- dashboard_plugin: 16
 - desktop: 5
 - device: 1
 - device_enroll: 1
@@ -126,7 +126,7 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
 - ide: 9
 - import_agent: 2
 - insights: 1
-- kanban: 44
+- kanban: 48
 - lessons: 3
 - local-models: 16
 - local_models: 13
@@ -159,6 +159,7 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
 - policy: 2
 - power_status: 1
 - product: 7
+- profile: 9
 - profiles: 20
 - projects: 13
 - prompt_budget: 1
@@ -216,7 +217,7 @@ No code-side open rows: every row is terminal (IMPLEMENTED / SAFE_EQUIVALENT / O
 
 ## Terminal gate rows (SAFE_EQUIVALENT / OPERATOR_ONLY)
 
-### SAFE_EQUIVALENT — Qubit-safe equivalents (closed; unsafe raw behavior explicitly refused) (157)
+### SAFE_EQUIVALENT — Qubit-safe equivalents (closed; unsafe raw behavior explicitly refused) (158)
 
 | id | source | needs | capability | proving test |
 | --- | --- | --- | --- | --- |
@@ -231,6 +232,7 @@ No code-side open rows: every row is terminal (IMPLEMENTED / SAFE_EQUIVALENT / O
 | `api:DELETE /api/messaging/whatsapp/onboarding/{pairing_id}` | hermes | creds | DELETE /api/messaging/whatsapp/onboarding/{pairing_id} | tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:DELETE /api/providers/oauth/sessions/{session_id}` | hermes | creds | DELETE /api/providers/oauth/sessions/{session_id} | tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:DELETE /api/providers/oauth/{provider_id}` | hermes | creds | DELETE /api/providers/oauth/{provider_id} | tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed |
+| `api:DELETE /api/sessions/empty` | hermes | owner | DELETE /api/sessions/empty | tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:GET /api/audio/elevenlabs/voices` | hermes | creds | GET /api/audio/elevenlabs/voices | tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:GET /api/config/raw` | hermes | creds | GET /api/config/raw | tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:GET /api/credentials/pool` | hermes | creds | GET /api/credentials/pool | tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed |

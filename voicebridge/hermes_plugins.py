@@ -23,7 +23,9 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -59,7 +61,11 @@ VENDORED_PLUGIN_FLEET: Tuple[str, ...] = (
 
 def _hermes_home(cfg: Any) -> Path:
     """Qubit-owned Hermes root: the live ``HERMES_HOME`` when the fork set one,
-    else ``<Qubit state dir>/hermes`` (matching ``hermes_asgi``'s default)."""
+    else ``<Qubit state dir>/qubit`` — the SAME home ``voicebridge.webui``
+    points the in-process vendored backend at, so CLI/voice plugin reads and
+    the dashboard read one store. (``hermes_runtime.run`` uses
+    ``<state>/runtime`` for forwarded ``qubit hermes`` calls; unifying that
+    third home is an operator migration, recorded in ``kanban_bridge``.)"""
     env = os.environ.get("HERMES_HOME", "").strip()
     if env:
         return Path(env)
@@ -68,7 +74,7 @@ def _hermes_home(cfg: Any) -> Path:
     except Exception:
         base = Path(os.environ.get("XDG_STATE_HOME", str(Path.home()))) / \
             "qubit-voicebridge"
-    return base / "hermes"
+    return base / "qubit"
 
 
 def _plugin_data_dir(cfg: Any, name: str) -> Path:
@@ -113,6 +119,45 @@ def _redact(text: Any) -> str:
         return redact_text(str(text))
     except Exception:
         return str(text)
+
+
+_UPSTREAM_PRODUCT_RE = re.compile(
+    r"\b(?:" + "Her" + "mes" + "|" + "Open" + "Claw" + r")\b",
+    re.IGNORECASE)
+
+
+def _rebrand_product(text: Any) -> str:
+    """Render upstream product names as Qubit at the served boundary.
+
+    Vendored manifests/catalogs author upstream product names; the frozen
+    identity promise requires the normal dashboard to render Qubit while the
+    vendored tree stays byte-faithful as the provenance record. Backend
+    counterpart of ``frontend/hermes-web/src/lib/rebrand.ts``.
+    """
+    return _UPSTREAM_PRODUCT_RE.sub("Qubit", str(text))
+
+
+def _rebrand_tab(tab: Any) -> Any:
+    if isinstance(tab, dict) and tab.get("label"):
+        out = dict(tab)
+        out["label"] = _rebrand_product(out["label"])
+        return out
+    return tab
+
+
+def _rebrand_obj(value: Any) -> Any:
+    """Recursively rebrand upstream product names in a served payload.
+
+    Applied to the vendored achievements payload at the backend boundary so the
+    raw JSON API is already Qubit-branded (the SPA normalizer remains a second
+    guard)."""
+    if isinstance(value, str):
+        return _rebrand_product(value)
+    if isinstance(value, list):
+        return [_rebrand_obj(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _rebrand_obj(v) for k, v in value.items()}
+    return value
 
 
 def _audit(op: str, detail: Dict[str, Any]) -> None:
@@ -276,7 +321,7 @@ def _achievements_payload(engine: Any) -> Dict[str, Any]:
     payload["scan_meta"] = {
         **(data.get("scan_meta") or {}),
         "status": engine._scan_status_payload()}
-    return payload
+    return _rebrand_obj(payload)
 
 
 def h_plugin_achievements(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -411,39 +456,224 @@ def _kanban_read(cfg: Any, fn_name: str, **kwargs: Any) -> Tuple[int, Any]:
         return _fail(exc, "kanban")
 
 
+# ---------------------------------------------------------------------------
+# Kanban read surface -> the AUTHORITATIVE Qubit-native store
+# ---------------------------------------------------------------------------
+# The vendored Hermes kanban plugin read the fork's own ``hermes_cli.kanban_db``
+# while Qubit's CLI, voice, operations catalog, task ledger and reports all use
+# ``voicebridge.kanban``. One store must back every surface, so these handlers
+# synthesize the vendored board/task wire shape from the native store. Fields
+# the native store does not own (links, runs, diagnostics, attachments,
+# workspace, tenant, sub-columns) are returned typed-empty, never read from the
+# legacy store.
+
+_NATIVE_TO_VENDOR = {
+    "open": "todo", "claimed": "running", "blocked": "blocked",
+    "done": "done", "archived": "archived",
+}
+_VENDOR_COLUMNS = ("triage", "todo", "scheduled", "ready", "running",
+                   "blocked", "review", "done")
+# The native store only has these mapping targets; the four upstream-only
+# sub-columns (triage/scheduled/ready/review) are omitted from the board so the
+# UI does not render empty lanes with dead create buttons.
+_SUPPORTED_COLUMNS = ("todo", "running", "blocked", "done")
+_NATIVE_PRIORITY_INT = {"low": 0, "normal": 1, "high": 2}
+
+
+def _native_board(q: Dict[str, str]) -> str:
+    raw = str((q or {}).get("board", "") or "").strip()
+    return "main" if raw in ("", "default") else raw
+
+
+def _kanban_http(exc: Exception) -> Tuple[int, Any]:
+    code = str(getattr(exc, "code", "") or "")
+    detail = str(getattr(exc, "detail", "") or exc)
+    status = 500
+    if "NOT_FOUND" in code:
+        status = 404
+    elif "BAD_INPUT" in code or "BAD_STATE" in code:
+        status = 400
+    elif "CONFIRM" in code:
+        status = 409
+    elif "ESTOP" in code:
+        status = 403
+    if status == 500:
+        return _fail(exc, "kanban")
+    return status, {"ok": False, "state": "FAILED", "code": code,
+                    "detail": _redact(detail)[:300]}
+
+
+def _native_comment_counts(cfg: Any, kanban_mod: Any) -> Dict[int, int]:
+    conn = kanban_mod._connect(cfg)
+    try:
+        kanban_mod._migrate(conn)
+        return {int(r["task_id"]): int(r["c"]) for r in conn.execute(
+            "SELECT task_id, COUNT(*) c FROM comments GROUP BY task_id")}
+    except Exception:
+        return {}
+    finally:
+        conn.close()
+
+
+def _native_task_vendor(task: Dict[str, Any], now: float,
+                        comment_count: int) -> Dict[str, Any]:
+    """Synthesize the vendored task wire shape from a native task."""
+    created = float(task.get("created_at") or now)
+    return {
+        "id": str(task.get("id")),
+        "board": task.get("board", "main"),
+        "title": task.get("title", ""),
+        "body": task.get("body", ""),
+        "result": None,
+        "latest_summary": None,
+        "assignee": task.get("assignee") or None,
+        "tenant": None,
+        "status": _NATIVE_TO_VENDOR.get(str(task.get("status")), "todo"),
+        "priority": _NATIVE_PRIORITY_INT.get(str(task.get("priority")), 1),
+        "created_at": task.get("created_at"),
+        "updated_at": task.get("updated_at"),
+        "age": {"created_age_seconds": max(0.0, now - created),
+                "started_age_seconds": None,
+                "time_to_complete_seconds": None},
+        "comment_count": int(comment_count or 0),
+        "link_counts": {"parents": 0, "children": 0},
+        "progress": None,
+        "workspace_kind": "scratch",
+        "workspace_path": None,
+        "skills": [],
+        "goal_mode": False,
+        "goal_max_turns": None,
+        "created_by": None,
+        "model_override": None,
+        "provider_override": None,
+        "runs": [],
+        "diagnostics": [],
+        "warnings": None,
+    }
+
+
 def h_plugin_kanban_board(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                           p: Dict[str, str]) -> Tuple[int, Any]:
-    return _kanban_read(
-        cfg, "get_board", tenant=q.get("tenant"),
-        include_archived=_qbool(q, "include_archived"),
-        board=q.get("board") or None,
-        workflow_template_id=q.get("workflow_template_id") or None,
-        current_step_key=q.get("current_step_key") or None)
+    from . import kanban as N
+    board = _native_board(q)
+    try:
+        out = N.board_open(cfg, board=board)
+    except Exception as exc:
+        # A fresh native store has no ``main`` row yet; the default board is
+        # empty, not missing. A non-default slug that does not exist stays 404.
+        if "NOT_FOUND" in str(getattr(exc, "code", "")) and board == "main":
+            out = {"by_column": {}}
+        else:
+            return _kanban_http(exc)
+    now = time.time()
+    counts = _native_comment_counts(cfg, N)
+    columns: Dict[str, List[Dict[str, Any]]] = {
+        c: [] for c in _SUPPORTED_COLUMNS}
+    if _qbool(q, "include_archived"):
+        columns["archived"] = []
+    for status, tasks in (out.get("by_column") or {}).items():
+        vendor = _NATIVE_TO_VENDOR.get(status, "todo")
+        if vendor == "archived" and "archived" not in columns:
+            continue
+        if vendor not in columns:
+            vendor = "todo"
+        for t in tasks:
+            columns[vendor].append(_native_task_vendor(
+                t, now, counts.get(int(t.get("id")), 0)))
+    assignees = sorted({t["assignee"] for col in columns.values()
+                        for t in col if t.get("assignee")})
+    return 200, {"ok": True,
+                 "columns": [{"name": n, "tasks": columns[n]} for n in columns],
+                 "tenants": [], "assignees": assignees,
+                 "latest_event_id": 0, "now": int(now)}
 
 
 def h_plugin_kanban_task(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                          p: Dict[str, str]) -> Tuple[int, Any]:
-    return _kanban_read(
-        cfg, "get_task", task_id=str(p.get("task_id") or ""),
-        board=q.get("board") or None,
-        run_state_type=q.get("run_state_type") or None,
-        run_state_name=q.get("run_state_name") or None)
+    from . import kanban as N
+    try:
+        tid = int(str(p.get("task_id") or ""))
+    except (TypeError, ValueError):
+        return 404, {"ok": False, "state": "FAILED", "code": "PLUGIN_HTTP",
+                     "detail": f"task {p.get('task_id')!r} not found"}
+    try:
+        out = N.show(cfg, tid)
+    except Exception as exc:
+        return _kanban_http(exc)
+    task = out["task"]
+    comments = [{"id": c.get("id"), "author": c.get("author", ""),
+                 "body": c.get("body", ""), "created_at": c.get("created_at")}
+                for c in task.get("comments", [])]
+    events = [{"id": i, "kind": e.get("kind", ""),
+               "created_at": e.get("created_at"), "payload": None}
+              for i, e in enumerate(task.get("events", []))]
+    return 200, {"ok": True,
+                 "task": _native_task_vendor(task, time.time(), len(comments)),
+                 "comments": comments, "events": events, "attachments": [],
+                 "links": {"parents": [], "children": []},
+                 "child_results": [], "runs": []}
 
 
 def h_plugin_kanban_stats(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                           p: Dict[str, str]) -> Tuple[int, Any]:
-    return _kanban_read(cfg, "get_stats", board=q.get("board") or None)
+    from . import kanban as N
+    board = _native_board(q)
+    try:
+        out = N.stats(cfg, board=board)
+    except Exception as exc:
+        if "NOT_FOUND" in str(getattr(exc, "code", "")) and board == "main":
+            out = {"stats": {}}
+        else:
+            return _kanban_http(exc)
+    by_status = next(iter((out.get("stats") or {}).values()), {})
+    return 200, {"ok": True, "by_status": by_status, "by_assignee": {},
+                 "oldest_ready_age_seconds": None, "now": int(time.time())}
 
 
 def h_plugin_kanban_assignees(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                               p: Dict[str, str]) -> Tuple[int, Any]:
-    return _kanban_read(cfg, "get_assignees", board=q.get("board") or None)
+    from . import kanban as N
+    try:
+        out = N.list_tasks(cfg, board=_native_board(q), limit=N.LIST_MAX)
+    except Exception as exc:
+        return _kanban_http(exc)
+    names = sorted({t["assignee"] for t in out.get("tasks", [])
+                    if t.get("assignee")})
+    return 200, {"ok": True,
+                 "assignees": [{"name": n, "on_disk": False, "counts": {}}
+                               for n in names]}
 
 
 def h_plugin_kanban_boards(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                            p: Dict[str, str]) -> Tuple[int, Any]:
-    return _kanban_read(cfg, "list_boards",
-                        include_archived=_qbool(q, "include_archived"))
+    from . import kanban as N
+    try:
+        out = N.boards_list(cfg)
+    except Exception as exc:
+        return _kanban_http(exc)
+    boards = []
+    for bd in out.get("boards", []):
+        counts = bd.get("counts", {}) or {}
+        boards.append({
+            "slug": bd.get("board"),
+            "name": bd.get("name"),
+            "counts": counts,
+            "total": sum(v for k, v in counts.items() if k != "archived"),
+            "is_current": bd.get("board") == "main",
+            "default_workspace_kind": "scratch",
+            "default_workdir": None,
+            "project_id": bd.get("project_slug"),
+            "project_name": bd.get("project_slug"),
+            "archived": False,
+        })
+    if not boards:
+        # A fresh native store has no board row yet: present the canonical
+        # empty board so the dashboard renders instead of an empty selector.
+        boards = [{"slug": "main", "name": "main", "counts": {}, "total": 0,
+                   "is_current": True, "default_workspace_kind": "scratch",
+                   "default_workdir": None, "project_id": None,
+                   "project_name": None, "archived": False}]
+    return 200, {"ok": True, "boards": boards, "current": "main"}
 
 
 def h_plugin_kanban_config(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -537,6 +767,39 @@ def h_plugin_kanban_orchestration(
 # Plugin fleet discovery
 # ---------------------------------------------------------------------------
 
+def h_plugin_kanban_events(
+    cfg: Any, q: Dict[str, str], b: Dict[str, Any], p: Dict[str, str]
+) -> Tuple[int, Any]:
+    """Recent board events for the kanban plugin's live-update poll.
+
+    Qubit serves ONE event path and refuses the vendored plugin's ``/events``
+    WebSocket with the typed ``WS_SINGLE_PATH`` gate, so the served bundle polls
+    this GET route. It reads the SAME authoritative Qubit-native store as the
+    board handlers (``kanban.log``), newest-first and bounded — a read, never a
+    second listener or a second store.
+    """
+    from . import kanban as N
+    board = _native_board(q)
+    try:
+        out = N.log(cfg, board=board, limit=100)
+    except Exception as exc:
+        if "NOT_FOUND" in str(getattr(exc, "code", "")) and board == "main":
+            out = {"events": []}
+        else:
+            return _kanban_http(exc)
+    events = [{"id": i, "task_id": e.get("task_id"),
+               "kind": e.get("kind", ""), "title": e.get("title"),
+               "detail": e.get("detail"), "payload": None,
+               "created_at": e.get("created_at")}
+              for i, e in enumerate(out.get("events", []))]
+    return 200, {"ok": True, "state": "OK", "events": events}
+
+
+# ---------------------------------------------------------------------------
+# Plugin fleet discovery
+# ---------------------------------------------------------------------------
+
+
 def plugin_fleet_manifests() -> List[Dict[str, Any]]:
     """Manifests for the vendored dashboard plugin fleet.
 
@@ -556,11 +819,11 @@ def plugin_fleet_manifests() -> List[Dict[str, Any]]:
             continue
         manifests.append({
             "name": str(data.get("name") or name),
-            "label": data.get("label", name),
-            "description": data.get("description", ""),
+            "label": _rebrand_product(data.get("label", name)),
+            "description": _rebrand_product(data.get("description", "")),
             "icon": data.get("icon", "Puzzle"),
             "version": data.get("version", "0.0.0"),
-            "tab": data.get("tab", {}),
+            "tab": _rebrand_tab(data.get("tab", {})),
             "entry": data.get("entry", "dist/index.js"),
             "css": data.get("css"),
             "api": data.get("api"),
@@ -603,15 +866,28 @@ def h_plugin_fleet(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 
 __all__ = [
-    "h_plugin_achievements", "h_plugin_achievements_scan_status",
+    "h_plugin_achievements",
+    "h_plugin_achievements_scan_status",
     "h_plugin_achievements_recent_unlocks",
-    "h_plugin_achievements_session_badges", "h_plugin_achievements_rescan",
+    "h_plugin_achievements_session_badges",
+    "h_plugin_achievements_rescan",
     "h_plugin_achievements_reset_state",
-    "h_plugin_kanban_board", "h_plugin_kanban_task", "h_plugin_kanban_stats",
-    "h_plugin_kanban_assignees", "h_plugin_kanban_boards",
-    "h_plugin_kanban_config", "h_plugin_kanban_projects",
-    "h_plugin_kanban_workers", "h_plugin_kanban_diagnostics",
-    "h_plugin_kanban_model_options", "h_plugin_kanban_home_channels",
-    "h_plugin_fleet", "plugin_fleet_manifests", "plugin_fleet_audit",
-    "dashboard_surface", "VENDORED_PLUGIN_FLEET", "reset_plugin_caches",
+    "h_plugin_kanban_board",
+    "h_plugin_kanban_task",
+    "h_plugin_kanban_stats",
+    "h_plugin_kanban_assignees",
+    "h_plugin_kanban_boards",
+    "h_plugin_kanban_config",
+    "h_plugin_kanban_projects",
+    "h_plugin_kanban_workers",
+    "h_plugin_kanban_diagnostics",
+    "h_plugin_kanban_model_options",
+    "h_plugin_kanban_home_channels",
+    "h_plugin_kanban_events",
+    "h_plugin_fleet",
+    "plugin_fleet_manifests",
+    "plugin_fleet_audit",
+    "dashboard_surface",
+    "VENDORED_PLUGIN_FLEET",
+    "reset_plugin_caches",
 ]

@@ -20,7 +20,11 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# Prefer the machine-local bake artifact; fall back to the tracked sanitized
+# persona fixture so a clean checkout can rebuild the default brain.
 MODEFILE = ROOT / "Modelfile.qubit4"
+if not MODEFILE.is_file():
+    MODEFILE = ROOT / "tests" / "fixtures" / "modelfiles" / "qubit4.sanitized"
 
 
 def json_dumps(o):

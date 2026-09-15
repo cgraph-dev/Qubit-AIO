@@ -2595,3 +2595,25 @@ The project is ready for broad PC control only when:
 - OpenRouter API quickstart and OpenAI-compatible endpoint: https://openrouter.ai/docs/quickstart
 - OpenRouter provider selection, fallback, and data-policy controls: https://openrouter.ai/docs/guides/routing/provider-selection
 - OpenAI API-key handling guidance: https://platform.openai.com/docs/api-reference/authentication
+
+## 10. Current authority amendment — 2026-09-15
+
+This historical implementation plan remains useful for its detailed packet and
+engineering guidance. Its current execution authority is supplemented by:
+
+- `QUBIT_OWNER_AMENDMENT_2026-09-15_PROVIDER_AND_VOICE_PLUGGABILITY.md`;
+- `QUBIT_PROVIDER_VOICE_PARITY_PLAN_2026-09-15.md`;
+- `QUBIT_PRODUCT_PARITY_AND_AUTONOMY_PLAN_2026-09-15.md`; and
+- `QUBIT_PLAN_INTEGRITY_AUDIT_2026-09-15.md`.
+
+The current local product is the Qubit-owned pinned Hermes foundation with
+OpenClaw capability integrations and Qubit VoiceBridge. `qubit-brain4` is a
+versioned default profile, not a permanent product requirement: local models,
+approved API models, ASR, TTS, devices, and realtime speech providers are
+independently selectable behind the one Qubit session/broker/policy/audit path.
+The owner also authorizes scoped autonomy and advanced local-model research as
+defined in the amendment. New work must use the master plan's source/control
+audit and batch-test cadence; historic phase checkmarks or narrow tests do not
+prove product completion. An active owner autonomy profile supplies the
+pre-authorization for actions wholly within its declared scope; it does not
+remove audit, redaction, e-stop, resource, authentication, or secret controls.

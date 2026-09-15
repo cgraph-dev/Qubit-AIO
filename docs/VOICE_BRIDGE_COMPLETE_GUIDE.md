@@ -93,11 +93,16 @@ The resulting description, transcript, or selected frames become bounded,
 cited evidence for the main model. Large raw videos should not be placed in a
 prompt. The assistant should read only the required part.
 
-### 3. Brain: the local model
+### 3. Brain: a selectable model profile
 
-Ollama runs the local model. `qubit-brain4` is the current production alias.
-The local model writes the answer, decides what information it needs, and
-proposes tool work.
+`qubit-brain4` is the current default local model profile, commonly served by
+Ollama. It is not embedded into Qubit. You can select another validated local
+model, an approved API model for a difficult task, or a future provider profile
+without replacing Qubit's sessions, memory, tools, or VoiceBridge.
+
+The selected model writes the answer, decides what information it needs, and
+proposes tool work. Qubit's profile resolver records which provider/model was
+used, whether data left the machine, usage/budget, and every fallback.
 
 The model does not directly control the computer. It produces a structured
 request. The router and permission broker decide whether that request is safe.
@@ -107,8 +112,8 @@ The system can also use different model tiers:
 
 - a fast local model for short answers, classification, and summaries;
 - the main local model for normal conversation and planning;
-- a stronger local or remote model only when the user has allowed it and the
-  task justifies the extra time or cost.
+- a stronger local or remote model only when the selected profile/autonomy
+  policy allows it and the task justifies the extra time or cost.
 
 This improves practical intelligence and speed without pretending that a
 smaller model has learned everything from a larger model.
@@ -317,10 +322,18 @@ the browser/web endpoint is useful when speech is inconvenient.
 
 ### Speech quality and one-voice rule
 
-Qubit uses one user-selected canonical voice. A small sentiment controller may
-choose safe delivery states—neutral, warm, calm, concerned, urgent, or
-excited—but these are presentation settings, not literal feelings. Fish Audio
-can inform TTS design, but it is not Qubit's brain, memory, planner, or STT.
+Qubit uses one active voice/session/policy path at a time, with a user-selected
+speech profile. A profile independently selects ASR, TTS, voice, microphone,
+output device, VAD, push-to-talk/wake behavior, language, and—when explicitly
+enabled—an external realtime speech provider. This is intentionally not one
+permanent local vendor: local speech, API TTS, and approved realtime speech are
+interchangeable adapters behind the same Qubit broker, receipts, cancellation,
+and e-stop.
+
+A small sentiment controller may choose delivery states—neutral, warm, calm,
+concerned, urgent, or excited—but these are presentation settings, not literal
+feelings. Fish Audio can inform TTS design, but it is not Qubit's brain,
+memory, planner, or STT.
 
 The local speech budget is strict: the complete agent may use at most 5 GB
 VRAM, targeting 4 GB or less. The resident model stays on the GPU; Piper TTS
@@ -330,8 +343,10 @@ agent.
 
 Background audio capture is a separate permissioned feature. It is off by
 default, visibly indicated when active, bounded to a local ring buffer, and
-subject to pause, deletion, and retention expiry. Ambient audio is never
-silently added to memory or training.
+subject to pause, deletion, and retention expiry. The owner may deliberately
+select raw local audio/logs for an advanced Brain4 research dataset, but that
+selection is explicit, visible, local by default, and never an automatic model
+promotion.
 
 ## How it becomes faster and more useful
 

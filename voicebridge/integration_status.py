@@ -86,12 +86,16 @@ def verify_static() -> Dict[str, Any]:
     """Run the hermetic static release qualification (no build/install)."""
     import runpy
     import sys
-    from io import StringIO
 
     argv_save = sys.argv
     sys.argv = ["release_qualify.py", "--static"]
     script = str(Path(__file__).resolve().parents[1] / "scripts" /
                  "release_qualify.py")
+    if not Path(script).exists():
+        sys.argv = argv_save
+        return {"schema": "qubit-verify/1", "state": "UNAVAILABLE",
+                "detail": "static release qualification runs from a source "
+                          "checkout; the script is not packaged in this install"}
     try:
         try:
             runpy.run_path(script, run_name="__main__")

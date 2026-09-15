@@ -13,11 +13,13 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from .resources import resource_path
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _load(name: str) -> Dict[str, Any]:
-    with open(REPO_ROOT / "docs" / name, encoding="utf-8") as fh:
+    with open(resource_path(f"docs/{name}"), encoding="utf-8") as fh:
         return json.load(fh)
 
 

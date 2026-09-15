@@ -1428,3 +1428,25 @@ one Qubit system with:
 At the end, OpenClaw and Hermes may be removed because Qubit owns the required
 capabilities. Until Qubit proves parity in real tests, they remain valuable
 fallbacks and sources of proven implementations.
+
+## Owner amendment 2026-09-15 — active product-correction layer
+
+This plan predates the provider/voice and autonomy clarification. For all new
+work, read and apply these documents before selecting a phase:
+
+- `QUBIT_OWNER_AMENDMENT_2026-09-15_PROVIDER_AND_VOICE_PLUGGABILITY.md`;
+- `QUBIT_PROVIDER_VOICE_PARITY_PLAN_2026-09-15.md`;
+- `QUBIT_PRODUCT_PARITY_AND_AUTONOMY_PLAN_2026-09-15.md`; and
+- `QUBIT_PLAN_INTEGRITY_AUDIT_2026-09-15.md`.
+
+Qubit-Brain4 is a replaceable default model profile. “One model/provider
+gateway” and “one voice path” mean one Qubit-owned resolver/session/broker/
+audit authority with profile-selected local, API, ASR, TTS, and realtime
+adapters—not one hard-coded Ollama model or vendor. Qubit may run owner-scoped
+autonomous work under the dated amendment, but no model or received content can
+grant itself a scope. Within an active autonomy profile, its exact
+pre-authorization replaces an otherwise required per-action confirmation;
+outside that scope, the existing confirmation rules apply. Do not use source
+presence, a compatibility route, a
+ledger terminal status, or a UI screenshot as proof of functional parity;
+require a production caller/control workflow and persistent result.

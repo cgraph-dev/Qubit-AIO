@@ -68,7 +68,7 @@ def _stage_confirm(port, path, body):
     status, out = _http(port, "POST", path, body)
     assert status == 409, (path, status, out)
     assert out.get("state") == "NEEDS_CONFIRMATION", out
-    status, done = _http(port, "POST", "/hermes/api/ops/confirm",
+    status, done = _http(port, "POST", "/agent/api/ops/confirm",
                           {"confirmation_id": out["confirmation_id"]})
     assert status == 200 and done.get("ok"), (path, status, done)
     return done
@@ -78,10 +78,10 @@ def _stage_confirm(port, path, body):
 def test_gateway_lifecycle_over_http(tmp_path):
     ui, port = _start(tmp_path)
     try:
-        _stage_confirm(port, "/hermes/api/ops/msg-account-add",
+        _stage_confirm(port, "/agent/api/ops/msg-account-add",
                        {"account_id": "team", "provider": "slack",
                         "label": "Team", "key_ref": "env:SLACK_TOKEN"})
-        done = _stage_confirm(port, "/hermes/api/ops/gateway-add",
+        done = _stage_confirm(port, "/agent/api/ops/gateway-add",
                               {"gateway_id": "gw1", "provider": "slack",
                                "account": "team", "channel": "webhook",
                                "key_ref": "env:SLACK_TOKEN"})
@@ -91,13 +91,13 @@ def test_gateway_lifecycle_over_http(tmp_path):
         assert gw.get("key_ref") == "env", gw  # kind only, never the ref
         assert gw.get("process") == "UNMANAGED", gw
         status, out = _http(port, "GET",
-                             "/hermes/api/ops/gateway-link?gateway_id=gw1")
+                             "/agent/api/ops/gateway-link?gateway_id=gw1")
         assert status == 200
         assert (out.get("result") or {}).get("state") == "NO_CREDENTIAL", \
             out  # honest: env var unset in test
-        _stage_confirm(port, "/hermes/api/ops/gateway-remove",
+        _stage_confirm(port, "/agent/api/ops/gateway-remove",
                        {"gateway_id": "gw1"})
-        status, out = _http(port, "GET", "/hermes/api/ops/gateways")
+        status, out = _http(port, "GET", "/agent/api/ops/gateways")
         assert status == 200
         assert (out.get("result") or {}).get("gateways", []) == [], out
     finally:
@@ -110,7 +110,7 @@ def test_raw_secret_value_fails_before_staging(tmp_path):
     try:
         from voicebridge.approvals import ApprovalJournal
         from voicebridge.config import Config as _C
-        status, out = _http(port, "POST", "/hermes/api/ops/msg-account-add",
+        status, out = _http(port, "POST", "/agent/api/ops/msg-account-add",
                              {"account_id": "bad", "provider": "slack",
                               "label": "Bad", "key_ref": "xoxb-raw-value"})
         assert status == 400, (status, out)
@@ -134,7 +134,7 @@ def test_gateway_tab_drives_backend(tmp_path):
             page = browser.new_page(viewport={"width": 1440, "height": 900})
             errors = []
             page.on("pageerror", lambda e: errors.append(str(e)))
-            page.goto(f"http://127.0.0.1:{port}/hermes/qubit-gateway",
+            page.goto(f"http://127.0.0.1:{port}/qubit-gateway",
                       timeout=30000)
             page.wait_for_timeout(2500)
             page.get_by_label("New account id").fill("team")
@@ -169,7 +169,7 @@ def test_gateway_tab_drives_backend(tmp_path):
             page.wait_for_timeout(2000)
             assert not errors, errors[:3]
             browser.close()
-        status, out = _http(port, "GET", "/hermes/api/ops/gateways")
+        status, out = _http(port, "GET", "/agent/api/ops/gateways")
         assert status == 200
         assert (out.get("result") or {}).get("gateways", []) == [], out
     finally:

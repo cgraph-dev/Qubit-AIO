@@ -5,7 +5,12 @@ import { usePageHeader } from "@/contexts/usePageHeader";
 import { cn } from "@/lib/utils";
 import { PluginSlot } from "@/plugins";
 
-export const HERMES_DOCS_URL = "https://hermes-agent.nousresearch.com/docs/";
+// Upstream vendor documentation. The real URL is preserved for
+// provenance/attribution; the Qubit product surfaces it explicitly as upstream
+// vendor documentation instead of presenting it as Qubit's own docs.
+export const UPSTREAM_DOCS_URL = "https://hermes-agent.nousresearch.com/docs/";
+export const UPSTREAM_DOCS_LABEL =
+  "Upstream vendor documentation (Nous Research)";
 
 const DS_BUTTON_OUTLINED_LINK_CN = cn(
   "group relative inline-grid grid-cols-[auto_1fr_auto] items-center",
@@ -22,9 +27,11 @@ export default function DocsPage() {
   useLayoutEffect(() => {
     setEnd(
       <a
-        href={HERMES_DOCS_URL}
+        href={UPSTREAM_DOCS_URL}
         target="_blank"
         rel="noopener noreferrer"
+        title={UPSTREAM_DOCS_LABEL}
+        aria-label={UPSTREAM_DOCS_LABEL}
         className={DS_BUTTON_OUTLINED_LINK_CN}
       >
         <ExternalLink className="size-3.5" />
@@ -44,9 +51,17 @@ export default function DocsPage() {
       )}
     >
       <PluginSlot name="docs:top" />
+      <p
+        className={cn(
+          "px-1 pb-1 font-mondwest text-xs tracking-[0.08em]",
+          "text-text-tertiary",
+        )}
+      >
+        {UPSTREAM_DOCS_LABEL}
+      </p>
       <iframe
-        title={t.app.nav.documentation}
-        src={HERMES_DOCS_URL}
+        title={UPSTREAM_DOCS_LABEL}
+        src={UPSTREAM_DOCS_URL}
         className={cn(
           "min-h-0 w-full min-w-0 flex-1",
           "rounded-sm border border-current/20",

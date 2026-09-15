@@ -19,7 +19,7 @@ import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from .config import canonical_state_dir
 
@@ -46,8 +46,9 @@ FLAGS: List[FeatureFlag] = [
         rollback_value=True,
         category="phase3",
         description="Route local actions + local-script templates through the "
-                    "capability broker (argv-only). False = LEGACY DIRECT shell "
-                    "path (unsecured; never described as secured)."),
+                    "capability broker (argv-only). False fails closed with a "
+                    "typed BROKER_DISABLED denial (no direct shell path); it "
+                    "never executes around the broker."),
     FeatureFlag(
         name="compiler_5c",
         config_path=("intent", "compiler", "mode"),

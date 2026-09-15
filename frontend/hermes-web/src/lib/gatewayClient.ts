@@ -21,7 +21,7 @@ import {
   type GatewayEventName,
 } from "@hermes/shared";
 
-import { HERMES_BASE_PATH, buildWsAuthParam } from "@/lib/api";
+import { HERMES_BASE_PATH, buildWsAuthParam, withApiPrefix } from "@/lib/api";
 import { maybeReloadForLoopbackWsAuthFailure } from "@/lib/dashboard-auth-reload";
 
 export type { ConnectionState, GatewayEvent, GatewayEventName };
@@ -56,7 +56,7 @@ export class GatewayClient extends JsonRpcGatewayClient {
       buildHermesWebSocketUrl({
         authParam,
         basePath: HERMES_BASE_PATH,
-        path: "/api/ws",
+        path: withApiPrefix("/api/ws"),
       }),
     );
   }

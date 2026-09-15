@@ -18,6 +18,7 @@ from ``frontend/hermes-qubit/`` (overlay).
 """
 from __future__ import annotations
 
+import base64
 import json
 import re
 import time
@@ -333,7 +334,8 @@ def h_sessions_stats(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     items = res.get("sessions", [])
     by_state: Dict[str, int] = {}
     for r in items:
-        by_state[str(r.get("state", "?"))] += 1
+        key = str(r.get("state", "?"))
+        by_state[key] = by_state.get(key, 0) + 1
     total = len(items)
     # SessionStoreStats wire shape (web/src/lib/api.ts): total, active_store,
     # archived, messages, by_source. Receipts are append-only: archived=0.
@@ -449,18 +451,157 @@ def h_session_messages(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                       "live conversation runs in Qubit Chat (agent.turn)")
 
 
+def _config_field_type(value: Any) -> str:
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, (int, float)):
+        return "number"
+    if isinstance(value, list):
+        return "list"
+    if isinstance(value, dict):
+        return "object"
+    return "string"
+
+
+def _config_fields(schema: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """Flat ``dot.path -> field descriptor`` view of a nested config schema.
+
+    The served ConfigPage binds ``getSchema() -> {fields, category_order}``;
+    deriving the descriptors from the live ``Config`` defaults keeps the form
+    shape tied to the real settings tree instead of a wire-shape stub."""
+    fields: Dict[str, Dict[str, Any]] = {}
+
+    def walk(node: Dict[str, Any], prefix: str) -> None:
+        for key in sorted(node):
+            if str(key).startswith("_"):
+                continue
+            value = node[key]
+            full = f"{prefix}.{key}" if prefix else str(key)
+            if isinstance(value, dict):
+                walk(value, full)
+                continue
+            fields[full] = {
+                "type": _config_field_type(value),
+                "description": full.replace(".", " \u2192 ").replace("_", " ").title(),
+                "category": prefix.split(".")[0] if prefix else "general",
+                "default": value,
+            }
+
+    walk(schema, "")
+    return fields
+
+
+def _config_defaults() -> Dict[str, Any]:
+    from . import config as C
+    return json.loads(json.dumps(C.DEFAULTS, default=str))
+
+
+def _set_dotted(data: Dict[str, Any], dotted: str, value: Any) -> None:
+    parts = [p for p in str(dotted).split(".") if p]
+    if not parts:
+        return
+    node = data
+    for part in parts[:-1]:
+        nxt = node.get(part)
+        if not isinstance(nxt, dict):
+            nxt = {}
+            node[part] = nxt
+        node = nxt
+    node[parts[-1]] = value
+
+
+def _flatten_config(data: Any, prefix: str = "") -> Dict[str, Any]:
+    """Flatten a nested settings body to ``dot.path -> scalar`` overrides.
+
+    The served ConfigPage sends ``{"config": {<nested tree>}}``; the override
+    store is a flat mapping. Walking both shapes here is what stops the nested
+    body from being silently dropped (fabricated success)."""
+    out: Dict[str, Any] = {}
+    if not isinstance(data, dict):
+        return out
+    for key, value in data.items():
+        if str(key) == "confirm":
+            continue
+        full = f"{prefix}.{key}" if prefix else str(key)
+        if isinstance(value, dict):
+            out.update(_flatten_config(value, full))
+        elif value is None or isinstance(value, (str, int, float, bool, list)):
+            out[full] = value
+    return out
+
+
+def _config_scalar_paths(defaults: Any, prefix: str = "") -> Dict[str, Any]:
+    """Map every real scalar setting to its ``dot.path`` and default value.
+
+    Used to reject unknown/mistyped settings writes instead of silently
+    persisting an arbitrary key (which would fabricate success)."""
+    out: Dict[str, Any] = {}
+    if not isinstance(defaults, dict):
+        return out
+    for key, value in defaults.items():
+        if str(key).startswith("_"):
+            continue
+        full = f"{prefix}.{key}" if prefix else str(key)
+        if isinstance(value, dict):
+            out.update(_config_scalar_paths(value, full))
+        else:
+            out[full] = value
+    return out
+
+
+def _config_live(cfg: Any) -> Dict[str, Any]:
+    """The live Qubit config record: defaults deep-merged with the loaded YAML
+    plus any confirm-gated dashboard overrides, in the nested shape the served
+    Settings form reads and writes."""
+    from . import config as C
+    base = getattr(cfg, "data", None)
+    data = json.loads(json.dumps(base if isinstance(base, dict) else C.DEFAULTS,
+                                 default=str))
+    for dotted, value in _load_json_store(_config_overrides_path(cfg)).items():
+        _set_dotted(data, dotted, value)
+    return data
+
+
 def h_config(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    from . import dashboard_ops as OPS
-    out = OPS.run_op(cfg, "config_profiles", {}, actor="dashboard:user",
-                     session="dashboard")
-    if out.get("state") != "executed":
-        return 200, {"ok": False, "code": out.get("code", "FAILED"),
-                     "detail": _redact(out.get("speech", out.get("detail", "")))[:400]}
-    # getConfig/getDefaults/getSchema expect Record<string, unknown>.
-    return _ok(qubit_config_profiles=_res(out),
-               note="read-only inventory; writes stage through the Qubit "
-                    "operations console with confirmation")
+    """GET /api/config -> the live Qubit settings record (``Record<string, unknown>``).
+
+    The served ConfigPage binds ``getConfig()`` to this nested record; returning
+    the real tree (defaults + YAML + applied overrides) is what makes the form
+    render actual values rather than an empty shell.
+    """
+    try:
+        return 200, _config_live(cfg)
+    except Exception as exc:
+        return _fail(exc)
+
+
+def h_config_defaults(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/config/defaults -> the live Qubit default record."""
+    try:
+        return 200, _config_defaults()
+    except Exception as exc:
+        return _fail(exc)
+
+
+def h_config_schema(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/config/schema -> real ``{fields, category_order}`` descriptors.
+
+    Descriptors are derived from the live Qubit config schema (``Config``
+    defaults), so the Settings form groups and renders every real field instead
+    of the previous shape-only stub.
+    """
+    try:
+        from . import config as C
+        fields = _config_fields(C.DEFAULTS)
+        categories = {f["category"] for f in fields.values()}
+        order = [str(k) for k in C.DEFAULTS.keys()
+                 if str(k) in categories and not str(k).startswith("_")]
+        return 200, {"fields": fields, "category_order": order}
+    except Exception as exc:
+        return _fail(exc)
 
 
 def h_egress_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -1002,16 +1143,6 @@ def h_mcp_servers(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                       "MCP servers")
 
 
-def h_mcp_catalog(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
-                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    return _ok(entries=[],
-               diagnostics=[{
-                   "name": "catalog",
-                   "level": "info",
-                   "message": "remote catalog fetch refused; install local "
-                              "reviewed manifests only"}])
-
-
 def h_mcp_catalog_live(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/mcp/catalog -> real local MCP inventory as the catalog.
@@ -1243,7 +1374,9 @@ def h_platforms(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             "updated_at": None, "home_channel": None,
             "whatsapp_setup": None, "env_vars": [],
         })
-    return _ok(env_path="", gateway_start_command="", platforms=platforms)
+    return _ok(env_path="~/.qubit/.env",
+               gateway_start_command="qubit gateway start",
+               platforms=platforms)
 
 
 def h_memory(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -1629,14 +1762,6 @@ def h_ops_run(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ops_result(out)
 
 
-def h_kanban_events(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
-                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    from . import dashboard_ops as OPS
-    out = OPS.run_op(cfg, "kanban_log", {"limit": 50},
-                     actor="dashboard:user", session="dashboard")
-    return _ok(events=_res(out), state=out.get("state"))
-
-
 def h_approvals_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """Pending confirmations on the SHARED journal (same records CLI
@@ -1689,29 +1814,307 @@ def h_ops_cancel(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _confirm_payload(out)
 
 
+def _rebrand_chat_message(message: Any) -> Any:
+    """Render one persisted chat message as Qubit at the served boundary.
+
+    The chat-session store is durable history and may hold legacy
+    upstream-authored text (D4: ``"developed as OpenClaw"``). It is never
+    rewritten; upstream product names are rendered as Qubit only on the served
+    response through the shared ``hermes_plugins._rebrand_product`` convention,
+    so the stored transcript bytes stay unchanged.
+    """
+    if not isinstance(message, dict):
+        return message
+    out = dict(message)
+    if isinstance(out.get("content"), str):
+        out["content"] = _hermes_plugins._rebrand_product(out["content"])
+    meta = out.get("meta")
+    if isinstance(meta, dict):
+        out["meta"] = {
+            key: (_hermes_plugins._rebrand_product(value)
+                  if isinstance(value, str) else value)
+            for key, value in meta.items()}
+    return out
+
+
+def _rebrand_chat_messages(messages: Any) -> Any:
+    if isinstance(messages, list):
+        return [_rebrand_chat_message(m) for m in messages]
+    return messages
+
+
+def _rebrand_chat_record(record: Any) -> Any:
+    if not isinstance(record, dict):
+        return record
+    out = dict(record)
+    for key in ("name", "title", "preview"):
+        if isinstance(out.get(key), str):
+            out[key] = _hermes_plugins._rebrand_product(out[key])
+    return out
+
+
+def _rebrand_chat_result(res: Dict[str, Any]) -> Dict[str, Any]:
+    out = dict(res)
+    if isinstance(out.get("reply"), str):
+        out["reply"] = _hermes_plugins._rebrand_product(out["reply"])
+    if isinstance(out.get("message"), dict):
+        out["message"] = _rebrand_chat_message(out["message"])
+    return out
+
+
 def h_chat_turn(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """Qubit Chat (overlay): one native agent turn, same module as CLI/voice."""
-    from . import agent as AG
+    """Qubit Chat (overlay): one persisted native agent turn, same module as
+    CLI/voice. The turn is written to the Qubit chat-session store so the
+    dashboard can reload it; nothing is fabricated on model failure."""
+    from . import chat_transport as CT
     if _estop(cfg):
-        return 403, {"ok": False, "code": "EMERGENCY_STOP",
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
                      "detail": "emergency stop latched; agent turn refused"}
-    text = str(b.get("text", "") or "")[:4000]
-    session = str(b.get("session", "dashboard-chat") or "dashboard-chat")[:80]
-    if not text.strip():
-        return 400, {"ok": False, "code": "MALFORMED",
-                     "detail": "turn needs non-empty text"}
+    text = str(b.get("text", "") or "")
+    session = str(b.get("session", CT.DEFAULT_SESSION) or CT.DEFAULT_SESSION)[:80]
+    model = b.get("model")
     try:
-        res = AG.turn(cfg, text, session=session)
-    except AG.AgentDenied as exc:
-        _audit("chat_turn_denied", "dashboard:user", {"code": exc.code})
-        return 403, {"ok": False, "code": exc.code,
-                     "detail": _redact(exc.detail)[:300]}
+        res = CT.turn(cfg, text, session=session, model=model)
     except Exception as exc:
         return _fail(exc)
     _audit("chat_turn", "dashboard:user", {"session": session,
                                            "ok": bool(res.get("ok"))})
-    return (200 if res.get("ok") else 502), res
+    if res.get("ok"):
+        return 200, _rebrand_chat_result(res)
+    status = {"EMERGENCY_STOP": 403, "AGENT_DISABLED": 403,
+              "MALFORMED": 400, "MODEL_NOT_ALLOWED": 400,
+              "CANCELLED": 409}.get(str(res.get("code")), 502)
+    return status, res
+
+
+def h_chat_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/qubit/chat/sessions -> persisted chat sessions."""
+    from . import chat_transport as CT
+    try:
+        limit = max(1, min(int(q.get("limit", "50") or "50"), 100))
+    except ValueError:
+        limit = 50
+    try:
+        offset = max(0, int(q.get("offset", "0") or "0"))
+    except ValueError:
+        offset = 0
+    query = str(q.get("q", q.get("query", "")) or "")
+    res = CT.store(cfg).list(limit=limit, offset=offset, query=query)
+    return _ok(sessions=[_rebrand_chat_record(row) for row in res["sessions"]],
+               total=res["total"],
+               limit=res["limit"], offset=res["offset"],
+               state="OK", code=None, source="qubit-chat-store")
+
+
+def h_chat_session_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import chat_transport as CT
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; session create refused"}
+    routed = CT.resolve_model(cfg, b.get("model"))
+    if not routed.get("ok"):
+        return 400, routed
+    res = CT.store(cfg).create(str(b.get("name", "") or ""),
+                               session_id=b.get("id"), model=routed["model"])
+    if res.get("state") == "OK":
+        return _ok(session=_rebrand_chat_record(res["session"]),
+                   messages=res.get("messages", []))
+    status = 409 if res.get("state") == "EXISTS" else 400
+    return status, {"ok": False, "code": res.get("code"),
+                    "detail": res.get("detail", "")}
+
+
+def h_chat_session_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import chat_transport as CT
+    res = CT.store(cfg).show(p.get("id", ""))
+    if res.get("state") != "OK":
+        return 404, {"ok": False, "code": res.get("code"),
+                     "detail": res.get("detail", "")}
+    return _ok(session=_rebrand_chat_record(res["session"]),
+               messages=_rebrand_chat_messages(res.get("messages", [])),
+               message_count=res.get("message_count", 0))
+
+
+def h_chat_session_messages(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import chat_transport as CT
+    try:
+        limit = max(1, min(int(q.get("limit", "500") or "500"), 1000))
+    except ValueError:
+        limit = 500
+    try:
+        offset = max(0, int(q.get("offset", "0") or "0"))
+    except ValueError:
+        offset = 0
+    res = CT.store(cfg).messages(p.get("id", ""), limit=limit, offset=offset)
+    if res.get("state") != "OK":
+        return 404, {"ok": False, "code": res.get("code"),
+                     "detail": res.get("detail", "")}
+    return _ok(session_id=res["session_id"],
+               messages=_rebrand_chat_messages(res["messages"]),
+               total=res["total"],
+               pagination={"limit": res["limit"], "offset": res["offset"],
+                           "order": "asc", "returned": len(res["messages"]),
+                           "total": res["total"]})
+
+
+def h_chat_session_patch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import chat_transport as CT
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; session change refused"}
+    st = CT.store(cfg)
+    if "name" in b:
+        res = st.rename(p.get("id", ""), str(b.get("name", "")))
+    elif b.get("archived") is not None:
+        res = st.archive(p.get("id", ""), bool(b.get("archived")))
+    else:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "patch needs name or archived"}
+    if res.get("state") == "MISSING":
+        return 404, {"ok": False, "code": res.get("code"),
+                     "detail": res.get("detail", "")}
+    if res.get("state") != "OK":
+        return 400, {"ok": False, "code": res.get("code"),
+                     "detail": res.get("detail", "")}
+    return _ok(session=_rebrand_chat_record(res["session"]))
+
+
+def h_chat_session_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import chat_transport as CT
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; session delete refused"}
+    # HTTP DELETE bodies are not parsed by ``webui._hermes_api`` (only
+    # POST/PUT/PATCH are), so a body-only ``confirm`` is unreachable from the
+    # listener. Honor the query string too so the documented confirmation
+    # actually settles the delete.
+    confirmed = bool(b.get("confirm", False)) or str(
+        q.get("confirm", "") or "").strip().lower() in (
+            "1", "true", "yes", "on")
+    res = CT.store(cfg).delete(p.get("id", ""), confirm=confirmed)
+    if res.get("state") == "MISSING":
+        return 404, {"ok": False, "code": res.get("code"),
+                     "detail": res.get("detail", "")}
+    if res.get("state") == "CONFIRM_REQUIRED":
+        return 409, {"ok": False, "state": "CONFIRM_REQUIRED",
+                     "code": "CONFIRM_REQUIRED", "detail": res.get("detail", ""),
+                     "session": _rebrand_chat_record(res.get("session")),
+                     "qubit_counterpart": "re-DELETE with {\"confirm\": true} "
+                                          "or ?confirm=true"}
+    if res.get("state") != "OK":
+        return 400, {"ok": False, "code": res.get("code"),
+                     "detail": res.get("detail", "")}
+    return _ok(state="OK", session=_rebrand_chat_record(res.get("session")))
+
+
+def h_chat_session_export(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import chat_transport as CT
+    res = CT.store(cfg).export(p.get("id", ""))
+    if res.get("state") != "OK":
+        return 404, {"ok": False, "code": res.get("code"),
+                     "detail": res.get("detail", "")}
+    return _ok(schema=res["schema"], session=_rebrand_chat_record(res["session"]),
+               messages=_rebrand_chat_messages(res["messages"]),
+               exported_at=res["exported_at"])
+
+
+def h_chat_session_import(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import chat_transport as CT
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; session import refused"}
+    payload = b.get("envelope") if isinstance(b.get("envelope"), dict) else b
+    res = CT.store(cfg).import_session(
+        payload, overwrite=bool(b.get("overwrite", False)))
+    if res.get("state") == "OK":
+        return _ok(session=res.get("session"), imported=res.get("imported", 0))
+    status = 409 if res.get("state") == "EXISTS" else 400
+    return status, {"ok": False, "code": res.get("code"),
+                    "detail": res.get("detail", "")}
+
+
+def h_chat_cancel(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/qubit/chat/cancel -> stop the in-flight turn on a session."""
+    from . import chat_transport as CT
+    session = str(b.get("session", CT.DEFAULT_SESSION) or CT.DEFAULT_SESSION)
+    res = CT.cancel(session)
+    return (200 if res.get("ok") else 404), res
+
+
+def h_chat_retry(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/qubit/chat/retry -> re-run the last unanswered user message.
+
+    A failed turn keeps the user message and no assistant reply; retry
+    re-invokes the model without duplicating the transcript. Nothing is
+    fabricated when the model is still unavailable.
+    """
+    from . import chat_transport as CT
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; agent turn refused"}
+    session = str(b.get("session", CT.DEFAULT_SESSION) or CT.DEFAULT_SESSION)
+    res = CT.retry_last(cfg, session, model=b.get("model"))
+    if res.get("ok"):
+        return 200, _rebrand_chat_result(res)
+    status = {"SESSION_NOT_FOUND": 404, "NOTHING_TO_RETRY": 409,
+              "EMERGENCY_STOP": 403, "AGENT_DISABLED": 403,
+              "MALFORMED": 400, "MODEL_NOT_ALLOWED": 400}.get(
+                  str(res.get("code")), 502)
+    return status, res
+
+
+def h_chat_pty(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/qubit/chat/pty -> PTY-shaped, agent-backed frame (base64).
+
+    No shell or PTY is spawned: the input line runs one persisted agent turn
+    and the reply is returned as terminal bytes for the xterm UI.
+    """
+    from . import chat_transport as CT
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; chat session refused"}
+    res = CT.pty_feed(cfg,
+                      str(b.get("session", CT.DEFAULT_SESSION) or
+                          CT.DEFAULT_SESSION),
+                      str(b.get("input", "") or ""), model=b.get("model"),
+                      reset=bool(b.get("reset", False)))
+    return (200 if res.get("ok") else 400), res
+
+
+def h_chat_stream(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]):
+    """Streaming chat handler for the ``disp="stream"`` route.
+
+    Returns an iterator of SSE frames -- a real implementation, not a JSON
+    ``(status, dict)`` envelope, which is why the route kind exists. The webui
+    dispatcher consumes the route's ``stream`` disposition and iterates this;
+    :func:`dispatch` never calls it (JSON cannot express an event stream).
+    Preflight (model/empty/e-stop) runs in ``chat_transport.stream_turn`` via
+    the shared ``chat_transport.stream_preflight``.
+    """
+    from . import chat_transport as CT
+    text = str(b.get("text", "") or "")
+    session = str(b.get("session", CT.DEFAULT_SESSION) or CT.DEFAULT_SESSION)
+    return CT.stream_sse(cfg, text, session=session, model=b.get("model"))
 
 
 # ---------------------------------------------------------------------------
@@ -2518,13 +2921,16 @@ def _asr_from_cfg(cfg: Any):
 def _tts_from_cfg(cfg: Any):
     """Build the configured TTS provider (same selection as the orchestrator)."""
     from .tts.piper import PiperTTS
+    from .providers.speech import external_speech_guard
+    _egress = external_speech_guard(cfg)
     provider = cfg.get("tts", "provider", default="piper")
     if provider == "edge":
         from .tts.edge import EdgeTTS
         edge = EdgeTTS(
             voice=cfg.get("tts", "edge", "voice",
                           default="en-US-JennyNeural"),
-            rate=cfg.get("tts", "edge", "rate", default="+0%"))
+            rate=cfg.get("tts", "edge", "rate", default="+0%"),
+            egress_guard=_egress)
         if edge.available():
             return edge
     if provider == "hybrid":
@@ -2541,7 +2947,8 @@ def _tts_from_cfg(cfg: Any):
             key_env=cfg.get("tts", "openai", "key_env",
                             default="~/.config/qubit-voicebridge/.env"),
             instructions=cfg.get("tts", "openai", "instructions", default=""),
-            threshold_words=int(h.get("threshold_words", 18)))
+            threshold_words=int(h.get("threshold_words", 18)),
+            egress_guard=_egress)
     if provider == "openai":
         from .tts.openai_tts import OpenAITTS
         tts = OpenAITTS(
@@ -2550,7 +2957,8 @@ def _tts_from_cfg(cfg: Any):
                           default="gpt-4o-mini-tts"),
             key_env=cfg.get("tts", "openai", "key_env",
                             default="~/.config/qubit-voicebridge/.env"),
-            instructions=cfg.get("tts", "openai", "instructions", default=""))
+            instructions=cfg.get("tts", "openai", "instructions", default=""),
+            egress_guard=_egress)
         if tts.available():
             return tts
     if provider == "kokoro":
@@ -3807,6 +4215,14 @@ _NO_PTY = _g("PTY_NO_SHELL",
              "Qubit forbids raw shell/PTY spawn; the xterm mirror cannot attach. "
              "Use Qubit Chat (streaming agent turns) or the TUI live board.",
              "overlay Qubit Chat tab (POST /api/qubit/chat) + CLI `qubit tui`")
+# The Qubit listener does not mount the curated console WebSocket (it runs one
+# brokered event path). The refusal is accurate for /api/console: it points at
+# the real Qubit safe consoles instead of claiming a raw PTY is being denied.
+_NO_CONSOLE = _g("PTY_NO_SHELL",
+                 "This listener serves Qubit Chat and the Qubit Operations "
+                 "console; the curated console WebSocket is not mounted here. "
+                 "No raw shell/PTY is exposed.",
+                 "overlay Operations tab (/operations) + CLI `qubit-hermes console`")
 _NO_WRITE = _g("WRITE_BROKERED",
                "Direct file writes are refused; writes run only as brokered, "
                "confirmed argv actions with audit receipts.",
@@ -3945,6 +4361,11 @@ _GATE_IMPORT_REVIEW = _g(
     "Uploads enter quarantine for review; reviewed artifacts install via "
     "skills install. Nothing executes on upload.",
     "CLI `qubit import-agent inspect`")
+_GATE_KANBAN_WRITE = _g(
+    "KANBAN_WRITE_BROKERED",
+    "Kanban task mutations run through the Qubit confirmation/broker path "
+    "(`qubit kanban` + approvals), not a direct dashboard write.",
+    "CLI `qubit kanban` + pending-approvals banner")
 _GATE_MCP_NO_MOUNT = {
     **_g("MCP_NO_MOUNT",
          "MCP servers are inventory-only; Qubit never mounts them.",
@@ -3970,11 +4391,15 @@ _r("GET", r"/api/sessions/(?P<id>[^/]+)/export", "h_session_show")
 _r("GET", r"/api/sessions/(?P<id>[^/]+)/latest-descendant", "h_session_show")
 _r("GET", r"/api/sessions/(?P<id>[^/]+)/messages", "h_session_messages")
 # Negative lookahead keeps the dedicated /api/sessions/shares collection from
-# being captured as a session id by the generic show route below.
+# being captured as a session id by the generic show route below. The specific
+# ``/api/sessions/empty[*]`` read (pinned bulk empty-session listing) must
+# precede the generic id pattern or a bare ``/api/sessions/empty`` is misread
+# as a session named ``empty``.
+_r("GET", r"/api/sessions/empty.*", "sess_empty")
 _r("GET", r"/api/sessions/(?!shares$)(?P<id>[^/]+)", "h_session_show")
 _r("GET", r"/api/config", "h_config")
-_r("GET", r"/api/config/schema", "h_config")
-_r("GET", r"/api/config/defaults", "h_config")
+_r("GET", r"/api/config/schema", "h_config_schema")
+_r("GET", r"/api/config/defaults", "h_config_defaults")
 _r("GET", r"/api/egress/status", "h_egress_status")
 _r("GET", r"/api/model/info", "h_model_info")
 _r("GET", r"/api/model/recommended-default", "h_model_recommended_default")
@@ -4060,7 +4485,7 @@ _r("POST", r"/api/ops/import-upload", "__gate__", "gated", _GATE_IMPORT_REVIEW)
 _r("GET", r"/api/ops/(?P<name>[a-z-]+)", "h_ops")
 _r("POST", r"/api/ops/(?P<name>[a-z-]+)", "h_ops")
 _r("DELETE", r"/api/ops/hooks", "hooks_delete")
-_r("GET", r"/api/plugins/kanban/events", "h_kanban_events")
+_r("GET", r"/api/plugins/kanban/events", "h_plugin_kanban_events")
 # Vendored dashboard plugin fleet (hermes-achievements + kanban). Real
 # backends live in voicebridge/hermes_plugins.py and read the same local
 # session history / kanban DB the Qubit-owned Hermes runtime uses. Read routes
@@ -4099,11 +4524,39 @@ _r("GET", r"/api/plugins/kanban/runs/(?P<run_id>[^/]+)",
 _r("GET", r"/api/plugins/kanban/profiles", "h_plugin_kanban_profiles")
 _r("GET", r"/api/plugins/kanban/orchestration",
    "h_plugin_kanban_orchestration")
+# Binary-capable attachment download. The vendored dashboard calls
+# GET /api/plugins/kanban/attachments/{id} and downloads the bytes; the compat
+# dispatcher is a JSON surface, so the handler serves the SAME vendored kanban
+# store as the attachments listing, base64-encoded with real filename/type.
+# No dead 404: a missing attachment is a typed PLUGIN_HTTP 404.
+_r("GET", r"/api/plugins/kanban/attachments/(?P<attachment_id>[^/]+)",
+   "h_plugin_kanban_attachment_download")
 # Discovery for the vendored plugin fleet. The existing
 # /api/dashboard/plugins response stays fixed to the Qubit overlay set; this
 # additive view reports the vendored manifests without changing that contract.
 _r("GET", r"/api/dashboard/plugins/fleet", "h_plugin_fleet")
 _r("POST", r"/api/qubit/chat", "h_chat_turn")
+# Qubit-safe streaming chat. ``stream`` disposition: the handler yields SSE
+# frames (``h_chat_stream``) rather than a JSON envelope, so webui's dispatcher
+# owns the socket while THIS table stays the single route authority.
+_r("POST", r"/api/qubit/chat/stream", "h_chat_stream", "stream")
+# Qubit-safe chat transport: persisted sessions + a PTY-shaped, agent-backed
+# terminal frame. Literal rows precede the parameterized session id so
+# /sessions/import and /sessions/<id> never collide. No shell/PTY is spawned.
+_r("GET", r"/api/qubit/chat/sessions", "h_chat_sessions_list")
+_r("POST", r"/api/qubit/chat/sessions/import", "h_chat_session_import")
+_r("POST", r"/api/qubit/chat/sessions", "h_chat_session_create")
+_r("GET", r"/api/qubit/chat/sessions/(?P<id>[^/]+)/messages",
+   "h_chat_session_messages")
+_r("GET", r"/api/qubit/chat/sessions/(?P<id>[^/]+)/export",
+   "h_chat_session_export")
+_r("GET", r"/api/qubit/chat/sessions/(?P<id>[^/]+)", "h_chat_session_show")
+_r("PATCH", r"/api/qubit/chat/sessions/(?P<id>[^/]+)", "h_chat_session_patch")
+_r("DELETE", r"/api/qubit/chat/sessions/(?P<id>[^/]+)",
+   "h_chat_session_delete")
+_r("POST", r"/api/qubit/chat/cancel", "h_chat_cancel")
+_r("POST", r"/api/qubit/chat/retry", "h_chat_retry")
+_r("POST", r"/api/qubit/chat/pty", "h_chat_pty")
 _r("GET", r"/api/dashboard/plugins", "h_plugins")
 _r("GET", r"/api/dashboard/themes", "h_themes")
 _r("PUT", r"/api/dashboard/theme", "h_theme_set")
@@ -4175,6 +4628,7 @@ _r("GET", r"/auth/native/authorize", "h_auth_native_authorize")
 _r("GET", r"/auth/callback", "h_auth_callback")
 _r("POST", r"/auth/password-login", "h_auth_password_login")
 _r("POST", r"/auth/logout", "h_auth_logout")
+_r("POST", r"/api/auth/logout", "h_auth_logout")
 _r("POST", r"/auth/native/token", "h_auth_native_token")
 _r("POST", r"/auth/native/refresh", "h_auth_native_refresh")
 
@@ -4306,7 +4760,7 @@ GATED: List[Dict[str, Any]] = [
                            "No WS tickets are minted; Qubit serves no WS gateway dialect. "
                            "Loopback clients use the session token directly.",
                            "GET /api/events (SSE) + POST /api/qubit/chat")),
-    ("GET", r"/api/console", _NO_PTY),
+    ("GET", r"/api/console", _NO_CONSOLE),
     ("GET", r"/api/config/raw", _NO_SECRET),
     ("PUT", r"/api/config/raw", _NO_SECRET),
     ("GET", r"/api/env/reveal", _NO_SECRET),
@@ -4320,6 +4774,10 @@ GATED: List[Dict[str, Any]] = [
                                            "Qubit Chat attachments (vision_describe backend).",
                                            "overlay Qubit Chat tab + `qubit vision describe`")),
     ("POST", r"/api/gateway/restart", _NO_SUPERVISION),
+    # Public Qubit path + migration-only upstream-compat alias (allowed:
+    # migration/compatibility record; the public frontend uses /api/qubit/*).
+    ("GET", r"/api/qubit/update.*", _NO_UPDATE),
+    ("POST", r"/api/qubit/update.*", _NO_UPDATE),
     ("GET", r"/api/hermes/update.*", _NO_UPDATE),
     ("POST", r"/api/hermes/update.*", _NO_UPDATE),
     ("GET", r"/api/portal", _NO_UPDATE),
@@ -4358,10 +4816,15 @@ GATED: List[Dict[str, Any]] = [
     ("POST", r"/api/sessions/import", _GATE_SESSIONS_RECEIPT),
     ("POST", r"/api/sessions/prune", _GATE_SESSIONS_RECEIPT),
     ("POST", r"/api/sessions/bulk-delete", _GATE_SESSIONS_RECEIPT),
+    # ``DELETE /api/sessions/empty`` is the pinned bulk "delete every empty
+    # session" endpoint (backing ``api.deleteEmptySessions``), not a session
+    # named ``empty``. It must precede the generic id pattern or it is
+    # misrouted to the single-session delete. Qubit receipts are append-only,
+    # so the bulk sweep is the same typed gate as POST /api/sessions/bulk-delete.
+    ("DELETE", r"/api/sessions/empty", _GATE_SESSIONS_RECEIPT),
     ("DELETE", r"/api/sessions/(?P<id>[^/]+)", "h_session_delete"),
     ("PATCH", r"/api/sessions/(?P<id>[^/]+)", "h_session_patch"),
     ("POST", r"/api/sessions/(?P<id>[^/]+)/resume", "h_session_resume"),
-    ("GET", r"/api/sessions/empty.*", "sess_empty"),
     ("GET", r"/api/memory/reset", "mem_reset"),
     ("POST", r"/api/memory/reset", "mem_reset"),
     # Provider OAuth status is a credential surface (the fork polls a live
@@ -4451,18 +4914,14 @@ GATED: List[Dict[str, Any]] = [
     # voicebridge/hermes_plugins.py; task mutations stay on the shared Qubit
     # confirmation/broker path (`qubit kanban` + approvals) rather than the
     # plugin's direct server-side writes.
-    ("POST", r"/api/plugins/kanban/.*", _g("KANBAN_WRITE_BROKERED",
-        "Kanban task mutations run through the Qubit confirmation/broker path "
-        "(`qubit kanban` + approvals), not a direct dashboard write.",
-        "CLI `qubit kanban` + pending-approvals banner")),
-    ("PATCH", r"/api/plugins/kanban/.*", _g("KANBAN_WRITE_BROKERED",
-        "Kanban task mutations run through the Qubit confirmation/broker path "
-        "(`qubit kanban` + approvals), not a direct dashboard write.",
-        "CLI `qubit kanban` + pending-approvals banner")),
-    ("DELETE", r"/api/plugins/kanban/.*", _g("KANBAN_WRITE_BROKERED",
-        "Kanban task mutations run through the Qubit confirmation/broker path "
-        "(`qubit kanban` + approvals), not a direct dashboard write.",
-        "CLI `qubit kanban` + pending-approvals banner")),
+    ("POST", r"/api/plugins/kanban/.*", _GATE_KANBAN_WRITE),
+    ("PATCH", r"/api/plugins/kanban/.*", _GATE_KANBAN_WRITE),
+    ("DELETE", r"/api/plugins/kanban/.*", _GATE_KANBAN_WRITE),
+    # ``PUT /api/plugins/kanban/orchestration`` writes orchestration knobs to
+    # config.yaml (pinned plugin_api.py). It was previously unrouted and the
+    # active backend answered a bare 404; the dashboard plugin ``saveSettings``
+    # calls it. Same shared broker gate as every other kanban write.
+    ("PUT", r"/api/plugins/kanban/.*", _GATE_KANBAN_WRITE),
 ]
 
 for _m, _p, _ginfo in GATED:
@@ -4506,15 +4965,6 @@ def h_sess_empty(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                           "created_at": r.get("created_at")} for r in empty])
 
 
-def h_sessions_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
-                     p: Dict[str, str], kind: str) -> Tuple[int, Dict[str, Any]]:
-    return _gate("SESSIONS_RECEIPT_STORE",
-                 "Qubit sessions are append-only audit receipts; bulk delete, prune, "
-                 "import, rename, and empty-store sweeps are not offered on receipts. "
-                 "Memory tombstones/corrections own forgetting.",
-                 "memory_forget/correct + CLI/voice (same stores)", 501)
-
-
 def h_mem_reset(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     if not b.get("confirm"):
@@ -4555,13 +5005,6 @@ def h_mem_provider(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                       "by policy")
 
 
-def h_msg_test(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
-               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    return _ok(test="deferred",
-               detail="credential-gated last-mile probe; runs only with a vault "
-                      "credential reference present (MSG_NO_CREDENTIAL otherwise)")
-
-
 def h_msg_test_live(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/messaging/platforms/{platform_id}/test -> real link state.
@@ -4587,21 +5030,6 @@ def h_msg_test_live(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                reachable=reachable, link=linked,
                error_code=linked.get("code"),
                detail="credential/transport link state; no message sent")
-
-
-def h_mcp_test(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
-               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    # McpTestResult wire shape; mounts never happen so tools stay empty.
-    return _ok(ok=False, tools=[],
-               error="MCP_NO_MOUNT: Qubit inventories MCP servers but never "
-                     "mounts them")
-
-
-def h_mcp_enabled(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
-                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    return _gate("MCP_NO_MOUNT", "MCP servers stay disabled-until-enabled inventory; "
-                 "enabling a mount is refused.",
-                 "skills_enable for Qubit-native skills", 501)
 
 
 def h_toolset_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -4636,20 +5064,6 @@ def h_toolset_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(ok=True, name=name, grant_id=grant.id, scope=scope,
                qubit_counterpart="CLI `qubit permissions` + dashboard "
                                  "Settings (classic)")
-
-
-def h_profile_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
-                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    from . import dashboard_ops as OPS
-    out = OPS.run_op(cfg, "brain_profile_set", {k: v for k, v in b.items()
-                                                if isinstance(v, (str, int, float, bool))},
-                     actor="dashboard:user", session="dashboard")
-    ok = out.get("state") == "executed"
-    if out.get("confirmation_id") and not ok:
-        return _staged(_redact(out.get("speech", ""))[:300],
-                       out["confirmation_id"])
-    return (200 if ok else 400), {"ok": ok, "result": _res(out),
-                                  "state": out.get("state")}
 
 
 def h_plugins_rescan(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -4693,14 +5107,6 @@ def h_debug_share(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     out = OPS.run_op(cfg, "diagnostics", {}, actor="dashboard:user", session="dashboard")
     return _ok(bundle=_res(out),
                detail="redacted diagnostic bundle (never secrets); no external share")
-
-
-def h_import_upload(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
-                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    return _gate("IMPORT_REVIEW_REQUIRED",
-                 "Uploads enter quarantine for review; reviewed artifacts install "
-                 "via skills install. Nothing executes on upload.",
-                 "CLI `qubit import-agent inspect`")
 
 
 def h_hooks(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -4772,14 +5178,6 @@ def h_ckpt(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                          "files": int(r.get("files", 0) or 0), "bytes": size})
     # CheckpointsResponse wire shape.
     return _ok(sessions=sessions, total_bytes=total)
-
-
-def h_ckpt_prune(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
-                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    return _gate("CHECKPOINT_CONFIRM_REQUIRED",
-                 "Checkpoint prune is metadata-destructive: confirm in the Qubit "
-                 "operations console with explicit scope.",
-                 "dashboard /ops checkpoints + CLI")
 
 
 def h_actions_read(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -5397,29 +5795,6 @@ def agent_remove(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(ok=True, name=name)
 
 
-def agent_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
-                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    return _gate("SKILL_MANIFEST_REQUIRED",
-                 "Direct plugin installs are refused; install a validated "
-                 "local manifest staged disabled instead.",
-                 "CLI `qubit skills install <manifest>` + 7E validation")
-
-
-def agent_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
-                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    return _gate("SKILL_VERSIONED",
-                 "In-place plugin updates are refused; versions are immutable. "
-                 "Remove and reinstall the new validated version.",
-                 "CLI `qubit skills remove/rollback/install`")
-
-
-def oauth_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
-                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    return 404, {"ok": False, "code": "OAUTH_MANUAL_HANDOFF",
-                 "detail": "no OAuth sessions are stored server-side; "
-                           "enrollment is a manual handoff in your own browser"}
-
-
 def mem_provider_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """PUT /api/memory/provider -> real persisted local-provider selection."""
@@ -5533,21 +5908,31 @@ def config_save(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """PUT /api/config -> real confirm-gated Qubit settings override write.
 
-    Values are persisted to ``<state_dir>/hermes_config_overrides.json`` with
-    an atomic backup and an audit line, then read back by ``h_config`` on the
-    next request. Secret-shaped keys (``*_key``, ``*_token``, ``*_secret``)
-    never enter the store: only a vault reference name is accepted. Without
-    ``confirm`` the write stages a typed 409; it never fabricates success.
+    Accepts both the served client shape (``{"config": {<nested tree>}}``) and
+    legacy flat scalars, flattens them to ``dot.path -> scalar`` overrides,
+    persists to ``<state_dir>/hermes_config_overrides.json`` with an atomic
+    ``.bak`` and an audit line, and reads them back through ``h_config`` on the
+    next request. Secret-shaped keys (``*_key``, ``*_token``, ``*_secret``,
+    ``*_password``) never enter the store: only a vault reference is accepted.
+    A body that carries no applicable scalar is a typed refusal; without
+    ``confirm`` the write stages a typed 409. It never returns ``ok=True`` with
+    a zero count and no change.
     """
     if not isinstance(b, dict) or not b:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "config write needs an object body"}
-    if not b.get("confirm"):
-        return _staged(
-            "config write stages through the Qubit settings console: re-POST "
-            "with {\"confirm\": true} plus a fresh approval", "")
-    values = {k: v for k, v in b.items()
-              if k != "confirm" and isinstance(v, (str, int, float, bool))}
+    payload = b.get("config")
+    if "config" in b and not isinstance(payload, dict):
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "config must be an object of settings, not "
+                               f"{type(payload).__name__}"}
+    if not isinstance(payload, dict):
+        payload = b
+    values = _flatten_config(payload)
+    if not values:
+        return _gate("CONFIG_NO_FIELDS",
+                     "config write carried no scalar settings; nothing to apply",
+                     "CLI `qubit config` / dashboard Settings")
     secret_shaped = [k for k in values
                      if re.search(r"(_key|_token|_secret|_password)$", k)]
     if secret_shaped:
@@ -5555,15 +5940,56 @@ def config_save(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      "The dashboard never writes secret values; reference "
                      "names only (" + ", ".join(sorted(secret_shaped)[:5]) + ")",
                      "CLI `qubit auth login` (vault references, manual handoff)")
+    # Reject unknown keys and mistyped values against the real schema instead of
+    # persisting an arbitrary key and reporting fabricated success.
+    from . import config as C
+    known = _config_scalar_paths(C.DEFAULTS)
+    unknown = sorted(k for k in values if k not in known)
+    if unknown:
+        return _gate("UNKNOWN_CONFIG_KEY",
+                     "unknown settings key(s): " + ", ".join(unknown[:5]) +
+                     "; see GET /api/config/schema",
+                     "GET /api/config/schema")
+    mistyped = []
+    for key, value in values.items():
+        default = known[key]
+        if default is None:
+            continue
+        if isinstance(default, bool):
+            good = isinstance(value, bool)
+        elif isinstance(default, (int, float)):
+            good = isinstance(value, (int, float)) and not isinstance(value, bool)
+        elif isinstance(default, str):
+            good = isinstance(value, str)
+        elif isinstance(default, list):
+            good = isinstance(value, list)
+        else:
+            good = True
+        if not good:
+            mistyped.append(key)
+    if mistyped:
+        return _gate("BAD_CONFIG_TYPE",
+                     "settings value type mismatch: " +
+                     ", ".join(sorted(mistyped)[:5]),
+                     "GET /api/config/schema")
+    if not b.get("confirm"):
+        return _staged(
+            "config write stages through the Qubit settings console: re-POST "
+            "with {\"confirm\": true} plus a fresh approval", "")
     path = _config_overrides_path(cfg)
     try:
         previous = _load_json_store(path)
-        previous.update(values)
-        _save_json_store(path, previous)
+        merged = dict(previous)
+        merged.update(values)
+        _save_json_store(path, merged)
     except Exception as exc:
         return _fail(exc)
+    _audit("config_apply", "dashboard:user",
+           {"keys": sorted(values)[:20], "count": len(values)})
     return _ok(ok=True, config=values, count=len(values),
                path=str(path),
+               rollback=f"restore {path.name}.bak (atomic previous state) or "
+                        f"PUT the prior {len(previous)} overrides back",
                qubit_counterpart="dashboard Settings (classic) + CLI config "
                                  "profiles")
 
@@ -6776,7 +7202,59 @@ def h_blueprint_instantiate(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return cron_create(cfg, q, {**values, "confirm": bool(b.get("confirm"))}, p)
 
 
+def h_plugin_kanban_attachment_download(
+        cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/plugins/kanban/attachments/{id} -> real attachment bytes.
+
+    Serves the vendored kanban plugin's own attachment store — the same store
+    ``GET /tasks/{id}/attachments`` lists. The compat dispatcher returns JSON,
+    so the blob is base64-encoded alongside the real filename/content-type and
+    the served UI decodes it into a Blob download. A missing row, a tampered
+    path, or a missing blob is the vendored plugin's typed ``PLUGIN_HTTP`` 404 —
+    never a JSON success with no bytes and never the dead compat no-route 404.
+    """
+    from . import hermes_plugins as HP
+    raw = str(p.get("attachment_id") or "").strip()
+    if not raw.isdigit():
+        return 404, {"ok": False, "code": "PLUGIN_HTTP",
+                     "detail": f"attachment {raw!r} not found"}
+    att_id = int(raw)
+    try:
+        engine = HP._kanban_engine(cfg)
+        kb = engine.kanban_db
+        with engine._board_conn(q.get("board") or None) as (board, conn):
+            att = kb.get_attachment(conn, att_id)
+            if att is None:
+                return 404, {"ok": False, "code": "PLUGIN_HTTP",
+                             "detail": f"attachment {att_id} not found"}
+            root = Path(kb.attachments_root(board=board)).resolve()
+            stored = Path(att.stored_path).resolve()
+            try:
+                stored.relative_to(root)
+            except (ValueError, OSError):
+                return 404, {"ok": False, "code": "PLUGIN_HTTP",
+                             "detail": "attachment file unavailable"}
+            if not stored.is_file():
+                return 404, {"ok": False, "code": "PLUGIN_HTTP",
+                             "detail": "attachment file missing on disk"}
+            data = stored.read_bytes()
+    except HP.PluginUnavailable as exc:
+        return _gate("ATTACHMENT_STORE_UNAVAILABLE",
+                     "the kanban attachment store is unavailable: "
+                     + _redact(str(exc))[:200],
+                     "CLI `qubit kanban` (attachments live with the task)",
+                     http=503)
+    except Exception as exc:
+        return HP._kanban_http(exc)
+    return _ok(attachment_id=att_id, filename=att.filename,
+               content_type=att.content_type or "application/octet-stream",
+               size=len(data),
+               data_base64=base64.b64encode(data).decode("ascii"))
+
+
 _EXTRA_HANDLERS: Dict[str, Handler] = {
+    "h_plugin_kanban_attachment_download": h_plugin_kanban_attachment_download,
     "cron_pause": lambda cfg, q, b, p: _cron_mutate("pause", cfg, p),
     "cron_resume": lambda cfg, q, b, p: _cron_mutate("resume", cfg, p),
     "cron_trigger": lambda cfg, q, b, p: _cron_mutate("run_due", cfg, p),
@@ -6788,27 +7266,15 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "webhooks_mutate": lambda cfg, q, b, p: h_webhooks_mutate("remove", cfg, b, p),
     "blueprints": h_blueprints,
     "delivery": h_delivery_targets,
-    "sess_import": lambda cfg, q, b, p: h_sessions_write(cfg, q, b, p, "import"),
-    "sess_prune": lambda cfg, q, b, p: h_sessions_write(cfg, q, b, p, "prune"),
-    "sess_bulk": lambda cfg, q, b, p: h_sessions_write(cfg, q, b, p, "bulk"),
-    "sess_delete": lambda cfg, q, b, p: h_sessions_write(cfg, q, b, p, "delete"),
-    "sess_patch": lambda cfg, q, b, p: h_sessions_write(cfg, q, b, p, "patch"),
     "h_session_patch": h_session_patch,
     "h_session_delete": h_session_delete,
     "h_session_resume": h_session_resume,
     "sess_empty": lambda cfg, q, b, p: h_sess_empty(cfg, q, b, p),
     "mem_reset": h_mem_reset,
     "mem_prov": h_mem_provider,
-    "msg_test": h_msg_test,
-    "mcp_test": h_mcp_test,
-    "mcp_enabled": h_mcp_enabled,
     "toolset_write": h_toolset_write,
-    "profile_write": h_profile_write,
     "plugins_rescan": h_plugins_rescan,
-    "plugin_visibility": h_plugin_visibility,
     "debug_share": h_debug_share,
-    "import_upload": h_import_upload,
-    "ckpt_prune": h_ckpt_prune,
     "ckpt": h_ckpt,
     "h_ckpt": h_ckpt,
     "actions_read": h_actions_read,
@@ -6842,9 +7308,6 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "agent_enable": agent_enable,
     "agent_disable": agent_disable,
     "agent_remove": agent_remove,
-    "agent_install": agent_install,
-    "agent_update": agent_update,
-    "oauth_delete": oauth_delete,
     "env_write": env_write,
     "mem_provider_set": mem_provider_set,
     "mem_config": mem_config,
@@ -6852,7 +7315,6 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "h_profile_setup_command": h_profile_setup_command,
     "h_profile_soul": h_profile_soul,
     "h_skill_content": h_skill_content,
-    "h_mcp_catalog": h_mcp_catalog,
     "config_save": config_save,
     "toolset_config": toolset_config,
     "toolset_models": toolset_models,
@@ -7003,6 +7465,7 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "h_plugin_kanban_profiles": _hermes_plugins.h_plugin_kanban_profiles,
     "h_plugin_kanban_orchestration":
         _hermes_plugins.h_plugin_kanban_orchestration,
+    "h_plugin_kanban_events": _hermes_plugins.h_plugin_kanban_events,
     "h_plugin_fleet": _hermes_plugins.h_plugin_fleet,
 }
 
@@ -7011,7 +7474,8 @@ HANDLERS: Dict[str, Handler] = {
     "h_health": h_health, "h_egress_status": h_egress_status,
     "h_sessions_list": h_sessions_list, "h_sessions_stats": h_sessions_stats,
     "h_session_show": h_session_show, "h_session_messages": h_session_messages,
-    "h_config": h_config, "h_model_info": h_model_info,
+    "h_config": h_config, "h_config_defaults": h_config_defaults,
+    "h_config_schema": h_config_schema, "h_model_info": h_model_info,
     "h_model_recommended_default": h_model_recommended_default,
     "h_model_options": h_model_options, "h_model_moa": h_model_moa,
     "h_model_auxiliary": h_model_auxiliary, "h_model_set": h_model_set,
@@ -7026,7 +7490,17 @@ HANDLERS: Dict[str, Handler] = {
     "h_curator": h_curator, "h_env": h_env, "h_ops": h_ops,
     "h_ops_catalog": h_ops_catalog,
     "h_ops_run": h_ops_run,
-    "h_kanban_events": h_kanban_events, "h_chat_turn": h_chat_turn,
+    "h_chat_turn": h_chat_turn,
+    "h_chat_sessions_list": h_chat_sessions_list,
+    "h_chat_session_create": h_chat_session_create,
+    "h_chat_session_show": h_chat_session_show,
+    "h_chat_session_messages": h_chat_session_messages,
+    "h_chat_session_patch": h_chat_session_patch,
+    "h_chat_session_delete": h_chat_session_delete,
+    "h_chat_session_export": h_chat_session_export,
+    "h_chat_session_import": h_chat_session_import,
+    "h_chat_cancel": h_chat_cancel, "h_chat_pty": h_chat_pty,
+    "h_chat_retry": h_chat_retry, "h_chat_stream": h_chat_stream,
     "h_plugins": h_plugins, "h_themes": h_themes, "h_theme_set": h_theme_set,
     "h_hooks": h_hooks, "h_hooks_create": h_hooks_create,
     "h_approvals_list": h_approvals_list,
@@ -7111,6 +7585,17 @@ def dispatch(cfg: Any, method: str, path: str,
                                        "qubit_counterpart": gate.get("counterpart"),
                                        "owner": gate.get("owner"),
                                        "rollback": gate.get("rollback")}
+    if route["disposition"] == "stream":
+        # A streaming route cannot be expressed as a JSON ``(status, dict)``.
+        # The SSE front door (webui) consumes this disposition and iterates the
+        # route handler; a generic JSON dispatch is a typed refusal, never a
+        # fabricated success.
+        _audit("stream_requires_sse", actor, {"route": f"{method} {path}"})
+        return 400, {"ok": False, "code": "STREAM_REQUIRES_SSE",
+                     "detail": "this route streams Server-Sent Events; call it "
+                               "over the SSE front door, not the JSON dispatcher",
+                     "content_type": "text/event-stream",
+                     "qubit_counterpart": f"POST {path} (Accept: text/event-stream)"}
     handler = HANDLERS.get(route["handler"])
     if handler is None:
         return 500, {"ok": False, "code": "NO_HANDLER",

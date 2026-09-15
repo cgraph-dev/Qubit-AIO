@@ -1,12 +1,10 @@
 import { buildHermesWebSocketUrl } from "@hermes/shared";
 
-// The dashboard can be served either at the root of its host (e.g.
-// https://kanban.tilos.com/) or under a URL prefix when reverse-proxied
-// (e.g. https://mission-control.tilos.com/hermes/). The Python backend
-// injects ``window.__HERMES_BASE_PATH__`` into index.html based on the
-// incoming ``X-Forwarded-Prefix`` header so the SPA can address its own
-// ``/api/...`` and ``/dashboard-plugins/...`` URLs correctly without a
-// rebuild. Empty string means "served at root".
+// Qubit serves the dashboard at the root of its host. The Python backend
+// injects ``window.__HERMES_BASE_PATH__ = ""`` into index.html (the reader
+// stays so a deployment behind ``X-Forwarded-Prefix`` can still address its
+// own ``/api/...`` and ``/dashboard-plugins/...`` URLs without a rebuild).
+// Empty string means "served at root".
 function readBasePath(): string {
   if (typeof window === "undefined") return "";
   const raw = window.__HERMES_BASE_PATH__ ?? "";
@@ -18,6 +16,35 @@ function readBasePath(): string {
 
 export const HERMES_BASE_PATH = readBasePath();
 const BASE = HERMES_BASE_PATH;
+
+// Qubit-owned API namespace. The vendored SPA addresses its backend through
+// ``/api/<x>``; Qubit mounts that same dispatcher under ``/agent/api/<x>``.
+// The server injects ``window.__QUBIT_API_PREFIX__ = "/agent"`` into
+// index.html. Rewriting here — the single seam every ``fetchJSON`` /
+// ``authedFetch`` / ``buildWsUrl`` call (and the plugin SDK routed through
+// them) passes through — keeps each literal ``/api/...`` call site unchanged
+// while the wire path is Qubit-owned.
+function readApiPrefix(): string {
+  if (typeof window === "undefined") return "/agent";
+  const raw = window.__QUBIT_API_PREFIX__;
+  if (raw === undefined || raw === null) return "/agent";
+  if (!raw) return "";
+  const withLead = raw.startsWith("/") ? raw : `/${raw}`;
+  return withLead.replace(/\/+$/, "");
+}
+
+export const QUBIT_API_PREFIX = readApiPrefix();
+
+/** Prefix a vendored ``/api/<x>`` endpoint with the Qubit-owned API namespace
+ *  (``/agent/api/<x>``). Non-``/api`` paths (auth redirects, plugin asset
+ *  URLs) are returned unchanged. */
+export function withApiPrefix(url: string): string {
+  if (!QUBIT_API_PREFIX) return url;
+  if (url === "/api" || url.startsWith("/api/")) {
+    return `${QUBIT_API_PREFIX}${url}`;
+  }
+  return url;
+}
 
 import type { DashboardTheme } from "@/themes/types";
 import {
@@ -31,6 +58,9 @@ declare global {
   interface Window {
     __HERMES_SESSION_TOKEN__?: string;
     __HERMES_BASE_PATH__?: string;
+    /** Qubit-owned API namespace injected by the server (``"/agent"``).
+     *  Rewrites the vendored ``/api/<x>`` paths via :func:`withApiPrefix`. */
+    __QUBIT_API_PREFIX__?: string;
     /** Server-injected flag: ``true`` when the dashboard's OAuth gate is
      * engaged (public bind, no ``--insecure``). Toggles the SPA's
      * WS-upgrade path from legacy ``?token=`` to single-use ``?ticket=``
@@ -115,7 +145,7 @@ export async function fetchJSON<T>(
   if (token) {
     setSessionHeader(headers, token);
   }
-  const res = await fetch(`${BASE}${url}`, {
+  const res = await fetch(`${BASE}${withApiPrefix(url)}`, {
     ...init,
     headers,
     // ``credentials: 'include'`` so the cookie-auth path (gated mode) works
@@ -204,7 +234,7 @@ function pluginPath(name: string): string {
  * fetch a fresh ticket.
  */
 export async function getWsTicket(): Promise<{ ticket: string; ttl_seconds: number }> {
-  const res = await fetch(`${BASE}/api/auth/ws-ticket`, {
+  const res = await fetch(`${BASE}${withApiPrefix("/api/auth/ws-ticket")}`, {
     method: "POST",
     credentials: "include",
   });
@@ -254,7 +284,7 @@ export async function authedFetch(
   if (token) {
     setSessionHeader(headers, token);
   }
-  return fetch(`${BASE}${url}`, {
+  return fetch(`${BASE}${withApiPrefix(url)}`, {
     ...init,
     headers,
     credentials: init?.credentials ?? "include",
@@ -282,7 +312,7 @@ export async function buildWsUrl(
     authParam: await buildWsAuthParam(),
     basePath: BASE,
     params,
-    path,
+    path: withApiPrefix(path),
   });
 }
 
@@ -363,11 +393,11 @@ export const api = {
       allowUnauthorized: true,
     }),
   logout: () =>
-    fetch(`${BASE}/auth/logout`, {
+    fetch(withApiPrefix("/api/auth/logout"), {
       method: "POST",
       credentials: "include",
     }).then((r) => {
-      // /auth/logout returns 302 → /login. Follow that with a full-page
+      // /api/auth/logout returns 302 → /login. Follow that with a full-page
       // navigation rather than letting fetch() opaquely consume the
       // redirect — the SPA needs to leave the protected area.
       window.location.assign("/login");
@@ -441,7 +471,9 @@ export const api = {
   getSessionStats: (profile = getManagementProfile()) =>
     fetchJSON<SessionStoreStats>(appendProfileParam("/api/sessions/stats", profile)),
   exportSessionUrl: (id: string, profile = getManagementProfile()) =>
-    appendProfileParam(`/api/sessions/${encodeURIComponent(id)}/export`, profile),
+    withApiPrefix(
+      appendProfileParam(`/api/sessions/${encodeURIComponent(id)}/export`, profile),
+    ),
   importSessions: (
     sessions: Array<Record<string, unknown>>,
     profile = getManagementProfile(),
@@ -467,6 +499,36 @@ export const api = {
           profile: profile || undefined,
         }),
       },
+    ),
+  /**
+   * Qubit-native chat-session store (`/chat` authority). Distinct from the
+   * receipts `getSessions` store above; the Chat sidebar and transcript use
+   * these so a reload restores the real server transcript.
+   */
+  listChatSessions: (limit = 50, offset = 0, query = "") => {
+    const q = query ? `&q=${encodeURIComponent(query)}` : "";
+    return fetchJSON<ChatStoreSessionsResponse>(
+      `/api/qubit/chat/sessions?limit=${limit}&offset=${offset}${q}`,
+    );
+  },
+  getChatSession: (id: string) =>
+    fetchJSON<ChatStoreSessionResponse>(
+      `/api/qubit/chat/sessions/${encodeURIComponent(id)}`,
+    ),
+  getChatSessionMessages: (id: string, limit = 500) =>
+    fetchJSON<ChatStoreMessagesResponse>(
+      `/api/qubit/chat/sessions/${encodeURIComponent(id)}/messages?limit=${limit}&offset=0`,
+    ),
+  createChatSession: (name = "") =>
+    fetchJSON<ChatStoreCreateResponse>("/api/qubit/chat/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }),
+  deleteChatSession: (id: string, confirm = true) =>
+    fetchJSON<{ ok: boolean; session?: ChatStoreSession }>(
+      `/api/qubit/chat/sessions/${encodeURIComponent(id)}?confirm=${confirm ? "true" : "false"}`,
+      { method: "DELETE" },
     ),
   listFiles: (path?: string) => {
     const query = path ? `?path=${encodeURIComponent(path)}` : "";
@@ -568,11 +630,15 @@ export const api = {
         body: JSON.stringify(body),
       },
     ),
-  saveConfig: (config: Record<string, unknown>, profile = getManagementProfile()) =>
+  saveConfig: (
+    config: Record<string, unknown>,
+    profile = getManagementProfile(),
+    confirm = false,
+  ) =>
     fetchJSON<{ ok: boolean }>(appendProfileParam("/api/config", profile), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ config }),
+      body: JSON.stringify(confirm ? { config, confirm: true } : { config }),
     }),
   getConfigRaw: (profile = getManagementProfile()) =>
     fetchJSON<{ yaml: string; path?: string }>(
@@ -954,13 +1020,15 @@ export const api = {
     ),
 
   // Gateway / update actions
+  getGatewayStatus: () =>
+    fetchJSON<GatewayStatusResponse>("/api/gateway"),
   restartGateway: () =>
     fetchJSON<ActionResponse>("/api/gateway/restart", { method: "POST" }),
   updateHermes: () =>
-    fetchJSON<ActionResponse>("/api/hermes/update", { method: "POST" }),
+    fetchJSON<ActionResponse>("/api/qubit/update", { method: "POST" }),
   checkHermesUpdate: (force = false) =>
     fetchJSON<UpdateCheckResponse>(
-      `/api/hermes/update/check${force ? "?force=true" : ""}`,
+      `/api/qubit/update/check${force ? "?force=true" : ""}`,
     ),
   getActionStatus: (name: string, lines = 200) =>
     fetchJSON<ActionStatusResponse>(
@@ -1361,6 +1429,17 @@ export interface ActionResponse {
   message?: string;
   uploaded_bytes?: number;
   update_command?: string;
+}
+
+/** GET /api/gateway — gateway records plus the supervision policy string.
+ *  Qubit refuses process supervision, so `supervision` carries a typed
+ *  `GATEWAY_NO_SUPERVISION: …` explanation the dashboard renders instead of
+ *  offering start/stop/restart controls that can only fail. */
+export interface GatewayStatusResponse {
+  ok?: boolean;
+  gateway?: { state?: string; gateways?: unknown[] };
+  state?: string;
+  supervision?: string;
 }
 
 export interface DebugShareResponse {
@@ -1965,6 +2044,160 @@ export interface PaginatedSessions {
   total: number;
   limit: number;
   offset: number;
+}
+
+/**
+ * One row of the Qubit-native chat-session store
+ * (`GET /api/qubit/chat/sessions`, `voicebridge.chat_transport`). This is the
+ * authority for `/chat` — distinct from the receipts `GET /api/sessions`
+ * store used by the Sessions page.
+ */
+export interface ChatStoreSession {
+  id: string;
+  source?: string | null;
+  model?: string | null;
+  title?: string | null;
+  name?: string | null;
+  archived?: boolean;
+  started_at?: number;
+  ended_at?: number | null;
+  last_active?: number;
+  is_active?: boolean;
+  message_count?: number;
+  preview?: string | null;
+}
+
+export interface ChatStoreSessionsResponse {
+  sessions: ChatStoreSession[];
+  total: number;
+  limit: number;
+  offset: number;
+  state?: string;
+  code?: string | null;
+  source?: string;
+}
+
+export interface ChatStoreMessage {
+  role: string;
+  content: string;
+  timestamp?: number;
+  meta?: Record<string, unknown>;
+}
+
+export interface ChatStoreMessagesResponse {
+  session_id: string;
+  messages: ChatStoreMessage[];
+  total: number;
+}
+
+export interface ChatStoreSessionResponse {
+  session: ChatStoreSession;
+  messages: ChatStoreMessage[];
+  message_count?: number;
+}
+
+export interface ChatStoreCreateResponse {
+  session: ChatStoreSession;
+  messages?: ChatStoreMessage[];
+}
+
+/** Parsed SSE frame from `POST /api/qubit/chat/stream`. */
+export interface ChatStreamEvent {
+  event: string;
+  text?: string;
+  reply?: string;
+  code?: string;
+  detail?: string;
+  session_id?: string;
+  session?: string;
+  elapsed_ms?: number;
+  message?: ChatStoreMessage;
+  message_count?: number;
+  receipt?: { model?: string; runtime?: string; path?: string };
+}
+
+export interface ChatStreamHandlers {
+  onStart?: (event: ChatStreamEvent) => void;
+  onDelta?: (text: string, event: ChatStreamEvent) => void;
+  onDone?: (event: ChatStreamEvent) => void;
+  onError?: (event: ChatStreamEvent) => void;
+  onCancelled?: (event: ChatStreamEvent) => void;
+}
+
+function parseSseFrame(frame: string): ChatStreamEvent | null {
+  const dataLines: string[] = [];
+  for (const rawLine of frame.split("\n")) {
+    const line = rawLine.trimEnd();
+    if (line.startsWith("data:")) dataLines.push(line.slice(5).trimStart());
+  }
+  if (!dataLines.length) return null;
+  try {
+    return JSON.parse(dataLines.join("\n")) as ChatStreamEvent;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Stream one persisted agent turn over the Qubit SSE transport
+ * (`POST /api/qubit/chat/stream`). The same `voicebridge.chat_transport`
+ * module backs the non-streaming turn and CLI/voice; it persists the user
+ * message and the final reply into the chat-session store, so a reload
+ * restores the transcript. Nothing is fabricated on model failure — a typed
+ * `error` event is surfaced instead.
+ */
+export async function streamChatTurn(
+  body: { text: string; session?: string; model?: string },
+  handlers: ChatStreamHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  const res = await authedFetch("/api/qubit/chat/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`${res.status}: ${text}`);
+  }
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("STREAM_UNSUPPORTED: no response body");
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let idx = buffer.indexOf("\n\n");
+    while (idx >= 0) {
+      const frame = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      const event = parseSseFrame(frame);
+      if (event) {
+        switch (event.event) {
+          case "start":
+            handlers.onStart?.(event);
+            break;
+          case "delta":
+            handlers.onDelta?.(event.text ?? "", event);
+            break;
+          case "done":
+            handlers.onDone?.(event);
+            break;
+          case "cancelled":
+            handlers.onCancelled?.(event);
+            break;
+          case "error":
+            handlers.onError?.(event);
+            break;
+          default:
+            break;
+        }
+      }
+      idx = buffer.indexOf("\n\n");
+    }
+  }
 }
 
 export interface EnvVarInfo {

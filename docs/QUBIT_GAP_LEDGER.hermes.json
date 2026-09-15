@@ -118,8 +118,8 @@
  "counts": {
   "total": 573,
   "by_status": {
-   "IMPLEMENTED": 454,
-   "SAFE_EQUIVALENT": 119
+   "IMPLEMENTED": 453,
+   "SAFE_EQUIVALENT": 120
   },
   "by_area": {
    "analytics-config": 4,
@@ -399,7 +399,7 @@
    "dashboard": "hermes-dist System",
    "voice": "voice gateway",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_approvals_cli8tf.py::test_cli_executes_dashboard_extra_backend",
+   "proving_test": "tests/test_agentE_tri_parity.py::test_three_surfaces_return_same_kanban_list",
    "note": "",
    "needs": "owner"
   },
@@ -646,12 +646,12 @@
    "area": "config-env",
    "capability": "GET /api/config/defaults",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/config_env.py:87",
-   "qubit_backend": "voicebridge/hermes_compat.py:h_config",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_config_defaults",
    "cli": "qubit flags / capability / auth",
    "dashboard": "hermes-dist Config/Keys",
    "voice": "voice config",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_command_parity8u.py::test_representative_reads_execute_over_compat_get",
+   "proving_test": "tests/test_hermes_config_fixes.py::test_config_read_returns_live_record",
    "note": "",
    "needs": "none"
   },
@@ -660,12 +660,12 @@
    "area": "config-env",
    "capability": "GET /api/config/schema",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/config_env.py:92",
-   "qubit_backend": "voicebridge/hermes_compat.py:h_config",
+   "qubit_backend": "voicebridge/hermes_compat.py:h_config_schema",
    "cli": "qubit flags / capability / auth",
    "dashboard": "hermes-dist Config/Keys",
    "voice": "voice config",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_command_parity8u.py::test_representative_reads_execute_over_compat_get",
+   "proving_test": "tests/test_hermes_config_fixes.py::test_config_schema_has_real_fields_and_order",
    "note": "",
    "needs": "none"
   },
@@ -693,7 +693,7 @@
    "dashboard": "hermes-dist Config/Keys",
    "voice": "voice config",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_routes_agent2b_wiring.py::test_config_and_env_writes_are_real_confirm_gated",
+   "proving_test": "tests/test_hermes_config_fixes.py::test_config_put_applies_nested_body_and_reads_back",
    "note": "",
    "needs": "none"
   },
@@ -2779,7 +2779,7 @@
    "dashboard": "hermes-dist System",
    "voice": "voice ops",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_approvals_cli8tf.py::test_cli_executes_dashboard_extra_backend",
+   "proving_test": "tests/test_agentE_tri_parity.py::test_three_surfaces_return_same_kanban_list",
    "note": "",
    "needs": "none"
   },
@@ -3292,14 +3292,14 @@
    "area": "sessions",
    "capability": "DELETE /api/sessions/empty",
    "upstream_ref": "qubit_hermes/hermes_cli/web_routers/sessions.py:440",
-   "qubit_backend": "voicebridge/hermes_compat.py:h_session_delete",
+   "qubit_backend": "voicebridge/hermes_compat.py:__gate__",
    "cli": "qubit sessions / memory",
    "dashboard": "hermes-dist Sessions",
    "voice": "voice sessions",
-   "status": "IMPLEMENTED",
-   "proving_test": "tests/test_hermes_api_parity_wave1.py::test_wave1_dispatch_non_refusal_success",
-   "note": "",
-   "needs": "none"
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
+   "note": "Typed policy gate SESSIONS_RECEIPT_STORE via compat dispatcher.",
+   "needs": "owner"
   },
   {
    "id": "api:GET /api/sessions/stats",
@@ -4585,7 +4585,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_remaining_family_argv_surfaces_reach_a_real_surface",
+   "proving_test": "tests/test_model_profile_cli_voice.py::test_clone_rollback_and_remove",
    "note": "No direct model-switch command.",
    "needs": "none"
   },
@@ -4697,7 +4697,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_remaining_family_argv_surfaces_reach_a_real_surface",
+   "proving_test": "tests/test_model_profile_cli_voice.py::test_clone_rollback_and_remove",
    "note": "Profiles family.",
    "needs": "none"
   },
@@ -7021,7 +7021,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_remaining_family_argv_surfaces_reach_a_real_surface",
+   "proving_test": "tests/test_model_profile_cli_voice.py::test_clone_rollback_and_remove",
    "note": "Subcommand-surface gap inside the profile family.",
    "needs": "none"
   },
@@ -7063,7 +7063,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_families.py::test_remaining_family_argv_surfaces_reach_a_real_surface",
+   "proving_test": "tests/test_model_profile_cli_voice.py::test_clone_rollback_and_remove",
    "note": "Subcommand-surface gap inside the profile family.",
    "needs": "none"
   },

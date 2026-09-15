@@ -17,9 +17,32 @@
     }, "Qubit Agent");
   }
 
-  // Hidden route component (tab is hidden:true; never shown in sidebar).
-  function Hidden() { return null; }
-  window.__HERMES_PLUGINS__.register("qubit-brand", Hidden);
+  /* Hidden route body (tab is hidden:true; never shown in the sidebar) but
+   * still reachable by URL. It must render a real component, not null: the
+   * route documents the Qubit brand surface instead of being a dead path. */
+  function QubitBrandPage() {
+    return e("div", {style: {padding: "16px 20px", maxWidth: 760}},
+      e("h1", {style: {margin: "0 0 4px", fontSize: 20}}, "Qubit Brand"),
+      e("p", {style: {opacity: 0.72, margin: "0 0 14px", fontSize: 13}},
+        "Product identity for the Qubit Agent dashboard."),
+      e("div", {style: {border: "1px solid #2a3443", borderRadius: 8,
+          padding: "10px 12px", marginBottom: 12}},
+        e("strong", null, "Header mark"),
+        e("p", {style: {fontSize: 13, margin: "6px 0 0"}},
+          "The Qubit Agent mark is rendered in the sidebar by this plugin " +
+          "(header-left slot); the vendored wordmark is hidden by the active " +
+          "Qubit theme, never by editing the vendored source."),
+        e("strong", {style: {display: "block", marginTop: 10}},
+          "Attribution"),
+        e("p", {style: {fontSize: 13, margin: "6px 0 0"}},
+          "Third-party names remain only in legal notices, attribution, " +
+          "provenance, and compatibility records \u2014 never in normal " +
+          "product surfaces.")),
+      e("div", {"data-state": "empty",
+        style: {opacity: 0.7, fontSize: 13}},
+        "No settings on this page; it records the brand surface only."));
+  }
+  window.__HERMES_PLUGINS__.register("qubit-brand", QubitBrandPage);
   if (window.__HERMES_PLUGINS__.registerSlot) {
     window.__HERMES_PLUGINS__.registerSlot("qubit-brand", "header-left", QubitMark);
     window.__HERMES_PLUGINS__.registerSlot("qubit-brand", "docs:top", DocsNotice);

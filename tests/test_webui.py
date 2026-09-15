@@ -325,9 +325,9 @@ def test_frontend_has_no_voice_selector():
 def test_served_dashboard_has_no_voice_selector(tmp_path: Path) -> None:
     """The SERVED classic page (over HTTP) must not expose the voice selector.
 
-    Hermes-first architecture: / redirects to the Hermes dashboard at
-    /hermes/; the legacy static UI lives under /classic/ only, where the
-    no-voice-selector safety contract still holds verbatim."""
+    Qubit rebrand: / redirects to the Qubit SPA at /chat; the legacy static
+    UI lives under /classic/ only, where the no-voice-selector safety contract
+    still holds verbatim."""
     import http.client
     import urllib.request
     from voicebridge.webui import WebUI
@@ -340,7 +340,7 @@ def test_served_dashboard_has_no_voice_selector(tmp_path: Path) -> None:
         conn.request("GET", "/")
         resp = conn.getresponse()
         assert resp.status == 302, resp.status
-        assert resp.getheader("Location") == "/hermes/", \
+        assert resp.getheader("Location") == "/chat", \
             resp.getheader("Location")
         resp.read()
         html = urllib.request.urlopen(
@@ -400,8 +400,8 @@ def test_web_ptt_keeps_same_backend_tts_contract(tmp_path: Path) -> None:
 
 def test_served_dashboard_http_content_is_rate_aware(tmp_path: Path) -> None:
     """Verify the SERVED classic page (over HTTP, not only the source file)
-    contains the rate-aware audio contract (/classic/ under Hermes-first;
-    / redirects to /hermes/)."""
+    contains the rate-aware audio contract (/classic/ under the Qubit SPA;
+    / redirects to /chat)."""
     import urllib.request
     from voicebridge.webui import WebUI
     orch = _FakeOrch()

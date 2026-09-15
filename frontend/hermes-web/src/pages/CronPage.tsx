@@ -85,17 +85,19 @@ function NameCheckboxPicker({
   onChange: (names: string[]) => void;
   emptyLabel: string;
 }) {
-  const names = available.map((item) => item.name);
-  const orphaned = selected.filter((s) => !names.includes(s));
-  const all = [...orphaned.map((name) => ({ name, description: "" })), ...available];
+  const items = available ?? [];
+  const chosen = selected ?? [];
+  const names = items.map((item) => item.name);
+  const orphaned = chosen.filter((s) => !names.includes(s));
+  const all = [...orphaned.map((name) => ({ name, description: "" })), ...items];
 
   if (all.length === 0) {
     return <p className="text-xs text-muted-foreground">{emptyLabel}</p>;
   }
 
   const toggle = (name: string, checked: boolean) => {
-    if (checked) onChange([...selected, name]);
-    else onChange(selected.filter((s) => s !== name));
+    if (checked) onChange([...chosen, name]);
+    else onChange(chosen.filter((s) => s !== name));
   };
 
   return (
@@ -112,7 +114,7 @@ function NameCheckboxPicker({
           <input
             type="checkbox"
             className="accent-foreground"
-            checked={selected.includes(item.name)}
+            checked={chosen.includes(item.name)}
             onChange={(e) => toggle(item.name, e.target.checked)}
           />
           <span className="font-mono-ui truncate">{item.name}</span>
@@ -353,12 +355,13 @@ function CronJobFormFields({
   ) => {
     onChange({ ...form, [key]: next });
   };
+  const targets = deliveryTargets ?? [];
   const onlyLocalAvailable =
-    deliveryTargets.filter((target) => target.id !== "local").length === 0;
+    targets.filter((target) => target.id !== "local").length === 0;
 
   const deliveryOptions = selectOptions(
     form.deliver,
-    deliveryTargets.map((target) => {
+    targets.map((target) => {
       const base = target.id === "local" ? t.cron.delivery.local : target.name;
       if (target.id !== "local" && !target.home_target_set) {
         const hint = t.cron.delivery.needsHomeChannel ?? "set a home channel first";

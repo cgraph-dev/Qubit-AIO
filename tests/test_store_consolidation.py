@@ -1,0 +1,211 @@
+"""F3 — single writable authority per domain (boards + sessions).
+
+Proves the ownership contract the final wave requires:
+
+(a) exactly one writable board authority: ``voicebridge.kanban`` (native). The
+    vendored Hermes kanban store's dashboard write path is a typed
+    ``KANBAN_WRITE_BROKERED`` refusal and the in-process compatibility
+    boundary (``kanban_bridge.vendored_write``) refuses identically;
+(b) board data written to the native store survives a reload and is served by
+    the vendored dashboard READ path (which delegates to the same authority);
+(c) the chat-transcript store (``chat_sessions.json``) and the receipt
+    session store (``sessions.json``) are disjoint authorities: different
+    files, schemas, record namespaces, and neither writes the other's records.
+
+Hermetic: temp ``XDG_*`` + ``HERMES_HOME``; no network; no live services.
+"""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+
+
+def _cfg(tmp_path, monkeypatch):
+    from voicebridge import config as C
+
+    for var in ("XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME"):
+        (tmp_path / var.lower()).mkdir(parents=True, exist_ok=True)
+        monkeypatch.setenv(var, str(tmp_path / var.lower()))
+    hermes = tmp_path / "home" / ".hermes"
+    hermes.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("HERMES_HOME", str(hermes))
+    p = tmp_path / "voice.yaml"
+    p.write_text("logging:\n  jsonl: false\n")
+    return C.Config.load(p)
+
+
+# ---------------------------------------------------------------------------
+# (a) no second writable board authority
+# ---------------------------------------------------------------------------
+def test_single_writable_board_authority_is_typed_refused(
+        tmp_path, monkeypatch):
+    from voicebridge import hermes_compat as HC
+    from voicebridge import kanban as N
+    from voicebridge import kanban_bridge as KBG
+
+    cfg = _cfg(tmp_path, monkeypatch)
+
+    # The contract declares exactly one writable authority.
+    auth = KBG.BOARD_AUTHORITY
+    assert auth["writable"] == ["qubit-native"], auth
+    assert auth["read_only"] == ["hermes-vendored"], auth
+    native = KBG.native_store(cfg)
+    vendored = KBG.vendored_store(cfg)
+    assert native["writable"] is True and native["authoritative"] is True
+    assert vendored["writable"] is False and vendored["authoritative"] is False
+    assert vendored["read_only"] is True
+
+    # The vendored compat write path is a typed refusal on every verb.
+    for method, path in (
+            ("POST", "/api/plugins/kanban/tasks"),
+            ("PATCH", "/api/plugins/kanban/tasks/task-1"),
+            ("DELETE", "/api/plugins/kanban/tasks/task-1"),
+            ("POST", "/api/plugins/kanban/boards"),
+            ("PUT", "/api/plugins/kanban/orchestration")):
+        status, out = HC.dispatch(cfg, method, path, {}, {"title": "x"})
+        assert status == 403, (method, path, status, out)
+        assert out.get("ok") is False, (method, path, out)
+        assert out.get("code") == "KANBAN_WRITE_BROKERED", (method, path, out)
+        assert out.get("qubit_counterpart"), (method, path, out)
+
+    # The in-process compatibility boundary refuses the same way.
+    refused = KBG.vendored_write("create", board="default", title="nope")
+    assert refused["ok"] is False
+    assert refused["code"] == "KANBAN_WRITE_BROKERED"
+    assert refused["authoritative_store"] == "qubit-native"
+    assert refused["writable_store"] == "qubit-native"
+    assert refused["qubit_counterpart"]
+
+    # The native store is the one surface a write lands on.
+    made = N.create(cfg, "native-ok", board="main", confirmed=True)
+    assert made["task"]["id"] is not None
+    stores = KBG.stores(cfg)
+    assert stores["authoritative"] == "qubit-native"
+    assert stores["writable"] == "qubit-native"
+    assert stores["native"]["task_count"] == 1
+    assert stores["vendored"]["task_count"] == 0
+
+
+def test_vendored_seed_is_not_a_competing_authority(tmp_path, monkeypatch):
+    """A legacy vendored row is neither served nor silently merged."""
+    from voicebridge import hermes_compat as HC
+    from voicebridge import hermes_plugins as HP
+    from voicebridge import kanban as N
+    from voicebridge import kanban_bridge as KBG
+
+    cfg = _cfg(tmp_path, monkeypatch)
+
+    # Simulate an old fork store with a vendored-only row.
+    engine = HP._kanban_engine(cfg)
+    conn = engine._conn(board=None)
+    try:
+        engine.kanban_db.create_task(
+            conn, title="legacy-vendored", created_by="test", board=None,
+            initial_status="running")
+        conn.commit()
+    finally:
+        conn.close()
+
+    # The dashboard READ (the single authority) does not serve the legacy row.
+    status, board = HC.dispatch(
+        cfg, "GET", "/api/plugins/kanban/board", {}, {})
+    assert status == 200 and board.get("ok") is True, board
+    titles = [t["title"] for col in board["columns"] for t in col["tasks"]]
+    assert "legacy-vendored" not in titles, titles
+    stores = KBG.stores(cfg)
+    assert stores["native"]["task_count"] == 0
+    assert stores["vendored"]["task_count"] == 1
+
+    # The only sanctioned convergence is the explicit migration.
+    out = KBG.migrate(cfg)
+    assert out["imported"] == 1, out
+    assert "legacy-vendored" in [
+        t["title"] for t in N.list_tasks(cfg)["tasks"]]
+
+
+# ---------------------------------------------------------------------------
+# (b) board data survives a reload; vendored read path serves the authority
+# ---------------------------------------------------------------------------
+def test_board_data_survives_reload_and_vendored_read(tmp_path, monkeypatch):
+    from voicebridge import hermes_compat as HC
+    from voicebridge import kanban as N
+    from voicebridge import kanban_bridge as KBG
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    N.create(cfg, "durable-task", board="main", confirmed=True)
+
+    # A fresh list (new connection) still sees the persisted row.
+    reopened = N.list_tasks(cfg)
+    assert [t["title"] for t in reopened["tasks"]] == ["durable-task"]
+
+    # The vendored dashboard READ delegates to the same single authority.
+    status, board = HC.dispatch(
+        cfg, "GET", "/api/plugins/kanban/board", {}, {})
+    assert status == 200 and board.get("ok") is True, board
+    titles = [t["title"] for col in board["columns"] for t in col["tasks"]]
+    assert "durable-task" in titles, titles
+
+    # And the contract still reports one writable authority after the reload.
+    stores = KBG.stores(cfg)
+    assert stores["native"]["task_count"] == 1
+    assert stores["native"]["writable"] is True
+    assert stores["vendored"]["writable"] is False
+
+
+# ---------------------------------------------------------------------------
+# (c) the two session stores do not both own the same records
+# ---------------------------------------------------------------------------
+def test_session_stores_are_disjoint_authorities(tmp_path, monkeypatch):
+    from voicebridge import auth_status as AS
+    from voicebridge import chat_transport as CT
+
+    state = tmp_path / "state"
+    state.mkdir()
+
+    # Chat transcript authority: own session + conversation turn.
+    chat = CT.ChatSessionStore(state)
+    assert chat.create("Chat One", session_id="chat-1")["state"] == "OK"
+    assert chat.append("chat-1", "user", "hello transcript")["state"] == "OK"
+
+    # Receipt-session authority in the SAME state dir, over actions.json.
+    (state / "actions.json").write_text(json.dumps({
+        "receipts": {"r1": {"receipt_id": "r1", "action_id": "a1",
+                            "state": "done", "code": "OK", "created_at": 1.0,
+                            "detail": "ran a thing"}}}), encoding="utf-8")
+    sess = AS.SessionStore(state)
+    renamed = sess.rename("r1", "Receipt One")
+    assert renamed["state"] == "OK", renamed
+
+    # Two files, two schemas, no shared record namespace.
+    chat_file = state / CT.STORE_FILE
+    sess_file = state / AS.SessionStore.STORE_FILE
+    assert chat_file.name == "chat_sessions.json"
+    assert sess_file.name == "sessions.json"
+    assert chat_file != sess_file and chat_file.is_file() and sess_file.is_file()
+    chat_doc = json.loads(chat_file.read_text(encoding="utf-8"))
+    sess_doc = json.loads(sess_file.read_text(encoding="utf-8"))
+    assert chat_doc["schema"] == AS.CHAT_TRANSCRIPT_SCHEMA
+    assert sess_doc["schema"] == AS.LIFECYCLE_SCHEMA
+    assert set(chat_doc["sessions"]).isdisjoint(set(sess_doc["sessions"]))
+    # Neither authority writes the other's records.
+    assert "chat-1" not in sess_doc["sessions"]
+    assert "r1" not in chat_doc["sessions"]
+    assert "messages" not in sess_doc
+    assert "audit" not in chat_doc
+    assert "hello transcript" not in json.dumps(sess_doc)
+
+    # The boundary is documented and names both authorities + exclusions.
+    boundary = AS.store_boundary()
+    assert boundary["schema"] == "qubit-store-boundary/1"
+    assert boundary["sessions"]["authority"] == \
+        "voicebridge.auth_status.SessionStore"
+    assert boundary["chat"]["authority"] == \
+        "voicebridge.chat_transport.ChatSessionStore"
+    assert boundary["sessions"]["file"] == "sessions.json"
+    assert boundary["chat"]["file"] == "chat_sessions.json"
+    assert "chat_sessions.json" in boundary["sessions"]["not_owner_of"]
+    assert "sessions.json" in boundary["chat"]["not_owner_of"]

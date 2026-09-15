@@ -20,6 +20,7 @@ from .gateway_ws import GatewayError
 
 METHOD_NOT_FOUND = "GATEWAY_METHOD_NOT_FOUND"
 METHOD_BAD_PARAMS = "GATEWAY_BAD_PARAMS"
+SESSION_REPOSITORY_UNAVAILABLE = "SESSION_REPOSITORY_UNAVAILABLE"
 
 Handler = Callable[[Any, Dict[str, Any]], Dict[str, Any]]
 
@@ -184,6 +185,73 @@ def _ui_panel_layout(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
                        f"unknown ui.panel_layout action {action!r}")
 
 
+def _sessions_sharing(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+    """Qubit equivalent of the upstream session-sharing gateway methods.
+
+    The pinned v2026.9.4 gateway added ``session.publicShare.set``,
+    ``session.visibility.set`` and ``session.members.*`` over a cloud session
+    repository. Qubit runs no cloud repository and no second policy authority,
+    so this single method exposes exactly the safe local capability: publish a
+    redacted, revocable, expiring read-only share of a receipt-store session
+    (``voicebridge/session_share.py``), list shares, revoke, and resolve. Every
+    mutation stays confirmation/e-stop gated in the shared backend; unknown
+    actions are typed bad-params, never a fabricated member/visibility result.
+    """
+    from .. import session_share as SS
+
+    action = str(params.get("action", "status") or "status").strip().lower()
+    if action == "status":
+        return SS.status(cfg)
+    if action == "list":
+        return SS.list_shares(cfg)
+    if action == "publish":
+        return SS.publish(
+            cfg, str(params.get("session_id", "") or ""),
+            ttl_s=params.get("ttl_s", SS.DEFAULT_TTL_S),
+            confirmed=bool(params.get("confirmed", False)),
+            requested_by=str(params.get("requested_by", "gateway")))
+    if action == "revoke":
+        return SS.revoke(cfg, str(params.get("share_id", "") or ""),
+                         confirmed=bool(params.get("confirmed", False)))
+    if action == "resolve":
+        return SS.resolve(cfg, str(params.get("share_id", "") or ""),
+                          str(params.get("token", "") or ""))
+    if action == "purge":
+        return SS.purge_expired(cfg)
+    raise GatewayError(METHOD_BAD_PARAMS,
+                       f"unknown sessions.sharing action {action!r}")
+
+
+def _session_repository_artifacts(cfg: Any,
+                                  params: Dict[str, Any]) -> Dict[str, Any]:
+    """Read-only session artifact view (Qubit-safe local equivalent).
+
+    Upstream lists artifacts from a cloud session repository
+    (``session-repository-artifacts.ts``). Qubit runs no cloud repository, so
+    the *only* session artifacts it has are the local opt-in public shares.
+    This returns those read-only and reports the cloud path as a typed
+    ``SESSION_REPOSITORY_UNAVAILABLE`` — it never fabricates a remote listing.
+    """
+    from .. import session_share as SS
+
+    action = str(params.get("action", "list") or "list").strip().lower()
+    if action != "list":
+        raise GatewayError(METHOD_BAD_PARAMS,
+                           f"unknown session.repository_artifacts action "
+                           f"{action!r}")
+    listing = SS.list_shares(cfg)
+    return {
+        "state": "OK",
+        "mode": "local-shares",
+        "artifacts": listing.get("shares", []),
+        "count": listing.get("count", 0),
+        "cloud": {"state": "UNAVAILABLE", "code": SESSION_REPOSITORY_UNAVAILABLE,
+                  "detail": "no cloud session repository is run; local "
+                            "read-only session shares are the safe equivalent"},
+        "authority": "read-only; nothing is fetched or fabricated",
+    }
+
+
 def _migrations(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
     from .. import lifecycle as LC
     from .. import product as PR
@@ -206,6 +274,9 @@ def default_registry() -> MethodRegistry:
     registry.register("plugin.mutations", _plugin_mutations)
     registry.register("ui.panels", _ui_panels)
     registry.register("ui.panel_layout", _ui_panel_layout)
+    registry.register("sessions.sharing", _sessions_sharing)
+    registry.register("session.repository_artifacts",
+                      _session_repository_artifacts)
     registry.register("migrations", _migrations)
     return registry
 

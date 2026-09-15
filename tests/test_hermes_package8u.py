@@ -29,9 +29,16 @@ def test_pyproject_declares_dashboard_artifacts():
     sdist = data["tool"]["hatch"]["build"]["targets"]["sdist"]
     assert "frontend/hermes-dist" in wheel.get("artifacts", []), wheel
     assert "frontend/hermes-dist" in sdist.get("artifacts", []), sdist
-    # the frontend tree (source + overlay) is force-included in the wheel
+    # the frontend tree (source + overlay) is packaged in the wheel, either as
+    # a direct force-include mapping or via the filtered custom build hook.
     force = wheel.get("force-include", {})
-    assert "frontend" in force, force
+    if "frontend" not in force:
+        hook_path = str(wheel.get("hooks", {}).get("custom", {})
+                        .get("path", ""))
+        assert hook_path and (REPO_ROOT / hook_path).is_file(), wheel
+        text = (REPO_ROOT / hook_path).read_text(encoding="utf-8",
+                                                 errors="replace")
+        assert "voicebridge/_data/frontend/" in text, text
 
 
 def test_resource_resolution_prefers_package_data(monkeypatch, tmp_path):
@@ -81,5 +88,5 @@ def test_build_script_present_and_executable():
     import os
     assert os.access(script, os.X_OK)
     text = script.read_text()
-    assert "vite build --base=/hermes/" in text
+    assert "vite build --base=/" in text
     assert "--outDir" in text

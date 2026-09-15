@@ -105,3 +105,19 @@ safety controls and all licensing/provenance records. This amends only the
 other requirement above remains in force. Full verbatim text:
 `docs/QUBIT_OWNER_AMENDMENT_2026-09-11_HERMES_RUNTIME.md`.
 
+## Owner amendment 2026-09-15 (provider, voice, autonomy, and plan integrity)
+
+The owner approved the configurable-provider, Qubit-Brain4 lifecycle, advanced
+local-model research, and scoped-autonomy requirements in
+`docs/QUBIT_OWNER_AMENDMENT_2026-09-15_PROVIDER_AND_VOICE_PLUGGABILITY.md`.
+The current master execution/correction plan is
+`docs/QUBIT_PRODUCT_PARITY_AND_AUTONOMY_PLAN_2026-09-15.md`; the plan-integrity
+findings are recorded in `docs/QUBIT_PLAN_INTEGRITY_AUDIT_2026-09-15.md`.
+
+This amendment clarifies that a byte-verified vendor baseline and a fully
+Qubit-branded product are complementary requirements: byte identity applies to
+unchanged vendor files and provenance, while Qubit overlays are reviewed by
+patch manifest and behavioral parity tests. It also clarifies that one voice
+path means one session/broker/policy authority, not one permanently embedded
+model or voice provider. All original parity, safety, rebrand, and final-gate
+requirements remain in force.

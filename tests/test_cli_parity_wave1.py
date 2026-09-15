@@ -401,7 +401,7 @@ def _run_cli(tmp_path, argv, timeout=180):
 def test_readonly_family_executes_real_fork(tmp_path, family):
     r = _run_cli(tmp_path, [family, "--help"])
     assert r.returncode == 0, (family, r.stderr[-400:])
-    assert "usage: hermes" in r.stdout, (family, r.stdout[:200])
+    assert "usage: qubit" in r.stdout, (family, r.stdout[:200])
 
 
 @pytest.mark.parametrize("pair,fork_argv", [
@@ -412,7 +412,7 @@ def test_readonly_family_executes_real_fork(tmp_path, family):
 def test_confirm_route_executes_real_fork_with_confirm(tmp_path, pair, fork_argv):
     r = _run_cli(tmp_path, [*pair, "--confirm", "--help"])
     assert r.returncode == 0, (pair, r.stderr[-400:])
-    assert fork_argv[0] in r.stdout and "usage: hermes" in r.stdout, \
+    assert fork_argv[0] in r.stdout and "usage: qubit" in r.stdout, \
         (pair, r.stdout[:200])
 
 

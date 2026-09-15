@@ -51,6 +51,10 @@ const PROVIDER_GROUPS: { prefix: string; name: string; priority: number }[] = [
   // Then alphabetical by display name
   { prefix: "ANTHROPIC_", name: "Anthropic", priority: 1 },
   { prefix: "DASHSCOPE_", name: "DashScope (Qwen)", priority: 2 },
+  { prefix: "QWEN_", name: "DashScope (Qwen)", priority: 2 },
+  // Legacy upstream env prefix: an internal wire identifier, not a product
+  // name. Renaming it would stop grouping existing HERMES_QWEN_* secrets (see
+  // docs/QUBIT_REBRAND_ALLOWLIST.md).
   { prefix: "HERMES_QWEN_", name: "DashScope (Qwen)", priority: 2 },
   { prefix: "DEEPSEEK_", name: "DeepSeek", priority: 3 },
   { prefix: "GOOGLE_", name: "Gemini", priority: 4 },
@@ -913,7 +917,7 @@ export default function EnvPage() {
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <p className="text-sm text-muted-foreground">
-            {t.env.description} <code>~/.hermes/.env</code>
+            {t.env.description} <code>~/.qubit/.env</code>
           </p>
           <p className="text-xs text-text-tertiary">
             {t.env.changesNote}

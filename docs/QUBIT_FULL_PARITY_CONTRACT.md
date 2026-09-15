@@ -129,10 +129,12 @@ Hermes/OpenClaw functionality.
 ## Safety and authorization
 
 Full parity means full authorized capability, not a raw bypass. Existing Qubit
-broker, permission, confirmation, audit, redaction, isolation, resource, and
-emergency-stop contracts remain mandatory. High-impact actions continue to
-require explicit confirmation. No direct shell, HTTP, MCP, voice, dashboard, or
-upstream-process path may bypass those contracts.
+broker, permission, confirmation/pre-authorization, audit, redaction, isolation,
+resource, and emergency-stop contracts remain mandatory. High-impact actions
+require explicit confirmation unless the owner has already pre-authorized the
+exact scope, target, time, budget, and policy in an active autonomy profile
+under the 2026-09-15 owner amendment. No direct shell, HTTP, MCP, voice,
+dashboard, or upstream-process path may bypass those contracts.
 
 ## Packet order
 
@@ -164,3 +166,20 @@ The final verifier must reproduce:
 The verdict must be `VERIFIED`, `VERIFIED WITH EXPLICIT LIMITATION`, or
 `REJECTED`. No later packet may be started from a report that merely says
 “parity matrix complete” without this evidence.
+
+## Owner amendment 2026-09-15 — provider, voice, and control-level parity
+
+The complete local upstream inventory includes model/provider selection,
+model-health, routing, credentials-reference, streaming, voice/audio, device,
+session, autonomy, and provider-failure workflows. Qubit-Brain4 is the default
+local profile, not an embedded product requirement. Qubit must expose real,
+profile-driven local/API/realtime provider choices and independently selectable
+ASR/TTS/device settings through the same CLI/dashboard/voice backend.
+
+For parity, a page is not complete until each visible interactive control,
+form, menu, dialog, stream, keyboard path, state transition, persistence, and
+error/recovery path has been exercised against the production listener and
+canonical store. Source/vendor hashes, route tests, screenshots, or a 200
+response are supplementary evidence, not substitutes. See
+`QUBIT_PROVIDER_VOICE_PARITY_PLAN_2026-09-15.md` and
+`QUBIT_PRODUCT_PARITY_AND_AUTONOMY_PLAN_2026-09-15.md`.

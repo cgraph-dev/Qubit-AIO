@@ -1116,12 +1116,17 @@ def test_config_and_env_writes_are_real_confirm_gated(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
 
     # PUT /api/config: real settings override write, confirm-gated.
-    code, out = HC.dispatch(cfg, "PUT", "/api/config", {}, {"theme": "qubit"})
+    code, out = HC.dispatch(cfg, "PUT", "/api/config", {},
+                            {"logging": {"level": "DEBUG"}})
     assert code == 409 and out["code"] == "CONFIRM_REQUIRED", (code, out)
     code, out = HC.dispatch(cfg, "PUT", "/api/config", {},
-                            {"theme": "qubit", "confirm": True})
+                            {"logging": {"level": "DEBUG"}, "confirm": True})
     assert code == 200 and out["ok"] is True, (code, out)
-    assert out["config"]["theme"] == "qubit", out
+    assert out["config"]["logging.level"] == "DEBUG", out
+    # An unknown settings key is a typed refusal, never a fabricated success.
+    code, out = HC.dispatch(cfg, "PUT", "/api/config", {},
+                            {"definitely_not_a_setting": True, "confirm": True})
+    assert code == 403 and out["code"] == "UNKNOWN_CONFIG_KEY", (code, out)
 
     # Secret-shaped keys never enter the store (reference names only).
     code, out = HC.dispatch(cfg, "PUT", "/api/config", {},

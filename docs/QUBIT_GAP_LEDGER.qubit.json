@@ -17,12 +17,12 @@
   "docs/QUBIT_SOURCE_INVENTORY.json (direct source inventory, agent A)"
  ],
  "generated_from": {
-  "voice_commands.REGISTRY": 476,
-  "dashboard_ops.catalog": 510,
+  "voice_commands.REGISTRY": 480,
+  "dashboard_ops.catalog": 523,
   "dashboard_ops.EXTRA_OPS": 34,
   "voice_commands.CLI_COVERAGE": 106,
-  "hermes_compat.ROUTES": 367,
-  "hermes_compat.GATED": 102,
+  "hermes_compat.ROUTES": 385,
+  "hermes_compat.GATED": 105,
   "cli_families": 106,
   "source_inventory.items": 6775,
   "source_inventory.surface_items": 1818,
@@ -34,7 +34,7 @@
   "source_inventory.dispositioned_gated": 4
  },
  "counts_by_status": {
-  "IMPLEMENTED": 654,
+  "IMPLEMENTED": 668,
   "OPERATOR_ONLY": 3,
   "SAFE_EQUIVALENT": 36
  },
@@ -68,7 +68,7 @@
   "config_profiles": 8,
   "console_guidance": 1,
   "curator": 1,
-  "dashboard_plugin": 10,
+  "dashboard_plugin": 11,
   "device": 1,
   "device_enroll": 1,
   "diagnostics": 1,
@@ -95,7 +95,7 @@
   "ide": 2,
   "import_agent": 2,
   "insights": 1,
-  "kanban": 44,
+  "kanban": 48,
   "lessons": 3,
   "local_models": 13,
   "logbook": 2,
@@ -123,6 +123,7 @@
   "plugins_remote": 1,
   "power_status": 1,
   "product": 7,
+  "profile": 9,
   "projects": 13,
   "prompt_budget": 1,
   "proxy": 4,
@@ -165,12 +166,12 @@
   "worktree": 1
  },
  "counts_by_source": {
-  "qubit-surface": 693
+  "qubit-surface": 707
  },
  "tri_surface": {
-  "has-cli has-dashboard": 31,
-  "has-cli has-dashboard has-voice": 472,
-  "has-dashboard": 62,
+  "has-cli has-dashboard": 40,
+  "has-cli has-dashboard has-voice": 476,
+  "has-dashboard": 63,
   "has-dashboard has-voice": 4,
   "no-surface": 124
  },
@@ -1953,6 +1954,34 @@
    "needs": "none"
   },
   {
+   "id": "clear_session_model",
+   "area": "profile",
+   "capability": "Clear session model",
+   "upstream_ref": "config",
+   "qubit_backend": "voicebridge.dashboard_ops._op_clear_session_model -> voicebridge.model_profiles_ops.clear_session_model",
+   "cli": "qubit profile model deactivate",
+   "dashboard": "qubit-models:/qubit-models",
+   "voice": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_model_profiles.py::test_every_model_profile_op_dispatches_through_the_production_route",
+   "note": "Clear this session's model override (confirmed).",
+   "needs": "none"
+  },
+  {
+   "id": "clone_model_profile",
+   "area": "profile",
+   "capability": "Clone model profile",
+   "upstream_ref": "config",
+   "qubit_backend": "voicebridge.dashboard_ops._op_clone_model_profile -> voicebridge.model_profiles_ops.clone_model_profile",
+   "cli": "qubit profile model clone",
+   "dashboard": "qubit-models:/qubit-models",
+   "voice": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_model_profiles.py::test_every_model_profile_op_dispatches_through_the_production_route",
+   "note": "Clone a model profile under a new id (records the source as the rollback target).",
+   "needs": "none"
+  },
+  {
    "id": "commands_list",
    "area": "commands",
    "capability": "What can you do",
@@ -2118,6 +2147,20 @@
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_ops8tf.py::test_dashboard_matches_direct_backend_for_every_read_op",
    "note": "How to use the terminal REPL.",
+   "needs": "none"
+  },
+  {
+   "id": "create_model_profile",
+   "area": "profile",
+   "capability": "Create model profile",
+   "upstream_ref": "config",
+   "qubit_backend": "voicebridge.dashboard_ops._op_create_model_profile -> voicebridge.model_profiles_ops.create_model_profile",
+   "cli": "qubit profile model create",
+   "dashboard": "qubit-models:/qubit-models",
+   "voice": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_model_profiles.py::test_dashboard_dispatch_reads_and_stages_mutations",
+   "note": "Register a model profile (non-secret fields only; key_ref is an env:/file: reference, never a raw key).",
    "needs": "none"
   },
   {
@@ -3027,7 +3070,7 @@
    "voice": "git_log",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_git_scope8u.py::test_status_log_diff_show_roundtrip",
-   "note": "Bounded commit log of the active project repo (read-only).",
+   "note": "Bounded commit log of the active project repo (read-only; default 10, max 50).",
    "needs": "none"
   },
   {
@@ -3572,7 +3615,7 @@
    "dashboard": "qubit-boards:/qubit-boards",
    "voice": "kanban_archive",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_board_canvas8u.py::test_atomic_claim_single_winner",
+   "proving_test": "tests/test_agentD_parity.py::test_kanban_vendored_reads_are_real",
    "note": "Archive a task (confirmed).",
    "needs": "none"
   },
@@ -3614,7 +3657,7 @@
    "dashboard": "qubit-boards:/qubit-boards",
    "voice": "kanban_boards",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_board_canvas8u.py::test_atomic_claim_single_winner",
+   "proving_test": "tests/test_agentD_parity.py::test_kanban_vendored_reads_are_real",
    "note": "Task boards with counts.",
    "needs": "none"
   },
@@ -3684,7 +3727,7 @@
    "dashboard": "qubit-boards:/qubit-boards",
    "voice": "kanban_create",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_approvals_cli8tf.py::test_deny_settles_without_executing",
+   "proving_test": "tests/test_agentD_parity.py::test_kanban_vendored_reads_are_real",
    "note": "Create a task (confirmed; board defaults to main).",
    "needs": "none"
   },
@@ -3698,7 +3741,7 @@
    "dashboard": "qubit-boards:/qubit-boards",
    "voice": "kanban_current",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_board_canvas8u.py::test_atomic_claim_single_winner",
+   "proving_test": "tests/test_agentD_parity.py::test_kanban_vendored_reads_are_real",
    "note": "Newest actionable task, or a typed empty state.",
    "needs": "none"
   },
@@ -3726,7 +3769,7 @@
    "dashboard": "qubit-boards:/qubit-boards",
    "voice": "kanban_dispatch",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_board_canvas8u.py::test_atomic_claim_single_winner",
+   "proving_test": "tests/test_agentD_parity.py::test_kanban_vendored_reads_are_real",
    "note": "Typed refusal: execution ops delegate to supervised runs.",
    "needs": "none"
   },
@@ -3810,7 +3853,7 @@
    "dashboard": "qubit-boards:/qubit-boards",
    "voice": "kanban_list",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_approvals_cli8tf.py::test_deny_settles_without_executing",
+   "proving_test": "tests/test_agentD_parity.py::test_kanban_vendored_reads_are_real",
    "note": "Board tasks.",
    "needs": "none"
   },
@@ -3829,6 +3872,20 @@
    "needs": "none"
   },
   {
+   "id": "kanban_migrate",
+   "area": "kanban",
+   "capability": "Migrate kanban",
+   "upstream_ref": "kanban",
+   "qubit_backend": "voicebridge.voice_commands._b_kanban -> voicebridge.kanban_bridge.migrate",
+   "cli": "qubit kanban migrate",
+   "dashboard": "qubit-boards:/qubit-boards",
+   "voice": "kanban_migrate",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_kanban_bridge.py::test_migrate_dry_run_writes_nothing",
+   "note": "Import legacy kanban tasks into the Qubit store (confirmed).",
+   "needs": "none"
+  },
+  {
    "id": "kanban_move",
    "area": "kanban",
    "capability": "Move this task",
@@ -3838,7 +3895,7 @@
    "dashboard": "qubit-boards:/qubit-boards",
    "voice": "kanban_move",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_board_canvas8u.py::test_atomic_claim_single_winner",
+   "proving_test": "tests/test_agentD_parity.py::test_kanban_vendored_reads_are_real",
    "note": "Move a task across boards/columns (confirmed).",
    "needs": "none"
   },
@@ -3852,7 +3909,7 @@
    "dashboard": "qubit-boards:/qubit-boards",
    "voice": "kanban_open",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_board_canvas8u.py::test_atomic_claim_single_winner",
+   "proving_test": "tests/test_agentD_parity.py::test_kanban_vendored_reads_are_real",
    "note": "Whole board canvas: columns, widgets, layout, roles.",
    "needs": "none"
   },
@@ -3882,6 +3939,20 @@
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_board_canvas8u.py::test_voice_kanban_task_lifecycle_and_widget_move",
    "note": "Reclaim a task (confirmed).",
+   "needs": "none"
+  },
+  {
+   "id": "kanban_restore",
+   "area": "kanban",
+   "capability": "Restore task",
+   "upstream_ref": "kanban",
+   "qubit_backend": "voicebridge.voice_commands._b_kanban -> voicebridge.kanban.archive_task",
+   "cli": "qubit kanban restore",
+   "dashboard": "qubit-boards:/qubit-boards",
+   "voice": "kanban_restore",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_agentD_parity.py::test_kanban_vendored_reads_are_real",
+   "note": "Restore an archived task to its prior column (confirmed).",
    "needs": "none"
   },
   {
@@ -3983,6 +4054,20 @@
    "needs": "none"
   },
   {
+   "id": "kanban_snapshots",
+   "area": "kanban",
+   "capability": "List canvas snapshots",
+   "upstream_ref": "kanban",
+   "qubit_backend": "voicebridge.voice_commands._b_kanban -> voicebridge.kanban.archive_task",
+   "cli": "qubit kanban snapshots",
+   "dashboard": "qubit-boards:/qubit-boards",
+   "voice": "kanban_snapshots",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_agentD_parity.py::test_kanban_vendored_reads_are_real",
+   "note": "Newest-first canvas restore points for a board (read-only; board defaults to main).",
+   "needs": "none"
+  },
+  {
    "id": "kanban_stats",
    "area": "kanban",
    "capability": "Board stats",
@@ -3997,6 +4082,20 @@
    "needs": "none"
   },
   {
+   "id": "kanban_stores",
+   "area": "kanban",
+   "capability": "Kanban stores",
+   "upstream_ref": "kanban",
+   "qubit_backend": "voicebridge.voice_commands._b_kanban -> voicebridge.kanban_bridge.stores",
+   "cli": "qubit kanban stores",
+   "dashboard": "qubit-boards:/qubit-boards",
+   "voice": "kanban_stores",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_kanban_bridge.py::test_stores_reports_both_and_authoritative",
+   "note": "Both kanban stores and the authoritative one.",
+   "needs": "none"
+  },
+  {
    "id": "kanban_swarm",
    "area": "kanban",
    "capability": "Swarm board",
@@ -4006,7 +4105,7 @@
    "dashboard": "qubit-boards:/qubit-boards",
    "voice": "kanban_swarm",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_board_canvas8u.py::test_atomic_claim_single_winner",
+   "proving_test": "tests/test_agentD_parity.py::test_kanban_vendored_reads_are_real",
    "note": "Typed refusal: parallel work goes through the Qubit broker.",
    "needs": "none"
   },
@@ -4104,7 +4203,7 @@
    "dashboard": "qubit-boards:/qubit-boards",
    "voice": "kanban_watch",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_board_canvas8u.py::test_atomic_claim_single_winner",
+   "proving_test": "tests/test_agentD_parity.py::test_kanban_vendored_reads_are_real",
    "note": "Typed refusal: watchers run as monitor jobs.",
    "needs": "none"
   },
@@ -4218,6 +4317,20 @@
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_hermes_routes_agent2b_wiring.py::test_learning_node_mutations_are_real_confirm_gated",
    "note": "Tombstone a lesson (confirmed).",
+   "needs": "none"
+  },
+  {
+   "id": "list_model_profiles",
+   "area": "profile",
+   "capability": "List model profiles",
+   "upstream_ref": "config",
+   "qubit_backend": "voicebridge.dashboard_ops._op_list_model_profiles -> voicebridge.model_profiles_ops.list_model_profiles",
+   "cli": "qubit profile model list",
+   "dashboard": "qubit-models:/qubit-models",
+   "voice": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_model_profiles.py::test_dashboard_dispatch_reads_and_stages_mutations",
+   "note": "List the canonical model/provider profiles and their gates.",
    "needs": "none"
   },
   {
@@ -4678,7 +4791,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "model",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_dashboard_agent3_wiring.py::test_read_capabilities_match_direct_backend",
+   "proving_test": "tests/test_autonomy_wiring.py::test_scope_widening_attempt_cannot_expand_profile",
    "note": "Resident model and frontier policy.",
    "needs": "creds"
   },
@@ -6237,6 +6350,20 @@
    "needs": "none"
   },
   {
+   "id": "remove_model_profile",
+   "area": "profile",
+   "capability": "Remove model profile",
+   "upstream_ref": "config",
+   "qubit_backend": "voicebridge.dashboard_ops._op_remove_model_profile -> voicebridge.model_profiles_ops.remove_model_profile",
+   "cli": "qubit profile model remove",
+   "dashboard": "qubit-models:/qubit-models",
+   "voice": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_model_profiles.py::test_every_model_profile_op_dispatches_through_the_production_route",
+   "note": "Remove a non-default model profile (refused while a session selects it).",
+   "needs": "none"
+  },
+  {
    "id": "reports_list",
    "area": "reports",
    "capability": "Show my reports",
@@ -6262,6 +6389,20 @@
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_cli_missing_wave2.py::test_pause_confirm_latches_the_one_qubit_estop",
    "note": "Clear the emergency stop (confirmed).",
+   "needs": "none"
+  },
+  {
+   "id": "rollback_model_profile",
+   "area": "profile",
+   "capability": "Rollback model profile",
+   "upstream_ref": "config",
+   "qubit_backend": "voicebridge.dashboard_ops._op_rollback_model_profile -> voicebridge.model_profiles_ops.rollback_model_profile",
+   "cli": "qubit profile model rollback",
+   "dashboard": "qubit-models:/qubit-models",
+   "voice": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_model_profiles.py::test_every_model_profile_op_dispatches_through_the_production_route",
+   "note": "Select a profile's declared rollback target for a session (confirmed; typed NO_ROLLBACK when none is declared).",
    "needs": "none"
   },
   {
@@ -6601,6 +6742,20 @@
    "needs": "none"
   },
   {
+   "id": "select_session_model",
+   "area": "profile",
+   "capability": "Select session model",
+   "upstream_ref": "config",
+   "qubit_backend": "voicebridge.dashboard_ops._op_select_session_model -> voicebridge.model_profiles_ops.select_session_model",
+   "cli": "qubit profile model activate",
+   "dashboard": "qubit-models:/qubit-models",
+   "voice": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_model_profiles.py::test_every_model_profile_op_dispatches_through_the_production_route",
+   "note": "Select a model profile for one session/role (confirmed).",
+   "needs": "none"
+  },
+  {
    "id": "session_archive",
    "area": "sessions",
    "capability": "Archive a session",
@@ -6780,6 +6935,20 @@
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_session_share8u.py::test_bad_input_unavailable_and_corrupt",
    "note": "Share-store health and counts (never tokens).",
+   "needs": "none"
+  },
+  {
+   "id": "show_model_profile",
+   "area": "profile",
+   "capability": "Show model profile",
+   "upstream_ref": "config",
+   "qubit_backend": "voicebridge.dashboard_ops._op_show_model_profile -> voicebridge.model_profiles_ops.show_model_profile",
+   "cli": "qubit profile model show",
+   "dashboard": "qubit-models:/qubit-models",
+   "voice": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_model_profiles.py::test_every_model_profile_op_dispatches_through_the_production_route",
+   "note": "Show one model profile: capabilities, locality, egress, budgets, health and effective selection.",
    "needs": "none"
   },
   {
@@ -7109,12 +7278,12 @@
    "area": "task_run",
    "capability": "Run the task",
    "upstream_ref": "chat",
-   "qubit_backend": "voicebridge.voice_commands._b_task_run -> voicebridge.agent.turn",
+   "qubit_backend": "voicebridge.voice_commands._b_task_run -> voicebridge.chat_transport.turn",
    "cli": "qubit task",
    "dashboard": "qubit-chat:/qubit-chat",
    "voice": "task_run",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_agent8u.py::test_agent_receipt_carries_provenance",
+   "proving_test": "tests/test_provider_resolver.py::test_chat_turn_routes_api_profile_through_gateway",
    "note": "Dispatch one task to the agent runtime (confirmed).",
    "needs": "none"
   },
@@ -7123,13 +7292,27 @@
    "area": "task_run",
    "capability": "Run this task",
    "upstream_ref": "chat",
-   "qubit_backend": "voicebridge.voice_commands._b_task_run -> voicebridge.agent.turn",
+   "qubit_backend": "voicebridge.voice_commands._b_task_run -> voicebridge.chat_transport.turn",
    "cli": "qubit task",
    "dashboard": "qubit-chat:/qubit-chat",
    "voice": "task_run_current",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_agent8u.py::test_agent_receipt_carries_provenance",
+   "proving_test": "tests/test_provider_resolver.py::test_chat_turn_routes_api_profile_through_gateway",
    "note": "Dispatch the current kanban task to the agent runtime (confirmed; typed empty state when nothing is actionable).",
+   "needs": "none"
+  },
+  {
+   "id": "test_model_profile",
+   "area": "profile",
+   "capability": "Test model profile",
+   "upstream_ref": "config",
+   "qubit_backend": "voicebridge.dashboard_ops._op_test_model_profile -> voicebridge.model_profiles_ops.test_model_profile",
+   "cli": "qubit profile model test",
+   "dashboard": "qubit-models:/qubit-models",
+   "voice": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_model_profiles.py::test_every_model_profile_op_dispatches_through_the_production_route",
+   "note": "Preflight a model profile (read-only; optional local probe).",
    "needs": "none"
   },
   {
@@ -7899,7 +8082,7 @@
    "voice": "",
    "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
-   "note": "Kanban task mutations run through the Qubit confirmation/broker path (`qubit kanban` + approvals), not a direct dashboard write. routes=3",
+   "note": "Kanban task mutations run through the Qubit confirmation/broker path (`qubit kanban` + approvals), not a direct dashboard write. routes=4",
    "needs": "owner"
   },
   {
@@ -8053,7 +8236,7 @@
    "voice": "",
    "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
-   "note": "Qubit sessions are append-only audit receipts; owner back-fill is not offered. Memory tombstones/corrections own forgetting. routes=4",
+   "note": "Qubit sessions are append-only audit receipts; owner back-fill is not offered. Memory tombstones/corrections own forgetting. routes=5",
    "needs": "owner"
   },
   {
@@ -8081,7 +8264,7 @@
    "voice": "",
    "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_hermes_routes_parity8u.py::test_every_gated_route_is_typed",
-   "note": "In-place self-update from the dashboard is refused; upgrades are versioned, staged, and reversible. routes=3",
+   "note": "In-place self-update from the dashboard is refused; upgrades are versioned, staged, and reversible. routes=5",
    "needs": "owner"
   },
   {
@@ -8236,6 +8419,20 @@
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_plugins.py::test_every_plugin_manifest_served_through_real_route",
    "note": "Memory provider status, search, and the learning ledger (same MemoryStore/curator backend as CLI `qubit memory`/`lessons` and voice).",
+   "needs": "none"
+  },
+  {
+   "id": "plugin_qubit-models",
+   "area": "dashboard_plugin",
+   "capability": "Models & Providers",
+   "upstream_ref": "qubit-overlay",
+   "qubit_backend": "voicebridge.hermes_compat+frontend/hermes-qubit",
+   "cli": "",
+   "dashboard": "qubit-models:/qubit-models",
+   "voice": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_agent3_plugins.py::test_every_plugin_manifest_served_through_real_route",
+   "note": "Canonical model/provider profiles: list, inspect capabilities, locality, egress, budgets and health, create (non-secret fields only), clone, test, session-select and rollback throu",
    "needs": "none"
   },
   {

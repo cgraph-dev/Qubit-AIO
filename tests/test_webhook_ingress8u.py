@@ -269,7 +269,7 @@ def test_endpoint_accepts_valid_signature_and_alias(tmp_path, monkeypatch):
 
         body2 = b'{"deploy": "prod-43"}'
         ts2 = time.time()
-        status, out = _post(port, "/hermes/hooks/deploy", body2,
+        status, out = _post(port, "/hooks/deploy", body2,
                             _headers(SECRET, ts2, body2, delivery="e2e-2"))
         assert status == 200, (status, out)
         assert out["state"] == "VALID"

@@ -7,7 +7,9 @@ fail closed or use a clearly typed local fallback.
 """
 from __future__ import annotations
 
+import json
 import time
+import urllib.request
 from collections.abc import Mapping
 from typing import Any, Callable, Optional
 
@@ -18,7 +20,7 @@ from .catalog import ModelEntry, ProviderCatalog
 from .contracts import ProviderRequest, ProviderResult, UsageRecord
 from .credentials import (SecretRef, looks_like_browser_secret,
                            looks_like_opencode_private_db, redact_ref,
-                           redact_secret_ref, resolve_key)
+                           resolve_key)
 from .egress import classify_and_sanitize
 from .policy import FrontierPolicy, disclosure_block, get_governor
 
@@ -46,25 +48,49 @@ def _estimate_cost(entry: Optional[ModelEntry], pcfg: dict,
     return (pt_est / 1000.0) * pin + (max_tokens / 1000.0) * pout
 
 
-def _local_complete(prompt: str, cfg: Any, max_tokens: int) -> ProviderResult:
-    """Local path: existing runner contract, no network beyond Ollama."""
+def _local_complete(prompt: str, cfg: Any, max_tokens: int, *,
+                    conversation_prompt: str = "", context: str = "",
+                    timeout_s: Optional[float] = None,
+                    on_sentence: Optional[Callable[[str], None]] = None,
+                    should_stop: Optional[Callable[[], bool]] = None,
+                    reasoning: Optional[str] = None,
+                    num_ctx: Optional[int] = None,
+                    model: Optional[str] = None) -> ProviderResult:
+    """Local path: existing runner contract, no network beyond Ollama.
+
+    ``on_sentence`` selects the streaming adapter (TTS overlap); otherwise the
+    blocking ``chat_local`` adapter is used. Both are the sanctioned shared
+    local adapters — no caller performs its own Ollama request.
+    """
     try:
-        from ..local_llm import chat_local
+        from ..local_llm import chat_local, chat_local_stream
         from ..runner_contract import resolve
         rc = resolve(cfg)
+        alias = (model or "").strip() or rc.alias
+        timeout = 8.0 if timeout_s is None else float(timeout_s)
         t0 = time.time()
-        text = chat_local(prompt[:2000], "", model=rc.alias, url=rc.url,
-                          timeout_s=8.0, max_tokens=max_tokens)
+        if on_sentence is not None:
+            text = chat_local_stream(
+                prompt, conversation_prompt, model=alias, url=rc.url,
+                timeout_s=timeout, max_tokens=max_tokens, context=context,
+                num_ctx=num_ctx or rc.num_ctx, on_sentence=on_sentence,
+                should_stop=should_stop)
+        else:
+            text = chat_local(prompt[:2000], conversation_prompt,
+                              model=alias, url=rc.url, timeout_s=timeout,
+                              max_tokens=max_tokens, context=context,
+                              num_ctx=num_ctx or rc.num_ctx,
+                              reasoning=reasoning)
         ms = int((time.time() - t0) * 1000)
         if not text:
             return ProviderResult(ok=False, code="PROVIDER_OUTAGE",
                                   message="local model unavailable",
-                                  provider="local", model=rc.alias,
-                                  identity=f"local/{rc.alias}")
-        usage = UsageRecord(provider="local", model=rc.alias,
-                            identity=f"local/{rc.alias}", latency_ms=ms)
+                                  provider="local", model=alias,
+                                  identity=f"local/{alias}")
+        usage = UsageRecord(provider="local", model=alias,
+                            identity=f"local/{alias}", latency_ms=ms)
         return ProviderResult(ok=True, text=text, provider="local",
-                              model=rc.alias, identity=f"local/{rc.alias}",
+                              model=alias, identity=f"local/{alias}",
                               usage=usage)
     except Exception as exc:
         return ProviderResult(ok=False, code="PROVIDER_OUTAGE",
@@ -73,12 +99,272 @@ def _local_complete(prompt: str, cfg: Any, max_tokens: int) -> ProviderResult:
                               identity="local/qubit-brain4")
 
 
+def _local_generate(prompt: str, cfg: Any, max_tokens: int, *,
+                    system_prompt: str = "",
+                    structured_schema: Optional[Any] = None,
+                    options: Optional[dict] = None,
+                    timeout_s: Optional[float] = None,
+                    keep_alive: Optional[int] = None,
+                    model: Optional[str] = None) -> ProviderResult:
+    """Raw local ``/api/generate`` adapter (classifier/summarizer shape).
+
+    Preserves the Packet 4B canonical runner contract (model alias, num_ctx,
+    keep_alive) so the resident runner never reloads. Per-caller options are
+    bounded to temperature/num_predict policy only.
+    """
+    from ..runner_contract import resolve
+
+    try:
+        rc = resolve(cfg)
+        alias = (model or "").strip() or rc.alias
+        timeout = 8.0 if timeout_s is None else float(timeout_s)
+        opts = {"temperature": 0.0, "num_ctx": rc.num_ctx,
+                "num_predict": int(max_tokens)}
+        if options:
+            opts.update(options)
+        payload: dict = {
+            "model": alias, "prompt": prompt, "stream": False,
+            "keep_alive": rc.keep_alive if keep_alive is None else keep_alive,
+            "options": opts}
+        if system_prompt:
+            payload["system"] = system_prompt
+        if structured_schema is not None:
+            payload["format"] = structured_schema
+        req = urllib.request.Request(
+            f"{rc.url}/api/generate",
+            data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"})
+        t0 = time.time()
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = json.loads(resp.read().decode())
+        text = str(body.get("response") or "")
+        ms = int((time.time() - t0) * 1000)
+        if not text:
+            return ProviderResult(ok=False, code="PROVIDER_OUTAGE",
+                                  message="local model returned no content",
+                                  provider="local", model=alias,
+                                  identity=f"local/{alias}")
+        return ProviderResult(
+            ok=True, text=text, provider="local", model=alias,
+            identity=f"local/{alias}",
+            usage=UsageRecord(provider="local", model=alias,
+                              identity=f"local/{alias}", latency_ms=ms))
+    except Exception as exc:
+        return ProviderResult(ok=False, code="PROVIDER_OUTAGE",
+                              message=redact_text(str(exc))[:200],
+                              provider="local", model="qubit-brain4",
+                              identity="local/qubit-brain4")
+
+
+def _local_chat_raw(messages: Any, cfg: Any, max_tokens: int, *,
+                    structured_schema: Optional[Any] = None,
+                    options: Optional[dict] = None,
+                    timeout_s: Optional[float] = None,
+                    keep_alive: Optional[int] = None,
+                    model: Optional[str] = None) -> ProviderResult:
+    """Raw local ``/api/chat`` adapter (planner/vision message shape).
+
+    ``messages`` may carry role/content and, for vision, an ``images`` list.
+    ``keep_alive`` is explicit so the vision deep-tier cycle can expire the
+    resident model; planner leaves it at the canonical -1.
+    """
+    from ..local_llm import _extract_reply
+    from ..runner_contract import resolve
+
+    try:
+        rc = resolve(cfg)
+        alias = (model or "").strip() or rc.alias
+        timeout = 8.0 if timeout_s is None else float(timeout_s)
+        msgs = list(messages or [])
+        opts = {"temperature": 0.0, "num_ctx": rc.num_ctx,
+                "num_predict": int(max_tokens)}
+        if options:
+            opts.update(options)
+        payload: dict = {
+            "model": alias, "messages": msgs, "stream": False,
+            "keep_alive": rc.keep_alive if keep_alive is None else keep_alive,
+            "options": opts}
+        if structured_schema is not None:
+            payload["format"] = structured_schema
+        req = urllib.request.Request(
+            f"{rc.url}/api/chat",
+            data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"})
+        t0 = time.time()
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = json.loads(resp.read().decode())
+        text = _extract_reply(body)
+        ms = int((time.time() - t0) * 1000)
+        if not text:
+            return ProviderResult(ok=False, code="PROVIDER_OUTAGE",
+                                  message="local model returned no content",
+                                  provider="local", model=alias,
+                                  identity=f"local/{alias}")
+        return ProviderResult(
+            ok=True, text=text, provider="local", model=alias,
+            identity=f"local/{alias}",
+            usage=UsageRecord(provider="local", model=alias,
+                              identity=f"local/{alias}", latency_ms=ms))
+    except Exception as exc:
+        return ProviderResult(ok=False, code="PROVIDER_OUTAGE",
+                              message=redact_text(str(exc))[:200],
+                              provider="local", model="qubit-brain4",
+                              identity="local/qubit-brain4")
+
+
+def _local_dispatch(prompt: str, cfg: Any, max_tokens: int, *,
+                    local_mode: str = "chat", **kw: Any) -> ProviderResult:
+    """Route one local request to the matching shared local adapter."""
+    mode = (local_mode or "chat").lower()
+    if mode == "generate":
+        return _local_generate(
+            prompt, cfg, max_tokens,
+            system_prompt=kw.get("system_prompt", ""),
+            structured_schema=kw.get("structured_schema"),
+            options=kw.get("options"), timeout_s=kw.get("timeout_s"),
+            keep_alive=kw.get("keep_alive"), model=kw.get("model"))
+    if mode == "chat_raw":
+        msgs = kw.get("messages")
+        if msgs is None:
+            msgs = [{"role": "user", "content": prompt}]
+        return _local_chat_raw(
+            msgs, cfg, max_tokens,
+            structured_schema=kw.get("structured_schema"),
+            options=kw.get("options"), timeout_s=kw.get("timeout_s"),
+            keep_alive=kw.get("keep_alive"), model=kw.get("model"))
+    return _local_complete(
+        prompt, cfg, max_tokens,
+        conversation_prompt=kw.get("conversation_prompt", ""),
+        context=kw.get("context", ""), timeout_s=kw.get("timeout_s"),
+        on_sentence=kw.get("on_sentence"), should_stop=kw.get("should_stop"),
+        reasoning=kw.get("reasoning"), num_ctx=kw.get("num_ctx"),
+        model=kw.get("model"))
+
+
+def resolve_role(cfg: Any, role: str = "chat", *,
+                 profile_id: Optional[str] = None,
+                 session: Optional[str] = None):
+    """Resolve the effective model profile for a task role (canonical).
+
+    Thin re-export of :func:`voicebridge.providers.resolver.resolve` so every
+    production caller has one import surface. Raises ``ResolverError``.
+    """
+    from . import resolver
+    return resolver.resolve(cfg, role=role, profile_id=profile_id,
+                            session=session)
+
+
+def run_role(prompt: str, cfg: Any, *, role: str = "chat",
+             profile_id: Optional[str] = None,
+             session: Optional[str] = None,
+             max_tokens: int = 100,
+             timeout_s: Optional[float] = None,
+             provider: str = "", model: str = "",
+             base_url: str = "", api_key: str = "",
+             local_mode: str = "chat",
+             conversation_prompt: str = "", context: str = "",
+             system_prompt: str = "",
+             structured_schema: Optional[Any] = None,
+             messages: Any = None, options: Optional[dict] = None,
+             keep_alive: Optional[int] = None,
+             on_sentence: Optional[Callable[[str], None]] = None,
+             should_stop: Optional[Callable[[], bool]] = None,
+             reasoning: Optional[str] = None,
+             num_ctx: Optional[int] = None,
+             require_tools: bool = False,
+             require_streaming: bool = False,
+             context_chars: int = 0,
+             allow_private: bool = False,
+             cancel: Optional[Callable[[], bool]] = None) -> ProviderResult:
+    """Resolve a task role's effective profile, then execute via ``run``.
+
+    Local profiles execute on the local route only (no frontier/network
+    request); a non-executable external profile is a typed refusal, never a
+    silent local substitution. ``prompt`` is used by the chat/generate
+    adapters; ``messages``/``structured_schema`` drive the raw chat adapter.
+
+    The resolved profile's model is always forwarded: for a local profile the
+    selected ``eff.model`` reaches the local adapter instead of being discarded
+    in favor of a hard-coded alias. ``base_url``/``api_key`` are optional
+    gateway overrides for a canonical caller that holds a pre-resolved
+    credential (never logged); the frontier policy still gates enablement,
+    allowlist, egress, and budgets, so the shipped local-only default never
+    reaches the network.
+    """
+    from . import resolver
+
+    try:
+        eff = resolver.resolve(cfg, role=role, profile_id=profile_id,
+                               session=session)
+    except resolver.ResolverError as exc:
+        return ProviderResult(ok=False, code=exc.code, message=exc.detail,
+                              provider="", model="", identity="resolver")
+    if not eff.executable:
+        code = ("EGRESS_DENIED" if eff.egress_required
+                and not eff.egress_allowed else "PROFILE_NOT_EXECUTABLE")
+        return ProviderResult(
+            ok=False, code=code,
+            message=(f"profile {eff.profile_id!r} is not executable: "
+                     f"policy_enabled={eff.policy_enabled} "
+                     f"allowlisted={eff.allowlisted} "
+                     f"egress_allowed={eff.egress_allowed}"),
+            provider=eff.provider, model=eff.model,
+            identity=f"{eff.provider}/{eff.model}")
+    route = "local" if eff.is_local else eff.route
+    if route not in ("local", "frontier", "auto"):
+        # A realtime/duplex kind is a speech adapter, not a text runner: never
+        # silently substitute local text for it.
+        return ProviderResult(
+            ok=False, code="PROFILE_NOT_EXECUTABLE",
+            message=f"profile {eff.profile_id!r} kind {eff.kind!r} has no "
+                    f"text-runner route",
+            provider=eff.provider, model=eff.model,
+            identity=f"{eff.provider}/{eff.model}")
+    req = ProviderRequest(
+        prompt=prompt, max_tokens=int(max_tokens),
+        timeout_s=float(timeout_s) if timeout_s is not None else 20.0,
+        route=route,
+        provider=provider or ("" if eff.is_local else eff.provider),
+        model=model or eff.model,
+        structured_schema=structured_schema,
+        require_tools=require_tools, require_streaming=require_streaming,
+        context_chars=context_chars or len(prompt or ""))
+    return run(req, cfg, cancel=cancel, allow_private=allow_private,
+               base_url=base_url, api_key=api_key,
+               local_mode=local_mode, conversation_prompt=conversation_prompt,
+               context=context, timeout_s=timeout_s,
+               system_prompt=system_prompt, messages=messages, options=options,
+               keep_alive=keep_alive, on_sentence=on_sentence,
+               should_stop=should_stop, reasoning=reasoning, num_ctx=num_ctx)
+
+
 def run(req: ProviderRequest, cfg: Any,
         catalog: Optional[ProviderCatalog] = None,
         transport: Optional[_frontier.Transport] = None,
         cancel: Optional[Callable[[], bool]] = None,
-        allow_private: bool = False) -> ProviderResult:
-    """Run one request through the 8Q policy. Never raises; typed results."""
+        allow_private: bool = False, *,
+        base_url: str = "",
+        api_key: str = "",
+        local_mode: str = "chat",
+        conversation_prompt: str = "",
+        context: str = "",
+        timeout_s: Optional[float] = None,
+        system_prompt: str = "",
+        messages: Any = None,
+        options: Optional[dict] = None,
+        keep_alive: Optional[int] = None,
+        on_sentence: Optional[Callable[[str], None]] = None,
+        should_stop: Optional[Callable[[], bool]] = None,
+        reasoning: Optional[str] = None,
+        num_ctx: Optional[int] = None) -> ProviderResult:
+    """Run one request through the 8Q policy. Never raises; typed results.
+
+    The local route uses one of the shared local adapters: ``chat`` (default,
+    ``chat_local``/``chat_local_stream``), ``generate`` (raw ``/api/generate``)
+    or ``chat_raw`` (raw ``/api/chat`` with explicit messages/format/images).
+    All three honor the canonical runner contract; none is a caller-owned
+    Ollama request.
+    """
     policy = FrontierPolicy.from_config(cfg)
     requested = (req.route or policy.route or "local").lower()
     if requested not in ("local", "frontier", "auto"):
@@ -120,8 +406,14 @@ def run(req: ProviderRequest, cfg: Any,
 
     # Local is always available and performs no frontier network request.
     if requested == "local":
-        return _local_complete(req.prompt, cfg,
-                               min(req.max_tokens, policy.max_tokens))
+        return _local_dispatch(
+            req.prompt, cfg, min(req.max_tokens, policy.max_tokens),
+            local_mode=local_mode, conversation_prompt=conversation_prompt,
+            context=context, timeout_s=timeout_s, system_prompt=system_prompt,
+            structured_schema=req.structured_schema, messages=messages,
+            options=options, keep_alive=keep_alive, on_sentence=on_sentence,
+            should_stop=should_stop, reasoning=reasoning, num_ctx=num_ctx,
+            model=(req.model or None))
     if not policy.enabled:
         if requested == "auto":
             return _fallback("CLOUD_DISABLED",
@@ -204,15 +496,29 @@ def run(req: ProviderRequest, cfg: Any,
                                       "valid credential references",
                               provider=provider, model=model,
                               identity=f"{provider}/{model}")
-    key, kcode = resolve_key(provider, ref)
-    if kcode:
+    if api_key:
+        # A canonical caller (e.g. the voice fallback whose credential lives in
+        # the Qubit env file rather than provider config) may supply an
+        # already-resolved credential. It is used on the wire only, is never
+        # logged or stored, and does not relax the enablement/allowlist/egress
+        # gates above.
+        key = str(api_key)
+    else:
+        key, kcode = resolve_key(provider, ref)
+        if kcode:
+            return ProviderResult(ok=False, code="AUTH_MISSING",
+                                  message=f"no credential ({redact_ref(ref)})",
+                                  provider=provider, model=model,
+                                  identity=f"{provider}/{model}")
+
+    base_url = (str(base_url or "").strip()
+                or str(pcfg.get("base_url", "") or
+                       _frontier.WELL_KNOWN_BASES.get(provider, "") or ""))
+    if looks_like_opencode_private_db(base_url):
         return ProviderResult(ok=False, code="AUTH_MISSING",
-                              message=f"no credential ({redact_ref(ref)})",
+                              message="undocumented OpenCode credential use refused",
                               provider=provider, model=model,
                               identity=f"{provider}/{model}")
-
-    base_url = str(pcfg.get("base_url", "") or
-                   _frontier.WELL_KNOWN_BASES.get(provider, "") or "")
     if not base_url:
         return ProviderResult(ok=False, code="NOT_CONFIGURED",
                               message="no base_url for provider",

@@ -3,9 +3,11 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
 import { Input } from "@nous-research/ui/ui/components/input";
 import { Label } from "@nous-research/ui/ui/components/label";
 
+import { rebrandOptional } from "@/lib/rebrand";
+
 function FieldHint({ schema, schemaKey }: { schema: Record<string, unknown>; schemaKey: string }) {
   const keyPath = schemaKey.includes(".") ? schemaKey : "";
-  const description = schema.description ? String(schema.description) : "";
+  const description = rebrandOptional(schema.description as string | undefined);
 
   if (!keyPath && !description) return null;
 
@@ -90,6 +92,10 @@ export function AutoField({
 }: AutoFieldProps) {
   const rawLabel = schemaKey.split(".").pop() ?? schemaKey;
   const label = rawLabel.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  // Associate the visible <Label> with the control so every config field has
+  // an accessible name (the Label previously had no htmlFor and controls had
+  // no id / aria-label — screen readers announced bare "edit"/"switch").
+  const fieldId = `cfg-${schemaKey.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 
   if (isRecord(value) || (Array.isArray(value) && value.some((item) => isRecord(item)))) {
     return (
@@ -108,7 +114,11 @@ export function AutoField({
           <Label className="text-sm">{label}</Label>
           <FieldHint schema={schema} schemaKey={schemaKey} />
         </div>
-        <Switch checked={!!value} onCheckedChange={onChange} />
+        <Switch
+          checked={!!value}
+          onCheckedChange={onChange}
+          aria-label={label}
+        />
       </div>
     );
   }
@@ -117,9 +127,9 @@ export function AutoField({
     const options = (schema.options as string[]) ?? [];
     return (
       <div className="grid gap-1.5">
-        <Label className="text-sm">{label}</Label>
+        <Label htmlFor={fieldId} className="text-sm">{label}</Label>
         <FieldHint schema={schema} schemaKey={schemaKey} />
-        <Select value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
+        <Select id={fieldId} value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
           {options.map((opt) => (
             <SelectOption key={opt} value={opt}>
               {opt || "(none)"}
@@ -133,9 +143,10 @@ export function AutoField({
   if (schema.type === "number") {
     return (
       <div className="grid gap-1.5">
-        <Label className="text-sm">{label}</Label>
+        <Label htmlFor={fieldId} className="text-sm">{label}</Label>
         <FieldHint schema={schema} schemaKey={schemaKey} />
         <Input
+          id={fieldId}
           type="number"
           value={value === undefined || value === null ? "" : String(value)}
           onChange={(e) => {
@@ -157,9 +168,10 @@ export function AutoField({
   if (schema.type === "text") {
     return (
       <div className="grid gap-1.5">
-        <Label className="text-sm">{label}</Label>
+        <Label htmlFor={fieldId} className="text-sm">{label}</Label>
         <FieldHint schema={schema} schemaKey={schemaKey} />
         <textarea
+          id={fieldId}
           className="flex min-h-[80px] w-full border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           value={String(value ?? "")}
           onChange={(e) => onChange(e.target.value)}
@@ -171,9 +183,10 @@ export function AutoField({
   if (schema.type === "list") {
     return (
       <div className="grid gap-1.5">
-        <Label className="text-sm">{label}</Label>
+        <Label htmlFor={fieldId} className="text-sm">{label}</Label>
         <FieldHint schema={schema} schemaKey={schemaKey} />
         <Input
+          id={fieldId}
           value={Array.isArray(value) ? value.join(", ") : String(value ?? "")}
           onChange={(e) =>
             onChange(
@@ -191,9 +204,13 @@ export function AutoField({
 
   return (
     <div className="grid gap-1.5">
-      <Label className="text-sm">{label}</Label>
+      <Label htmlFor={fieldId} className="text-sm">{label}</Label>
       <FieldHint schema={schema} schemaKey={schemaKey} />
-      <Input value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />
+      <Input
+        id={fieldId}
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+      />
     </div>
   );
 }

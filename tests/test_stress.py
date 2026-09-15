@@ -532,11 +532,16 @@ def test_local_llm_options_have_num_ctx_and_keepalive():
     src = pathlib.Path("voicebridge/local_llm.py").read_text()
     assert '"num_ctx": num_ctx' in src, "local_llm lost configurable num_ctx"
     assert '"keep_alive": -1' in src, "local_llm missing keep_alive"
+    # The single runner contract (num_ctx + keep_alive) now lives in the
+    # canonical provider gateway that summarizer/planner/vision delegate to.
+    gw = pathlib.Path("voicebridge/providers/gateway.py").read_text()
+    assert '"num_ctx": rc.num_ctx' in gw, \
+        "gateway must source num_ctx from the runner contract"
+    assert '"keep_alive": rc.keep_alive' in gw, \
+        "gateway must source keep_alive from the runner contract"
     summ = pathlib.Path("voicebridge/summarizer.py").read_text()
-    assert '"num_ctx": _rc.num_ctx' in summ, \
-        "summarizer must source num_ctx from the runner contract"
-    assert '"keep_alive": _rc.keep_alive' in summ, \
-        "summarizer missing contract keep_alive"
+    assert "run_role" in summ, \
+        "summarizer must execute through the canonical provider gateway"
     assert '"num_ctx": 4096' not in summ, \
         "per-caller num_ctx literal must be gone (single-contract rule)"
 

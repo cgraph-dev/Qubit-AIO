@@ -1,0 +1,12 @@
+{
+  "name": "qubit-models",
+  "label": "Models & Providers",
+  "description": "Canonical model/provider profiles: list, inspect capabilities, locality, egress, budgets and health, create (non-secret fields only), clone, test, session-select and rollback through the shared backend.",
+  "icon": "cpu",
+  "version": "1.0.0",
+  "tab": {"path": "/qubit-models", "position": "after:models"},
+  "entry": "qubit-models.js",
+  "css": null,
+  "has_api": true,
+  "source": "qubit-overlay"
+}

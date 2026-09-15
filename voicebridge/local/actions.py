@@ -153,7 +153,11 @@ def _a_open_app(params: Dict[str, Any]) -> str:
 
 
 def _a_open_project(params: Dict[str, Any]) -> str:
-    """'open the CGraph project in vscode' -> launch VS Code on that repo."""
+    """'open the <name> project in vscode' -> launch VS Code on that repo.
+
+    ``<name>`` is matched against the operator-configured ``project_roots``;
+    no project names are baked into the product source.
+    """
     roots = _project_roots()
     name = (params.get("project", "") or "").strip().lower()
     root = roots.get(name)
@@ -558,10 +562,13 @@ ACTIONS: Dict[str, LocalAction] = {
                             patterns=[r"\b(mute|unmute) (the )?(microphone|mic)\b"]),
     "open_app": LocalAction("open_app", "launch an application", _a_open_app,
                             patterns=[r"\b(open|launch|start|run) (the )?(browser|editor|vscode|terminal|discord|telegram|files|fl studio|spotify)\b"]),
+    # Project names are operator-local (config/local-actions.yaml
+    # ``project_roots``); the patterns stay generic so no personal project
+    # names are baked into the shipped product source.
     "open_project": LocalAction("open_project", "open a project in VS Code", _a_open_project,
-                               patterns=[r"\b(open|launch|start) (the )?(cgraph|rankvalut|qubit|voice bridge|voicebridge|project|repo|repos|projects) (in|with|using) (vs ?code|the editor|editor)\b",
-                                         r"\bopen (cgraph|rankvalut|qubit) (in|with|using) (vs ?code|editor)\b",
-                                         r"\b(open|launch) (the )?(cgraph|rankvalut|qubit) project\b"]),
+                               patterns=[r"\b(open|launch|start) (the )?([a-z0-9][\w.-]*) (in|with|using) (vs ?code|the editor|editor)\b",
+                                         r"\bopen ([a-z0-9][\w.-]*) (in|with|using) (vs ?code|editor)\b",
+                                         r"\b(open|launch) (the )?([a-z0-9][\w.-]*) project\b"]),
     "screenshot": LocalAction("screenshot", "take a screenshot", _a_screenshot,
                               patterns=[r"\b(take|grab) (a |an? )?(screenshot|screen ?shot)\b"]),
     "clipboard": LocalAction("clipboard", "read the clipboard", _a_clipboard,
@@ -667,6 +674,11 @@ def match(text: str) -> Optional[ActionMatch]:
                         if word in low:
                             params["project"] = word
                             break
+                    if not params.get("project"):
+                        # Only a configured project root is an open_project
+                        # intent; otherwise let the utterance fall through to
+                        # the normal task/coding classifier.
+                        continue
                 elif name == "quick_note":
                     import re as _re
                     m2 = _re.search(r"(?:note (?:that|this)|remember (?:that|this)|write down|jot down|save (?:a )?note|remind me (?:to |that )?)(.*)", low)

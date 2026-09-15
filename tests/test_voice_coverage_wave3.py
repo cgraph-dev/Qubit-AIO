@@ -106,7 +106,7 @@ def _voice_surface(op_id):
     candidates = [f"{op_id}_refusal", f"{op_id}_voice", f"guard_{op_id}"]
     candidates.extend(_EXTRA_VOICE_FAMILY.get(op_id, ()))
     candidates.append(_EXTRA_VOICE_GUARD.get(op_id, ""))
-    spec = OPS.EXTRA_OPS.get(op_id)
+    spec = OPS.EXTRA_OPS.get(op_id) or OPS.MODEL_PROFILE_OPS.get(op_id)
     if spec is not None:
         candidates.append(spec.voice_guard)
     for cand in candidates:

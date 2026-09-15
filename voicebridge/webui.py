@@ -103,6 +103,37 @@ def _redact_served(obj: Any, _depth: int = 0,
 
 
 # --------------------------------------------------------------------------
+# Fork read-proxy branding seam
+# --------------------------------------------------------------------------
+# URL/provenance fields whose hosts are explicitly allowlisted; never rebranded
+# so a docs link stays a real URL instead of a broken "Qubit-agent" host.
+_PROXY_UNREBRANDED_KEYS = {
+    "docs_url", "url", "source", "install_url", "homepage", "repository",
+    "repo", "git_url", "base_url", "endpoint",
+}
+
+
+def _rebrand_proxied_json(value: Any, key: str = "") -> Any:
+    """Rebrand upstream product names in free-text values of a proxied payload.
+
+    The cutover read-proxy returns the vendored fork's JSON verbatim, which
+    authors upstream product names in platform/toolset/MCP copy. Rebrand only
+    free-text fields (never URL/provenance fields), and map the gateway command
+    to the Qubit launcher so the dashboard shows the real Qubit command.
+    """
+    if isinstance(value, dict):
+        return {k: _rebrand_proxied_json(v, k) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_rebrand_proxied_json(v, key) for v in value]
+    if isinstance(value, str) and key not in _PROXY_UNREBRANDED_KEYS:
+        from . import hermes_plugins as _HP
+        if key == "gateway_start_command":
+            return re.sub(r"(?i)\bhermes\b", "qubit", value)
+        return _HP._rebrand_product(value)
+    return value
+
+
+# --------------------------------------------------------------------------
 # Activity feed (ring buffer) + persistence through events.jsonl
 # --------------------------------------------------------------------------
 
@@ -253,8 +284,8 @@ def _event_to_feed_item(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return {"kind": "fail", "text": evt.replace(".", " "),
                 "route": "webui", "detail": str(ev.get("error", ""))[:300]}
     if evt == "conversation.local.summary":
-        # new: text=what user SAID (transcription), summary=bot reply — lets Tricky
-        # verify ASR: the activity card shows "You: How are you?" alongside the reply
+        # new: text=what user SAID (transcription), summary=bot reply — lets the
+        # operator verify ASR: the activity card shows "You: How are you?" next to the reply
         return {"kind": "summary", "text": ev.get("text", ""),
                 "summary": ev.get("summary", ""), "route": "local",
                 "detail": "conversation"}
@@ -730,66 +761,81 @@ refresh();
 
 
 # --------------------------------------------------------------------------
-# Hermes-first route aliases (owner directive 2026-09-11)
+# Qubit SPA routes (rebrand wave 2, owner gate)
 # --------------------------------------------------------------------------
-# Every normal public dashboard route renders the vendored Hermes React
-# shell. Qubit route names are compatibility aliases onto Hermes
-# workspaces; the legacy static Qubit pages are reachable only under
-# /classic/. This table is the single source of truth for that mapping.
-HERMES_ROUTE_ALIASES = {
-    # Hermes-native workspaces (Qubit compatibility names)
-    "/chat": "/hermes/chat",
-    "/sessions": "/hermes/sessions",
-    "/files": "/hermes/files",
-    "/models": "/hermes/models",
-    "/analytics": "/hermes/analytics",
-    "/logs": "/hermes/logs",
-    "/cron": "/hermes/cron",
-    "/skills": "/hermes/skills",
-    "/plugins": "/hermes/plugins",
-    "/mcp": "/hermes/mcp",
-    "/channels": "/hermes/channels",
-    "/webhooks": "/hermes/webhooks",
-    "/pairing": "/hermes/pairing",
-    "/profiles": "/hermes/profiles",
-    "/config": "/hermes/config",
-    "/env": "/hermes/env",
-    "/system": "/hermes/system",
-    "/docs": "/hermes/docs",
-    # Qubit page families -> Hermes shell workspaces / overlay pages
-    "/activity": "/hermes/logs",
-    "/reports": "/hermes/reports",
-    "/operations": "/hermes/operations",
-    "/ops": "/hermes/operations",
-    "/approvals": "/hermes/qubit-approvals",
-    "/settings": "/hermes/config",
-    "/setup": "/hermes/system",
-    "/projects": "/hermes/files",
-    "/tasks": "/hermes/cron",
-    "/devices": "/hermes/devices",
-    "/messages": "/hermes/channels",
-    "/memory": "/hermes/memory",
-    "/security": "/hermes/qubit-approvals",
+# The vendored dashboard is served from the ROOT. Every normal public route
+# renders the SPA shell and the client router resolves the page; nothing is
+# served from, and nothing redirects into, an upstream-named prefix. This set
+# is the single source of truth for which public paths render the shell.
+SPA_ROUTE_PATHS = (
+    # canonical SPA workspaces (real client routes)
+    "/chat", "/sessions", "/files", "/models", "/analytics", "/logs",
+    "/cron", "/skills", "/plugins", "/mcp", "/channels", "/webhooks",
+    "/pairing", "/profiles", "/config", "/env", "/system", "/docs",
+    # Qubit overlay plugin tabs (real client routes)
+    "/reports", "/operations", "/devices", "/memory", "/qubit-approvals",
+    "/qubit-boards", "/qubit-brand", "/qubit-chat", "/qubit-gateway",
+    "/qubit-runtime",
+)
+SPA_ROUTE_SET = frozenset(SPA_ROUTE_PATHS)
+# First path segment of every shell route, for SPA deep links such as
+# ``/sessions/<id>`` or ``/profiles/new``.
+SPA_ROUTE_ROOTS = frozenset(
+    p.strip("/").split("/")[0] for p in SPA_ROUTE_PATHS)
+
+# Qubit family aliases -> the real root SPA route they render. A request for a
+# non-identity alias is redirected to its Qubit-owned target (never into an
+# upstream-named prefix).
+PUBLIC_ROUTE_ALIASES = {
+    "/activity": "/logs",
+    "/ops": "/operations",
+    "/approvals": "/qubit-approvals",
+    "/security": "/qubit-approvals",
+    "/settings": "/config",
+    "/setup": "/system",
+    "/projects": "/files",
+    "/tasks": "/cron",
+    "/messages": "/channels",
 }
 
+# Internal compatibility identifier: the old alias table is retained under
+# its historical name so callers/scripts that import it keep working. Values
+# are root-served Qubit client routes; no value carries an upstream name.
+HERMES_ROUTE_ALIASES = ({p: p for p in SPA_ROUTE_PATHS}
+                        | dict(PUBLIC_ROUTE_ALIASES))
 
-def hermes_alias_target(path: str) -> Optional[str]:
-    """Return the Hermes target for a normal dashboard path, or None.
 
-    Accepts an optional trailing slash and/or ``.html`` suffix so the old
-    static URLs (/activity.html, /ops/) resolve to the shell instead of a
-    static file. ``/api/*`` paths are never aliased.
-    """
-    if path.startswith("/api/") or path.startswith("/hermes"):
-        return None
-    clean = path
+def _normalize_route(path: str) -> str:
+    clean = path.split("?", 1)[0]
     if clean.endswith(".html") and clean != "/index.html":
         clean = clean[: -len(".html")]
     if len(clean) > 1:
         clean = clean.rstrip("/")
-    if not clean:
-        clean = "/"
-    return HERMES_ROUTE_ALIASES.get(clean)
+    return clean or "/"
+
+
+def hermes_alias_target(path: str) -> Optional[str]:
+    """Return the root SPA route served for a normal dashboard path, or None.
+
+    Internal compatibility identifier (historical name). A canonical route maps
+    to itself; a Qubit family alias maps to its real Qubit target. ``/api/*``,
+    ``/agent/*`` and any ``/hermes`` path are never shell routes.
+    """
+    if (path.startswith("/api/") or path.startswith("/agent")
+            or path.startswith("/hermes")):
+        return None
+    clean = _normalize_route(path)
+    if clean in HERMES_ROUTE_ALIASES:
+        return HERMES_ROUTE_ALIASES[clean]
+    # SPA deep link (/sessions/<id>, /profiles/new, ...).
+    seg = clean.strip("/").split("/")[0]
+    if seg in SPA_ROUTE_ROOTS:
+        return clean
+    return None
+
+
+# Public-route resolver, same behavior under the Qubit name.
+spa_route_target = hermes_alias_target
 
 
 # --------------------------------------------------------------------------
@@ -800,8 +846,10 @@ def hermes_alias_target(path: str) -> Optional[str]:
 # connection error. An ``Upgrade: websocket`` request for one of these
 # paths gets an HTTP 426 + typed JSON envelope carrying the existing GATED
 # codes from ``voicebridge.hermes_compat`` (never a new dialect, never a
-# WS server). Keys are the API path with any ``/hermes`` prefix stripped,
-# so ``/hermes/api/*`` and any plain ``/api/*`` alias resolve alike.
+# WS server). Keys are the API path with the Qubit SPA API prefix
+# ``/agent`` stripped, so ``/agent/api/*`` resolves to the protected
+# ``/api/*`` path. Public ``/hermes/*`` requests are not gated here: they
+# fall through to a plain 404.
 HERMES_WS_GATE_CODES: Dict[str, str] = {
     "/api/pty": "PTY_NO_SHELL",
     "/api/console": "PTY_NO_SHELL",
@@ -809,6 +857,7 @@ HERMES_WS_GATE_CODES: Dict[str, str] = {
     "/api/events": "WS_SINGLE_PATH",
     "/api/pub": "WS_SINGLE_PATH",
     "/api/audio/speak-stream": "WS_SINGLE_PATH",
+    "/api/plugins/kanban/events": "WS_SINGLE_PATH",
 }
 
 HERMES_WS_GATE_DETAIL: Dict[str, str] = {
@@ -833,11 +882,13 @@ def hermes_ws_gate_code(path: str) -> Optional[str]:
     """Return the GATED code for a WebSocket-upgrade API path, or None.
 
     Pure path lookup (query string ignored); used by the request handler and
-    directly testable. Only the six upstream WS endpoints are listed.
+    directly testable. Only the six upstream WS endpoints are listed. The
+    Qubit SPA API prefix ``/agent`` is stripped; an upstream ``/hermes`` path
+    is deliberately NOT recognized (it has no public route).
     """
     clean = path.split("?")[0]
-    if clean.startswith("/hermes"):
-        clean = clean[len("/hermes"):]
+    if clean.startswith("/agent"):
+        clean = clean[len("/agent"):]
     if len(clean) > 1:
         clean = clean.rstrip("/")
     return HERMES_WS_GATE_CODES.get(clean)
@@ -1026,11 +1077,11 @@ class WebUIHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: Any) -> None:  # silence noise
         pass
 
-    # -- Hermes-dashboard compat (owner amendment 2026-09-11) -----------
-    # Serves the byte-identical vendored Hermes dashboard build
-    # (frontend/hermes-dist/, built from frontend/hermes-web/) at /hermes/
-    # with the loopback session token + base path injected server-side
-    # (vendored index.html untouched). /hermes/api/* is served by
+    # -- Qubit dashboard compat (owner amendment 2026-09-11) ------------
+    # Serves the vendored dashboard build (frontend/hermes-dist/, built from
+    # frontend/hermes-web/) from Qubit-owned root paths with the loopback
+    # session token + base path injected server-side. The SPA API lives under
+    # the Qubit-owned ``/agent`` prefix and dispatches through
     # voicebridge/hermes_compat.py on the same backend modules as CLI/voice.
     def _hermes_token_ok(self) -> bool:
         hermes_tok = self.headers.get("X-Hermes-Session-Token", "")
@@ -1058,43 +1109,47 @@ class WebUIHandler(BaseHTTPRequestHandler):
         dist = self._hermes_dist()
         fp = dist / "index.html"
         if not fp.is_file():
-            self._send(404, b"hermes dashboard not built (see "
+            self._send(404, b"dashboard not built (see "
                             b"frontend/hermes-qubit/README.md)")
             return
         try:
             html = fp.read_text(encoding="utf-8")
         except OSError:
-            self._send(404, b"hermes dashboard unreadable")
+            self._send(404, b"dashboard unreadable")
             return
         token = self.app.api_token or ""
         safe = json.dumps(token)
+        # Public SPA base is the root. ``__HERMES_BASE_PATH__`` is retained as
+        # an internal compatibility identifier the frontend still reads (now
+        # empty); ``__QUBIT_API_PREFIX__`` is the Qubit-owned API prefix.
         inject = ('<script>window.__HERMES_SESSION_TOKEN__=%s;'
-                  'window.__HERMES_BASE_PATH__="/hermes";</script>' % safe)
+                  'window.__HERMES_BASE_PATH__="";'
+                  'window.__QUBIT_API_PREFIX__="/agent";</script>' % safe)
         if "</head>" in html:
             html = html.replace("</head>", inject + "</head>", 1)
         else:
             html = inject + html
         # Qubit rebrand (server-side template; vendored index.html untouched):
-        # product title carries the Qubit name. Upstream names remain in
-        # legal notices, attribution, provenance, and compat records.
+        # product title carries the Qubit name, and any residual upstream
+        # asset prefix in the served markup is rewritten to the Qubit root so
+        # no public URL exposes the upstream name. Upstream names remain only
+        # in legal notices, attribution, provenance, and compat records.
         import re as _re
         html = _re.sub(r"<title>.*?</title>",
                        "<title>Qubit Agent - Command Center</title>", html,
                        count=1, flags=_re.S)
+        html = html.replace('"/hermes/', '"/')
         self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
 
     def _serve_hermes_static(self, sub: str) -> None:
         dist = self._hermes_dist()
         rel = sub.lstrip("/").split("?")[0]
         if not rel or ".." in rel.split("/"):
-            self._serve_hermes_index()
+            self._send(404, b"not found")
             return
         fp = dist / rel
-        if fp.is_dir():
-            fp = fp / "index.html"
         if not fp.is_file():
-            # SPA deep link (/hermes/sessions/...) -> shell with injection.
-            self._serve_hermes_index()
+            self._send(404, b"not found")
             return
         low = fp.name.lower()
         if low.endswith(".js"): ctype = "application/javascript"
@@ -1139,7 +1194,13 @@ class WebUIHandler(BaseHTTPRequestHandler):
             self._send(401, b"unauthorized")
             return
         raw = self.path
-        sub = raw[len("/hermes"):]
+        # Qubit SPA API prefix: ``/agent/api/<x>`` -> compat ``/api/<x>``.
+        # Callers only reach here for ``/agent/`` paths (the SPA prefix); the
+        # upstream ``/hermes`` mount is refused with 404 in ``do_GET``.
+        if raw.startswith("/agent"):
+            sub = raw[len("/agent"):]
+        else:
+            sub = raw
         api_path = sub.split("?")[0]
         query: Dict[str, str] = {}
         if "?" in raw:
@@ -1161,6 +1222,50 @@ class WebUIHandler(BaseHTTPRequestHandler):
                     return
                 if not isinstance(body, dict):
                     body = {"_list": body}
+        # Qubit-safe streaming chat (no raw PTY): SSE over the same agent.turn
+        # backend the non-streaming /api/qubit/chat and CLI/voice use. The path
+        # is declared ONCE in the compat route authority
+        # (hermes_compat.ROUTES, disposition "stream"); this dispatcher owns the
+        # socket and iterates the registered handler, so there is no second
+        # route table and no duplicated preflight. Raw /api/pty stays typed.
+        from . import hermes_compat as HC
+        if method == "POST":
+            _route, _rparams = HC.match(method, api_path.rstrip("/") or "/")
+        else:
+            _route = None
+        if method == "POST" and _route is not None \
+                and _route.get("disposition") == "stream":
+            from . import chat_transport as CT
+            text = str(body.get("text", "") or "")
+            # One shared preflight (model/empty/e-stop) from chat_transport: a
+            # typed refusal fires BEFORE any SSE frame opens. The same helper
+            # backs stream_turn's own error events; no logic is duplicated.
+            status, refusal, _model = CT.stream_preflight(
+                self.app.orch.cfg, text, body.get("model"),
+                session=body.get("session"))
+            if refusal is not None:
+                payload = {k: v for k, v in refusal.items() if k != "event"}
+                payload["ok"] = False
+                payload.setdefault("state",
+                                   "UNAVAILABLE" if status == 403 else "FAILED")
+                self._json(payload, status)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type",
+                             "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Accel-Buffering", "no")
+            for k, v in cors_headers_for(self.app.allowed_origins,
+                                         self.headers.get("Origin", "")):
+                self.send_header(k, v)
+            self.end_headers()
+            try:
+                for frame in HC.h_chat_stream(self.app.orch.cfg, {}, body, {}):
+                    self.wfile.write(frame.encode("utf-8"))
+                    self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                pass
+            return
         # Cutover stage 2 (docs/QUBIT_HERMES_CUTOVER_MIGRATION.md): safe reads
         # are served by the vendored Hermes backend in-process (single
         # listener, no second server); every Qubit-gated/sensitive surface and
@@ -1176,6 +1281,13 @@ class WebUIHandler(BaseHTTPRequestHandler):
                         headers={"accept": "application/json"})
                     if code < 500 and code not in (404, 405):
                         ctype = hdrs.get("content-type", "application/json")
+                        if "json" in ctype:
+                            try:
+                                parsed = json.loads(rbody.decode("utf-8"))
+                                rbody = json.dumps(
+                                    _rebrand_proxied_json(parsed)).encode()
+                            except (ValueError, UnicodeDecodeError):
+                                pass
                         self._send(code, rbody, ctype)
                         return
                     log_event("webui.hermes_backend.degraded",
@@ -1277,7 +1389,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
 
     # -- signed inbound webhook ingress ----------------------------------
     def _webhook_ingress(self, path: str) -> None:
-        """POST /hooks/<sub_id> (alias /hermes/hooks/<sub_id>).
+        """POST /hooks/<sub_id>.
 
         Authenticated by HMAC signature over the subscription's configured
         ``env:``/``file:`` secret — NOT by the dashboard session token. An
@@ -1287,8 +1399,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
         """
         from . import webhooks as WH
 
-        prefix = ("/hermes/hooks/" if path.startswith("/hermes/hooks/")
-                  else "/hooks/")
+        prefix = "/hooks/"
         sub_id = path[len(prefix):].strip("/")
         if not sub_id or "/" in sub_id:
             self._json({"state": "failed", "code": WH.BAD_INPUT_CODE,
@@ -1334,7 +1445,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
         return ""
 
     def _channel_ingress(self, path: str) -> None:
-        """POST /channels/<channel_id> (alias /hermes/channels/<channel_id>).
+        """POST /channels/<channel_id>.
 
         Authenticated by the HMAC signature over the channel's configured
         ``env:``/``file:`` secret — NOT by the dashboard session token. The
@@ -1345,8 +1456,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
         """
         from . import channels_inbound as CI
 
-        prefix = ("/hermes/channels/" if path.startswith("/hermes/channels/")
-                  else "/channels/")
+        prefix = "/channels/"
         channel_id = path[len(prefix):].strip("/")
         if not channel_id or "/" in channel_id:
             self._json({"state": "failed", "code": CI.BAD_INPUT_CODE,
@@ -1406,8 +1516,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
         if self.headers.get("Upgrade", "").strip().lower() != "websocket":
             return False
         api_path = self.path.split("?")[0]
-        if api_path.startswith("/hermes"):
-            api_path = api_path[len("/hermes"):]
+        if api_path.startswith("/agent"):
+            api_path = api_path[len("/agent"):]
         if len(api_path) > 1:
             api_path = api_path.rstrip("/")
         code = HERMES_WS_GATE_CODES.get(api_path)
@@ -1445,20 +1555,42 @@ class WebUIHandler(BaseHTTPRequestHandler):
             return
         path = self.path.split("?")[0]
         if path in ("/", "/index.html"):
-            # Hermes-first (owner directive): the Hermes React dashboard at
-            # /hermes/ is the active UI. The legacy static Qubit page is
-            # preserved under /classic/ only — root must never serve the
-            # old horizontal nav / Activity/Talk cards as the first screen.
-            self._redirect("/hermes/")
+            # Qubit rebrand: the public dashboard lives at /chat.
+            self._redirect("/chat")
             return
-        # Every normal public dashboard route renders the Hermes React
-        # shell; Qubit route names are compatibility aliases. Static pages
-        # are reachable only under the explicitly labelled /classic/.
+        if path == "/hermes" or path.startswith("/hermes/"):
+            # The upstream mount is gone: no route at all, no redirect. A
+            # remaining public /hermes/... route is a gate failure.
+            self._send(404, b"not found")
+            return
+        if path.startswith("/agent/"):
+            # Qubit-owned SPA API prefix -> native compat dispatch
+            # (``/agent/api/<x>`` is rewritten to ``/api/<x>``).
+            self._hermes_api("GET")
+            return
+        # Built dashboard assets are served from Qubit-owned root paths.
+        if (path.startswith("/assets/") or path.startswith("/fonts/")
+                or path.startswith("/fonts-terminal/")
+                or path.startswith("/plugins/")):
+            self._serve_hermes_static(path)
+            return
+        if path.startswith("/dashboard-plugins/"):
+            self._serve_hermes_plugin(path[len("/dashboard-plugins/"):])
+            return
+        if path == "/favicon.ico":
+            self._serve_hermes_static("/favicon.ico")
+            return
+        # Every canonical public dashboard route renders the root-served SPA
+        # shell; Qubit family aliases redirect to their real Qubit route. No
+        # redirect into an upstream-named prefix, ever.
         _alias = hermes_alias_target(path)
         if _alias is not None:
-            self._redirect(_alias)
+            if _alias != _normalize_route(path):
+                self._redirect(_alias)
+            else:
+                self._serve_hermes_index()
             return
-        elif path == "/classic/" or path == "/classic/index.html":
+        if path == "/classic/" or path == "/classic/index.html":
             fp = self._frontend_file("index.html")
             if fp is not None:
                 self._file(fp, "text/html; charset=utf-8")
@@ -1513,12 +1645,6 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self._file(fp, "text/html; charset=utf-8")
             else:
                 self._send(404, b"setup page not found")
-        elif path == "/activity":
-            fp = self._frontend_file("activity.html")
-            if fp is not None:
-                self._file(fp, "text/html; charset=utf-8")
-            else:
-                self._html(ACTIVITY_PAGE)
         elif path == "/docs" or path == "/docs.html":
             fp = self._frontend_file("docs.html")
             if fp is not None:
@@ -2135,23 +2261,6 @@ class WebUIHandler(BaseHTTPRequestHandler):
             # query, never the dashboard token (owner directive: public share
             # URL). Typed gates; no cross-session access.
             self._public_share(path)
-        elif path == "/hermes" or path.startswith("/hermes/"):
-            # Vendored Hermes dashboard (amendment 2026-09-11): same-origin
-            # /hermes/api/* compat backend + overlay plugins; the classic
-            # Qubit pages above are untouched.
-            sub = path[len("/hermes"):]
-            if sub.startswith("/api/"):
-                if self.command == "GET":
-                    self._hermes_api("GET")
-                else:
-                    self._send(405, b"method not allowed")
-                return
-            if sub.startswith("/dashboard-plugins/"):
-                self._serve_hermes_plugin(
-                    sub[len("/dashboard-plugins/"):])
-                return
-            self._serve_hermes_static(sub)
-            return
         elif path.startswith("/static/"):
             name = path.split("/", 2)[-1]
             if name == "theme.css":
@@ -2179,7 +2288,14 @@ class WebUIHandler(BaseHTTPRequestHandler):
             else: ctype = "application/octet-stream"
             self._file(fp, ctype)
         else:
-            self._send(404, b"not found")
+            # Unknown non-API path: a client-side SPA route (plugin tab such
+            # as /achievements or /kanban, or a deep link). Serve the shell;
+            # the client router resolves it or renders its own not-found. The
+            # API/compat namespaces stay honest 404s.
+            if path.startswith(("/api/", "/agent", "/hermes")):
+                self._send(404, b"not found")
+            else:
+                self._serve_hermes_index()
 
     def do_POST(self) -> None:  # noqa: N802
         path = self.path.split("?")[0]
@@ -3106,41 +3222,40 @@ class WebUIHandler(BaseHTTPRequestHandler):
             except Exception as exc:
                 log_event("feedback.error", error=str(exc)[:160])
                 self._json({"error": str(exc)[:200]}, 500)
-        elif path.startswith("/hooks/") or path.startswith("/hermes/hooks/"):
+        elif path.startswith("/hooks/"):
             # Signed inbound webhook delivery. Authentication is the HMAC
             # signature, never the dashboard token; unsigned/unknown requests
             # fail closed with a typed code.
             self._webhook_ingress(path)
-        elif path.startswith("/channels/") \
-                or path.startswith("/hermes/channels/"):
+        elif path.startswith("/channels/"):
             # Signed inbound channel delivery (same kernel as webhooks).
             # Authentication is the per-channel HMAC signature, never the
             # dashboard token; unsigned/unknown requests fail closed typed.
             self._channel_ingress(path)
-        elif path.startswith("/hermes/api/"):
-            # Vendored Hermes dashboard POST backend (compat, same modules
-            # as CLI/voice). Auth: X-Hermes-Session-Token or X-Api-Token.
+        elif path.startswith("/agent/api/"):
+            # Qubit SPA POST backend (compat, same modules as CLI/voice).
+            # Auth: X-Hermes-Session-Token or X-Api-Token.
             self._hermes_api("POST")
         else:
             self._send(404, b"not found")
 
     def do_PUT(self) -> None:  # noqa: N802
         path = self.path.split("?")[0]
-        if path.startswith("/hermes/api/"):
+        if path.startswith("/agent/api/"):
             self._hermes_api("PUT")
         else:
             self._send(404, b"not found")
 
     def do_PATCH(self) -> None:  # noqa: N802
         path = self.path.split("?")[0]
-        if path.startswith("/hermes/api/"):
+        if path.startswith("/agent/api/"):
             self._hermes_api("PATCH")
         else:
             self._send(404, b"not found")
 
     def do_DELETE(self) -> None:  # noqa: N802
         path = self.path.split("?")[0]
-        if path.startswith("/hermes/api/"):
+        if path.startswith("/agent/api/"):
             self._hermes_api("DELETE")
         else:
             self._send(404, b"not found")
@@ -3294,11 +3409,11 @@ class WebUI:
         self._asr_factory = asr_factory or _default_asr_factory(orchestrator)
         self._tts = tts
         self._state_dir = state_dir or Path("/tmp")
-        # Point the vendored Hermes backend at a Qubit-owned HERMES_HOME (never
+        # Point the vendored Hermes backend at a Qubit-owned runtime home (never
         # the operator's real ~/.hermes) before the in-process bridge starts.
         try:
             from . import hermes_asgi as _HA
-            _HA.set_home(str(self._state_dir / "hermes"))
+            _HA.set_home(str(self._state_dir / "qubit"))
         except Exception:
             pass
         # pre-seed the live feed from the persisted event journal so the

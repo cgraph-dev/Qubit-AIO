@@ -208,32 +208,31 @@ def _extract_reply(body: Any) -> str:
         return ""
 
 
-def _analyze(url: str, model: str, image_b64: str, prompt: str,
+def _analyze(cfg: Any, model: str, image_b64: str, prompt: str,
              timeout_s: float) -> str:
+    """Run one image analysis through the canonical provider authority.
+
+    The effective ``vision`` profile is resolved by ``providers.resolver`` and
+    the call executes via ``providers.gateway.run`` on the local route
+    (``keep_alive=0`` so the multi-GB model is never left resident).
+    """
+    from .providers import gateway as _gateway
+
     text = (prompt or "").strip()[:MAX_PROMPT_CHARS] or \
         "Describe this image factually: main subjects, text visible, setting."
-    payload = {"model": model, "stream": False, "keep_alive": 0,
-               "messages": [{"role": "user", "content": text,
-                             "images": [image_b64]}]}
-    req = urllib.request.Request(
-        f"{url.rstrip('/')}/api/chat",
-        data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
-            body = json.loads(resp.read().decode())
-    except TimeoutError as exc:
-        raise VisionError(TIMEOUT_CODE,
-                          f"vision request timed out after {timeout_s:.0f}s") from exc
-    except Exception as exc:
-        # urllib raises URLError (wrapping socket.timeout) on timeouts.
-        if "timed out" in str(exc).lower():
+    res = _gateway.run_role(
+        text, cfg, role="vision", model=model, max_tokens=512,
+        timeout_s=timeout_s, local_mode="chat_raw",
+        messages=[{"role": "user", "content": text,
+                   "images": [image_b64]}],
+        keep_alive=0)
+    if not res.ok:
+        msg = str(res.message or "")
+        if res.code == "TIMEOUT" or "timed out" in msg.lower():
             raise VisionError(TIMEOUT_CODE,
-                              f"vision request timed out after {timeout_s:.0f}s"
-                              ) from exc
-        raise VisionError(UPSTREAM_CODE,
-                          f"vision provider failed: {exc}") from exc
-    reply = _extract_reply(body)
+                              f"vision request timed out after {timeout_s:.0f}s")
+        raise VisionError(UPSTREAM_CODE, f"vision provider failed: {msg}")
+    reply = res.text
     if not reply:
         raise VisionError(UPSTREAM_CODE, "vision model returned no content")
     return reply
@@ -329,7 +328,7 @@ def describe(cfg: Any, image: str, *, prompt: str = "", model: str = "",
     from .vram_guard import deep_tier_cycle
 
     def _work() -> str:
-        return _analyze(url, found["name"], image_b64, prompt,
+        return _analyze(cfg, found["name"], image_b64, prompt,
                         settings["timeout_s"])
 
     t0 = time.monotonic()

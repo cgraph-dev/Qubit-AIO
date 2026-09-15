@@ -10,12 +10,12 @@ build, no install):
    imports in eslint.config.js and needs for vitest — every tool is a
    declared devDependency (never an undeclared ``--no-save`` install);
 3. the reproducible build script and the isolated-install verification script
-   exist, are executable, and carry the ``--base=/hermes/`` / ``--outDir``
+   exist, are executable, and carry the root-base ``--base=/`` / ``--outDir``
    build contract;
 4. the Qubit overlay plugin manifests are complete, their entry bundles
    exist, and their labels carry no upstream product identity;
-5. the served /hermes/ dashboard is Qubit-branded and carries the injected
-   session token + base path;
+5. the served ``/chat`` dashboard is Qubit-branded and carries the injected
+   session token + API prefix;
 6. the generated shell completions carry Qubit identity only.
 """
 from __future__ import annotations
@@ -99,9 +99,20 @@ def test_pyproject_ships_dashboard_in_wheel_and_sdist():
     sdist = data["tool"]["hatch"]["build"]["targets"]["sdist"]
     assert "frontend/hermes-dist" in wheel.get("artifacts", []), wheel
     assert "frontend/hermes-dist" in sdist.get("artifacts", []), sdist
+    # The frontend tree is force-included under voicebridge/_data/frontend,
+    # either as a direct directory mapping or via the filtered custom build hook
+    # (scripts/hatch_build_qubit.py) that prunes the git-ignored dev trees
+    # (node_modules) a raw directory mapping would sweep into the wheel.
     force = wheel.get("force-include", {})
-    assert "frontend" in force, force
-    assert force["frontend"].endswith("_data/frontend"), force
+    if "frontend" in force:
+        assert force["frontend"].endswith("_data/frontend"), force
+    else:
+        hook = wheel.get("hooks", {}).get("custom", {})
+        hook_path = str(hook.get("path", ""))
+        assert hook_path and (REPO / hook_path).is_file(), wheel
+        text = (REPO / hook_path).read_text(encoding="utf-8",
+                                            errors="replace")
+        assert "voicebridge/_data/frontend/" in text, text
 
 
 def test_dashboard_source_tree_present():
@@ -153,7 +164,7 @@ def test_build_and_verify_scripts_present_executable():
 
 def test_build_script_carries_build_contract():
     text = (REPO / "scripts" / "build_dashboard.sh").read_text(encoding="utf-8")
-    assert "vite build --base=/hermes/" in text, text
+    assert "vite build --base=/" in text, text
     assert "--outDir" in text, text
 
 
@@ -221,7 +232,7 @@ def _get(port, path, token="test-token"):
 def test_served_dashboard_is_qubit_branded_with_injection(tmp_path):
     ui, port = _boot(tmp_path)
     try:
-        status, body = _get(port, "/hermes/")
+        status, body = _get(port, "/chat")
         assert status == 200, status
         text = body.decode("utf-8", "replace")
         title = re.search(r"<title>(.*?)</title>", text, flags=re.S)
@@ -230,7 +241,8 @@ def test_served_dashboard_is_qubit_branded_with_injection(tmp_path):
         assert "__HERMES_SESSION_TOKEN__" in text, "session token not injected"
         assert "test-token" in text, "loopback token value not injected"
         assert "__HERMES_BASE_PATH__" in text, "base path not injected"
-        assert "/hermes" in text, "base path value not injected"
+        assert "__QUBIT_API_PREFIX__" in text, "api prefix not injected"
+        assert "/agent" in text, "api prefix value not injected"
     finally:
         ui.stop()
 

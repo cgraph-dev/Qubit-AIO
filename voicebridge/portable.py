@@ -189,8 +189,8 @@ def _collect_reports(cfg: Any, *, max_files: int = 40,
 
 
 def _collect_migrations() -> List[str]:
-    repo = Path(__file__).resolve().parents[1]
-    mig = repo / "docs" / "MIGRATIONS.md"
+    from .resources import resource_path
+    mig = resource_path("docs/MIGRATIONS.md")
     if not mig.exists():
         return []
     return [ln[4:].split("|")[0].strip()

@@ -419,10 +419,14 @@ DEFAULTS: Dict[str, Any] = {
         ],
         "dry_run_first": False,   # prepend "dry run first" to agent coding tasks
         "spoken_confirmation": True,
-        # Packet 3A: route local actions + local-script templates through the
-        # capability broker (argv-only). false selects the LEGACY DIRECT PATH:
-        # an UNSECURED ROLLBACK mode with no policy decisions — never describe
-        # it as secured.
+        # Route local actions + local-script templates through the capability
+        # broker (argv-only). Setting this false NO LONGER selects a direct
+        # path: the orchestrator fails closed with a typed BROKER_DISABLED
+        # denial (Packet 8O — see tests/test_packet8o.py no-bypass regression),
+        # so a configured script or local action can never execute around
+        # grants, scopes, confirmation, audit, resource limits, or emergency
+        # stop. Power/autonomous mode pre-authorizes scopes THROUGH the broker;
+        # it never turns the broker off.
         "tool_broker": True,
     },
     "summarizer": {

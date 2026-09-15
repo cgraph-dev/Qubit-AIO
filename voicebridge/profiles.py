@@ -33,7 +33,7 @@ import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 # ---------------------------------------------------------------------------
 # Component kinds
@@ -542,6 +542,39 @@ def _config_update_for(manifest: ProviderManifest) -> Dict[str, Any]:
     return {section: manifest.config_value}
 
 
+def _write_registry(cfg: Any,
+                    manifests: List[ProviderManifest]) -> Optional[Path]:
+    """Atomic read-modify-write of the registry file preserving other keys.
+
+    The registry file is shared with the canonical model-profile resolver
+    (``voicebridge.providers.resolver``), which stores its records under
+    ``model_profiles``. Rewriting the whole file with only ``profiles`` would
+    silently delete those records, so unrelated top-level keys are preserved.
+    """
+    reg_file = _registry_path(cfg)
+    if reg_file is None:
+        return None
+    payload: Dict[str, Any] = {}
+    try:
+        if reg_file.exists():
+            existing = json.loads(reg_file.read_text())
+            if isinstance(existing, dict):
+                payload = existing
+    except (OSError, ValueError):
+        payload = {}
+    payload.setdefault("version", 1)
+    payload["profiles"] = [
+        {k: v for k, v in p.__dict__.items()} for p in manifests
+        if not p.default]
+    reg_file.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(reg_file.parent), prefix=reg_file.name,
+                               suffix=".tmp")
+    with os.fdopen(fd, "w") as fh:
+        json.dump(payload, fh, indent=2, sort_keys=True)
+    os.replace(tmp, reg_file)
+    return reg_file
+
+
 def install_manifest(cfg: Any, manifest: ProviderManifest) -> Dict[str, Any]:
     """Register a validated manifest (persisted to the registry file). The
     manifest must already pass its gates; nothing is activated here."""
@@ -550,17 +583,12 @@ def install_manifest(cfg: Any, manifest: ProviderManifest) -> Dict[str, Any]:
         return {"state": gate["state"], "detail": gate["detail"]}
     if manifest.kind not in KINDS:
         return {"state": "MISSING", "detail": f"unknown kind {manifest.kind!r}"}
-    reg_file = _registry_path(cfg)
     profiles = [m for m in registry(cfg) if not m.default]
     profiles = [p for p in profiles
                 if not (p.kind == manifest.kind and p.id == manifest.id)]
     profiles.append(manifest)
-    payload = {"version": 1, "profiles": [
-        {k: v for k, v in p.__dict__.items()} for p in profiles]}
     try:
-        if reg_file:
-            reg_file.parent.mkdir(parents=True, exist_ok=True)
-            reg_file.write_text(json.dumps(payload, indent=2, sort_keys=True))
+        _write_registry(cfg, profiles)
     except OSError as exc:
         return {"state": "FAILED", "detail": f"registry write failed: {exc}"}
     return {"state": "OK", "kind": manifest.kind, "profile": manifest.id,
@@ -681,16 +709,10 @@ def remove_profile(cfg: Any, kind: str, profile_id: str, *,
     if cur == profile_id:
         return {"state": "DENIED",
                 "detail": "cannot remove the active profile; select first"}
-    reg_file = _registry_path(cfg)  # must use the SAME config as the caller
     manifests = [x for x in registry(cfg) if not (x.kind == kind
                                                and x.id == profile_id)]
-    payload = {"version": 1, "profiles": [
-        {k: v for k, v in m.__dict__.items()} for m in manifests
-        if not m.default]}
     try:
-        if reg_file:
-            reg_file.parent.mkdir(parents=True, exist_ok=True)
-            reg_file.write_text(json.dumps(payload, indent=2, sort_keys=True))
+        _write_registry(cfg, manifests)
     except OSError as exc:
         return {"state": FAILED, "detail": f"registry write failed: {exc}"}
     return {"state": OK, "kind": kind, "removed": profile_id}

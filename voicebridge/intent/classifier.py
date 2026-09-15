@@ -17,7 +17,8 @@ from typing import Any, Callable, Dict, Optional
 
 from ..local import actions as local_actions
 from ..logging_setup import get_logger
-from .llm import classify_with_ollama
+from .llm import classify_local_llm
+from .llm import classify_with_ollama  # noqa: F401  (compat seam for tests)
 from .state import ConfirmationState, ConversationState
 
 log = get_logger()
@@ -401,7 +402,8 @@ class Classifier:
 
         # Weak/ambiguous -> LLM classifier (if enabled & available).
         if self.llm_enabled:
-            llm = classify_with_ollama(text, self.ollama_url, self.ollama_model, self.timeout)
+            llm = classify_local_llm(text, self.cfg, self.ollama_url,
+                                     self.ollama_model, self.timeout)
             if llm:
                 kind = llm["kind"]
                 conf = float(llm.get("confidence", 0.6))

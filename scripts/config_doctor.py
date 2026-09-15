@@ -44,8 +44,11 @@ OPTIONAL_GUARDED = {"psutil", "onnx", "prompt_toolkit", "websocket",
                     "pystray"}
 LOCAL_TOP = {"voicebridge", "scripts", "browser_auto",
              # Qubit-owned vendored Hermes fork (qubit_hermes/): local source,
-             # not a PyPI distribution.
-             "hermes_cli"}
+             # not a PyPI distribution. The fork's modules are top-level once
+             # ``hermes_runtime.ensure_path()`` puts the fork root on sys.path;
+             # ``toolsets`` is the toolset registry imported by the Qubit
+             # config overlay in voicebridge/hermes_asgi.py.
+             "hermes_cli", "toolsets"}
 
 
 # Distribution-name -> import-name corrections (pip name differs from module).

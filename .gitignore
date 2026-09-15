@@ -9,12 +9,28 @@ browser_profiles
 browser_auto_state
 *.done
 
+# Playwright MCP probe output (transient page snapshots/console logs — never shipped)
+.playwright-mcp/
+
+# opencode tooling: cache/deps are local, never committed (config/skills/commands are)
+.opencode/node_modules/
+opencode.json.backup
+
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
 
 # PII bake artifact: composed from live personal files by scripts/bake_brain.py.
 # NEVER commit (plan rule 29). Superseded by the Packet 4B context compiler.
 Modelfile.qubit4
+
+# Operator personal knowledge (real name/contact/handles — plan rule 29).
+# NEVER commit; install.sh ships a typed starter instead. Read at runtime from
+# ~/.config/qubit-voicebridge/personal-knowledge.md.
+config/personal-knowledge.md
+
+# Operator task templates (real project names/paths — plan rule 29).
+# NEVER commit; install.sh seeds the portable example instead.
+config/task-templates.yaml
 
 # Packet 8K release certification output (wheel/sdist + clean-HOME installs).
 /dist/

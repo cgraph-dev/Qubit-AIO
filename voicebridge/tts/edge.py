@@ -18,9 +18,12 @@ from .base import TTSProvider, TTSUnavailable
 class EdgeTTS(TTSProvider):
     name = "edge"
 
-    def __init__(self, voice: str = "en-US-JennyNeural", rate: str = "+0%") -> None:
+    def __init__(self, voice: str = "en-US-JennyNeural", rate: str = "+0%",
+                 egress_guard=None) -> None:
         self.voice = voice
         self.rate = rate
+        # Qubit egress/emergency-stop gate consulted before every network call.
+        self._egress_guard = egress_guard
 
     def load(self) -> None:
         try:
@@ -31,6 +34,10 @@ class EdgeTTS(TTSProvider):
             raise TTSUnavailable("ffmpeg not found; needed to convert edge-tts mp3 -> wav")
 
     def synthesize(self, text: str, out_path: Optional[Path | str] = None) -> Path:
+        if self._egress_guard is not None and not self._egress_guard():
+            raise TTSUnavailable(
+                "external Edge TTS refused by Qubit egress/emergency-stop "
+                "policy; use the local TTS provider or clear the stop")
         import edge_tts
         import asyncio
         self.load()

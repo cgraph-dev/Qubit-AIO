@@ -191,7 +191,8 @@ SECRET_SHAPES = (
 # HTML/JS/markdown that say ``token=``, are NOT secrets.
 SECRET_SHAPES_ALL = SECRET_SHAPES + (
     ("assign_secret", re.compile(
-        r"(?i)\b(api[_-]?key|token|secret|password|passwd|bearer)\s*[=:]\s*\S+")),
+        r"(?i)\b(api[_-]?key|token|secret|password|passwd|bearer)\s*[=:]\s*"
+        r"(?:\"[^\"]+\"|'[^']+'|[^\s\"']\S*)")),
 )
 
 _CONFIG_EXT = {".yaml", ".yml", ".env", ".service", ".timer", ".json",
@@ -396,6 +397,7 @@ def _private_paths() -> set[str]:
     """Paths that must never be scanned as shipped code or shipped at all."""
     return {
         "scripts/browser_profiles", "scripts/browser_auto_state",
+        ".playwright-mcp",
         ".git", ".venv", "__pycache__", ".pytest_cache", "graft", "dist",
         ".claude", ".cursor", ".gemini", ".github", ".kiro", ".vscode",
         ".windsurf", ".adal", "node_modules", ".mcp.json", "opencode.json",
@@ -509,10 +511,22 @@ def import_scan_installed(base: Path, declared: set[str],
              # Qubit-owned vendored Hermes fork (qubit_hermes/): a local
              # source tree, not a PyPI distribution. See the owner amendment
              # docs/QUBIT_OWNER_AMENDMENT_2026-09-11_HERMES_RUNTIME.md.
-             "hermes_cli"}
+             # ``toolsets`` is a vendored top-level module reached through the
+             # runtime path shim from ``voicebridge/hermes_asgi.py`` (guarded).
+             "hermes_cli", "toolsets"}
     failures: List[str] = []
     for py in _walk_py_files(base):
-        rel = py.relative_to(base).as_posix()
+        rel_path = py.relative_to(base)
+        # ``_data`` is shipped package *data*: the Qubit-owned vendored Hermes
+        # runtime plus completions/templates. It is a separate source tree with
+        # its own pinned dependency contract (qubit_hermes/pyproject.toml,
+        # verified by tests/test_qbpv_pkg5_packaging.py) and imports its own
+        # local top-level modules (agent, tools, toolsets, hermes_cli, …). It is
+        # not part of the voicebridge import contract, so scanning it here would
+        # report thousands of false undeclared-import failures.
+        if "_data" in rel_path.parts:
+            continue
+        rel = rel_path.as_posix()
         try:
             tree = ast.parse(_read_capped(py))
         except SyntaxError as exc:
@@ -604,10 +618,22 @@ def artifact_member_hits(artifact: Path, forbidden: Tuple[str, ...] = ARTIFACT_F
             continue
         for pat in forbidden:
             pl = pat.lower()
-            if pl in low.split("/") or low.endswith(pl):
+            # Exact path-segment match for file/dir names; a multi-segment
+            # pattern (e.g. ``config/voice.yaml``) matches as a suffix. Never a
+            # raw ``endswith`` on a bare name: that falsely flagged
+            # ``responsive-design.md`` for the ``design.md`` pattern.
+            if pl in low.split("/") or (
+                    "/" in pl and (low == pl or low.endswith("/" + pl))):
                 hits.append(name)
                 break
     return hits
+
+
+# An sdist source-root directory is ``<project>-<version>`` (setuptools
+# normalizes ``-`` to ``_`` in the distribution name). Matched generically so
+# the classifier survives a project rename; repo top-level dirs (voicebridge,
+# tests, docs, config, …) never match ``name-<digit>``.
+_SDIST_ROOT_RE = re.compile(r"^[A-Za-z0-9_.]+-\d")
 
 
 def artifact_member_class(name: str) -> str:
@@ -618,8 +644,11 @@ def artifact_member_class(name: str) -> str:
     ``noncore`` — docs, frontend UI, templates, metadata, model files."""
     low = name.lstrip("./")
     parts = low.split("/")
-    if len(parts) > 1 and parts[0].startswith("qubit_voice_agent-"):
-        # sdist members carry the source-root directory prefix.
+    if len(parts) > 1 and _SDIST_ROOT_RE.match(parts[0]):
+        # sdist members carry the ``<name>-<version>`` source-root prefix
+        # (setuptools normalizes the project name, e.g. ``qubit_voicebridge-``
+        # or the historical ``qubit_voice_agent-``). Strip it generically so
+        # core/fixture classification is not tied to one stale project name.
         low = "/".join(parts[1:])
     if "/tests/" in low or low.split("/")[0] == "tests" \
             or low.startswith("voicebridge/evaluation/"):

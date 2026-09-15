@@ -63,7 +63,16 @@ def test_catalog_mirrors_registry_exactly(tmp_path, monkeypatch):
         assert [(a["name"], a["type"], a["required"])
                 for a in item["args"]] == \
             [(a.name, a.type, a.required) for a in entry.args], entry_id
-        assert item["interfaces"] == ["cli", "dashboard", "voice"], entry_id
+        if entry_id in OPS.CLI_PENDING:
+            # A tier-1 op whose CLI binding is a tracked cross-boundary
+            # handoff reports dashboard+voice only, with the documented
+            # reason; it must never silently advertise an absent `cli`.
+            assert item["interfaces"] == ["dashboard", "voice"], entry_id
+            assert item["interface_reason"] == OPS.CLI_PENDING[entry_id], \
+                entry_id
+        else:
+            assert item["interfaces"] == ["cli", "dashboard", "voice"], \
+                entry_id
         assert item["help"], entry_id
     for op_id, spec in OPS.EXTRA_OPS.items():
         item = cat[op_id]
@@ -471,7 +480,7 @@ def test_ops_http_end_to_end(tmp_path):
         resp = conn.getresponse()
         resp.read()
         assert resp.status == 302, resp.status
-        assert resp.getheader("Location") == "/hermes/operations"
+        assert resp.getheader("Location") == "/operations"
         # Catalog requires auth.
         status, _, _ = _http(port, "GET", "/api/ops", token=None)
         assert status == 401, status

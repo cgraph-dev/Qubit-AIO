@@ -711,7 +711,7 @@ def test_settings_page_served(tmp_path, monkeypatch):
         resp = conn.getresponse()
         resp.read()
         assert resp.status == 302, resp.status
-        assert resp.getheader("Location") == "/hermes/config"
+        assert resp.getheader("Location") == "/config"
         # The labelled /classic/ fallback still serves the static page.
         import urllib.request
         with urllib.request.urlopen(

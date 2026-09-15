@@ -149,7 +149,8 @@ class CapabilityBroker:
     """Decides, then executes trusted host tools; never falls back to shell."""
 
     def __init__(self, default_ttl_s: float = 120.0,
-                 power_control: Optional[Any] = None):
+                 power_control: Optional[Any] = None,
+                 cfg: Optional[Any] = None):
         self.registry = CapabilityRegistry()
         self.engine = PolicyEngine(
             registry=self.registry,
@@ -163,6 +164,12 @@ class CapabilityBroker:
         # failures so a circuit can trip. All channels that share this broker
         # observe the same control state.
         self._power = power_control
+        # Workstream F seam: the config that locates the canonical autonomy
+        # store. When armed, execute consults the owner-authored scoped-autonomy
+        # authority before any per-action confirmation (see _autonomy_decision).
+        # It is an explicit, opt-in seam so hermetic broker tests never read a
+        # developer's real state tree; callers arm it by passing `cfg`.
+        self._cfg = cfg
 
     def _power_denied(self, capability: str, spec: Optional[CapabilitySpec]) \
             -> Optional[str]:
@@ -191,6 +198,30 @@ class CapabilityBroker:
                       error=str(exc)[:160])
             return "POWER_UNAVAILABLE"
         return None
+
+    def _autonomy_decision(self, capability: str, target: str, *,
+                           owner: Optional[str], session: Optional[str],
+                           device: Optional[str], source: str) -> Optional[Any]:
+        """Consult the one owner-authored scoped-autonomy authority (read-only).
+
+        Returns ``None`` when the seam is unarmed or when no ACTIVE profile
+        applies to this request binding, so the caller keeps its existing
+        per-action confirmation/grant behavior unchanged. Otherwise returns an
+        audited :class:`voicebridge.autonomy_ops.OpDecision`: an in-scope profile
+        allows (pre-authorized); out-of-scope/target/budget/e-stop is a typed
+        refusal. Request data is only containment-checked and can never widen
+        the profile. Laid out lazily to avoid an import cycle with autonomy_ops
+        (which reads this module's e-stop probe).
+        """
+        try:
+            from . import autonomy_ops
+            return autonomy_ops.resolve_operation(
+                self._cfg, capability, target or "", owner=owner,
+                session=session, device=device, source=source)
+        except Exception as exc:  # noqa: BLE001 - never crash a dispatch
+            log_event("broker.autonomy.probe_error", capability=capability,
+                      error=str(exc)[:160])
+            return None
 
     # ------------------------------------------------------------ registration
     def register(self, binding: ToolBinding) -> CapabilitySpec:
@@ -236,7 +267,11 @@ class CapabilityBroker:
                 dry_run: bool = False,
                 timeout_s: Optional[float] = None,
                 max_output: int = 200_000,
-                utterance: str = "") -> ExecResult:
+                utterance: str = "",
+                target: str = "",
+                owner: Optional[str] = None,
+                session: Optional[str] = None,
+                device: Optional[str] = None) -> ExecResult:
         if source not in ("user", "automation", "model"):
             raise ValueError(f"invalid dispatch source: {source!r}")
         cid = correlation_id or uuid.uuid4().hex[:16]
@@ -270,25 +305,58 @@ class CapabilityBroker:
             d = Decision(False, DENY_DESTRUCTIVE_SCREEN, capability)
             self._audit("denied", capability, spec, source, cid, d)
             return _res(denied=d.code)
-        eff_conf = confirmation_id
-        if spec is not None and spec.needs_confirmation and not eff_conf \
-                and source == "user":
-            if spec.tier is Tier.DESTRUCTIVE:
-                # Two-step spoken flow: deny first so the caller can ask.
-                d = Decision(False, DENY_CONFIRM, capability)
-                self._audit("denied", capability, spec, source, cid, d)
-                return _res(denied=d.code)
-            rec = self.issue_confirmation(capability, args,
-                                          issued_by="user", ttl_s=120)
-            eff_conf = rec.id
-        # Non-user sources fall through: policy refuses them carrying ids.
-        req = ActionRequest(capability=capability, args=dict(args),
-                            source=source, confirmation_id=eff_conf,
-                            correlation_id=cid)
-        d = self.engine.decide(req)
-        if not d.allowed:
+        # Workstream F: an owner-authored scoped-autonomy profile is the ONLY
+        # authority that may replace per-action confirmation. When one is armed
+        # for this broker and an ACTIVE profile matches the request binding, the
+        # profile decides — allow (pre-authorized, no ad-hoc confirmation) or a
+        # typed refusal carrying the autonomy code. With no applicable profile
+        # the existing confirmation/grant flow below is unchanged. e-stop and
+        # hard-deny capability classes are enforced inside autonomy_ops before
+        # any allow, so a model/message can never widen its own scope.
+        autonomy_decision = None
+        if spec is not None and self._cfg is not None:
+            autonomy_decision = self._autonomy_decision(
+                capability, target, owner=owner, session=session,
+                device=device, source=source)
+        if autonomy_decision is not None and not autonomy_decision.allowed:
+            d = Decision(False, autonomy_decision.code, capability,
+                         detail=autonomy_decision.reason)
             self._audit("denied", capability, spec, source, cid, d)
             return _res(denied=d.code)
+        if autonomy_decision is not None and autonomy_decision.allowed:
+            # Owner pre-authorized: validate the declared input schema exactly
+            # as the policy engine would, but issue/consume no ad-hoc
+            # confirmation because the profile already granted this scope.
+            if spec.arg_validator is not None:
+                try:
+                    spec.arg_validator(dict(args))
+                except Exception as exc:
+                    d = Decision(False, "MALFORMED_INPUT", capability,
+                                 detail=f"validator: {exc}")
+                    self._audit("denied", capability, spec, source, cid, d)
+                    return _res(denied=d.code)
+            d = Decision(True, "ALLOWED", capability,
+                         detail=f"autonomy:{autonomy_decision.profile_id}")
+        else:
+            eff_conf = confirmation_id
+            if spec is not None and spec.needs_confirmation and not eff_conf \
+                    and source == "user":
+                if spec.tier is Tier.DESTRUCTIVE:
+                    # Two-step spoken flow: deny first so the caller can ask.
+                    d = Decision(False, DENY_CONFIRM, capability)
+                    self._audit("denied", capability, spec, source, cid, d)
+                    return _res(denied=d.code)
+                rec = self.issue_confirmation(capability, args,
+                                              issued_by="user", ttl_s=120)
+                eff_conf = rec.id
+            # Non-user sources fall through: policy refuses them carrying ids.
+            req = ActionRequest(capability=capability, args=dict(args),
+                                source=source, confirmation_id=eff_conf,
+                                correlation_id=cid)
+            d = self.engine.decide(req)
+            if not d.allowed:
+                self._audit("denied", capability, spec, source, cid, d)
+                return _res(denied=d.code)
 
         if dry_run:
             try:
@@ -556,11 +624,18 @@ _ACTION_EFFECTS = {
 }
 
 
-def build_host_broker(power_control: Optional[Any] = None) -> CapabilityBroker:
-    """Register every whitelisted local action behind the registry."""
+def build_host_broker(power_control: Optional[Any] = None,
+                      cfg: Optional[Any] = None) -> CapabilityBroker:
+    """Register every whitelisted local action behind the registry.
+
+    ``cfg`` arms the Workstream F autonomy seam: when supplied, every execute
+    consults the canonical owner-authored autonomy store (read-only) before the
+    per-action confirmation flow. Omitting it preserves the prior behavior and
+    keeps hermetic tests off any real state tree.
+    """
     from .local.actions import ACTIONS
 
-    broker = CapabilityBroker(power_control=power_control)
+    broker = CapabilityBroker(power_control=power_control, cfg=cfg)
     for name, act in ACTIONS.items():
         if act is None or act.fn is None:
             continue

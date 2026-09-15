@@ -56,12 +56,26 @@ def _targets() -> tuple[dict, dict]:
 # ===========================================================================
 # 1. Package-data completeness (wheel + sdist)
 # ===========================================================================
+def _frontend_tree_packaged(wheel: dict) -> bool:
+    """Frontend tree packaged under voicebridge/_data/frontend, as a direct
+    force-include directory mapping or the filtered custom build hook."""
+    if wheel.get("force-include", {}).get("frontend") == \
+            "voicebridge/_data/frontend":
+        return True
+    hook = wheel.get("hooks", {}).get("custom", {})
+    hook_path = str(hook.get("path", ""))
+    if not hook_path or not (REPO / hook_path).is_file():
+        return False
+    text = (REPO / hook_path).read_text(encoding="utf-8", errors="replace")
+    return "voicebridge/_data/frontend/" in text and "frontend" in text
+
+
 def test_wheel_and_sdist_declare_the_runtime_resources():
     wheel, sdist = _targets()
     assert wheel.get("packages") == ["voicebridge"]
     assert "frontend/hermes-dist" in wheel.get("artifacts", [])
     assert "frontend/hermes-dist" in sdist.get("artifacts", [])
-    assert wheel["force-include"].get("frontend") == "voicebridge/_data/frontend"
+    assert _frontend_tree_packaged(wheel)
     # the vendored runtime the fork executes from is packaged
     for name in ("hermes_cli", "agent", "tools", "gateway", "plugins",
                  "skills", "providers", "cron"):
@@ -253,7 +267,7 @@ def test_clean_install_and_dashboard_gates_declare_package_data_probe():
     assert "--no-deps" not in clean
     verify = VERIFY_DASHBOARD.read_text(encoding="utf-8")
     for token in ("uv build", "uv venv", "--no-deps", "hr.status()",
-                  "/hermes/api/dashboard/plugins"):
+                  "/agent/api/dashboard/plugins"):
         assert token in verify, token
 
 

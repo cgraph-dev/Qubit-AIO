@@ -55,7 +55,7 @@ export const hu: Translations = {
     closeNavigation: "Navigáció bezárása",
     closeModelTools: "Modell és eszközök bezárása",
     footer: {
-      org: "Nous Research",
+      org: "Qubit",
     },
     activeSessionsLabel: "Aktív munkamenetek:",
     gatewayStatusLabel: "Átjáró állapota:",
@@ -326,7 +326,7 @@ export const hu: Translations = {
     enableRuntime: "Engedélyezés",
     forceReinstall: "Kényszerített újratelepítés (a meglévő mappa előbb törlődik)",
     headline:
-      "Qubit-bővítmények felfedezése, telepítése, engedélyezése és frissítése (a `hermes plugins` paritás).",
+      "Qubit-bővítmények felfedezése, telepítése, engedélyezése és frissítése (a `qubit plugins` paritás).",
     identifierLabel: "Git URL vagy owner/repo",
     inactive: "inaktív",
     installBtn: "Telepítés",
@@ -343,8 +343,8 @@ export const hu: Translations = {
     providersHint:
       "A memory.provider (üres = beépített) és a context.engine értékét írja a config.yaml fájlba. A következő munkamenetben lép életbe.",
     refreshDashboard: "Vezérlőpult-bővítmények újraolvasása",
-    removeConfirm: "Eltávolítja ezt a bővítményt a ~/.hermes/plugins/ mappából?",
-    removeHint: "Csak a felhasználó által a ~/.hermes/plugins alá telepített bővítmények távolíthatók el.",
+    removeConfirm: "Eltávolítja ezt a bővítményt a ~/.qubit/plugins/ mappából?",
+    removeHint: "Csak a felhasználó által a ~/.qubit/plugins alá telepített bővítmények távolíthatók el.",
     rescanHeading: "SPA-bővítményregiszter",
     rescanHint: "Olvassa újra a fájlokat a lemezen történő hozzáadás után, hogy az oldalsáv felvegye az új manifesteket.",
     runtimeHeading: "Átjáró-futási idő (YAML-bővítmények)",
@@ -366,7 +366,7 @@ export const hu: Translations = {
     all: "Összes",
     categories: "Kategóriák",
     filters: "Szűrők",
-    noSkills: "Nem található készség. A készségek a ~/.hermes/skills/ mappából töltődnek be",
+    noSkills: "Nem található készség. A készségek a ~/.qubit/skills/ mappából töltődnek be",
     noSkillsMatch: "Nincs a keresésnek vagy szűrőnek megfelelő készség.",
     skillCount: "{count} készség{s}",
     resultCount: "{count} találat{s}",
@@ -380,7 +380,7 @@ export const hu: Translations = {
   },
 
   config: {
-    configPath: "~/.hermes/config.yaml",
+    configPath: "~/.qubit/config.yaml",
     filters: "Szűrők",
     sections: "Szakaszok",
     exportConfig: "Konfiguráció exportálása JSON-ba",

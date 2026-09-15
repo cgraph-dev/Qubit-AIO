@@ -11,7 +11,12 @@ readme = "README.md"
 # open-source project.
 license = { text = "Qubit VoiceBridge Educational Project License — Copyright © 2026 Qubit by Tricky; applies only to original Qubit material. Third-party/upstream-derived material remains under its original license; see LICENSE, docs/LICENSING.md, and THIRD_PARTY_NOTICES.md." }
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
-requires-python = ">=3.11"
+# Python floor is 3.12, not 3.11: the product uses PEP 701 f-strings (e.g.
+# voicebridge/local_llm.py) and scripts/install.sh creates the venv with
+# `uv venv --python 3.12`. Declaring 3.11 let pip/uv build a 3.11 environment
+# where `qubit run` dies at import with SyntaxError; the metadata now matches
+# the interpreter the product actually supports and installs.
+requires-python = ">=3.12"
 dependencies = [
     "sherpa-onnx>=1.13",      # Moonshine ASR + Silero VAD + eres2net voice-ID + Kokoro
     "sounddevice>=0.4",       # mic capture + playback (PortAudio)
@@ -22,6 +27,14 @@ dependencies = [
     "piper-tts>=1.2",         # default TTS
     "faster-whisper>=1.1",    # optional ASR fallback (asr.provider: whisper)
     "webrtcvad>=2.0.10",      # optional VAD fallback (vad.backend: webrtc)
+    # webrtcvad imports the legacy pkg_resources API at import time. The
+    # default VAD backend is silero, but when the silero model is absent (a
+    # stock install before model download) voicebridge/audio/vad.py falls back
+    # to webrtcvad, so the runtime import would fail with ModuleNotFoundError:
+    # pkg_resources. scripts/install.sh already installs setuptools<81 for
+    # exactly this reason; declare it here so every install path (pip/uv/wheel,
+    # not just the repo installer) gets a working runtime.
+    "setuptools<81",
     "onnx>=1.14",             # Parakeet ONNX metadata patcher (scripts/install.sh) + guarded sherpa fallback
     "playwright>=1.49",       # browser inbox reader (Gmail/IG/FB/TikTok via persistent profiles)
 
@@ -99,13 +112,23 @@ packages = ["voicebridge"]
 # need no npm. See docs/CLEAN_CLONE_AUDIT_WAVE5.md.
 artifacts = ["frontend/hermes-dist"]
 
+# The wheel force-includes the frontend tree for the packaged dashboard.
+# Hatchling `exclude` does not filter `force-include`, so a custom build hook
+# (scripts/hatch_build_qubit.py) stages `frontend/` as a filtered per-file
+# mapping. A dirty working-tree build must never embed node_modules (git-ignored
+# but walked by `force-include`) or its placeholder user-home paths into the wheel.
+[tool.hatch.build.targets.wheel.hooks.custom]
+path = "scripts/hatch_build_qubit.py"
+
 # Ship the runtime resources inside the wheel so a clean install (no checkout)
 # can resolve the dashboard frontend, config examples, prompt dialogs, task
 # templates, report templates, and systemd units (Packet 8K). voicebridge/
 # resources.py resolves package data first, then the checkout path when run
 # from a repository. No files are duplicated in the repo.
 [tool.hatch.build.targets.wheel.force-include]
-"frontend" = "voicebridge/_data/frontend"
+# NOTE: the ``frontend`` tree is force-included by the custom build hook
+# (scripts/hatch_build_qubit.py) as a filtered per-file mapping, because a raw
+# directory mapping would sweep the git-ignored node_modules tree into the wheel.
 "templates" = "voicebridge/_data/templates"
 "config/dialogs.md" = "voicebridge/_data/config/dialogs.md"
 # ship the PORTABLE example as the installed default; the developer's personal
@@ -193,6 +216,15 @@ artifacts = ["frontend/hermes-dist"]
 # voicebridge/hermes_runtime.manifest_path()); ship it at that path so a clean
 # install reports upstream_revision/patched/file_count.
 "docs/QUBIT_HERMES_VENDOR_MANIFEST.json" = "docs/QUBIT_HERMES_VENDOR_MANIFEST.json"
+# Wave 5: ship the small, secret-free matrices/docs that install-time code
+# reads. They land under package data so the resolver can reach them with the
+# installed path preferred and the checkout as fallback. voicebridge/
+# capability_catalog.py and voicebridge/portable.py must resolve these through
+# ``voicebridge.resources`` (reported as a cross-boundary repair) — a wheel-root
+# ``docs/`` mapping is not permitted by the packaging contract.
+"docs/PARITY_HERMES.json" = "voicebridge/_data/docs/PARITY_HERMES.json"
+"docs/MATRIX_8T_F.json" = "voicebridge/_data/docs/MATRIX_8T_F.json"
+"docs/MIGRATIONS.md" = "voicebridge/_data/docs/MIGRATIONS.md"
 
 [tool.hatch.build.targets.sdist]
 # The generated dashboard build ships in the sdist too (reproducible build
@@ -231,8 +263,34 @@ exclude = [
   "docs/OPERATIONS_8S.md",
   "docs/QUBIT_COMPLETION_EVIDENCE.md",
   "docs/QUBIT_FINAL_CODE_READY_PROMPT.md",
+  "docs/OPERATOR_QUALIFICATION.md",
   "docs/SECURITY_AUDIT_WAVE4.md",
+  # Wave 5: an untracked agent wave prompt is swept into the sdist by the
+  # working-tree build; it is internal and carries the developer home path, so
+  # exclude it (a clean release is built from a committed tree anyway).
+  "docs/QUBIT_BYTE_PARITY_VERIFICATION_PROMPT.md",
+  # Wave 2 (full-parity): internal agent reports/evidence that are untracked
+  # working-tree artifacts. They are not product docs, and one carries a real
+  # developer home path, so they must never be swept into the release sdist.
+  "docs/QUBIT_QBPV2_PACKAGING.md",
+  "docs/QUBIT_QBPV_PACKAGING_SECURITY.md",
+  "docs/QUBIT_BYTE_PARITY_EVIDENCE.md",
+  "docs/QUBIT_REACHABILITY_AUDIT.md",
+  # Wave 2 (Agent 5 re-audit): untracked internal evidence/allowlist docs swept
+  # into the sdist by a working-tree build. QUBIT_WAVE2_EVIDENCE.md carries a
+  # real developer home path, so the release must not ship either file.
+  "docs/QUBIT_WAVE2_EVIDENCE.md",
+  "docs/QUBIT_REBRAND_ALLOWLIST.md",
+  # untracked agent execution prompt swept in by a working-tree build; carries
+  # a real developer home path, so the release must not ship it.
+  "docs/QUBIT_PROVIDER_VOICE_EXECUTION_PROMPT_2026-09-15.md",
   "tests/test_new_features.py",
+  # tests that reference a concrete developer home path as a fixture or
+  # scan pattern are source-only; keep the release sdist free of dev paths.
+  "tests/test_foundation_gate.py",
+  "tests/test_packet8r.py",
+  "tests/test_packet8s.py",
+  "tests/test_paths8tf.py",
   "scripts/browser_profiles",
   "scripts/browser_auto_state",
   "106",
@@ -250,6 +308,14 @@ exclude = [
   "graft",
   ".mcp.json",
   "opencode.json",
+  # Agent-harness state swept into a working-tree sdist: .opencode ships a
+  # node_modules tree (3655 members), and the Playwright/agent scratch files
+  # are internal. None may enter the release (Packet 8K sdist privacy).
+  ".opencode",
+  ".playwright-mcp",
+  "opencode.json.backup",
+  "deintegratecuritate.md",
+  "docs/OPENCODE_WORKFLOW.md",
   # The whole vendored fork is excluded from the default sdist tree walk; the
   # runtime subset is force-included below at its original qubit_hermes/
   # layout (mirrors the wheel subset) so the sdist still rebuilds the wheel

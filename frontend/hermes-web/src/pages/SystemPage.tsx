@@ -45,6 +45,7 @@ import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { HermesConsoleModal } from "@/components/HermesConsoleModal";
 import { cn, themedBody } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { parsePolicyRefusal, policyRefusalMessage } from "@/lib/policy-refusal";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import type {
   StatusResponse,
@@ -252,6 +253,14 @@ export default function SystemPage() {
   );
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateConfirmOpen, setUpdateConfirmOpen] = useState(false);
+  // Expected typed policy refusal (e.g. UPDATE_OPERATOR_OWNED) for the
+  // dashboard self-update path — rendered as honest guidance, never as a
+  // raw `403: {…}` error string.
+  const [updateRefusal, setUpdateRefusal] = useState<string | null>(null);
+  // GATEWAY_NO_SUPERVISION explanation from GET /api/gateway: process control
+  // is operator-owned, so the Start/Restart/Stop controls render meaningfully
+  // disabled instead of failing on click.
+  const [gatewayRefusal, setGatewayRefusal] = useState<string | null>(null);
 
   const loadAll = useCallback(() => {
     Promise.allSettled([
@@ -266,8 +275,10 @@ export default function SystemPage() {
       // Cached (non-forced) check so the version row shows update status on
       // load without a separate effect / a forced network round-trip.
       api.checkHermesUpdate(false),
+      // Supervision policy: Qubit refuses in-dashboard process control.
+      api.getGatewayStatus(),
     ])
-      .then(([s, st, m, p, c, h, cur, prt, upd]) => {
+      .then(([s, st, m, p, c, h, cur, prt, upd, gw]) => {
         if (s.status === "fulfilled") setStatus(s.value);
         if (st.status === "fulfilled") setStats(st.value);
         if (m.status === "fulfilled") setMemory(m.value);
@@ -277,6 +288,12 @@ export default function SystemPage() {
         if (cur.status === "fulfilled") setCurator(cur.value);
         if (prt.status === "fulfilled") setPortal(prt.value);
         if (upd.status === "fulfilled") setUpdateInfo(upd.value);
+        if (gw.status === "fulfilled") {
+          const supervision = gw.value?.supervision ?? "";
+          setGatewayRefusal(
+            supervision.includes("GATEWAY_NO_SUPERVISION") ? supervision : null,
+          );
+        }
       })
       .finally(() => setLoading(false));
   }, []);
@@ -301,7 +318,14 @@ export default function SystemPage() {
       showToast(`Gateway ${verb} started`, "success");
       setTimeout(loadAll, 3000);
     } catch (e) {
-      showToast(`Gateway ${verb} failed: ${e}`, "error");
+      const refusal = parsePolicyRefusal(e);
+      if (refusal) {
+        const message = policyRefusalMessage(refusal);
+        setGatewayRefusal(message);
+        showToast(message, "success");
+      } else {
+        showToast(`Gateway ${verb} failed: ${e}`, "error");
+      }
     }
   };
 
@@ -517,6 +541,7 @@ export default function SystemPage() {
       try {
         const info = await api.checkHermesUpdate(force);
         setUpdateInfo(info);
+        setUpdateRefusal(null);
         if (force) {
           if (info.update_available) {
             showToast(
@@ -532,7 +557,16 @@ export default function SystemPage() {
           }
         }
       } catch (e) {
-        showToast(`Update check failed: ${e}`, "error");
+        // The dashboard self-update is refused by policy in some installs.
+        // That is an expected typed state: render the Qubit path, not a 403.
+        const refusal = parsePolicyRefusal(e);
+        if (refusal) {
+          const message = policyRefusalMessage(refusal);
+          setUpdateRefusal(message);
+          if (force) showToast(message, "success");
+        } else {
+          showToast(`Update check failed: ${e}`, "error");
+        }
       } finally {
         setCheckingUpdate(false);
       }
@@ -564,7 +598,14 @@ export default function SystemPage() {
       setActiveAction(resp.name ?? "hermes-update");
       showToast("Update started", "success");
     } catch (e) {
-      showToast(`Update failed: ${e}`, "error");
+      const refusal = parsePolicyRefusal(e);
+      if (refusal) {
+        const message = policyRefusalMessage(refusal);
+        setUpdateRefusal(message);
+        showToast(message, "success");
+      } else {
+        showToast(`Update failed: ${e}`, "error");
+      }
     }
   };
 
@@ -910,7 +951,16 @@ export default function SystemPage() {
                 CPU / memory / disk metrics.
               </p>
             )}
-            {canUpdateHermes && (
+            {updateRefusal ? (
+              <p
+                className="mt-4 border-t border-border pt-4 text-xs text-muted-foreground"
+                role="note"
+                data-state="unavailable"
+              >
+                {updateRefusal}
+              </p>
+            ) : null}
+            {canUpdateHermes && !updateRefusal && (
               <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
                 <Button
                   size="sm"
@@ -995,7 +1045,7 @@ export default function SystemPage() {
             )}
             {!portal?.logged_in && (
               <p className="text-xs text-muted-foreground">
-                Log in with <span className="font-mono">hermes portal</span>.
+                Log in with <span className="font-mono">qubit portal</span>.
               </p>
             )}
           </CardContent>
@@ -1056,7 +1106,8 @@ export default function SystemPage() {
                 size="sm"
                 className="uppercase"
                 onClick={() => runGateway("start")}
-                disabled={gatewayRunning}
+                disabled={gatewayRunning || !!gatewayRefusal}
+                title={gatewayRefusal ?? undefined}
                 prefix={<Play className="h-3.5 w-3.5" />}
               >
                 Start
@@ -1065,6 +1116,8 @@ export default function SystemPage() {
                 size="sm"
                 className="uppercase"
                 onClick={() => runGateway("restart")}
+                disabled={!!gatewayRefusal}
+                title={gatewayRefusal ?? undefined}
                 prefix={<RotateCw className="h-3.5 w-3.5" />}
               >
                 Restart
@@ -1074,13 +1127,23 @@ export default function SystemPage() {
                 className="uppercase text-warning"
                 ghost
                 onClick={() => runGateway("stop")}
-                disabled={!gatewayRunning}
+                disabled={!gatewayRunning || !!gatewayRefusal}
+                title={gatewayRefusal ?? undefined}
                 prefix={<Power className="h-3.5 w-3.5" />}
               >
                 Stop
               </Button>
             </div>
           </CardContent>
+          {gatewayRefusal ? (
+            <p
+              className="px-4 pb-3 text-xs text-muted-foreground"
+              role="note"
+              data-state="unavailable"
+            >
+              {gatewayRefusal}
+            </p>
+          ) : null}
         </Card>
       </section>
 
@@ -1308,7 +1371,7 @@ export default function SystemPage() {
                   id="import-path"
                   value={importPath}
                   onChange={(e) => setImportPath(e.target.value)}
-                  placeholder="$HERMES_HOME/backups/hermes-backup.zip"
+                  placeholder="$QUBIT_HOME/backups/qubit-backup.zip"
                 />
               </div>
               <Button

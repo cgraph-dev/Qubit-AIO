@@ -36,7 +36,6 @@ contracts; CLI, dashboard, and voice share every function.
 from __future__ import annotations
 
 import json
-import os
 import re
 import sqlite3
 import time
@@ -151,6 +150,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
         " kind TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '',"
         " created_at REAL NOT NULL);"
         "CREATE INDEX IF NOT EXISTS idx_events_task ON events(task_id);")
+    # Additive-only: remembers the status a task held before it was archived so
+    # a later restore returns it there (OpenClaw workboard "Restore from
+    # archive" parity) instead of silently resetting to ``open``.
+    _ensure_column(conn, "tasks", "archived_from", "TEXT")
 
 
 def _audit(op: str, actor: str, detail: Dict[str, Any]) -> None:
@@ -485,6 +488,11 @@ def _transition(cfg: Any, task_id: int, to: str, *,
                 params.append(who)
             if op == "reclaim":
                 updates += ", assignee=NULL"
+            if op == "archive":
+                # Remember the pre-archive column so ``restore`` can return the
+                # task exactly where it was (never a fabricated default).
+                updates += ", archived_from=?"
+                params.append(task["status"])
             params.append(task["id"])
             conn.execute(f"UPDATE tasks SET {updates} WHERE id=?", params)
             _event(conn, task["id"], op,
@@ -577,6 +585,52 @@ def archive_task(cfg: Any, task_id: int, *, requested_by: str = "cli:user",
     """Archive a task (hidden from default lists)."""
     return _transition(cfg, task_id, "archived", requested_by=requested_by,
                        confirmed=confirmed, op="archive")
+
+
+def restore_task(cfg: Any, task_id: int, *, requested_by: str = "cli:user",
+                 confirmed: bool = False) -> Dict[str, Any]:
+    """Restore an archived task (OpenClaw workboard "Restore from archive").
+
+    Returns the task to the exact status it held before archiving when the
+    store recorded it, else to ``open``. Non-archived tasks are a typed state
+    error, and every mutation is atomic, audited, and confirmation-gated —
+    the same shared path the CLI, dashboard, and voice all reach.
+    """
+    if not confirmed:
+        raise KanbanError(CONFIRM_CODE,
+                          "kanban restore requires explicit --confirm")
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            row = _get_task(conn, int(task_id))
+            if row["status"] != "archived":
+                raise KanbanError(STATE_CODE,
+                                  f"task #{task_id} is not archived")
+            keys = _row_keys(row)
+            prior = str(row["archived_from"] or "") \
+                if "archived_from" in keys else ""
+            target = prior if prior in STATUSES \
+                and prior != "archived" else "open"
+            conn.execute(
+                "UPDATE tasks SET status=?, archived_from=NULL, updated_at=?"
+                " WHERE id=?", (target, _now(), row["id"]))
+            _event(conn, row["id"], "restore", f"restored to status={target}")
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except sqlite3.Error:
+                pass
+            raise
+        _audit("restore", requested_by,
+               {"task_id": row["id"], "status": target})
+        out = _task_dict(_get_task(conn, row["id"]))
+        out["restored_from"] = "archived"
+        return {"state": "OK", "task": out}
+    finally:
+        conn.close()
 
 
 def edit(cfg: Any, task_id: int, *, title: str = "", body: str = "",

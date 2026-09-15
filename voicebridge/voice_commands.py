@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import re
 import time
-import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
@@ -47,6 +46,7 @@ ALLOWED_SOURCES = ("user", "cli", "dashboard")
 # would make the e-stop unrecoverable by voice/dashboard. Every other
 # mutation still fails closed while latched.
 ESTOP_EXEMPT_BACKENDS = ("resume",)
+GIT_LOG_DEFAULT = 10
 CONFIRM_TTL_S = 120.0
 MAX_PENDING_PER_SESSION = 10
 EXECUTED_KEEP = 500
@@ -179,9 +179,9 @@ def _clean_remainder(remainder: str) -> str:
     return cleaned
 
 
-def _extract(entry: VoiceCommand,
-             remainder: str,
-             alias_text: str = "") -> Tuple[Dict[str, Any], List[VoiceArg]]:
+def _extract(
+    entry: VoiceCommand, remainder: str, alias_text: str = ""
+) -> Tuple[Dict[str, Any], List[VoiceArg]]:
     """Pull typed args from the remainder; returns (args, missing)."""
     args: Dict[str, Any] = {}
     missing: List[VoiceArg] = []
@@ -221,8 +221,7 @@ def _extract(entry: VoiceCommand,
         task_spec, when_spec = entry.args[0], entry.args[1]
         if task_part:
             args[task_spec.name] = task_part
-        elif "this task" in (alias_text or "") or \
-                "current task" in (alias_text or ""):
+        elif "this task" in (alias_text or "") or "current task" in (alias_text or ""):
             # "schedule this task ..." names the current kanban task; the
             # backend resolves it (same sentinel as task_run from_current).
             args[task_spec.name] = "this task"
@@ -238,8 +237,9 @@ def _extract(entry: VoiceCommand,
         if quoted:
             args[entry.args[0].name] = quoted[0][0] or quoted[0][1]
             return args, []
-        cleaned = re.sub(r"^(?:at|the|file|image|picture|photo|path|of)\b\s*",
-                         "", rest).strip()
+        cleaned = re.sub(
+            r"^(?:at|the|file|image|picture|photo|path|of)\b\s*", "", rest
+        ).strip()
         if cleaned:
             args[entry.args[0].name] = cleaned
             return args, []
@@ -248,30 +248,44 @@ def _extract(entry: VoiceCommand,
     quoted_vals = [a or b for a, b in quoted]
     rest_bare = re.sub(r"'[^']+'|\"[^\"]+\"", " ", rest)
     remainder_consumed = False
+    typed_consumed = False
     for spec in entry.args:
         value: Any = None
         if spec.type == "choice":
             for choice in spec.choices:
                 if re.search(r"\b" + re.escape(choice) + r"\b", rest_bare):
                     value = choice
+                    typed_consumed = True
                     break
         elif spec.type == "int":
             found = re.search(r"\b(\d{1,6})\b", rest_bare)
             if found:
                 value = int(found.group(1))
+                typed_consumed = True
+                # Consume the token so a following remainder/scalar does not
+                # re-include it (e.g. "assign task 3 to alice" -> assignee
+                # "alice", not "3 to alice").
+                token = found.group(0)
+                rest_bare = rest_bare[: found.start()] + " " + rest_bare[found.end() :]
+                rest = re.sub(r"\b" + re.escape(token) + r"\b", " ", rest, count=1)
         elif spec.type == "remainder":
             candidate = rest.strip()
+            if typed_consumed:
+                candidate = re.sub(
+                    r"^(?:to|for|with|onto|from|of)\s+", "", candidate, flags=re.I
+                ).strip()
             value = candidate or None
             remainder_consumed = True
         else:
             if quoted_vals:
                 value = quoted_vals.pop(0)
-            elif remainder_consumed:
-                # An optional trailing scalar after a remainder arg (e.g. an
-                # explicit board on "create task <title>") is NOT taken from
-                # the whole remainder: the remainder owns the free text and
-                # the scalar stays unset unless the caller passes it
-                # explicitly (dashboard/CLI) or quotes it (voice).
+            elif remainder_consumed or typed_consumed:
+                # A scalar after a typed (int/choice) or free-text arg is NOT
+                # taken from the whole remainder: the typed arg already
+                # consumed its token, and re-using the remainder would leak
+                # that token into unrelated optional scalars (e.g.
+                # "move task 3" must not set board='3'). Callers pass it
+                # explicitly, or the speaker quotes it.
                 value = None
             else:
                 value = rest.strip() or None
@@ -304,11 +318,13 @@ def _iter_entries():
     """
     yield from REGISTRY.values()
     yield from PLUGIN_FLEET_REGISTRY.values()
+    yield from MODEL_PROFILE_REGISTRY.values()
 
 
 def _lookup_entry(entry_id: str) -> Optional[VoiceCommand]:
     """Find an entry in either registry (execute paths never assume one)."""
-    return REGISTRY.get(entry_id) or PLUGIN_FLEET_REGISTRY.get(entry_id)
+    return (REGISTRY.get(entry_id) or PLUGIN_FLEET_REGISTRY.get(entry_id)
+            or MODEL_PROFILE_REGISTRY.get(entry_id))
 
 
 def resolve(text: str) -> Resolution:
@@ -452,12 +468,6 @@ def _b_setup_check(ctx, args):
     return {"checklist": L.checklist(ctx.cfg)}
 
 
-def _b_setup_run_preview(ctx, args):
-    from . import lifecycle as L
-
-    return {"plan": L.setup_run(dry_run=True)}
-
-
 def _b_verify_release(ctx, args):
     from .integration_status import verify_static
 
@@ -528,8 +538,7 @@ def _b_sessions(ctx, args):
     if action in ("search", "show", "rename", "archive", "delete", "resume"):
         store = session_store(ctx.cfg)
         if action == "search":
-            return {"sessions": store.search(
-                str(args.get("query", "")), 20)}
+            return {"sessions": store.search(str(args.get("query", "")), 20)}
         if action == "show":
             return {"session": store.show(sid)}
         if action == "rename":
@@ -539,11 +548,13 @@ def _b_sessions(ctx, args):
         if action == "delete":
             return {"session": store.delete(sid, confirm=True)}
         return {"session": store.resume(sid)}
-    limit = args.get("limit", 5)
+    # Match the CLI parser default (`sessions list --limit`, default 20);
+    # `recent_sessions` applies the canonical [1, 100] bound itself.
+    limit = args.get("limit", 20)
     try:
-        limit = max(1, min(int(limit), 20))
+        limit = int(limit)
     except (TypeError, ValueError):
-        limit = 5
+        limit = 20
     return {"sessions": recent_sessions(ctx.cfg, limit)}
 
 
@@ -715,146 +726,288 @@ def _b_projects(ctx, args):
     raise ValueError(f"unknown projects action {action!r}")
 
 
+def _int_arg(args: Dict[str, Any], key: str, default: int = 0) -> int:
+    """Coerce an int arg without leaking OverflowError/ValueError to callers.
+
+    A malformed or absurd value (e.g. task_id=2**63) resolves to ``default``
+    so the backend returns its own typed NOT_FOUND/BAD_ARGS instead of a raw
+    exception class.
+    """
+    try:
+        return int(args.get(key, default) or default)
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
 def _b_kanban(ctx, args):
     from . import kanban as KB
 
     action = args.get("action", "list")
     if action == "boards":
         return KB.boards_list(ctx.cfg)
+    if action == "stores":
+        from . import kanban_bridge as KBG
+        return KBG.stores(ctx.cfg)
+    if action == "migrate":
+        from . import kanban_bridge as KBG
+        raw = str(args.get("dry_run", "") or "").strip().lower()
+        return KBG.migrate(ctx.cfg, dry_run=raw in ("1", "true", "yes", "on"))
     if action == "current":
         return KB.current_task(ctx.cfg)
     if action == "list":
-        return KB.list_tasks(ctx.cfg, board=str(args.get("board", "")),
-                             status=str(args.get("status", "")),
-                             limit=int(args.get("limit", 10) or 10))
+        return KB.list_tasks(
+            ctx.cfg,
+            board=str(args.get("board", "")),
+            status=str(args.get("status", "")),
+            limit=int(args.get("limit", KB.LIST_DEFAULT) or KB.LIST_DEFAULT),
+        )
     if action == "show":
-        return KB.show(ctx.cfg, int(args.get("task_id", 0)))
+        return KB.show(ctx.cfg, _int_arg(args, "task_id"))
     if action == "create":
-        return KB.create(ctx.cfg, str(args.get("title", "")),
-                         board=str(args.get("board", "") or "main"),
-                         requested_by="voice:user", confirmed=True)
+        return KB.create(
+            ctx.cfg,
+            str(args.get("title", "")),
+            board=str(args.get("board", "") or "main"),
+            requested_by="voice:user",
+            confirmed=True,
+        )
     if action == "claim":
-        return KB.claim(ctx.cfg, int(args.get("task_id", 0)),
-                        requested_by="voice:user", confirmed=True)
+        return KB.claim(
+            ctx.cfg,
+            _int_arg(args, "task_id"),
+            requested_by="voice:user",
+            confirmed=True,
+        )
     if action == "complete":
-        return KB.complete(ctx.cfg, int(args.get("task_id", 0)),
-                           requested_by="voice:user", confirmed=True)
+        return KB.complete(
+            ctx.cfg,
+            _int_arg(args, "task_id"),
+            requested_by="voice:user",
+            confirmed=True,
+        )
     if action == "comment":
-        return KB.comment(ctx.cfg, int(args.get("task_id", 0)),
-                          str(args.get("body", "")),
-                          requested_by="voice:user", confirmed=True)
+        return KB.comment(
+            ctx.cfg,
+            _int_arg(args, "task_id"),
+            str(args.get("body", "")),
+            requested_by="voice:user",
+            confirmed=True,
+        )
     if action == "init":
         return KB.init(ctx.cfg)
     if action == "boards_create":
-        return KB.boards_create(ctx.cfg, str(args.get("board", "main")),
-                                str(args.get("name", "")),
-                                requested_by="voice:user", confirmed=True)
+        return KB.boards_create(
+            ctx.cfg,
+            str(args.get("board", "main")),
+            str(args.get("name", "")),
+            requested_by="voice:user",
+            confirmed=True,
+        )
     if action == "assign":
-        return KB.assign(ctx.cfg, int(args.get("task_id", 0)),
-                         str(args.get("assignee", "")),
-                         requested_by="voice:user", confirmed=True)
+        return KB.assign(
+            ctx.cfg,
+            _int_arg(args, "task_id"),
+            str(args.get("assignee", "")),
+            requested_by="voice:user",
+            confirmed=True,
+        )
     if action == "reassign":
-        return KB.reassign(ctx.cfg, int(args.get("task_id", 0)),
-                           str(args.get("assignee", "")),
-                           requested_by="voice:user", confirmed=True)
+        return KB.reassign(
+            ctx.cfg,
+            _int_arg(args, "task_id"),
+            str(args.get("assignee", "")),
+            requested_by="voice:user",
+            confirmed=True,
+        )
     if action == "reclaim":
-        return KB.reclaim(ctx.cfg, int(args.get("task_id", 0)),
-                          requested_by="voice:user", confirmed=True)
+        return KB.reclaim(
+            ctx.cfg,
+            _int_arg(args, "task_id"),
+            requested_by="voice:user",
+            confirmed=True,
+        )
     if action == "edit":
-        return KB.edit(ctx.cfg, int(args.get("task_id", 0)),
-                       title=str(args.get("title", "")),
-                       body=str(args.get("body", "")),
-                       priority=str(args.get("priority", "")),
-                       requested_by="voice:user", confirmed=True)
+        return KB.edit(
+            ctx.cfg,
+            _int_arg(args, "task_id"),
+            title=str(args.get("title", "")),
+            body=str(args.get("body", "")),
+            priority=str(args.get("priority", "")),
+            requested_by="voice:user",
+            confirmed=True,
+        )
     if action == "block":
-        return KB.block(ctx.cfg, int(args.get("task_id", 0)),
-                        requested_by="voice:user", confirmed=True)
+        return KB.block(
+            ctx.cfg,
+            _int_arg(args, "task_id"),
+            requested_by="voice:user",
+            confirmed=True,
+        )
     if action == "unblock":
-        return KB.unblock(ctx.cfg, int(args.get("task_id", 0)),
-                          requested_by="voice:user", confirmed=True)
+        return KB.unblock(
+            ctx.cfg,
+            _int_arg(args, "task_id"),
+            requested_by="voice:user",
+            confirmed=True,
+        )
     if action == "archive":
-        return KB.archive_task(ctx.cfg, int(args.get("task_id", 0)),
-                               requested_by="voice:user", confirmed=True)
+        return KB.archive_task(
+            ctx.cfg,
+            _int_arg(args, "task_id"),
+            requested_by="voice:user",
+            confirmed=True,
+        )
+    if action == "restore":
+        return KB.restore_task(
+            ctx.cfg,
+            _int_arg(args, "task_id"),
+            requested_by="voice:user",
+            confirmed=True,
+        )
     if action == "stats":
         return KB.stats(ctx.cfg, board=str(args.get("board", "")))
     if action == "log":
-        return KB.log(ctx.cfg, board=str(args.get("board", "")),
-                      limit=int(args.get("limit", 10) or 10))
+        return KB.log(
+            ctx.cfg,
+            board=str(args.get("board", "")),
+            limit=int(args.get("limit", KB.LIST_DEFAULT) or KB.LIST_DEFAULT),
+        )
     if action == "export":
         return KB.export(ctx.cfg)
     if action == "open":
         return KB.board_open(ctx.cfg, board=str(args.get("board", "") or "main"))
     if action == "move":
-        return KB.move_task(ctx.cfg, int(args.get("task_id", 0)),
-                            board=str(args.get("board", "") or ""),
-                            status=str(args.get("status", "") or ""),
-                            requested_by="voice:user", confirmed=True)
+        return KB.move_task(
+            ctx.cfg,
+            _int_arg(args, "task_id"),
+            board=str(args.get("board", "") or ""),
+            status=str(args.get("status", "") or ""),
+            requested_by="voice:user",
+            confirmed=True,
+        )
     if action == "widget_add":
-        return KB.widget_add(ctx.cfg, str(args.get("board", "") or "main"),
-                             str(args.get("kind", "") or "note"),
-                             str(args.get("title", "")),
-                             content=str(args.get("content", "") or ""),
-                             tab=str(args.get("tab", "") or ""),
-                             requested_by="voice:user", confirmed=True)
+        return KB.widget_add(
+            ctx.cfg,
+            str(args.get("board", "") or "main"),
+            str(args.get("kind", "") or "note"),
+            str(args.get("title", "")),
+            content=str(args.get("content", "") or ""),
+            tab=str(args.get("tab", "") or ""),
+            requested_by="voice:user",
+            confirmed=True,
+        )
     if action == "tab_list":
-        return {"tabs": KB.tab_list(ctx.cfg,
-                                    str(args.get("board", "") or "main"))}
+        return {"tabs": KB.tab_list(ctx.cfg, str(args.get("board", "") or "main"))}
     if action == "tab_create":
-        return {"tab": KB.tab_create(
-            ctx.cfg, str(args.get("board", "") or "main"),
-            str(args.get("slug", "")), str(args.get("name", "")),
-            requested_by="voice:user", confirmed=True)}
+        return {
+            "tab": KB.tab_create(
+                ctx.cfg,
+                str(args.get("board", "") or "main"),
+                str(args.get("slug", "")),
+                str(args.get("name", "")),
+                requested_by="voice:user",
+                confirmed=True,
+            )
+        }
     if action == "tab_rename":
-        return {"tab": KB.tab_rename(
-            ctx.cfg, str(args.get("board", "") or "main"),
-            str(args.get("tab", "")), str(args.get("name", "")),
-            requested_by="voice:user", confirmed=True)}
+        return {
+            "tab": KB.tab_rename(
+                ctx.cfg,
+                str(args.get("board", "") or "main"),
+                str(args.get("tab", "")),
+                str(args.get("name", "")),
+                requested_by="voice:user",
+                confirmed=True,
+            )
+        }
     if action == "tab_delete":
-        return {"tab": KB.tab_delete(
-            ctx.cfg, str(args.get("board", "") or "main"),
-            str(args.get("tab", "")),
-            requested_by="voice:user", confirmed=True)}
+        return {
+            "tab": KB.tab_delete(
+                ctx.cfg,
+                str(args.get("board", "") or "main"),
+                str(args.get("tab", "")),
+                requested_by="voice:user",
+                confirmed=True,
+            )
+        }
     if action == "tab_move":
-        return {"tab": KB.tab_move(
-            ctx.cfg, str(args.get("board", "") or "main"),
-            str(args.get("tab", "")), int(args.get("position", 0) or 0),
-            requested_by="voice:user", confirmed=True)}
+        return {
+            "tab": KB.tab_move(
+                ctx.cfg,
+                str(args.get("board", "") or "main"),
+                str(args.get("tab", "")),
+                int(args.get("position", 0) or 0),
+                requested_by="voice:user",
+                confirmed=True,
+            )
+        }
     if action == "widget_list":
-        return KB.widget_list(ctx.cfg,
-                              board=str(args.get("board", "") or "main"))
+        return KB.widget_list(ctx.cfg, board=str(args.get("board", "") or "main"))
     if action == "widget_remove":
-        return KB.widget_remove(ctx.cfg, int(args.get("widget_id", 0)),
-                                requested_by="voice:user", confirmed=True)
+        return KB.widget_remove(
+            ctx.cfg,
+            int(args.get("widget_id", 0)),
+            requested_by="voice:user",
+            confirmed=True,
+        )
     if action == "layout_show":
-        return KB.layout_show(ctx.cfg,
-                              board=str(args.get("board", "") or "main"))
+        return KB.layout_show(ctx.cfg, board=str(args.get("board", "") or "main"))
     if action == "layout_set":
-        cols = [c.strip().lower() for c in
-                str(args.get("columns", "") or "").replace(" ", ",").split(",")
-                if c.strip()]
-        return KB.layout_set(ctx.cfg, str(args.get("board", "") or "main"),
-                             cols, requested_by="voice:user", confirmed=True)
+        cols = [
+            c.strip().lower()
+            for c in str(args.get("columns", "") or "").replace(" ", ",").split(",")
+            if c.strip()
+        ]
+        return KB.layout_set(
+            ctx.cfg,
+            str(args.get("board", "") or "main"),
+            cols,
+            requested_by="voice:user",
+            confirmed=True,
+        )
     if action == "role_grant":
         board, principal = _voice_board_principal(args)
-        return KB.role_grant(ctx.cfg, board, principal,
-                             str(args.get("role", "") or "viewer"),
-                             requested_by="voice:user", confirmed=True)
+        return KB.role_grant(
+            ctx.cfg,
+            board,
+            principal,
+            str(args.get("role", "") or "viewer"),
+            requested_by="voice:user",
+            confirmed=True,
+        )
     if action == "role_revoke":
         board, principal = _voice_board_principal(args)
-        return KB.role_revoke(ctx.cfg, board, principal,
-                              requested_by="voice:user", confirmed=True)
+        return KB.role_revoke(
+            ctx.cfg, board, principal, requested_by="voice:user", confirmed=True
+        )
     if action == "widget_move":
         wid = int(args.get("widget_id", 0))
-        nums = [int(n) for n in
-                re.findall(r"\b(\d{1,4})\b",
-                           str(args.get("geometry", "") or ""))]
+        nums = [
+            int(n)
+            for n in re.findall(r"\b(\d{1,4})\b", str(args.get("geometry", "") or ""))
+        ]
         rest = nums[1:] if nums and nums[0] == wid else nums
         box = dict(zip(("x", "y", "w", "h"), rest[:4]))
-        return KB.widget_move(ctx.cfg, wid, requested_by="voice:user",
-                              confirmed=True, **box)
+        return KB.widget_move(
+            ctx.cfg, wid, requested_by="voice:user", confirmed=True, **box
+        )
+    if action == "snapshots":
+        # Newest-first canvas restore points, the same KB.snapshot_list the CLI
+        # `qubit kanban snapshots` read calls (read-only, bounded).
+        return {
+            "snapshots": KB.snapshot_list(
+                ctx.cfg,
+                board=str(args.get("board", "") or "main"),
+                limit=_int_arg(args, "limit", KB.LIST_DEFAULT),
+            )
+        }
     if action == "snapshot_restore":
-        return KB.snapshot_restore(ctx.cfg, int(args.get("snapshot_id", 0)),
-                                   requested_by="voice:user", confirmed=True)
+        return KB.snapshot_restore(
+            ctx.cfg,
+            int(args.get("snapshot_id", 0)),
+            requested_by="voice:user",
+            confirmed=True,
+        )
     if action == "delegated":
         sub = str(args.get("subcommand", "") or "watch")
         if sub not in KB.DELEGATED:
@@ -1328,21 +1481,6 @@ def _b_insights(ctx, args):
     return {"insights": {"recent_sessions": len(sessions), "states": states}}
 
 
-def _b_model(ctx, args):
-    from .providers.policy import FrontierPolicy
-    from .runner_contract import resolve
-
-    try:
-        rc = resolve(ctx.cfg)
-        resident = {"alias": rc.alias, "url": rc.url, "num_ctx": rc.num_ctx}
-    except Exception:
-        resident = {"alias": "unknown"}
-    policy = FrontierPolicy.from_config(ctx.cfg)
-    return {"model": {"resident": resident,
-                      "frontier_enabled": policy.enabled,
-                      "allowlist": policy.allowlist}}
-
-
 def _b_prompt_budget(ctx, args):
     from .runner_contract import resolve
 
@@ -1444,20 +1582,35 @@ def _b_git(ctx, args):
     root = str(args.get("root", "") or "")
     try:
         if action == "status":
-            return {"git": GI.status(ctx.cfg, root,
-                                     requested_by="voice:user")}
+            return {"git": GI.status(ctx.cfg, root, requested_by="voice:user")}
         if action == "log":
-            return {"git": GI.log(ctx.cfg, root,
-                                  args.get("limit", 5),
-                                  requested_by="voice:user")}
+            return {
+                "git": GI.log(
+                    ctx.cfg,
+                    root,
+                    args.get("limit", GIT_LOG_DEFAULT),
+                    requested_by="voice:user",
+                )
+            }
         if action == "diff":
-            return {"git": GI.diff(ctx.cfg, root,
-                                   str(args.get("path", "") or ""),
-                                   requested_by="voice:user")}
+            return {
+                "git": GI.diff(
+                    ctx.cfg,
+                    root,
+                    str(args.get("path", "") or ""),
+                    requested_by="voice:user",
+                )
+            }
         if action == "show":
-            return {"git": GI.show(ctx.cfg, root, "HEAD",
-                                   str(args.get("path", "") or ""),
-                                   requested_by="voice:user")}
+            return {
+                "git": GI.show(
+                    ctx.cfg,
+                    root,
+                    "HEAD",
+                    str(args.get("path", "") or ""),
+                    requested_by="voice:user",
+                )
+            }
         return {"refused": GI.refuse_write(action)}
     except GI.GitError as exc:
         return GI.public_error(exc)
@@ -1914,6 +2067,162 @@ def _b_config_profiles(ctx, args):
     return PF.profiles_list(ctx.cfg)
 
 
+# ------------------------------------------------ model/provider profiles
+# Spoken intents that map to the canonical resolver
+# (voicebridge.providers.resolver). Mutating selections are confirm-gated by
+# the entry (the shared journal is the human authorization); backends pass a
+# raw secret reference only through the CLI/dashboard flow and never accept,
+# echo, or log a key value.
+def _mp_role(args: Dict[str, Any], default: str = "chat") -> str:
+    return str(args.get("role", "") or default)
+
+
+def _b_model_profile_status(ctx, args):
+    """Active model profile plus the active voice/STT/TTS registry records."""
+    from . import profiles as PF
+    from .providers import resolver as R
+
+    role = _mp_role(args)
+    try:
+        eff = R.resolve(ctx.cfg, role=role, session=ctx.session)
+        model: Dict[str, Any] = {"state": "OK", "role": role,
+                                 "effective": eff.to_public_dict()}
+    except R.ResolverError as exc:
+        model = {"state": "FAILED", "role": role, **exc.to_dict()}
+    active = PF.current_profiles(ctx.cfg)
+    return {"model_profile": {
+        "model": model,
+        "voice": active.get("voice", {}),
+        "stt": active.get("stt", {}),
+        "tts": active.get("tts", {}),
+    }}
+
+
+def _b_model_profile_test(ctx, args):
+    """Preflight a profile (same read-only test the CLI performs)."""
+    from .providers import resolver as R
+
+    pid = str(args.get("profile_id", "") or "").strip()
+    try:
+        if not pid:
+            pid = R.resolve(ctx.cfg, role=_mp_role(args),
+                            session=ctx.session).profile_id
+        return {"model_profile": R.test_profile(
+            ctx.cfg, pid, probe=bool(args.get("probe")))}
+    except R.ResolverError as exc:
+        return {"model_profile": exc.to_dict()}
+
+
+def _b_speech_profile_test(ctx, args):
+    """Read-only preflight of the active (or named) speech profile.
+
+    Uses the speech registry (ASR/TTS/realtime), not the language-model
+    registry, so 'test my speech profile' inspects the real speech profile.
+    """
+    from .providers import speech as SP
+
+    pid = str(args.get("profile_id", "") or "").strip()
+    kind = str(args.get("kind", "") or SP.SPEECH_OUT).strip() or SP.SPEECH_OUT
+    try:
+        if pid:
+            rec = SP.show_speech_profile(ctx.cfg, pid)
+        else:
+            eff = SP.resolve_speech(ctx.cfg, kind, session=ctx.session)
+            rec = eff.to_public_dict()
+        return {"model_profile": {"state": "OK", "kind": kind,
+                                  "profile": rec}}
+    except SP.ResolverError as exc:
+        return {"model_profile": {"state": "FAILED", "kind": kind,
+                                  **exc.to_dict()}}
+    except Exception as exc:  # noqa: BLE001 - typed, no fabrication
+        return {"model_profile": {
+            "state": "FAILED", "kind": kind,
+            "code": getattr(exc, "code", type(exc).__name__),
+            "detail": str(exc)[:200]}}
+
+
+def _b_model_profile_local(ctx, args):
+    from .providers import resolver as R
+
+    out = R.set_session_profile(ctx.cfg, ctx.session, R.DEFAULT_LOCAL_ID,
+                                role=_mp_role(args), confirm=True)
+    return {"model_profile": {"state": out.get("state", "OK"),
+                              "profile": R.DEFAULT_LOCAL_ID,
+                              "session": ctx.session, "selected": out}}
+
+
+def _b_model_profile_use(ctx, args):
+    from .providers import resolver as R
+
+    pid = str(args.get("profile_id", "") or "").strip()
+    if not pid:
+        return {"model_profile": {
+            "state": "FAILED", "code": "MALFORMED",
+            "detail": "which model profile? name one, or say 'use my local "
+                      "brain'."}}
+    return {"model_profile": R.set_session_profile(
+        ctx.cfg, ctx.session, pid, role=_mp_role(args), confirm=True)}
+
+
+def _b_model_profile_realtime(ctx, args):
+    """Select the registered realtime voice profile (never invents one)."""
+    from .providers import speech as SP
+
+    pid = str(args.get("profile_id", "") or "").strip()
+    if not pid:
+        candidates = [p for p in SP.load_speech_profiles(ctx.cfg, SP.REALTIME)
+                      if p.enabled]
+        if not candidates:
+            return {"model_profile": {
+                "state": "UNAVAILABLE", "code": "NO_REALTIME_PROFILE",
+                "detail": "no realtime voice profile is registered; create one "
+                          "with the speech profile lifecycle or the dashboard"}}
+        pid = candidates[0].id
+    if SP.get_speech_profile(ctx.cfg, pid) is None:
+        return {"model_profile": {
+            "state": "FAILED", "code": "UNKNOWN_PROFILE",
+            "detail": f"no realtime speech profile {pid!r}"}}
+    out = SP.set_session_speech_profile(ctx.cfg, ctx.session, SP.REALTIME,
+                                        pid, confirm=True)
+    return {"model_profile": {"state": out.get("state", "OK"),
+                              "kind": SP.REALTIME, "profile": pid,
+                              "selected": out}}
+
+
+def _b_model_profile_coding(ctx, args):
+    """Route the coding role to the effective coding profile for the session."""
+    from .providers import resolver as R
+
+    pid = str(args.get("profile_id", "") or "").strip() or None
+    try:
+        eff = R.resolve(ctx.cfg, role="coding", profile_id=pid,
+                        session=ctx.session)
+    except R.ResolverError as exc:
+        return {"model_profile": exc.to_dict()}
+    out = R.set_session_profile(ctx.cfg, ctx.session, eff.profile_id,
+                               role="coding", confirm=True)
+    return {"model_profile": {
+        "state": out.get("state", "OK"), "role": "coding",
+        "profile": eff.profile_id, "effective": eff.to_public_dict(),
+        "selected": out,
+        "next": "coding-role work resolves this profile through the canonical "
+                "resolver (chat_transport.turn(role='coding')); ordinary chat "
+                "turns keep the chat role unless you select it explicitly"}}
+
+
+def _b_model_profile_local_only(ctx, args):
+    """Clear this session's overrides and reselect the local brain."""
+    from .providers import resolver as R
+
+    cleared = R.clear_session_profile(ctx.cfg, ctx.session, role="*")
+    out = R.set_session_profile(ctx.cfg, ctx.session, R.DEFAULT_LOCAL_ID,
+                                role=R.DEFAULT_ROLE, confirm=True)
+    return {"model_profile": {"state": out.get("state", "OK"),
+                              "local_only": True,
+                              "profile": R.DEFAULT_LOCAL_ID,
+                              "cleared": cleared, "selected": out}}
+
+
 def _b_migrate_status(ctx, args):
     from . import product as P
 
@@ -1921,12 +2230,6 @@ def _b_migrate_status(ctx, args):
         return {"migration": P.branding_status()}
     except Exception as exc:
         return {"migration": {"state": "UNAVAILABLE", "detail": str(exc)[:160]}}
-
-
-def _b_vision_guidance(ctx, args):
-    return {"guidance": "image analysis needs a file path: run "
-                        "`qubit vision describe <image> --confirm` "
-                        "from the CLI"}
 
 
 def _runner_power(cfg):
@@ -1942,8 +2245,6 @@ def _b_task_run(ctx, args):
     after the voice pipeline's explicit confirmation. DISABLED
     (agent.enabled=false) and EMERGENCY_STOP surface as typed unavailable
     states — never fake success."""
-    from .agent import AgentDenied, turn as agent_turn
-
     text = str(args.get("task_text", "") or "").strip()
     if not text and str(args.get("from_current", "")).lower() in (
             "1", "true", "yes"):
@@ -1960,19 +2261,19 @@ def _b_task_run(ctx, args):
                 str(task.get("body", ""))).strip()
     if not text:
         raise ValueError("missing task text")
-    try:
-        res = agent_turn(ctx.cfg, text, session=ctx.session or "qubit-voice",
-                         estop_engaged=lambda: _estop(ctx.cfg))
-    except AgentDenied as exc:
-        msg = str(exc)
-        code = "EMERGENCY_STOP" if "EMERGENCY_STOP" in msg else \
-            "AGENT_DISABLED"
-        return {"task": {"state": "UNAVAILABLE", "code": code,
-                         "detail": msg[:160]}}
+    # Canonical operation path: the task resolves the selected model/provider
+    # profile through the same chat_transport resolver+gateway CLI/dashboard
+    # use, so a chosen profile is honored and the receipt is truthful.
+    from . import chat_transport as _CT
+
+    res = _CT.turn(ctx.cfg, text, session=ctx.session or "qubit-voice",
+                   role="coding")
     if not isinstance(res, dict) or not res.get("ok"):
-        return {"task": {"state": "UNAVAILABLE",
-                         "code": str((res or {}).get("code", "AGENT_ERROR")),
-                         "detail": str((res or {}).get("error", ""))[:200]}}
+        code = str((res or {}).get("code", "AGENT_ERROR"))
+        detail = str((res or {}).get("detail")
+                     or (res or {}).get("error", ""))[:200]
+        return {"task": {"state": "UNAVAILABLE", "code": code,
+                         "detail": detail}}
     return {"task": {"state": "OK", "runtime": "qubit",
                      "reply": str(res.get("reply", "")),
                      "receipt": res.get("receipt", {})}}
@@ -3673,58 +3974,117 @@ def _b_logbook(ctx, args):
 
 
 _BACKENDS: Dict[str, Callable] = {
-    "status": _b_status, "pause": _b_pause, "resume": _b_resume,
-    "doctor": _b_doctor, "setup_check": _b_setup_check,
-    "setup_run_preview": _b_setup_run_preview,
-    "verify_release": _b_verify_release, "security": _b_security,
-    "diagnostics": _b_diagnostics, "backup": _b_backup,
+    "status": _b_status,
+    "pause": _b_pause,
+    "resume": _b_resume,
+    "doctor": _b_doctor,
+    "setup_check": _b_setup_check,
+    "verify_release": _b_verify_release,
+    "security": _b_security,
+    "diagnostics": _b_diagnostics,
+    "backup": _b_backup,
     "voice_unsupported": _b_voice_unsupported,
-    "sessions": _b_sessions, "capability": _b_capability,
-    "checkpoints": _b_checkpoints, "auth_status": _b_auth_status,
-    "auth_login": _b_auth_login, "auth_verify": _b_auth_verify,
-    "auth_logout": _b_auth_logout, "mcp": _b_mcp, "worker": _b_worker,
-    "memory": _b_memory, "skills": _b_skills, "projects": _b_projects,
-    "kanban": _b_kanban, "themes": _b_themes, "proxy": _b_proxy,
+    "sessions": _b_sessions,
+    "capability": _b_capability,
+    "checkpoints": _b_checkpoints,
+    "auth_status": _b_auth_status,
+    "auth_login": _b_auth_login,
+    "auth_verify": _b_auth_verify,
+    "auth_logout": _b_auth_logout,
+    "mcp": _b_mcp,
+    "worker": _b_worker,
+    "memory": _b_memory,
+    "skills": _b_skills,
+    "projects": _b_projects,
+    "kanban": _b_kanban,
+    "themes": _b_themes,
+    "proxy": _b_proxy,
     "runtime": _b_runtime,
-    "import_agent": _b_import_agent, "hooks": _b_hooks, "sync": _b_sync,
-    "vision_status": _b_vision_status, "vision_describe": _b_vision_describe,
-    "pairing": _b_pairing, "webhook": _b_webhook, "msg": _b_msg,
-    "gateway": _b_gateway, "peer": _b_peer, "brain": _b_brain,
-    "permissions": _b_permissions, "monitor": _b_monitor,
-    "frontier": _b_frontier, "audio": _b_audio, "device": _b_device,
-    "flags": _b_flags, "logs": _b_logs, "insights": _b_insights,
-    "model": _b_model, "prompt_budget": _b_prompt_budget,
-    "reasoning": _b_reasoning, "approvals": _b_approvals, "tools": _b_tools,
-    "secrets": _b_secrets, "worktree": _b_worktree,
-    "completions": _b_completions, "tui_guidance": _b_tui_guidance,
-    "console_guidance": _b_console_guidance, "mic_guidance": _b_mic_guidance,
-    "vision_guidance": _b_vision_guidance, "backup": _b_backup,
-    "curator": _b_curator, "update_status": _b_update_status,
-    "config_profiles": _b_config_profiles, "migrate_status": _b_migrate_status,
-    "acp": _b_acp, "lsp": _b_lsp, "browser": _b_browser,
+    "import_agent": _b_import_agent,
+    "hooks": _b_hooks,
+    "sync": _b_sync,
+    "vision_status": _b_vision_status,
+    "vision_describe": _b_vision_describe,
+    "pairing": _b_pairing,
+    "webhook": _b_webhook,
+    "msg": _b_msg,
+    "gateway": _b_gateway,
+    "peer": _b_peer,
+    "brain": _b_brain,
+    "permissions": _b_permissions,
+    "monitor": _b_monitor,
+    "frontier": _b_frontier,
+    "audio": _b_audio,
+    "device": _b_device,
+    "flags": _b_flags,
+    "logs": _b_logs,
+    "insights": _b_insights,
+    "prompt_budget": _b_prompt_budget,
+    "reasoning": _b_reasoning,
+    "approvals": _b_approvals,
+    "tools": _b_tools,
+    "secrets": _b_secrets,
+    "worktree": _b_worktree,
+    "completions": _b_completions,
+    "tui_guidance": _b_tui_guidance,
+    "console_guidance": _b_console_guidance,
+    "mic_guidance": _b_mic_guidance,
+    "curator": _b_curator,
+    "update_status": _b_update_status,
+    "config_profiles": _b_config_profiles,
+    "model_profile_status": _b_model_profile_status,
+    "model_profile_test": _b_model_profile_test,
+    "speech_profile_test": _b_speech_profile_test,
+    "model_profile_local": _b_model_profile_local,
+    "model_profile_use": _b_model_profile_use,
+    "model_profile_realtime": _b_model_profile_realtime,
+    "model_profile_coding": _b_model_profile_coding,
+    "model_profile_local_only": _b_model_profile_local_only,
+    "migrate_status": _b_migrate_status,
+    "acp": _b_acp,
+    "lsp": _b_lsp,
+    "browser": _b_browser,
     "browser_tabs": _b_tabs,
-    "computer": _b_computer, "plugins_install": _b_plugins_install,
+    "computer": _b_computer,
+    "plugins_install": _b_plugins_install,
     "plugins_remote": _b_plugins_install,
-    "lessons": _b_lessons, "power_status": _b_power_status,
-    "websites": _b_websites, "task_run": _b_task_run,
-    "schedules": _b_schedules, "files": _b_files, "ide": _b_ide,
+    "lessons": _b_lessons,
+    "power_status": _b_power_status,
+    "websites": _b_websites,
+    "task_run": _b_task_run,
+    "schedules": _b_schedules,
+    "files": _b_files,
+    "ide": _b_ide,
     "git": _b_git,
-    "actions": _b_actions, "ghost": _b_ghost, "opencode": _b_opencode,
-    "verified": _b_verified, "experiments": _b_experiments,
-    "product": _b_product, "package": _b_package, "webui": _b_webui,
+    "actions": _b_actions,
+    "ghost": _b_ghost,
+    "opencode": _b_opencode,
+    "verified": _b_verified,
+    "experiments": _b_experiments,
+    "product": _b_product,
+    "package": _b_package,
+    "webui": _b_webui,
     "reports": _b_reports,
-    "frontier_chat": _b_frontier_chat, "frontier_show": _b_frontier_show,
+    "frontier_chat": _b_frontier_chat,
+    "frontier_show": _b_frontier_show,
     "commands": _b_commands,
-    "audio_hw": _b_audio_hw, "loop": _b_loop,
+    "audio_hw": _b_audio_hw,
+    "loop": _b_loop,
     "wake": _b_wake,
-    "device_enroll": _b_device_enroll, "branding": _b_branding,
-    "node_host": _b_node_host, "task_ledger": _b_task_ledger,
-    "media_gen": _b_media_gen, "local_models": _b_local_models,
-    "plugin_runtime": _b_plugin_runtime, "channels": _b_channels,
+    "device_enroll": _b_device_enroll,
+    "branding": _b_branding,
+    "node_host": _b_node_host,
+    "task_ledger": _b_task_ledger,
+    "media_gen": _b_media_gen,
+    "local_models": _b_local_models,
+    "plugin_runtime": _b_plugin_runtime,
+    "channels": _b_channels,
     "plugin_fleet": _b_plugin_fleet,
     "acp_client": _b_acp_client,
-    "file_transfer": _b_file_transfer, "active_memory": _b_active_memory,
-    "doc_extract": _b_doc_extract, "question_prompt": _b_question_prompt,
+    "file_transfer": _b_file_transfer,
+    "active_memory": _b_active_memory,
+    "doc_extract": _b_doc_extract,
+    "question_prompt": _b_question_prompt,
     "session_share": _b_session_share,
     "browser_profiles": _b_browser_profiles,
     "computer_screen": _b_computer_screen,
@@ -3793,17 +4153,29 @@ def _sum_msg_send(result):
     return f"Message sent, receipt {str(msg.get('id', ''))[:12]}."
 
 
-def _sum_vision(result):
-    desc = str(result.get("description", ""))[:300]
-    restored = "resident model restored" if result.get("resident_restored") else \
-        "resident restore unverified"
-    return f"Image described: {desc} {restored}."
-
-
 def _sum_pairing_create(result):
     code = str(result.get("code", ""))
     grouped = " ".join(code[i:i + 4] for i in range(0, len(code), 4))
     return f"Your pairing code is {grouped}. It expires in ten minutes."
+
+
+def _sum_kanban_stores(result):
+    if not isinstance(result, dict):
+        return "Kanban store status unavailable."
+    native = result.get("native", {})
+    vendored = result.get("vendored", {})
+    return (f"Qubit kanban store is authoritative with "
+            f"{native.get('task_count', 0)} tasks; the legacy kanban store "
+            f"has {vendored.get('task_count', 0)}.")
+
+
+def _sum_kanban_migrate(result):
+    if not isinstance(result, dict):
+        return "Kanban migration did not return a result."
+    if result.get("dry_run"):
+        return f"Dry run: {result.get('imported', 0)} tasks would migrate."
+    return (f"Migrated {result.get('imported', 0)} tasks into the Qubit "
+            f"kanban store; skipped {result.get('skipped', 0)}.")
 
 
 def _sum_kanban_task(result):
@@ -4171,13 +4543,41 @@ def _sum_plugin_fleet(result):
     return "Plugin fleet result recorded."
 
 
+def _sum_model_profile(result):
+    """Voice summary for resolver-backed model-profile intents."""
+    if not isinstance(result, dict):
+        return "Model profile updated."
+    mp = result.get("model_profile")
+    if not isinstance(mp, dict):
+        return "Model profile updated."
+    model = mp.get("model")
+    if isinstance(model, dict):
+        eff = model.get("effective", {}) if isinstance(
+            model.get("effective"), dict) else {}
+        if model.get("state") != "OK":
+            return f"Model status {model.get('code', model.get('state', '?'))}."
+        return (f"Active model {eff.get('profile_id', '?')} "
+                f"({eff.get('provider', '?')}/{eff.get('model', '?')}).")
+    if mp.get("local_only"):
+        return "Local-only mode: session overrides cleared."
+    if mp.get("gate") is not None and mp.get("effective") is not None:
+        state = str(mp.get("state", "OK"))
+        return (f"Profile {mp.get('profile', '?')} preflight {state}.")
+    if str(mp.get("state", "OK")) in ("FAILED", "UNAVAILABLE", "DENIED"):
+        return f"Model profile {mp.get('code', mp.get('state'))}."
+    pid = mp.get("profile") or mp.get("profile_id") or "selected"
+    return f"Model profile {pid} selected for this session."
+
+
 _SUMMARIES = {
     "generic": _generic_summary,
     "status": _sum_status,
     "task": _sum_task,
     "sessions": _sum_sessions,
     "msg_send": _sum_msg_send,
-    "vision": _sum_vision,
+    "pairing_create": _sum_pairing_create,
+    "kanban_stores": _sum_kanban_stores,
+    "kanban_migrate": _sum_kanban_migrate,
     "kanban_task": _sum_kanban_task,
     "board": _sum_board,
     "runtime": _sum_runtime,
@@ -4200,6 +4600,7 @@ _SUMMARIES = {
     "guidance": _sum_guidance,
     "audio_hw": _sum_audio_hw,
     "plugin_fleet": _sum_plugin_fleet,
+    "model_profile": _sum_model_profile,
 }
 
 
@@ -5319,6 +5720,18 @@ _E("kanban_archive", "Archive task",
    fixed=(("action", "archive"),), confirm=True,
    examples=("qubit, archive task 3",),
    help="Archive a task (confirmed).")
+_E(
+    "kanban_restore",
+    "Restore task",
+    ("restore task", "unarchive task", "bring back task"),
+    "kanban",
+    ("kanban",),
+    args=(_I("task_id"),),
+    fixed=(("action", "restore"),),
+    confirm=True,
+    examples=("qubit, restore task 3",),
+    help="Restore an archived task to its prior column (confirmed).",
+)
 _E("kanban_stats", "Board stats",
    ("board stats", "task counts", "kanban stats"),
    "kanban", ("kanban",), args=(_S("board"),),
@@ -5331,11 +5744,41 @@ _E("kanban_log", "Board log",
    fixed=(("action", "log"),),
    examples=("qubit, board log",),
    help="Task event history.")
+_E("kanban_stores", "Kanban stores",
+   ("kanban stores", "which kanban store", "task board stores"),
+   "kanban", ("kanban",), fixed=(("action", "stores"),),
+   summary="kanban_stores",
+   examples=("qubit, which kanban store",),
+   help="Both kanban stores and the authoritative one.")
+_E("kanban_migrate", "Migrate kanban",
+   ("migrate kanban", "unify task boards", "import kanban tasks"),
+   "kanban", ("kanban",), args=(_S("dry_run"),),
+   fixed=(("action", "migrate"),), confirm=True,
+   summary="kanban_migrate",
+   examples=("qubit, unify task boards",),
+   help="Import legacy kanban tasks into the Qubit store (confirmed).")
 _E("kanban_export", "Export board",
    ("export board", "download tasks"),
    "kanban", ("kanban",), fixed=(("action", "export"),),
    examples=("qubit, export board",),
    help="Snapshot all boards and tasks.")
+_E(
+    "kanban_snapshots",
+    "List canvas snapshots",
+    (
+        "list canvas snapshots",
+        "board snapshots",
+        "list snapshots",
+        "show canvas snapshots",
+    ),
+    "kanban",
+    ("kanban",),
+    args=(_I("limit", required=False), _S("board")),
+    fixed=(("action", "snapshots"),),
+    examples=("qubit, list canvas snapshots",),
+    help="Newest-first canvas restore points for a board (read-only; "
+    "board defaults to main).",
+)
 _E("kanban_open", "Open the board",
    ("open the board", "show the board", "open my board",
     "show my board", "board view"),
@@ -5878,12 +6321,18 @@ _E("git_status", "Git status",
    fixed=(("action", "status"),),
    examples=("qubit, git status",),
    help="Porcelain status of the active project repo (read-only).")
-_E("git_log", "Recent commits",
-   ("recent commits", "git log", "commit history", "show commits"),
-   "git", ("git",),
-   fixed=(("action", "log"),),
-   examples=("qubit, recent commits",),
-   help="Bounded commit log of the active project repo (read-only).")
+_E(
+    "git_log",
+    "Recent commits",
+    ("recent commits", "git log", "commit history", "show commits"),
+    "git",
+    ("git",),
+    args=(_I("limit", required=False),),
+    fixed=(("action", "log"),),
+    examples=("qubit, recent commits", "qubit, recent commits 20"),
+    help="Bounded commit log of the active project repo (read-only; "
+    f"default {GIT_LOG_DEFAULT}, max 50).",
+)
 _E("git_diff", "Show uncommitted diff",
    ("show diff", "git diff", "uncommitted diff", "show changes"),
    "git", ("git",),
@@ -7244,20 +7693,34 @@ CLI_COVERAGE = {
     "run": ("loop_start",),
     "once": ("loop_start",),
     "task": ("task_run", "task_run_current"),
-    "schedules": ("schedules_create", "schedules_list", "schedules_show",
-                  "schedules_pause", "schedules_resume", "schedules_delete",
-                  "schedules_history", "schedules_run_due",
-                  "automation_status", "automation_orders",
-                  "automation_heartbeats", "automation_flows",
-                  "automation_scenarios", "automation_yield_pending",
-                  "automation_order_add", "automation_order_enable",
-                  "automation_order_disable", "automation_order_remove",
-                  "automation_heartbeat_add", "automation_flow_add",
-                  "automation_flow_run", "automation_qa_add",
-                  "automation_qa_run", "automation_yield_handoff",
-                  "automation_yield_resume"),
-    "files": ("files_inspect", "files_list", "files_read",
-              "file_patch_rollback"),
+    "schedules": (
+        "schedules_create",
+        "schedules_list",
+        "schedules_show",
+        "schedules_pause",
+        "schedules_resume",
+        "schedules_delete",
+        "schedules_history",
+        "schedules_run_due",
+        "automation_status",
+        "automation_orders",
+        "automation_heartbeats",
+        "automation_flows",
+        "automation_scenarios",
+        "automation_yield_pending",
+        "automation_order_add",
+        "automation_order_enable",
+        "automation_order_disable",
+        "automation_order_remove",
+        "automation_heartbeat_add",
+        "automation_flow_add",
+        "automation_flow_run",
+        "automation_qa_add",
+        "automation_qa_run",
+        "automation_yield_handoff",
+        "automation_yield_resume",
+    ),
+    "files": ("files_inspect", "files_list", "files_read", "file_patch_rollback"),
     "git": ("git_status", "git_log", "git_diff", "git_show"),
     "ide": ("ide_status", "ide_open"),
     "voice": ("commands_list",),
@@ -7269,81 +7732,181 @@ CLI_COVERAGE = {
     "approvals": ("approvals",),
     "verify-release": ("verify_release",),
     "checkpoints": ("checkpoints_list", "checkpoints_write"),
-    "sessions": ("sessions", "sessions_search", "session_show",
-                 "session_rename", "session_archive", "session_delete",
-                 "session_resume"),
+    "sessions": (
+        "sessions",
+        "sessions_search",
+        "session_show",
+        "session_rename",
+        "session_archive",
+        "session_delete",
+        "session_resume",
+    ),
     "capability": ("capability", "capabilities_list"),
     "roundtrip": ("roundtrip_test",),
     "enroll": ("enroll_voice",),
-    "verify": ("auth_verify", "verify_voice", "verify_release",
-               "branding_verify"),
+    "verify": ("auth_verify", "verify_voice", "verify_release", "branding_verify"),
     "flags": ("flags",),
     "flag-drill": ("flags",),
     "package": ("package_certify", "package_status"),
-    "product": ("product_status", "product_probe", "product_first_run",
-                "product_install", "product_migrate", "product_rollback",
-                "product_repair", "migrate_status"),
-    "audio": ("audio", "mic_test", "asr_test", "tts_test",
-              "wake_status"),
+    "product": (
+        "product_status",
+        "product_probe",
+        "product_first_run",
+        "product_install",
+        "product_migrate",
+        "product_rollback",
+        "product_repair",
+        "migrate_status",
+    ),
+    "audio": ("audio", "mic_test", "asr_test", "tts_test", "wake_status"),
     "mic-test": ("mic_test",),
     "asr-test": ("asr_test",),
     "tts-test": ("tts_test",),
-    "profile": ("config_profiles", "profile_show", "profile_check",
-                "profile_select", "profile_reset", "profile_upgrade",
-                "profile_remove", "profile_rollback"),
-    "branding": ("branding_plan", "branding_verify", "branding_migrate",
-                 "migrate_status"),
+    "profile": (
+        "config_profiles",
+        "profile_show",
+        "profile_check",
+        "profile_select",
+        "profile_reset",
+        "profile_upgrade",
+        "profile_remove",
+        "profile_rollback",
+    ),
+    "branding": (
+        "branding_plan",
+        "branding_verify",
+        "branding_migrate",
+        "migrate_status",
+    ),
     "permissions": ("permissions",),
-    "skills": ("skills_list", "skills_show", "skills_enable",
-               "skills_disable", "skills_remove", "skills_rollback",
-               "plugins_install", "plugins_remote_refusal",
-               "verified_list", "verified_show", "verified_recall",
-               "verified_verdict", "verified_pin", "verified_unpin",
-               "skills_workshop", "skills_workshop_backups",
-               "skills_workshop_curator", "skills_workshop_backup",
-               "skills_workshop_restore", "skills_workshop_rollback"),
-    "verified-skills": ("verified_list", "verified_show",
-                        "verified_recall", "verified_verdict",
-                        "verified_pin", "verified_unpin"),
+    "skills": (
+        "skills_list",
+        "skills_show",
+        "skills_enable",
+        "skills_disable",
+        "skills_remove",
+        "skills_rollback",
+        "plugins_install",
+        "plugins_remote_refusal",
+        "verified_list",
+        "verified_show",
+        "verified_recall",
+        "verified_verdict",
+        "verified_pin",
+        "verified_unpin",
+        "skills_workshop",
+        "skills_workshop_backups",
+        "skills_workshop_curator",
+        "skills_workshop_backup",
+        "skills_workshop_restore",
+        "skills_workshop_rollback",
+    ),
+    "verified-skills": (
+        "verified_list",
+        "verified_show",
+        "verified_recall",
+        "verified_verdict",
+        "verified_pin",
+        "verified_unpin",
+    ),
     "project": ("projects_list", "projects_show", "projects_active"),
-    "kanban": ("kanban_list", "kanban_show", "kanban_current",
-               "kanban_role_grant_voice", "kanban_role_revoke_voice",
-               "kanban_widget_move_voice", "kanban_snapshot_restore_voice",
-               "kanban_tab_list", "kanban_tab_create", "kanban_tab_rename",
-               "kanban_tab_delete", "kanban_tab_move", "kanban_widget_add",
-               "kanban_swarm", "kanban_watch", "kanban_dispatch"),
-    "computer-use": ("computer_status", "computer_screen",
-                     "computer_screen_panes", "computer_screen_arrange"),
-    "browser": ("browser_status", "browser_doctor", "browser_tabs",
-                "browser_read", "browser_find", "browser_screenshot",
-                "browser_open_browser",
-                "browser_activate", "browser_open", "browser_navigate",
-                "browser_fill", "browser_click", "browser_close_tab",
-                "browser_profiles", "browser_profile_create",
-                "browser_profile_open", "browser_profile_close",
-                "browser_profile_remove"),
-    "acp": ("acp", "acp_client_status", "acp_client_catalog",
-            "acp_client_configure", "acp_client_unconfigure",
-            "acp_client_handshake", "acp_client_send", "acp_client_receipts"),
+    "kanban": (
+        "kanban_list",
+        "kanban_show",
+        "kanban_current",
+        "kanban_role_grant_voice",
+        "kanban_role_revoke_voice",
+        "kanban_widget_move_voice",
+        "kanban_snapshot_restore_voice",
+        "kanban_tab_list",
+        "kanban_tab_create",
+        "kanban_tab_rename",
+        "kanban_tab_delete",
+        "kanban_tab_move",
+        "kanban_widget_add",
+        "kanban_snapshots",
+        "kanban_swarm",
+        "kanban_watch",
+        "kanban_dispatch",
+        "kanban_restore",
+    ),
+    "computer-use": (
+        "computer_status",
+        "computer_screen",
+        "computer_screen_panes",
+        "computer_screen_arrange",
+    ),
+    "browser": (
+        "browser_status",
+        "browser_doctor",
+        "browser_tabs",
+        "browser_read",
+        "browser_find",
+        "browser_screenshot",
+        "browser_open_browser",
+        "browser_activate",
+        "browser_open",
+        "browser_navigate",
+        "browser_fill",
+        "browser_click",
+        "browser_close_tab",
+        "browser_profiles",
+        "browser_profile_create",
+        "browser_profile_open",
+        "browser_profile_close",
+        "browser_profile_remove",
+    ),
+    "acp": (
+        "acp",
+        "acp_client_status",
+        "acp_client_catalog",
+        "acp_client_configure",
+        "acp_client_unconfigure",
+        "acp_client_handshake",
+        "acp_client_send",
+        "acp_client_receipts",
+    ),
     "lsp": ("lsp",),
-    "plugins": ("plugins_status", "plugins_list", "plugins_show",
-                "plugins_register", "plugins_invoke", "plugins_unregister",
-                "plugins_doctor"),
-    "channels": ("channels_status", "channels_catalog", "channels_accounts",
-                 "channels_configure", "channels_unconfigure",
-                 "channels_receive_refusal", "channels_doctor"),
+    "plugins": (
+        "plugins_status",
+        "plugins_list",
+        "plugins_show",
+        "plugins_register",
+        "plugins_invoke",
+        "plugins_unregister",
+        "plugins_doctor",
+    ),
+    "channels": (
+        "channels_status",
+        "channels_catalog",
+        "channels_accounts",
+        "channels_configure",
+        "channels_unconfigure",
+        "channels_receive_refusal",
+        "channels_doctor",
+    ),
     "theme": ("themes", "pets_downloads_refusal"),
     "proxy": ("proxy",),
     "hooks": ("hooks_list", "hooks_doctor", "hooks_emit"),
     "sync": ("sync_list", "sync_revoke_voice"),
-    "pairing": ("pairing_list", "pairing_create", "pairing_approve",
-                "pairing_revoke", "pairing_setup_code", "pairing_accept"),
+    "pairing": (
+        "pairing_list",
+        "pairing_create",
+        "pairing_approve",
+        "pairing_revoke",
+        "pairing_setup_code",
+        "pairing_accept",
+    ),
     "webhook": ("webhooks",),
     "msg": ("msg_accounts",),
     "brain": ("brain",),
-    "gateway": ("gateway", "gateway_supervision_refusal",
-                "gateway_supervision_request", "gateway_supervision_revert",
-                "gateway_discovery"),
+    "gateway": (
+        "gateway",
+        "gateway_supervision_refusal",
+        "gateway_supervision_request",
+        "gateway_supervision_revert",
+        "gateway_discovery",
+    ),
     "peer": ("peer_list", "peer_dm", "peer_run"),
     "tui": ("tui_help",),
     "vision": ("vision_status",),
@@ -7351,20 +7914,45 @@ CLI_COVERAGE = {
     "lessons": ("lessons_list", "lessons_promote", "lessons_remove"),
     "memory": ("memory_search",),
     "websites": ("websites_list", "websites_show", "web_fetch", "web_search"),
-    "actions": ("actions_list", "actions_show", "actions_check",
-                "actions_receipts", "actions_receipt", "actions_execute",
-                "actions_cancel"),
-    "ghost": ("ghost_list", "ghost_status", "ghost_show", "ghost_check",
-              "ghost_grant", "ghost_revoke", "ghost_execute",
-              "ghost_cancel", "ghost_receipts", "ghost_enable",
-              "ghost_disable", "ghost_estop", "ghost_reset"),
+    "actions": (
+        "actions_list",
+        "actions_show",
+        "actions_check",
+        "actions_receipts",
+        "actions_receipt",
+        "actions_execute",
+        "actions_cancel",
+    ),
+    "ghost": (
+        "ghost_list",
+        "ghost_status",
+        "ghost_show",
+        "ghost_check",
+        "ghost_grant",
+        "ghost_revoke",
+        "ghost_execute",
+        "ghost_cancel",
+        "ghost_receipts",
+        "ghost_enable",
+        "ghost_disable",
+        "ghost_estop",
+        "ghost_reset",
+    ),
     "power": ("power_status",),
-    "experiments": ("experiments_status", "experiments_list",
-                    "experiments_show", "experiments_register",
-                    "experiments_start", "experiments_trial",
-                    "experiments_finish", "experiments_signal",
-                    "experiments_abort", "experiments_snapshot",
-                    "experiments_promote", "experiments_evaluate"),
+    "experiments": (
+        "experiments_status",
+        "experiments_list",
+        "experiments_show",
+        "experiments_register",
+        "experiments_start",
+        "experiments_trial",
+        "experiments_finish",
+        "experiments_signal",
+        "experiments_abort",
+        "experiments_snapshot",
+        "experiments_promote",
+        "experiments_evaluate",
+    ),
     "export-state": (),
     "import-state": (),
     "device": ("device", "device_enroll"),
@@ -7372,41 +7960,95 @@ CLI_COVERAGE = {
     "webui": ("webui_status",),
     "setup": ("setup_check",),
     "frontier": ("model", "frontier_show", "frontier_chat"),
-    "opencode": ("opencode_status", "opencode_list", "opencode_show",
-                 "opencode_check", "opencode_grant", "opencode_revoke",
-                 "opencode_preview", "opencode_run", "opencode_cancel",
-                 "opencode_retry", "opencode_recover", "opencode_receipts"),
-    "runtime": ("runtime_images", "runtime_status", "runtime_doctor",
-                "runtime_install", "runtime_upgrade", "runtime_rollback",
-                "runtime_remove", "runtime_recover", "runtime_repair",
-                "runtime_history", "runtime_discovery",
-                "runtime_marketplace", "runtime_update_report"),
+    "opencode": (
+        "opencode_status",
+        "opencode_list",
+        "opencode_show",
+        "opencode_check",
+        "opencode_grant",
+        "opencode_revoke",
+        "opencode_preview",
+        "opencode_run",
+        "opencode_cancel",
+        "opencode_retry",
+        "opencode_recover",
+        "opencode_receipts",
+    ),
+    "runtime": (
+        "runtime_images",
+        "runtime_status",
+        "runtime_doctor",
+        "runtime_install",
+        "runtime_upgrade",
+        "runtime_rollback",
+        "runtime_remove",
+        "runtime_recover",
+        "runtime_repair",
+        "runtime_history",
+        "runtime_discovery",
+        "runtime_marketplace",
+        "runtime_update_report",
+    ),
     "egress": ("egress_status", "egress_check", "substitute_egress"),
     "policy": ("policy_conformance", "policy_attest"),
     "usage": ("usage_summary", "evaluation_telemetry"),
     "receipts": ("receipts_ledger",),
     "logbook": ("logbook_entries", "logbook_summary"),
-    "node": ("node_host_status", "node_host_list", "node_host_show",
-             "node_host_capabilities", "node_host_enroll", "node_host_revoke",
-             "node_host_dispatch"),
-    "tasks": ("task_ledger_status", "task_ledger_list", "task_ledger_show",
-              "task_ledger_timeline"),
+    "node": (
+        "node_host_status",
+        "node_host_list",
+        "node_host_show",
+        "node_host_capabilities",
+        "node_host_enroll",
+        "node_host_revoke",
+        "node_host_dispatch",
+    ),
+    "tasks": (
+        "task_ledger_status",
+        "task_ledger_list",
+        "task_ledger_show",
+        "task_ledger_timeline",
+    ),
     "media": ("media_gen_status", "media_gen_catalog", "media_gen_generate"),
-    "local-models": ("local_models_status", "local_models_hardware",
-                     "local_models_catalog", "local_models_jobs",
-                     "local_models_runtime_install", "local_models_download",
-                     "local_models_sideload", "local_models_server",
-                     "local_models_eject", "local_models_activate",
-                     "local_models_quickstart", "local_models_fallback",
-                     "local_models_resolve"),
-    "transfers": ("transfers_status", "transfers_list", "transfers_fetch",
-                  "transfers_plan", "transfers_resume"),
-    "recall": ("recall_status", "recall_policy_get", "recall_policy_set",
-               "recall_query", "recall_resolve", "recall_escalate"),
+    "local-models": (
+        "local_models_status",
+        "local_models_hardware",
+        "local_models_catalog",
+        "local_models_jobs",
+        "local_models_runtime_install",
+        "local_models_download",
+        "local_models_sideload",
+        "local_models_server",
+        "local_models_eject",
+        "local_models_activate",
+        "local_models_quickstart",
+        "local_models_fallback",
+        "local_models_resolve",
+    ),
+    "transfers": (
+        "transfers_status",
+        "transfers_list",
+        "transfers_fetch",
+        "transfers_plan",
+        "transfers_resume",
+    ),
+    "recall": (
+        "recall_status",
+        "recall_policy_get",
+        "recall_policy_set",
+        "recall_query",
+        "recall_resolve",
+        "recall_escalate",
+    ),
     "documents": ("documents_status", "documents_kinds", "documents_extract"),
     "ask": ("questions_status", "questions_ask", "questions_pending"),
-    "shares": ("shares_status", "shares_publish", "shares_list",
-               "shares_revoke", "shares_purge"),
+    "shares": (
+        "shares_status",
+        "shares_publish",
+        "shares_list",
+        "shares_revoke",
+        "shares_purge",
+    ),
     "agent": (),
 }
 
@@ -7880,6 +8522,80 @@ _FE("kanban_fleet_home_channels", "Vendored kanban channels",
     help="Home channel bindings of the vendored kanban plugin.")
 
 
+# ------------------------------------------------------ model-profile voice
+# Canonical resolver-backed spoken model/provider intents. A dedicated
+# registry keeps the dashboard-catalog mirror (REGISTRY) untouched while the
+# entries flow through the one resolve/execute/confirm pipeline, one journal,
+# one redactor, and one e-stop. Mutating selections are confirm-gated; voice
+# never accepts, echoes, or logs a raw API key (see execute()).
+MODEL_PROFILE_REGISTRY: Dict[str, VoiceCommand] = {}
+
+
+def _MP(entry_id: str, title: str, aliases: Tuple[str, ...], backend: str,
+        args: Tuple[VoiceArg, ...] = (),
+        fixed: Tuple[Tuple[str, str], ...] = (), confirm: bool = False,
+        examples: Tuple[str, ...] = (), help: str = "") -> VoiceCommand:
+    entry = VoiceCommand(id=entry_id, title=title, aliases=tuple(aliases),
+                         args=tuple(args), backend=backend,
+                         fixed=tuple(fixed), scope=("model-profile",),
+                         confirm=confirm, summary="model_profile",
+                         examples=tuple(examples), parity=(), help=help)
+    MODEL_PROFILE_REGISTRY[entry_id] = entry
+    return entry
+
+
+_MP("model_profile_local", "Use local brain",
+    ("use my local brain", "switch to my local brain", "use the local brain",
+     "go back to my local brain"),
+    "model_profile_local", fixed=(("role", "chat"),), confirm=True,
+    examples=("qubit, use my local brain",),
+    help="Select the shipped local model profile for this session (confirmed).")
+_MP("model_profile_research", "Use a named model for this session",
+    (r"rx:use (?:my )?([a-z0-9_\-]+) model for this session$",
+     r"rx:switch to (?:my )?([a-z0-9_\-]+) model for this session$"),
+    "model_profile_use", args=(_S("profile_id", True),), confirm=True,
+    examples=("qubit, use my research model for this session",),
+    help="Select a registered profile by name for this session (confirmed).")
+_MP("model_profile_active", "Active model and voice",
+    ("what model and voice are active", "which model and voice are active",
+     "what model is active", "what voice is active"),
+    "model_profile_status",
+    examples=("qubit, what model and voice are active?",),
+    help="Active model profile plus the active voice/STT/TTS records.")
+_MP("model_profile_test", "Test model profile",
+    ("test my model profile", "test the model profile",
+     "test my brain profile"),
+    "model_profile_test", args=(_S("profile_id"),),
+    examples=("qubit, test my model profile",),
+    help="Preflight the active (or named) language-model profile, read-only.")
+_MP("speech_profile_test", "Test speech profile",
+    ("test my speech profile", "test my voice profile",
+     "test the speech profile"),
+    "speech_profile_test", args=(_S("profile_id"), _S("kind")),
+    examples=("qubit, test my speech profile",),
+    help="Preflight the active (or named) speech profile (ASR/TTS/realtime), "
+         "read-only.")
+_MP("model_profile_realtime", "Use realtime voice profile",
+    ("use the realtime voice profile", "use my realtime voice profile",
+     "switch to the realtime voice profile", "use realtime voice"),
+    "model_profile_realtime", confirm=True,
+    examples=("qubit, use the realtime voice profile",),
+    help="Select the registered realtime voice profile (confirmed).")
+_MP("model_profile_coding", "Route this task with my coding model",
+    ("run this task with my coding model", "use my coding model for this task",
+     "run this with my coding model", "switch to my coding model",
+     "use my coding model"),
+    "model_profile_coding", args=(_S("profile_id"),), confirm=True,
+    examples=("qubit, run this task with my coding model",),
+    help="Select the coding-role profile for this session (confirmed).")
+_MP("model_profile_local_only", "Return to local-only mode",
+    ("return to local only mode", "return to local-only mode", "go local only",
+     "local only mode", "reset this session to defaults"),
+    "model_profile_local_only", confirm=True,
+    examples=("qubit, return to local-only mode",),
+    help="Clear this session's model overrides and reselect the local brain.")
+
+
 # ---------------------------------------------------------------- execution
 @dataclass
 class Outcome:
@@ -7942,6 +8658,21 @@ def execute(ctx, resolution: Resolution) -> Outcome:
     merged = dict(resolution.args)
     for key, value in (entry.fixed or ()):
         merged.setdefault(key, value)
+    # Model-profile intents must never take a raw key by voice. A pasted
+    # secret is refused typed BEFORE it can reach a journal, receipt, spoken
+    # summary, or audit meta — the secret stays out of every spoken path.
+    if entry.id in MODEL_PROFILE_REGISTRY:
+        from .providers.resolver import looks_like_raw_secret as _looks
+        for _v in merged.values():
+            if isinstance(_v, str) and _looks(_v):
+                _audit("rejected", ctx.actor,
+                       {"entry": entry.id, "reason": "raw_secret_argument",
+                        "session": ctx.session})
+                return Outcome(FAILED, entry,
+                               "I can't take an API key by voice. Store it as "
+                               "env:NAME or file:PATH, then run `qubit profile "
+                               "model create --key-ref env:NAME` or use the "
+                               "dashboard secret flow.", {})
     if entry.confirm:
         if entry.backend not in ESTOP_EXEMPT_BACKENDS and _estop(ctx.cfg):
             _audit("estop", ctx.actor,
@@ -8118,11 +8849,12 @@ def voice_say(cfg: Any, text: str, *, actor: str = "voice:user",
             out["candidates"] = [e.id for e in resolution.candidates]
         return out
     entry = resolution.entry
-    if entry.backend == "plugin_fleet":
-        # Wave-4 vendored-plugin entries are not dashboard_ops rows; they run
-        # through the shared execute/confirm pipeline so staging, session
-        # isolation, e-stop, redaction, and single-use confirmations are the
-        # exact same code path — not a parallel dispatcher.
+    if entry.backend == "plugin_fleet" or entry.id in MODEL_PROFILE_REGISTRY:
+        # Wave-4 vendored-plugin entries and the resolver-backed model-profile
+        # intents are not dashboard_ops rows; they run through the shared
+        # execute/confirm pipeline so staging, session isolation, e-stop,
+        # redaction, and single-use confirmations are the exact same code
+        # path — not a parallel dispatcher.
         ctx = make_ctx(cfg, actor=actor, session=session, source=source)
         out = execute(ctx, resolution)
         payload: Dict[str, Any] = {

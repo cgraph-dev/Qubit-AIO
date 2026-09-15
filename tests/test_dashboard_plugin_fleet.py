@@ -252,11 +252,11 @@ def test_frontend_discovers_and_merges_the_fleet():
 def test_served_spa_and_fleet_assets(tmp_path):
     ui, port = _start(tmp_path)
     try:
-        status, ctype, body = _get(port, "/hermes/")
+        status, ctype, body = _get(port, "/chat")
         assert status == 200 and "text/html" in ctype
         assert b'id="root"' in body
 
-        status, ctype, body = _get(port, "/hermes/plugins/fleet.json")
+        status, ctype, body = _get(port, "/plugins/fleet.json")
         assert status == 200, (status, body[:200])
         assert "application/json" in ctype
         fleet = {m["name"]: m for m in json.loads(body)}
@@ -265,11 +265,11 @@ def test_served_spa_and_fleet_assets(tmp_path):
 
         for name, (tab, _pos, entry, css) in FLEET_PLUGINS.items():
             status, ctype, body = _get(
-                port, f"/hermes/plugins/{name}/{entry}")
+                port, f"/plugins/{name}/{entry}")
             assert status == 200, (name, entry, status)
             assert "javascript" in ctype
             assert f'register("{name}"'.encode() in body, name
-            status, _ctype, body = _get(port, f"/hermes/plugins/{name}/{css}")
+            status, _ctype, body = _get(port, f"/plugins/{name}/{css}")
             assert status == 200 and body, (name, css, status)
     finally:
         ui.stop()
@@ -280,7 +280,7 @@ def test_served_spa_answers_every_baseline_route(tmp_path):
     try:
         for route in sorted(BASELINE_ROUTES) + ["/", "/docs", "/achievements",
                                                 "/kanban"]:
-            status, ctype, body = _get(port, "/hermes" + route)
+            status, ctype, body = _get(port, route)
             assert status == 200, (route, status)
             assert "text/html" in ctype, (route, ctype)
             assert b'id="root"' in body, route
@@ -297,17 +297,24 @@ def test_plugin_backend_route_dispatched_through_compat(tmp_path, monkeypatch):
     status, body = HC.dispatch(cfg, "GET", "/api/plugins/kanban/events", {}, {})
     assert status in (200, 202), (status, body)
     assert isinstance(body, dict) and body.get("ok") is True, body
+    # Real result, not route-existence: the op must execute and the feed must
+    # carry the event list (regression: passing the op envelope as ``events``
+    # silently disabled live board updates).
+    assert body.get("state") == "OK", body
+    assert isinstance(body.get("events"), list), body
 
 
 def test_plugin_backend_route_over_http_boundary(tmp_path):
     ui, port = _start(tmp_path)
     try:
         status, ctype, body = _get(
-            port, "/hermes/api/plugins/kanban/events", token="test-token")
+            port, "/agent/api/plugins/kanban/events", token="test-token")
         assert status == 200, (status, body[:200])
         assert "json" in ctype
         payload = json.loads(body)
         assert payload.get("ok") is True, payload
+        assert payload.get("state") == "OK", payload
+        assert isinstance(payload.get("events"), list), payload
     finally:
         ui.stop()
 

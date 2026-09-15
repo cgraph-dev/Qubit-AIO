@@ -4,14 +4,25 @@
 > projects, what we still want to build, and how to keep it smart/fast.
 > Keep in sync after each big change. Refresh with `graft build` if you use the
 > code graph.
+>
+> **Profile note (PV-08):** the English / HyperX / Piper / Brain4 values shown
+> below are the *current default machine profile* for this PC, not product
+> policy. Qubit resolves language, ASR, TTS, model/provider, realtime voice, and
+> audio device from one versioned profile registry; other profiles may select
+> other languages, devices, local/API models, and local/API/realtime voices,
+> all through the same Qubit session, broker, policy, audit, cancellation, and
+> e-stop path. Genuine upstream/open-source attribution below is provenance,
+> not product identity.
 
 ---
 
 ## 1. What this system IS (current)
 
-A **local, low-resource, English-only voice assistant** bridging your mic to
-agents/browsers/tools. Runs on the RTX 3070 Ti 8 GB + Ryzen 5700X, with a hard
-whole-agent budget of 5 GB VRAM maximum and a 4 GB steady-state target.
+A **local voice-assistant profile currently tuned for English** bridging your
+mic to agents/browsers/tools. The shown configuration is this machine's current
+default, not a product-wide immutable requirement. It runs on the RTX 3070 Ti
+8 GB + Ryzen 5700X, with a hard whole-agent budget of 5 GB VRAM maximum and a
+4 GB steady-state target.
 
 ### The pipeline (each turn)
 ```
@@ -20,10 +31,11 @@ mic (HyperX USB mono) --> 16k WAV
    -> [if empty: cached fallback]
    -> classifier (heuristic + optional LLM)
    -> route (local | agent | worker | browser | coding | conversation)
-   -> local model qubit-brain4 (Qwen3-4B sanitized artifact, resident)
+   -> active language-model profile (current default: local qubit-brain4)
       answers chat (~0.5s warm; personal facts served per-turn by the
       bounded context compiler — Packet 4B)
-   -> TTS piper en_US-amy (CPU, 22050Hz) -> resample -> default sink (HyperX IEC958)
+   -> active speech-output profile (current default: Piper en_US-amy)
+      -> resample -> default sink (HyperX IEC958)
 ```
 
 ### Key files
@@ -47,13 +59,23 @@ mic (HyperX USB mono) --> 16k WAV
   `/watch` (live activity tail), `/logs`, `/activity`
 - `events.jsonl` = source of truth; dashboard Activity/Reports/Logs read it.
 
+### Profile portability target (required, not yet evidence of completion)
+
+Qubit must resolve model, provider, ASR, TTS, realtime voice, device, language,
+quality, locality, egress, and fallback from one versioned profile registry.
+The current Brain4/Sherpa/Piper/HyperX setup is the default profile for this
+machine. Users with different hardware may choose a larger local model, a
+different local voice, an approved API language model, or an approved realtime
+voice provider. Those choices must still use the one Qubit session, broker,
+audit, cancellation, and e-stop path; they may not become direct side channels.
+
 ---
 
-## 2. Language & mic (current decisions)
-- **English only — THE single language policy** (decided Packet 0B; this file is
-  its authoritative statement): replies are English-only regardless of input
-  language; Romanian/mixed input is understood and answered in English; the
-  reply-guard retries if the model drifts out of English.
+## 2. Language & mic (current default profile)
+- **English is the current default profile language**, not an immutable product
+  policy. A future selected profile may support other languages once its ASR,
+  TTS, model, quality, and test evidence are registered. The current English
+  reply guard remains active for this profile.
   Resolved in Packet 4B: the baked Modelfile.qubit4 memory blocks (which
   contained EN+RO rules) were REMOVED — the artifact is now a minimal English
   persona and personal facts reach the model only through the bounded context

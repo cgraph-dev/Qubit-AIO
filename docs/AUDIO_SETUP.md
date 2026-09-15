@@ -1,8 +1,17 @@
-# Audio Setup — the WORKING configuration (keep; do not "help" break it)
+# Audio Setup — current default machine profile (this PC)
 
-> This is the verified-working audio config for the voice bridge on this PC.
-> Any operator or tool MUST read this BEFORE touching any
-> audio/mic/TTS setting. It took many hours to stabilise — do not reinvent it.
+> This is the verified-working audio config for the voice bridge on **this
+> machine**. It is the *current default machine profile*, not product policy:
+> Qubit resolves language, ASR, TTS, model/provider, realtime voice, and audio
+> device from the versioned profile registry, and an operator may select a
+> different device, language, local/API model, or local/API/realtime voice.
+> Those choices still run through the one Qubit session, broker, policy, audit,
+> cancellation, and e-stop path — they are adapters behind it, never side
+> channels. See `docs/VOICE_BRIDGE_SYSTEM.md` §1 and the profile portability
+> target for the profile-driven model.
+>
+> Any operator or tool MUST read this BEFORE touching any audio/mic/TTS
+> setting. It took many hours to stabilise — do not reinvent it.
 
 ## Hardware (currently connected)
 - **Mic**: **Focusrite Scarlett 2i2 4th Gen** USB interface into **AT2020
@@ -16,7 +25,7 @@
 - The **HyperX Cloud III headset** is no longer the active input; the effective
   config now pins the Scarlett by stable name.
 
-## The live config — `~/.config/qubit-voicebridge/voice.yaml`
+## The current default profile — `~/.config/qubit-voicebridge/voice.yaml`
 ```yaml
 mic:
   device: null              # never a transient PortAudio index
@@ -41,7 +50,12 @@ voicebridge audio status
 systemctl --user restart qubit-voicebridge.service
 ```
 
-## Critical rules (do NOT break)
+## Critical rules for this default profile (do NOT break)
+These rules are scoped to the current default machine profile (Scarlett/AT2020
+by stable name, follow-default sink). A different selected profile supplies its
+own device pins; the portable invariants are "resolve devices by name, never a
+transient index" and "follow the configured/default sink when nothing is
+pinned".
 1. **`audio.output_device` / `output_device_name` must stay EMPTY.** Device
    indices shift on every reconnect; pinning an index is what caused "I can't
    hear the agent." The resolver (2026-08-23) follows the **system default

@@ -99,6 +99,9 @@ _OP_CLI = (
     ("kanban", "delegated", "kanban_delegated",
      "delegated kanban subcommand guidance (read-only)",
      (("subcommand", {}),)),
+    ("kanban", "restore", "kanban_restore",
+     "restore an archived task (stages confirmation)",
+     (("task_id", {"type": int}),)),
     ("opencode", "run-confirmed", "opencode_run_confirmed",
      "apply a prepared OpenCode change by expected hash (stages confirmation)",
      (("task", {}), ("--project", {"default": ""}),
@@ -560,6 +563,103 @@ def build_parser() -> argparse.ArgumentParser:
     prof_roll.add_argument("--backup", type=Path, default=None)
     prof_roll.add_argument("--apply", action="store_true",
                            help="actually roll back (default: dry-run)")
+    # Canonical model/provider profiles (voicebridge.providers.resolver).
+    # Every mutation is dry-run unless --confirm; secrets are env:/file:
+    # references only (a raw key is refused with a typed error).
+    prof_model = prof_sub.add_parser(
+        "model", parents=[common],
+        help="canonical model/provider profiles (list/show/test/create/clone/"
+             "edit/activate/deactivate/rollback/remove)")
+    pmod_sub = prof_model.add_subparsers(dest="profile_model_command")
+    pmod_list = pmod_sub.add_parser("list", parents=[common],
+                                    help="list model profiles + effective selection")
+    pmod_list.add_argument("--json", action="store_true")
+    pmod_show = pmod_sub.add_parser("show", parents=[common],
+                                    help="show one model profile (read-only)")
+    pmod_show.add_argument("profile")
+    pmod_show.add_argument("--json", action="store_true")
+    pmod_test = pmod_sub.add_parser("test", parents=[common],
+                                    help="preflight a model profile (read-only; --probe runs a local ping)")
+    pmod_test.add_argument("profile")
+    pmod_test.add_argument("--probe", action="store_true")
+    pmod_test.add_argument("--json", action="store_true")
+    pmod_create = pmod_sub.add_parser(
+        "create", parents=[common],
+        help="create a model profile (dry-run unless --confirm; non-secret flags only)")
+    pmod_create.add_argument("--id", required=True)
+    pmod_create.add_argument("--kind", choices=["local", "api", "realtime"],
+                             default="local")
+    pmod_create.add_argument("--provider", default="ollama")
+    pmod_create.add_argument("--model", default=None)
+    pmod_create.add_argument("--base-url", default="")
+    pmod_create.add_argument("--key-ref", default="",
+                             help="secret reference env:NAME or file:PATH (never a raw value)")
+    pmod_create.add_argument("--locality", choices=["local", "external"],
+                             default=None)
+    pmod_create.add_argument("--egress-consent", choices=["deny", "allow"],
+                             default=None)
+    pmod_create.add_argument("--roles", default=None,
+                             help="comma-separated roles (chat,hard,coding,tool,summarize,vision,classify)")
+    pmod_create.add_argument("--context-tokens", type=int, default=4096)
+    pmod_create.add_argument("--confirm", action="store_true",
+                             help="actually persist (default: dry-run)")
+    pmod_create.add_argument("--json", action="store_true")
+    pmod_clone = pmod_sub.add_parser(
+        "clone", parents=[common],
+        help="clone a model profile under a new id (dry-run unless --confirm)")
+    pmod_clone.add_argument("source")
+    pmod_clone.add_argument("new")
+    pmod_clone.add_argument("--confirm", action="store_true")
+    pmod_clone.add_argument("--json", action="store_true")
+    pmod_edit = pmod_sub.add_parser(
+        "edit", parents=[common],
+        help="edit a model profile (dry-run unless --confirm; non-secret flags only)")
+    pmod_edit.add_argument("profile")
+    pmod_edit.add_argument("--kind", choices=["local", "api", "realtime"],
+                           default=None)
+    pmod_edit.add_argument("--provider", default=None)
+    pmod_edit.add_argument("--model", default=None)
+    pmod_edit.add_argument("--base-url", default=None)
+    pmod_edit.add_argument("--key-ref", default=None,
+                           help="secret reference env:NAME or file:PATH (never a raw value)")
+    pmod_edit.add_argument("--locality", choices=["local", "external"],
+                           default=None)
+    pmod_edit.add_argument("--egress-consent", choices=["deny", "allow"],
+                           default=None)
+    pmod_edit.add_argument("--roles", default=None)
+    pmod_edit.add_argument("--context-tokens", type=int, default=None)
+    pmod_edit.add_argument("--confirm", action="store_true")
+    pmod_edit.add_argument("--json", action="store_true")
+    pmod_activate = pmod_sub.add_parser(
+        "activate", parents=[common],
+        help="select a profile for a session/role (dry-run unless --confirm)")
+    pmod_activate.add_argument("profile")
+    pmod_activate.add_argument("--session", default="cli")
+    pmod_activate.add_argument("--role", default="chat")
+    pmod_activate.add_argument("--confirm", action="store_true")
+    pmod_activate.add_argument("--json", action="store_true")
+    pmod_deactivate = pmod_sub.add_parser(
+        "deactivate", parents=[common],
+        help="clear a session profile override (dry-run unless --confirm)")
+    pmod_deactivate.add_argument("--session", default="cli")
+    pmod_deactivate.add_argument("--role", default="*",
+                                 help="role to clear, or * for the whole session")
+    pmod_deactivate.add_argument("--confirm", action="store_true")
+    pmod_deactivate.add_argument("--json", action="store_true")
+    pmod_rollback = pmod_sub.add_parser(
+        "rollback", parents=[common],
+        help="select a profile's rollback target for a session (dry-run unless --confirm)")
+    pmod_rollback.add_argument("profile")
+    pmod_rollback.add_argument("--session", default="cli")
+    pmod_rollback.add_argument("--role", default="chat")
+    pmod_rollback.add_argument("--confirm", action="store_true")
+    pmod_rollback.add_argument("--json", action="store_true")
+    pmod_remove = pmod_sub.add_parser(
+        "remove", parents=[common],
+        help="remove a non-default model profile (dry-run unless --confirm)")
+    pmod_remove.add_argument("profile")
+    pmod_remove.add_argument("--confirm", action="store_true")
+    pmod_remove.add_argument("--json", action="store_true")
     brand = add("branding", help="Qubit VoiceBridge branding migration (dry-run/backup/verify/rollback)")
     brand_sub = brand.add_subparsers(dest="branding_command")
     brand_plan = brand_sub.add_parser("plan", parents=[common],
@@ -718,6 +818,11 @@ def build_parser() -> argparse.ArgumentParser:
     kb_sub.add_parser("init", parents=[common],
                       help="create the board store if missing (idempotent)")
     kb_sub.add_parser("boards", parents=[common], help="list boards")
+    kb_sub.add_parser("stores", parents=[common],
+                      help="show both kanban stores and the authoritative one")
+    kb_migrate = kb_sub.add_parser(
+        "migrate", parents=[common],
+        help="import legacy kanban tasks into the Qubit store")
     kb_bc = kb_sub.add_parser("boards-create", parents=[common],
                               help="create a board (dry-run unless --confirm)")
     kb_bc.add_argument("slug")
@@ -1257,6 +1362,32 @@ def build_parser() -> argparse.ArgumentParser:
                          choices=["", "draft", "approved", "queued", "sent", "failed"])
     mg_show = mg_sub.add_parser("show", parents=[common], help="show one message")
     mg_show.add_argument("msg_id")
+    # OC-D16: dynamic Feishu agent routing records (local, credential-reference
+    # only). Sending as an agent needs the operator-injected open-platform
+    # transport; without it the op is a typed MSG_TRANSPORT_UNAVAILABLE.
+    fa_add = mg_sub.add_parser("feishu-agent-add", parents=[common],
+                               help="record a dynamic Feishu agent route (dry-run unless --confirm)")
+    fa_add.add_argument("agent_id")
+    fa_add.add_argument("--app-id-ref", required=True,
+                        help="env:VAR or file:PATH reference (never a value)")
+    fa_add.add_argument("--allowlist", default="",
+                        help="comma/space-separated chat allowlist")
+    fa_add.add_argument("--commands", default="",
+                        help="comma/space-separated command allowlist")
+    fa_add.add_argument("--confirm", action="store_true")
+    mg_sub.add_parser("feishu-agent-list", parents=[common],
+                      help="list dynamic Feishu agent routes (read-only)")
+    fa_rm = mg_sub.add_parser("feishu-agent-remove", parents=[common],
+                              help="remove a dynamic Feishu agent route (dry-run unless --confirm)")
+    fa_rm.add_argument("agent_id")
+    fa_rm.add_argument("--confirm", action="store_true")
+    fa_send = mg_sub.add_parser("feishu-send-as-agent", parents=[common],
+                                help="send as a dynamic Feishu agent (needs live transport; --confirm)")
+    fa_send.add_argument("agent_id")
+    fa_send.add_argument("--account", required=True)
+    fa_send.add_argument("--to", required=True)
+    fa_send.add_argument("--body", required=True)
+    fa_send.add_argument("--confirm", action="store_true")
     vo = add("voice", help="Voice command registry (resolve/execute/confirm/cancel)")
     vo_sub = vo.add_subparsers(dest="voice_command")
     vo_say = vo_sub.add_parser("say", parents=[common],
@@ -1521,6 +1652,31 @@ def build_parser() -> argparse.ArgumentParser:
                                  help="export active memory records to private JSON")
     mem_exp.add_argument("--out", type=Path, default=None)
     mem_exp.add_argument("--scope", default=None)
+    # OC-48 local part: markdown workspace memory + offline dreaming. The
+    # external LanceDB/Wiki/Honcho-style sync providers stay a typed local-only
+    # refusal (see `workspace-providers`), so no credential is ever needed for
+    # the local surface.
+    mem_wsl = mem_sub.add_parser("workspace-list", parents=[common],
+                                 help="list markdown workspace notes (read-only)")
+    mem_wsl.add_argument("--tag", default="")
+    mem_wss = mem_sub.add_parser("workspace-show", parents=[common],
+                                 help="show one workspace note (read-only)")
+    mem_wss.add_argument("name")
+    mem_wsw = mem_sub.add_parser("workspace-write", parents=[common],
+                                 help="write a workspace note (dry-run unless --confirm)")
+    mem_wsw.add_argument("name")
+    mem_wsw.add_argument("--body", required=True)
+    mem_wsw.add_argument("--tag", action="append", default=[])
+    mem_wsw.add_argument("--confirm", action="store_true")
+    mem_wsf = mem_sub.add_parser("workspace-forget", parents=[common],
+                                 help="forget a workspace note (dry-run unless --confirm)")
+    mem_wsf.add_argument("name")
+    mem_wsf.add_argument("--confirm", action="store_true")
+    mem_wsd = mem_sub.add_parser("workspace-dream", parents=[common],
+                                 help="offline consolidate workspace notes (dry-run unless --confirm)")
+    mem_wsd.add_argument("--confirm", action="store_true")
+    mem_sub.add_parser("workspace-providers", parents=[common],
+                       help="workspace-memory providers (external sync typed local-only)")
     ws = add("websites", help="Packet 8E website-integration onboarding (proposal/observability, no live adapter)")
     ws_sub = ws.add_subparsers(dest="websites_command")
     ws_human = argparse.ArgumentParser(add_help=False)
@@ -4467,12 +4623,189 @@ def _cmd_audio(cfg, args) -> int:
     return 2
 
 
+_PROFILE_MODEL_SECRET_GUIDANCE = (
+    "key_ref must be a secret reference (env:NAME or file:PATH), never a raw "
+    "key value. Put the key in your environment or an owner-only file first; "
+    "secrets are never written to a profile, command history, a transcript, or "
+    "the audit log.")
+
+
+def _profile_model_emit(out) -> int:
+    import json as _json
+
+    print(_json.dumps(out, indent=2, sort_keys=True))
+    state = str(out.get("state", "OK"))
+    ok = out.get("ok", True)
+    return 0 if ok is not False and state in (
+        "OK", "VALID", "DEGRADED", "dry_run") else 2
+
+
+def _profile_model_key_ref_guard(key_ref):
+    """Typed refusal for a raw secret value; None when the ref is safe."""
+    from .providers import resolver as R
+
+    ref = str(key_ref or "").strip()
+    if not ref:
+        return None
+    if R.looks_like_raw_secret(ref):
+        return {"state": "FAILED", "code": "RAW_SECRET_REFUSED",
+                "detail": "refused a raw secret value. " +
+                          _PROFILE_MODEL_SECRET_GUIDANCE}
+    if not R.is_secret_ref(ref):
+        return {"state": "FAILED", "code": "BAD_SECRET_REF",
+                "detail": _PROFILE_MODEL_SECRET_GUIDANCE}
+    return None
+
+
+def _profile_model_roles(text):
+    from .providers import resolver as R
+
+    if text is None:
+        return None
+    roles = [r.strip() for r in str(text).replace(" ", ",").split(",")
+             if r.strip()]
+    return roles or [R.DEFAULT_ROLE]
+
+
+def _cmd_profile_model(cfg, args) -> int:
+    """qubit profile model list|show|test|create|clone|edit|activate|
+    deactivate|rollback|remove — canonical resolver-backed model profiles.
+
+    Reads execute; mutations are dry-run unless --confirm. Secrets are
+    ``env:``/``file:`` references only: a raw key is refused with a typed
+    error before anything is written.
+    """
+    import dataclasses
+    import json as _json
+
+    from .providers import resolver as R
+
+    cmd = getattr(args, "profile_model_command", None) or "list"
+    try:
+        if cmd == "list":
+            out = R.list_profiles(cfg)
+            if getattr(args, "json", False):
+                return _profile_model_emit(out)
+            print(f"{'id':<24} {'kind':<9} {'provider':<12} {'model':<26} "
+                  f"{'locality':<9} {'gate':<8} default")
+            for p in out["profiles"]:
+                print(f"{p['id']:<24} {p['kind']:<9} {p['provider']:<12} "
+                      f"{str(p['model']):<26} {p['locality']:<9} "
+                      f"{p['gate']:<8} {'yes' if p['default'] else ''}")
+            print("count:", out["count"])
+            return 0
+        if cmd == "show":
+            return _profile_model_emit(R.show_profile(cfg, args.profile))
+        if cmd == "test":
+            return _profile_model_emit(
+                R.test_profile(cfg, args.profile, probe=bool(args.probe)))
+        if cmd == "create":
+            guard = _profile_model_key_ref_guard(args.key_ref)
+            if guard:
+                return _profile_model_emit(guard)
+            kind = args.kind or R.LOCAL
+            profile = R.ModelProfile(
+                id=args.id, kind=kind,
+                provider=args.provider or "ollama",
+                model=args.model if args.model is not None else args.id,
+                base_url=args.base_url or "",
+                key_ref=str(args.key_ref or "").strip(),
+                context_tokens=int(args.context_tokens or 4096),
+                # Honest capability default: the local runner streams, the
+                # external request/response adapter does not.
+                supports_streaming=(kind == R.LOCAL),
+                locality=args.locality or
+                ("local" if kind == R.LOCAL else "external"),
+                egress_consent=args.egress_consent or "deny",
+                roles=_profile_model_roles(args.roles) or [R.DEFAULT_ROLE])
+            return _profile_model_emit(
+                R.upsert_model_profile(cfg, profile, confirm=bool(args.confirm)))
+        if cmd == "clone":
+            return _profile_model_emit(
+                R.clone_model_profile(cfg, args.source, args.new,
+                                      confirm=bool(args.confirm)))
+        if cmd == "edit":
+            p = R.get_profile(cfg, args.profile)
+            if p is None:
+                raise R.ResolverError(
+                    "UNKNOWN_PROFILE", f"no model profile {args.profile!r}")
+            if p.default:
+                raise R.ResolverError(
+                    "IMMUTABLE_DEFAULT",
+                    "the shipped default profile is a record, not a file: "
+                    "clone it to a new id and edit the clone")
+            if args.key_ref is not None:
+                guard = _profile_model_key_ref_guard(args.key_ref)
+                if guard:
+                    return _profile_model_emit(guard)
+            changes = {}
+            for attr in ("kind", "provider", "model", "base_url",
+                         "context_tokens"):
+                val = getattr(args, attr, None)
+                if val is not None:
+                    changes[attr] = val
+            if args.key_ref is not None:
+                changes["key_ref"] = str(args.key_ref or "").strip()
+            if args.roles is not None:
+                changes["roles"] = _profile_model_roles(args.roles)
+            if args.locality is not None:
+                changes["locality"] = args.locality
+            if args.egress_consent is not None:
+                changes["egress_consent"] = args.egress_consent
+            new_kind = changes.get("kind", p.kind)
+            if args.locality is None:
+                if new_kind == R.LOCAL and p.locality != "local":
+                    changes["locality"] = "local"
+                elif new_kind != R.LOCAL and p.locality != "external":
+                    changes["locality"] = "external"
+            edited = dataclasses.replace(p, **changes)
+            return _profile_model_emit(
+                R.upsert_model_profile(cfg, edited, confirm=bool(args.confirm)))
+        if cmd == "activate":
+            return _profile_model_emit(R.set_session_profile(
+                cfg, args.session, args.profile, role=args.role,
+                confirm=bool(args.confirm)))
+        if cmd == "deactivate":
+            if not args.confirm:
+                return _profile_model_emit(
+                    {"state": "OK", "dry_run": True, "action": "would clear",
+                     "session": args.session, "role": args.role})
+            return _profile_model_emit(
+                R.clear_session_profile(cfg, args.session, role=args.role))
+        if cmd == "rollback":
+            p = R.get_profile(cfg, args.profile)
+            if p is None:
+                raise R.ResolverError(
+                    "UNKNOWN_PROFILE", f"no model profile {args.profile!r}")
+            target = p.rollback_to or p.fallback_to
+            if not target:
+                raise R.ResolverError(
+                    "NO_ROLLBACK",
+                    f"profile {p.id!r} declares no rollback target")
+            return _profile_model_emit(R.set_session_profile(
+                cfg, args.session, target, role=args.role,
+                confirm=bool(args.confirm)))
+        if cmd == "remove":
+            return _profile_model_emit(R.remove_model_profile(
+                cfg, args.profile, confirm=bool(args.confirm)))
+        print(_json.dumps({"state": "FAILED", "code": "UNKNOWN_COMMAND",
+                           "detail": f"unknown profile model command {cmd!r}"},
+                          indent=2))
+        return 2
+    except R.ResolverError as exc:
+        detail = exc.to_dict()
+        detail["state"] = "FAILED"
+        return _profile_model_emit(detail)
+
+
 def _cmd_profile(cfg, args) -> int:
     """voicebridge profile list|show|check|install|select|reset|upgrade|
     remove|rollback. Dry-run by default; JSON output."""
     import json as _json
     from . import profiles as P
     cmd = getattr(args, "profile_command", None) or "list"
+    if cmd == "model":
+        return _cmd_profile_model(cfg, args)
     if cmd == "list":
         out = P.profiles_list(cfg)
         if getattr(args, "json", False):
@@ -4875,6 +5208,16 @@ def _cmd_kanban(cfg, args) -> int:
                  "widget-move", "widget-remove", "layout-set",
                  "role-grant", "role-revoke", "snapshot-restore"}
     try:
+        if cmd in ("stores", "migrate"):
+            from . import kanban_bridge as KBG
+            if cmd == "migrate" and KB.estop_engaged(cfg):
+                print(_json.dumps(KB.refuse_estop("kanban migrate"), indent=2))
+                return 3
+            out = (KBG.stores(cfg) if cmd == "stores"
+                   else KBG.migrate(cfg, dry_run=bool(
+                       getattr(args, "dry_run", False))))
+            print(_json.dumps(out, indent=2))
+            return 0
         if cmd in _MUTATING and KB.estop_engaged(cfg):
             print(_json.dumps(KB.refuse_estop(f"kanban {cmd}"), indent=2))
             return 3
@@ -5799,7 +6142,8 @@ def _cmd_msg(cfg, args) -> int:
     confirm = bool(getattr(args, "confirm", False))
     try:
         _MUT = {"account-add", "account-remove", "draft", "approve",
-                "send", "retry"}
+                "send", "retry", "feishu-agent-add", "feishu-agent-remove",
+                "feishu-send-as-agent"}
         if cmd in _MUT and MG.estop_engaged(cfg):
             print(_json.dumps(MG.refuse_estop(f"msg {cmd}"), indent=2))
             return 3
@@ -5852,6 +6196,24 @@ def _cmd_msg(cfg, args) -> int:
         elif cmd == "draft-reply":
             out = MG.draft_reply(cfg, args.msg_id, args.account, args.body,
                                  requested_by="cli:user", confirmed=confirm)
+        elif cmd == "feishu-agent-add":
+            out = MG.feishu_agent_add(cfg, args.agent_id,
+                                      app_id_ref=args.app_id_ref,
+                                      allowlist=args.allowlist,
+                                      commands=getattr(args, "commands", ""),
+                                      requested_by="cli:user",
+                                      confirmed=confirm)
+        elif cmd == "feishu-agent-list":
+            out = MG.feishu_agents(cfg)
+        elif cmd == "feishu-agent-remove":
+            out = MG.feishu_agent_remove(cfg, args.agent_id,
+                                         requested_by="cli:user",
+                                         confirmed=confirm)
+        elif cmd == "feishu-send-as-agent":
+            out = MG.feishu_send_as_agent(cfg, args.account, to=args.to,
+                                          body=args.body, agent_id=args.agent_id,
+                                          requested_by="cli:user",
+                                          confirmed=confirm)
         else:
             print(f"ERROR: unknown msg command {cmd!r}")
             return 2
@@ -6136,6 +6498,60 @@ def _cmd_voice(cfg, args) -> int:
     return 2
 
 
+def _cmd_memory_workspace(cfg, args, cmd: str) -> int:
+    """OC-48 local markdown workspace memory + offline dreaming (no creds)."""
+    import json as _json
+    from .memory import workspace as WS
+
+    confirm = bool(getattr(args, "confirm", False))
+    dry = bool(getattr(args, "dry_run", False))
+    try:
+        if cmd == "workspace-list":
+            out = WS.list_notes(cfg)
+            tag = (getattr(args, "tag", "") or "").strip()
+            if tag and isinstance(out.get("notes"), list):
+                out = dict(out)
+                out["notes"] = [n for n in out["notes"]
+                                if tag in (n.get("tags") or [])]
+        elif cmd == "workspace-show":
+            out = WS.read_note(cfg, args.name)
+        elif cmd == "workspace-providers":
+            out = WS.providers()
+        elif cmd == "workspace-write":
+            if dry:
+                out = {"state": "preview", "would": "memory workspace-write",
+                       "name": args.name}
+            else:
+                out = WS.write_note(cfg, args.name, args.body,
+                                    tags=getattr(args, "tag", []) or [],
+                                    requested_by="cli:user", confirmed=confirm)
+        elif cmd == "workspace-forget":
+            if dry:
+                out = {"state": "preview", "would": "memory workspace-forget",
+                       "name": args.name}
+            else:
+                out = WS.forget_note(cfg, args.name, requested_by="cli:user",
+                                     confirmed=confirm)
+        elif cmd == "workspace-dream":
+            if dry:
+                out = {"state": "preview", "would": "memory workspace-dream"}
+            else:
+                out = WS.dream(cfg, requested_by="cli:user", confirmed=confirm)
+        else:
+            print(f"ERROR: unknown memory command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except WS.WorkspaceError as exc:
+        rc = 3 if exc.code in (WS.CONFIRM_CODE, WS.ESTOP_CODE) else 2
+        print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                           "code": exc.code, "detail": exc.detail[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "workspace notes preserved"},
+                          indent=2))
+        return rc
+
+
 def _cmd_memory(cfg, args) -> int:
     """voicebridge memory status|enable|disable|set-provider|belief-record|
     belief-at|belief-conflicts|explain|journal-verify|journal-replay|export.
@@ -6154,6 +6570,8 @@ def _cmd_memory(cfg, args) -> int:
                          redact_secrets)
     from .memory.semantic import SEMANTIC_STATE_SCHEMA
     cmd = getattr(args, "memory_command", None) or "status"
+    if cmd.startswith("workspace-"):
+        return _cmd_memory_workspace(cfg, args, cmd)
     base = cfg.state_dir() / "memory"
     base.mkdir(parents=True, exist_ok=True)
     state_path = base / "semantic.json"

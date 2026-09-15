@@ -467,6 +467,25 @@ def extension_map_summary() -> Dict[str, object]:
 # Each entry records the real Qubit backend and the behavioural test that
 # exercises the production caller for a row closed since the audit.
 ROW_EVIDENCE: Dict[str, Dict[str, str]] = {
+    "OC-34": {
+        "qubit_backend": ("voicebridge/kanban.py create/_transition/archive_task/"
+                          "restore_task"),
+        "cli": "kanban",
+        "dashboard": "qubit-boards",
+        "voice": "kanban_*",
+        "status": "IMPLEMENTED",
+        "proving_test": "tests/test_qbpv2_oc_kanban_e2e.py",
+        "needs": "none",
+        "note": ("Full card lifecycle over one persisted SQLite store, reached "
+                 "by CLI/dashboard/voice: create, move, edit, assign, block, "
+                 "complete, archive, and restore (the OpenClaw workboard "
+                 "'Restore from archive' / unarchived event). Restore returns a "
+                 "task to its pre-archive column; every mutation is atomic, "
+                 "confirmation-gated, audited, and redacted. The CLI "
+                 "`kanban restore` binding exists (cli.py `_OP_CLI`) and is "
+                 "exercised end-to-end alongside the dashboard and voice "
+                 "surfaces in tests/test_qbpv2_oc_kanban_e2e.py."),
+    },
     "OC-04": {
         "qubit_backend": ("voicebridge/gateway_peers.py supervision_request/"
                           "supervision_revert/supervision_status"),
@@ -600,6 +619,17 @@ ROW_EVIDENCE: Dict[str, Dict[str, str]] = {
                  "and pending-handoff surfacing on the one scheduler tick; "
                  "configurable through the schedules 'automation:' directive."),
     },
+    # ---- Evidence-accuracy correction: the audited baseline wrote the CLI
+    # family name (``ask``) into the ``voice`` field, but the real spoken
+    # registry ids are ``questions_*`` (questions_status/questions_ask/
+    # questions_pending) over the same voicebridge/question_prompt.py backend.
+    "OC-D21": {
+        "voice": "questions_*",
+        "note": ("Bounded persisted contract; replay/expiry/estop gated. Spoken "
+                 "surface is questions_status/questions_ask/questions_pending "
+                 "(the registry ids), the same question_prompt backend as the "
+                 "CLI `ask` family."),
+    },
     # ---- Agent 5-10 wave: rows proven by the new module tests ----
     "OC-29": {
         "qubit_backend": ("voicebridge/hooks.py emit/declare/fire + lifecycle "
@@ -642,8 +672,9 @@ ROW_EVIDENCE: Dict[str, Dict[str, str]] = {
     },
     "OC-48": {
         "qubit_backend": ("voicebridge/memory/workspace.py write_note/read_note/"
-                          "list_notes/dream/providers"),
-        "cli": "",
+                          "list_notes/dream/providers; cli.py "
+                          "_cmd_memory_workspace"),
+        "cli": "memory workspace-*",
         "dashboard": "",
         "voice": "",
         "status": "PARTIAL",
@@ -676,8 +707,8 @@ ROW_EVIDENCE: Dict[str, Dict[str, str]] = {
                           "feishu_agents/feishu_agent_remove/"
                           "feishu_send_as_agent/_provider_request/_transport; "
                           "voicebridge/channels_inbound.py "
-                          "normalize_event/ingest"),
-        "cli": "msg",
+                          "normalize_event/ingest; cli.py feishu-agent-*"),
+        "cli": "msg, msg feishu-agent-*",
         "dashboard": "",
         "voice": "channels_*",
         "status": "PARTIAL",
@@ -1676,8 +1707,34 @@ def _finalize_terminal_statuses(
     return rows
 
 
+def _apply_live_voice_counts(rows: List[Dict[str, str]]) -> None:
+    """Keep OC-68's registry/guard counts equal to the live code surface.
+
+    The audited baseline froze the entry/guard count at generation time; the
+    voice registry keeps growing with each closed capability, so a hard-coded
+    number silently goes stale and overstates/understates the surface. Import
+    the real registry and refresh the row in place (no status is changed). If
+    the package is not importable the baseline text is left untouched.
+    """
+    try:
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+        from voicebridge import voice_commands as _VC  # local import on purpose
+        registry = len(_VC.REGISTRY)
+        guards = len(_VC.VOICE_GUARDS)
+    except Exception:  # pragma: no cover - source-only / import failure
+        return
+    for row in rows:
+        if row.get("id") != "OC-68":
+            continue
+        row["qubit_backend"] = (f"voicebridge/voice_commands.py REGISTRY "
+                                f"({registry}) + VOICE_GUARDS ({guards})")
+        row["voice"] = f"{registry} entries/{guards} guards"
+
+
 def build_ledger() -> Dict[str, object]:
     rows = _finalize_terminal_statuses(build_rows(), require_typed_code=True)
+    _apply_live_voice_counts(rows)
     by_status = Counter(r["status"] for r in rows)
     by_area = Counter(r["area"] for r in rows)
     return {

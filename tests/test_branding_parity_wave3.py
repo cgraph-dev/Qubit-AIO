@@ -274,7 +274,7 @@ def _get(port, path):
 def test_served_spa_shell_and_plugins_are_qubit_branded(tmp_path):
     ui, port = _start_webui(tmp_path)
     try:
-        status, ctype, body = _get(port, "/hermes/")
+        status, ctype, body = _get(port, "/chat")
         assert status == 200 and "text/html" in ctype
         html = body.decode("utf-8")
         assert "<title>Qubit Agent" in html, html[:200]
@@ -282,14 +282,14 @@ def test_served_spa_shell_and_plugins_are_qubit_branded(tmp_path):
             html = html.replace(token, "")
         assert not _residual(html), "served shell leaks an upstream product name"
 
-        status, ctype, body = _get(port, "/hermes/api/dashboard/plugins")
+        status, ctype, body = _get(port, "/agent/api/dashboard/plugins")
         assert status == 200 and "application/json" in ctype, (status, body[:200])
         # The endpoint returns {"plugins": [...]} when driven through the
         # served HTTP boundary (compat dispatch returns the bare list).
         plugins = json.loads(body)
         if isinstance(plugins, dict):
             plugins = plugins.get("plugins", [])
-        assert len(plugins) == 10, plugins
+        assert len(plugins) == 11, plugins
         for man in plugins:
             blob = f'{man.get("label", "")} {man.get("description", "")}'
             assert not _residual(blob), (man.get("name"), blob)

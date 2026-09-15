@@ -69,7 +69,7 @@ def _http(port, method, path, body=None, token="test-token"):
 def test_staged_mutation_is_409_never_2xx(tmp_path):
     ui, port = _start(tmp_path)
     try:
-        status, out = _http(port, "POST", "/hermes/api/ops/boards-create",
+        status, out = _http(port, "POST", "/agent/api/ops/boards-create",
                              {"board": "main", "name": "Main"})
         assert status == 409, (status, out)
         assert out.get("state") == "NEEDS_CONFIRMATION", out
@@ -83,30 +83,30 @@ def test_staged_mutation_is_409_never_2xx(tmp_path):
 def test_confirm_loop_executes_on_shared_journal(tmp_path):
     ui, port = _start(tmp_path)
     try:
-        _, staged = _http(port, "POST", "/hermes/api/ops/boards-create",
+        _, staged = _http(port, "POST", "/agent/api/ops/boards-create",
                            {"board": "main", "name": "Main"})
         cid = staged["confirmation_id"]
-        status, listed = _http(port, "GET", "/hermes/api/ops/approvals")
+        status, listed = _http(port, "GET", "/agent/api/ops/approvals")
         assert status == 200
         assert listed["count"] == 1
         assert listed["approvals"][0]["id"] == cid
         assert listed["approvals"][0]["capability"] == \
             "voice.kanban_boards_create"
-        status, done = _http(port, "POST", "/hermes/api/ops/confirm",
+        status, done = _http(port, "POST", "/agent/api/ops/confirm",
                               {"confirmation_id": cid})
         assert status == 200, (status, done)
         assert done.get("ok") is True and done.get("state") == "executed", \
             done
-        _, listed2 = _http(port, "GET", "/hermes/api/ops/approvals")
+        _, listed2 = _http(port, "GET", "/agent/api/ops/approvals")
         assert listed2["count"] == 0
         # Backend effect is real on the canonical store (same module as CLI).
-        status, boards = _http(port, "GET", "/hermes/api/ops/boards")
+        status, boards = _http(port, "GET", "/agent/api/ops/boards")
         assert status == 200
         result = boards.get("result", boards)
         assert any(b.get("board") == "main"
                    for b in result.get("boards", [])), result
         # Settle-once: confirming again cannot re-execute.
-        status, again = _http(port, "POST", "/hermes/api/ops/confirm",
+        status, again = _http(port, "POST", "/agent/api/ops/confirm",
                                {"confirmation_id": cid})
         assert status == 400, (status, again)
     finally:
@@ -117,15 +117,15 @@ def test_confirm_loop_executes_on_shared_journal(tmp_path):
 def test_cancel_settles_without_executing(tmp_path):
     ui, port = _start(tmp_path)
     try:
-        _, staged = _http(port, "POST", "/hermes/api/ops/boards-create",
+        _, staged = _http(port, "POST", "/agent/api/ops/boards-create",
                            {"board": "ghost", "name": "Ghost"})
         cid = staged["confirmation_id"]
-        status, out = _http(port, "POST", "/hermes/api/ops/cancel",
+        status, out = _http(port, "POST", "/agent/api/ops/cancel",
                              {"confirmation_id": cid})
         assert status == 200, (status, out)
-        _, listed = _http(port, "GET", "/hermes/api/ops/approvals")
+        _, listed = _http(port, "GET", "/agent/api/ops/approvals")
         assert listed["count"] == 0
-        _, boards = _http(port, "GET", "/hermes/api/ops/boards")
+        _, boards = _http(port, "GET", "/agent/api/ops/boards")
         result = boards.get("result", boards)
         assert all(b.get("board") != "ghost"
                    for b in result.get("boards", [])), result
@@ -137,11 +137,11 @@ def test_cancel_settles_without_executing(tmp_path):
 def test_confirm_unknown_id_is_typed(tmp_path):
     ui, port = _start(tmp_path)
     try:
-        status, out = _http(port, "POST", "/hermes/api/ops/confirm",
+        status, out = _http(port, "POST", "/agent/api/ops/confirm",
                              {"confirmation_id": "nope"})
         assert status == 400, (status, out)
         assert out.get("ok") is False
-        status, out = _http(port, "POST", "/hermes/api/ops/confirm", {})
+        status, out = _http(port, "POST", "/agent/api/ops/confirm", {})
         assert status == 400, (status, out)
         assert out.get("code") == "MALFORMED", out
     finally:
@@ -155,19 +155,19 @@ def test_model_set_retry_settles_staged_approval(tmp_path):
     the staged record is consumed settle-once."""
     ui, port = _start(tmp_path)
     try:
-        status, staged = _http(port, "POST", "/hermes/api/model/set",
+        status, staged = _http(port, "POST", "/agent/api/model/set",
                                 {"model": "qubit-brain4", "scope": "main"})
         assert status == 409, (status, staged)
         assert staged.get("confirm_required") is True, staged
-        _, before = _http(port, "GET", "/hermes/api/ops/approvals")
+        _, before = _http(port, "GET", "/agent/api/ops/approvals")
         assert before["count"] == 1
-        status, out = _http(port, "POST", "/hermes/api/model/set",
+        status, out = _http(port, "POST", "/agent/api/model/set",
                              {"model": "qubit-brain4", "scope": "main",
                               "confirm_expensive_model": True})
         # Either outcome proves the retry settled (not re-staged): the tmp
         # state has no such brain profile, so the backend honestly refuses.
         assert status in (200, 400), (status, out)
-        _, after = _http(port, "GET", "/hermes/api/ops/approvals")
+        _, after = _http(port, "GET", "/agent/api/ops/approvals")
         assert after["count"] == 0, after
     finally:
         ui.stop()
@@ -178,13 +178,13 @@ def test_banner_settles_pending_confirmation(tmp_path):
     pw = pytest.importorskip("playwright.sync_api")
     ui, port = _start(tmp_path)
     try:
-        _, staged = _http(port, "POST", "/hermes/api/ops/boards-create",
+        _, staged = _http(port, "POST", "/agent/api/ops/boards-create",
                            {"board": "main", "name": "Main"})
         assert staged.get("confirmation_id")
         with pw.sync_playwright() as p:
             browser = p.chromium.launch()
             page = browser.new_page(viewport={"width": 1440, "height": 900})
-            page.goto(f"http://127.0.0.1:{port}/hermes/boards",
+            page.goto(f"http://127.0.0.1:{port}/qubit-boards",
                       timeout=30000)
             page.wait_for_timeout(2500)
             banner = page.get_by_role("region",
@@ -197,7 +197,7 @@ def test_banner_settles_pending_confirmation(tmp_path):
             page.wait_for_timeout(2500)
             assert banner.count() == 0
             browser.close()
-        _, boards = _http(port, "GET", "/hermes/api/ops/boards")
+        _, boards = _http(port, "GET", "/agent/api/ops/boards")
         result = boards.get("result", boards)
         assert any(b.get("board") == "main"
                    for b in result.get("boards", [])), result
@@ -210,7 +210,7 @@ def test_approvals_require_auth(tmp_path):
     ui, port = _start(tmp_path)
     try:
         import urllib.request as _up
-        req = _up.Request("http://127.0.0.1:%d/hermes/api/ops/approvals"
+        req = _up.Request("http://127.0.0.1:%d/agent/api/ops/approvals"
                           % port, method="GET")
         try:
             with _up.urlopen(req, timeout=10) as r:

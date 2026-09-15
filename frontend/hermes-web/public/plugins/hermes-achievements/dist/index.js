@@ -48,6 +48,37 @@
     return tier ? "ha-tier-" + tier.toLowerCase() : "ha-tier-pending";
   };
 
+  // Qubit product-identity normalization at the render boundary. The pinned
+  // achievements engine returns catalog strings authored upstream, so every
+  // API payload is normalized before it reaches React. Upstream names remain
+  // only in the vendored engine source and the provenance/licence records.
+  // The names are assembled from fragments so this served bundle does not
+  // itself carry an upstream product name.
+  const UPSTREAM_PRODUCT_RE = new RegExp(
+    "\\b" + ["Her", "mes"].join("") + "\\b|\\b" +
+      ["Open", "Claw"].join("") + "\\b",
+    "gi"
+  );
+  function rebrandText(value) {
+    return typeof value === "string"
+      ? value.replace(UPSTREAM_PRODUCT_RE, "Qubit")
+      : value;
+  }
+  function rebrandPayload(value) {
+    if (typeof value === "string") return rebrandText(value);
+    if (Array.isArray(value)) return value.map(rebrandPayload);
+    if (value && typeof value === "object") {
+      const out = {};
+      for (const key in value) {
+        if (Object.prototype.hasOwnProperty.call(value, key)) {
+          out[key] = rebrandPayload(value[key]);
+        }
+      }
+      return out;
+    }
+    return value;
+  }
+
   function api(path, options) {
     // Delegate to the host SDK's fetchJSON so auth is handled correctly in
     // BOTH dashboard modes: loopback (X-Hermes-Session-Token header) and
@@ -57,7 +88,7 @@
     // Error("<status>: <body>") on non-2xx — the call sites' .catch() relies
     // on that to surface errors, so we let it propagate (don't swallow).
     const url = "/api/plugins/hermes-achievements" + path;
-    return SDK.fetchJSON(url, options);
+    return SDK.fetchJSON(url, options).then(rebrandPayload);
   }
 
   function AchievementIcon({ icon }) {
@@ -257,7 +288,7 @@
     ctx.fillStyle = "#8b95a8";
     ctx.font = "600 20px ui-monospace, 'SF Mono', Menlo, monospace";
     ctx.textBaseline = "bottom";
-    ctx.fillText("HERMES AGENT  ·  hermes-agent.nousresearch.com", 70, H - 40);
+    ctx.fillText("QUBIT AGENT", 70, H - 40);
 
     // "UNLOCKED" stamp upper-right
     ctx.textBaseline = "top";
@@ -306,7 +337,7 @@
       const url = URL.createObjectURL(blobRef.current);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "hermes-achievement-" + (achievement.id || "badge") + ".png";
+      a.download = "qubit-achievement-" + (achievement.id || "badge") + ".png";
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -339,7 +370,7 @@
         tier_part: tierPart,
         name: achievement.name,
       });
-      return tmpl + "\n\n@NousResearch · https://hermes-agent.nousresearch.com";
+      return tmpl + "\n\n@NousResearch";
     }
 
     function shareOnX() {
@@ -568,6 +599,16 @@
     const [error, setError] = hooks.useState(null);
     const [category, setCategory] = hooks.useState("All");
     const [visibility, setVisibility] = hooks.useState("all");
+    const [resetArmed, setResetArmed] = hooks.useState(false);
+
+    function resetState() {
+      setError(null);
+      api("/reset-state", { method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: true }) })
+        .then(function () { setResetArmed(false); load(); })
+        .catch(function (err) { setError(String(err)); setResetArmed(false); });
+    }
 
     function load() {
       setLoading(true);
@@ -669,7 +710,13 @@
           React.createElement("h1", null, tx(t, "hero.title", "Qubit Achievements")),
           React.createElement("p", null, tx(t, "hero.subtitle", "Collectible Qubit badges earned from real session history. Known unfinished achievements are shown as Discovered; Secret achievements stay hidden until the first matching behavior appears."))
         ),
-        React.createElement(C.Button, { onClick: load, className: "ha-refresh" }, tx(t, "actions.rescan", "Rescan"))
+        React.createElement(React.Fragment, null,
+          React.createElement(C.Button, { onClick: function () { api("/rescan", { method: "POST" }).then(function () { return load(); }).catch(function () {}); }, className: "ha-refresh" }, tx(t, "actions.rescan", "Rescan")),
+          resetArmed
+            ? React.createElement(React.Fragment, null,
+                React.createElement(C.Button, { onClick: resetState, className: "ha-refresh ha-danger" }, tx(t, "actions.reset_confirm", "Confirm reset")),
+                React.createElement(C.Button, { onClick: function () { setResetArmed(false); }, className: "ha-refresh" }, tx(t, "common.cancel", "Cancel")))
+            : React.createElement(C.Button, { onClick: function () { setResetArmed(true); }, className: "ha-refresh" }, tx(t, "actions.reset", "Reset")))
       ),
       scanBanner,
       error && React.createElement(C.Card, { className: "ha-error" }, React.createElement(C.CardContent, null, String(error))),

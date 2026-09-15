@@ -209,7 +209,7 @@ def test_page_root_served_spa(tmp_path):
     """`/` redirects into the served SPA shell (HTTP boundary)."""
     ui, port = _start(tmp_path)
     try:
-        status, ctype, body = _get(port, "/hermes/")
+        status, ctype, body = _get(port, "/chat")
         assert status == 200, (status, body[:200])
         assert "text/html" in ctype
         assert b'id="root"' in body
@@ -221,7 +221,7 @@ def test_page_docs_served_spa(tmp_path):
     """`/docs` is reachable through the served SPA shell (HTTP boundary)."""
     ui, port = _start(tmp_path)
     try:
-        status, ctype, body = _get(port, "/hermes/docs")
+        status, ctype, body = _get(port, "/docs")
         assert status == 200, (status, body[:200])
         assert "text/html" in ctype
         assert b'id="root"' in body
@@ -234,7 +234,7 @@ def test_page_backing_routes_over_http_boundary(tmp_path):
     ui, port = _start(tmp_path)
     try:
         for page, route in PAGE_BACKING.items():
-            status, _ctype, body = _get(port, "/hermes" + route)
+            status, _ctype, body = _get(port, "/agent" + route)
             assert status in (200, 202), (page, route, status, body[:200])
             json.loads(body)  # truthful, parseable success body
     finally:

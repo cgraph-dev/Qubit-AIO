@@ -1,16 +1,16 @@
 /**
  * ChatSessionList — a ChatGPT-style conversation switcher that sits beside
- * the embedded TUI on the dashboard Chat tab.
+ * the Qubit Chat transcript on the dashboard Chat tab.
  *
- * It lists the most recent sessions for the active management profile and
- * lets the user swap between them without leaving the Chat page. Selecting
- * a row sets `/chat?resume=<id>`; ChatPage treats the resume target as part
- * of the PTY identity, so the change tears down the current terminal child
- * and respawns it resuming that conversation (see ChatPage.tsx). The
- * "New session" action clears the resume param, which spawns a fresh PTY.
+ * It lists the most recent sessions from the Qubit-native chat-session store
+ * (`GET /api/qubit/chat/sessions`, `voicebridge.chat_transport`) — NOT the
+ * receipts `GET /api/sessions` store used by the Sessions page. Selecting a
+ * row sets `/chat?resume=<id>` and ChatPage loads that session's persisted
+ * SSE transcript from the same store. The "New session" action starts a
+ * fresh chat.
  *
- * Best-effort, like ChatSidebar: a failed fetch surfaces a small inline
- * error with a retry affordance and the terminal pane keeps working.
+ * Best-effort: a failed fetch surfaces a small inline error with a retry
+ * affordance and the transcript pane keeps working.
  *
  * This is a navigation surface, NOT a session-management one — delete,
  * rename, export, and bulk actions live on the Sessions page. Keeping this
@@ -26,29 +26,28 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { useI18n } from "@/i18n";
-import { api, type SessionInfo } from "@/lib/api";
+import { api, type ChatStoreSession } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
 
 const SESSION_LIMIT = 30;
 interface ChatSessionListProps {
-  /** Active resume target (the session currently shown in the terminal). */
+  /** Active resume target (the session currently shown in the transcript). */
   activeSessionId: string | null;
-  /** Management profile from the dashboard switcher — scopes the listing. */
+  /** Management profile from the dashboard switcher (chat store is single-
+   * principal; retained for interface compatibility with the host). */
   profile?: string;
   className?: string;
   /** Optional callback fired after a row is picked (e.g. close mobile sheet). */
   onPicked?: () => void;
   /**
-   * Starts a fresh chat. ChatPage supplies its `startFreshDashboardChat`,
-   * which clears `?resume` AND bumps the reconnect nonce so a brand-new PTY
-   * spawns even when the user is already on an unsaved fresh session. When
-   * omitted, we fall back to clearing the resume param ourselves.
+   * Starts a fresh chat. ChatPage clears `?resume` and resets the transcript;
+   * when omitted we clear the resume param ourselves.
    */
   onNewChat?: () => void;
 }
 
-function rowLabel(session: SessionInfo, untitled: string): string {
-  const title = session.title?.trim();
+function rowLabel(session: ChatStoreSession, untitled: string): string {
+  const title = session.name?.trim() || session.title?.trim();
   if (title && title !== "Untitled") return title;
   const preview = session.preview?.trim();
   if (preview) return preview;
@@ -57,27 +56,21 @@ function rowLabel(session: SessionInfo, untitled: string): string {
 
 export function ChatSessionList({
   activeSessionId,
-  profile,
   className,
   onPicked,
   onNewChat,
 }: ChatSessionListProps) {
   const { t } = useI18n();
   const [, setSearchParams] = useSearchParams();
-  const [sessions, setSessions] = useState<SessionInfo[] | null>(null);
+  const [sessions, setSessions] = useState<ChatStoreSession[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Bumped to force a refetch (after switching, on Refresh, on mount).
   const [reloadNonce, setReloadNonce] = useState(0);
 
-  // `profile` is read inside the fetch; it's part of the scope key so a
-  // profile switch refetches. The empty-string fallback keeps the dep
-  // stable when no profile is selected (default profile).
-  const scopeKey = profile ?? "";
-
   // Monotonic request token: only the most recent fetch is allowed to
-  // commit state, so a fast profile switch (or Refresh spam) can't land a
-  // stale list out of order.
+  // commit state, so a fast refresh (or Refresh spam) can't land a stale
+  // list out of order.
   const reqRef = useRef(0);
 
   const load = useCallback(() => {
@@ -85,19 +78,19 @@ export function ChatSessionList({
     setLoading(true);
     setError(null);
     api
-      .getSessions(SESSION_LIMIT, 0, scopeKey, "recent")
+      .listChatSessions(SESSION_LIMIT, 0)
       .then((res) => {
         if (reqRef.current !== myReq) return;
         setSessions(res.sessions);
       })
       .catch((e: Error) => {
         if (reqRef.current !== myReq) return;
-        setError(e.message || "failed to load sessions");
+        setError(e.message || "failed to load chat sessions");
       })
       .finally(() => {
         if (reqRef.current === myReq) setLoading(false);
       });
-  }, [scopeKey]);
+  }, []);
 
   useEffect(() => {
     // Dashboard data surfaces fetch from an effect on mount + scope change;
@@ -198,8 +191,8 @@ export function ChatSessionList({
                 {rowLabel(s, t.sessions.untitledSession)}
               </span>
               <span className="flex w-full items-center gap-1.5 text-[0.6875rem] text-text-tertiary">
-                <span>{timeAgo(s.last_active)}</span>
-                {s.message_count > 0 && (
+                <span>{timeAgo(s.last_active ?? s.started_at ?? 0)}</span>
+                {(s.message_count ?? 0) > 0 && (
                   <>
                     <span aria-hidden>·</span>
                     <span>{s.message_count} msgs</span>

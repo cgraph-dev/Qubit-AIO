@@ -291,7 +291,7 @@ def test_channel_http_ingress_hmac_auth(tmp_path, monkeypatch):
         ts2 = time.time()
         hdrs2 = {"X-Qubit-Signature": _sign(CHANNEL_SECRET, ts2, body2),
                  "X-Qubit-Timestamp": str(ts2)}
-        status, out = _post(port, "/hermes/channels/discord", body2, hdrs2)
+        status, out = _post(port, "/channels/discord", body2, hdrs2)
         assert status == 200 and out["state"] == "UNAVAILABLE"
         status, out = _post(port, "/channels/discord", body, hdrs)
         assert status == 409 and out["code"] == CI.REPLAY_CODE

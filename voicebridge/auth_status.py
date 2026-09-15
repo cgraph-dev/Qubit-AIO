@@ -26,6 +26,43 @@ AUDIT_CAP = 1000
 DETAIL_LIMIT = 160
 NAME_LIMIT = 120
 
+#: Explicit store boundary: one writable authority per domain. The chat
+#: transcript store (``voicebridge.chat_transport.ChatSessionStore``) owns
+#: conversation sessions + turns in ``chat_sessions.json``; this module's
+#: :class:`SessionStore` owns action-receipt lifecycle metadata in
+#: ``sessions.json``. They never share a file, a schema, or a record id
+#: namespace, and neither writes the other's records.
+CHAT_TRANSCRIPT_STORE = "chat_sessions.json"
+CHAT_TRANSCRIPT_SCHEMA = "qubit-chat-session/1"
+RECEIPT_SESSION_STORE = "sessions.json"
+STORE_BOUNDARY = {
+    "schema": "qubit-store-boundary/1",
+    "sessions": {
+        "authority": "voicebridge.auth_status.SessionStore",
+        "domain": "action-receipt session lifecycle",
+        "file": RECEIPT_SESSION_STORE,
+        "schema_id": LIFECYCLE_SCHEMA,
+        "backing_source": "actions.json",
+        "owns": ["display names", "archive/deleted tombstones", "resume marks",
+                 "bounded redacted audit"],
+        "not_owner_of": [CHAT_TRANSCRIPT_STORE, "chat conversation turns"],
+    },
+    "chat": {
+        "authority": "voicebridge.chat_transport.ChatSessionStore",
+        "domain": "chat transcript",
+        "file": CHAT_TRANSCRIPT_STORE,
+        "schema_id": CHAT_TRANSCRIPT_SCHEMA,
+        "owns": ["chat sessions", "conversation messages"],
+        "not_owner_of": [RECEIPT_SESSION_STORE, "action receipts",
+                         "receipt lifecycle metadata"],
+    },
+}
+
+
+def store_boundary() -> Dict[str, Any]:
+    """Return the explicit, non-overlapping store ownership contract."""
+    return dict(STORE_BOUNDARY)
+
 
 def auth_status(cfg: Any) -> Dict[str, Any]:
     """Inventory credential references for every configured provider.
@@ -67,12 +104,19 @@ class SessionStore:
     (``0600``/``0700``) ``sessions.json`` with display names, archive marks,
     delete tombstones, and a bounded, redacted audit. It never rewrites or
     deletes a receipt, so a deleted session stays recoverable via ``resume``.
+
+    Store boundary: this authority owns receipt lifecycle metadata only. Chat
+    conversation sessions + turns are owned by
+    ``voicebridge.chat_transport.ChatSessionStore`` (`chat_sessions.json`);
+    this store never reads or writes that file. See :data:`STORE_BOUNDARY`.
     """
+
+    STORE_FILE = RECEIPT_SESSION_STORE
 
     def __init__(self, state_dir: Path | str, *,
                  clock: Callable[[], float] = time.time) -> None:
         self._dir = Path(state_dir)
-        self._path = self._dir / "sessions.json"
+        self._path = self._dir / self.STORE_FILE
         self._receipts_path = self._dir / "actions.json"
         self._clock = clock
         self._lock = threading.RLock()

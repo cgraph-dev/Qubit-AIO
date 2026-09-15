@@ -610,7 +610,7 @@ def test_every_hermes_web_page_served_through_real_route(tmp_path,
     for row_id, component, alias, method, api, op_id in PAGE_ROWS:
         assert row_id  # ledger row id literal for the proving-test index
         assert (pages_dir / f"{component}.tsx").is_file(), component
-        target = ("/hermes" + alias) if alias else None
+        target = alias if alias else None
         if alias:
             assert hermes_alias_target(alias) == target, (row_id, alias)
         if api:

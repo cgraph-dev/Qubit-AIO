@@ -50,10 +50,14 @@ DASHBOARD_ONLY_PLUGIN_ROUTES = {
     # surface (`kanban_fleet_*`) covers board/task/stats/config/projects.
     "h_plugin_kanban_task_log",
     "h_plugin_kanban_task_attachments",
+    "h_plugin_kanban_attachment_download",
     "h_plugin_kanban_run",
     "h_plugin_kanban_run_inspect",
     "h_plugin_kanban_profiles",
     "h_plugin_kanban_orchestration",
+    # Live-update poll for the board tab (real task_events read); the spoken
+    # kanban surface covers board/task/stats/config/projects.
+    "h_plugin_kanban_events",
 }
 
 # Representative fleet reads: (spoken alias, voice entry id, compat handler).
@@ -122,17 +126,11 @@ def _seed_history(cfg, monkeypatch):
 
 
 def _seed_kanban(cfg, monkeypatch):
-    from voicebridge import hermes_runtime
+    from voicebridge import kanban as N
 
-    monkeypatch.setenv("HERMES_HOME", str(_hermes_home(cfg)))
-    hermes_runtime.ensure_path()
-    from hermes_cli import kanban_db, kanban_db_connect as kbc
-
-    kanban_db.init_db()
-    with kbc.connect() as conn:
-        task_id = kanban_db.create_task(
-            conn, title="Wave4 voice task", created_by="dashboard")
-    return task_id
+    out = N.create(cfg, "Wave4 voice task", requested_by="voice",
+                   confirmed=True)
+    return out["task"]["id"]
 
 
 def _families():
@@ -262,11 +260,23 @@ def test_fleet_reads_share_the_compat_backend_result(tmp_path, monkeypatch):
         code, direct = HC.dispatch(cfg, route["method"], route["pattern"],
                                    {}, {}, actor="dashboard:user")
         assert code == 200, (entry_id, code, str(direct)[:300])
-        # ``generated_at`` is a wall-clock stamp computed per call; every other
-        # field must be byte-identical between the two surfaces.
+        # Top-level wall-clock stamps are computed per call (``generated_at``,
+        # ``checked_at``, the kanban board's ``now``), so they legitimately
+        # differ by up to a second between the two surfaces; every other field
+        # must be byte-identical. Nested task timestamps are seeded and stay
+        # deterministic, so they are still compared.
+        def _strip_volatile(v):
+            if isinstance(v, dict):
+                return {k: _strip_volatile(x) for k, x in v.items()
+                        if k != "now" and k != "age"
+                        and not k.endswith("_at")}
+            if isinstance(v, list):
+                return [_strip_volatile(x) for x in v]
+            return v
+
         if isinstance(voiced, dict) and isinstance(direct, dict):
-            voiced = {k: v for k, v in voiced.items() if k != "generated_at"}
-            direct = {k: v for k, v in direct.items() if k != "generated_at"}
+            voiced = _strip_volatile(voiced)
+            direct = _strip_volatile(direct)
         assert voiced == direct, (entry_id, "voice and dashboard differ")
 
 

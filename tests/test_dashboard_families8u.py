@@ -26,44 +26,44 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-# Qubit route -> the Hermes workspace it must render (shell target).
+# Qubit route -> the real root SPA route it renders (canonical self, Qubit
+# family alias -> target). No /hermes prefix anywhere.
 FAMILY_TARGETS = {
-    "/activity": "/hermes/logs",
-    "/reports": "/hermes/reports",
-    "/sessions": "/hermes/sessions",
-    "/projects": "/hermes/files",
-    "/models": "/hermes/models",
-    "/skills": "/hermes/skills",
-    "/tasks": "/hermes/cron",
-    "/security": "/hermes/qubit-approvals",
-    "/devices": "/hermes/devices",
-    "/messages": "/hermes/channels",
-    "/memory": "/hermes/memory",
-    "/operations": "/hermes/operations",
-    "/ops": "/hermes/operations",
-    "/approvals": "/hermes/qubit-approvals",
-    "/settings": "/hermes/config",
-    "/setup": "/hermes/system",
-    "/system": "/hermes/system",
-    "/chat": "/hermes/chat",
-    "/files": "/hermes/files",
-    "/models": "/hermes/models",
-    "/analytics": "/hermes/analytics",
-    "/logs": "/hermes/logs",
-    "/cron": "/hermes/cron",
-    "/plugins": "/hermes/plugins",
-    "/mcp": "/hermes/mcp",
-    "/channels": "/hermes/channels",
-    "/webhooks": "/hermes/webhooks",
-    "/pairing": "/hermes/pairing",
-    "/profiles": "/hermes/profiles",
-    "/config": "/hermes/config",
-    "/env": "/hermes/env",
-    "/docs": "/hermes/docs",
+    "/activity": "/logs",
+    "/reports": "/reports",
+    "/sessions": "/sessions",
+    "/projects": "/files",
+    "/models": "/models",
+    "/skills": "/skills",
+    "/tasks": "/cron",
+    "/security": "/qubit-approvals",
+    "/devices": "/devices",
+    "/messages": "/channels",
+    "/memory": "/memory",
+    "/operations": "/operations",
+    "/ops": "/operations",
+    "/approvals": "/qubit-approvals",
+    "/settings": "/config",
+    "/setup": "/system",
+    "/system": "/system",
+    "/chat": "/chat",
+    "/files": "/files",
+    "/analytics": "/analytics",
+    "/logs": "/logs",
+    "/cron": "/cron",
+    "/plugins": "/plugins",
+    "/mcp": "/mcp",
+    "/channels": "/channels",
+    "/webhooks": "/webhooks",
+    "/pairing": "/pairing",
+    "/profiles": "/profiles",
+    "/config": "/config",
+    "/env": "/env",
+    "/docs": "/docs",
 }
 
 REQUIRED_ROUTES = [
-    "/", "/hermes/", "/chat", "/sessions", "/files", "/models", "/analytics",
+    "/", "/chat", "/sessions", "/files", "/models", "/analytics",
     "/logs", "/cron", "/skills", "/plugins", "/mcp", "/channels", "/webhooks",
     "/pairing", "/profiles", "/config", "/env", "/system", "/docs",
     "/activity", "/reports", "/operations", "/ops", "/approvals",
@@ -128,21 +128,20 @@ def _raw(port, path):
 def test_every_family_alias_maps_to_a_real_hermes_workspace():
     from voicebridge import hermes_compat as HC
     from voicebridge.webui import HERMES_ROUTE_ALIASES
-    plugin_paths = {"/hermes" + m["tab"]["path"]
-                    for m in HC._overlay_manifests()}
+    plugin_paths = {m["tab"]["path"] for m in HC._overlay_manifests()}
     builtin = {
-        "/hermes/chat", "/hermes/sessions", "/hermes/files", "/hermes/models",
-        "/hermes/analytics", "/hermes/logs", "/hermes/cron", "/hermes/skills",
-        "/hermes/plugins", "/hermes/mcp", "/hermes/channels",
-        "/hermes/webhooks", "/hermes/pairing", "/hermes/profiles",
-        "/hermes/config", "/hermes/env", "/hermes/system", "/hermes/docs",
+        "/chat", "/sessions", "/files", "/models",
+        "/analytics", "/logs", "/cron", "/skills",
+        "/plugins", "/mcp", "/channels",
+        "/webhooks", "/pairing", "/profiles",
+        "/config", "/env", "/system", "/docs",
     }
     known = builtin | plugin_paths
     for alias, target in FAMILY_TARGETS.items():
         assert HERMES_ROUTE_ALIASES.get(alias) == target, (alias, target)
         assert target in known, (alias, target, sorted(known))
     for route in REQUIRED_ROUTES:
-        if route in ("/", "/hermes/"):
+        if route == "/":
             continue
         assert route in HERMES_ROUTE_ALIASES, route
 
@@ -152,13 +151,18 @@ def test_every_normal_route_redirects_into_the_shell(tmp_path):
     ui, port = _start(tmp_path)
     try:
         status, loc = _raw(port, "/")
-        assert (status, loc) == (302, "/hermes/")
+        assert (status, loc) == (302, "/chat")
         for route in REQUIRED_ROUTES:
-            if route in ("/", "/hermes/"):
+            if route == "/":
                 continue
+            target = hermes_alias_target(route)
+            assert target is not None, route
             status, loc = _raw(port, route)
-            assert status == 302, (route, status)
-            assert loc == hermes_alias_target(route), (route, loc)
+            if target != route:
+                assert status == 302, (route, status)
+                assert loc == target, (route, loc, target)
+            else:
+                assert status == 200, (route, status)
     finally:
         ui.stop()
 
@@ -167,7 +171,7 @@ def test_ops_catalog_matches_registry_and_runs(tmp_path):
     from voicebridge import dashboard_ops as OPS
     ui, port = _start(tmp_path)
     try:
-        status, ctype, body = _http(port, "GET", "/hermes/api/ops",
+        status, ctype, body = _http(port, "GET", "/agent/api/ops",
                                     hermes=True)
         assert status == 200, (status, body[:200])
         out = json.loads(body)
@@ -180,7 +184,7 @@ def test_ops_catalog_matches_registry_and_runs(tmp_path):
             read = next((o for o in candidates if not o["confirm"]),
                         candidates[0])
             status, _, body = _http(
-                port, "POST", "/hermes/api/ops/run",
+                port, "POST", "/agent/api/ops/run",
                 {"id": read["id"], "args": {}}, hermes=True)
             assert status in (200, 400, 409), (group, read["id"], status)
             out2 = json.loads(body)
@@ -188,11 +192,11 @@ def test_ops_catalog_matches_registry_and_runs(tmp_path):
                                          "needs-confirm",
                                          "NEEDS_CONFIRMATION"), (group, out2)
             if out2.get("confirmation_id"):
-                _http(port, "POST", "/hermes/api/ops/cancel",
+                _http(port, "POST", "/agent/api/ops/cancel",
                       {"confirmation_id": out2["confirmation_id"]},
                       hermes=True)
         # unknown op is typed, never a fabricated success
-        status, _, body = _http(port, "POST", "/hermes/api/ops/run",
+        status, _, body = _http(port, "POST", "/agent/api/ops/run",
                                 {"id": "no-such-op", "args": {}}, hermes=True)
         assert status == 400
         assert json.loads(body)["code"] == "UNKNOWN_OP"
@@ -203,9 +207,9 @@ def test_ops_catalog_matches_registry_and_runs(tmp_path):
 def test_ops_api_stays_header_token_authenticated(tmp_path):
     ui, port = _start(tmp_path)
     try:
-        status, _, _ = _http(port, "GET", "/hermes/api/ops", token=None)
+        status, _, _ = _http(port, "GET", "/agent/api/ops", token=None)
         assert status == 401
-        status, _, _ = _http(port, "GET", "/hermes/api/ops?token=test-token",
+        status, _, _ = _http(port, "GET", "/agent/api/ops?token=test-token",
                              token=None)
         assert status == 401, "query-string tokens must stay rejected"
     finally:
@@ -270,7 +274,7 @@ def test_family_routes_render_hermes_shell(tmp_path_factory):
                          if not any(s in e for s in (
                              "ws://", "/api/ws", "/api/pty", "WebSocket",
                              "/api/credentials/pool", "/api/portal",
-                             "/api/hermes/update/check"))]
+                             "/api/qubit/update/check"))]
                 assert not fatal, (route, fatal[:3])
                 ctx.close()
         finally:

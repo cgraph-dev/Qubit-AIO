@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import logging
-import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
@@ -132,36 +131,26 @@ def _validate(tool: Any, args: Any, confidence: Any,
         requires_confirmation=False)
 
 
-def plan(text: str, *, url: str = "http://127.0.0.1:11434",
+def plan(text: str, *, cfg: Any = None,
+         url: str = "http://127.0.0.1:11434",
          model: Optional[str] = None, timeout_s: float = 8.0,
          ) -> Optional[TypedProposal]:
     """One canonical-contract LLM call producing a validated proposal or a
-    typed no-decision (None). Same runner options source as every other
-    caller (Packet 4B contract); format = full JSON Schema, temp 0."""
-    from .runner_contract import resolve
-    _rc = resolve()
-    model = model or _rc.alias
-    payload = {
-        "model": model,
-        "messages": build_messages(text),
-        "stream": False,
-        "format": PLANNER_SCHEMA,
-        "keep_alive": _rc.keep_alive,
-        "options": {"temperature": 0.0, "num_ctx": _rc.num_ctx},
-    }
-    req = urllib.request.Request(
-        f"{url.rstrip('/')}/api/chat",
-        data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
-            body = json.loads(resp.read().decode())
-    except Exception as exc:
-        log.info("planner.unavailable error=%s", str(exc)[:120])
+    typed no-decision (None). The effective ``tool`` profile is resolved by
+    ``providers.resolver`` and executed through ``providers.gateway.run``
+    (local route, full JSON Schema, temp 0)."""
+    from .providers import gateway as _gateway
+
+    res = _gateway.run_role(
+        text, cfg, role="tool", max_tokens=256, timeout_s=timeout_s,
+        local_mode="chat_raw", messages=build_messages(text),
+        structured_schema=PLANNER_SCHEMA, options={"temperature": 0.0})
+    if not res.ok:
+        log.info("planner.unavailable error=%s code=%s",
+                 res.message[:120], res.code)
         return None
-    raw = (body.get("message") or {}).get("content") or ""
     try:
-        parsed = json.loads(raw)
+        parsed = json.loads(res.text)
     except json.JSONDecodeError:
         log.info("planner.no_decision reason=unparseable")
         return None

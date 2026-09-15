@@ -1,6 +1,6 @@
 """Agent 3 — Qubit overlay dashboard plugins are real, not tiles.
 
-The ten ``dashboard_plugin`` ledger rows (``plugin_qubit-*``) must be backed
+The eleven ``dashboard_plugin`` ledger rows (``plugin_qubit-*``) must be backed
 by a real Hermes workspace and a real Qubit backend. This suite proves, from
 the shipped frontend source and the production compat dispatcher:
 
@@ -27,8 +27,8 @@ PLUGDIR = REPO_ROOT / "frontend" / "hermes-qubit" / "plugins"
 MANIFESTS = sorted(PLUGDIR.glob("*/manifest.json"))
 EXPECTED = [
     "qubit-approvals", "qubit-boards", "qubit-brand", "qubit-chat",
-    "qubit-devices", "qubit-gateway", "qubit-memory", "qubit-ops",
-    "qubit-reports", "qubit-runtime",
+    "qubit-devices", "qubit-gateway", "qubit-memory", "qubit-models",
+    "qubit-ops", "qubit-reports", "qubit-runtime",
 ]
 ENDPOINT_RE = re.compile(r"""["'](/api/[A-Za-z0-9_./-]+)["']""")
 # Read-only ops endpoints safe to execute during the route audit; mutating
@@ -48,7 +48,7 @@ def _cfg(tmp_path, monkeypatch):
 
 
 def test_all_ten_plugin_manifests_have_real_entry_bundles():
-    assert len(MANIFESTS) == 10, MANIFESTS
+    assert len(MANIFESTS) == 11, MANIFESTS
     assert sorted(p.parent.name for p in MANIFESTS) == EXPECTED
     for mf in MANIFESTS:
         import json
@@ -147,7 +147,7 @@ def test_every_manifest_tab_is_served_and_unique():
         assert route.startswith("/hermes/"), (man["name"], route)
         assert route not in tabs, (man["name"], route)
         tabs.append(route)
-    assert len(tabs) == len(manifests) == 10
+    assert len(tabs) == len(manifests) == 11
     # the plugin response is the real served manifest set
     served = {m["name"] for m in HC.plugins_response()["plugins"]}
     assert served == set(EXPECTED)
@@ -164,7 +164,7 @@ def test_every_manifest_entry_registers_its_plugin_component():
         assert "return" in text or "function" in text, man["name"]
 
 
-# Ledger row ids for the ten overlay plugin pages, plus a representative
+# Ledger row ids for the eleven overlay plugin pages, plus a representative
 # read-only Qubit operation each plugin drives through the shared dispatcher.
 PLUGIN_ROW_IDS = {
     "qubit-approvals": "plugin_qubit-approvals",
@@ -174,6 +174,7 @@ PLUGIN_ROW_IDS = {
     "qubit-devices": "plugin_qubit-devices",
     "qubit-gateway": "plugin_qubit-gateway",
     "qubit-memory": "plugin_qubit-memory",
+    "qubit-models": "plugin_qubit-models",
     "qubit-ops": "plugin_qubit-ops",
     "qubit-reports": "plugin_qubit-reports",
     "qubit-runtime": "plugin_qubit-runtime",
@@ -186,6 +187,7 @@ PLUGIN_READ_OPS = {
     "qubit-devices": ("runtime_status", {}),
     "qubit-gateway": ("gateway", {}),
     "qubit-memory": ("memory_search", {"query": "agent3"}),
+    "qubit-models": ("list_model_profiles", {}),
     "qubit-ops": ("capabilities_list", {}),
     "qubit-reports": ("insights", {}),
     "qubit-runtime": ("runtime_status", {}),

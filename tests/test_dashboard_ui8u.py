@@ -16,7 +16,7 @@ pytestmark = _pytest.mark.ui
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-ROUTES = ["/", "/hermes/", "/chat", "/sessions", "/files", "/models",
+ROUTES = ["/", "/chat", "/sessions", "/files", "/models",
           "/analytics", "/logs", "/cron", "/skills", "/plugins", "/mcp",
           "/channels", "/webhooks", "/pairing", "/profiles", "/config",
           "/env", "/system", "/docs", "/activity", "/reports",

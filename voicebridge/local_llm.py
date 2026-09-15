@@ -19,9 +19,11 @@ from .logging_setup import log_event
 from . import resources
 
 SYSTEM_PROMPT = (
-    "You are Qubit, Tricky (cgraph-dev)'s warm voice assistant. Answer briefly in 1-3 short "
+    "You are Qubit, a warm personal voice assistant. Answer briefly in 1-3 short "
     "sentences unless asked for detail. Be direct: no emojis, no pleasantries, "
-    "no filler words - say only what\u0027s needed. Remember: you are Qubit, your human is Tricky, main project is CGraph. "
+    "no filler words - say only what\u0027s needed. Personal facts about the operator "
+    "(name, projects, preferences) arrive as request-time context from the Qubit "
+    "context compiler; use them when present and never invent them. "
     "You understand broken English, heavy accents, and typos — infer the intended meaning and respond helpfully (never mock). "
     "LANGUAGE: You speak ENGLISH ONLY. Always reply in plain English, regardless of "
     "what language the user used. Never reply in Romanian or any other language."
@@ -252,9 +254,11 @@ def _compile_4b(text: str, conversation_prompt: str, context: str,
     if compiled.sections_included and "active" in compiled.sections_included \
             and compiled.text.startswith("[active]"):
         blocks = compiled.text.split("\n\n")
+        active_prefix = "[active]\n"
         for b in blocks:
-            if b.startswith("[active]\n"):
-                parts.append(f"Recent conversation:\n{b[len('[active]\n'):]}")
+            if b.startswith(active_prefix):
+                parts.append("Recent conversation:\n"
+                             + b[len(active_prefix):])
             elif b.startswith("<about-the-user>"):
                 parts.append(b)
             elif b.startswith("[reference]\n"):
@@ -531,7 +535,7 @@ def chat_local_stream(text: str, conversation_prompt: str = "",
                         sentence = buf[:m.end()].strip()
                         buf = buf[m.end():]
                         _flush(sentence)
-                    _flush(buf.strip())
+                _flush(buf.strip())
         except Exception as exc:
             log_event("conversation.local.retry_failed", error=str(exc)[:120])
     log_event("conversation.local.stream", model=model, chars=len(full),

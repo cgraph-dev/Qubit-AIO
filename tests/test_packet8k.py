@@ -143,6 +143,13 @@ def test_scan_text_secrets_config_assign_flagged():
     # HTML/JS prose `token=` is not a config secret assignment
     assert "assign_secret" not in R.scan_text_secrets(
         "const token = vbToken();", is_config=False)
+    # An empty quoted placeholder (the shipped example) is not a secret.
+    assert "assign_secret" not in R.scan_text_secrets(
+        'webui:\n  token: ""\n', is_config=True)
+    assert "assign_secret" not in R.scan_text_secrets(
+        "webui:\n  token: ''\n", is_config=True)
+    assert "assign_secret" not in R.scan_text_secrets(
+        "webui:\n  token:\n", is_config=True)
 
 
 def test_scan_text_machine_paths_prose_not_path():

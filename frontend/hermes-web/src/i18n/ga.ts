@@ -55,7 +55,7 @@ export const ga: Translations = {
     closeNavigation: "Dún an nascleanúint",
     closeModelTools: "Dún an samhail agus na huirlisí",
     footer: {
-      org: "Nous Research",
+      org: "Qubit",
     },
     activeSessionsLabel: "Seisiúin gníomhacha:",
     gatewayStatusLabel: "Stádas an gateway:",
@@ -334,7 +334,7 @@ export const ga: Translations = {
     enableRuntime: "Cumasaigh",
     forceReinstall: "Cuir iallach ar athshuiteáil (scrios an fillteán atá ann ar dtús)",
     headline:
-      "Faigh, suiteáil, cumasaigh agus nuashonraigh plugins Qubit (paireacht le `hermes plugins`).",
+      "Faigh, suiteáil, cumasaigh agus nuashonraigh plugins Qubit (paireacht le `qubit plugins`).",
     identifierLabel: "URL Git nó owner/repo",
     inactive: "neamhghníomhach",
     installBtn: "Suiteáil",
@@ -351,8 +351,8 @@ export const ga: Translations = {
     providersHint:
       "Scríobhann memory.provider (folamh = ionsuite) agus context.engine chuig config.yaml. Beidh éifeacht aige sa chéad seisiún eile.",
     refreshDashboard: "Athscan síntí an dashboard",
-    removeConfirm: "Bain an plugin seo ó ~/.hermes/plugins/?",
-    removeHint: "Ní féidir ach plugins atá suiteáilte ag an úsáideoir faoi ~/.hermes/plugins a bhaint.",
+    removeConfirm: "Bain an plugin seo ó ~/.qubit/plugins/?",
+    removeHint: "Ní féidir ach plugins atá suiteáilte ag an úsáideoir faoi ~/.qubit/plugins a bhaint.",
     rescanHeading: "Clár plugin SPA",
     rescanHint: "Athscan tar éis comhaid a chur leis an diosca ionas go n-aimseoidh barra taoibh an dashboard manifests nua.",
     runtimeHeading: "Runtime gateway (plugins YAML)",
@@ -374,7 +374,7 @@ export const ga: Translations = {
     all: "Gach ceann",
     categories: "Catagóirí",
     filters: "Scagairí",
-    noSkills: "Níor aimsíodh scileanna. Luchtaítear scileanna ó ~/.hermes/skills/",
+    noSkills: "Níor aimsíodh scileanna. Luchtaítear scileanna ó ~/.qubit/skills/",
     noSkillsMatch: "Níl scil ar bith ag teacht le do chuardach nó scagaire.",
     skillCount: "{count} scil{s}",
     resultCount: "{count} torad{s}",
@@ -388,7 +388,7 @@ export const ga: Translations = {
   },
 
   config: {
-    configPath: "~/.hermes/config.yaml",
+    configPath: "~/.qubit/config.yaml",
     filters: "Scagairí",
     sections: "Ranna",
     exportConfig: "Easpórtáil cumraíocht mar JSON",

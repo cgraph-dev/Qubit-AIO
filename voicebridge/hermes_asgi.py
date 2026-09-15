@@ -48,10 +48,15 @@ SENSITIVE_READ_PREFIXES = (
 # Qubit-owned dashboard surfaces: the fork also has these paths, but Qubit's
 # own theme/overlay-plugin/ops endpoints must stay authoritative so the active
 # dashboard keeps the Qubit tabs and branding (owner rebrand requirement).
+# The vendored dashboard plugins are Qubit-owned too: Qubit's compat handlers
+# call the real vendored engines but rebrand the served payload, and the kanban
+# adapter reads the authoritative Qubit-native store (single-store rule).
 QUBIT_OWNED_PREFIXES = (
     "/api/dashboard",
     "/api/qubit",
     "/api/ops",
+    "/api/plugins/hermes-achievements",
+    "/api/plugins/kanban",
 )
 
 _lock = threading.Lock()
@@ -64,20 +69,45 @@ _start_error: Optional[BaseException] = None
 _ready = threading.Event()
 
 
+_overlay_applied = False
+
+
+def _apply_qubit_config_overlay() -> None:
+    """Qubit-owned overlay on the vendored runtime (no upstream file edit).
+
+    The pinned fork's default config names its canonical toolset after the
+    upstream product. Qubit keeps the internal id working but presents a
+    Qubit-owned default: register ``qubit-cli`` as an alias of the same toolset
+    bundle and make it the default rendered by the dashboard.
+    """
+    global _overlay_applied
+    if _overlay_applied:
+        return
+    _overlay_applied = True
+    try:
+        from . import hermes_runtime as _HR
+        _HR.ensure_path()
+        from hermes_cli import config_defaults as _CD
+        if _CD.DEFAULT_CONFIG.get("toolsets") == ["hermes-cli"]:
+            _CD.DEFAULT_CONFIG["toolsets"] = ["qubit-cli"]
+        try:
+            import toolsets as _ts
+            if "qubit-cli" not in _ts.TOOLSETS and "hermes-cli" in _ts.TOOLSETS:
+                _ts.TOOLSETS["qubit-cli"] = _ts.TOOLSETS["hermes-cli"]
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
 def set_home(path: str) -> None:
-    """Point the fork at a Qubit-owned HERMES_HOME before the bridge starts.
+    """Point the fork at a Qubit-owned runtime home before the bridge starts.
 
     No-op once the bridge has started (the root is snapshotted at import)."""
+    _apply_qubit_config_overlay()
     if _client is not None or os.environ.get("HERMES_HOME"):
         return
     os.environ["HERMES_HOME"] = str(path)
-
-
-def _default_hermes_home() -> str:
-    """Qubit-owned state root for the vendored backend (never ~/.hermes)."""
-    base = os.environ.get("XDG_STATE_HOME") or os.path.join(
-        os.path.expanduser("~"), ".local", "state")
-    return os.path.join(base, "qubit-voicebridge", "hermes")
 
 
 def _template_re(template: str) -> Pattern[str]:
@@ -102,11 +132,9 @@ async def _startup() -> None:
         # The vendored backend must use a Qubit-owned HERMES_HOME, never the
         # operator's real ~/.hermes (single-authority + Hermes' own
         # live-system guard). Set before importing web_server, which snapshots
-        # the root at import time.
-        if not os.environ.get("HERMES_HOME"):
-            home = _default_hermes_home()
-            Path(home).mkdir(parents=True, exist_ok=True)
-            os.environ["HERMES_HOME"] = home
+        # the root at import time. Shared resolver with ``hermes_runtime.run``
+        # so CLI and dashboard read the exact same home.
+        hermes_runtime.use_qubit_home()
         import httpx
         from hermes_cli import web_server as ws  # type: ignore
 

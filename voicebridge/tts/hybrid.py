@@ -23,7 +23,8 @@ class HybridTTS(TTSProvider):
     def __init__(self, model_dir: Path, piper_voice: str = "en_US-amy-medium",
                  openai_voice: str = "nova", openai_model: str = "gpt-4o-mini-tts",
                  key_env: str = "~/.config/qubit-voicebridge/.env", instructions: str = "",
-                 threshold_words: int = 18) -> None:
+                 threshold_words: int = 18,
+                 egress_guard=None) -> None:
         self.model_dir = Path(model_dir)
         self.piper_voice = piper_voice
         self.openai_voice = openai_voice
@@ -31,6 +32,7 @@ class HybridTTS(TTSProvider):
         self.key_env = key_env
         self.instructions = instructions
         self.threshold_words = int(threshold_words)
+        self._egress_guard = egress_guard
         self._piper = None
         self._openai = None
 
@@ -44,7 +46,8 @@ class HybridTTS(TTSProvider):
         if self._openai is None:
             from .openai_tts import OpenAITTS
             self._openai = OpenAITTS(voice=self.openai_voice, model=self.openai_model,
-                                     key_env=self.key_env, instructions=self.instructions)
+                                     key_env=self.key_env, instructions=self.instructions,
+                                     egress_guard=self._egress_guard)
         return self._openai
 
     def load(self) -> None:

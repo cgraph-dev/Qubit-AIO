@@ -55,8 +55,10 @@ The final dashboard must expose real pages or routed workspaces for:
    confirmation, session state, receipts, and recovery.
 3. **Projects / Files** — project registry, folders, active project, file tree,
    preview, search, reports, task board, import/export, and safe file actions.
-4. **Models / Providers** — local models, provider inventory, capabilities,
-   routing, budgets, health, API-key reference status, and degraded states.
+4. **Models / Providers** — versioned local/API model profiles, provider
+   inventory, capabilities, routing per task/session, locality/egress consent,
+   budgets, health, credential-reference status, test/validate, activate,
+   clone/edit, rollback/remove, visible fallback, and degraded states.
 5. **Tools / Skills / Plugins** — installed, staged, enabled, disabled,
    provenance, permissions, manifests, validation, rollback, and logs.
 6. **Tasks / Cron / Runs** — schedules, queue, current runs, history, retry,
@@ -73,8 +75,9 @@ The final dashboard must expose real pages or routed workspaces for:
     separation.
 11. **Reports / Activity / Logs** — live event stream, filtered activity,
     reports, bundles, audit receipts, diagnostics, and redacted exports.
-12. **Setup / Runtime / System** — installation health, audio, ASR/TTS,
-    runtime inventory, services, upgrades, rollback, backup, and repair.
+12. **Setup / Runtime / System** — installation health, selectable audio,
+    ASR/TTS/realtime voice/device profiles, runtime inventory, autonomy policy,
+    services, upgrades, rollback, backup, and repair.
 
 If a workflow is implemented in CLI or voice, it must have an appropriate
 dashboard route or embedded workspace. A count, status tile, or link to a
@@ -181,6 +184,10 @@ The dashboard is not complete until:
   Qubit hash or a documented Qubit patch with a regression test;
 - every adopted OpenClaw page/workflow has a Qubit equivalent;
 - all twelve page families exist or have a documented, tested route mapping;
+- Models/Providers and Setup/Voice make every profile operation real and
+  recoverable; a selector or status card without its backend lifecycle is open;
+- every visible control has an authenticated production-listener test that
+  proves request, backend, persistence, displayed result, and failure/recovery;
 - desktop and narrow-mobile screenshots show a coherent Qubit command center;
 - no upstream product branding appears in normal UI;
 - UI and backend suites pass with warnings as errors;

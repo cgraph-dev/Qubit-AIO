@@ -8,7 +8,7 @@ import react, { reactCompilerPreset } from "@vitejs/plugin-react";
  *  module — which made the babel pass parse the whole codebase. */
 function compilerPreset() {
   const preset = reactCompilerPreset();
-  preset.rolldown.filter.code = /\/>|<\/|from\s*['"][^'"]*react/;
+  preset.rolldown.filter = { ...preset.rolldown.filter, code: /\/>|<\/|from\s*['"][^'"]*react/ };
   return preset;
 }
 import tailwindcss from "@tailwindcss/vite";
@@ -69,6 +69,9 @@ function hermesDevToken(): Plugin {
 }
 
 export default defineConfig({
+  // Qubit serves the dashboard at the host root; asset/plugin URLs resolve
+  // from "/" (no "/hermes/" base path).
+  base: "/",
   plugins: [
     react(),
     babel({ presets: [compilerPreset()] }),
@@ -100,7 +103,7 @@ export default defineConfig({
     ],
   },
   build: {
-    outDir: "../hermes_cli/web_dist",
+    outDir: "../hermes-dist",
     emptyOutDir: true,
     // Shell stays a bit over Vite's 500 kB default after vendor splits;
     // page/xterm chunks load on demand. Keep a modest ceiling so a true
@@ -150,6 +153,11 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      // Qubit-owned API namespace injected via window.__QUBIT_API_PREFIX__.
+      "/agent": {
+        target: BACKEND,
+        ws: true,
+      },
       "/api": {
         target: BACKEND,
         ws: true,

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import re
-import urllib.request
+import urllib.request  # re-exported for callers/tests that patch this seam
 from typing import Any, Dict, Optional
 
 from ..logging_setup import log_event
@@ -112,74 +112,69 @@ def _parse_json_loose(raw: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+def classify_local_llm(text: str, cfg: Any = None,
+                       url: Optional[str] = None,
+                       model: Optional[str] = None,
+                       timeout_s: float = 8.0) -> Optional[Dict[str, Any]]:
+    """Returns {kind, task, confidence, reason} or None if the local model is
+    unavailable or the decision fails schema validation (typed no-decision).
+
+    Execution goes through the canonical provider authority: the effective
+    ``classify`` profile is resolved by ``providers.resolver`` and the call runs
+    through ``providers.gateway.run`` (local route, no frontier network). The
+    legacy ``url``/``model`` hints are accepted for call-site compatibility;
+    the resolver decides the actual runner.
+    """
+    from ..providers import gateway as _gateway
+
+    prompt = f"User said: \"{text[:600]}\"\n\nClassify it. /no_think"
+    res = _gateway.run_role(
+        prompt, cfg, role="classify", max_tokens=64, timeout_s=timeout_s,
+        local_mode="generate", system_prompt=SYSTEM_PROMPT,
+        structured_schema=DECISION_SCHEMA)
+    if not res.ok:
+        log_event("intent.llm.unavailable", code=res.code,
+                  error=res.message[:160])
+        return None
+    raw = res.text
+    parsed = _parse_json_loose(raw)
+    if not isinstance(parsed, dict):
+        return None
+    kind = parsed.get("kind")
+    if kind not in VALID_KINDS:
+        return None
+    confidence = parsed.get("confidence")
+    if not isinstance(confidence, (int, float)) or not (
+            0.0 <= float(confidence) <= 1.0):
+        confidence = 0.6
+    # Compact typed decision -> downstream shape preserved without
+    # asking the model for free text (hot-path eval tokens saved).
+    parsed.setdefault("task", "" if kind != "coding" else text)
+    parsed["confidence"] = round(float(confidence), 3)
+    parsed.setdefault("reason", f"{kind}:schema")
+    # Packet 4D structural mitigation: destructive-intent screen.
+    # A model claiming "local" for destruction text is overridden to the
+    # confirmation-gated coding path - independent of model behavior.
+    if kind == "local":
+        from ..safety.destructive_screen import screen_destructive
+        scr = screen_destructive(text)
+        if scr.matched:
+            log_event("intent.destructive_screen",
+                      claimed="local", route="coding",
+                      reason=scr.reason)
+            kind = "coding"
+            parsed["kind"] = "coding"   # returned dict must reflect it
+            parsed["task"] = text
+            parsed["confidence"] = 0.99
+            parsed["reason"] = f"destructive-screen:{scr.reason}"
+    log_event("intent.llm", kind=kind, confidence=parsed.get("confidence"),
+              reason=parsed.get("reason", "")[:200],
+              provider=res.provider, model=res.model)
+    return parsed
+
+
 def classify_with_ollama(text: str, url: Optional[str] = None,
                          model: Optional[str] = None,
                          timeout_s: float = 8.0) -> Optional[Dict[str, Any]]:
-    """Returns {kind, task, confidence, reason} or None if Ollama is
-    unavailable or the decision fails schema validation (typed no-decision).
-
-    Runner options come ONLY from the canonical runner contract (Packet 4B);
-    task/reason are synthesized locally — the model emits kind+confidence.
-    """
-    from ..runner_contract import resolve
-    _rc = resolve()
-    url = url or _rc.url
-    model = model or _rc.alias
-    payload = {
-        "model": model,
-        "prompt": f"User said: \"{text[:600]}\"\n\nClassify it. /no_think",
-        "system": SYSTEM_PROMPT,
-        "stream": False,
-        "format": DECISION_SCHEMA,
-        "keep_alive": _rc.keep_alive,
-        # NOTE: no options.think — ollama ignores it there; the baked brain4
-        # template already disables thinking at the source.
-        "options": {"temperature": 0.0, "num_ctx": _rc.num_ctx},
-    }
-    req = urllib.request.Request(
-        f"{url}/api/generate",
-        data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json"},
-    )
-    try:
-        t0 = __import__("time").time()
-        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
-            body = json.loads(resp.read().decode())
-        ms = round((__import__("time").time() - t0) * 1000)
-        raw = body.get("response", "")
-        parsed = _parse_json_loose(raw)
-        if not isinstance(parsed, dict):
-            return None
-        kind = parsed.get("kind")
-        if kind not in VALID_KINDS:
-            return None
-        confidence = parsed.get("confidence")
-        if not isinstance(confidence, (int, float)) or not (
-                0.0 <= float(confidence) <= 1.0):
-            confidence = 0.6
-        # Compact typed decision -> downstream shape preserved without
-        # asking the model for free text (hot-path eval tokens saved).
-        parsed.setdefault("task", "" if kind != "coding" else text)
-        parsed["confidence"] = round(float(confidence), 3)
-        parsed.setdefault("reason", f"{kind}:schema")
-        # Packet 4D structural mitigation: destructive-intent screen.
-        # A model claiming "local" for destruction text is overridden to the
-        # confirmation-gated coding path - independent of model behavior.
-        if kind == "local":
-            from ..safety.destructive_screen import screen_destructive
-            scr = screen_destructive(text)
-            if scr.matched:
-                log_event("intent.destructive_screen",
-                          claimed="local", route="coding",
-                          reason=scr.reason)
-                kind = "coding"
-                parsed["kind"] = "coding"   # returned dict must reflect it
-                parsed["task"] = text
-                parsed["confidence"] = 0.99
-                parsed["reason"] = f"destructive-screen:{scr.reason}"
-        log_event("intent.llm", kind=kind, confidence=parsed.get("confidence"),
-                  reason=parsed.get("reason", "")[:200], ms=ms)
-        return parsed
-    except Exception as exc:
-        log_event("intent.llm.unavailable", error=str(exc)[:160])
-        return None
+    """Backward-compatible alias for :func:`classify_local_llm`."""
+    return classify_local_llm(text, None, url, model, timeout_s)

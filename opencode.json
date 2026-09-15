@@ -9,5 +9,16 @@
       ],
       "enabled": true
     }
-  }
+  },
+  "instructions": [
+    "docs/OPENCODE_WORKFLOW.md"
+  ],
+  "compaction": {
+    "auto": true,
+    "keep": {
+      "tokens": 12000
+    },
+    "buffer": 20000
+  },
+  "formatter": false
 }

@@ -3,10 +3,11 @@
 #
 # The Hermes React/Vite source lives in frontend/hermes-web/ (pinned
 # hermes-agent@2237be3); the generated bundle is written to
-# frontend/hermes-dist/ and is served by voicebridge.webui at /hermes/ (and
-# packaged into wheel/sdist via pyproject `artifacts`). Qubit overlay
-# additions live in frontend/hermes-qubit/ and are NOT part of this build --
-# they are served as runtime plugins from frontend/hermes-qubit/plugins/.
+# frontend/hermes-dist/ and is served by voicebridge.webui from Qubit-owned
+# root paths (base "/") and packaged into wheel/sdist via pyproject
+# `artifacts`. Qubit overlay additions live in frontend/hermes-qubit/ and are
+# NOT part of this build -- they are served as runtime plugins from
+# frontend/hermes-qubit/plugins/.
 #
 # Usage:  scripts/build_dashboard.sh [--check]
 #
@@ -61,7 +62,7 @@ cd "$WEB_DIR"
 npm install --legacy-peer-deps --no-audit --no-fund \
   || build_failed "npm install failed (network/registry unavailable?)"
 npx tsc -p . --noEmit || build_failed "TypeScript typecheck failed"
-npx vite build --base=/hermes/ --outDir "$DIST_DIR" --emptyOutDir \
+npx vite build --base=/ --outDir "$DIST_DIR" --emptyOutDir \
   || build_failed "vite build failed"
 
 # node_modules is a build-only dependency, but pyproject.toml force-includes

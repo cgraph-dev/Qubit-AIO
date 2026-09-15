@@ -223,10 +223,10 @@ def test_upstream_parser_error_is_preserved(tmp_path):
     assert "unrecognized arguments" in r.stderr or "invalid" in r.stderr
 
 
-def test_forwarded_help_is_the_upstream_parser_help(tmp_path):
+def test_forwarded_help_is_qubit_branded_upstream_parser(tmp_path):
     r = _run_cli(tmp_path, ["schedules", "doctor", "--help"])
     assert r.returncode == 0
-    assert "usage: hermes cron doctor" in r.stdout
+    assert "usage: qubit cron doctor" in r.stdout
     assert "-h, --help" in r.stdout
 
 
@@ -236,10 +236,10 @@ def test_forwarded_curator_status_runs_in_fork(tmp_path):
     assert "curator:" in r.stdout
 
 
-def test_forwarded_curator_ledger_help_is_upstream(tmp_path):
+def test_forwarded_curator_ledger_help_is_qubit_branded(tmp_path):
     r = _run_cli(tmp_path, ["lessons", "ledger", "--help"])
     assert r.returncode == 0
-    assert "usage: hermes curator ledger" in r.stdout
+    assert "usage: qubit curator ledger" in r.stdout
 
 
 def test_forwarded_mcp_catalog_runs_in_fork(tmp_path):

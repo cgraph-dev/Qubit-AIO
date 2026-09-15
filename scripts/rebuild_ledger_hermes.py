@@ -1486,7 +1486,7 @@ PAGES = [
 # IMPLEMENTED on the mere existence of an unrelated test file.
 _DASHBOARD_TEST = "tests/test_dashboard_page_closure_wave2.py"
 DASHBOARD_PROOF: Dict[str, Tuple[str, str]] = {
-    "/": (f"{_DASHBOARD_TEST}::test_page_root_served_spa", "/hermes/"),
+    "/": (f"{_DASHBOARD_TEST}::test_page_root_served_spa", "/chat"),
     "/chat": (f"{_DASHBOARD_TEST}::test_page_chat_backing_route",
               "/api/status"),
     "/sessions": (f"{_DASHBOARD_TEST}::test_page_sessions_backing_route",
@@ -1523,7 +1523,7 @@ DASHBOARD_PROOF: Dict[str, Tuple[str, str]] = {
                 "/api/config"),
     "/env": (f"{_DASHBOARD_TEST}::test_page_env_backing_route", "/api/env"),
     "/docs": (f"{_DASHBOARD_TEST}::test_page_docs_served_spa",
-              "/hermes/docs"),
+              "/docs"),
 }
 
 

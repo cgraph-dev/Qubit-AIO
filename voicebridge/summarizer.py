@@ -10,8 +10,7 @@ from __future__ import annotations
 
 import json
 import re
-import urllib.request
-from typing import Optional
+from typing import Any, Optional
 
 from .logging_setup import log_event
 
@@ -30,33 +29,39 @@ def _strip_markdown(text: str) -> str:
     return text.strip()
 
 
-def summarize_ollama(text: str, url: Optional[str] = None,
-                     model: Optional[str] = None, timeout_s: float = 5.0,
-                     max_chars: int = 900) -> Optional[str]:
-    from .runner_contract import resolve
-    _rc = resolve()
-    url = url or _rc.url
-    model = model or _rc.alias
+def _summarize_via_gateway(text: str, cfg: Any = None,
+                          url: Optional[str] = None,
+                          model: Optional[str] = None, timeout_s: float = 5.0,
+                          max_chars: int = 900) -> Optional[str]:
+    """Summarize through the canonical provider authority (local route).
+
+    The effective ``summarize`` profile is resolved by
+    ``providers.resolver`` and executed by ``providers.gateway.run``; the
+    legacy ``url``/``model`` hints are accepted for compatibility only.
+    """
+    from .providers import gateway as _gateway
+
     text = text[:max_chars]
-    payload = {"model": model,
-               "prompt": f"Agent output:\n{text} /no_think",
-               "system": SUMMARY_PROMPT, "stream": False, "format": "json",
-               "keep_alive": _rc.keep_alive,   # canonical contract (4B)
-               "options": {"temperature": 0.2,
-                           "num_ctx": _rc.num_ctx,   # single runner contract
-                           "num_predict": 90}}    # cap generation (<=40w summary + json)
-    req = urllib.request.Request(f"{url}/api/generate",
-                                 data=json.dumps(payload).encode(),
-                                 headers={"Content-Type": "application/json"})
+    prompt = f"Agent output:\n{text} /no_think"
+    res = _gateway.run_role(
+        prompt, cfg, role="summarize", max_tokens=90, timeout_s=timeout_s,
+        local_mode="generate", system_prompt=SUMMARY_PROMPT,
+        structured_schema="json", options={"temperature": 0.2})
+    if not res.ok:
+        log_event("summarizer.ollama.unavailable", code=res.code,
+                  error=res.message[:160])
+        return None
     try:
-        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
-            body = json.loads(resp.read().decode())
-        summary = json.loads(body.get("response", "{}")).get("summary", "")
-        if summary.strip():
-            return _strip_markdown(summary)
-    except Exception as exc:
-        log_event("summarizer.ollama.unavailable", error=str(exc)[:160])
+        summary = json.loads(res.text).get("summary", "")
+    except (ValueError, TypeError):
+        summary = res.text
+    if summary and summary.strip():
+        return _strip_markdown(summary)
     return None
+
+
+# Public name preserved for existing callers/tests; the core is gateway-backed.
+summarize_ollama = _summarize_via_gateway
 
 
 def summarize_extractive(text: str, max_chars: int = 900) -> str:
@@ -105,7 +110,8 @@ def summarize(text: str, cfg: Optional[dict] = None,
         # truncate for LLM but keep deterministic fallback on full stripped text
         if provider == "ollama":
             try:
-                s = summarize_ollama(text, url, model, max_chars=max_chars)
+                s = _summarize_via_gateway(text, cfg, url, model,
+                                           max_chars=max_chars)
                 if s and s.strip():
                     return clamp_words(s, max_words)
             except Exception:

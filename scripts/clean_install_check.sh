@@ -28,7 +28,18 @@ REQUIRE_NETWORK=0
 [ "${1:-}" = "--require-network" ] && REQUIRE_NETWORK=1
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/qubit-clean-install-XXXXXX")"
-trap 'rm -rf "$WORK"' EXIT
+# pyproject force-includes the whole frontend/ tree (a frozen mapping) and
+# hatchling force-include does NOT honor .gitignore, so a leftover
+# frontend/hermes-web/node_modules would ship ~21.6k build-only members
+# (~405 MB) into the wheel. Stash it for the duration of the build and restore
+# it on exit — never delete a developer's node_modules in a gate.
+NODE_MODULES="$REPO_ROOT/frontend/hermes-web/node_modules"
+NODE_MODULES_STASH="$WORK/node_modules.stash"
+cleanup() {
+  if [ -d "$NODE_MODULES_STASH" ]; then mv "$NODE_MODULES_STASH" "$NODE_MODULES"; fi
+  rm -rf "$WORK"
+}
+trap cleanup EXIT
 
 HOME_DIR="$WORK/home"
 VENV="$WORK/venv"
@@ -87,6 +98,9 @@ echo "== toolchain: $TOOLCHAIN =="
 
 # ---------------------------------------------------------------- build wheel
 echo "== build wheel =="
+if [ -d "$NODE_MODULES" ]; then
+  mv "$NODE_MODULES" "$NODE_MODULES_STASH"
+fi
 if ! "${BUILD_CMD[@]}" >/dev/null 2>"$WORK/build.err"; then
   degrade "wheel build failed: $(tail -c 300 "$WORK/build.err" | tr '\n' ' ')"
 fi
@@ -104,11 +118,15 @@ with zipfile.ZipFile(sys.argv[1]) as z:
     names = z.namelist()
 assert any(n.endswith("_data/frontend/hermes-dist/index.html") for n in names), \
     "wheel is missing voicebridge/_data/frontend/hermes-dist/index.html"
+# Force-include ignores .gitignore, so prove the build-only node_modules tree
+# never leaked into the wheel (the stash above must have worked).
+leaked = [n for n in names if "node_modules/" in n]
+assert not leaked, f"wheel swept {len(leaked)} node_modules members"
 PY
 then
-  fail "wheel built without the dashboard bundle (frontend/hermes-dist missing at build time)"
+  fail "wheel built without the dashboard bundle or swept build-only node_modules"
 fi
-echo "  dashboard bundle shipped in wheel"
+echo "  dashboard bundle shipped in wheel; node_modules members: 0"
 
 # ---------------------------------------------------------------- venv + install
 echo "== throwaway venv (under $VENV) =="
@@ -206,13 +224,14 @@ def raw(path, headers=None):
 
 try:
     st, loc, _ = raw("/")
-    assert (st, loc) == (302, "/hermes/"), (st, loc)
-    st, _, body = raw("/hermes/")
+    assert (st, loc) == (302, "/chat"), (st, loc)
+    st, _, body = raw("/chat")
     assert st == 200 and b"__HERMES_BASE_PATH__" in body, st
-    asset = re.search(rb"/hermes/(assets/[^\"]+\.js)", body).group(1).decode()
-    st, _, ab = raw("/hermes/" + asset)
+    assert b'__HERMES_BASE_PATH__=""' in body, "base path not root"
+    asset = re.search(rb"/(assets/[^\"]+\.js)", body).group(1).decode()
+    st, _, ab = raw("/" + asset)
     assert st == 200 and len(ab) > 1000, (asset, st, len(ab))
-    st, _, pb = raw("/hermes/api/dashboard/plugins",
+    st, _, pb = raw("/agent/api/dashboard/plugins",
                     {"X-Hermes-Session-Token": "probe-token"})
     names = [m["name"] for m in json.loads(pb)]
     for want in ("qubit-ops", "qubit-devices", "qubit-memory",
@@ -233,7 +252,19 @@ import hermes_cli.main as m  # noqa: E402  (forced by ensure_path above)
 mod = pathlib.Path(m.__file__).resolve()
 assert mod.is_relative_to(root), (mod, root)
 
-print(f"OK dashboard plugins={len(names)} runtime={root}")
+# Real runtime import path: the default service start imports the orchestrator
+# (and therefore local_llm) and builds the VAD gate. On a stock install the
+# silero VAD model is absent, so voicebridge/audio/vad.py falls back to
+# webrtcvad, which imports the legacy pkg_resources API at import time. This
+# probe catches both an undeclared setuptools dependency and a Python-floor
+# syntax incompatibility that a webui-only import misses.
+import voicebridge.orchestrator as _orch  # noqa: E402,F401
+from voicebridge.audio.vad import _make_vad_gate  # noqa: E402
+
+_gate = _make_vad_gate("silero", 1, None)
+assert callable(_gate), "default VAD gate did not resolve (silero->webrtc fallback)"
+
+print(f"OK dashboard plugins={len(names)} runtime={root} vads=webrtc-fallback")
 PY
 VB_INSTALL_VENV="$VENV" "$VENV/bin/python" -I "$WORK/probe.py" \
   || fail "startup probe failed"

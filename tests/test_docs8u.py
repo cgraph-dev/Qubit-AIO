@@ -60,15 +60,15 @@ def _http(port, method, path, body=None, token="test-token"):
 def test_docs_page_served_with_shell(tmp_path):
     ui, port = _start(tmp_path)
     try:
-        # Hermes-first: /docs aliases into the Hermes shell Docs workspace.
+        # Qubit rebrand: /docs is the Qubit Docs workspace, served at root.
         import http.client
         for route in ("/docs", "/docs.html"):
             conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
             conn.request("GET", route)
             resp = conn.getresponse()
-            resp.read()
-            assert resp.status == 302, (route, resp.status)
-            assert resp.getheader("Location") == "/hermes/docs", route
+            body = resp.read()
+            assert resp.status == 200, (route, resp.status)
+            assert b'id="root"' in body, route
         # The labelled /classic/ fallback still serves the static docs page.
         status, ctype, body = _http(port, "GET", "/classic/docs")
         assert status == 200, status

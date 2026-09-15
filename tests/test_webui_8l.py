@@ -73,23 +73,27 @@ def _http_status_location(port, path):
     return resp.status, loc
 
 
-def test_every_normal_route_renders_the_hermes_shell(tmp_path):
-    """Hermes-first: every normal dashboard route redirects into the
-    Hermes React shell; only /classic/ and /token-setup serve static HTML."""
+def test_every_normal_route_serves_the_spa_shell(tmp_path):
+    """Qubit rebrand: every normal dashboard route serves the root-served
+    SPA shell (200); nothing redirects into an upstream-named prefix."""
     from voicebridge.webui import hermes_alias_target
     ui, port = _start(tmp_path)
     try:
-        # root is the active Hermes dashboard, never the legacy static page
+        # root is the SPA, reached via the public /chat route
         status, loc = _http_status_location(port, "/")
-        assert (status, loc) == (302, "/hermes/"), (status, loc)
+        assert (status, loc) == (302, "/chat"), (status, loc)
         for page in PAGES:
             if page in ("/classic/", "/token-setup"):
                 continue
             target = hermes_alias_target(page)
             assert target is not None, page
-            assert target.startswith("/hermes/"), (page, target)
-            status, loc = _http_status_location(port, page)
-            assert (status, loc) == (302, target), (page, status, loc)
+            assert "hermes" not in target.lower(), (page, target)
+            status, ctype, body = _http(port, "GET", page)
+            if status == 404 and b"not built" in body:
+                continue  # dashboard build absent in this checkout
+            assert status == 200, (page, status)
+            assert "text/html" in ctype, (page, ctype)
+            assert b'id="root"' in body, page
     finally:
         ui.stop()
 
@@ -111,17 +115,16 @@ def test_classic_fallback_serves_static_pages(tmp_path):
 
 
 def test_normal_routes_never_serve_static_qubit_html(tmp_path):
-    """No normal route returns the legacy static markup (even via redirect,
-    the final body is the Hermes shell, not the old horizontal nav)."""
+    """No normal route returns the legacy static markup; every normal route
+    serves the SPA shell (or the dashboard-not-built gate), never the old
+    horizontal nav."""
     from voicebridge.webui import hermes_alias_target
     ui, port = _start(tmp_path)
     try:
         for page in [p for p in PAGES if hermes_alias_target(p)]:
             status, _, body = _http(port, "GET", page)  # follows redirect
             if status == 404:
-                # hermes-dist not built in this checkout; the alias target
-                # is still asserted above.
-                continue
+                continue  # dashboard build absent in this checkout
             assert status == 200, page
             html = body.decode("utf-8", "replace")
             assert "Qubit VoiceBridge — Workspace" not in html, page

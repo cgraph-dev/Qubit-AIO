@@ -1,10 +1,11 @@
-"""Live serving tests for the vendored Hermes dashboard (amendment 2026-09-11).
+"""Live serving tests for the vendored dashboard on Qubit-owned public paths.
 
 Boots the real Qubit WebUI on loopback and proves:
-- /hermes/ serves the built dashboard shell with token + base-path injection;
-- /hermes/api/* compat endpoints answer with the Qubit token header
+- /chat (and every root client route) serves the built dashboard shell with
+  token + API-prefix injection; no /hermes/ path is served;
+- /agent/api/* compat endpoints answer with the Qubit token header
   (X-Hermes-Session-Token) and reject without it;
-- overlay plugin bundles + manifests are served;
+- overlay plugin bundles + manifests are served at /dashboard-plugins/*;
 - SPA deep links fall back to the shell;
 - the classic Qubit pages still serve (no regression).
 """
@@ -73,11 +74,12 @@ def _http(port, method, path, body=None, token="test-token",
 def test_hermes_shell_serves_with_injection(tmp_path):
     ui, port = _start(tmp_path)
     try:
-        status, ctype, body = _http(port, "GET", "/hermes/")
+        status, ctype, body = _http(port, "GET", "/chat")
         assert status == 200, status
         assert "text/html" in ctype
         text = body.decode()
-        assert "__HERMES_BASE_PATH__" in text and "/hermes" in text
+        assert "__HERMES_BASE_PATH__" in text and "__QUBIT_API_PREFIX__" in text
+        assert "/agent" in text and "/hermes/" not in text
         assert "__HERMES_SESSION_TOKEN__" in text
         assert "Hermes" in text or "hermes" in text or "assets/" in text
     finally:
@@ -88,7 +90,7 @@ def test_hermes_shell_serves_with_injection(tmp_path):
 def test_hermes_spa_deep_link_falls_back(tmp_path):
     ui, port = _start(tmp_path)
     try:
-        for deep in ("/hermes/sessions", "/hermes/skills", "/hermes/qubit-chat"):
+        for deep in ("/sessions", "/skills", "/plugins"):
             status, _, body = _http(port, "GET", deep)
             assert status == 200, (deep, status)
             assert b"__HERMES_BASE_PATH__" in body, deep
@@ -100,16 +102,16 @@ def test_hermes_spa_deep_link_falls_back(tmp_path):
 def test_hermes_api_auth_and_status(tmp_path):
     ui, port = _start(tmp_path)
     try:
-        status, _, _ = _http(port, "GET", "/hermes/api/status", token=None)
+        status, _, _ = _http(port, "GET", "/agent/api/status", token=None)
         assert status == 401, status
-        status, ctype, body = _http(port, "GET", "/hermes/api/status",
+        status, ctype, body = _http(port, "GET", "/agent/api/status",
                                     hermes_token=True)
         assert status == 200, (status, body[:200])
         out = json.loads(body)
         # Cutover stage 2: /api/status is a safe read served by the vendored
         # Hermes backend (real status shape), not the compat wrapper.
         assert out.get("version") and "overall" in out, out
-        status, _, body = _http(port, "GET", "/hermes/api/dashboard/themes",
+        status, _, body = _http(port, "GET", "/agent/api/dashboard/themes",
                                 hermes_token=True)
         assert status == 200
         assert json.loads(body)["active"] == "qubit"
@@ -121,18 +123,18 @@ def test_hermes_api_auth_and_status(tmp_path):
 def test_hermes_plugins_served(tmp_path):
     ui, port = _start(tmp_path)
     try:
-        status, _, body = _http(port, "GET", "/hermes/api/dashboard/plugins",
+        status, _, body = _http(port, "GET", "/agent/api/dashboard/plugins",
                                 hermes_token=True)
         assert status == 200
         plugins = json.loads(body)
         names = [m["name"] for m in plugins]
         assert names == ["qubit-approvals", "qubit-boards", "qubit-brand", "qubit-chat",
-                          "qubit-devices", "qubit-gateway", "qubit-memory", "qubit-ops",
-                          "qubit-reports", "qubit-runtime"], names
+                          "qubit-devices", "qubit-gateway", "qubit-memory", "qubit-models",
+                          "qubit-ops", "qubit-reports", "qubit-runtime"], names
         for name in names:
             mf = [m for m in plugins if m["name"] == name][0]
             status, ctype, js = _http(
-                port, "GET", f"/hermes/dashboard-plugins/{name}/{mf['entry']}")
+                port, "GET", f"/dashboard-plugins/{name}/{mf['entry']}")
             assert status == 200, (name, status)
             assert "application/javascript" in ctype
             assert b"__HERMES_PLUGINS__" in js, name
@@ -144,12 +146,12 @@ def test_hermes_plugins_served(tmp_path):
 def test_hermes_chat_validation_live(tmp_path):
     ui, port = _start(tmp_path)
     try:
-        status, _, body = _http(port, "POST", "/hermes/api/qubit/chat",
+        status, _, body = _http(port, "POST", "/agent/api/qubit/chat",
                                 body={"text": "  ", "session": "t"},
                                 hermes_token=True)
         assert status == 400, (status, body[:200])
         assert json.loads(body)["code"] == "MALFORMED"
-        status, _, body = _http(port, "GET", "/hermes/api/pty",
+        status, _, body = _http(port, "GET", "/agent/api/pty",
                                 hermes_token=True)
         assert status == 403
         assert json.loads(body)["code"] == "PTY_NO_SHELL"

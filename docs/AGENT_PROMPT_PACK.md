@@ -4,6 +4,14 @@ Use this file with `docs/UNIFIED_AGENT_PLAN.md`.
 
 The authoritative architecture for the current completion effort is
 [`QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md`](QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md).
+The complete orchestrator prompt is
+[`QUBIT_FINAL_CODE_READY_PROMPT.md`](QUBIT_FINAL_CODE_READY_PROMPT.md).
+For the direct byte-level upstream comparison, complete page/plugin inventory,
+dead-code audit, and multi-agent repair wave, use
+[`QUBIT_BYTE_PARITY_VERIFICATION_PROMPT.md`](QUBIT_BYTE_PARITY_VERIFICATION_PROMPT.md)
+after the implementation base prompt. It is deliberately stricter than a
+ledger-only verification and explicitly covers Hermes achievements and every
+frontend workflow.
 It records the owner-approved runtime decision: the complete pinned Hermes
 source is the Qubit-owned runtime foundation; OpenClaw is integrated on top of
 it; and CLI, dashboard, and VoiceBridge use the same real backend operations.

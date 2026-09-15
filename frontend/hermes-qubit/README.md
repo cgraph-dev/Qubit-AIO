@@ -56,8 +56,8 @@ pinned hermes-agent@2237be3 (see `docs/HERMES_SOURCE_COMPARISON.json`).
 
 The canonical reproducible build is `scripts/build_dashboard.sh`, which sets
 up the `frontend/apps/shared` workspace link, installs the declared
-dependencies, typechecks, and writes the bundle with the `/hermes/` base the
-server expects:
+dependencies, typechecks, and writes the bundle for the Qubit root base (`/`)
+the server expects:
 
 ```sh
 scripts/build_dashboard.sh
@@ -69,7 +69,7 @@ Equivalent manual steps:
 cd frontend/hermes-web
 npm install --legacy-peer-deps --no-audit --no-fund   # deps declared in package.json
 mkdir -p ../apps && ln -sfn ../hermes-shared ../apps/shared   # monorepo layout
-npx vite build --base=/hermes/ --outDir ../hermes-dist --emptyOutDir
+npx vite build --base=/ --outDir ../hermes-dist --emptyOutDir
 ```
 
 `frontend/hermes-dist/` is a build artifact (VCS-ignored) and is declared in
@@ -77,6 +77,6 @@ npx vite build --base=/hermes/ --outDir ../hermes-dist --emptyOutDir
 so wheel/sdist builds ship it and a clean install serves the dashboard with
 no checkout or untracked file. `voicebridge.webui` resolves the bundle (and
 the `frontend/hermes-qubit/plugins` overlay) from package data first, then
-the checkout, and serves it at `/hermes/` with the loopback session token +
-`__HERMES_BASE_PATH__=/hermes` injected server-side (vendored `index.html`
+the checkout, and serves it at `/` with the loopback session token +
+`__HERMES_BASE_PATH__=""` injected server-side (vendored `index.html`
 untouched).

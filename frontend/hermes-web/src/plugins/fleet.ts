@@ -11,11 +11,20 @@
 import { HERMES_BASE_PATH } from "@/lib/api";
 import type { PluginManifest } from "./types";
 
-export const FLEET_MANIFEST_PATH = `${HERMES_BASE_PATH}/plugins/fleet.json`;
+/** Dashboard-relative fleet manifest URL.
+ *
+ * Resolved lazily (not at module load) so importing this module never reads
+ * `@/lib/api` at evaluation time: tests that partially mock `@/lib/api` (e.g.
+ * SessionsPage.test.tsx) must not fail just because this overlay module is
+ * transitively imported.
+ */
+export function fleetManifestPath(): string {
+  return `${HERMES_BASE_PATH}/plugins/fleet.json`;
+}
 
 export async function loadFleetManifests(): Promise<PluginManifest[]> {
   try {
-    const res = await fetch(FLEET_MANIFEST_PATH, {
+    const res = await fetch(fleetManifestPath(), {
       credentials: "same-origin",
       headers: { accept: "application/json" },
     });

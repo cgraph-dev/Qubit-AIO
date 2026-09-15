@@ -68,7 +68,7 @@ def _stage_confirm(port, method, path, body):
     status, out = _http(port, method, path, body)
     assert status == 409, (path, status, out)
     assert out.get("state") == "NEEDS_CONFIRMATION", out
-    status, done = _http(port, "POST", "/hermes/api/ops/confirm",
+    status, done = _http(port, "POST", "/agent/api/ops/confirm",
                           {"confirmation_id": out["confirmation_id"]})
     assert status == 200 and done.get("ok"), (path, status, done)
     return done
@@ -78,18 +78,18 @@ def _stage_confirm(port, method, path, body):
 def test_board_card_lifecycle_over_http(tmp_path):
     ui, port = _start(tmp_path)
     try:
-        _stage_confirm(port, "POST", "/hermes/api/ops/boards-create",
+        _stage_confirm(port, "POST", "/agent/api/ops/boards-create",
                        {"board": "main", "name": "Main"})
-        done = _stage_confirm(port, "POST", "/hermes/api/ops/cards-create",
+        done = _stage_confirm(port, "POST", "/agent/api/ops/cards-create",
                               {"title": "buy milk", "board": "main"})
         tid = ((done.get("receipt") or {}).get("result") or {}).get(
             "task", {}).get("id")
         assert tid, done
-        _stage_confirm(port, "POST", "/hermes/api/ops/cards-move",
+        _stage_confirm(port, "POST", "/agent/api/ops/cards-move",
                        {"task_id": tid, "status": "claimed"})
-        _stage_confirm(port, "POST", "/hermes/api/ops/cards-complete",
+        _stage_confirm(port, "POST", "/agent/api/ops/cards-complete",
                        {"task_id": tid})
-        status, out = _http(port, "GET", "/hermes/api/ops/kanban?board=main")
+        status, out = _http(port, "GET", "/agent/api/ops/kanban?board=main")
         assert status == 200
         tasks = (out.get("result") or {}).get("tasks", [])
         assert [(t["id"], t["status"]) for t in tasks] == [(tid, "done")], \
@@ -108,7 +108,7 @@ def test_boards_tab_drives_backend(tmp_path):
             page = browser.new_page(viewport={"width": 1440, "height": 900})
             errors = []
             page.on("pageerror", lambda e: errors.append(str(e)))
-            page.goto(f"http://127.0.0.1:{port}/hermes/qubit-boards",
+            page.goto(f"http://127.0.0.1:{port}/qubit-boards",
                       timeout=30000)
             page.wait_for_timeout(2500)
             # Create board through the tab, confirm inline.
@@ -146,7 +146,7 @@ def test_boards_tab_drives_backend(tmp_path):
             page.wait_for_timeout(2000)
             assert not errors, errors[:3]
             browser.close()
-        status, out = _http(port, "GET", "/hermes/api/ops/kanban?board=main")
+        status, out = _http(port, "GET", "/agent/api/ops/kanban?board=main")
         assert status == 200
         tasks = (out.get("result") or {}).get("tasks", [])
         assert [(t["id"], t["status"]) for t in tasks] == [(1, "done")], \

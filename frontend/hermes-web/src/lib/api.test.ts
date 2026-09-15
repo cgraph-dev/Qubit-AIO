@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { api, fetchJSON, setManagementProfile } from "./api";
+import { api, fetchJSON, setManagementProfile, withApiPrefix } from "./api";
 
 const reloadMocks = vi.hoisted(() => ({
   attemptDashboardTokenReloadOnce: vi.fn(() => false),
@@ -99,7 +99,7 @@ describe("api.getModelOptions", () => {
     await api.getModelOptions({ refresh: true });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/model/options?refresh=1&include_unconfigured=1",
+      "/agent/api/model/options?refresh=1&include_unconfigured=1",
       expect.objectContaining({ credentials: "include" }),
     );
   });
@@ -113,7 +113,7 @@ describe("api.getModelOptions", () => {
     await api.getModelOptions({ profile: "default", refresh: true });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/model/options?profile=default&refresh=1&include_unconfigured=1",
+      "/agent/api/model/options?profile=default&refresh=1&include_unconfigured=1",
       expect.objectContaining({ credentials: "include" }),
     );
   });
@@ -131,7 +131,7 @@ describe("api OAuth helpers", () => {
     await api.startOAuthLogin("openai-codex");
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/providers/oauth/openai-codex/start",
+      "/agent/api/providers/oauth/openai-codex/start",
       expect.objectContaining({
         body: "{}",
         credentials: "include",
@@ -191,12 +191,27 @@ describe("api OAuth helpers", () => {
     await api.cancelOAuthSession("oauth-session");
 
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
-      "/api/providers/oauth?profile=worker",
-      "/api/providers/oauth/anthropic?profile=worker",
-      "/api/providers/oauth/openai-codex/start?profile=worker",
-      "/api/providers/oauth/anthropic/submit?profile=worker",
-      "/api/providers/oauth/anthropic/poll/oauth-session?profile=worker",
-      "/api/providers/oauth/sessions/oauth-session?profile=worker",
+      "/agent/api/providers/oauth?profile=worker",
+      "/agent/api/providers/oauth/anthropic?profile=worker",
+      "/agent/api/providers/oauth/openai-codex/start?profile=worker",
+      "/agent/api/providers/oauth/anthropic/submit?profile=worker",
+      "/agent/api/providers/oauth/anthropic/poll/oauth-session?profile=worker",
+      "/agent/api/providers/oauth/sessions/oauth-session?profile=worker",
     ]);
+  });
+});
+
+describe("withApiPrefix", () => {
+  it("maps the vendored /api namespace onto the Qubit-owned /agent prefix", () => {
+    expect(withApiPrefix("/api/status")).toBe("/agent/api/status");
+    expect(withApiPrefix("/api/qubit/chat")).toBe("/agent/api/qubit/chat");
+    expect(withApiPrefix("/api/plugins/kanban/boards?x=1")).toBe(
+      "/agent/api/plugins/kanban/boards?x=1",
+    );
+  });
+
+  it("leaves non-API paths (auth, plugin assets) unchanged", () => {
+    expect(withApiPrefix("/auth/logout")).toBe("/auth/logout");
+    expect(withApiPrefix("/plugins/fleet.json")).toBe("/plugins/fleet.json");
   });
 });

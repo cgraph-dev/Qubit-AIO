@@ -23,6 +23,12 @@ The dashboard-specific route, workflow, and visual requirements are defined in
 [`QUBIT_DASHBOARD_REBUILD_PLAN.md`](QUBIT_DASHBOARD_REBUILD_PLAN.md). A Talk
 page alone is never dashboard parity.
 
+The owner-approved configurable-provider, advanced Brain4-research, and
+scoped-autonomy requirements are defined in
+[`QUBIT_OWNER_AMENDMENT_2026-09-15_PROVIDER_AND_VOICE_PLUGGABILITY.md`](QUBIT_OWNER_AMENDMENT_2026-09-15_PROVIDER_AND_VOICE_PLUGGABILITY.md)
+and implemented under
+[`QUBIT_PRODUCT_PARITY_AND_AUTONOMY_PLAN_2026-09-15.md`](QUBIT_PRODUCT_PARITY_AND_AUTONOMY_PLAN_2026-09-15.md).
+
 ## Definition of done
 
 1. `qubit` is the canonical launcher, package, service, dashboard, and
@@ -57,7 +63,7 @@ documented migration aliases may retain the name and must not be falsified.
 Qubit Agent / Qubit VoiceBridge
   ├── Qubit-owned fork of the pinned Hermes agent runtime and entry point
   ├── qubit CLI and one authenticated dashboard
-  ├── one voice/session path
+  ├── one voice/session/policy path with selectable provider profiles
   ├── one broker, permission, audit, redaction, and e-stop authority
   ├── Hermes baseline + OpenClaw integrations behind Qubit contracts
   └── one config/state/data/release plane
@@ -122,8 +128,11 @@ Qubit → supervisor → external Hermes assistant
 - Give every implemented CLI/dashboard operation natural Qubit aliases,
   bounded argument parsing, typed errors, confirmations, cancellation,
   expiry, replay protection, session isolation, and redacted receipts.
-- Preserve exactly one mic, ASR, TTS, Right-Ctrl, wake/session, barge-in, and
-  cancellation path.
+- Preserve one authoritative mic/session/broker/policy, Right-Ctrl, wake,
+  barge-in, and cancellation path while allowing owner-configured ASR, TTS,
+  realtime voice, language-model, device, quality, and routing profiles.
+- Make Qubit-Brain4 a replaceable local default rather than a hard-coded model;
+  provide tested local-only and explicit approved API/realtime provider paths.
 
 ### 5. Complete OpenClaw integration
 

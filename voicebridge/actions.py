@@ -806,9 +806,10 @@ class ActionBroker(CapabilityBroker):
 
     def __init__(self, confirm_required: Tuple[str, ...] = (),
                  default_ttl_s: float = 300.0,
-                 power_control: Optional[Any] = None):
+                 power_control: Optional[Any] = None,
+                 cfg: Optional[Any] = None):
         super().__init__(default_ttl_s=default_ttl_s,
-                         power_control=power_control)
+                         power_control=power_control, cfg=cfg)
         self._confirm_required = frozenset(confirm_required)
 
     def execute(self, capability: str, args: Dict[str, Any], *, source: str,
@@ -817,7 +818,11 @@ class ActionBroker(CapabilityBroker):
                 dry_run: bool = False,
                 timeout_s: Optional[float] = None,
                 max_output: int = 200_000,
-                utterance: str = "") -> ExecResult:
+                utterance: str = "",
+                target: str = "",
+                owner: Optional[str] = None,
+                session: Optional[str] = None,
+                device: Optional[str] = None) -> ExecResult:
         if capability in self._confirm_required and not confirmation_id:
             log_event("broker.action.deny_first", capability=capability,
                       source=source, code="CONFIRMATION_REQUIRED")
@@ -826,7 +831,9 @@ class ActionBroker(CapabilityBroker):
                                correlation_id=correlation_id,
                                confirmation_id=confirmation_id,
                                dry_run=dry_run, timeout_s=timeout_s,
-                               max_output=max_output, utterance=utterance)
+                               max_output=max_output, utterance=utterance,
+                               target=target, owner=owner, session=session,
+                               device=device)
 
 
 def actions_broker(cfg=None, *, executors: Optional[Dict[str, Callable]] = None,
@@ -841,11 +848,11 @@ def actions_broker(cfg=None, *, executors: Optional[Dict[str, Callable]] = None,
     every action path observes the same global control state.
     """
     from .broker import build_host_broker
-    host = build_host_broker(power_control=power_control)
+    host = build_host_broker(power_control=power_control, cfg=cfg)
     confirm_required = tuple(s.action_id for s in action_specs()
                              if s.needs_confirmation)
     broker = ActionBroker(confirm_required=confirm_required,
-                          power_control=power_control)
+                          power_control=power_control, cfg=cfg)
     broker.registry = host.registry
     broker.engine = host.engine
     for name, binding in host._bindings.items():

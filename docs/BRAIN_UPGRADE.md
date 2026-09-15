@@ -1,93 +1,125 @@
-# Brain Upgrade — How to Make the Local 3B Smarter (Beyond Text Files)
+# Qubit-Brain4 Lifecycle and Advanced Local Research
 
-> You asked: can we edit the model's brain directly, remove bad habits and teach new things, auto-improve — not just prompts/templates. Answer: yes, with **finetuning**. Here's the practical path for this box.
+Status: **ACTIVE OWNER-DIRECTED PLAN — 2026-09-15**
 
-## Reality Check (This Box: Ryzen 5700X + RTX 3070 Ti 8 GB + 62 GB RAM)
+Qubit-Brain4 is the current default local language-model profile. It is not the
+Qubit product, not the authorization layer, and not a permanent dependency.
+Qubit remains usable with another local model, an approved API model, or a
+future model profile. This document governs Qubit-Brain4 development and its
+integration into the product.
 
-| Method | VRAM Need | Time | Risk | What It Does |
-|--------|-----------|------|------|--------------|
-| **Ollama modelfile SYSTEM patch** | 0 | 1 min | none | Bakes routing rules into the model weights-adjacent layer — survives no-file edits |
-| **LoRA finetune (Unsloth / Axolotl)** | 8–12 GB | 20–90 min | low | Trains a small adapter on your voice logs so the 3B learns your tasks |
-| **Abliteration / weight surgery (Obliteratus)** | 8 GB | 10 min | medium | Removes refusals / over-cautious behavior at the weight level |
-| **Knowledge distillation from 30B/70B** | 8 GB | 2–6 h | medium | Big model teaches small model your domain |
-| **Continuous auto-improve (RL / DPO loop)** | 8 GB | ongoing | needs data | Nightly retrain on accepted vs rejected replies |
+The controlling product requirements are:
 
-**Text files (what we already do) are the right first layer** — `SYSTEM_PROMPT`, `dialogs.md`, templates, `shared_memory`, sticky routing — they cost 0 VRAM and survive reboots. Brain edits are layer 2.
+- `QUBIT_OWNER_AMENDMENT_2026-09-15_PROVIDER_AND_VOICE_PLUGGABILITY.md`;
+- `QUBIT_PROVIDER_VOICE_PARITY_PLAN_2026-09-15.md`; and
+- `QUBIT_PRODUCT_PARITY_AND_AUTONOMY_PLAN_2026-09-15.md`.
 
-## Immediate Wins (Do These Today)
+## What the owner authorized
 
-### 1. Ollama modelfile — bake the persona without touching code
+The owner may experiment locally with a Modelfile/persona, LoRA/adapters,
+distillation, preference optimization, and weight-level research including
+abliteration. These are **research candidate** workflows, not automatic
+production changes.
 
-```dockerfile
-# Modelfile.qubit
-FROM huihui_ai/llama3.2-abliterate:3b
-SYSTEM """You are Qubit, Tricky's voice assistant. You NEVER forget routing: when the user says route to agent/worker/browser, you honor it for the next 8 turns. You produce professional reports via the generate_report.py helper. You speak directly, no filler."""
-PARAMETER temperature 0.4
-PARAMETER num_ctx 4096
-```
+An experimental model may be intentionally less restrictive in what it says.
+It cannot bypass Qubit's capability broker, profile scopes, authenticated owner
+control, audit, secret isolation, resource budget, cancellation, or emergency
+stop. A language model proposes; Qubit decides what may execute.
 
-```bash
-ollama create qubit-brain -f Modelfile.qubit
-# then set intent.local_llm.model: qubit-brain in voice.yaml
-```
+## Model roles
 
-### 2. Obliteratus — remove the "I'm sorry, I can't" reflex
+Qubit supports independently selected profiles for:
 
-```bash
-pip install obliteratus
-# needs the HF model dir — run on the 3B
-python -m obliteratus --model huihui_ai/llama3.2-abliterate --output qubit-abliterated
-ollama create qubit-abliterated -f Modelfile.abliterated
-```
+| Role | Default | May be changed to |
+|---|---|---|
+| Main local reasoning | `qubit-brain4` | another validated local profile |
+| Fast/local classification or summary | configured local profile | another local or explicit API profile |
+| Difficult reasoning/coding/research | local-only by default | an owner-approved named API profile |
+| ASR/TTS/realtime speech | current local profiles | separately selected local or approved external profiles |
 
-This is literally weight surgery (diff-in-means on refusal vectors) — no prompt can replicate it.
+The active language model, speech profile, provider locality, egress decision,
+fallback, and cost/usage must be visible in the Qubit receipt and session UI.
 
-### 3. Unsloth LoRA — teach it YOUR tasks from logs
+## Candidate lifecycle
 
-Collect training data from `events.jsonl` + `shared_memory.jsonl`:
+1. Create a new immutable candidate ID; never overwrite `qubit-brain4`.
+2. Record base artifact, exact revision/digest, license, template, source,
+   training method, data policy, hardware/resource cost, and rollback target.
+3. Run functional, held-out quality, policy/tool-boundary, privacy, latency,
+   VRAM/RAM, failure, and rollback evaluations.
+4. Store an evaluation receipt and make the candidate available only as a
+   non-default model profile.
+5. The owner reviews the receipt and explicitly activates the candidate through
+   the profile lifecycle. Activation is atomic and reversible.
+6. Keep the previous active profile available until the replacement has passed
+   a real session and voice/CLI/dashboard smoke test.
+7. Archive or remove candidate artifacts only with an explicit lifecycle
+   action; removal never deletes Qubit sessions, memory, reports, or other
+   profiles.
 
-```python
-# build training set: 200-500 examples of (instruction → perfect report / routing)
-{"instruction": "fix the login bug", "output": "<professional report markdown + 40w summary>"}
-{"instruction": "route to agent", "output": "Got it — routing to the agent from now on."}
-```
+## Training-data policy
 
-```bash
-pip install unsloth
-python scripts/finetune_lora.py --data data/qubit_train.jsonl --base huihui_ai/llama3.2-abliterate:3b --iters 200
-# produces adapters/qubit-lora/ — merge or load as ollama model
-```
+Training jobs use owner-selected local datasets. The UI/CLI must expose:
 
-## Auto-Improve Loop (Nightly)
+- dataset sources and date range;
+- redacted versus raw-local mode (new jobs default to redacted);
+- which fields are included/excluded, deduplication, retention, and deletion;
+- whether any egress is permitted (off by default);
+- license/consent provenance and experiment owner; and
+- the resulting candidate ID, digest, metrics, and rollback path.
 
-```
-events.jsonl + shared_memory.jsonl
-        │
-        ├──> nightly job: extract (user text → agent reply, was it accepted?)
-        ├──> DPO dataset: chosen vs rejected
-        └──> Unsloth DPO step → new adapter → ollama create qubit-brain-v2
-```
+Raw local logs and audio can be selected by the owner under the advanced
+research policy. They are not silently collected, uploaded, used for nightly
+automatic retraining, or used to replace the active model. Secrets, browser
+cookies, credential values, and hidden system prompts remain excluded.
 
-```bash
-# cron: 03:00 nightly
-0 3 * * * ~/qubit-voice-agent/scripts/auto_improve.sh
-```
+## Practical experiment lanes
 
-`auto_improve.sh` should: pull last 7 days logs → build DPO pairs (tasks where you said "good" vs re-prompted) → 30-min finetune → swap model if eval improves.
+### Persona/template lane
 
-## What We Already Ship (No Brain Edit Needed)
+Use a new Modelfile and candidate alias to test behavior, context, temperature,
+and tool-format changes. Validate the complete runtime request path as well as
+direct local inference; direct `ollama run` behavior is not proof of Qubit
+behavior.
 
-- `scripts/generate_report.py` — the local agent never needs to reason about report format; it just calls the script (works even if the 3B is "retarded").
-- `voicebridge/shared_memory.py` — ledger survives reboots + lane switches (agent / worker / browser / local all share it).
-- `StickyRouteState` — `route to agent` persists 8 turns / 10 min to disk (`sticky_route.json`), so the tiny brain doesn't need to remember.
-- `templates/professional_report.md` — the orchestrator's nudge tells the big-model worker to produce the two-layer report (full + 40w spoken).
+### Adapter/LoRA lane
 
-## Recommendation For You
+Train an adapter against a reviewed task corpus, then compare it against a
+held-out corpus and the existing default. Measure task quality, structured
+output/tool accuracy, hallucination rate, latency, VRAM, and regression on
+normal conversation. Keep adapter/base compatibility and rollback metadata.
 
-**Don't LoRA yet** — finish the deterministic layer (done) and collect 2 weeks of real logs. Then:
+### Distillation/preference lane
 
-1. Today: `Modelfile.qubit` (SYSTEM bake) + verify OpenAI Nova voice toggle.
-2. Week 2: run `scripts/finetune_lora.py` on 300+ real examples.
-3. Ongoing: `auto_improve.sh` nightly DPO.
+Use consented examples and explicit quality criteria. Prefer a reviewable,
+versioned dataset over implicit “good/bad” inference from logs. A local model
+may learn response style and task procedures, but Qubit's permissions and
+policy stay outside the model weights.
 
-The 3B will never be a 30B — but with LoRA + abliteration + deterministic report scripts, it behaves like a much smarter model for YOUR tasks, on this 8 GB GPU.
+### Weight-research lane
+
+Weight surgery, including abliteration, is allowed only in the experimental
+lane. Its evaluation must document changed behavior and possible safety/quality
+trade-offs. It must not auto-promote, replace the active default, or be
+described as authorization control.
+
+## Product integration requirements
+
+The model profile registry—not hard-coded aliases—must supply the model used by
+chat, agent, planner, intent routing, summaries, vision, evaluation, CLI,
+dashboard, and VoiceBridge. Direct provider calls are open defects unless they
+use the canonical resolver and emit the same receipt/audit fields.
+
+Qubit must support local-only operation. A hard question may route to a named
+approved API model only under the selected model/autonomy profile and egress
+policy. Fallback across locality boundaries is opt-in, typed, visible, and
+cancelable. A provider failure never fabricates an answer or silently changes
+the model identity.
+
+## Definition of done
+
+Brain4 integration is complete only when the user can list, inspect, test,
+clone, activate, deactivate, roll back, and remove model profiles from Qubit
+CLI and dashboard; use corresponding non-secret voice commands; run a
+candidate safely; choose local/API/realtime routes explicitly; and retain one
+session/memory/broker/audit path regardless of model choice.

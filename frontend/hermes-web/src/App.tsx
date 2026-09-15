@@ -105,6 +105,12 @@ import type { PluginManifest } from "@/plugins";
 import { useTheme } from "@/themes";
 import { isDashboardEmbeddedChatEnabled } from "@/lib/dashboard-flags";
 import { latchChatActivation } from "@/lib/chat-activation";
+import { ROUTE_TITLES } from "@/lib/resolve-page-title";
+import {
+  parsePolicyRefusal,
+  policyRefusalMessage,
+  type PolicyRefusal,
+} from "@/lib/policy-refusal";
 import { api } from "@/lib/api";
 import type { StatusResponse, UpdateCheckResponse } from "@/lib/api";
 
@@ -265,7 +271,7 @@ function buildNavItems(
 
     const pluginItem: NavItem = {
       path: manifest.tab.path,
-      label: manifest.label,
+      label: ROUTE_TITLES[manifest.tab.path] ?? manifest.label,
       icon: resolveIcon(manifest.icon),
     };
 
@@ -475,12 +481,13 @@ export default function App() {
   );
   const pluginTabMeta = useMemo(
     () =>
-      manifests
-        .filter((m) => !m.tab.hidden)
-        .map((m) => ({
-          path: m.tab.override ?? m.tab.path,
-          label: m.label,
-        })),
+      manifests.map((m) => {
+        // Hidden tabs (/qubit-approvals, /qubit-brand) still claim a URL, so
+        // they need a real page title too; ROUTE_TITLES keeps the Qubit overlay
+        // labels distinct from the vendored duplicate routes.
+        const path = m.tab.override ?? m.tab.path;
+        return { path, label: ROUTE_TITLES[path] ?? m.label };
+      }),
     [manifests],
   );
 
@@ -946,10 +953,63 @@ function SidebarSystemActions({
   const [updateConfirmInfo, setUpdateConfirmInfo] =
     useState<UpdateCheckResponse | null>(null);
   const [updateConfirmChecking, setUpdateConfirmChecking] = useState(false);
+  // The status endpoint can advertise `can_update_hermes: true` while the
+  // Qubit backend refuses in-place dashboard self-updates with a typed
+  // UPDATE_OPERATOR_OWNED policy refusal. Probe once up front so the action
+  // renders honestly disabled with that reason instead of offering a control
+  // that can only fail (the expected refusal must never surface as a raw
+  // `ACTION FAILED: 403` toast).
+  const [updateRefusal, setUpdateRefusal] = useState<PolicyRefusal | null>(
+    null,
+  );
+  // Qubit refuses in-dashboard process supervision (gateway start/stop/restart)
+  // with a typed GATEWAY_NO_SUPERVISION refusal. GET /api/gateway carries the
+  // supervision policy, so the restart action can be honestly disabled with
+  // that reason instead of failing on click.
+  const [gatewayRefusal, setGatewayRefusal] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!updateConfirmOpen) {
-      setUpdateConfirmInfo(null);
+    let cancelled = false;
+    api
+      .getGatewayStatus()
+      .then((res) => {
+        if (cancelled) return;
+        const supervision = res?.supervision ?? "";
+        setGatewayRefusal(
+          supervision.includes("GATEWAY_NO_SUPERVISION") ? supervision : null,
+        );
+      })
+      .catch(() => {
+        // Best-effort probe: leave the action enabled and classify any typed
+        // refusal when the operator actually invokes it.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!canUpdateHermes) return;
+    let cancelled = false;
+    api
+      .checkHermesUpdate(false)
+      .then((info) => {
+        if (cancelled) return;
+        setUpdateConfirmInfo(info);
+        setUpdateRefusal(null);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setUpdateConfirmInfo(null);
+        setUpdateRefusal(parsePolicyRefusal(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canUpdateHermes]);
+
+  useEffect(() => {
+    if (!updateConfirmOpen || updateRefusal) {
       return;
     }
     let cancelled = false;
@@ -959,8 +1019,10 @@ function SidebarSystemActions({
       .then((info) => {
         if (!cancelled) setUpdateConfirmInfo(info);
       })
-      .catch(() => {
-        if (!cancelled) setUpdateConfirmInfo(null);
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setUpdateConfirmInfo(null);
+        setUpdateRefusal(parsePolicyRefusal(err));
       })
       .finally(() => {
         if (!cancelled) setUpdateConfirmChecking(false);
@@ -968,7 +1030,7 @@ function SidebarSystemActions({
     return () => {
       cancelled = true;
     };
-  }, [updateConfirmOpen]);
+  }, [updateConfirmOpen, updateRefusal]);
 
   const updateConfirmDescription = useMemo(() => {
     if (updateConfirmInfo?.behind && updateConfirmInfo.behind > 0) {
@@ -990,6 +1052,7 @@ function SidebarSystemActions({
       label: t.status.restartGateway,
       runningLabel: t.status.restartingGateway,
       spin: true,
+      disabledReason: gatewayRefusal ?? undefined,
     },
   ];
   if (canUpdateHermes) {
@@ -999,11 +1062,16 @@ function SidebarSystemActions({
       label: t.status.updateHermes,
       runningLabel: t.status.updatingHermes,
       spin: false,
+      disabledReason: updateRefusal
+        ? policyRefusalMessage(updateRefusal)
+        : undefined,
     });
   }
 
   const handleClick = (action: SystemAction) => {
     if (isBusy) return;
+    if (action === "update" && updateRefusal) return;
+    if (action === "restart" && gatewayRefusal) return;
     if (action === "restart") {
       setRestartConfirmOpen(true);
       return;
@@ -1061,7 +1129,10 @@ function SidebarSystemActions({
           <SystemActionButton
             key={item.action}
             collapsed={collapsed}
-            disabled={isBusy && !(pendingAction === item.action || (activeAction === item.action && isRunning))}
+            disabled={
+              !!item.disabledReason ||
+              (isBusy && !(pendingAction === item.action || (activeAction === item.action && isRunning)))
+            }
             tooltipWarmRef={tooltipWarmRef}
             isPending={pendingAction === item.action}
             isRunning={activeAction === item.action && isRunning && pendingAction !== item.action}
@@ -1097,7 +1168,7 @@ function SidebarSystemActions({
       loading={pendingAction === "update" || updateConfirmChecking}
       onCancel={() => setUpdateConfirmOpen(false)}
       onConfirm={confirmUpdate}
-      open={updateConfirmOpen}
+      open={updateConfirmOpen && !updateRefusal}
       title={t.status.updateHermesConfirmTitle ?? `${t.status.updateHermes}?`}
     />
     </>
@@ -1136,6 +1207,7 @@ function SystemActionButton({
         onClick={onClick}
         disabled={disabled}
         aria-busy={busy}
+        title={item.disabledReason || undefined}
         aria-label={collapsed ? displayLabel : undefined}
         onFocus={collapsed ? showTooltip : undefined}
         onBlur={collapsed ? hideTooltip : undefined}
@@ -1392,4 +1464,6 @@ interface SystemActionItem {
   label: string;
   runningLabel: string;
   spin: boolean;
+  /** When set, the action is honestly disabled with this operator-facing reason. */
+  disabledReason?: string;
 }

@@ -139,3 +139,22 @@ The latest gap ledger is open, so the product is not 1:1 or complete. Agents
 must report the actual ledger counts and exact remaining rows. `VERIFIED` is
 allowed only after an independent verifier reproduces the final evidence and
 the ledger has no code-side open rows.
+
+## Owner correction 2026-09-15 — plan integrity and execution order
+
+Read `QUBIT_PRODUCT_PARITY_AND_AUTONOMY_PLAN_2026-09-15.md`,
+`QUBIT_PROVIDER_VOICE_PARITY_PLAN_2026-09-15.md`, and
+`QUBIT_PLAN_INTEGRITY_AUDIT_2026-09-15.md` before new implementation waves.
+They resolve previous execution ambiguity without weakening this directive:
+
+- verify immutable vendor baseline bytes separately from Qubit overlay patches
+  and from actual user-visible behavior;
+- make every route, control, store, CLI leaf, and voice intent pass a
+  production-caller workflow test rather than accepting a 200 response;
+- use one Qubit provider/profile/session/broker authority while allowing
+  selectable local, API, and realtime voice adapters;
+- implement user-owned scoped autonomy profiles under audit/e-stop instead of
+  using a model or incoming content as an authority; and
+- batch coherent implementation work before the final expensive gates. A final
+  release wave must still run every required full, UI, lifecycle, package, and
+  independent-verifier gate.

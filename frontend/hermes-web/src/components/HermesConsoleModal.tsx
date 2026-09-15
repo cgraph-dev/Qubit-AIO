@@ -104,8 +104,8 @@ export function HermesConsoleModal({ open, onClose }: HermesConsoleModalProps) {
   const termRef = useRef<XtermTerminal | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const lineRef = useRef("");
-  const promptRef = useRef("hermes> ");
-  const inputPromptRef = useRef("hermes> ");
+  const promptRef = useRef("qubit> ");
+  const inputPromptRef = useRef("qubit> ");
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef<number | null>(null);
   const activeCommandRef = useRef(false);
@@ -273,7 +273,7 @@ export function HermesConsoleModal({ open, onClose }: HermesConsoleModalProps) {
       if (!term) return;
 
       if (frame.type === "ready") {
-        const nextPrompt = frame.prompt || "hermes> ";
+        const nextPrompt = frame.prompt || "qubit> ";
         promptRef.current = nextPrompt;
         inputPromptRef.current = nextPrompt;
         hasReadyFrameRef.current = true;
@@ -402,6 +402,35 @@ export function HermesConsoleModal({ open, onClose }: HermesConsoleModalProps) {
         const params = profile ? { profile } : undefined;
         const url = await api.buildWsUrl("/api/console", params);
         if (cancelled) return;
+        // Qubit serves a typed HTTP refusal for /api/console when no brokered
+        // console is mounted on this listener. Probe over HTTP first so the
+        // user sees the honest typed reason and a real safe alternative
+        // instead of opening a socket the browser logs as a fatal error.
+        const probe = await fetch(url.replace(/^ws/, "http"), { method: "GET" })
+          .catch(() => null);
+        if (cancelled) return;
+        if (probe && probe.status !== 101 && probe.status !== 200) {
+          let code = `HTTP ${probe.status}`;
+          let detail = "";
+          let counterpart = "";
+          try {
+            const body = (await probe.json()) as Record<string, unknown>;
+            code = String(body.code || code);
+            detail = String(body.detail || "");
+            counterpart = String(
+              body.qubit_counterpart || body.counterpart || "",
+            );
+          } catch {
+            /* non-JSON refusal; keep the HTTP status */
+          }
+          setConnectionState("error");
+          writeLine(term, `\x1b[33mConsole unavailable: ${code}\x1b[0m`);
+          if (detail) writeLine(term, `\x1b[2m${detail}\x1b[0m`);
+          if (counterpart) {
+            writeLine(term, `\x1b[2mSafe alternative: ${counterpart}\x1b[0m`);
+          }
+          return;
+        }
         const ws = new WebSocket(url);
         wsRef.current = ws;
 

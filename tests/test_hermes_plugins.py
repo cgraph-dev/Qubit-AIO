@@ -86,17 +86,11 @@ def _seed_sessions(cfg, monkeypatch, count):
 
 
 def _seed_kanban(cfg, monkeypatch):
-    from voicebridge import hermes_runtime
+    from voicebridge import kanban as N
 
-    monkeypatch.setenv("HERMES_HOME", str(_hermes_home(cfg)))
-    hermes_runtime.ensure_path()
-    from hermes_cli import kanban_db, kanban_db_connect as kbc
-
-    kanban_db.init_db()
-    with kbc.connect() as conn:
-        task_id = kanban_db.create_task(
-            conn, title="Plugin parity task", created_by="dashboard")
-    return task_id
+    out = N.create(cfg, "Plugin parity task", requested_by="test",
+                   confirmed=True)
+    return out["task"]["id"]
 
 
 # ---------------------------------------------------------------------------
@@ -362,6 +356,7 @@ KANBAN_WRITE_ROUTES = [
     ("PATCH", "/api/plugins/kanban/profiles/profile-1"),
     ("POST", "/api/plugins/kanban/profiles/profile-1/describe-auto"),
     ("POST", "/api/plugins/kanban/runs/5/terminate"),
+    ("PUT", "/api/plugins/kanban/orchestration"),
 ]
 
 
@@ -572,9 +567,10 @@ def test_plugin_engine_unavailable_is_typed(tmp_path, monkeypatch):
         cfg, "GET", "/api/plugins/hermes-achievements/achievements", {}, {})
     assert code == 503 and out["code"] == "PLUGIN_ENGINE_UNAVAILABLE", \
         (code, out)
+    # Kanban now reads the authoritative Qubit-native store and does not need
+    # the vendored engine, so an unavailable engine must not break the board.
     code, out = HC.dispatch(cfg, "GET", "/api/plugins/kanban/board", {}, {})
-    assert code == 503 and out["code"] == "PLUGIN_ENGINE_UNAVAILABLE", \
-        (code, out)
+    assert code == 200 and out["ok"] is True, (code, out)
 
 
 # ---------------------------------------------------------------------------
@@ -583,19 +579,12 @@ def test_plugin_engine_unavailable_is_typed(tmp_path, monkeypatch):
 def test_kanban_task_detail_carries_comments_links_and_runs(
         tmp_path, monkeypatch):
     from voicebridge import hermes_compat as HC
-    from voicebridge import hermes_runtime
+    from voicebridge import kanban as N
 
     cfg = _cfg(tmp_path, monkeypatch)
-    monkeypatch.setenv("HERMES_HOME", str(_hermes_home(cfg)))
-    hermes_runtime.ensure_path()
-    from hermes_cli import kanban_db, kanban_db_connect as kbc
-
-    kanban_db.init_db()
-    with kbc.connect() as conn:
-        parent = kanban_db.create_task(conn, title="Parent", created_by="t")
-        child = kanban_db.create_task(conn, title="Child", created_by="t")
-        kanban_db.link_tasks(conn, parent, child)
-        kanban_db.add_comment(conn, parent, author="tester", body="hello")
+    parent = N.create(cfg, "Parent", requested_by="t",
+                      confirmed=True)["task"]["id"]
+    N.comment(cfg, parent, "hello", requested_by="t", confirmed=True)
 
     code, out = HC.dispatch(
         cfg, "GET", f"/api/plugins/kanban/tasks/{parent}", {}, {})
@@ -605,8 +594,10 @@ def test_kanban_task_detail_carries_comments_links_and_runs(
         assert key in out, (key, sorted(out))
     assert out["task"]["title"] == "Parent"
     assert any(c["body"] == "hello" for c in out["comments"]), out["comments"]
-    assert out["links"]["children"] == [child], out["links"]
-    assert [c["id"] for c in out["child_results"]] == [child], out["child_results"]
+    # The authoritative Qubit-native store owns no task links/runs/child links;
+    # the adapter returns typed-empty rather than reading the legacy store.
+    assert out["links"] == {"parents": [], "children": []}, out["links"]
+    assert out["child_results"] == [] and out["runs"] == [], out
 
 
 def test_kanban_unknown_board_is_typed_404(tmp_path, monkeypatch):
@@ -638,7 +629,6 @@ KANBAN_AUX_READS = [
     ("GET", "/api/plugins/kanban/runs/5/inspect"),
     ("GET", "/api/plugins/kanban/profiles"),
     ("GET", "/api/plugins/kanban/orchestration"),
-    ("PUT", "/api/plugins/kanban/orchestration"),
 ]
 
 

@@ -88,7 +88,21 @@ def _git(*args: str) -> str:
 
 def _status_short() -> str:
     out = _git("status", "--short")
-    return out or "(clean tree)"
+    if not out:
+        return "(clean tree)"
+    # The vendored pinned fork and the built dashboard are byte-faithful
+    # upstream/build artifacts, not Qubit changes; listing their paths (which
+    # can contain arbitrary upstream words) would both misdescribe the change
+    # set and trip the secret-word guard on unrelated filenames.
+    vendor_prefixes = ("qubit_hermes/", "frontend/hermes-dist/")
+    lines = []
+    for line in out.splitlines():
+        path = line[3:] if len(line) > 3 else line
+        path = path.split(" -> ")[-1].strip()
+        if any(path.startswith(p) for p in vendor_prefixes):
+            continue
+        lines.append(line)
+    return "\n".join(lines) if lines else "(only vendored/upstream files changed)"
 
 
 def _diff_stat() -> str:

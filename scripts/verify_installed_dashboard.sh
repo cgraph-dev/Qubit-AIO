@@ -11,7 +11,17 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/qubit-install-XXXXXX")"
-trap 'rm -rf "$WORK"' EXIT
+# pyproject force-includes the whole frontend/ tree (a frozen mapping) and
+# hatchling force-include does NOT honor .gitignore, so a leftover
+# frontend/hermes-web/node_modules would ship ~21.6k build-only members into
+# the wheel. Stash it for the build and restore it on exit.
+NODE_MODULES="$REPO_ROOT/frontend/hermes-web/node_modules"
+NODE_MODULES_STASH="$WORK/node_modules.stash"
+cleanup() {
+  if [ -d "$NODE_MODULES_STASH" ]; then mv "$NODE_MODULES_STASH" "$NODE_MODULES"; fi
+  rm -rf "$WORK"
+}
+trap cleanup EXIT
 
 PY="${PYTHON:-$REPO_ROOT/.venv/bin/python}"
 command -v uv >/dev/null 2>&1 || {
@@ -33,6 +43,9 @@ if [ ! -f "$REPO_ROOT/frontend/hermes-dist/index.html" ]; then
 fi
 
 echo "== build wheel =="
+if [ -d "$NODE_MODULES" ]; then
+  mv "$NODE_MODULES" "$NODE_MODULES_STASH"
+fi
 uv build --wheel --out-dir "$WORK/dist" >/dev/null
 WHEEL="$(ls "$WORK"/dist/*.whl)"
 echo "wheel: $(basename "$WHEEL")"
@@ -93,30 +106,36 @@ def raw(path, headers=None):
 
 try:
     st, loc, _ = raw("/")
-    assert (st, loc) == (302, "/hermes/"), (st, loc)
+    assert (st, loc) == (302, "/chat"), (st, loc)
+    # /activity is a public alias for the Qubit /logs route
+    # (PUBLIC_ROUTE_ALIASES); a legacy Hermes path must redirect to the real
+    # Qubit page, never serve the stale activity.html shell with a 200.
     st, loc, _ = raw("/activity")
-    assert (st, loc) == (302, "/hermes/logs"), (st, loc)
-    st, _, body = raw("/hermes/")
+    assert (st, loc) == (302, "/logs"), (st, loc)
+    st, _, _ = raw("/logs")
+    assert st == 200, st
+    st, _, body = raw("/chat")
     assert st == 200 and b"__HERMES_BASE_PATH__" in body, st
+    assert b'__HERMES_BASE_PATH__=""' in body, "base path not root"
     assert b"__HERMES_SESSION_TOKEN__" in body, "token not injected"
-    asset = re.search(rb"/hermes/(assets/[^\"]+\.js)", body).group(1).decode()
-    st, _, ab = raw("/hermes/" + asset)
+    asset = re.search(rb"/(assets/[^\"]+\.js)", body).group(1).decode()
+    st, _, ab = raw("/" + asset)
     assert st == 200 and len(ab) > 1000, (asset, st, len(ab))
-    st, _, _ = raw("/hermes/api/dashboard/plugins")
+    st, _, _ = raw("/agent/api/dashboard/plugins")
     assert st == 401, st
-    st, _, pb = raw("/hermes/api/dashboard/plugins",
+    st, _, pb = raw("/agent/api/dashboard/plugins",
                     {"X-Hermes-Session-Token": "gate-token"})
     names = [m["name"] for m in json.loads(pb)]
     for want in ("qubit-ops", "qubit-devices", "qubit-memory",
                  "qubit-reports", "qubit-approvals"):
         assert want in names, (want, names)
-    st, _, jb = raw("/hermes/dashboard-plugins/qubit-ops/qubit-ops.js")
+    st, _, jb = raw("/dashboard-plugins/qubit-ops/qubit-ops.js")
     assert st == 200 and b"__HERMES_PLUGINS__" in jb, st
-    st, _, ob = raw("/hermes/api/ops",
+    st, _, ob = raw("/agent/api/ops",
                     {"X-Hermes-Session-Token": "gate-token"})
     ops = json.loads(ob)
     assert st == 200 and ops["count"] > 300, (st, ops.get("count"))
-    print(f"OK root->/hermes/  asset={asset}  plugins={len(names)}  "
+    print(f"OK root->/chat  asset={asset}  plugins={len(names)}  "
           f"ops={ops['count']}")
 finally:
     ui.stop()

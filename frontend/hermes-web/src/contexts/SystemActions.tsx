@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { ActionStatusResponse } from "@/lib/api";
+import { parsePolicyRefusal, policyRefusalMessage } from "@/lib/policy-refusal";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { useI18n } from "@/i18n";
 import {
@@ -92,6 +93,14 @@ export function SystemActionsProvider({
           setActiveAction(action);
         }
       } catch (err) {
+        // Dashboard self-update / process-supervision refusals are expected,
+        // typed policy states, not failures: surface the Qubit path instead
+        // of a raw `ACTION FAILED: 403: {…}` string.
+        const refusal = parsePolicyRefusal(err);
+        if (refusal) {
+          setToast({ type: "success", message: policyRefusalMessage(refusal) });
+          return;
+        }
         const detail = err instanceof Error ? err.message : String(err);
         setToast({
           type: "error",

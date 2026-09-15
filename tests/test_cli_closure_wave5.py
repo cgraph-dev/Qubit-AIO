@@ -384,7 +384,7 @@ def _run_cli(tmp_path, argv, timeout=180):
 def test_wave5_readonly_route_executes_real_fork(tmp_path, qargv, fork_family):
     r = _run_cli(tmp_path, [*qargv, "--help"])
     assert r.returncode == 0, (qargv, r.stderr[-500:])
-    assert f"usage: hermes {fork_family}" in r.stdout, (qargv, r.stdout[:300])
+    assert f"usage: qubit {fork_family}" in r.stdout, (qargv, r.stdout[:300])
 
 
 @pytest.mark.parametrize("qargv,fork_family", (
@@ -397,7 +397,7 @@ def test_wave5_confirm_route_executes_real_fork_with_confirm(
         tmp_path, qargv, fork_family):
     r = _run_cli(tmp_path, [*qargv, "--confirm", "--help"])
     assert r.returncode == 0, (qargv, r.stderr[-500:])
-    assert f"usage: hermes {fork_family}" in r.stdout, (qargv, r.stdout[:300])
+    assert f"usage: qubit {fork_family}" in r.stdout, (qargv, r.stdout[:300])
 
 
 def test_wave5_confirm_route_without_confirm_never_runs_fork(tmp_path):

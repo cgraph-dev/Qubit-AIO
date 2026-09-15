@@ -75,3 +75,24 @@ PRESERVATION: unrelated-file hash result
 ROLLBACK: exact safe command
 NEXT ACTION: only if no code-side blocker remains
 ```
+
+## 2026-09-15 provider, autonomy, and control-level closure gate
+
+- [ ] Immutable upstream vendor baselines, Qubit patch manifests, and
+  production behavior/control evidence are independently reconciled.
+- [ ] Qubit-Brain4 is a tested, replaceable local profile; it can be activate,
+  deactivate, roll back, and remove without corrupting Qubit state.
+- [ ] Local language, approved API language, ASR, TTS, realtime voice, devices,
+  budgets, locality, and fallback are explicit versioned profiles.
+- [ ] CLI, dashboard, and VoiceBridge manage non-secret profile lifecycle
+  through one backend; secrets use only the protected reference flow.
+- [ ] Local-only mode proves no provider egress; every API/realtime call shows
+  provider/model, consent, budget, and fallback in its receipt.
+- [ ] Every dashboard route and visible control has production-listener user
+  flow, persistence/recovery, keyboard/a11y, and responsive evidence.
+- [ ] One canonical writable store exists for every Qubit domain, with
+  migration/rollback proof for every legacy store.
+- [ ] Scoped autonomy profiles are visible, bounded, revocable, auditable,
+  e-stop aware, and cannot be widened by models or untrusted content.
+- [ ] Normal product paths, services, help, UI, generated artifacts, and logs
+  are Qubit-branded; upstream names are confined to allowed provenance areas.

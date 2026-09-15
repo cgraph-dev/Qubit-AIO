@@ -21,6 +21,7 @@ import { PluginSlot } from "@/plugins";
 // structured level token and falls back to word-boundary matching so payload
 // text like "parse_errors=0" can't render an INFO line red.
 import { classifyLine } from "@/lib/log-classify";
+import { rebrand } from "@/lib/rebrand";
 
 const FILES = ["agent", "errors", "gateway"] as const;
 const LEVELS = ["ALL", "DEBUG", "INFO", "WARNING", "ERROR"] as const;
@@ -224,7 +225,7 @@ export default function LogsPage() {
                   key={i}
                   className={`${LINE_COLORS[cls]} hover:bg-secondary/20 px-1 -mx-1`}
                 >
-                  {line}
+                  {rebrand(line)}
                 </div>
               );
             })}

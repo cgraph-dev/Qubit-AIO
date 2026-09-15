@@ -102,7 +102,7 @@ safety:
 summarizer:
   provider: ollama
   ollama_url: http://127.0.0.1:11434
-  ollama_model: huihui_ai/llama3.2-abliterate:3b
+  ollama_model: qubit-brain4
   max_chars: 900
   max_words: 40
 logging:
