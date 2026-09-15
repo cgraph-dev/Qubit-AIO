@@ -21,7 +21,7 @@ long coding output, and can be interrupted mid-speech — **only by your voice**
 │                          │                                                          │
 │                          ▼                                                          │
 │                   intent router (heuristic, ~0 ms)                                  │
-│                    ├─ CONVERSATION ──► short: llama3.2:3b (local, 0.3s)             │
+│                    ├─ CONVERSATION ──► short: qubit-brain4 (local, ~0.3s)           │
 │                    │                   long/complex: DeepSeek API (~1s)             │
 │                    │                   web/current: Perplexity API                  │
 │                    ├─ CODING TASK ────► Qubit worker (agent turns, tools,        │
@@ -106,9 +106,9 @@ curl -fsSL https://ollama.com/install.sh | sh      # then: ollama serve
 ```
 
 The installer (idempotent) creates the venv, installs deps, downloads the
-models (piper voice, Moonshine ASR, Silero VAD, eres2net voice-ID), pulls
-llama3.2:3b into ollama, and writes `~/.config/qubit-voicebridge/voice.yaml`
-from `config/voice.example.yaml`.
+models (piper voice, Moonshine ASR, Silero VAD, eres2net voice-ID), builds
+`qubit-brain4` into ollama from the pinned Modelfile, and writes
+`~/.config/qubit-voicebridge/voice.yaml` from `config/voice.example.yaml`.
 
 Optional keys for the cloud paths:
 
