@@ -16,7 +16,7 @@ from __future__ import annotations
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from ..benchmarking.corpus import Case
 from ..capabilities import (CapabilityError, CapabilityRegistry,

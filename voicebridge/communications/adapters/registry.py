@@ -20,14 +20,14 @@ import json
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from ..contracts import (AccountHealthRecord, AccountHealthStatus,
                          CommunicationItem, Platform, ReportManifest,
                          ReportStatus, ScanRecord, ScanStatus)
 from ..store import CommunicationsStore
-from .base import (CDP_LOOPBACK, AccountHealthStatus as _AHS, AdapterScan,
-                   CdpClient, CdpTargetNotFound, ScanBounds, find_target,
+from .base import (AdapterScan,
+                   CdpClient, ScanBounds, find_target,
                    find_target_preferring)
 from .sites import GmailAdapter, InstagramAdapter, MessengerAdapter
 

@@ -440,6 +440,10 @@ export const api = {
       appendProfileParam(`/api/sessions/${encodeURIComponent(id)}`, profile),
       {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        // The confirm dialog is the human confirmation; the backend requires
+        // an explicit confirm flag on the delete request.
+        body: JSON.stringify({ confirm: true }),
       },
     ),
   getEmptySessionsCount: (profile = getManagementProfile()) =>
@@ -465,7 +469,9 @@ export const api = {
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, profile: profile || undefined }),
+        // The backend patch handler reads `name`; `title` was silently
+        // dropped and returned 400 MALFORMED.
+        body: JSON.stringify({ name: title, profile: profile || undefined }),
       },
     ),
   getSessionStats: (profile = getManagementProfile()) =>

@@ -6,7 +6,7 @@
 [Unit]
 Description=Qubit Voice Agent (push-to-talk voice interface)
 After=network.target
-# OpenClaw gateway + ollama (local LLM) should be up first if they exist as units:
+# The Qubit runtime + ollama (local LLM) should be up first if they exist as units:
 After=ollama.service
 Wants=ollama.service
 

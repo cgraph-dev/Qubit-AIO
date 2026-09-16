@@ -30,7 +30,7 @@ import secrets
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict
 
 SCHEMA = "qubit-session-share/1"
 STORE_NAME = "session-shares.json"

@@ -19,7 +19,7 @@ import os
 import re
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
 _BWRAP_MIN_VERSION = (0, 9, 0)
 _BWRAP_VERSION_RE = re.compile(r"b(?:ubble)?wrap\s+(\d+)\.(\d+)\.(\d+)")

@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
-from .contracts import (AccountHealthStatus, CommunicationItem,
+from .contracts import (CommunicationItem,
                         EvidenceAssetRecord, EvidenceStatus, IdentitySource,
                         Platform, ReadState, ReportManifest, ReportStatus,
                         Sensitivity)

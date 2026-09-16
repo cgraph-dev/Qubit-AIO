@@ -34,7 +34,6 @@ Safety posture (audited, never silent):
 from __future__ import annotations
 
 import re
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
@@ -454,6 +453,69 @@ def _b_resume(ctx, args):
     out = PW.power_control(ctx.cfg).reset(issued_by="user")
     detail = out.get("detail", "") if isinstance(out, dict) else ""
     return {"cleared": True, "detail": detail}
+
+
+def _autonomy_owner() -> str:
+    # The canonical authenticated human principal the broker/autonomy store
+    # binds profiles to (voicebridge.actions.HUMAN_PRINCIPAL).
+    from .actions import HUMAN_PRINCIPAL
+    return HUMAN_PRINCIPAL
+
+
+def _b_autonomy_status(ctx, args):
+    from . import autonomy_ops as AO
+
+    return {"autonomy": AO.status(ctx.cfg)}
+
+
+def _b_autonomy_list(ctx, args):
+    from . import autonomy_ops as AO
+
+    profiles = AO.list_profiles(ctx.cfg)
+    return {"autonomy": {"count": len(profiles),
+                         "profiles": [p.to_dict() for p in profiles]}}
+
+
+def _b_autonomy_show(ctx, args):
+    from . import autonomy_ops as AO
+
+    prof = AO.show(ctx.cfg, str(args.get("profile_id", "") or ""))
+    if prof is None:
+        return {"autonomy": {"state": "UNAVAILABLE",
+                             "code": "AUTONOMY_PROFILE_NOT_FOUND"}}
+    return {"autonomy": {"state": "OK", "profile": prof.to_dict()}}
+
+
+def _b_autonomy_pause(ctx, args):
+    from . import autonomy_ops as AO
+
+    prof = AO.pause(ctx.cfg, str(args.get("profile_id", "") or ""),
+                    owner=_autonomy_owner())
+    return {"autonomy": {"state": "OK", "profile": prof.to_dict()}}
+
+
+def _b_autonomy_resume(ctx, args):
+    from . import autonomy_ops as AO
+
+    prof = AO.resume(ctx.cfg, str(args.get("profile_id", "") or ""),
+                     owner=_autonomy_owner())
+    return {"autonomy": {"state": "OK", "profile": prof.to_dict()}}
+
+
+def _b_autonomy_revoke(ctx, args):
+    from . import autonomy_ops as AO
+
+    prof = AO.revoke(ctx.cfg, str(args.get("profile_id", "") or ""),
+                     owner=_autonomy_owner())
+    return {"autonomy": {"state": "OK", "profile": prof.to_dict()}}
+
+
+def _b_autonomy_expire(ctx, args):
+    from . import autonomy_ops as AO
+
+    expired = AO.expire(ctx.cfg)
+    return {"autonomy": {"state": "OK", "expired": list(expired),
+                         "count": len(expired)}}
 
 
 def _b_doctor(ctx, args):
@@ -1530,7 +1592,6 @@ def _b_worktree(ctx, args):
 
 
 def _b_completions(ctx, args):
-    import os as _os
 
     root = Path(__file__).resolve().parents[1] / "voicebridge" / "_data" / \
         "completions"
@@ -2307,6 +2368,7 @@ def _b_actions(ctx, args):
         return runner.execute(
             str(args.get("action_id", "")),
             args={}, target=str(args.get("target", "") or ""),
+            session=str(getattr(ctx, "session", "") or ""),
             account_scope="", scope=str(args.get("scope", "") or ""),
             source="user", confirmed=True)
     if action == "cancel":
@@ -3977,6 +4039,13 @@ _BACKENDS: Dict[str, Callable] = {
     "status": _b_status,
     "pause": _b_pause,
     "resume": _b_resume,
+    "autonomy_status": _b_autonomy_status,
+    "autonomy_list": _b_autonomy_list,
+    "autonomy_show": _b_autonomy_show,
+    "autonomy_pause": _b_autonomy_pause,
+    "autonomy_resume": _b_autonomy_resume,
+    "autonomy_revoke": _b_autonomy_revoke,
+    "autonomy_expire": _b_autonomy_expire,
     "doctor": _b_doctor,
     "setup_check": _b_setup_check,
     "verify_release": _b_verify_release,
@@ -4665,6 +4734,41 @@ _E("resume", "Resume work",
    "resume", ("pause/resume",), confirm=True,
    examples=("qubit, resume work",),
    help="Clear the emergency stop (confirmed).")
+_E("autonomy_status", "Autonomy status",
+   ("autonomy status", "who is pre-authorized", "what can run unattended"),
+   "autonomy_status", ("autonomy",),
+   summary="status", examples=("qubit, autonomy status",),
+   help="Effective owner-scoped autonomy policy (read-only).")
+_E("autonomy_list", "List autonomy profiles",
+   ("list autonomy profiles", "show autonomy profiles", "my autonomy profiles"),
+   "autonomy_list", ("autonomy",),
+   summary="list", examples=("qubit, list autonomy profiles",),
+   help="Owner-scoped autonomy profiles (read-only).")
+_E("autonomy_expire", "Expire elapsed autonomy profiles",
+   ("expire autonomy profiles", "clean up autonomy profiles"),
+   "autonomy_expire", ("autonomy",),
+   summary="count", examples=("qubit, expire autonomy profiles",),
+   help="Expire elapsed scoped-autonomy profiles (read-only).")
+_E("autonomy_show", "Show an autonomy profile",
+   ("show autonomy profile", "details of autonomy profile"),
+   "autonomy_show", ("autonomy",), args=(_S("profile_id"),),
+   summary="show", examples=("qubit, show autonomy profile nightly-uploads",),
+   help="One owner-scoped autonomy profile by id (read-only).")
+_E("autonomy_pause", "Pause an autonomy profile",
+   ("pause autonomy", "suspend autonomy profile", "pause my autonomy"),
+   "autonomy_pause", ("autonomy",), args=(_S("profile_id"),),
+   confirm=True, examples=("qubit, pause autonomy nightly-uploads",),
+   help="Pause one scoped-autonomy profile (confirmed).")
+_E("autonomy_resume", "Resume an autonomy profile",
+   ("resume autonomy", "unsuspend autonomy profile", "resume my autonomy"),
+   "autonomy_resume", ("autonomy",), args=(_S("profile_id"),),
+   confirm=True, examples=("qubit, resume autonomy nightly-uploads",),
+   help="Resume one scoped-autonomy profile (confirmed).")
+_E("autonomy_revoke", "Revoke an autonomy profile",
+   ("revoke autonomy", "delete autonomy profile", "cancel my autonomy"),
+   "autonomy_revoke", ("autonomy",), args=(_S("profile_id"),),
+   confirm=True, examples=("qubit, revoke autonomy nightly-uploads",),
+   help="Revoke one scoped-autonomy profile (confirmed).")
 _E("doctor", "Diagnostics",
    ("run diagnostics", "check health", "diagnose problems", "doctor"),
    "doctor", ("doctor",),
@@ -7991,6 +8095,15 @@ CLI_COVERAGE = {
     ),
     "egress": ("egress_status", "egress_check", "substitute_egress"),
     "policy": ("policy_conformance", "policy_attest"),
+    "autonomy": (
+        "autonomy_status",
+        "autonomy_list",
+        "autonomy_show",
+        "autonomy_pause",
+        "autonomy_resume",
+        "autonomy_revoke",
+        "autonomy_expire",
+    ),
     "usage": ("usage_summary", "evaluation_telemetry"),
     "receipts": ("receipts_ledger",),
     "logbook": ("logbook_entries", "logbook_summary"),

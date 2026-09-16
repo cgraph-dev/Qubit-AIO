@@ -23,7 +23,6 @@ import os
 import sqlite3
 import threading
 import time
-import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 

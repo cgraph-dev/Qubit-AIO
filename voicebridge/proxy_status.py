@@ -14,8 +14,6 @@ ships no proxy server. The Qubit-native surface is:
 """
 from __future__ import annotations
 
-import os
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 NO_SERVER_CODE = "PROXY_NO_SERVER"

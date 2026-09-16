@@ -38,12 +38,11 @@ from __future__ import annotations
 import copy
 import json
 import os
-import threading
 import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from ..config import Config
 

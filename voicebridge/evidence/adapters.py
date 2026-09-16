@@ -17,7 +17,7 @@ import json
 import re
 import urllib.request
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from .models import (EvidenceError, EvidencePartialError, EvidenceRecord,
                      EvidenceUnavailableError, Scope, Sensitivity, Trust)

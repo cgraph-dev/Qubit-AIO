@@ -138,16 +138,13 @@ def _fail(exc: Exception) -> Tuple[int, Dict[str, Any]]:
 def h_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     from . import runtime_inventory as RI
-    inv = RI.inventory(cfg) if hasattr(RI, "inventory") else {}
+    # One canonical runtime inventory (the same function the CLI `qubit status`
+    # and voice `system status` call). Never return a 200 with an empty
+    # backend payload.
+    inv = RI.runtime_inventory(cfg) if hasattr(RI, "runtime_inventory") else {}
     if not isinstance(inv, dict):
         inv = {}
-    try:
-        from . import status as ST
-        core = ST.status(cfg) if hasattr(ST, "status") else {}
-    except Exception:
-        core = {}
-    if not isinstance(core, dict):
-        core = {}
+    core = inv
     model = ""
     try:
         from . import agent as AG

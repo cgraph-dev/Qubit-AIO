@@ -19,15 +19,13 @@ operator-side, while everything code-side is real:
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import re
 import time
 import urllib.request
-import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from urllib.parse import urlparse
 
 SCHEMA = "qubit-gateway-peers/1"

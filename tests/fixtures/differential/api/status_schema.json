@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "fixture_id": "api.route.status_schema",
+  "family": "api",
+  "command": null,
+  "request": {
+    "kind": null,
+    "method": "GET",
+    "path": "/agent/api/status",
+    "headers": {},
+    "body": null,
+    "event": null,
+    "argv": []
+  },
+  "transport": "http",
+  "base_url_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_URL",
+  "auth": {
+    "header": "X-Api-Token",
+    "value_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_TOKEN"
+  },
+  "normalizers": [
+    "timestamp",
+    "temp_path",
+    "pid",
+    "generated_hash",
+    "product_branding"
+  ],
+  "expected": {
+    "http_status": 200,
+    "json_schema": {
+      "ok": true,
+      "schema": "qubit-hermes-status/1",
+      "gateway_running": false,
+      "gateway_state": "not-supervised"
+    }
+  },
+  "qubit": {
+    "path": "voicebridge/webui.py:1192",
+    "caller": "_hermes_api",
+    "approval": null
+  },
+  "hermes": {
+    "path": "hermes_cli/web_routers/status.py:378",
+    "symbol": "get_status",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "src/gateway/server-methods/health.ts:115",
+    "symbol": "healthHandlers",
+    "mapping_status": "VERIFIED"
+  },
+  "notes": "API route status+wire-schema contract. Handler is the shared compat route authority (hermes_compat.ROUTES /api/status -> h_status, qubit-hermes-status/1). Gateway supervision is an honest policy negative (GATEWAY_NO_SUPERVISION), never a fabricated 200. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/web_routers/status.py:378 (get_status); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/health.ts:115 (healthHandlers).",
+  "evidence": {
+    "voice_utterance": null,
+    "dashboard_route": "/agent/api/status",
+    "dashboard_control": null,
+    "request_schema": {
+      "method": "GET",
+      "path": "/agent/api/status"
+    },
+    "broker_policy_decision": "GATEWAY_NO_SUPERVISION for gateway supervision",
+    "runtime_provider": null,
+    "store_state_assertion": null,
+    "output_event_assertion": null,
+    "error_codes": null,
+    "retry_recovery_proof": null,
+    "audit_receipt_proof": null,
+    "security_resource_proof": null,
+    "package_proof": null,
+    "response_headers": {
+      "content-type": "application/json"
+    },
+    "evidence_notes": {
+      "voice_utterance": "not exposed by this fixture's surface",
+      "dashboard_control": "not exposed by this fixture's surface",
+      "runtime_provider": "not exposed by this fixture's surface",
+      "store_state_assertion": "not exposed by this fixture's surface",
+      "output_event_assertion": "not exposed by this fixture's surface",
+      "error_codes": "not exposed by this fixture's surface",
+      "retry_recovery_proof": "not exposed by this fixture's surface",
+      "audit_receipt_proof": "not exposed by this fixture's surface",
+      "security_resource_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface"
+    }
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "fixture_id": "rpc.methodregistry.session_list",
+  "family": "rpc",
+  "command": null,
+  "request": {
+    "kind": "rpc",
+    "method": "POST",
+    "path": "/agent/api/qubit/gateway/rpc",
+    "headers": {},
+    "body": {
+      "type": "req",
+      "id": 1,
+      "method": "ui.panels",
+      "params": {}
+    },
+    "event": null,
+    "argv": []
+  },
+  "transport": "rpc",
+  "base_url_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_URL",
+  "auth": {
+    "header": "X-Api-Token",
+    "value_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_TOKEN"
+  },
+  "sequence": [
+    {"kind": "rpc", "step": "request", "method": "ui.panels", "params": {}},
+    {"kind": "rpc", "step": "reconnect", "attempts": 1}
+  ],
+  "persisted_state_schema": {
+    "type": "object",
+    "properties": {
+      "connected": {"type": "boolean"},
+      "scopes": {"type": "array", "items": {"type": "string"}},
+      "reconnect_attempts": {"type": "integer"}
+    }
+  },
+  "normalizers": [
+    "uuid",
+    "generated_hash"
+  ],
+  "expected": {
+    "http_status": 200,
+    "json_schema": {
+      "type": "res",
+      "id": 1,
+      "ok": true
+    }
+  },
+  "qubit": {
+    "path": "voicebridge/gateway/rpc.py:284",
+    "caller": "handle_request",
+    "approval": null
+  },
+  "hermes": {
+    "path": "tui_gateway/server.py:757",
+    "symbol": "dispatch",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "src/gateway/server-methods/core-handlers.ts:166",
+    "symbol": "coreGatewayHandlers",
+    "mapping_status": "VERIFIED"
+  },
+  "notes": "RPC req/res framing contract: one shared MethodRegistry; a request frame returns {type:res,id,ok,payload} and never raises. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: tui_gateway/server.py:757 (dispatch); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/core-handlers.ts:166 (coreGatewayHandlers).",
+  "evidence": {
+    "voice_utterance": null,
+    "dashboard_route": null,
+    "dashboard_control": null,
+    "request_schema": {
+      "type": "req",
+      "id": 1,
+      "method": "ui.panels",
+      "params": {}
+    },
+    "broker_policy_decision": null,
+    "runtime_provider": null,
+    "store_state_assertion": null,
+    "output_event_assertion": {
+      "type": "res",
+      "id": 1,
+      "ok": true
+    },
+    "error_codes": null,
+    "retry_recovery_proof": null,
+    "audit_receipt_proof": null,
+    "security_resource_proof": null,
+    "package_proof": null,
+    "response_headers": null,
+    "evidence_notes": {
+      "voice_utterance": "not exposed by this fixture's surface",
+      "dashboard_route": "not exposed by this fixture's surface",
+      "dashboard_control": "not exposed by this fixture's surface",
+      "broker_policy_decision": "not exposed by this fixture's surface",
+      "runtime_provider": "not exposed by this fixture's surface",
+      "store_state_assertion": "not exposed by this fixture's surface",
+      "error_codes": "not exposed by this fixture's surface",
+      "retry_recovery_proof": "not exposed by this fixture's surface",
+      "audit_receipt_proof": "not exposed by this fixture's surface",
+      "security_resource_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface",
+      "response_headers": "not exposed by this fixture's surface"
+    }
+  }
+}

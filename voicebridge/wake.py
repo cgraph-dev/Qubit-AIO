@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import wave
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 NO_MODEL_CODE = "WAKE_NO_MODEL"
 BAD_INPUT_CODE = "WAKE_BAD_INPUT"

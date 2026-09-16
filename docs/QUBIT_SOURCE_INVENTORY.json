@@ -92,7 +92,7 @@
    "unmatched": 89
   },
   "qubit": {
-   "ledger_rows": 707
+   "ledger_rows": 714
   },
   "ledger_ids": [
    "OC-01",
@@ -522,6 +522,13 @@
    "automation_yield_handoff",
    "automation_yield_pending",
    "automation_yield_resume",
+   "autonomy_expire",
+   "autonomy_list",
+   "autonomy_pause",
+   "autonomy_resume",
+   "autonomy_revoke",
+   "autonomy_show",
+   "autonomy_status",
    "backup_create",
    "backup_info",
    "backup_restore",

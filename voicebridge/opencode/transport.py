@@ -17,7 +17,6 @@ from .policy import (
     RLIMIT_AS_BYTES,
     RLIMIT_FSIZE_BYTES,
     RLIMIT_NOFILE,
-    RLIMIT_NPROC_MARGIN,
     SAFE_PATH,
     OpenCodeError,
     _FORBIDDEN_TOKENS,

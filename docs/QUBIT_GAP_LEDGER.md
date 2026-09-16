@@ -23,8 +23,8 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
   - upstream_pin: 3a9d69db306cd7f081e06254cb89c4bcc14a7107
   - upstream_tag: v2026.9.4
   - upstream_tree: /tmp/opencode/pinned/openclaw (read via git show 3a9d69db306cd7f081e06254cb89c4bcc14a7107, shallow clone)
-- `docs/QUBIT_GAP_LEDGER.qubit.json` — schema `qubit-gap-ledger-section/1`, source `qubit-surface`, 707 rows
-  - generated_from: cli_families=106, dashboard_ops.EXTRA_OPS=34, dashboard_ops.catalog=523, hermes_compat.GATED=105, hermes_compat.ROUTES=385, source_inventory.dispositioned=121, source_inventory.dispositioned_gated=4, source_inventory.dispositioned_implemented=117, source_inventory.distinct_uncovered=0, source_inventory.items=6775, source_inventory.parented_covered=1081, source_inventory.parented_uncovered=0, source_inventory.surface_items=1818, voice_commands.CLI_COVERAGE=106, voice_commands.REGISTRY=480
+- `docs/QUBIT_GAP_LEDGER.qubit.json` — schema `qubit-gap-ledger-section/1`, source `qubit-surface`, 714 rows
+  - generated_from: cli_families=107, dashboard_ops.EXTRA_OPS=34, dashboard_ops.catalog=530, hermes_compat.GATED=105, hermes_compat.ROUTES=385, source_inventory.dispositioned=121, source_inventory.dispositioned_gated=4, source_inventory.dispositioned_implemented=117, source_inventory.distinct_uncovered=0, source_inventory.items=6775, source_inventory.parented_covered=1081, source_inventory.parented_uncovered=0, source_inventory.surface_items=1818, voice_commands.CLI_COVERAGE=107, voice_commands.REGISTRY=487
   - evidence: production backend + declared interfaces + live CLI tree + voice registry + linked tests/ AST proofs + direct source inventory
   - generator: scripts/rebuild_ledger_qubit.py
   - backend_flags: []
@@ -35,7 +35,7 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
 
 ## Counts
 
-- Total rows: **1384**
+- Total rows: **1391**
 - Code-side open rows (not terminal): **0**
 - SAFE_EQUIVALENT (closed for code readiness): **158**
 - OPERATOR_ONLY (manual/operator qualification): **11**
@@ -43,7 +43,7 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
 
 ### By status
 
-- IMPLEMENTED: 1215
+- IMPLEMENTED: 1222
 - OPERATOR_ONLY: 11
 - SAFE_EQUIVALENT: 158
 
@@ -51,7 +51,7 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
 
 - hermes: 573
 - openclaw: 104
-- qubit: 707
+- qubit: 714
 
 ### By area
 
@@ -70,6 +70,13 @@ Machine-generated from `docs/QUBIT_GAP_LEDGER.*.json`. This merged report is the
 - auth_status: 1
 - auth_verify: 1
 - automation: 27
+- autonomy_expire: 1
+- autonomy_list: 1
+- autonomy_pause: 1
+- autonomy_resume: 1
+- autonomy_revoke: 1
+- autonomy_show: 1
+- autonomy_status: 1
 - backup: 5
 - boards: 6
 - brain: 17

@@ -17,7 +17,6 @@ import hashlib
 import json
 import os
 import socket
-import ssl
 import struct
 import time
 import urllib.parse

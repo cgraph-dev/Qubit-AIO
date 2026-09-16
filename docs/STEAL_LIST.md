@@ -11,8 +11,9 @@
 ---
 
 ## 0. The hard constraint
-8 GB VRAM total. Currently ~2.6 GB = qubit-brain (3.6B, Q4_K_M, resident).
-Headroom ≈ 5 GB. Whisper-large is removed (EN-only). So we have room for
+8 GB VRAM total. Currently the resident default is `qubit-brain4`
+(Qwen3-4B abliterated, Q4_K_M, ~3.2 GB resident); the retired 3B alias is
+gone. Headroom ≈ 4.8 GB. Whisper-large is removed (EN-only). So we have room for
 **one more, larger, resident model** IF it's heavily quantized AND we stream
 responsibly. Anything that doubles memory per call is out.
 
@@ -64,9 +65,11 @@ PARAMETER top_p 0.9
 ollama create qubit-brain4 -f Modelfile.qubit4
 ```
 Then point config `intent.local_llm.model: qubit-brain4` (+ `ollama_model`).
-REWRITE the response to only use `content`; if the model returns empty `content`
-but non-empty `thinking`, keep the thinking as the answer (best effort) — do NOT
-return blank.
+Use only `content`: `local_llm._extract_reply` is content-only and thinking text
+is NEVER spoken (it is stripped, and an empty content turn is retried once).
+Do not resurrect the old "answer with thinking when content is empty" behavior —
+`tests/test_steal_list_strict.py::test_extract_reply_never_speaks_thinking`
+guards this.
 
 ### Validation before making it the default (run on this box)
 ```

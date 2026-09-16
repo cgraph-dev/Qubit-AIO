@@ -34,7 +34,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Optional
+from typing import Any, Callable, Dict, Iterator, Optional
 
 SCHEMA = "qubit-chat/1"
 SESSION_SCHEMA = "qubit-chat-session/1"

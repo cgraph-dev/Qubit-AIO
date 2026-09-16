@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
 from ..context_compiler import (CHARS_PER_TOKEN, CORE_FACTS_MAX_CHARS,
-                                ACTIVE_MAX_CHARS, RECALL_MAX_CHARS,
+                                RECALL_MAX_CHARS,
                                 compile_context, fits_budget)
 
 PERSONA_MAX_CHARS = 6000

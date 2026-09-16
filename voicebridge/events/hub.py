@@ -17,7 +17,7 @@ import threading
 from collections import deque
 from typing import Any, Deque, Dict, List, Optional
 
-from .core import EventType, to_wire
+from .core import to_wire
 from .journal import EventJournal
 
 HEARTBEAT_S = 15.0

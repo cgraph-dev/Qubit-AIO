@@ -775,7 +775,7 @@ SPA_ROUTE_PATHS = (
     # Qubit overlay plugin tabs (real client routes)
     "/reports", "/operations", "/devices", "/memory", "/qubit-approvals",
     "/qubit-boards", "/qubit-brand", "/qubit-chat", "/qubit-gateway",
-    "/qubit-runtime",
+    "/qubit-models", "/qubit-runtime",
 )
 SPA_ROUTE_SET = frozenset(SPA_ROUTE_PATHS)
 # First path segment of every shell route, for SPA deep links such as
@@ -2524,6 +2524,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
                         args=body.get("args"),
                         envelope=body.get("envelope"),
                         target=str(body.get("target", "")),
+                        session=str(body.get("session", "")),
                         account_scope=str(body.get("account_scope", "")),
                         scope=str(body.get("scope", "")),
                         idempotency_key=str(body.get("idempotency_key", "")),

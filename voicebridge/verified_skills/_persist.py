@@ -11,7 +11,7 @@ import os
 import sqlite3
 import threading
 from pathlib import Path
-from typing import Any, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from ._models import (SKILL_STATE_SCHEMA, SkillRecord)
 

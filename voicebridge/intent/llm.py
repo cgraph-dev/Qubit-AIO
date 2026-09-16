@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import re
-import urllib.request  # re-exported for callers/tests that patch this seam
+import urllib.request  # noqa: F401 - re-exported for callers/tests that patch this seam
 from typing import Any, Dict, Optional
 
 from ..logging_setup import log_event

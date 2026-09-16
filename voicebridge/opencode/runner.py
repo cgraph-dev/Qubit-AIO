@@ -8,8 +8,6 @@ import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from ..actions import ADAPTER_OPENCODE, ActionRunner, ActionSpec, ActionStore, ST_OK, _render_preview
-from ..broker import ToolBinding
-from ..capabilities import CapabilitySpec
 from ..logging_setup import log_event
 from .policy import (
     DEFAULT_TIMEOUT_S, OPENCODE_ACTIONS, PINNED_OPENCODE_VERSION,

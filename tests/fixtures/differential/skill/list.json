@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "fixture_id": "skill.verified.list",
+  "family": "skill",
+  "command": {
+    "argv": [
+      "voicebridge",
+      "skills",
+      "list"
+    ],
+    "stdin": null,
+    "env": {}
+  },
+  "request": null,
+  "normalizers": [
+    "timestamp",
+    "generated_hash",
+    "product_branding"
+  ],
+  "expected": {
+    "exit_code": 0
+  },
+  "qubit": {
+    "path": "voicebridge/verified_skills/store.py:59",
+    "caller": "VerifiedSkillStore.list",
+    "approval": null
+  },
+  "hermes": {
+    "path": "hermes_cli/web_routers/skills.py:344",
+    "symbol": "get_skills",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "src/skills/library/service.ts:75",
+    "symbol": "listSkillLibrary",
+    "mapping_status": "VERIFIED"
+  },
+  "notes": "Verified-skill manifest list contract (install staged disabled; lifecycle is journaled). Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/web_routers/skills.py:344 (get_skills); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/skills/library/service.ts:75 (listSkillLibrary).",
+  "evidence": {
+    "voice_utterance": null,
+    "dashboard_route": null,
+    "dashboard_control": null,
+    "request_schema": {
+      "argv": [
+        "voicebridge",
+        "skills",
+        "list"
+      ]
+    },
+    "broker_policy_decision": "install staged disabled; lifecycle journaled",
+    "runtime_provider": null,
+    "store_state_assertion": "verified-skill manifest store",
+    "output_event_assertion": null,
+    "error_codes": null,
+    "retry_recovery_proof": null,
+    "audit_receipt_proof": null,
+    "security_resource_proof": null,
+    "package_proof": null,
+    "response_headers": null,
+    "evidence_notes": {
+      "voice_utterance": "not exposed by this fixture's surface",
+      "dashboard_route": "not exposed by this fixture's surface",
+      "dashboard_control": "not exposed by this fixture's surface",
+      "runtime_provider": "not exposed by this fixture's surface",
+      "output_event_assertion": "not exposed by this fixture's surface",
+      "error_codes": "not exposed by this fixture's surface",
+      "retry_recovery_proof": "not exposed by this fixture's surface",
+      "audit_receipt_proof": "not exposed by this fixture's surface",
+      "security_resource_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface",
+      "response_headers": "not exposed by this fixture's surface"
+    }
+  }
+}

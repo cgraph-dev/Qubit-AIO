@@ -17,13 +17,13 @@
   "docs/QUBIT_SOURCE_INVENTORY.json (direct source inventory, agent A)"
  ],
  "generated_from": {
-  "voice_commands.REGISTRY": 480,
-  "dashboard_ops.catalog": 523,
+  "voice_commands.REGISTRY": 487,
+  "dashboard_ops.catalog": 530,
   "dashboard_ops.EXTRA_OPS": 34,
-  "voice_commands.CLI_COVERAGE": 106,
+  "voice_commands.CLI_COVERAGE": 107,
   "hermes_compat.ROUTES": 385,
   "hermes_compat.GATED": 105,
-  "cli_families": 106,
+  "cli_families": 107,
   "source_inventory.items": 6775,
   "source_inventory.surface_items": 1818,
   "source_inventory.parented_covered": 1081,
@@ -34,7 +34,7 @@
   "source_inventory.dispositioned_gated": 4
  },
  "counts_by_status": {
-  "IMPLEMENTED": 668,
+  "IMPLEMENTED": 675,
   "OPERATOR_ONLY": 3,
   "SAFE_EQUIVALENT": 36
  },
@@ -52,6 +52,13 @@
   "auth_status": 1,
   "auth_verify": 1,
   "automation": 17,
+  "autonomy_expire": 1,
+  "autonomy_list": 1,
+  "autonomy_pause": 1,
+  "autonomy_resume": 1,
+  "autonomy_revoke": 1,
+  "autonomy_show": 1,
+  "autonomy_status": 1,
   "backup": 5,
   "brain": 17,
   "branding": 3,
@@ -166,11 +173,11 @@
   "worktree": 1
  },
  "counts_by_source": {
-  "qubit-surface": 707
+  "qubit-surface": 714
  },
  "tri_surface": {
   "has-cli has-dashboard": 40,
-  "has-cli has-dashboard has-voice": 476,
+  "has-cli has-dashboard has-voice": 483,
   "has-dashboard": 63,
   "has-dashboard has-voice": 4,
   "no-surface": 124
@@ -1195,6 +1202,104 @@
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_automation_agent6_standing_orders.py::test_order_creation_gates_and_validation",
    "note": "Consume a pending yield handoff (confirmed).",
+   "needs": "none"
+  },
+  {
+   "id": "autonomy_expire",
+   "area": "autonomy_expire",
+   "capability": "Expire elapsed autonomy profiles",
+   "upstream_ref": "autonomy",
+   "qubit_backend": "voicebridge.voice_commands._b_autonomy_expire -> voicebridge.autonomy_ops.expire",
+   "cli": "qubit autonomy expire",
+   "dashboard": "qubit-ops:/operations",
+   "voice": "autonomy_expire",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_autonomy_surface.py::test_dashboard_route_and_confirmation_flow",
+   "note": "Expire elapsed scoped-autonomy profiles (read-only).",
+   "needs": "none"
+  },
+  {
+   "id": "autonomy_list",
+   "area": "autonomy_list",
+   "capability": "List autonomy profiles",
+   "upstream_ref": "autonomy",
+   "qubit_backend": "voicebridge.voice_commands._b_autonomy_list -> voicebridge.autonomy_ops.list_profiles",
+   "cli": "qubit autonomy list",
+   "dashboard": "qubit-ops:/operations",
+   "voice": "autonomy_list",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_autonomy_surface.py::test_dashboard_route_and_confirmation_flow",
+   "note": "Owner-scoped autonomy profiles (read-only).",
+   "needs": "none"
+  },
+  {
+   "id": "autonomy_pause",
+   "area": "autonomy_pause",
+   "capability": "Pause an autonomy profile",
+   "upstream_ref": "autonomy",
+   "qubit_backend": "voicebridge.voice_commands._b_autonomy_pause -> voicebridge.autonomy_ops.pause",
+   "cli": "qubit autonomy pause",
+   "dashboard": "qubit-ops:/operations",
+   "voice": "autonomy_pause",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_autonomy_surface.py::test_dashboard_route_and_confirmation_flow",
+   "note": "Pause one scoped-autonomy profile (confirmed).",
+   "needs": "none"
+  },
+  {
+   "id": "autonomy_resume",
+   "area": "autonomy_resume",
+   "capability": "Resume an autonomy profile",
+   "upstream_ref": "autonomy",
+   "qubit_backend": "voicebridge.voice_commands._b_autonomy_resume -> voicebridge.autonomy_ops.resume",
+   "cli": "qubit autonomy resume",
+   "dashboard": "qubit-ops:/operations",
+   "voice": "autonomy_resume",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_autonomy_surface.py::test_dashboard_route_and_confirmation_flow",
+   "note": "Resume one scoped-autonomy profile (confirmed).",
+   "needs": "none"
+  },
+  {
+   "id": "autonomy_revoke",
+   "area": "autonomy_revoke",
+   "capability": "Revoke an autonomy profile",
+   "upstream_ref": "autonomy",
+   "qubit_backend": "voicebridge.voice_commands._b_autonomy_revoke -> voicebridge.autonomy_ops.revoke",
+   "cli": "qubit autonomy revoke",
+   "dashboard": "qubit-ops:/operations",
+   "voice": "autonomy_revoke",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_autonomy_surface.py::test_dashboard_route_and_confirmation_flow",
+   "note": "Revoke one scoped-autonomy profile (confirmed).",
+   "needs": "none"
+  },
+  {
+   "id": "autonomy_show",
+   "area": "autonomy_show",
+   "capability": "Show an autonomy profile",
+   "upstream_ref": "autonomy",
+   "qubit_backend": "voicebridge.voice_commands._b_autonomy_show -> voicebridge.autonomy_ops.show",
+   "cli": "qubit autonomy show",
+   "dashboard": "qubit-ops:/operations",
+   "voice": "autonomy_show",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_autonomy_surface.py::test_dashboard_route_and_confirmation_flow",
+   "note": "One owner-scoped autonomy profile by id (read-only).",
+   "needs": "none"
+  },
+  {
+   "id": "autonomy_status",
+   "area": "autonomy_status",
+   "capability": "Autonomy status",
+   "upstream_ref": "autonomy",
+   "qubit_backend": "voicebridge.voice_commands._b_autonomy_status -> voicebridge.autonomy_ops.status",
+   "cli": "qubit autonomy status",
+   "dashboard": "qubit-ops:/operations",
+   "voice": "autonomy_status",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_autonomy_surface.py::test_dashboard_route_and_confirmation_flow",
+   "note": "Effective owner-scoped autonomy policy (read-only).",
    "needs": "none"
   },
   {

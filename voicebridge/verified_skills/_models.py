@@ -12,7 +12,7 @@ import hashlib
 import math
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 ST_QUARANTINED = "quarantined"
 ST_VERIFIED = "verified"

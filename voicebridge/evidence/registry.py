@@ -7,7 +7,7 @@ adapter that exposes write-like methods or declares write/remember intent.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from .models import (EvidenceError, EvidencePermissionError, EvidenceRecord,
                      AdapterContract)

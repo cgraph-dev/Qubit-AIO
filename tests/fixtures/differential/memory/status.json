@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "fixture_id": "memory.store.status",
+  "family": "memory",
+  "command": {
+    "argv": [
+      "voicebridge",
+      "memory",
+      "status"
+    ],
+    "stdin": null,
+    "env": {}
+  },
+  "request": null,
+  "normalizers": [
+    "timestamp",
+    "uuid",
+    "generated_hash",
+    "product_branding"
+  ],
+  "expected": {
+    "exit_code": 0
+  },
+  "qubit": {
+    "path": "voicebridge/memory/store.py:368",
+    "caller": "search",
+    "approval": null
+  },
+  "hermes": {
+    "path": "hermes_cli/web_routers/ops.py:435",
+    "symbol": "get_memory_status",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "src/gateway/server-methods/memory-search.ts:70",
+    "symbol": "memorySearchHandlers",
+    "mapping_status": "VERIFIED"
+  },
+  "notes": "Semantic memory store status contract (GENOME contract; disabled by default). The same store backs remember/search/correct/forget; secrets are rejected at the write boundary (SecretRejectedError). Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/web_routers/ops.py:435 (get_memory_status); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/memory-search.ts:70 (memorySearchHandlers).",
+  "evidence": {
+    "voice_utterance": null,
+    "dashboard_route": null,
+    "dashboard_control": null,
+    "request_schema": {
+      "argv": [
+        "voicebridge",
+        "memory",
+        "status"
+      ]
+    },
+    "broker_policy_decision": null,
+    "runtime_provider": null,
+    "store_state_assertion": "semantic memory store disabled by default",
+    "output_event_assertion": null,
+    "error_codes": null,
+    "retry_recovery_proof": null,
+    "audit_receipt_proof": null,
+    "security_resource_proof": "secrets rejected at write boundary (SecretRejectedError)",
+    "package_proof": null,
+    "response_headers": null,
+    "evidence_notes": {
+      "voice_utterance": "not exposed by this fixture's surface",
+      "dashboard_route": "not exposed by this fixture's surface",
+      "dashboard_control": "not exposed by this fixture's surface",
+      "broker_policy_decision": "not exposed by this fixture's surface",
+      "runtime_provider": "not exposed by this fixture's surface",
+      "output_event_assertion": "not exposed by this fixture's surface",
+      "error_codes": "not exposed by this fixture's surface",
+      "retry_recovery_proof": "not exposed by this fixture's surface",
+      "audit_receipt_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface",
+      "response_headers": "not exposed by this fixture's surface"
+    }
+  }
+}

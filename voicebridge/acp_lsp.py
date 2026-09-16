@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 NO_SERVER_CODE = "ACP_NO_SERVER"
 ACCEPT_HOOKS_CODE = "ACP_ACCEPT_HOOKS_REFUSED"

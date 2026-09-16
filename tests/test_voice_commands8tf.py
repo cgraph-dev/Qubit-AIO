@@ -684,6 +684,13 @@ COMPLETE_EXAMPLES = {
     "substitute_egress":
         "qubit, substitute egress secrets api.example.com "
         "authorization {{secret:api}}",
+    "autonomy_status": "qubit, autonomy status",
+    "autonomy_list": "qubit, list autonomy profiles",
+    "autonomy_show": "qubit, show autonomy profile nightly",
+    "autonomy_pause": "qubit, pause autonomy nightly",
+    "autonomy_resume": "qubit, resume autonomy nightly",
+    "autonomy_revoke": "qubit, revoke autonomy nightly",
+    "autonomy_expire": "qubit, expire autonomy profiles",
 }
 
 

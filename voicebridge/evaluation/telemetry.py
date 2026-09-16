@@ -19,7 +19,7 @@ import json
 import re
 import secrets
 import time
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional
+from typing import Any, Callable, Dict, List, Mapping, Optional
 
 SCHEMA = "qubit-otel/1"
 W3C_VERSION = "00"

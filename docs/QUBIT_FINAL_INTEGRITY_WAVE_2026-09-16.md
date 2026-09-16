@@ -63,6 +63,74 @@ classified, `unexplained=0`, `missing=0`, `omitted=0`,
 regenerated per-file hashes include the Qubit overlay change to
 `frontend/hermes-web/src/components/HermesConsoleModal.tsx`.
 
+## Second wave (same date) — code-ready completion pass
+
+A ten-agent read-only audit found further code-side defects; these were repaired
+with focused tests. Summary (file:line evidence in the code and tests):
+
+- **Autonomy is now a real tri-surface.** `voicebridge/autonomy_ops` admin is
+  exposed via `qubit autonomy status|list|show|pause|resume|revoke|expire`
+  (`voicebridge/cli.py` `_cmd_autonomy`), the voice registry
+  (`voicebridge/voice_commands.py` `autonomy_*` entries) and the dashboard
+  (Tier-1 `dashboard_ops.run_op`/`confirm_op` through the shared journal).
+  Regression: `tests/test_autonomy_surface.py`.
+- **Broker context forwarding.** `ActionRunner.execute`/`recover` now forward
+  `target`/`owner`/`session`/`device` to the broker
+  (`voicebridge/actions.py`), so the scoped-autonomy containment check is
+  reachable from the live CLI/dashboard/voice paths.
+- **Dashboard status backend fixed.** `h_status` returned a 200 with an empty
+  payload (nonexistent `RI.inventory`/`voicebridge.status`); it now returns the
+  canonical `runtime_inventory.runtime_inventory` (`voicebridge/hermes_compat.py`).
+- **Sessions rename/delete contract aligned.** `api.ts` now sends `{name}` on
+  PATCH and `{confirm:true}` on DELETE (was 400/409 for every user).
+- **Provider profile endpoint/credential honored.** `EffectiveProfile` carries
+  `base_url`/`key_ref`; `gateway.run_role` forwards them so a selected API
+  profile executes against its own endpoint and credential reference
+  (`voicebridge/providers/resolver.py`, `providers/gateway.py`).
+- **Capability requirements fail closed without a catalog** (`require_streaming`
+  /`require_tools`/structured) in `gateway.run`.
+- **Failure receipts are truthful** (use the executed alias, not a hard-coded
+  `qubit-brain4`) in all three local adapters.
+- **Bare CLI families no longer silently succeed**: `egress`, `policy`,
+  `backup`, `reports`, `marketplace` require a subcommand (`required=True`).
+  Dead `_cmd_hermes` branch/function removed.
+- **Packaging/entry-point truth**: `_data`-scoped dependency scan (prior
+  commit) plus the plan-required `docs/QUBIT_PROVIDER_VOICE_AUDIT_2026-09-15.{md,json}`
+  generated deterministically by `scripts/provider_voice_audit.py`.
+- **Branding/config**: systemd unit comments and `docs/STEAL_LIST.md` corrected;
+  `/qubit-models` added to the served SPA route set.
+- **Dead imports**: 97 unused imports removed across `voicebridge/`
+  (`ruff F401`); `product.LEGACY_NAMES` deliberately preserved.
+
+### Known remaining limitations (honestly scoped, not silently passed)
+
+- **Dashboard gated-control rendering.** Many gated controls surface a raw
+  `403/409 {json}` toast instead of the typed policy-refusal renderer
+  (`frontend/hermes-web/src/lib/policy-refusal.ts` is used on only a few
+  pages). The controls are honest (gated, not fake success) but the copy is
+  not yet uniform.
+- **`/api/actions/{name}/status` wire shape** differs from the client type
+  (`api.ts` expects `{lines,running,…}`; `h_actions_read` returns
+  `{ok,actions,state}`), so the action-log viewers show no rows.
+- **Autonomy policy ordering (D4/D5).** The outer `PowerPolicy` gate runs
+  before the broker autonomy seam, so an in-scope high-impact op can still be
+  denied by the gate; and `autonomy_ops`' hard-deny classifier is narrower
+  than `power.is_high_impact` for project-code writes. Non-high-impact
+  autonomy works end-to-end (tested); the high-impact reconciliation is open.
+- **Desktop/browser hardware surfaces** (`OC-05` device tokens, `OC-12` remote
+  attach, `OC-16/17` snapshot/CUA state, `OC-51` capture, `OC-D12/D13/D17`
+  Discord/Telegram rich, `OC-D27` inspect/screencast) remain backend+test only
+  with no product control caller; `OC-13/14` actuators require the operator's
+  pinned actuator, which no caller can yet inject.
+- **Voice-ID barge gate is inert**: `orchestrator._speaker` is never assigned,
+  so `_barge_allowed` always returns True despite `config/voice.yaml:47`.
+- **`/docs` embeds the upstream documentation site** (external egress); it is
+  attribution-adjacent but not Qubit-hosted.
+- **OpenClaw capability target** still needs the owner amendment described in
+  the previous report before the 9.2/9.4 split is owner-approved.
+- 23 defined-once helper functions have no caller (some may be intended public
+  API); not removed to avoid breaking an undocumented consumer.
+
 ## Operator-only rows
 
 The 11 `OPERATOR_ONLY` rows and their live prerequisites are unchanged and

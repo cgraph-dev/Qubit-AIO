@@ -464,6 +464,11 @@ class EffectiveProfile:
     budgets: Dict[str, float]
     fallback_chain: Tuple[str, ...]
     rollback_to: str
+    # The profile's own endpoint and credential *reference* (never a key
+    # value). Forwarded so a selected API profile is executed against the
+    # endpoint/credential it declares instead of the policy provider default.
+    base_url: str = ""
+    key_ref: str = ""
 
     @property
     def is_local(self) -> bool:
@@ -483,6 +488,8 @@ class EffectiveProfile:
             "budgets": dict(self.budgets),
             "fallback_chain": list(self.fallback_chain),
             "rollback_to": self.rollback_to,
+            "base_url": self.base_url,
+            "key_ref": self.key_ref,
         }
 
 
@@ -542,7 +549,9 @@ def _effective(cfg: Any, profile: ModelProfile, *, source: str
             "timeout_s": float(policy.timeout_s),
         },
         fallback_chain=_fallback_chain(cfg, profile),
-        rollback_to=profile.rollback_to)
+        rollback_to=profile.rollback_to,
+        base_url=str(profile.base_url or "").strip(),
+        key_ref=str(profile.key_ref or "").strip())
 
 
 def _pick(cfg: Any, *, role: str, profile_id: Optional[str],

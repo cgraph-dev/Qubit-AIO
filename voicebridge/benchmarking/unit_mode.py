@@ -8,7 +8,7 @@ counted separately — never reported as measured.
 from __future__ import annotations
 
 import time
-from typing import Any, Callable, Dict, List
+from typing import Any, Dict, List
 
 from ..intent.classifier import Classifier
 from ..intent.state import ConfirmationState, ConversationState

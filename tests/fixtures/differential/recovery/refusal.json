@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "fixture_id": "recovery.estop.refusal",
+  "family": "recovery",
+  "command": null,
+  "request": {
+    "kind": "http",
+    "method": "POST",
+    "path": "/agent/api/qubit/dashboard/op",
+    "headers": {},
+    "body": {
+      "op": "power.emergency-stop"
+    },
+    "event": null,
+    "argv": []
+  },
+  "transport": "http",
+  "base_url_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_URL",
+  "auth": {
+    "header": "X-Api-Token",
+    "value_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_TOKEN"
+  },
+  "persisted_state_schema": {
+    "type": "object",
+    "properties": {
+      "estop_engaged": {"type": "boolean"},
+      "latch": {"type": ["string", "null"]},
+      "code": {"const": "EMERGENCY_STOP"}
+    }
+  },
+  "normalizers": [
+    "timestamp",
+    "uuid",
+    "generated_hash"
+  ],
+  "expected": {
+    "http_status": 403,
+    "json_schema": {
+      "ok": false,
+      "state": "REFUSED",
+      "code": "EMERGENCY_STOP"
+    }
+  },
+  "qubit": {
+    "path": "voicebridge/power.py:1964",
+    "caller": "power.emergency-stop",
+    "approval": null
+  },
+  "hermes": {
+    "path": "agent/estop.py:122",
+    "symbol": "check_paused",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "src/gateway/server-methods/suspend.ts:32",
+    "symbol": "suspendHandlers",
+    "mapping_status": "VERIFIED"
+  },
+  "notes": "E-stop refusal contract: while the latch is engaged every mutation path returns a typed refusal (never counted as success). Route/op is the shared dashboard registry so voice/CLI/dashboard agree. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: agent/estop.py:122 (check_paused); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/suspend.ts:32 (suspendHandlers).",
+  "evidence": {
+    "voice_utterance": null,
+    "dashboard_route": "/agent/api/qubit/dashboard/op",
+    "dashboard_control": "power.emergency-stop",
+    "request_schema": {
+      "method": "POST",
+      "path": "/agent/api/qubit/dashboard/op",
+      "body": {
+        "op": "power.emergency-stop"
+      }
+    },
+    "broker_policy_decision": "typed refusal while the ESTOP latch is engaged",
+    "runtime_provider": null,
+    "store_state_assertion": null,
+    "output_event_assertion": null,
+    "error_codes": [
+      "EMERGENCY_STOP"
+    ],
+    "retry_recovery_proof": "mutations resume only after the latch is lifted (recovery.probe)",
+    "audit_receipt_proof": null,
+    "security_resource_proof": "e-stop latch covers every mutation path",
+    "package_proof": null,
+    "response_headers": {
+      "content-type": "application/json"
+    },
+    "evidence_notes": {
+      "voice_utterance": "not exposed by this fixture's surface",
+      "runtime_provider": "not exposed by this fixture's surface",
+      "store_state_assertion": "not exposed by this fixture's surface",
+      "output_event_assertion": "not exposed by this fixture's surface",
+      "audit_receipt_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface"
+    }
+  }
+}

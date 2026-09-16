@@ -369,7 +369,6 @@ def _due(job: Dict[str, Any], now: float) -> bool:
         base = job["last_run_at"] or job["created_at"]
         return now >= base + job["interval_min"] * 60.0
     if kind == "daily":
-        import datetime as _dt
         day_start = now - (now % 86400.0)
         target = day_start + job["hour"] * 3600.0 + job["minute"] * 60.0
         if target > now:

@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "fixture_id": "browser.status.read_only",
+  "family": "browser",
+  "command": null,
+  "request": {
+    "kind": null,
+    "method": "GET",
+    "path": "/agent/api/qubit/browser/status",
+    "headers": {},
+    "body": null,
+    "event": null,
+    "argv": []
+  },
+  "transport": "http",
+  "base_url_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_URL",
+  "auth": {
+    "header": "X-Api-Token",
+    "value_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_TOKEN"
+  },
+  "normalizers": [
+    "temp_path",
+    "pid",
+    "generated_hash",
+    "product_branding"
+  ],
+  "expected": {
+    "http_status": 200,
+    "json_schema": {
+      "state": "OK"
+    },
+    "backend_operation": {
+      "op": "browser.status"
+    }
+  },
+  "qubit": {
+    "path": "voicebridge/browser.py:51",
+    "caller": "status",
+    "approval": null
+  },
+  "hermes": {
+    "path": "hermes_cli/subcommands/browser.py:8",
+    "symbol": "build_browser_parser",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "extensions/browser/src/browser-control-state.ts:44",
+    "symbol": "getBrowserControlState",
+    "mapping_status": "VERIFIED"
+  },
+  "notes": "Browser loopback control contract. Browser is a VISUAL family: the fixture requires a real canonical backend_operation, so a rendered control cannot pass on markup alone. Profiles are untouched by read-only status. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/subcommands/browser.py:8 (build_browser_parser); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: extensions/browser/src/browser-control-state.ts:44 (getBrowserControlState).",
+  "evidence": {
+    "voice_utterance": null,
+    "dashboard_route": "/agent/api/qubit/browser/status",
+    "dashboard_control": "browser.status",
+    "request_schema": {
+      "method": "GET",
+      "path": "/agent/api/qubit/browser/status"
+    },
+    "broker_policy_decision": null,
+    "runtime_provider": "loopback CDP",
+    "store_state_assertion": null,
+    "output_event_assertion": null,
+    "error_codes": null,
+    "retry_recovery_proof": null,
+    "audit_receipt_proof": null,
+    "security_resource_proof": null,
+    "package_proof": null,
+    "response_headers": {
+      "content-type": "application/json"
+    },
+    "evidence_notes": {
+      "voice_utterance": "not exposed by this fixture's surface",
+      "broker_policy_decision": "not exposed by this fixture's surface",
+      "store_state_assertion": "not exposed by this fixture's surface",
+      "output_event_assertion": "not exposed by this fixture's surface",
+      "error_codes": "not exposed by this fixture's surface",
+      "retry_recovery_proof": "not exposed by this fixture's surface",
+      "audit_receipt_proof": "not exposed by this fixture's surface",
+      "security_resource_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface"
+    },
+    "screenshot_ref": {
+      "kind": "screenshot",
+      "ref": "evidence:browser.status.read_only/screenshot.png"
+    },
+    "dom_snapshot_ref": {
+      "kind": "dom",
+      "ref": "evidence:browser.status.read_only/dom.html"
+    },
+    "a11y_snapshot_ref": {
+      "kind": "a11y",
+      "ref": "evidence:browser.status.read_only/a11y.json"
+    }
+  }
+}

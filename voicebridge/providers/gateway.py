@@ -93,10 +93,11 @@ def _local_complete(prompt: str, cfg: Any, max_tokens: int, *,
                               model=alias, identity=f"local/{alias}",
                               usage=usage)
     except Exception as exc:
+        _m = (model or "").strip() or "qubit-brain4"
         return ProviderResult(ok=False, code="PROVIDER_OUTAGE",
                               message=redact_text(str(exc))[:200],
-                              provider="local", model="qubit-brain4",
-                              identity="local/qubit-brain4")
+                              provider="local", model=_m,
+                              identity=f"local/{_m}")
 
 
 def _local_generate(prompt: str, cfg: Any, max_tokens: int, *,
@@ -150,10 +151,11 @@ def _local_generate(prompt: str, cfg: Any, max_tokens: int, *,
             usage=UsageRecord(provider="local", model=alias,
                               identity=f"local/{alias}", latency_ms=ms))
     except Exception as exc:
+        _m = (model or "").strip() or "qubit-brain4"
         return ProviderResult(ok=False, code="PROVIDER_OUTAGE",
                               message=redact_text(str(exc))[:200],
-                              provider="local", model="qubit-brain4",
-                              identity="local/qubit-brain4")
+                              provider="local", model=_m,
+                              identity=f"local/{_m}")
 
 
 def _local_chat_raw(messages: Any, cfg: Any, max_tokens: int, *,
@@ -206,10 +208,11 @@ def _local_chat_raw(messages: Any, cfg: Any, max_tokens: int, *,
             usage=UsageRecord(provider="local", model=alias,
                               identity=f"local/{alias}", latency_ms=ms))
     except Exception as exc:
+        _m = (model or "").strip() or "qubit-brain4"
         return ProviderResult(ok=False, code="PROVIDER_OUTAGE",
                               message=redact_text(str(exc))[:200],
-                              provider="local", model="qubit-brain4",
-                              identity="local/qubit-brain4")
+                              provider="local", model=_m,
+                              identity=f"local/{_m}")
 
 
 def _local_dispatch(prompt: str, cfg: Any, max_tokens: int, *,
@@ -330,7 +333,9 @@ def run_role(prompt: str, cfg: Any, *, role: str = "chat",
         require_tools=require_tools, require_streaming=require_streaming,
         context_chars=context_chars or len(prompt or ""))
     return run(req, cfg, cancel=cancel, allow_private=allow_private,
-               base_url=base_url, api_key=api_key,
+               base_url=base_url or ("" if eff.is_local else eff.base_url),
+               api_key=api_key,
+               key_ref="" if eff.is_local else eff.key_ref,
                local_mode=local_mode, conversation_prompt=conversation_prompt,
                context=context, timeout_s=timeout_s,
                system_prompt=system_prompt, messages=messages, options=options,
@@ -345,6 +350,7 @@ def run(req: ProviderRequest, cfg: Any,
         allow_private: bool = False, *,
         base_url: str = "",
         api_key: str = "",
+        key_ref: str = "",
         local_mode: str = "chat",
         conversation_prompt: str = "",
         context: str = "",
@@ -430,6 +436,15 @@ def run(req: ProviderRequest, cfg: Any,
     if not policy.is_allowed(provider, model):
         return _deny("UNKNOWN_MODEL", "model not in owner allowlist")
 
+    # Capability requirements fail closed even when no catalog is supplied:
+    # a caller that requires streaming/tools/structured output must never be
+    # silently handed a capability we could not verify.
+    if catalog is None and (req.require_streaming or req.require_tools
+                            or req.structured_schema is not None):
+        return _deny("UNSUPPORTED_CAPABILITY",
+                     "capability requirements need a validated catalog; "
+                     "none was supplied")
+
     # Catalog validation (stale/unknown fail closed).
     entry = catalog.lookup(provider, model) if catalog else None
     if catalog is None:
@@ -476,7 +491,10 @@ def run(req: ProviderRequest, cfg: Any,
     # to the same string contract below, so every refusal and redaction
     # below applies unchanged.
     pcfg = policy.provider_cfg(provider)
-    raw_ref = pcfg.get("key_ref", "")
+    # A resolved model profile may declare its own credential reference;
+    # prefer it over the policy provider default so two profiles of one
+    # provider never share a credential by accident. Values are never logged.
+    raw_ref = key_ref or pcfg.get("key_ref", "")
     if isinstance(raw_ref, SecretRef):
         ref = f"{raw_ref.source}:{raw_ref.name}"
     elif isinstance(raw_ref, Mapping):

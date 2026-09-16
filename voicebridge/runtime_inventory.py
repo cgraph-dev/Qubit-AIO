@@ -9,12 +9,10 @@ keys, cookies, raw paths, audio, or page text).
 """
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 from typing import Any, Dict
 
 from . import foundation as F
-from .redaction import redact_text
 
 
 def _short_home(path: str) -> str:
@@ -32,7 +30,6 @@ def _safe(fn, *args, **kwargs):
 
 def _agent_runtime(cfg: Any) -> Dict[str, Any]:
     """Qubit-native agent runtime identity (the effective runtime)."""
-    from .agent import turn as _turn
 
     get = (lambda *p, default=None: cfg.get(*p, default=default)) \
         if hasattr(cfg, "get") else (lambda *p, default=None: default)

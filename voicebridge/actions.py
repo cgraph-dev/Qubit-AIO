@@ -1527,7 +1527,9 @@ class ActionRunner:
                 source: str = "user", confirmation_id: Optional[str] = None,
                 confirmed: bool = False, dry_run: bool = False,
                 expected_hash: str = "",
-                timeout_s: Optional[float] = None) -> Dict[str, Any]:
+                timeout_s: Optional[float] = None,
+                owner: Optional[str] = None, session: Optional[str] = None,
+                device: Optional[str] = None) -> Dict[str, Any]:
         """Gate + confirm + execute one action through the broker.
 
         ``dry_run=True`` returns the real preview and persists nothing.
@@ -1603,11 +1605,18 @@ class ActionRunner:
 
         receipt = self._begin_receipt(spec, env, confirmation_id)
         cid = receipt.correlation_id
+        # Forward the FULL request binding to the broker so the scoped-autonomy
+        # authority can containment-check target/owner/session/device. Dropping
+        # these silently disabled the autonomy seam on every live surface.
+        _owner = owner if owner is not None else (
+            HUMAN_PRINCIPAL if source in HUMAN_CHANNELS else None)
         res = self.broker.execute(
             action_id, env, source=source, correlation_id=cid,
             confirmation_id=confirmation_id,
             timeout_s=min(float(timeout_s) if timeout_s is not None
-                          else spec.timeout_s, spec.timeout_s))
+                          else spec.timeout_s, spec.timeout_s),
+            target=str(env.get("target", "") or ""), owner=_owner,
+            session=session, device=device)
         outcome = self._outcome_from_exec(spec, env, res)
         updated = ActionReceipt.from_dict({
             **receipt.to_dict(),
@@ -1806,7 +1815,9 @@ class ActionRunner:
     # ------------------------------------------------------------- recover
     def recover(self, receipt_id: str, *, source: str = "user",
                 confirmation_id: Optional[str] = None,
-                confirmed: bool = False) -> Dict[str, Any]:
+                confirmed: bool = False,
+                owner: Optional[str] = None, session: Optional[str] = None,
+                device: Optional[str] = None) -> Dict[str, Any]:
         """Compensating rollback for a completed action, reported honestly.
 
         ``rollback_kind=reversible`` actions run the declared compensation
@@ -1866,10 +1877,14 @@ class ActionRunner:
                         "detail": gate.get("detail", "")}
         if gate.get("confirmation_id"):
             confirmation_id = gate["confirmation_id"]
+        _owner = owner if owner is not None else (
+            HUMAN_PRINCIPAL if source in HUMAN_CHANNELS else None)
         res = self.broker.execute(receipt.action_id, env, source=source,
                                   correlation_id=uuid.uuid4().hex[:16],
                                   confirmation_id=confirmation_id,
-                                  timeout_s=spec.timeout_s)
+                                  timeout_s=spec.timeout_s,
+                                  target=str(env.get("target", "") or ""),
+                                  owner=_owner, session=session, device=device)
         if not res.ok or res.denied:
             return {"state": ST_FAILED, "code": "RECOVERY_FAILED",
                     "receipt_id": receipt_id,

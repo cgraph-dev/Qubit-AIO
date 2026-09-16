@@ -15,7 +15,6 @@ thread-based for simplicity, using events/queues for coordination.
 """
 from __future__ import annotations
 
-import json
 import os
 import queue
 import random
@@ -2088,6 +2087,7 @@ class VoiceOrchestrator:
                     str(payload.get("action_id", "")),
                     args=dict(payload.get("args") or {}),
                     target=str(payload.get("target", "")),
+                    session=str(payload.get("session", "")),
                     account_scope=str(payload.get("account_scope", "")),
                     scope=str(payload.get("scope", "")),
                     source="user", confirmed=True)

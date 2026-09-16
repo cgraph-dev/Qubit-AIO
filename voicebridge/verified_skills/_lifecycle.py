@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import re
 import uuid
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 
 from ._models import (COST_CHEAP, KIND_NEGATIVE, KIND_POSITIVE,
                       MAX_CAPABILITIES, MIN_ACCEPTANCE_STRENGTH, ST_ARCHIVED,

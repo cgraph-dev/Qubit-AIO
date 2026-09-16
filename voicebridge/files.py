@@ -18,7 +18,7 @@ from __future__ import annotations
 import os
 import stat
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 CONFIRM_CODE = "FILES_CONFIRM_REQUIRED"
 NOT_FOUND_CODE = "FILES_NOT_FOUND"

@@ -23,9 +23,9 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from ..contracts import (AccountHealthRecord, AccountHealthStatus,
+from ..contracts import (AccountHealthStatus,
                          CommunicationItem, EvidenceAssetRecord, EvidenceStatus,
-                         Platform, ReadState, ScanStatus)
+                         Platform, ScanStatus)
 
 CDP_LOOPBACK = "http://127.0.0.1:9222"
 

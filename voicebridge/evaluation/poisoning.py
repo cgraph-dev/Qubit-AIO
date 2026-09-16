@@ -16,7 +16,6 @@ from typing import Any, Dict, List, Optional
 
 from ..benchmarking.corpus import Case
 from ..intent.classifier import Classifier
-from ..intent.state import ConfirmationState, ConversationState
 from ..learning import LearningLedger, _norm_key
 from ..memory import MemoryStore
 

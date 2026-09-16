@@ -19,12 +19,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 SCHEMA_VERSION = 1
 IDENTITY_VERSION = 1

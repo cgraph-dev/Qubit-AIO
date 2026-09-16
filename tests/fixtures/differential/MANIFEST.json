@@ -1,0 +1,197 @@
+{
+  "schema_version": 1,
+  "fixtures": [
+    {
+      "path": "tests/fixtures/differential/acp/catalog_status.json",
+      "sha256": "42b7021ca3921171e59e035428ab77e9370c683bdb4e1ed903173c20f74d2ebb",
+      "family": "acp",
+      "fixture_id": "acp.harness.catalog_status"
+    },
+    {
+      "path": "tests/fixtures/differential/api/status_schema.json",
+      "sha256": "b2eb2177bc9d41dcf2264f27e338462125303fc77f357e72997dc7db7d89cc01",
+      "family": "api",
+      "fixture_id": "api.route.status_schema"
+    },
+    {
+      "path": "tests/fixtures/differential/approval/pending_list.json",
+      "sha256": "7cfbf84529d10adebd2ec98da44c39afa7aa282f91f6fc761d95afc9254407df",
+      "family": "approval",
+      "fixture_id": "approval.journal.pending_list"
+    },
+    {
+      "path": "tests/fixtures/differential/auth/read_only.json",
+      "sha256": "2d83a0786293a27bceb7d947df9c6d438c6470c95c56c54bc30b089402f62a0c",
+      "family": "auth",
+      "fixture_id": "auth.status.read_only"
+    },
+    {
+      "path": "tests/fixtures/differential/board/boards_list.json",
+      "sha256": "34185b4a792107f4bd152a18ded67a553d42c20e155924c90864f4b934842d96",
+      "family": "board",
+      "fixture_id": "board.kanban.boards_list"
+    },
+    {
+      "path": "tests/fixtures/differential/browser/read_only.json",
+      "sha256": "6c078eafca101eee9f46cddf6f1bd9578aea52aff14ceabcfda7e26ad3052818",
+      "family": "browser",
+      "fixture_id": "browser.status.read_only"
+    },
+    {
+      "path": "tests/fixtures/differential/cli/help_exit_code.json",
+      "sha256": "ea7c0000c13ef99502b67c54f64c5f598401d90dbc4fa8ae963c6f149db9cc48",
+      "family": "cli",
+      "fixture_id": "cli.argument_parser.help_exit_code"
+    },
+    {
+      "path": "tests/fixtures/differential/cli/list_json.json",
+      "sha256": "fd09929a8450905f104e9ba05fc3dd9237bd2c31a8a65d156ad01ad36e3aecf3",
+      "family": "cli",
+      "fixture_id": "cli.model_profile.list_json"
+    },
+    {
+      "path": "tests/fixtures/differential/cron/list.json",
+      "sha256": "6f04f458f11cd46ee57bc64ff0b4327bbe619073f1cfe5e0f00eef1f0d0bb89e",
+      "family": "cron",
+      "fixture_id": "cron.schedules.list"
+    },
+    {
+      "path": "tests/fixtures/differential/dashboard/run_op.json",
+      "sha256": "f21115660e00b7ac121742a738cc4a784dd01dc55ef8255f145a1fe4aeaf8f19",
+      "family": "dashboard",
+      "fixture_id": "dashboard.control.run_op"
+    },
+    {
+      "path": "tests/fixtures/differential/desktop/profile.json",
+      "sha256": "bf23a6b085e48a7770afff14d5a2fc7acd41c28744342cf7675522d7dd9effe7",
+      "family": "desktop",
+      "fixture_id": "desktop.device.profile"
+    },
+    {
+      "path": "tests/fixtures/differential/file/inspect_active_project.json",
+      "sha256": "47162ed96db1aaf6dc96f38a15da8d84da2354f6abca4bead3b25d0bb0e2243b",
+      "family": "file",
+      "fixture_id": "file.files.inspect_active_project"
+    },
+    {
+      "path": "tests/fixtures/differential/gateway/protocol_negotiate.json",
+      "sha256": "ba9d6cc9ab92e0b25b68f465341fd3f6ef7cb46d073a0d1319e1aa6c3767f04d",
+      "family": "gateway",
+      "fixture_id": "gateway.peers.protocol_negotiate"
+    },
+    {
+      "path": "tests/fixtures/differential/mcp/grants_status.json",
+      "sha256": "89a876c4f6c460d6073c6f04656bf31c3a246bd96d82f95f202b622a73ee7ef1",
+      "family": "mcp",
+      "fixture_id": "mcp.loopback.grants_status"
+    },
+    {
+      "path": "tests/fixtures/differential/media/status.json",
+      "sha256": "b430d27f96a7e1d44e7bce27d7e349f0efa62e66e5735a845b9c5d6cbf16f821",
+      "family": "media",
+      "fixture_id": "media.catalog.status"
+    },
+    {
+      "path": "tests/fixtures/differential/memory/status.json",
+      "sha256": "5d9cb26fa0c1579c8d5502b7edc6109d6da27a334f77417af78f121b7187cd9c",
+      "family": "memory",
+      "fixture_id": "memory.store.status"
+    },
+    {
+      "path": "tests/fixtures/differential/messaging/list.json",
+      "sha256": "5c94a54c558f2288e094023fdde3bca271ed4a008d17db157cd1c5e0c46eaa7f",
+      "family": "messaging",
+      "fixture_id": "messaging.accounts.list"
+    },
+    {
+      "path": "tests/fixtures/differential/plugin/list.json",
+      "sha256": "b7987961892ea4527e2e9c904d891b8c1efeff5505558b0610b8ffe7f8e33ca5",
+      "family": "plugin",
+      "fixture_id": "plugin.runtime.list"
+    },
+    {
+      "path": "tests/fixtures/differential/project/list.json",
+      "sha256": "09173dc88e5f6f8f33f4faaa0652a0813132254700201a46eb28972703adc989",
+      "family": "project",
+      "fixture_id": "project.registry.list"
+    },
+    {
+      "path": "tests/fixtures/differential/provider/brain4_default.json",
+      "sha256": "1a7a20a8833efb0eb384de4e0976fe2e56103753066577dfda4d25b2dbd7accf",
+      "family": "provider",
+      "fixture_id": "provider.model_profile.brain4_default"
+    },
+    {
+      "path": "tests/fixtures/differential/provider/opencode_coding.json",
+      "sha256": "cc973afaa97715391d2c1fc657123e985a3038cb55075c003a814075f234e221",
+      "family": "provider",
+      "fixture_id": "provider.model_profile.opencode_coding"
+    },
+    {
+      "path": "tests/fixtures/differential/provider/openrouter_api.json",
+      "sha256": "67ad1a32e9368721136b24d68a1721f8208d8c2759b0d5f9c423a048aa933a36",
+      "family": "provider",
+      "fixture_id": "provider.model_profile.openrouter_api"
+    },
+    {
+      "path": "tests/fixtures/differential/recovery/probe.json",
+      "sha256": "9e975a7548bae7e41d64407e7055f963e1be9ae8607e547fe1fefa45e5c1eb10",
+      "family": "recovery",
+      "fixture_id": "recovery.crash.probe"
+    },
+    {
+      "path": "tests/fixtures/differential/recovery/refusal.json",
+      "sha256": "201b53991f8b87c50c641d506e37041d8e42c5e282df8037fcfd0081f18b784f",
+      "family": "recovery",
+      "fixture_id": "recovery.estop.refusal"
+    },
+    {
+      "path": "tests/fixtures/differential/rpc/session_list.json",
+      "sha256": "25acf67fc382c6be01e09db03b24489b5e992dbd245c8759a01104087fdbfdd6",
+      "family": "rpc",
+      "fixture_id": "rpc.methodregistry.session_list"
+    },
+    {
+      "path": "tests/fixtures/differential/session/list_persisted.json",
+      "sha256": "55763d1cc5dcc5dd5165f50f6af80f1b02b03913165d108e637b2a04f8f489a5",
+      "family": "session",
+      "fixture_id": "session.store.list_persisted"
+    },
+    {
+      "path": "tests/fixtures/differential/skill/list.json",
+      "sha256": "eb792ef4553328ea43aa368a646919bb86fd05207fb4e04e227dbce3f3b5e0b9",
+      "family": "skill",
+      "fixture_id": "skill.verified.list"
+    },
+    {
+      "path": "tests/fixtures/differential/sse/event_order.json",
+      "sha256": "3f8ebaaf210e9ffdf91968460b1a5e88f78dd92f0a3e56ab46e7fc733efb1739",
+      "family": "sse",
+      "fixture_id": "sse.chat_stream.event_order"
+    },
+    {
+      "path": "tests/fixtures/differential/task/status.json",
+      "sha256": "bd06d72047bbd660601a5e43908cddac1af21bd725df8bf8b2bbc794801e61a9",
+      "family": "task",
+      "fixture_id": "task.ledger.status"
+    },
+    {
+      "path": "tests/fixtures/differential/voice/canonical_op.json",
+      "sha256": "e01c49ab6e356b781d41f4c93e614977114f7f04503c1ba367dbd2adacad07a7",
+      "family": "voice",
+      "fixture_id": "voice.intent.canonical_op"
+    },
+    {
+      "path": "tests/fixtures/differential/webhook/list.json",
+      "sha256": "2d483df620d95ef469a84fbbea2e3485917f06977c8bdeb274fae563e3d986c7",
+      "family": "webhook",
+      "fixture_id": "webhook.subscriptions.list"
+    },
+    {
+      "path": "tests/fixtures/differential/ws/scope_events.json",
+      "sha256": "38066e30775739d43bf163e6a73ed4628b6adfca0158fe3027fcd2cd3085a12b",
+      "family": "ws",
+      "fixture_id": "ws.handshake.scope_events"
+    }
+  ]
+}

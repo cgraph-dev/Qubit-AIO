@@ -46,6 +46,9 @@ KNOWN_UNREFERENCED_MODULES: set = set()
 ARTIFACT_ONLY_TESTS = {
     "test_branding_scan8tf.py",
     "test_clean_clone_wave5.py",
+    # Loads the differential-parity runner (scripts/differential_parity.py) by
+    # path to guard that artifact; it does not import production modules.
+    "test_differential_parity8u.py",
     "test_frontend_hygiene.py",
     "test_hermes_frontend_map8u.py",
     "test_matrix_final8u.py",

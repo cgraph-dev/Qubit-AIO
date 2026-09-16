@@ -10,7 +10,7 @@ from __future__ import annotations
 import subprocess
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Optional
 
 DEFAULT_HEADROOM_MIB = 512
 

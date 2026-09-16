@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
 
 from ..redaction import redact_obj
-from .core import SCHEMA_VERSION, EventType, make_event
+from .core import EventType, make_event
 
 
 class EventJournal:

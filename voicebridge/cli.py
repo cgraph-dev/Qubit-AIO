@@ -124,6 +124,26 @@ _OP_CLI = (
     ("plugins", "remote", "plugins_remote",
      "typed refusal: remote plugin identifiers are never fetched",
      (("identifier", {}),)),
+    # Workstream F: owner-scoped autonomy admin (same ops the dashboard and
+    # voice registry run through one backend + confirmation journal).
+    ("autonomy", "status", "autonomy_status",
+     "effective owner-scoped autonomy policy (read-only)", ()),
+    ("autonomy", "list", "autonomy_list",
+     "owner-scoped autonomy profiles (read-only)", ()),
+    ("autonomy", "show", "autonomy_show",
+     "one autonomy profile by id (read-only)",
+     (("profile_id", {}),)),
+    ("autonomy", "pause", "autonomy_pause",
+     "pause one scoped-autonomy profile (stages confirmation)",
+     (("profile_id", {}), ("--confirm", {"action": "store_true"}))),
+    ("autonomy", "resume", "autonomy_resume",
+     "resume one scoped-autonomy profile (stages confirmation)",
+     (("profile_id", {}), ("--confirm", {"action": "store_true"}))),
+    ("autonomy", "revoke", "autonomy_revoke",
+     "revoke one scoped-autonomy profile (stages confirmation)",
+     (("profile_id", {}), ("--confirm", {"action": "store_true"}))),
+    ("autonomy", "expire", "autonomy_expire",
+     "expire elapsed autonomy profiles (read-only)", ()),
 )
 
 _OP_CLI_INDEX = {(fam, sub): op_id for fam, sub, op_id, _, _ in _OP_CLI}
@@ -2747,7 +2767,7 @@ def build_parser() -> argparse.ArgumentParser:
     # functions the voice and dashboard surfaces call).
     eg = add("egress",
              help="Deny-by-default egress policy + per-host decisions (read-only)")
-    eg_sub = eg.add_subparsers(dest="egress_command")
+    eg_sub = eg.add_subparsers(dest="egress_command", required=True)
     _integ(eg_sub, "status",
            "deny-by-default egress policy + secret registry (read-only)")
     _integ(eg_sub, "check",
@@ -2756,7 +2776,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     pol = add("policy",
               help="Workspace policy conformance + attestation (read-only)")
-    pol_sub = pol.add_subparsers(dest="policy_command")
+    pol_sub = pol.add_subparsers(dest="policy_command", required=True)
     _integ(pol_sub, "conformance",
            "policy workspace-conformance doctor (read-only)")
     _integ(pol_sub, "attest",
@@ -2792,11 +2812,14 @@ def build_parser() -> argparse.ArgumentParser:
     # but had no parser binding. Each subcommand maps to the same production op
     # id the dashboard/voice surfaces run.
     bk = add("backup", help="Passphrase-sealed portable backup (create/restore)")
-    bk_sub = bk.add_subparsers(dest="backup_command")
+    bk_sub = bk.add_subparsers(dest="backup_command", required=True)
     rp = add("reports", help="Published report bundles (read-only)")
-    rp_sub = rp.add_subparsers(dest="reports_command")
+    rp_sub = rp.add_subparsers(dest="reports_command", required=True)
     mk = add("marketplace", help="Local reviewed plugin/agent sources (read-only)")
-    mk_sub = mk.add_subparsers(dest="marketplace_command")
+    mk_sub = mk.add_subparsers(dest="marketplace_command", required=True)
+    au = add("autonomy",
+             help="Owner-scoped autonomy profiles (read + confirm-gated control)")
+    au_sub = au.add_subparsers(dest="autonomy_command", required=True)
 
     # Leaf families: one read/diagnostic op id apiece, run via _it_run_op.
     for _leaf_fam, _leaf_op, _leaf_help in _OP_LEAF_CLI:
@@ -2810,7 +2833,7 @@ def build_parser() -> argparse.ArgumentParser:
     _op_parsers = {"brain": bn_sub, "ghost": ghost_sub, "memory": mem_sub,
                    "acp": acp_sub, "skills": sk_sub, "kanban": kb_sub,
                    "opencode": oc_sub, "backup": bk_sub, "reports": rp_sub,
-                   "marketplace": mk_sub,
+                   "marketplace": mk_sub, "autonomy": au_sub,
                    "plugins": pl_sub}
     for fam, sub_name, op_id, help_text, specs in _OP_CLI:
         op_sp = _integ(_op_parsers[fam], sub_name, help_text, specs)
@@ -3277,6 +3300,55 @@ for _leaf_pair in (("logs", None), ("tools", None), ("reasoning", None),
     _INTEGRATION[_leaf_pair] = _it_run_op
 
 
+def _cmd_autonomy(cfg, args) -> int:
+    """Owner-scoped autonomy admin (same backend as the dashboard/voice ops)."""
+    from . import autonomy_ops as AO
+    from .actions import HUMAN_PRINCIPAL
+
+    sub = getattr(args, "autonomy_command", "") or "status"
+    try:
+        if sub == "status":
+            return _finish_integration({"state": "OK", "autonomy": AO.status(cfg)})
+        if sub == "list":
+            profs = AO.list_profiles(cfg)
+            return _finish_integration({
+                "state": "OK",
+                "autonomy": {"count": len(profs),
+                             "profiles": [p.to_dict() for p in profs]}})
+        if sub == "show":
+            prof = AO.show(cfg, str(getattr(args, "profile_id", "") or ""))
+            if prof is None:
+                return _finish_integration({
+                    "state": "UNAVAILABLE",
+                    "code": "AUTONOMY_PROFILE_NOT_FOUND"})
+            return _finish_integration(
+                {"state": "OK", "autonomy": {"profile": prof.to_dict()}})
+        if sub == "expire":
+            expired = AO.expire(cfg)
+            return _finish_integration({
+                "state": "OK",
+                "autonomy": {"expired": list(expired), "count": len(expired)}})
+        if sub in ("pause", "resume", "revoke"):
+            pid = str(getattr(args, "profile_id", "") or "")
+            if not getattr(args, "confirm", False):
+                return _finish_integration({
+                    "state": "NEEDS-CONFIRM", "code": "CONFIRM_REQUIRED",
+                    "detail": f"re-run with --confirm to {sub} {pid!r}",
+                    "profile_id": pid})
+            fn = {"pause": AO.pause, "resume": AO.resume,
+                  "revoke": AO.revoke}[sub]
+            prof = fn(cfg, pid, owner=HUMAN_PRINCIPAL)
+            return _finish_integration(
+                {"state": "OK", "autonomy": {"profile": prof.to_dict()}})
+    except Exception as exc:  # typed backend boundary: never a traceback
+        return _finish_integration({
+            "state": "FAILED",
+            "code": str(getattr(exc, "code", None) or "AUTONOMY_ERROR"),
+            "detail": str(getattr(exc, "detail", None) or exc)[:300]})
+    return _finish_integration({"state": "FAILED", "code": "BAD_SUBCOMMAND",
+                                "detail": sub})
+
+
 def _finish_integration(out) -> int:
     """Render one integration result and map its typed state to an exit code."""
     print(json.dumps(out, indent=2, sort_keys=True))
@@ -3351,6 +3423,12 @@ def main(argv=None) -> int:
     setup(level=cfg.get("logging", "level", default="INFO"),
           jsonl=cfg.get("logging", "jsonl", default=True),
           state_dir=cfg.state_dir())
+
+    # Owner-scoped autonomy admin is a native family: pause/resume/revoke call
+    # the canonical backend directly with an explicit --confirm (the dashboard
+    # and voice paths stage the same op through the shared journal).
+    if command == "autonomy":
+        return _cmd_autonomy(cfg, args)
 
     # Agent 1 integration wave: wired family subcommands execute their real
     # backend here, before the native family handlers below.
@@ -3521,8 +3599,6 @@ def main(argv=None) -> int:
         return _cmd_webui(cfg, args)
     if command == "setup":
         return _cmd_setup(cfg, args)
-    if command == "agent":
-        return _cmd_hermes(args)
 
     from .orchestrator import VoiceOrchestrator
     orch = VoiceOrchestrator(cfg, no_hotkey=args.no_hotkey, dry_run=args.dry_run)
@@ -4196,7 +4272,6 @@ def _cmd_flag_drill(cfg) -> int:
     """Hermetic rollback drill on throwaway config/state (never the live one)."""
     from . import feature_flags as FF
     import tempfile as _tf
-    import os as _os
     from .config import Config as _Config
 
     with _tf.TemporaryDirectory(prefix="vb-flag-drill-") as td:
@@ -6566,8 +6641,7 @@ def _cmd_memory(cfg, args) -> int:
     import time as _time
     from .memory import (SemanticMemory, SemanticMemoryError,
                          SemanticStateError,
-                         load_semantic_state, write_semantic_state,
-                         redact_secrets)
+                         load_semantic_state, redact_secrets)
     from .memory.semantic import SEMANTIC_STATE_SCHEMA
     cmd = getattr(args, "memory_command", None) or "status"
     if cmd.startswith("workspace-"):
@@ -6706,7 +6780,6 @@ def _memory_write_state(cfg, state_path, merged, *, confirm: bool,
     """Atomic private state write (fsync+rename). A corrupt existing file is
     backed up before an explicit confirmed overwrite; newer state is never
     overwritten."""
-    import json as _json
     import time as _time
     from .memory import write_semantic_state
     if not confirm:
@@ -6940,7 +7013,6 @@ def _print_website_out(args, cmd, out) -> None:
 
 def _human_websites(cmd: str, out: dict) -> str:
     """Concise, typed human-readable rendering of a websites command result."""
-    import json as _json
     if out is None:
         return "unavailable"
     st = out.get("state", "unavailable")
@@ -8928,15 +9000,6 @@ def _cmd_opencode(cfg, args) -> int:
         print(_json.dumps({"state": "failed", "detail": str(exc)[:200]},
                           indent=2))
         return 2
-
-
-def _cmd_hermes(args) -> int:
-    """Dispatch verbatim to the vendored Qubit-owned Hermes runtime.
-
-    The runtime executes in-process from ``qubit_hermes/`` (no external Hermes
-    install); see voicebridge/hermes_runtime.py and the owner amendment."""
-    from . import hermes_runtime
-    return hermes_runtime.run(getattr(args, "agent_args", []) or [])
 
 
 def _cmd_webui(cfg, args) -> int:

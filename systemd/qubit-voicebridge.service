@@ -1,7 +1,7 @@
 [Unit]
 Description=Qubit Agent (Qubit VoiceBridge push-to-talk voice interface)
 After=network.target
-# OpenClaw gateway + ollama (local LLM) should be up first if they exist as units:
+# The Qubit runtime + ollama (local LLM) should be up first if they exist as units:
 After=ollama.service
 Wants=ollama.service
 # Bounded restart storm guard: at most 5 restarts per 5 minutes; beyond that

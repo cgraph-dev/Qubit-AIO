@@ -26,21 +26,18 @@ from __future__ import annotations
 import copy
 import json
 import os
-import shutil
 import subprocess
-import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Optional, Sequence
 
 from ..config import Config
-from .adapters.registry import PLATFORM_NAMES, communications_store
+from .adapters.registry import communications_store
 from .contracts import NotificationKind, NotificationStatus
 from .monitor import (
     LEASE_MIN_TTL_S, MONITOR_LEASE, SERVICE_NAME, SERVICE_TIMEOUT_S,
-    TIMER_NAME, _parse_quiet_hours, _retry_pending_notifications,
-    render_units, run_hourly, time_config_state, validate_timezone,
+    TIMER_NAME, _parse_quiet_hours, render_units, run_hourly, time_config_state, validate_timezone,
 )
 
 QUALIFY_ENV = "VOICE_BRIDGE_QUALIFY"
@@ -278,7 +275,6 @@ def qualify_lease(cfg: Config, state_dir: Path) -> Dict[str, Any]:
 def qualify_quiet_hours(cfg: Config) -> Dict[str, Any]:
     """Qualify strict quiet-hours + IANA timezone validation and the
     fail-closed ``CONFIG_INVALID`` behavior, including DST fold/gap handling."""
-    from zoneinfo import ZoneInfo
     checks: Dict[str, Any] = {}
     valid = _parse_quiet_hours("22:00-07:00")
     checks["valid_spec"] = {

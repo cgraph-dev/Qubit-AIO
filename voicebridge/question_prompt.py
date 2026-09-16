@@ -18,7 +18,7 @@ import re
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
 CONFIRM_CODE = "QUESTION_CONFIRM_REQUIRED"
 BAD_INPUT_CODE = "QUESTION_BAD_INPUT"

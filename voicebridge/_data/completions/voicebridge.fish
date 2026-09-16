@@ -8,6 +8,7 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a ask
 complete -c voicebridge -n '__fish_use_subcommand' -f -a asr-test
 complete -c voicebridge -n '__fish_use_subcommand' -f -a audio
 complete -c voicebridge -n '__fish_use_subcommand' -f -a auth
+complete -c voicebridge -n '__fish_use_subcommand' -f -a autonomy
 complete -c voicebridge -n '__fish_use_subcommand' -f -a backup
 complete -c voicebridge -n '__fish_use_subcommand' -f -a brain
 complete -c voicebridge -n '__fish_use_subcommand' -f -a branding

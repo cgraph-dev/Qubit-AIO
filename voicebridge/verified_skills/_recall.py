@@ -11,11 +11,10 @@ from typing import Dict, List, Optional
 from ._models import (DEFAULT_HOT_CAP, DEFAULT_MAX_NEGATIVES,
                       DEFAULT_NEGATIVE_THRESHOLD, DEFAULT_TOKEN_BUDGET,
                       DEFAULT_TOP_K, KIND_NEGATIVE, KIND_POSITIVE, ST_ARCHIVED,
-                      ST_COLD, ST_HOT, ST_QUARANTINED, ST_VERIFIED,
+                      ST_COLD, ST_QUARANTINED, ST_VERIFIED,
                       TIER_COLD, TIER_HOT, TIER_WARM, _EMBEDDER_VERSION,
                       cosine, digest, est_tokens, recency_decay,
-                      recipe_embedding, utility_score)
-from ._models import SkillRecord
+                      recipe_embedding)
 from ._persist import PersistMixin
 
 

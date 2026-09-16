@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "fixture_id": "ws.handshake.scope_events",
+  "family": "ws",
+  "command": null,
+  "request": {
+    "kind": "ws",
+    "method": "GET",
+    "path": "/agent/api/qubit/gateway/ws",
+    "headers": {},
+    "body": null,
+    "event": null,
+    "argv": []
+  },
+  "transport": "ws",
+  "base_url_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_URL",
+  "auth": {
+    "header": "X-Api-Token",
+    "value_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_TOKEN"
+  },
+  "sequence": [
+    {"kind": "ws", "step": "connect", "path": "/agent/api/qubit/gateway/ws"},
+    {"kind": "ws", "step": "handshake", "expect": {"type": "hello", "protocol": "qubit-gateway/1"}},
+    {"kind": "ws", "step": "reconnect", "attempts": 1}
+  ],
+  "events_expected": [
+    {"event": "hello", "order": 1},
+    {"event": "status", "order": 2}
+  ],
+  "persisted_state_schema": {
+    "type": "object",
+    "properties": {
+      "handshake": {"type": "object"},
+      "scopes": {"type": "array", "items": {"type": "string"}},
+      "reconnect_attempts": {"type": "integer"}
+    }
+  },
+  "normalizers": [
+    "uuid",
+    "session_token",
+    "timestamp"
+  ],
+  "expected": {
+    "handshake": {
+      "type": "hello",
+      "protocol": "qubit-gateway/1"
+    },
+    "scopes": [
+      "gateway:read"
+    ],
+    "events": [
+      {
+        "event": "status"
+      }
+    ]
+  },
+  "qubit": {
+    "path": "voicebridge/gateway/gateway_ws.py:130",
+    "caller": "dispatch_request",
+    "approval": null
+  },
+  "hermes": {
+    "path": "tui_gateway/ws.py:239",
+    "symbol": "handle_ws",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "packages/gateway-protocol/src/frame-guards.ts:32",
+    "symbol": "isGatewayEventFrame",
+    "mapping_status": "VERIFIED"
+  },
+  "notes": "WS handshake+scope+event contract. FrameGuard.check_raw rejects oversize/malformed frames; dispatch_request routes req frames through the same rpc registry; event frames reach the event_cb. The ws adapter projects each frame to {event:<name>} so ordering is asserted without volatile payloads. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: tui_gateway/ws.py:239 (handle_ws); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: packages/gateway-protocol/src/frame-guards.ts:32 (isGatewayEventFrame).",
+  "evidence": {
+    "voice_utterance": null,
+    "dashboard_route": null,
+    "dashboard_control": null,
+    "request_schema": {
+      "method": "GET",
+      "path": "/agent/api/qubit/gateway/ws"
+    },
+    "broker_policy_decision": null,
+    "runtime_provider": null,
+    "store_state_assertion": null,
+    "output_event_assertion": {
+      "handshake": {
+        "type": "hello",
+        "protocol": "qubit-gateway/1"
+      },
+      "events": [
+        "status"
+      ]
+    },
+    "error_codes": null,
+    "retry_recovery_proof": null,
+    "audit_receipt_proof": null,
+    "security_resource_proof": null,
+    "package_proof": null,
+    "response_headers": null,
+    "evidence_notes": {
+      "voice_utterance": "not exposed by this fixture's surface",
+      "dashboard_route": "not exposed by this fixture's surface",
+      "dashboard_control": "not exposed by this fixture's surface",
+      "broker_policy_decision": "not exposed by this fixture's surface",
+      "runtime_provider": "not exposed by this fixture's surface",
+      "store_state_assertion": "not exposed by this fixture's surface",
+      "error_codes": "not exposed by this fixture's surface",
+      "retry_recovery_proof": "not exposed by this fixture's surface",
+      "audit_receipt_proof": "not exposed by this fixture's surface",
+      "security_resource_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface",
+      "response_headers": "not exposed by this fixture's surface"
+    }
+  }
+}

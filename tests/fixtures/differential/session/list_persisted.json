@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "fixture_id": "session.store.list_persisted",
+  "family": "session",
+  "command": {
+    "argv": [
+      "voicebridge",
+      "sessions",
+      "list",
+      "--limit",
+      "20"
+    ],
+    "stdin": null,
+    "env": {}
+  },
+  "request": null,
+  "normalizers": [
+    "timestamp",
+    "uuid",
+    "temp_path",
+    "product_branding"
+  ],
+  "expected": {
+    "exit_code": 0
+  },
+  "qubit": {
+    "path": "voicebridge/auth_status.py:406",
+    "caller": "recent_sessions",
+    "approval": null
+  },
+  "hermes": {
+    "path": "hermes_cli/subcommands/sessions.py:22",
+    "symbol": "build_sessions_parser",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "src/gateway/server-methods/sessions-read.ts:685",
+    "symbol": "sessionsListHandler",
+    "mapping_status": "VERIFIED"
+  },
+  "notes": "Session persistence contract: the session store is read back from the state tree (actions.json receipts + SessionStore lifecycle overlay). Deleted sessions are excluded; archived are listed. Timestamps normalize across runs. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/subcommands/sessions.py:22 (build_sessions_parser); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/sessions-read.ts:685 (sessionsListHandler).",
+  "evidence": {
+    "voice_utterance": null,
+    "dashboard_route": null,
+    "dashboard_control": null,
+    "request_schema": {
+      "argv": [
+        "voicebridge",
+        "sessions",
+        "list",
+        "--limit",
+        "20"
+      ]
+    },
+    "broker_policy_decision": null,
+    "runtime_provider": null,
+    "store_state_assertion": "session store read back from the state tree (actions.json + SessionStore)",
+    "output_event_assertion": null,
+    "error_codes": null,
+    "retry_recovery_proof": null,
+    "audit_receipt_proof": null,
+    "security_resource_proof": null,
+    "package_proof": null,
+    "response_headers": null,
+    "evidence_notes": {
+      "voice_utterance": "not exposed by this fixture's surface",
+      "dashboard_route": "not exposed by this fixture's surface",
+      "dashboard_control": "not exposed by this fixture's surface",
+      "broker_policy_decision": "not exposed by this fixture's surface",
+      "runtime_provider": "not exposed by this fixture's surface",
+      "output_event_assertion": "not exposed by this fixture's surface",
+      "error_codes": "not exposed by this fixture's surface",
+      "retry_recovery_proof": "not exposed by this fixture's surface",
+      "audit_receipt_proof": "not exposed by this fixture's surface",
+      "security_resource_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface",
+      "response_headers": "not exposed by this fixture's surface"
+    }
+  }
+}

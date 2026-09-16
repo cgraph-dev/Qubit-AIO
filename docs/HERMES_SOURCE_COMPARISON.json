@@ -1240,7 +1240,7 @@
    "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
    "upstream_sha256": "59bb6ab61d5fee205f3c0b3a410383d621f6e76cbfa9a6db24ce55014118f9b9",
    "qubit": "frontend/hermes-web/src/lib/api.ts",
-   "qubit_sha256": "f82b05426afea531648537e3cd5c680ac591143a261eb7fe6ec4f565de4c9604",
+   "qubit_sha256": "f011d702eee3bb30f0efc3dae381f01684074d8b5f1c8dfca924c465fb3ce105",
    "patch": "wave2/public-rebrand-api-prefix + Qubit config confirm flag",
    "reason": "Qubit-owned public API prefix (/api/<x> -> /agent/api/<x>) plus a confirm flag on saveConfig so the Settings page can complete the confirm-gated settings write. No vendor business logic changed.",
    "upstream_blob_sha256": "59bb6ab61d5fee205f3c0b3a410383d621f6e76cbfa9a6db24ce55014118f9b9",

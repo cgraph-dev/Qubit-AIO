@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "fixture_id": "file.files.inspect_active_project",
+  "family": "file",
+  "command": {
+    "argv": [
+      "voicebridge",
+      "files",
+      "inspect"
+    ],
+    "stdin": null,
+    "env": {}
+  },
+  "request": null,
+  "normalizers": [
+    "temp_path",
+    "generated_hash",
+    "product_branding"
+  ],
+  "expected": {
+    "exit_code": 0
+  },
+  "qubit": {
+    "path": "voicebridge/files.py:222",
+    "caller": "inspect",
+    "approval": null
+  },
+  "hermes": {
+    "path": "hermes_cli/web_routers/files.py:608",
+    "symbol": "fs_list",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "src/gateway/server-methods/fs.ts:19",
+    "symbol": "fsHandlers",
+    "mapping_status": "VERIFIED"
+  },
+  "notes": "Scoped file inspection contract (read-only, project roots only). OPERATOR_PREREQUISITE: an active project folder must be selected (voicebridge project use) for a non-empty inspection. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/web_routers/files.py:608 (fs_list); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/fs.ts:19 (fsHandlers).",
+  "evidence": {
+    "voice_utterance": null,
+    "dashboard_route": null,
+    "dashboard_control": null,
+    "request_schema": {
+      "argv": [
+        "voicebridge",
+        "files",
+        "inspect"
+      ]
+    },
+    "broker_policy_decision": null,
+    "runtime_provider": null,
+    "store_state_assertion": "active project root",
+    "output_event_assertion": null,
+    "error_codes": null,
+    "retry_recovery_proof": null,
+    "audit_receipt_proof": null,
+    "security_resource_proof": "read-only, project roots only",
+    "package_proof": null,
+    "response_headers": null,
+    "evidence_notes": {
+      "voice_utterance": "not exposed by this fixture's surface",
+      "dashboard_route": "not exposed by this fixture's surface",
+      "dashboard_control": "not exposed by this fixture's surface",
+      "broker_policy_decision": "not exposed by this fixture's surface",
+      "runtime_provider": "not exposed by this fixture's surface",
+      "output_event_assertion": "not exposed by this fixture's surface",
+      "error_codes": "not exposed by this fixture's surface",
+      "retry_recovery_proof": "not exposed by this fixture's surface",
+      "audit_receipt_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface",
+      "response_headers": "not exposed by this fixture's surface"
+    }
+  }
+}

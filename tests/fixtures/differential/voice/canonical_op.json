@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "fixture_id": "voice.intent.canonical_op",
+  "family": "voice",
+  "command": null,
+  "request": {
+    "kind": "voice",
+    "method": "POST",
+    "path": "/agent/api/qubit/voice/turn",
+    "headers": {},
+    "body": {
+      "text": "pause the board"
+    },
+    "event": null,
+    "argv": []
+  },
+  "transport": "http",
+  "base_url_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_URL",
+  "auth": {
+    "header": "X-Api-Token",
+    "value_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_TOKEN"
+  },
+  "persisted_state_schema": {
+    "type": "object",
+    "properties": {
+      "resolved_entry_id": {"type": "string"},
+      "confirmation": {"type": ["object", "null"]},
+      "journal_staged": {"type": "boolean"}
+    }
+  },
+  "normalizers": [
+    "timestamp",
+    "uuid",
+    "session_token",
+    "product_branding"
+  ],
+  "expected": {
+    "voice_operation": {
+      "entry_id": "board.pause"
+    },
+    "resolved_identity": "voice:user",
+    "confirmation": null
+  },
+  "qubit": {
+    "path": "voicebridge/voice_commands.py:329",
+    "caller": "resolve",
+    "approval": null
+  },
+  "hermes": {
+    "path": "hermes_cli/web_routers/audio.py:78",
+    "symbol": "transcribe_audio_upload",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "src/gateway/server-methods/talk.ts:827",
+    "symbol": "talkHandlers",
+    "mapping_status": "VERIFIED"
+  },
+  "notes": "Voice intent -> canonical operation contract. A voice turn resolves to exactly the same op the CLI/dashboard use (voice_commands.resolve/execute); confirmation-required ops stage the shared journal instead of executing. voice_backend_mismatch is a fail-closed gate. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/web_routers/audio.py:78 (transcribe_audio_upload); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/talk.ts:827 (talkHandlers).",
+  "evidence": {
+    "voice_utterance": "pause the board",
+    "dashboard_route": null,
+    "dashboard_control": null,
+    "request_schema": {
+      "method": "POST",
+      "path": "/agent/api/qubit/voice/turn",
+      "body": {
+        "text": "string"
+      }
+    },
+    "broker_policy_decision": "confirmation-required ops stage the shared approval journal",
+    "runtime_provider": null,
+    "store_state_assertion": "resolved op equals the CLI/dashboard canonical op",
+    "output_event_assertion": null,
+    "error_codes": null,
+    "retry_recovery_proof": null,
+    "audit_receipt_proof": null,
+    "security_resource_proof": null,
+    "package_proof": null,
+    "response_headers": {
+      "content-type": "application/json"
+    },
+    "evidence_notes": {
+      "dashboard_route": "not exposed by this fixture's surface",
+      "dashboard_control": "not exposed by this fixture's surface",
+      "runtime_provider": "not exposed by this fixture's surface",
+      "output_event_assertion": "not exposed by this fixture's surface",
+      "error_codes": "not exposed by this fixture's surface",
+      "retry_recovery_proof": "not exposed by this fixture's surface",
+      "audit_receipt_proof": "not exposed by this fixture's surface",
+      "security_resource_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface"
+    }
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "fixture_id": "recovery.crash.probe",
+  "family": "recovery",
+  "command": null,
+  "request": {
+    "kind": null,
+    "method": "GET",
+    "path": "/agent/api/qubit/recovery/status",
+    "headers": {},
+    "body": null,
+    "event": null,
+    "argv": []
+  },
+  "transport": "http",
+  "base_url_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_URL",
+  "auth": {
+    "header": "X-Api-Token",
+    "value_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_TOKEN"
+  },
+  "persisted_state_schema": {
+    "type": "object",
+    "properties": {
+      "schema": {"const": "qubit-recovery/1"},
+      "state_tree_verified": {"type": "boolean"},
+      "receipts": {"type": "array"}
+    }
+  },
+  "normalizers": [
+    "timestamp",
+    "generated_hash",
+    "temp_path",
+    "pid"
+  ],
+  "expected": {
+    "http_status": 200,
+    "json_schema": {
+      "state": "OK"
+    },
+    "receipts": {
+      "schema": "qubit-recovery/1"
+    }
+  },
+  "qubit": {
+    "path": "voicebridge/communications/recovery_crash.py:552",
+    "caller": "main",
+    "approval": null
+  },
+  "hermes": {
+    "path": "hermes_cli/_early_recovery.py:352",
+    "symbol": "recover_if_needed",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "node-runtime-recovery.mjs:314",
+    "symbol": "resolveRecoveryPath",
+    "mapping_status": "VERIFIED"
+  },
+  "notes": "Crash-recovery probe contract: bounded store commits are verified by re-reading the state tree and emitting a typed manifest/receipt. persistence_or_recovery_diff is a fail-closed gate. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/_early_recovery.py:352 (recover_if_needed); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: node-runtime-recovery.mjs:314 (resolveRecoveryPath).",
+  "evidence": {
+    "voice_utterance": null,
+    "dashboard_route": "/agent/api/qubit/recovery/status",
+    "dashboard_control": null,
+    "request_schema": {
+      "method": "GET",
+      "path": "/agent/api/qubit/recovery/status"
+    },
+    "broker_policy_decision": null,
+    "runtime_provider": null,
+    "store_state_assertion": "bounded store commits re-read from the state tree",
+    "output_event_assertion": null,
+    "error_codes": null,
+    "retry_recovery_proof": "crash probe re-reads state tree and emits a typed manifest",
+    "audit_receipt_proof": "qubit-recovery/1 receipt",
+    "security_resource_proof": null,
+    "package_proof": null,
+    "response_headers": {
+      "content-type": "application/json"
+    },
+    "evidence_notes": {
+      "voice_utterance": "not exposed by this fixture's surface",
+      "dashboard_control": "not exposed by this fixture's surface",
+      "broker_policy_decision": "not exposed by this fixture's surface",
+      "runtime_provider": "not exposed by this fixture's surface",
+      "output_event_assertion": "not exposed by this fixture's surface",
+      "error_codes": "not exposed by this fixture's surface",
+      "security_resource_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface"
+    }
+  }
+}

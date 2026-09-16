@@ -37,7 +37,6 @@ import hashlib
 import importlib.util
 import json
 import os
-import platform
 import shutil
 import threading
 import time

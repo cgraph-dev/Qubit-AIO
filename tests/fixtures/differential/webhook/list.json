@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "fixture_id": "webhook.subscriptions.list",
+  "family": "webhook",
+  "command": {
+    "argv": [
+      "voicebridge",
+      "webhook",
+      "list"
+    ],
+    "stdin": null,
+    "env": {}
+  },
+  "request": null,
+  "normalizers": [
+    "timestamp",
+    "session_token",
+    "generated_hash"
+  ],
+  "expected": {
+    "exit_code": 0
+  },
+  "qubit": {
+    "path": "voicebridge/webhooks.py:251",
+    "caller": "list_subs",
+    "approval": null
+  },
+  "hermes": {
+    "path": "hermes_cli/web_routers/ops.py:146",
+    "symbol": "list_webhooks",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "extensions/webhooks/src/config.ts:43",
+    "symbol": "resolveWebhooksPluginConfig",
+    "mapping_status": "VERIFIED"
+  },
+  "notes": "Webhook subscription inventory contract (HMAC verification, no listener in-process). Secrets are reference-only; receipts record verdicts. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/web_routers/ops.py:146 (list_webhooks); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: extensions/webhooks/src/config.ts:43 (resolveWebhooksPluginConfig).",
+  "evidence": {
+    "voice_utterance": null,
+    "dashboard_route": null,
+    "dashboard_control": null,
+    "request_schema": {
+      "argv": [
+        "voicebridge",
+        "webhook",
+        "list"
+      ]
+    },
+    "broker_policy_decision": null,
+    "runtime_provider": null,
+    "store_state_assertion": "webhook subscription store",
+    "output_event_assertion": null,
+    "error_codes": null,
+    "retry_recovery_proof": null,
+    "audit_receipt_proof": null,
+    "security_resource_proof": "HMAC verification; secrets reference-only",
+    "package_proof": null,
+    "response_headers": null,
+    "evidence_notes": {
+      "voice_utterance": "not exposed by this fixture's surface",
+      "dashboard_route": "not exposed by this fixture's surface",
+      "dashboard_control": "not exposed by this fixture's surface",
+      "broker_policy_decision": "not exposed by this fixture's surface",
+      "runtime_provider": "not exposed by this fixture's surface",
+      "output_event_assertion": "not exposed by this fixture's surface",
+      "error_codes": "not exposed by this fixture's surface",
+      "retry_recovery_proof": "not exposed by this fixture's surface",
+      "audit_receipt_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface",
+      "response_headers": "not exposed by this fixture's surface"
+    }
+  }
+}

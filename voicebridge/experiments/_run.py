@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from typing import List
 
-from ._models import (ST_RUNNING, VAR_CHALLENGER, VAR_CHAMPION, VARIANTS,
+from ._models import (ST_RUNNING, VAR_CHAMPION, VARIANTS,
                       Candidate, Experiment, ExperimentError, Signal, Trial,
                       bound)
 from ._persist import PersistMixin

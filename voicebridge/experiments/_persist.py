@@ -5,12 +5,10 @@ A newer-than-supported schema is a typed fail-closed error.
 """
 from __future__ import annotations
 
-import json
 import os
 import sqlite3
 import threading
 from pathlib import Path
-from typing import List, Optional
 
 from ._models import (EXPERIMENT_SCHEMA, Candidate, Experiment,
                       ExperimentStateError, Signal, Trial)

@@ -8,6 +8,7 @@ complete -c qubit -n '__fish_use_subcommand' -f -a ask
 complete -c qubit -n '__fish_use_subcommand' -f -a asr-test
 complete -c qubit -n '__fish_use_subcommand' -f -a audio
 complete -c qubit -n '__fish_use_subcommand' -f -a auth
+complete -c qubit -n '__fish_use_subcommand' -f -a autonomy
 complete -c qubit -n '__fish_use_subcommand' -f -a backup
 complete -c qubit -n '__fish_use_subcommand' -f -a brain
 complete -c qubit -n '__fish_use_subcommand' -f -a branding

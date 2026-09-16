@@ -802,7 +802,6 @@ class SessionGrantStore:
         Every failure is a typed :class:`SessionGrantError`; only the current
         writer's unique temp file is cleaned; the previous valid state is
         preserved on a pre-rename failure."""
-        import fcntl
         import json
         import os as _os
         p = self._path
@@ -1267,7 +1266,7 @@ def ghost_actions_broker(cfg=None, *,
     the 8O global control state.
     """
     from .actions import (_disabled_executor, _envelope_validator,
-                          actions_broker, action_specs)
+                          actions_broker)
     base = actions_broker(cfg, executors=executors, enabled=enabled,
                           power_control=power_control)
     register_ghost_specs()
@@ -1549,7 +1548,6 @@ class GhostRunner(ActionRunner):
         """Register the bound comet adapter as the broker executor for the
         comet capabilities (unless a fixture executor was explicitly injected).
         The broker remains the single decide/audit/cancel boundary."""
-        from .actions import _envelope_validator
         for spec in ghost_action_specs(shell=ghost_shell_enabled()):
             if not spec.action_id.startswith(f"{GHOST_NS}.comet."):
                 continue
