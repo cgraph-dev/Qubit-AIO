@@ -16,7 +16,7 @@ no timestamps).
 
 Usage:
     python scripts/config_binding_manifest.py \
-        --out docs/archive/2026-09-21/QUBIT_CONFIG_BINDING_MANIFEST.json
+        --out docs/generated/QUBIT_CONFIG_BINDING_MANIFEST.json
 """
 from __future__ import annotations
 
@@ -29,7 +29,22 @@ from typing import Any, Dict, List, Tuple
 
 REPO = Path(__file__).resolve().parents[1]
 HERMES_FORK = REPO / "qubit_runtime"
-VENDOR_MANIFEST = REPO / "docs/archive/2026-09-21" / "QUBIT_HERMES_VENDOR_MANIFEST.json"
+GENERATED_DIR = REPO / "docs" / "generated"
+ARCHIVE_DIR = REPO / "docs" / "archive" / "2026-09-21"
+VENDOR_MANIFEST = GENERATED_DIR / "QUBIT_HERMES_VENDOR_MANIFEST.json"
+
+
+def _frozen_fixture(name: str) -> Path:
+    """Canonical generated fixture, else the frozen archive copy read-only.
+
+    The OpenClaw env/config fixtures are pinned upstream-source inventories
+    with no regenerator in this repo; the canonical copy lives in
+    ``docs/generated/`` and the archive copy is an explicit read-only fallback.
+    """
+    candidate = GENERATED_DIR / name
+    if candidate.is_file():
+        return candidate
+    return ARCHIVE_DIR / name
 
 SECRET_SUFFIXES = (
     "_secret", "_password", "_passwd", "_token", "_key", "_apikey",
@@ -161,14 +176,14 @@ def _pin() -> Dict[str, Any]:
         return {}
     return {
         "revision": data.get("revision") or data.get("upstream_commit"),
-        "source": "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json",
+        "source": "docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json",
     }
 
 
 _ENV_LITERAL_RE = re.compile(
     r'"([A-Z][A-Z0-9_]{3,}_(?:API_KEY|TOKEN|BASE_URL|KEY|SECRET))"')
-_OPENCLAW_FIXTURE = REPO / "docs/archive/2026-09-21" / "QUBIT_OPENCLAW_ENV_NAMES.json"
-_OPENCLAW_CONFIG_FIXTURE = REPO / "docs/archive/2026-09-21" / "QUBIT_OPENCLAW_CONFIG_SURFACE.json"
+_OPENCLAW_FIXTURE = _frozen_fixture("QUBIT_OPENCLAW_ENV_NAMES.json")
+_OPENCLAW_CONFIG_FIXTURE = _frozen_fixture("QUBIT_OPENCLAW_CONFIG_SURFACE.json")
 _OPENCLAW_TESTISH_RE = re.compile(
     r"(TEST|FIXTURE|CI|BUILD|DEV|MOCK|BENCH|PROBE|TRACE|DEBUG)", re.IGNORECASE)
 
@@ -408,7 +423,7 @@ def build() -> Dict[str, Any]:
                         "env vars); qubit_runtime/qubit_cli/config.py "
                         "(_OPEN_DICT_TOP_LEVEL_KEYS et al.)",
             "qubit": "voicebridge/config.py (DEFAULTS)",
-            "openclaw": "docs/archive/2026-09-21/QUBIT_OPENCLAW_ENV_NAMES.json (read-only "
+            "openclaw": "docs/generated/QUBIT_OPENCLAW_ENV_NAMES.json (read-only "
                         "inventory of the pinned OpenClaw source)",
             "pin": _pin(),
         },
@@ -422,7 +437,7 @@ def build() -> Dict[str, Any]:
 
 def main(argv: list | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--out", default="docs/archive/2026-09-21/QUBIT_CONFIG_BINDING_MANIFEST.json")
+    ap.add_argument("--out", default="docs/generated/QUBIT_CONFIG_BINDING_MANIFEST.json")
     args = ap.parse_args(argv)
 
     manifest = build()

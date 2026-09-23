@@ -1,7 +1,7 @@
 """Status bar, spinner, turn-summary, pet pane, and prompt-stash rendering for the
 interactive CLI.
 
-Mixin bound onto ``HermesCLI`` via the MRO. cli.py-internal symbols are imported LAZILY
+Mixin bound onto ``QubitCLI`` via the MRO. cli.py-internal symbols are imported LAZILY
 inside each method (``from cli import ...``) — never at module load time (import cycle).
 """
 

@@ -1148,6 +1148,39 @@ review); the final M4 gate + independent verifier.
 modules (`cron`/`web`/`tools` remainder, `qubit_cli`, `tui_gateway`, top-level);
 the `.hermes_history` apply; the final M4 gate + independent verifier.
 
+## 30. Wave 18 — W9 optional-skills/website/plugin-catalog + deep rename — 2026-09-23
+
+**No `M1`/`VERIFIED`/`CODE_READY`/`COMPLETE` claimed.**
+
+- **W9 slices.** `optional-skills/` **+93** (14 new skills; 3 held back — the
+  legacy-named `hermes-s6-container-supervision` and `openclaw-migration` would
+  clobber the canonical Qubit skills); `website/`+`evals/`+`.github/` **+96**
+  (0 held back); `plugin-catalog/` **+230** (229 YAML, 0 held back; `load_catalog`
+  → 228 entries). `missing_from_local` **3151 → 2730**.
+- **Deep rename slices (existing files only).** `cron/`+`web/`: `hermes` 128 → 26
+  in `web/` (all preserved ids/packages/legacy-fallbacks), 17 locale files +
+  localStorage/DOM ids de-branded to the served-frontend convention.
+  `qubit_cli/`+`tui_gateway/`: `HermesCLI` 33 → 0 (fixed real broken imports
+  `from cli import HermesCLI`), `Hermes` 64 → 20; `shutil.which("hermes")`
+  resolution in `kanban_db_dispatch` fixed to `qubit` (independence).
+- **Vendored test sync:** `metadata.qubit` accepted alongside `metadata.hermes`
+  in `test_authoring_standards.py` (the de-branded tree convention; fixes the
+  pre-existing 193-skill mismatch); `test_qubit_package_runtime8u` PIN moved to
+  `d337b736` + the canonical manifest path, and `pyproject.toml` ships the
+  canonical manifest at the archive destination.
+- **Artifacts regenerated** (vendor manifest, source inventory, ledgers, page
+  coverage, parity, voice). Parity **1378 rows — 1249 PORTED / 129 GATED /
+  0 MISSING**. **Voice real 594 → 1009 (73.22%)** (concurrent bindings).
+- **Focused sweep: 467 passed / 2 skipped / 0 failed across 29 files**; graft
+  build refreshed; `parity_inventory.py --check` OK.
+- **New finding N36:** the voice registry gained a large set of real bindings
+  from a concurrent session (594 → 1009); voice coverage is not a stable
+  artifact while the worktree is multi-writer.
+
+**Still open:** owner ratification of `M1`; the deep rename of the remaining
+`qubit_runtime/` modules; the `.hermes_history` apply; the final M4 gate +
+independent verifier.
+
 ## 24. Live dashboard E2E audit + fix — 2026-09-23 (10-agent wave)
 
 **No M1/M2/CODE_READY/VERIFIED claimed. Not committed.** Real browser + live

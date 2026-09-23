@@ -1,12 +1,11 @@
 import { buildQubitWebSocketUrl } from "@hermes/shared";
 
-// The dashboard can be served either at the root of its host (e.g.
-// https://kanban.tilos.com/) or under a URL prefix when reverse-proxied
-// (e.g. https://mission-control.tilos.com/hermes/). The Python backend
-// injects ``window.__HERMES_BASE_PATH__`` into index.html based on the
-// incoming ``X-Forwarded-Prefix`` header so the SPA can address its own
-// ``/api/...`` and ``/dashboard-plugins/...`` URLs correctly without a
-// rebuild. Empty string means "served at root".
+// Qubit serves the dashboard at the root of its host, or under a URL
+// prefix when reverse-proxied. The Python backend injects
+// ``window.__HERMES_BASE_PATH__`` into index.html based on the incoming
+// ``X-Forwarded-Prefix`` header so the SPA can address its own ``/api/...``
+// and ``/dashboard-plugins/...`` URLs correctly without a rebuild. Empty
+// string means "served at root".
 function readBasePath(): string {
   if (typeof window === "undefined") return "";
   const raw = window.__HERMES_BASE_PATH__ ?? "";
@@ -148,7 +147,7 @@ export async function fetchJSON<T>(
       // fallback the post-login handler can read.
       try {
         sessionStorage.setItem(
-          "hermes.lastLocation",
+          "qubit.lastLocation",
           window.location.pathname + window.location.search,
         );
       } catch {

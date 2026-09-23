@@ -8,7 +8,7 @@ upstream git blob hash, the upstream blob sha256, the local sha256, and a
 six-way classification (UNCHANGED / QUBIT_PATCHED / OPENCLAW_OVERLAY /
 QUBIT_ADDED / MISSING / INTENTIONALLY_OMITTED) plus EOL-normalization notes.
 It also regenerates the vendored-frontend comparison ledger
-(``docs/archive/2026-09-21/HERMES_SOURCE_COMPARISON.json``). It is deterministic and re-runnable;
+(``docs/generated/HERMES_SOURCE_COMPARISON.json``). It is deterministic and re-runnable;
 no timestamps are embedded.
 
 Usage:
@@ -16,9 +16,9 @@ Usage:
     scripts/hermes_vendor_manifest.py \
         --upstream /tmp/opencode/pinned/hermes-agent \
         --local qubit_runtime \
-        --out docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json \
+        --out docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json \
         --openclaw /tmp/opencode/pinned/openclaw \
-        --comparison-out docs/archive/2026-09-21/HERMES_SOURCE_COMPARISON.json
+        --comparison-out docs/generated/HERMES_SOURCE_COMPARISON.json
 """
 from __future__ import annotations
 
@@ -1675,14 +1675,14 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--upstream", default="/tmp/opencode/pinned/hermes-agent")
     ap.add_argument("--local", default="qubit_runtime")
-    ap.add_argument("--out", default="docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json")
+    ap.add_argument("--out", default="docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json")
     # Default to the owner-pinned OpenClaw clone that matches OPENCLAW_PIN
     # (tag OPENCLAW_TAG). The live pinned checkout is passed explicitly with
     # --openclaw; the default path is only a convenience fallback.
     ap.add_argument("--openclaw",
                     default=f"/tmp/opencode/pinned/openclaw-{OPENCLAW_TAG}")
     ap.add_argument("--comparison-out",
-                    default="docs/archive/2026-09-21/HERMES_SOURCE_COMPARISON.json")
+                    default="docs/generated/HERMES_SOURCE_COMPARISON.json")
     args = ap.parse_args(argv)
 
     upstream = Path(args.upstream)

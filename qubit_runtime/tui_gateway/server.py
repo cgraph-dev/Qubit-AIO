@@ -269,7 +269,7 @@ def _slash_worker_env(profile_home: str | None = None) -> dict[str, str]:
 
 
 class _SlashWorker:
-    """Persistent HermesCLI subprocess for slash commands."""
+    """Persistent QubitCLI subprocess for slash commands."""
 
     def __init__(self, session_key: str, model: str, profile_home: str | None = None):
         self._lock = threading.Lock()

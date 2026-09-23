@@ -168,7 +168,7 @@ def _resolve_qubit_bin_for_desktop_entry(
 ) -> Optional[str]:
     """Resolve the launcher binary for the persisted ``.desktop`` entry.
 
-    Wraps :func:`qubit_cli.relaunch.resolve_hermes_bin` with one rule: an ``argv[0]`` inside this
+    Wraps :func:`qubit_cli.relaunch.resolve_qubit_bin` with one rule: an ``argv[0]`` inside this
     checkout is a launch-context artifact, not a durable installed launcher — persisting it makes
     the entry depend on how the previous launch happened (a bootstrap loop). Skip such candidates
     and fall through to PATH, then to the installer's known wrapper locations. ``resolve_fn`` is

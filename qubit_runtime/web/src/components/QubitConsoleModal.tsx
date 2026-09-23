@@ -490,7 +490,7 @@ export function QubitConsoleModal({ open, onClose }: QubitConsoleModalProps) {
       onClick={(event) => event.target === event.currentTarget && onClose()}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="hermes-console-title"
+      aria-labelledby="qubit-console-title"
     >
       <div
         className={cn(
@@ -504,7 +504,7 @@ export function QubitConsoleModal({ open, onClose }: QubitConsoleModalProps) {
           </div>
           <div className="min-w-0 flex-1">
             <h2
-              id="hermes-console-title"
+              id="qubit-console-title"
               className="font-mondwest text-display text-base tracking-wider"
             >
               Qubit Console

@@ -9,7 +9,7 @@ Invariants locked here:
   production backend;
 * op evidence is *linked* to a production dispatch, so a textual mention
   (docstring, comment, unrelated assertion) can never close a row;
-* the direct ``docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json`` is ingested when present:
+* the direct ``docs/generated/QUBIT_SOURCE_INVENTORY.json`` is ingested when present:
   unmatched surface items become explicit open rows and the omissions summary
   is recorded; a missing or malformed inventory is tolerated and recorded;
 * ``gap_ledger.py --require-inventory-complete`` fails on unexplained
@@ -463,7 +463,7 @@ def _write_sections(docs: Path, inventory: dict,
 def test_require_inventory_complete_fails_on_omissions(tmp_path) -> None:
     docs = tmp_path / "docs"
     _write_sections(docs, {
-        "present": True, "path": "docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json",
+        "present": True, "path": "docs/generated/QUBIT_SOURCE_INVENTORY.json",
         "items_total": 3, "surface_items": 3, "matched": 2, "unmatched": 1,
         "unexplained_omissions": 1, "omitted_ids": ["wave3:missing"],
         "error": "",
@@ -481,7 +481,7 @@ def test_require_inventory_complete_fails_on_omissions(tmp_path) -> None:
 def test_require_inventory_complete_passes_when_complete(tmp_path) -> None:
     docs = tmp_path / "docs"
     _write_sections(docs, {
-        "present": True, "path": "docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json",
+        "present": True, "path": "docs/generated/QUBIT_SOURCE_INVENTORY.json",
         "items_total": 2, "surface_items": 2, "matched": 2, "unmatched": 0,
         "unexplained_omissions": 0, "omitted_ids": [], "error": "",
     })
@@ -508,25 +508,34 @@ def test_require_inventory_complete_fails_when_inventory_absent(tmp_path) -> Non
 DOCUMENTED_OPEN_ROW = None
 
 
-def test_committed_ledgers_have_no_open_rows() -> None:
-    """The committed sections are code-complete: zero open rows."""
+def test_committed_ledgers_carry_the_documented_open_row() -> None:
+    """The committed sections carry exactly the one owner-gated architecture row.
+
+    Owner amendment 2026-09-22: ``OPERATOR_ONLY_ARCHITECTURE`` rows are OPEN
+    until individually approved, so ``OC-48`` is the single non-terminal row and
+    the code-ready gate is correctly closed.
+    """
     sections, missing, _ = gap_ledger.load_sections(
-        REPO_ROOT / "docs" / "archive" / "2026-09-21")
+        REPO_ROOT / "docs" / "generated")
     assert missing == [], missing
     summary = gap_ledger.build_summary(sections, missing)
-    assert summary["open_rows"] == 0, summary["by_status"]
-    assert summary["code_ready"] is True
+    open_ids = sorted(
+        row["id"] for section in sections for row in section["rows"]
+        if row["status"] not in gap_ledger.TERMINAL_STATUSES)
+    assert open_ids == ["OC-48"], open_ids
+    assert summary["open_rows"] == 1, summary["by_status"]
+    assert summary["code_ready"] is False
     assert summary["safe_equivalent_rows"] > 0
     assert summary["operator_qualification_rows"] > 0
     assert summary["complete"] is False
 
 
-def test_require_code_ready_passes_on_committed_ledgers(tmp_path) -> None:
+def test_require_code_ready_reflects_the_documented_open_row(tmp_path) -> None:
     rc = gap_ledger.main([
-        "--docs-dir", str(REPO_ROOT / "docs" / "archive" / "2026-09-21"),
+        "--docs-dir", str(REPO_ROOT / "docs" / "generated"),
         "--out", str(tmp_path / "LEDGER.md"),
         "--require-code-ready"])
-    assert rc == 0
+    assert rc == 1
 
 
 def test_require_code_ready_fails_on_non_terminal_row(tmp_path) -> None:

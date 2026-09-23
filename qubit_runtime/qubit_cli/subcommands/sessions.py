@@ -168,7 +168,7 @@ def build_sessions_parser(subparsers, *, cmd_sessions: Callable) -> None:
 
     sessions_set_journal_mode = sessions_subparsers.add_parser(
         "set-journal-mode", help="Convert state.db between journal_mode=WAL and DELETE offline (every holder stopped)",
-        description="Switch the on-disk journal mode of the session store. Hermes never "
+        description="Switch the on-disk journal mode of the session store. Qubit never "
             "live-downgrades a WAL database at startup (other processes may hold "
             "uncheckpointed commits), so `database.journal_mode: delete` cannot "
             "self-apply to an existing WAL store. Run this with the gateway, "
@@ -176,10 +176,10 @@ def build_sessions_parser(subparsers, *, cmd_sessions: Callable) -> None:
             "the file, switches the mode, and verifies the file header.")
     sessions_set_journal_mode.add_argument("mode", choices=("delete", "wal"), help="Target journal mode")
     sessions_set_journal_mode.add_argument("--db", default=None, metavar="PATH",
-        help="Convert another Hermes SQLite store (e.g. kanban.db) instead of the profile's state.db")
+        help="Convert another Qubit SQLite store (e.g. kanban.db) instead of the profile's state.db")
     _flag(sessions_set_journal_mode, "--force",
         help="Windows only: proceed without the holder scan (which does not exist there) after stopping "
-            "every Hermes process yourself")
+            "every Qubit process yourself")
 
     sessions_repair_routing = sessions_subparsers.add_parser(
         "repair-routing", help="Re-stamp gateway sessions that lost their routing identity",

@@ -52,7 +52,7 @@ Fail-closed rules:
   disposed only by a REAL proof (executed result or a resolvable test): a bare
   ``qubit_path``/``disposition_proof``/name-level ``verification`` is not a
   test and stays OPEN. The resolver searches the Python test tree by AST and
-  the owner ledger (``docs/archive/2026-09-21/QUBIT_GAP_LEDGER.openclaw.json``) and never
+  the owner ledger (``docs/generated/QUBIT_GAP_LEDGER.openclaw.json``) and never
   manufactures a test id: an unresolved citation is not proof;
 * only the seven allowlisted normalizers may collapse nondeterminism; any other
   key raises, and a normalizer that changes an out-of-shape value is reported as
@@ -568,7 +568,7 @@ VENDOR_FORK_DIRNAME = "qubit_runtime"
 VENDOR_KEY_SEP = "\x1f"
 # Sources used to resolve a wiring-level proof deterministically: the Python
 # test tree (AST) and the owner ledger for the upstream latest-main delta.
-OWNER_LEDGER_PATH = REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_GAP_LEDGER.openclaw.json"
+OWNER_LEDGER_PATH = REPO_ROOT / "docs/generated" / "QUBIT_GAP_LEDGER.openclaw.json"
 TESTS_DIR = REPO_ROOT / "tests"
 # Broad shared modules: a ledger entry naming one of these only counts for a
 # row when it also names the row's symbol (otherwise every qubit_compat row

@@ -559,7 +559,7 @@ def _preserve_file_ownership(path: Path, before: Optional[os.stat_result]) -> No
 
 
 def _is_named_profile_path(path: Path) -> bool:
-    """True if *path* is under ``<hermes_home>/profiles/<name>/`` (default/custom homes are not).
+    """True if *path* is under ``<qubit_home>/profiles/<name>/`` (default/custom homes are not).
     Checks the resolved path (symlinked parents) and the raw path (symlinked profile homes)."""
     with contextlib.suppress(OSError, RuntimeError):
         if "profiles" in path.resolve().parts:

@@ -912,6 +912,75 @@ def _b_mcp_catalog(ctx, args):
                             "data": payload}}
 
 
+def _b_mcp_admin(ctx, args):
+    """MCP catalog admin — the SAME canonical handlers the CLI ``qubit mcp``
+    family calls (``qubit_cli.mcp_catalog`` install/uninstall, the vendored
+    catalog the dashboard's install route also drives).
+
+    Install is a real mutation. Entries that require an interactive credential
+    prompt or a git bootstrap are NOT silently half-installed by voice: they
+    return a typed ``MCP_INSTALL_NEEDS_CREDENTIALS`` refusal naming the exact
+    CLI counterpart, so a spoken attempt never fabricates success. Pure
+    config-only entries install for real through ``install_entry``.
+    """
+    from . import qubit_runtime as _HR
+
+    try:
+        _HR.ensure_path()
+        try:
+            _HR.use_qubit_home(getattr(ctx, "cfg", None))
+        except Exception:  # noqa: BLE001 - keep serving a typed state
+            pass
+        from qubit_cli import mcp_catalog as MC
+    except Exception as exc:  # noqa: BLE001 - vendored catalog unavailable
+        return {"mcp_admin": {"state": "UNAVAILABLE", "ok": False,
+                              "detail": str(exc)[:200]}}
+
+    action = str(args.get("action", "") or "")
+    name = str(args.get("name", "") or args.get("identifier", "") or "").strip()
+    if not name:
+        raise ValueError("mcp admin requires a catalog server name")
+
+    if action == "install":
+        entry = MC.get_entry(name)
+        if entry is None:
+            return {"mcp_install": {"state": "NOT_FOUND", "ok": False,
+                                    "code": "MCP_NOT_IN_CATALOG", "name": name}}
+        # Interactive/network bootstrap stays a CLI/dashboard action; never
+        # block voice on a credential prompt or a clone.
+        if entry.install is not None or entry.auth.type == "api_key":
+            return {"mcp_install": {
+                "state": "REFUSED", "ok": False,
+                "code": "MCP_INSTALL_NEEDS_CREDENTIALS", "name": name,
+                "detail": ("catalog entry needs an interactive credential "
+                           "prompt or git bootstrap; use the dashboard Plugins "
+                           "form or `qubit mcp install "
+                           f"{name}` in a terminal")}}
+        try:
+            MC.install_entry(entry, enable=True)
+        except MC.CatalogError as exc:
+            return {"mcp_install": {"state": "FAILED", "ok": False,
+                                    "code": "MCP_INSTALL_FAILED",
+                                    "detail": str(exc)[:200], "name": name}}
+        return {"mcp_install": {"state": "OK", "ok": True, "name": name}}
+
+    if action == "remove":
+        try:
+            removed = bool(MC.uninstall_entry(name))
+        except Exception as exc:  # noqa: BLE001
+            return {"mcp_remove": {"state": "FAILED", "ok": False,
+                                   "detail": str(exc)[:200], "name": name}}
+        return {"mcp_remove": {"state": "OK" if removed else "NOT_INSTALLED",
+                               "ok": removed, "name": name}}
+
+    if action == "test":
+        from . import mcp_servers as MS
+
+        return {"mcp_test": MS.test(ctx.cfg, name, probe=True)}
+
+    raise ValueError(f"unknown mcp admin action {action!r}")
+
+
 def _b_worker(ctx, args):
     from .integration_status import worker_status
 
@@ -4696,6 +4765,7 @@ _BACKENDS: Dict[str, Callable] = {
     "auth_logout": _b_auth_logout,
     "mcp": _b_mcp,
     "mcp_catalog": _b_mcp_catalog,
+    "mcp_admin": _b_mcp_admin,
     "worker": _b_worker,
     "memory": _b_memory,
     "skills": _b_skills,
@@ -9304,16 +9374,20 @@ _CB("skills_install", "Install a skill manifest",
 # the exact CLI counterpart instead of silently doing nothing.
 KANBAN_NO_CONSTRUCT = {
     "request_review": ("kanban request review",
+                       "kanban request-review",
                        "request review of a kanban task",
                        "request-review a kanban task"),
     "request_changes": ("kanban request changes",
+                        "kanban request-changes",
                         "request changes on a kanban task",
                         "request-changes a kanban task"),
     "reopen_review": ("kanban reopen review",
+                      "kanban reopen-review",
                       "reopen review of a kanban task",
                       "reopen-review a kanban task"),
-    "link": ("kanban link task", "link a kanban task", "link kanban tasks"),
-    "unlink": ("kanban unlink task", "unlink a kanban task",
+    "link": ("kanban link task", "kanban link", "link a kanban task",
+             "link kanban tasks"),
+    "unlink": ("kanban unlink task", "kanban unlink", "unlink a kanban task",
                "unlink kanban tasks"),
 }
 for _kb_sub, _kb_aliases in KANBAN_NO_CONSTRUCT.items():
@@ -9749,6 +9823,820 @@ _CB("cli_env", "Environment references",
     examples=("qubit, env",),
     help="Configured environment variable references by name only (read-only; "
          "never values).")
+
+
+# ----------------------------------- wave 18: CLI-literal bridges, family-wide
+# The parity inventory still carries the *subcommand* forms the wave-12/13
+# family reads did not cover (``qubit kanban list``, ``qubit mcp install X``,
+# ``qubit schedules create`` …). Each entry below binds the exact CLI literal to
+# the SAME backend the CLI/dashboard already call — no new backend, no stub, no
+# fabricated success. Reads carry no confirmation; mutations are confirm-tier
+# through the one shared journal. Where a capability has no working Qubit
+# backend it is deliberately left unresolved (a visible gap) rather than bound
+# to an unrelated read.
+def _CL(entry_id: str, aliases: Tuple[str, ...], backend: str, *,
+        fixed: Tuple[Tuple[str, str], ...] = (),
+        args: Tuple[VoiceArg, ...] = (), confirm: bool = False,
+        help_text: str = "") -> VoiceCommand:
+    return _CB(entry_id, entry_id.replace("_", " ").title(), tuple(aliases),
+               backend, args=tuple(args), fixed=tuple(fixed), confirm=confirm,
+               examples=(),
+               help=help_text or ("CLI-literal bridge to the same backend the "
+                                  "CLI/dashboard call."))
+
+
+# --- MCP catalog admin (real install/remove/test; see _b_mcp_admin) ---
+_CL("cli_mcp_install", (r"rx:^mcp install\b",), "mcp_admin",
+    fixed=(("action", "install"),), args=(_S("name", True),), confirm=True,
+    help_text="Install a curated catalog MCP (same qubit_cli.mcp_catalog "
+              "handler `qubit mcp install <name>` uses; entries needing an "
+              "interactive credential prompt are typed-refused, never "
+              "half-installed).")
+_CL("cli_mcp_remove", (r"rx:^mcp remove\b",), "mcp_admin",
+    fixed=(("action", "remove"),), args=(_S("name", True),), confirm=True,
+    help_text="Remove a catalog MCP (same uninstall handler the CLI uses).")
+_CL("cli_mcp_test", (r"rx:^mcp test\b",), "mcp_admin",
+    fixed=(("action", "test"),), args=(_S("name", True),),
+    help_text="Probe one configured MCP (same reader `qubit mcp test` uses).")
+_CL("cli_mcp_invoke", (r"rx:^mcp invoke\b",), "mcp",
+    fixed=(("action", "invoke"),), args=(_S("server", True), _S("tool", True)),
+    confirm=True,
+    help_text="Invoke one MCP tool through the brokered, confirmation-gated "
+              "path (same backend as `qubit mcp invoke`).")
+
+# --- kanban (existing kanban backend; CLI subcommand literals) ---
+_CL("cli_kanban_list", (r"rx:^kanban(?: list)?$",), "kanban",
+    fixed=(("action", "list"),),
+    help_text="List kanban tasks (read-only).")
+_CL("cli_kanban_show", (r"rx:^kanban show\b",), "kanban",
+    fixed=(("action", "show"),), args=(_I("task_id"),),
+    help_text="Show one kanban task (read-only).")
+_CL("cli_kanban_current", (r"rx:^kanban current$",), "kanban",
+    fixed=(("action", "current"),),
+    help_text="Inspect the current kanban task (read-only).")
+_CL("cli_kanban_init", (r"rx:^kanban init$",), "kanban",
+    fixed=(("action", "init"),), confirm=True,
+    help_text="Initialize the main kanban board (confirmed).")
+_CL("cli_kanban_boards_create", (r"rx:^kanban boards create\b",), "kanban",
+    fixed=(("action", "boards_create"),), args=(_S("name"),), confirm=True,
+    help_text="Create a kanban board (confirmed).")
+_CL("cli_kanban_assign", (r"rx:^kanban assign\b",), "kanban",
+    fixed=(("action", "assign"),), args=(_I("task_id"), _S("assignee")),
+    confirm=True, help_text="Assign a kanban task (confirmed).")
+_CL("cli_kanban_reassign", (r"rx:^kanban reassign\b",), "kanban",
+    fixed=(("action", "reassign"),), args=(_I("task_id"), _S("assignee")),
+    confirm=True, help_text="Reassign a kanban task (confirmed).")
+_CL("cli_kanban_reclaim", (r"rx:^kanban reclaim\b",), "kanban",
+    fixed=(("action", "reclaim"),), args=(_I("task_id"),), confirm=True,
+    help_text="Reclaim a kanban task (confirmed).")
+_CL("cli_kanban_edit", (r"rx:^kanban edit\b",), "kanban",
+    fixed=(("action", "edit"),), args=(_I("task_id"), _S("title")),
+    confirm=True, help_text="Edit a kanban task (confirmed).")
+_CL("cli_kanban_block", (r"rx:^kanban block\b",), "kanban",
+    fixed=(("action", "block"),), args=(_I("task_id"),), confirm=True,
+    help_text="Mark a kanban task blocked (confirmed).")
+_CL("cli_kanban_archive", (r"rx:^kanban archive\b",), "kanban",
+    fixed=(("action", "archive"),), args=(_I("task_id"),), confirm=True,
+    help_text="Archive a kanban task (confirmed).")
+_CL("cli_kanban_stats", (r"rx:^kanban stats$",), "kanban",
+    fixed=(("action", "stats"),),
+    help_text="Kanban board statistics (read-only).")
+_CL("cli_kanban_log", (r"rx:^kanban log$",), "kanban",
+    fixed=(("action", "log"),),
+    help_text="Kanban board activity log (read-only).")
+_CL("cli_kanban_export", (r"rx:^kanban export$",), "kanban",
+    fixed=(("action", "export"),),
+    help_text="Export the kanban board (read-only).")
+_CL("cli_kanban_open", (r"rx:^kanban open$",), "kanban",
+    fixed=(("action", "open"),),
+    help_text="Open the kanban board view (read-only).")
+_CL("cli_kanban_migrate", (r"rx:^kanban migrate$",), "kanban",
+    fixed=(("action", "migrate"),), confirm=True,
+    help_text="Unify the kanban stores (confirmed).")
+_CL("cli_kanban_snapshots", (r"rx:^kanban snapshots$",), "kanban",
+    fixed=(("action", "snapshots"),),
+    help_text="List canvas restore points (read-only).")
+_CL("cli_kanban_layout_show", (r"rx:^kanban layout show$",), "kanban",
+    fixed=(("action", "layout_show"),),
+    help_text="Show the kanban board layout (read-only).")
+_CL("cli_kanban_role_grant", (r"rx:^kanban role grant voice$",), "kanban",
+    fixed=(("action", "role_grant"),), confirm=True,
+    help_text="Grant a board role (confirmed).")
+_CL("cli_kanban_role_revoke", (r"rx:^kanban role revoke voice$",), "kanban",
+    fixed=(("action", "role_revoke"),), confirm=True,
+    help_text="Revoke a board role (confirmed).")
+_CL("cli_kanban_snapshot_restore", (r"rx:^kanban snapshot restore voice$",),
+    "kanban", fixed=(("action", "snapshot_restore"),), confirm=True,
+    help_text="Restore a canvas snapshot (confirmed).")
+_CL("cli_kanban_widget_move", (r"rx:^kanban widget move voice$",), "kanban",
+    fixed=(("action", "widget_move"),), confirm=True,
+    help_text="Reposition a board widget (confirmed).")
+_CL("cli_kanban_widget_add", (r"rx:^kanban widget add\b",), "kanban",
+    fixed=(("action", "widget_add"),), confirm=True,
+    help_text="Add a board widget (confirmed).")
+_CL("cli_kanban_widget_list", (r"rx:^kanban widget list$",), "kanban",
+    fixed=(("action", "widget_list"),),
+    help_text="List board widgets (read-only).")
+_CL("cli_kanban_widget_remove", (r"rx:^kanban widget remove\b",), "kanban",
+    fixed=(("action", "widget_remove"),), confirm=True,
+    help_text="Remove a board widget (confirmed).")
+_CL("cli_kanban_tab_list", (r"rx:^kanban tab list$",), "kanban",
+    fixed=(("action", "tab_list"),),
+    help_text="List board tabs (read-only).")
+_CL("cli_kanban_tab_create", (r"rx:^kanban tab create\b",), "kanban",
+    fixed=(("action", "tab_create"),), confirm=True,
+    help_text="Create a board tab (confirmed).")
+_CL("cli_kanban_tab_rename", (r"rx:^kanban tab rename\b",), "kanban",
+    fixed=(("action", "tab_rename"),), confirm=True,
+    help_text="Rename a board tab (confirmed).")
+_CL("cli_kanban_tab_delete", (r"rx:^kanban tab delete\b",), "kanban",
+    fixed=(("action", "tab_delete"),), confirm=True,
+    help_text="Delete a board tab (confirmed).")
+_CL("cli_kanban_tab_move", (r"rx:^kanban tab move\b",), "kanban",
+    fixed=(("action", "tab_move"),), confirm=True,
+    help_text="Move a board tab (confirmed).")
+_CL("cli_kanban_swarm", (r"rx:^kanban swarm$",), "kanban",
+    fixed=(("action", "delegated"), ("subcommand", "swarm")),
+    help_text="Board swarm is dashboard/CLI-only: typed refusal naming the "
+              "counterpart (never a silent no-op).")
+_CL("cli_kanban_watch", (r"rx:^kanban watch$",), "kanban",
+    fixed=(("action", "delegated"), ("subcommand", "watch")),
+    help_text="Board watch is dashboard/CLI-only: typed refusal naming the "
+              "counterpart.")
+_CL("cli_kanban_dispatch", (r"rx:^kanban (?:dispatch|daemon)$",), "kanban",
+    fixed=(("action", "delegated"), ("subcommand", "dispatch")),
+    help_text="Board dispatch daemon is dashboard/CLI-only: typed refusal "
+              "naming the counterpart.")
+
+# --- skills (existing skills backend; CLI subcommand literals) ---
+_CL("cli_skills_root", (r"rx:^skills$",), "skills",
+    fixed=(("action", "list"),),
+    help_text="List on-disk + permissioned skills (read-only).")
+_CL("cli_skills_show", (r"rx:^skills (?:show|inspect)\b",), "skills",
+    fixed=(("action", "show"),), args=(_S("skill_id", True),),
+    help_text="Show one skill (read-only).")
+_CL("cli_skills_enable", (r"rx:^skills enable\b",), "skills",
+    fixed=(("action", "enable"),), args=(_S("skill_id", True),), confirm=True,
+    help_text="Enable a skill (confirmed).")
+_CL("cli_skills_disable", (r"rx:^skills disable\b",), "skills",
+    fixed=(("action", "disable"),), args=(_S("skill_id", True),), confirm=True,
+    help_text="Disable a skill (confirmed).")
+_CL("cli_skills_remove", (r"rx:^skills (?:remove|uninstall)\b",), "skills",
+    fixed=(("action", "remove"),), args=(_S("skill_id", True),), confirm=True,
+    help_text="Remove a skill (confirmed).")
+_CL("cli_skills_rollback", (r"rx:^skills rollback\b",), "skills",
+    fixed=(("action", "rollback"),), args=(_S("skill_id", True),), confirm=True,
+    help_text="Roll back a skill (confirmed).")
+
+# --- plugins (existing plugin_runtime backend; CLI subcommand literals) ---
+_CL("cli_plugins_show", (r"rx:^plugins show\b",), "plugin_runtime",
+    fixed=(("action", "show"),), args=(_S("plugin_id", True),),
+    help_text="Show one registered plugin (read-only).")
+_CL("cli_plugins_status", (r"rx:^plugins status$",), "plugin_runtime",
+    fixed=(("action", "status"),),
+    help_text="Plugin-runtime status (read-only).")
+_CL("cli_plugins_doctor", (r"rx:^plugins doctor$",), "plugin_runtime",
+    fixed=(("action", "doctor"),),
+    help_text="Plugin-runtime health (read-only).")
+_CL("cli_plugins_browse", (r"rx:^plugins browse$",), "plugin_runtime",
+    fixed=(("action", "catalog"),),
+    help_text="Installable plugin catalog (read-only).")
+_CL("cli_plugins_register", (r"rx:^plugins register\b",), "plugin_runtime",
+    fixed=(("action", "register"),), args=(_S("manifest", True),), confirm=True,
+    help_text="Register a reviewed local plugin manifest (confirmed).")
+_CL("cli_plugins_invoke", (r"rx:^plugins invoke\b",), "plugin_runtime",
+    fixed=(("action", "invoke"),), args=(_S("plugin_id", True),), confirm=True,
+    help_text="Invoke a plugin through the in-process host (confirmed).")
+_CL("cli_plugins_unregister", (r"rx:^plugins (?:unregister|remove)\b",),
+    "plugin_runtime", fixed=(("action", "unregister"),),
+    args=(_S("plugin_id", True),), confirm=True,
+    help_text="Unregister a plugin (confirmed).")
+_CL("cli_plugins_install", (r"rx:^plugins install\b",), "plugin_runtime",
+    fixed=(("action", "install"),), args=(_S("identifier", True),),
+    confirm=True,
+    help_text="Install a reviewed catalog/local plugin (confirmed; remote "
+              "identifiers stay typed-refused).")
+_CL("cli_plugins_runtime_install", (r"rx:^plugins runtime install\b",),
+    "plugin_runtime", fixed=(("action", "install"),),
+    args=(_S("identifier", True),), confirm=True,
+    help_text="Install a reviewed plugin runtime (confirmed).")
+
+# --- sessions (existing sessions backend; CLI subcommand literals) ---
+_CL("cli_session_show", (r"rx:^sessions? show\b",), "sessions",
+    fixed=(("action", "show"),), args=(_S("session_id", True),),
+    help_text="Show one session receipt (read-only).")
+_CL("cli_session_archive", (r"rx:^sessions? archive\b",), "sessions",
+    fixed=(("action", "archive"),), args=(_S("session_id", True),),
+    confirm=True, help_text="Archive a session (confirmed).")
+_CL("cli_session_delete", (r"rx:^sessions? delete\b",), "sessions",
+    fixed=(("action", "delete"),), args=(_S("session_id", True),),
+    confirm=True, help_text="Delete a session (confirmed).")
+_CL("cli_session_resume", (r"rx:^sessions? resume\b",), "sessions",
+    fixed=(("action", "resume"),), args=(_S("session_id", True),),
+    confirm=True, help_text="Resume a session (confirmed).")
+
+# --- profiles / config registry (existing config_profiles backend) ---
+_CL("cli_profile_root", (r"rx:^profile$",), "config_profiles",
+    fixed=(("action", "list"),),
+    help_text="List provider/config profile kinds (read-only).")
+_CL("cli_profile_list", (r"rx:^profile list$",), "config_profiles",
+    fixed=(("action", "list"),),
+    help_text="List provider/config profile kinds (read-only).")
+_CL("cli_profile_show", (r"rx:^profile (?:show|info)\b",), "config_profiles",
+    fixed=(("action", "show"),), args=(_S("kind", True),),
+    help_text="Show one provider/config profile kind (read-only).")
+_CL("cli_profile_select", (r"rx:^profile (?:select|use)\b",), "config_profiles",
+    fixed=(("action", "select"),), args=(_S("kind", True),), confirm=True,
+    help_text="Select a provider/config profile (confirmed).")
+_CL("cli_profile_reset", (r"rx:^profile reset\b",), "config_profiles",
+    fixed=(("action", "reset"),), args=(_S("kind", True),), confirm=True,
+    help_text="Reset a provider/config profile to its default (confirmed).")
+_CL("cli_profile_upgrade", (r"rx:^profile (?:upgrade|update)\b",),
+    "config_profiles", fixed=(("action", "upgrade"),),
+    args=(_S("kind", True),), confirm=True,
+    help_text="Upgrade a provider/config profile (confirmed).")
+_CL("cli_profile_remove", (r"rx:^profile (?:remove|delete)\b",), "config_profiles",
+    fixed=(("action", "remove"),), args=(_S("kind", True),), confirm=True,
+    help_text="Remove a provider/config profile (confirmed).")
+_CL("cli_profile_rollback", (r"rx:^profile rollback\b",), "config_profiles",
+    fixed=(("action", "rollback"),), args=(_S("kind", True),), confirm=True,
+    help_text="Roll back a provider/config profile (confirmed).")
+
+# --- schedules / cron (existing schedules backend) ---
+_CL("cli_schedules_root", (r"rx:^schedules$",), "schedules",
+    fixed=(("action", "list"),),
+    help_text="List scheduled jobs (read-only).")
+_CL("cli_schedules_list", (r"rx:^schedules list$",), "schedules",
+    fixed=(("action", "list"),),
+    help_text="List scheduled jobs (read-only).")
+_CL("cli_schedules_show", (r"rx:^schedules show\b",), "schedules",
+    fixed=(("action", "show"),), args=(_I("job_id"),),
+    help_text="Show one scheduled job (read-only).")
+_CL("cli_schedules_create", (r"rx:^schedules create\b",), "schedules",
+    fixed=(("action", "create"),), args=(_R("task_text"), _R("when")),
+    confirm=True, help_text="Create a scheduled job (confirmed).")
+_CL("cli_schedules_pause", (r"rx:^schedules pause\b",), "schedules",
+    fixed=(("action", "pause"),), args=(_I("job_id"),), confirm=True,
+    help_text="Pause a scheduled job (confirmed).")
+_CL("cli_schedules_resume", (r"rx:^schedules resume\b",), "schedules",
+    fixed=(("action", "resume"),), args=(_I("job_id"),), confirm=True,
+    help_text="Resume a scheduled job (confirmed).")
+_CL("cli_schedules_delete", (r"rx:^schedules delete\b",), "schedules",
+    fixed=(("action", "delete"),), args=(_I("job_id"),), confirm=True,
+    help_text="Delete a scheduled job (confirmed).")
+_CL("cli_schedules_history", (r"rx:^schedules history$",), "schedules",
+    fixed=(("action", "history"),),
+    help_text="Scheduled-job run history (read-only).")
+_CL("cli_schedules_run_due", (r"rx:^schedules run due$",), "schedules",
+    fixed=(("action", "run_due"),), confirm=True,
+    help_text="Run due scheduled jobs (confirmed).")
+_CL("cli_cron_root", (r"rx:^cron$",), "schedules",
+    fixed=(("action", "list"),),
+    help_text="List cron jobs (read-only).")
+_CL("cli_cron_remove", (r"rx:^cron remove\b",), "schedules",
+    fixed=(("action", "delete"),), args=(_I("job_id"),), confirm=True,
+    help_text="Remove a cron job (confirmed).")
+
+# --- automation (existing automation backend) ---
+_CL("cli_automation_orders", (r"rx:^automation orders$",), "automation",
+    fixed=(("action", "orders"),),
+    help_text="List standing orders (read-only).")
+_CL("cli_automation_heartbeats", (r"rx:^automation heartbeats$",), "automation",
+    fixed=(("action", "heartbeats"),),
+    help_text="List heartbeat monitors (read-only).")
+_CL("cli_automation_scenarios", (r"rx:^automation scenarios$",), "automation",
+    fixed=(("action", "scenarios"),),
+    help_text="List QA-lab scenarios (read-only).")
+_CL("cli_automation_yield_pending", (r"rx:^automation yield pending$",),
+    "automation", fixed=(("action", "yield_pending"),),
+    help_text="List pending automation handoffs (read-only).")
+_CL("cli_automation_order_add", (r"rx:^automation order add\b",), "automation",
+    fixed=(("action", "directive"), ("verb", "order.add")), confirm=True,
+    help_text="Add a standing order (confirmed).")
+_CL("cli_automation_order_enable", (r"rx:^automation order enable\b",),
+    "automation", fixed=(("action", "directive"), ("verb", "order.enable")),
+    confirm=True, help_text="Enable a standing order (confirmed).")
+_CL("cli_automation_order_disable", (r"rx:^automation order disable\b",),
+    "automation", fixed=(("action", "directive"), ("verb", "order.disable")),
+    confirm=True, help_text="Disable a standing order (confirmed).")
+_CL("cli_automation_order_remove", (r"rx:^automation order remove\b",),
+    "automation", fixed=(("action", "directive"), ("verb", "order.remove")),
+    confirm=True, help_text="Remove a standing order (confirmed).")
+_CL("cli_automation_heartbeat_add", (r"rx:^automation heartbeat add\b",),
+    "automation", fixed=(("action", "directive"), ("verb", "heartbeat.add")),
+    confirm=True, help_text="Add a heartbeat monitor (confirmed).")
+_CL("cli_automation_flow_add", (r"rx:^automation flow add\b",), "automation",
+    fixed=(("action", "directive"), ("verb", "flow.add")), confirm=True,
+    help_text="Add an automation flow (confirmed).")
+_CL("cli_automation_flow_run", (r"rx:^automation flow run\b",), "automation",
+    fixed=(("action", "directive"), ("verb", "flow.run")), confirm=True,
+    help_text="Run an automation flow (confirmed).")
+_CL("cli_automation_qa_add", (r"rx:^automation qa add\b",), "automation",
+    fixed=(("action", "directive"), ("verb", "qa.add")), confirm=True,
+    help_text="Add a QA-lab scenario (confirmed).")
+_CL("cli_automation_qa_run", (r"rx:^automation qa run\b",), "automation",
+    fixed=(("action", "directive"), ("verb", "qa.run")), confirm=True,
+    help_text="Run a QA-lab scenario (confirmed).")
+_CL("cli_automation_yield_resume", (r"rx:^automation yield resume\b",),
+    "automation", fixed=(("action", "yield_resume"),), confirm=True,
+    help_text="Resume an automation handoff (confirmed).")
+
+# --- gateway peers (existing gateway backend) ---
+_CL("cli_gateway_root", (r"rx:^gateway$",), "gateway",
+    fixed=(("action", "list"),),
+    help_text="List registered gateway peers (read-only).")
+_CL("cli_gateway_list", (r"rx:^gateway list$",), "gateway",
+    fixed=(("action", "list"),),
+    help_text="List registered gateway peers (read-only).")
+_CL("cli_gateway_show", (r"rx:^gateway show\b",), "gateway",
+    fixed=(("action", "show"),), args=(_S("gateway_id", True),),
+    help_text="Show one gateway peer (read-only).")
+_CL("cli_gateway_add", (r"rx:^gateway add\b",), "gateway",
+    fixed=(("action", "add"),), args=(_S("gateway_id", True),), confirm=True,
+    help_text="Register a gateway peer (confirmed).")
+_CL("cli_gateway_remove", (r"rx:^gateway remove\b",), "gateway",
+    fixed=(("action", "remove"),), args=(_S("gateway_id", True),), confirm=True,
+    help_text="Remove a gateway peer (confirmed).")
+_CL("cli_gateway_link", (r"rx:^gateway link\b",), "gateway",
+    fixed=(("action", "link"),), args=(_S("gateway_id", True),),
+    help_text="Check a gateway peer link (read-only).")
+_CL("cli_gateway_supervision_request", (r"rx:^gateway supervision request$",),
+    "gateway", fixed=(("action", "supervision_request"),), confirm=True,
+    help_text="Request gateway supervision (confirmed).")
+_CL("cli_gateway_supervision_revert", (r"rx:^gateway supervision revert$",),
+    "gateway", fixed=(("action", "supervision_revert"),), confirm=True,
+    help_text="Revert gateway supervision (confirmed).")
+_CL("cli_gateway_supervision_refusal", (r"rx:^gateway supervision refusal$",),
+    "gateway", fixed=(("action", "supervision"),),
+    help_text="Gateway process supervision is operator-owned: typed refusal "
+              "naming the supervisor control surface.")
+
+# --- brain (existing brain backend) ---
+_CL("cli_brain_principal_add", (r"rx:^brain principal add\b",), "brain",
+    fixed=(("action", "principal_add"),), args=(_S("pid", True),), confirm=True,
+    help_text="Register a brain principal (confirmed).")
+_CL("cli_brain_member_add", (r"rx:^brain member add\b",), "brain",
+    fixed=(("action", "member_add"),), confirm=True,
+    help_text="Link a brain member (confirmed).")
+_CL("cli_brain_member_remove", (r"rx:^brain member remove\b",), "brain",
+    fixed=(("action", "member_remove"),), confirm=True,
+    help_text="Unlink a brain member (confirmed).")
+_CL("cli_brain_profile_set", (r"rx:^brain profile set\b",), "brain",
+    fixed=(("action", "profile_set"),), confirm=True,
+    help_text="Store a brain profile field (confirmed).")
+_CL("cli_brain_profile_forget", (r"rx:^brain profile forget\b",), "brain",
+    fixed=(("action", "profile_forget"),), confirm=True,
+    help_text="Forget a brain profile field (confirmed).")
+_CL("cli_brain_profile_sweep", (r"rx:^brain profile sweep\b",), "brain",
+    fixed=(("action", "profile_sweep"),), confirm=True,
+    help_text="Sweep expired brain profile fields (confirmed).")
+_CL("cli_brain_profile_export", (r"rx:^brain profile export\b",), "brain",
+    fixed=(("action", "profile_export"),),
+    help_text="Export a brain profile (read-only).")
+_CL("cli_brain_account_add", (r"rx:^brain account add\b",), "brain",
+    fixed=(("action", "account_add"),), confirm=True,
+    help_text="Link a brain account alias (confirmed).")
+_CL("cli_brain_account_remove", (r"rx:^brain account remove\b",), "brain",
+    fixed=(("action", "account_remove"),), confirm=True,
+    help_text="Unlink a brain account alias (confirmed).")
+_CL("cli_brain_vault_list", (r"rx:^brain vault list$",), "brain",
+    fixed=(("action", "vault_list"),),
+    help_text="List brain vault references (read-only).")
+_CL("cli_brain_vault_set", (r"rx:^brain vault set\b",), "brain",
+    fixed=(("action", "vault_set"),), confirm=True,
+    help_text="Record a brain vault reference (confirmed).")
+_CL("cli_brain_vault_remove", (r"rx:^brain vault remove\b",), "brain",
+    fixed=(("action", "vault_remove"),), confirm=True,
+    help_text="Remove a brain vault reference (confirmed).")
+_CL("cli_brain_onboard_plan", (r"rx:^brain onboard plan$",), "brain",
+    fixed=(("action", "onboard_plan"),),
+    help_text="Brain onboarding plan (read-only).")
+
+# --- pairing (existing pairing backend) ---
+_CL("cli_pairing_create", (r"rx:^pairing create$",), "pairing",
+    fixed=(("action", "create"),), confirm=True,
+    help_text="Create a pairing code (confirmed).")
+_CL("cli_pairing_approve", (r"rx:^pairing approve\b",), "pairing",
+    fixed=(("action", "approve"),), confirm=True,
+    help_text="Approve a pairing code (confirmed).")
+_CL("cli_pairing_accept", (r"rx:^pairing accept\b",), "pairing",
+    fixed=(("action", "accept"),), confirm=True,
+    help_text="Accept a pairing setup code (confirmed).")
+_CL("cli_pairing_revoke", (r"rx:^pairing revoke\b",), "pairing",
+    fixed=(("action", "revoke"),), confirm=True,
+    help_text="Revoke a pairing (confirmed).")
+
+# --- hooks (existing hooks backend) ---
+_CL("cli_hooks_declare", (r"rx:^hooks declare\b",), "hooks",
+    fixed=(("action", "declare"),), confirm=True,
+    help_text="Declare an event hook (confirmed).")
+_CL("cli_hooks_validate", (r"rx:^hooks validate\b",), "hooks",
+    fixed=(("action", "validate"),),
+    help_text="Validate a hook declaration (read-only).")
+_CL("cli_hooks_fire", (r"rx:^hooks fire\b",), "hooks",
+    fixed=(("action", "fire"),), confirm=True,
+    help_text="Fire an event hook (confirmed).")
+_CL("cli_hooks_emit", (r"rx:^hooks emit\b",), "hooks",
+    fixed=(("action", "emit"),), confirm=True,
+    help_text="Emit a lifecycle event (confirmed).")
+_CL("cli_hooks_remove", (r"rx:^hooks remove\b",), "hooks",
+    fixed=(("action", "remove"),), confirm=True,
+    help_text="Remove a hook (confirmed).")
+_CL("cli_hooks_revoke", (r"rx:^hooks revoke\b",), "hooks",
+    fixed=(("action", "revoke"),), confirm=True,
+    help_text="Revoke a hook (confirmed).")
+_CL("cli_hooks_test", (r"rx:^hooks test\b",), "hooks",
+    fixed=(("action", "test"),),
+    help_text="Dry-run a hook (read-only).")
+_CL("cli_hooks_doctor", (r"rx:^hooks doctor$",), "hooks",
+    fixed=(("action", "doctor"),),
+    help_text="Hook health (read-only).")
+
+# --- sync (existing sync backend) ---
+_CL("cli_sync_root", (r"rx:^sync$",), "sync",
+    fixed=(("action", "list"),),
+    help_text="List sync offers (read-only).")
+_CL("cli_sync_list", (r"rx:^sync list$",), "sync",
+    fixed=(("action", "list"),),
+    help_text="List sync offers (read-only).")
+_CL("cli_sync_revoke", (r"rx:^sync revoke voice$",), "sync",
+    fixed=(("action", "revoke"),), confirm=True,
+    help_text="Revoke a sync offer (confirmed).")
+
+# --- peer gateways (existing peer backend) ---
+_CL("cli_peer_add", (r"rx:^peer add\b",), "peer",
+    fixed=(("action", "add"),), confirm=True,
+    help_text="Register a peer gateway (confirmed).")
+_CL("cli_peer_remove", (r"rx:^peer remove\b",), "peer",
+    fixed=(("action", "remove"),), confirm=True,
+    help_text="Remove a peer gateway (confirmed).")
+_CL("cli_peer_link", (r"rx:^peer link\b",), "peer",
+    fixed=(("action", "link"),),
+    help_text="Check a peer link (read-only).")
+_CL("cli_peer_dm", (r"rx:^peer dm\b",), "peer",
+    fixed=(("action", "dm"),), confirm=True,
+    help_text="Send a peer direct message (confirmed).")
+_CL("cli_peer_run", (r"rx:^peer run\b",), "peer",
+    fixed=(("action", "run"),), confirm=True,
+    help_text="Run a task on a peer (confirmed).")
+
+# --- messaging accounts (existing msg backend) ---
+_CL("cli_msg_account_add", (r"rx:^msg account add\b",), "msg",
+    fixed=(("action", "account_add"),), confirm=True,
+    help_text="Link a messaging account (confirmed).")
+_CL("cli_msg_account_remove", (r"rx:^msg account remove\b",), "msg",
+    fixed=(("action", "account_remove"),), confirm=True,
+    help_text="Unlink a messaging account (confirmed).")
+_CL("cli_msg_account_show", (r"rx:^msg account show\b",), "msg",
+    fixed=(("action", "account_show"),),
+    help_text="Show a messaging account (read-only).")
+_CL("cli_msg_link", (r"rx:^msg link$",), "msg",
+    fixed=(("action", "link"),),
+    help_text="Check account linkage (read-only).")
+_CL("cli_msg_inbox", (r"rx:^msg inbox$",), "msg",
+    fixed=(("action", "inbox"),),
+    help_text="Read the message inbox (read-only).")
+_CL("cli_msg_draft", (r"rx:^msg draft\b",), "msg",
+    fixed=(("action", "draft"),), confirm=True,
+    help_text="Draft a message (confirmed).")
+_CL("cli_msg_approve", (r"rx:^msg approve\b",), "msg",
+    fixed=(("action", "approve"),), confirm=True,
+    help_text="Approve a drafted message (confirmed).")
+_CL("cli_msg_summarize", (r"rx:^msg summarize\b",), "msg",
+    fixed=(("action", "summarize"),),
+    help_text="Summarize a message (read-only).")
+_CL("cli_msg_retry", (r"rx:^msg retry\b",), "msg",
+    fixed=(("action", "retry"),), confirm=True,
+    help_text="Retry a queued message (confirmed).")
+
+# --- webhooks (existing webhook backend) ---
+_CL("cli_webhook_root", (r"rx:^webhook$",), "webhook",
+    fixed=(("action", "list"),),
+    help_text="List webhook subscriptions (read-only).")
+_CL("cli_webhook_list", (r"rx:^webhook list$",), "webhook",
+    fixed=(("action", "list"),),
+    help_text="List webhook subscriptions (read-only).")
+_CL("cli_webhook_add", (r"rx:^webhook (?:add|subscribe)\b",),
+    "webhook", fixed=(("action", "add"),), confirm=True,
+    help_text="Add a webhook subscription (confirmed).")
+_CL("cli_webhook_show", (r"rx:^webhook show\b",), "webhook",
+    fixed=(("action", "show"),), args=(_S("webhook_id", True),),
+    help_text="Show a webhook subscription (read-only).")
+_CL("cli_webhook_remove", (r"rx:^webhook remove\b",), "webhook",
+    fixed=(("action", "remove"),), confirm=True,
+    help_text="Remove a webhook subscription (confirmed).")
+_CL("cli_webhook_test", (r"rx:^webhook test\b",), "webhook",
+    fixed=(("action", "test"),),
+    help_text="Test a webhook subscription (read-only).")
+
+# --- channels (existing channels backend) ---
+_CL("cli_channels_configure", (r"rx:^channels configure\b",), "channels",
+    fixed=(("action", "configure"),), confirm=True,
+    help_text="Configure an inbound channel (confirmed).")
+_CL("cli_channels_unconfigure", (r"rx:^channels unconfigure\b",), "channels",
+    fixed=(("action", "unconfigure"),), confirm=True,
+    help_text="Unconfigure an inbound channel (confirmed).")
+_CL("cli_channels_receive", (r"rx:^channels receive refusal$",), "channels",
+    fixed=(("action", "receive"),),
+    help_text="Inbound channel payload ingest is CLI/dashboard-only: typed "
+              "refusal naming the counterpart.")
+
+# --- opencode coding adapter (existing opencode backend) ---
+_CL("cli_opencode_show", (r"rx:^opencode show\b",), "opencode",
+    fixed=(("action", "show"),), args=(_S("capability", True),),
+    help_text="Show a coding capability (read-only).")
+_CL("cli_opencode_check", (r"rx:^opencode check\b",), "opencode",
+    fixed=(("action", "check"),),
+    help_text="Check whether a coding capability can run (read-only).")
+_CL("cli_opencode_grant", (r"rx:^opencode grant\b",), "opencode",
+    fixed=(("action", "grant"),), confirm=True,
+    help_text="Grant a coding capability (confirmed).")
+_CL("cli_opencode_revoke", (r"rx:^opencode revoke\b",), "opencode",
+    fixed=(("action", "revoke"),), confirm=True,
+    help_text="Revoke a coding grant (confirmed).")
+_CL("cli_opencode_preview", (r"rx:^opencode preview\b",), "opencode",
+    fixed=(("action", "preview"),),
+    help_text="Preview a coding task (read-only).")
+_CL("cli_opencode_cancel", (r"rx:^opencode cancel\b",), "opencode",
+    fixed=(("action", "cancel"),), confirm=True,
+    help_text="Cancel a coding run (confirmed).")
+_CL("cli_opencode_retry", (r"rx:^opencode retry\b",), "opencode",
+    fixed=(("action", "retry"),), confirm=True,
+    help_text="Retry a coding run (confirmed).")
+_CL("cli_opencode_recover", (r"rx:^opencode recover\b",), "opencode",
+    fixed=(("action", "recover"),), confirm=True,
+    help_text="Recover a coding run (confirmed).")
+
+# --- runtime images (existing runtime backend) ---
+_CL("cli_runtime_install", (r"rx:^runtime install\b",), "runtime",
+    fixed=(("action", "install"),), confirm=True,
+    help_text="Install the pinned runtime image (confirmed).")
+_CL("cli_runtime_upgrade", (r"rx:^runtime upgrade\b",), "runtime",
+    fixed=(("action", "upgrade"),), confirm=True,
+    help_text="Upgrade the pinned runtime image (confirmed).")
+_CL("cli_runtime_rollback", (r"rx:^runtime rollback\b",), "runtime",
+    fixed=(("action", "rollback"),), confirm=True,
+    help_text="Roll back the pinned runtime image (confirmed).")
+_CL("cli_runtime_remove", (r"rx:^runtime remove\b",), "runtime",
+    fixed=(("action", "remove"),), confirm=True,
+    help_text="Remove the pinned runtime image (confirmed).")
+_CL("cli_runtime_recover", (r"rx:^runtime recover\b",), "runtime",
+    fixed=(("action", "recover"),), confirm=True,
+    help_text="Recover the runtime install (confirmed).")
+
+# --- experiments (existing experiments backend) ---
+_CL("cli_experiments_start", (r"rx:^experiments start\b",), "experiments",
+    fixed=(("action", "start"),), confirm=True,
+    help_text="Start an experiment (confirmed).")
+_CL("cli_experiments_abort", (r"rx:^experiments abort\b",), "experiments",
+    fixed=(("action", "abort"),), confirm=True,
+    help_text="Abort an experiment (confirmed).")
+_CL("cli_experiments_evaluate", (r"rx:^experiments evaluate\b",), "experiments",
+    fixed=(("action", "evaluate"),), confirm=True,
+    help_text="Evaluate an experiment (confirmed).")
+_CL("cli_experiments_finish", (r"rx:^experiments finish\b",), "experiments",
+    fixed=(("action", "finish_trial"),), confirm=True,
+    help_text="Finish a trial (confirmed).")
+_CL("cli_experiments_promote", (r"rx:^experiments promote\b",), "experiments",
+    fixed=(("action", "promote"),), confirm=True,
+    help_text="Promote an experiment (confirmed).")
+_CL("cli_experiments_register", (r"rx:^experiments register\b",), "experiments",
+    fixed=(("action", "register_candidate"),), confirm=True,
+    help_text="Register an experiment candidate (confirmed).")
+_CL("cli_experiments_signal", (r"rx:^experiments signal\b",), "experiments",
+    fixed=(("action", "signal"),), confirm=True,
+    help_text="Record a trial signal (confirmed).")
+_CL("cli_experiments_snapshot", (r"rx:^experiments snapshot\b",), "experiments",
+    fixed=(("action", "snapshot"),), confirm=True,
+    help_text="Snapshot the experiment store (confirmed).")
+
+# --- verified skills (existing verified backend) ---
+_CL("cli_verified_bundled", (r"rx:^verified bundled$",), "verified",
+    fixed=(("action", "bundled"),),
+    help_text="List bundled skills (read-only).")
+_CL("cli_verified_show", (r"rx:^verified show\b",), "verified",
+    fixed=(("action", "show"),), args=(_S("skill_id", True),),
+    help_text="Show a verified skill (read-only).")
+_CL("cli_verified_verdict", (r"rx:^verified verdict\b",), "verified",
+    fixed=(("action", "verdict"),),
+    help_text="Verified-skill verdict (read-only).")
+_CL("cli_verified_pin", (r"rx:^verified pin\b",), "verified",
+    fixed=(("action", "pin"),), confirm=True,
+    help_text="Pin a verified skill (confirmed).")
+_CL("cli_verified_unpin", (r"rx:^verified unpin\b",), "verified",
+    fixed=(("action", "unpin"),), confirm=True,
+    help_text="Unpin a verified skill (confirmed).")
+
+# --- product install (existing product backend) ---
+_CL("cli_product_first_run", (r"rx:^product first run$",), "product",
+    fixed=(("action", "first_run"),),
+    help_text="First-run setup status (read-only).")
+_CL("cli_product_probe", (r"rx:^product probe$",), "product",
+    fixed=(("action", "probe"),),
+    help_text="Installation probe (read-only).")
+_CL("cli_product_migrate", (r"rx:^product migrate$",), "product",
+    fixed=(("action", "migrate"),), confirm=True,
+    help_text="Migrate a legacy install (confirmed).")
+_CL("cli_product_repair", (r"rx:^product repair$",), "product",
+    fixed=(("action", "repair"),), confirm=True,
+    help_text="Repair the installation (confirmed).")
+_CL("cli_product_rollback", (r"rx:^product rollback$",), "product",
+    fixed=(("action", "rollback"),), confirm=True,
+    help_text="Roll back a migration (confirmed).")
+
+# --- broker actions (existing actions backend) ---
+_CL("cli_actions_cancel", (r"rx:^actions cancel\b",), "actions",
+    fixed=(("action", "cancel"),), confirm=True,
+    help_text="Cancel a broker action (confirmed).")
+_CL("cli_actions_check", (r"rx:^actions check\b",), "actions",
+    fixed=(("action", "check"),),
+    help_text="Check whether a broker action can run (read-only).")
+_CL("cli_actions_execute", (r"rx:^actions execute\b",), "actions",
+    fixed=(("action", "execute"),), confirm=True,
+    help_text="Execute a broker action (confirmed).")
+_CL("cli_actions_receipt", (r"rx:^actions receipt\b",), "actions",
+    fixed=(("action", "receipt"),),
+    help_text="Show a broker action receipt (read-only).")
+
+# --- checkpoints (existing checkpoints backend) ---
+_CL("cli_checkpoints_write", (r"rx:^checkpoints write\b",), "checkpoints",
+    fixed=(("action", "create"),), confirm=True,
+    help_text="Write a checkpoint (confirmed).")
+_CL("cli_checkpoints_prune", (r"rx:^checkpoints prune\b",), "checkpoints",
+    fixed=(("action", "prune"),), confirm=True,
+    help_text="Prune checkpoints (confirmed).")
+
+# --- themes (existing themes backend) ---
+_CL("cli_themes_reset", (r"rx:^themes reset$",), "themes",
+    fixed=(("action", "reset"),), confirm=True,
+    help_text="Reset the dashboard theme (confirmed).")
+_CL("cli_themes_set", (r"rx:^themes set\b",), "themes",
+    fixed=(("action", "set"),), confirm=True,
+    help_text="Set the dashboard theme (confirmed).")
+_CL("cli_themes_tweak_set", (r"rx:^themes tweak set\b",), "themes",
+    fixed=(("action", "tweak_set"),), confirm=True,
+    help_text="Set a theme token tweak (confirmed).")
+_CL("cli_themes_tweak_clear", (r"rx:^themes tweak clear\b",), "themes",
+    fixed=(("action", "tweak_clear"),), confirm=True,
+    help_text="Clear a theme token tweak (confirmed).")
+
+# --- memory (existing memory backend) ---
+_CL("cli_memory_root", (r"rx:^memory$",), "memory",
+    fixed=(("action", "search"),), args=(_R("query"),),
+    help_text="Search remembered memories (read-only).")
+_CL("cli_memory_forget", (r"rx:^memory forget\b",), "memory",
+    fixed=(("action", "forget"),), args=(_I("memory_id"),), confirm=True,
+    help_text="Forget one memory (confirmed).")
+
+# --- media / lessons / websites (existing backends) ---
+_CL("cli_media_generate", (r"rx:^media gen generate\b",), "media_gen",
+    fixed=(("action", "generate"),), confirm=True,
+    help_text="Generate media through the brokered provider path (confirmed).")
+_CL("cli_lessons_list", (r"rx:^lessons list$",), "lessons",
+    fixed=(("action", "list"),),
+    help_text="List curator lessons (read-only).")
+_CL("cli_lessons_promote", (r"rx:^lessons promote\b",), "lessons",
+    fixed=(("action", "promote"),), confirm=True,
+    help_text="Promote a lesson (confirmed).")
+_CL("cli_lessons_remove", (r"rx:^lessons remove\b",), "lessons",
+    fixed=(("action", "remove"),), confirm=True,
+    help_text="Remove a lesson (confirmed).")
+_CL("cli_websites_list", (r"rx:^websites list$",), "websites",
+    fixed=(("action", "list"),),
+    help_text="List tracked websites (read-only).")
+
+# --- computer / acp / lsp / browser / ide / egress (existing backends) ---
+_CL("cli_computer_ops", (r"rx:^computer ops$",), "computer",
+    fixed=(("action", "desktop_ops"),),
+    help_text="Desktop-operation catalog (read-only).")
+_CL("cli_computer_launch", (r"rx:^computer launch\b",), "computer",
+    fixed=(("action", "launch"),), confirm=True,
+    help_text="Launch an app on the desktop (confirmed).")
+_CL("cli_computer_pip", (r"rx:^computer pip$",), "computer",
+    fixed=(("action", "pip"),), confirm=True,
+    help_text="Open picture-in-picture (confirmed).")
+_CL("cli_computer_present", (r"rx:^computer present$",), "computer",
+    fixed=(("action", "present"),), confirm=True,
+    help_text="Enter presentation mode (confirmed).")
+_CL("cli_computer_install_refusal", (r"rx:^computer(?:-use)? install$",),
+    "computer", fixed=(("action", "install"),),
+    help_text="Installing the desktop driver is CLI/dashboard-only: typed "
+              "refusal naming the counterpart.")
+_CL("cli_computer_permissions", (r"rx:^computer(?:-use)? permissions$",),
+    "computer", fixed=(("action", "permissions"),),
+    help_text="Desktop access permissions (read-only).")
+_CL("cli_acp_serve_refusal", (r"rx:^acp serve refusal$",), "acp",
+    fixed=(("action", "serve"),),
+    help_text="Serving ACP is CLI/editor-only: typed refusal naming the "
+              "counterpart.")
+_CL("cli_acp_client_configure", (r"rx:^acp client configure\b",), "acp_client",
+    fixed=(("action", "configure"),), confirm=True,
+    help_text="Configure an external ACP harness (confirmed).")
+_CL("cli_acp_client_handshake", (r"rx:^acp client handshake\b",), "acp_client",
+    fixed=(("action", "handshake"),), confirm=True,
+    help_text="Handshake with an external ACP harness (confirmed).")
+_CL("cli_acp_client_receipts", (r"rx:^acp client receipts$",), "acp_client",
+    fixed=(("action", "receipts"),),
+    help_text="External ACP harness receipts (read-only).")
+_CL("cli_acp_client_send", (r"rx:^acp client send\b",), "acp_client",
+    fixed=(("action", "send"),), confirm=True,
+    help_text="Send to an external ACP harness (confirmed).")
+_CL("cli_acp_client_unconfigure", (r"rx:^acp client unconfigure\b",),
+    "acp_client", fixed=(("action", "unconfigure"),), confirm=True,
+    help_text="Unconfigure an external ACP harness (confirmed).")
+_CL("cli_lsp_restart", (r"rx:^lsp restart\b",), "lsp",
+    fixed=(("action", "restart"),), confirm=True,
+    help_text="Restart language servers (confirmed).")
+_CL("cli_lsp_which", (r"rx:^lsp which\b",), "lsp",
+    fixed=(("action", "which"),), args=(_S("language", True),),
+    help_text="Resolve the language-server command for a language (read-only).")
+_CL("cli_lsp_install_refusal", (r"rx:^lsp install(?:-all)?$",), "lsp",
+    fixed=(("action", "install"),),
+    help_text="Installing language servers is CLI-only: typed refusal naming "
+              "the counterpart.")
+_CL("cli_browser_activate", (r"rx:^browser activate\b",), "browser_tabs",
+    fixed=(("action", "activate"),),
+    help_text="Activate a browser tab (read-only).")
+_CL("cli_browser_download", (r"rx:^browser download\b",), "browser_tabs",
+    fixed=(("action", "download"),), confirm=True,
+    help_text="Download the current browser page (confirmed).")
+_CL("cli_browser_close_refusal", (r"rx:^browser close(?:-profile)?$",), "browser",
+    fixed=(("action", "close"),),
+    help_text="Closing the browser/profile is CLI/dashboard-only: typed "
+              "refusal naming the counterpart.")
+_CL("cli_browser_read", (r"rx:^browser read$",), "browser_tabs",
+    fixed=(("action", "read"),),
+    help_text="Read the current browser tab (read-only).")
+_CL("cli_browser_screenshot", (r"rx:^browser screenshot$",), "browser_tabs",
+    fixed=(("action", "screenshot"),),
+    help_text="Screenshot the current browser tab (read-only).")
+_CL("cli_browser_find", (r"rx:^browser find\b",), "browser_tabs",
+    fixed=(("action", "find"),), args=(_R("query"),),
+    help_text="Find text on the current page (read-only).")
+_CL("cli_browser_fill", (r"rx:^browser fill\b",), "browser_tabs",
+    fixed=(("action", "fill"),), confirm=True,
+    help_text="Fill a form field on the current page (confirmed).")
+_CL("cli_browser_navigate", (r"rx:^browser navigate\b",), "browser_tabs",
+    fixed=(("action", "navigate"),), args=(_R("url"),), confirm=True,
+    help_text="Navigate the browser tab (confirmed).")
+_CL("cli_browser_tabs", (r"rx:^browser tabs$",), "browser_tabs",
+    fixed=(("action", "tabs"),),
+    help_text="List open browser tabs (read-only).")
+_CL("cli_browser_favicon", (r"rx:^browser favicon$",), "browser_tabs",
+    fixed=(("action", "favicon"),),
+    help_text="Read the current page favicon (read-only).")
+_CL("cli_browser_profile_create", (r"rx:^browser profile create\b",),
+    "browser_profiles", fixed=(("action", "create"),), confirm=True,
+    help_text="Create a browser profile (confirmed).")
+_CL("cli_browser_profile_open", (r"rx:^browser profile open\b",),
+    "browser_profiles", fixed=(("action", "open"),), confirm=True,
+    help_text="Open a browser profile (confirmed).")
+_CL("cli_browser_profile_remove", (r"rx:^browser profile remove\b",),
+    "browser_profiles", fixed=(("action", "remove"),), confirm=True,
+    help_text="Remove a browser profile (confirmed).")
+_CL("cli_ide_open", (r"rx:^ide open\b",), "ide",
+    fixed=(("action", "open"),), confirm=True,
+    help_text="Open the IDE (confirmed).")
+_CL("cli_substitute_egress", (r"rx:^substitute egress$",), "egress",
+    fixed=(("action", "substitute"),), confirm=True,
+    help_text="Materialize an egress secret substitution (confirmed).")
+_CL("cli_proxy_start_refusal", (r"rx:^proxy start(?: refusal)?$",), "proxy",
+    fixed=(("action", "start"),),
+    help_text="Starting the provider proxy is operator-owned: typed refusal "
+              "naming the counterpart.")
+
+# --- frontier / device / auth / audio / guidance (existing backends) ---
+_CL("cli_frontier_show", (r"rx:^frontier show\b",), "frontier_show",
+    help_text="Show the effective model/frontier policy (read-only).")
+_CL("cli_frontier_chat", (r"rx:^frontier chat\b",), "frontier_chat",
+    confirm=True,
+    help_text="Ask the frontier/cloud model (confirmed).")
+_CL("cli_device_enroll", (r"rx:^device enroll$",), "device_enroll",
+    fixed=(("action", "enroll"),), confirm=True,
+    help_text="Enroll this device (confirmed).")
+_CL("cli_auth_login", (r"rx:^auth login$",), "auth_login",
+    help_text="Credential login guidance (read-only).")
+_CL("cli_auth_verify", (r"rx:^auth verify\b",), "auth_verify",
+    help_text="Verify a configured provider credential (read-only).")
+_CL("cli_auth_logout", (r"rx:^auth logout$",), "auth_logout",
+    help_text="Credential logout/cleanup check (read-only).")
+_CL("cli_asr_test", (r"rx:^asr test$",), "audio_hw",
+    fixed=(("action", "asr_test"),),
+    help_text="ASR hardware test report (read-only).")
+_CL("cli_tts_test", (r"rx:^tts test$",), "audio_hw",
+    fixed=(("action", "tts_test"),),
+    help_text="TTS hardware test report (read-only).")
+_CL("cli_roundtrip_test", (r"rx:^roundtrip test$",), "audio_hw",
+    fixed=(("action", "roundtrip"),),
+    help_text="Audio roundtrip test report (read-only).")
+_CL("cli_tui_help", (r"rx:^tui help$",), "tui_guidance",
+    help_text="Terminal UI guidance (read-only).")
+_CL("cli_console_root", (r"rx:^console$",), "console_guidance",
+    help_text="Terminal/console guidance (read-only).")
+_CL("cli_console_help", (r"rx:^console help$",), "console_guidance",
+    help_text="Terminal/console guidance (read-only).")
+_CL("cli_mic_help", (r"rx:^mic help$",), "mic_guidance",
+    help_text="Microphone-test guidance (the capture itself stays CLI-only).")
 
 
 # ------------------------------------------------- wave 4: plugin fleet

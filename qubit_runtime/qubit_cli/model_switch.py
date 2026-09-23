@@ -357,7 +357,7 @@ def resolve_startup_model_route(
     custom_providers: Optional[list] = None) -> Optional[StartupModelRoute]:
     """Resolve aliases and configured ``provider/model`` input at startup.
 
-    ``HermesCLI`` is constructed before the interactive ``/model`` pipeline runs; resolving here
+    ``QubitCLI`` is constructed before the interactive ``/model`` pipeline runs; resolving here
     keeps startup from attaching the configured default provider to an explicitly requested
     model. ``provider/model`` strings are consumed only for providers present in user config. When
     ``current_provider`` is a routing aggregator and the raw string is an aggregator-native slug

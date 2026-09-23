@@ -1976,7 +1976,7 @@ def _resolve_qubit_argv() -> list[str]:
     same-directory file), then ``which("hermes")`` (Windows: safe PATH search,
     batch shims fall back to the module form), then ``sys.executable -m
     qubit_cli.main`` for shim-less environments (cron, systemd ``User=``,
-    launchd). Mirrors ``gateway.run._resolve_hermes_bin``; local because
+    launchd). Mirrors ``gateway.run._resolve_qubit_bin``; local because
     ``qubit_cli`` sits below ``gateway`` in the dependency order.
     """
     import shutil
@@ -1990,7 +1990,7 @@ def _resolve_qubit_argv() -> list[str]:
             return _qubit_path_argv(resolved_env_bin)
         return _module_qubit_argv()
 
-    qubit_bin = _safe_which_no_cwd("hermes") if _kb._IS_WINDOWS else shutil.which("hermes")
+    qubit_bin = _safe_which_no_cwd("qubit") if _kb._IS_WINDOWS else shutil.which("qubit")
     if qubit_bin:
         return _qubit_path_argv(qubit_bin)
     return _module_qubit_argv()

@@ -624,7 +624,7 @@ def _cleanup_pending_shim_renames(scripts_dir: Path) -> int:
 
 
 def _restore_quarantined_exes(moved: list[tuple[Path, Path]]) -> None:
-    """Roll back ``_quarantine_running_hermes_exe`` if uv didn't write replacements. Safety-
+    """Roll back ``_quarantine_running_qubit_exe`` if uv didn't write replacements. Safety-
     critical: a failed quarantine only aborts an update; a failed restore leaves no ``qubit``
     on PATH. Delegates to the stdlib-only retrying helper shared with ``_install_repair``.
 

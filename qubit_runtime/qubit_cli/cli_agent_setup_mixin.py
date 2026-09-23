@@ -1,4 +1,4 @@
-"""Agent construction + session-resume display for ``HermesCLI``: credential resolution,
+"""Agent construction + session-resume display for ``QubitCLI``: credential resolution,
 per-turn agent config, first-use build, resume preload + recap. ``cli.py`` helpers are
 imported lazily inside each method (import cycle)."""
 
@@ -172,7 +172,7 @@ def _resume_panel_colors() -> tuple:
 
 
 class CLIAgentSetupMixin:
-    """Agent construction + session-resume display methods for ``HermesCLI``."""
+    """Agent construction + session-resume display methods for ``QubitCLI``."""
 
     def _ensure_runtime_credentials(self) -> bool:
         """Re-resolve provider credentials before agent use so key rotation / token

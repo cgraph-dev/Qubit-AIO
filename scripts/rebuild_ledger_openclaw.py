@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate ``docs/archive/2026-09-21/QUBIT_GAP_LEDGER.openclaw.json`` deterministically.
+"""Regenerate ``docs/generated/QUBIT_GAP_LEDGER.openclaw.json`` deterministically.
 
 The upstream section is *evidence based*: every claim in the ledger is checked
 against the real code and a behavioural test on disk, and a row is never
@@ -75,7 +75,7 @@ _STOP = {
 # ---------------------------------------------------------------------------
 # upstream extension map
 # ---------------------------------------------------------------------------
-# The direct source inventory (docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json, agent A)
+# The direct source inventory (docs/generated/QUBIT_SOURCE_INVENTORY.json, agent A)
 # enumerates 154 ``extensions/*`` plugins. They are NOT 154 independent
 # capabilities: almost all are model/provider/transport plugins that either
 # ride an existing audited capability row or are a deliberate typed credential/
@@ -91,7 +91,15 @@ _STOP = {
 EXTENSION_DISPOSITIONS = ("parent", "gate", "distinct")
 EXTENSION_NEEDS = ("none", "creds", "hardware", "owner")
 
-_INVENTORY_PATH = ROOT / "docs/archive/2026-09-21" / "QUBIT_SOURCE_INVENTORY.json"
+# Canonical generated source inventory (Owner decision #24). The audited
+# extension map below is a *frozen* contract pinned to v2026.9.4 (154
+# extensions); the canonical inventory tracks the current OpenClaw pin, which
+# no longer carries that exact set. The frozen contract therefore reads the
+# generated inventory first and, only when it does not carry the frozen
+# extension set, falls back to the archive copy read-only so the map is never
+# silently mis-scored.
+GENERATED_INVENTORY = ROOT / "docs/generated" / "QUBIT_SOURCE_INVENTORY.json"
+FROZEN_INVENTORY = ROOT / "docs/archive/2026-09-21" / "QUBIT_SOURCE_INVENTORY.json"
 
 
 def _ext(disposition: str, parent: str, gate: str, needs: str, detail: str,
@@ -444,20 +452,41 @@ def wave5_summary() -> Dict[str, object]:
     }
 
 
+def _extension_inventory_names(path: Path) -> set:
+    """Read-only set of ``openclaw_extension`` names in an inventory file."""
+    try:
+        inventory = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return set()
+    names = {str(it.get("name") or "") for it in inventory.get("items", [])
+             if isinstance(it, dict)
+             and it.get("category") == "openclaw_extension"}
+    names.discard("")
+    return names
+
+
+def _inventory_path() -> Optional[Path]:
+    """Resolve the extension cross-check inventory, generated-first.
+
+    The canonical generated inventory is used when it carries exactly the
+    frozen extension set; otherwise the archive copy is read read-only as the
+    frozen v2026.9.4 contract source. ``None`` when neither is usable.
+    """
+    expected = set(EXTENSION_MAP)
+    for candidate in (GENERATED_INVENTORY, FROZEN_INVENTORY):
+        if candidate.is_file() and _extension_inventory_names(candidate) == expected:
+            return candidate
+    return None
+
+
 def extension_map_summary() -> Dict[str, object]:
     """Deterministic counts + coverage of the upstream extension map."""
     by_disposition = Counter(v["disposition"] for v in EXTENSION_MAP.values())
     by_needs = Counter(v["needs"] for v in EXTENSION_MAP.values())
     unexplained: List[str] = []
-    if _INVENTORY_PATH.is_file():
-        try:
-            inventory = json.loads(_INVENTORY_PATH.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            inventory = {}
-        names = {str(it.get("name") or "") for it in inventory.get("items", [])
-                 if isinstance(it, dict)
-                 and it.get("category") == "openclaw_extension"}
-        names.discard("")
+    inventory_path = _inventory_path()
+    if inventory_path is not None:
+        names = _extension_inventory_names(inventory_path)
         unexplained = sorted(names ^ set(EXTENSION_MAP))
     return {
         "total": len(EXTENSION_MAP),

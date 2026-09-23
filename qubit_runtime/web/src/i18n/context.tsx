@@ -72,7 +72,10 @@ export const LOCALE_META: Record<Locale, { name: string }> = {
 };
 
 const SUPPORTED_LOCALES = Object.keys(TRANSLATIONS) as Locale[];
-const STORAGE_KEY = "hermes-locale";
+const STORAGE_KEY = "qubit-locale";
+/** Pre-rebrand key, migrated one-time on first read so existing users keep
+ *  their saved locale. */
+const LEGACY_STORAGE_KEY = "hermes-locale";
 
 function isLocale(value: string): value is Locale {
   return (SUPPORTED_LOCALES as string[]).includes(value);
@@ -80,7 +83,15 @@ function isLocale(value: string): value is Locale {
 
 function getInitialLocale(): Locale {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    let stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === null) {
+      const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (legacy !== null) {
+        localStorage.setItem(STORAGE_KEY, legacy);
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
+        stored = legacy;
+      }
+    }
     if (stored && isLocale(stored)) return stored;
   } catch {
     // SSR or privacy mode

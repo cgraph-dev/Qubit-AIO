@@ -300,7 +300,7 @@ def _install_skin_light_mode_hook() -> None:
         from qubit_cli.skin_engine import SkinConfig  # type: ignore[import]
     except Exception:
         return
-    if getattr(SkinConfig, "_hermes_light_mode_hook_installed", False):
+    if getattr(SkinConfig, "_qubit_light_mode_hook_installed", False):
         return
     _orig_get_color = SkinConfig.get_color
 
@@ -312,7 +312,7 @@ def _install_skin_light_mode_hook() -> None:
             return value
 
     SkinConfig.get_color = _wrapped_get_color  # type: ignore[method-assign]
-    SkinConfig._hermes_light_mode_hook_installed = True  # type: ignore[attr-defined]
+    SkinConfig._qubit_light_mode_hook_installed = True  # type: ignore[attr-defined]
 
 
 class _SkinAwareAnsi:

@@ -1,8 +1,11 @@
 """OpenClaw extension map — coverage and typed-gate proving test.
 
-The direct source inventory (``docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json``) enumerates
-154 OpenClaw ``extensions/*`` plugins. Agent D maps every one of them to
-either
+The direct source inventory enumerates the pinned OpenClaw ``extensions/*``
+plugins (154 at the frozen v2026.9.4 audit pin). The canonical generated
+inventory tracks the current OpenClaw pin, whose manifests no longer carry the
+category metadata the frozen map depends on, so the frozen audit inventory is
+read read-only through the generator's own resolver. Agent D maps every one of
+them to either
 
 * (a) an existing audited capability row (``disposition == "parent"``),
 * (b) a credential/provider/transport gate with a typed reason
@@ -30,8 +33,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-INVENTORY_PATH = REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_SOURCE_INVENTORY.json"
-SECTION_PATH = REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_GAP_LEDGER.openclaw.json"
+SECTION_PATH = REPO_ROOT / "docs/generated" / "QUBIT_GAP_LEDGER.openclaw.json"
 
 _TYPED_CODE_RE = re.compile(r"^[A-Z][A-Z0-9_]{3,}$")
 
@@ -49,7 +51,9 @@ rebuild = _load_module("rebuild_ledger_openclaw_extmap",
 
 
 def _inventory_extensions() -> dict:
-    data = json.loads(INVENTORY_PATH.read_text(encoding="utf-8"))
+    path = rebuild._inventory_path()
+    assert path is not None, "no resolvable OpenClaw extension inventory"
+    data = json.loads(path.read_text(encoding="utf-8"))
     return {str(it.get("name")): it for it in data.get("items", [])
             if isinstance(it, dict)
             and it.get("category") == "openclaw_extension"}

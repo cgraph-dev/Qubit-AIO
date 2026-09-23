@@ -331,7 +331,7 @@ def _ensure_tui_node() -> None:
     """Ensure `node` + `npm` are on PATH: else run node-bootstrap.sh `ensure_node` and prepend
     the resolved node dir to PATH. ``QUBIT_SKIP_NODE_BOOTSTRAP=1`` (alias
     ``HERMES_SKIP_NODE_BOOTSTRAP``) disables auto-install. The helper installs under the
-    Qubit-owned node root, never the Hermes-home default."""
+    Qubit-owned node root, never the Qubit-home default."""
     from qubit_cli.main import PROJECT_ROOT
     if shutil.which("node") and shutil.which("npm"):
         return

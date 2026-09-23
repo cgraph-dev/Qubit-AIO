@@ -1,5 +1,5 @@
 """Simple slash-command wrappers plus goal/heartbeat/loop manager hooks for the interactive CLI.
-Mixin on ``HermesCLI``; cli.py symbols are imported lazily inside methods (import cycle)."""
+Mixin on ``QubitCLI``; cli.py symbols are imported lazily inside methods (import cycle)."""
 
 from __future__ import annotations
 

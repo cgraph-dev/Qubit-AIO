@@ -261,7 +261,7 @@ def run_oneshot(
 
 
 def _create_session_db_for_oneshot():
-    """Best-effort SessionDB — oneshot bypasses ``HermesCLI._init_agent()``, so it must wire the
+    """Best-effort SessionDB — oneshot bypasses ``QubitCLI._init_agent()``, so it must wire the
     SQLite store itself or ``session_search`` is advertised but always unavailable."""
     try:
         from qubit_state import SessionDB

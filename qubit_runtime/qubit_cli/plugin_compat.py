@@ -311,7 +311,7 @@ _log = __import__("logging").getLogger(__name__)
 
 
 def warn_once(facade: str, name: str, target_module: str, target_name: str) -> None:
-    """Per-name record that a moved name was resolved through its old path: a ``HermesPluginCompatWarning``
+    """Per-name record that a moved name was resolved through its old path: a ``QubitPluginCompatWarning``
     (so ``-W error`` catches it in tests and plugin authors' CI) plus a WARNING log line (agent.log /
     gateway.log). The interactive CLI hides the warning category from stderr (:func:`quiet_for_interactive`)
     because its banner carries the user-facing message with the plugin NAME, which this call site cannot know."""
@@ -328,7 +328,7 @@ def warn_once(facade: str, name: str, target_module: str, target_name: str) -> N
 
 def quiet_for_interactive() -> None:
     """Called by the interactive CLI before plugin discovery: the banner notice replaces raw stderr warnings.
-    Appends (does not override) so an explicit ``-W error::...HermesPluginCompatWarning`` still wins."""
+    Appends (does not override) so an explicit ``-W error::...QubitPluginCompatWarning`` still wins."""
     if not any(a == "error" and c is not None and issubclass(QubitPluginCompatWarning, c)
                for a, _m, c, _mod, _l in warnings.filters):
         warnings.filterwarnings("ignore", category=QubitPluginCompatWarning, append=True)

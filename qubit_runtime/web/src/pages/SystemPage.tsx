@@ -1308,7 +1308,7 @@ export default function SystemPage() {
                   id="import-path"
                   value={importPath}
                   onChange={(e) => setImportPath(e.target.value)}
-                  placeholder="$QUBIT_HOME/backups/hermes-backup.zip"
+                  placeholder="$QUBIT_HOME/backups/qubit-backup.zip"
                 />
               </div>
               <Button

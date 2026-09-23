@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-COMMITTED = REPO / "docs/archive/2026-09-21/QUBIT_CONFIG_BINDING_MANIFEST.json"
+COMMITTED = REPO / "docs/generated/QUBIT_CONFIG_BINDING_MANIFEST.json"
 GENERATOR = REPO / "scripts/config_binding_manifest.py"
 
 _SECRET_VALUE_RE = re.compile(
@@ -39,7 +39,7 @@ def _committed() -> dict:
 def test_committed_manifest_is_current():
     assert COMMITTED.is_file(), COMMITTED
     assert _committed() == _build(), (
-        "docs/archive/2026-09-21/QUBIT_CONFIG_BINDING_MANIFEST.json is stale; regenerate with "
+        "docs/generated/QUBIT_CONFIG_BINDING_MANIFEST.json is stale; regenerate with "
         "`python scripts/config_binding_manifest.py`")
 
 

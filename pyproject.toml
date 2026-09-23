@@ -221,13 +221,12 @@ path = "scripts/hatch_build_qubit.py"
 "qubit_runtime/utils.py" = "voicebridge/_data/qubit_runtime/utils.py"
 "qubit_runtime/LICENSE" = "voicebridge/_data/qubit_runtime/LICENSE"
 "qubit_runtime/pyproject.toml" = "voicebridge/_data/qubit_runtime/pyproject.toml"
-# ``qubit_runtime.status()`` reads the provenance manifest from
-# ``<site-packages>/docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json`` (see
-# voicebridge/qubit_runtime.manifest_path()); ship it at that path so a clean
-# install reports upstream_revision/patched/file_count. The source moved under
-# docs/archive/2026-09-21/ in the docs reorg; the installed destination is
-# unchanged.
-"docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json" = "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"
+# ``qubit_runtime.status()`` reads the provenance manifest from the canonical
+# generated location (docs/generated/) with the frozen archive as read-only
+# fallback (see voicebridge/qubit_runtime.manifest_path()); ship the canonical
+# manifest at the archive destination so a clean install reports
+# upstream_revision/patched/file_count.
+"docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json" = "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"
 # Wave 5: ship the small, secret-free matrices/docs that install-time code
 # reads. They land under package data so the resolver can reach them with the
 # installed path preferred and the checkout as fallback. voicebridge/

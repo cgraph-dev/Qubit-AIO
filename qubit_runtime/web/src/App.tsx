@@ -367,7 +367,10 @@ function buildRoutes(
   return routes;
 }
 
-const SIDEBAR_COLLAPSED_KEY = "hermes-sidebar-collapsed";
+const SIDEBAR_COLLAPSED_KEY = "qubit-sidebar-collapsed";
+/** Pre-rebrand key, migrated one-time on first read so existing users keep
+ *  their saved sidebar state. */
+const LEGACY_SIDEBAR_COLLAPSED_KEY = "hermes-sidebar-collapsed";
 
 export default function App() {
   const { t } = useI18n();
@@ -379,7 +382,15 @@ export default function App() {
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
-      return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+      const current = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+      if (current !== null) return current === "true";
+      const legacy = localStorage.getItem(LEGACY_SIDEBAR_COLLAPSED_KEY);
+      if (legacy !== null) {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, legacy);
+        localStorage.removeItem(LEGACY_SIDEBAR_COLLAPSED_KEY);
+        return legacy === "true";
+      }
+      return false;
     } catch {
       return false;
     }
@@ -666,7 +677,7 @@ export default function App() {
 
               {sidebarNav.pluginItems.length > 0 && (
                 <div
-                  aria-labelledby="hermes-sidebar-plugin-nav-heading"
+                  aria-labelledby="qubit-sidebar-plugin-nav-heading"
                   className="flex flex-col border-t border-current/10 pb-2"
                   role="group"
                 >
@@ -676,7 +687,7 @@ export default function App() {
                       "font-sans text-display text-xs tracking-[0.12em] text-text-tertiary",
                       isDesktopCollapsed && "lg:hidden",
                     )}
-                    id="hermes-sidebar-plugin-nav-heading"
+                    id="qubit-sidebar-plugin-nav-heading"
                   >
                     {t.app.pluginNavSection}
                   </span>
@@ -1098,7 +1109,7 @@ function SidebarSystemActions({
       onCancel={() => setUpdateConfirmOpen(false)}
       onConfirm={confirmUpdate}
       open={updateConfirmOpen}
-      title={t.status.updateQubitConfirmTitle ?? `${t.status.updateHermes}?`}
+      title={t.status.updateQubitConfirmTitle ?? `${t.status.updateQubit}?`}
     />
     </>
   );

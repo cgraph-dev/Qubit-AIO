@@ -288,8 +288,8 @@ export const ar = defineLocale({
     providersHint:
       "يكتب memory.provider (فارغ = مدمج) و context.engine إلى config.yaml. يسري في الجلسة التالية.",
     refreshDashboard: "إعادة فحص امتدادات لوحة التحكم",
-    removeConfirm: "إزالة هذا المكوِّن الإضافي من ~/.hermes/plugins/؟",
-    removeHint: "يمكن إزالة المكوِّنات المثبتة من المستخدم تحت ~/.hermes/plugins فقط.",
+    removeConfirm: "إزالة هذا المكوِّن الإضافي من $QUBIT_HOME/plugins/؟",
+    removeHint: "يمكن إزالة المكوِّنات المثبتة من المستخدم تحت $QUBIT_HOME/plugins فقط.",
     rescanHeading: "سجل مكوِّنات SPA",
     rescanHint: "أعد الفحص بعد إضافة ملفات على القرص لتمكن الشريط الجانبي من التقاط المخطوطات الجديدة.",
     runtimeHeading: "وقت تشغيل البوابة (مكوِّنات YAML)",
@@ -311,7 +311,7 @@ export const ar = defineLocale({
     all: "الكل",
     categories: "الفئات",
     filters: "الفلاتر",
-    noSkills: "لم يُعثر على مهارات. يتم تحميل المهارات من ~/.hermes/skills/",
+    noSkills: "لم يُعثر على مهارات. يتم تحميل المهارات من ~/.qubit/skills/",
     noSkillsMatch: "لا توجد مهارات تطابق بحثك أو الفلاتر.",
     skillCount: "{count} مهارة{s}",
     resultCount: "{count} نتيجة{s}",
@@ -325,7 +325,7 @@ export const ar = defineLocale({
   },
 
   config: {
-    configPath: "~/.hermes/config.yaml",
+    configPath: "~/.qubit/config.yaml",
     filters: "الفلاتر",
     sections: "الأقسام",
     exportConfig: "تصدير الإعدادات كـ JSON",

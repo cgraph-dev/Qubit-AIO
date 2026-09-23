@@ -131,7 +131,7 @@ function normalizeWhatsAppMode(mode: unknown): "bot" | "self-chat" | null {
 
 export default function ChannelsPage() {
   const [platforms, setPlatforms] = useState<MessagingPlatform[]>([]);
-  const [envPath, setEnvPath] = useState("~/.hermes/.env");
+  const [envPath, setEnvPath] = useState("~/.qubit/.env");
   const [gatewayStartCommand, setGatewayStartCommand] = useState(
     "qubit gateway start",
   );
@@ -163,7 +163,7 @@ export default function ChannelsPage() {
       .getMessagingPlatforms()
       .then((res) => {
         setPlatforms(res.platforms);
-        setEnvPath(res.env_path || "~/.hermes/.env");
+        setEnvPath(res.env_path || "~/.qubit/.env");
         setGatewayStartCommand(res.gateway_start_command || "qubit gateway start");
       })
       .catch((e) => showToast(`Error: ${e}`, "error"));

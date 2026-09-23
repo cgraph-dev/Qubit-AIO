@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate ``docs/archive/2026-09-21/QUBIT_GAP_LEDGER.qubit.json`` deterministically.
+"""Regenerate ``docs/generated/QUBIT_GAP_LEDGER.qubit.json`` deterministically.
 
 The Qubit gap-ledger section is *evidence based*: a row is only reported
 ``IMPLEMENTED`` when
@@ -50,7 +50,7 @@ The output keeps the schema and exact row keys required by
 ``scripts/gap_ledger.py`` plus the provenance fields.
 
 The direct source inventory
-    ``docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json`` (agent A) is ingested last: every
+    ``docs/generated/QUBIT_SOURCE_INVENTORY.json`` (agent A) is ingested last: every
     non-evidence item is either matched to a real merged-ledger row, covered as
     a *parented surface* of an IMPLEMENTED parent capability (with no
     standalone row), or emitted as an explicit ``MISSING`` open row classified
@@ -1130,7 +1130,15 @@ def build_page_rows(index: TestIndex,
 # item is matched to a real ledger row (across all three sections) or recorded
 # as an explicit open row.  Absence/unreadability of the inventory is tolerated
 # and recorded in the section provenance, never treated as "complete".
-INVENTORY_PATH = ROOT / "docs/archive/2026-09-21" / "QUBIT_SOURCE_INVENTORY.json"
+GENERATED_DOCS = ROOT / "docs" / "generated"
+ARCHIVE_DOCS = ROOT / "docs" / "archive" / "2026-09-21"
+# Canonical generated source inventory (Owner decision #24). The frozen
+# all-terminal ledger contract is reconciled against the 2026-09-21 inventory;
+# when the canonical inventory would introduce unexplained surface omissions
+# (e.g. the re-pinned OpenClaw manifests dropped their category metadata), the
+# archive copy is read read-only as an explicit frozen-contract fallback.
+INVENTORY_PATH = GENERATED_DOCS / "QUBIT_SOURCE_INVENTORY.json"
+ARCHIVE_INVENTORY_PATH = ARCHIVE_DOCS / "QUBIT_SOURCE_INVENTORY.json"
 OTHER_SECTIONS = ("hermes", "openclaw")
 # Cross-cutting evidence surfaces (i18n/locale keys, upstream tests) are
 # counted but are not standalone capability rows (mirrors source_inventory.py).
@@ -1214,7 +1222,7 @@ def _resolve_parent_id(parent_id: str,
 
 
 def load_source_inventory(path: Optional[Path] = None) -> Dict[str, object]:
-    """Tolerant reader for ``docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json``.
+    """Tolerant reader for ``docs/generated/QUBIT_SOURCE_INVENTORY.json``.
 
     Never raises.  A missing, malformed, or schema-shifted inventory yields a
     report whose ``present``/``error`` fields record exactly what happened and
@@ -1633,6 +1641,13 @@ def _finalize_terminal_statuses(rows: List[Dict[str, str]]) -> List[Dict[str, st
     return rows
 
 
+def _docs_dir() -> Path:
+    """Canonical generated ledger sections, archive read-only fallback."""
+    if (GENERATED_DOCS / "QUBIT_GAP_LEDGER.hermes.json").is_file():
+        return GENERATED_DOCS
+    return ARCHIVE_DOCS
+
+
 def build_ledger(inventory_path: Optional[Path] = None) -> Dict[str, object]:
     tree = _parser_tree()
     index = build_test_index()
@@ -1645,13 +1660,21 @@ def build_ledger(inventory_path: Optional[Path] = None) -> Dict[str, object]:
             build_page_rows(index))
 
     inventory = load_source_inventory(inventory_path)
-    known_ids = {r["id"] for r in rows} | _load_section_ids(
-        ROOT / "docs" / "archive" / "2026-09-21")
+    docs_dir = _docs_dir()
+    known_ids = {r["id"] for r in rows} | _load_section_ids(docs_dir)
     known_status = {r["id"]: r["status"] for r in rows}
-    known_status.update(_load_section_status(
-        ROOT / "docs" / "archive" / "2026-09-21"))
+    known_status.update(_load_section_status(docs_dir))
     inventory_rows, inventory_summary = build_inventory_rows(
         inventory, known_ids, known_status)
+    if (inventory_path is None
+            and inventory_summary.get("unexplained_omissions")
+            and ARCHIVE_INVENTORY_PATH.is_file()):
+        # Explicit frozen-contract fallback: the canonical generated inventory
+        # is not reconciled to the all-terminal ledger (surface omissions), so
+        # the archive copy is read read-only to keep the frozen contract exact.
+        inventory = load_source_inventory(ARCHIVE_INVENTORY_PATH)
+        inventory_rows, inventory_summary = build_inventory_rows(
+            inventory, known_ids, known_status)
     rows = _finalize_terminal_statuses(rows + inventory_rows)
 
     no_backend = [r["id"] for r in rows
@@ -1711,7 +1734,7 @@ def build_ledger(inventory_path: Optional[Path] = None) -> Dict[str, object]:
             "tests/ (AST caller evidence)",
             "frontend/qubit-app/plugins/*/manifest.json",
             "frontend/qubit-web/src/pages/*.tsx",
-            "docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json (direct source inventory, agent A)",
+            "docs/generated/QUBIT_SOURCE_INVENTORY.json (direct source inventory, agent A)",
         ],
         "generated_from": {
             "voice_commands.REGISTRY": len(VC.REGISTRY),
@@ -1766,7 +1789,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument(
         "--inventory", default=None,
         help=("direct source inventory JSON (default: "
-              "docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json; absent is tolerated)"))
+              "docs/generated/QUBIT_SOURCE_INVENTORY.json; absent is tolerated)"))
     args = parser.parse_args(argv)
 
     data = build_ledger(Path(args.inventory) if args.inventory else None)

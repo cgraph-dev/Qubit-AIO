@@ -1726,7 +1726,7 @@ def cmd_chat(args):
     except ImportError as e:
         # Mixed-version installs (new cli.py, older qubit_cli.config) crash
         # here — e.g. missing resolve_turn_limit / split_model_config_default
-        # (#96900). The agent-setup mixin prints this hint too late: HermesCLI
+        # (#96900). The agent-setup mixin prints this hint too late: QubitCLI
         # construction already failed. Fast-chat launch also goes through
         # cmd_chat, so this one catch covers `qubit` / `qubit chat`.
         from qubit_constants import emit_partial_update_hint
@@ -3326,7 +3326,7 @@ def main():
         pass
 
     # Sweep stale ``hermes.exe.old.*`` quarantine files from previous Windows
-    # updates (see ``_quarantine_running_hermes_exe``). No-op elsewhere.
+    # updates (see ``_quarantine_running_qubit_exe``). No-op elsewhere.
     try:
         _cleanup_quarantined_exes()
     except Exception:

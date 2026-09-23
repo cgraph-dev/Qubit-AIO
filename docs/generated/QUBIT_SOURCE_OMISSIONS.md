@@ -16,9 +16,9 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 - Parented surfaces needing parent closure (parent not IMPLEMENTED): **4**
 - Parented surfaces covered by an IMPLEMENTED parent: **1002**
 - Distinct capabilities total: **884**; parented surfaces total: **1006**
-- Fork-runtime dispositions (tools/skills/plugins): **174** (IMPLEMENTED 152, GATED 22)
+- Fork-runtime dispositions (tools/skills/plugins): **174** (IMPLEMENTED 153, GATED 21)
 - Ledger IMPLEMENTED rows with unreproducible evidence: **0**
-- Hermes byte diff vs `qubit_runtime/`: upstream=14733 local=12425 identical=4896 missing=3151 extra=843 changed=6686
+- Hermes byte diff vs `qubit_runtime/`: upstream=14733 local=12846 identical=5092 missing=2730 extra=843 changed=6911
 
 ### Omission counts by category (all uncovered)
 
@@ -401,7 +401,7 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 - `plugin:video_gen` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
 - `plugin:web` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
 
-### `fork_skill_runtime` (35; IMPLEMENTED 34, GATED 1)
+### `fork_skill_runtime` (35; IMPLEMENTED 35, GATED 0)
 
 - `skill:optional-skills/autonomous-ai-agents` — **IMPLEMENTED**; backend `qubit_runtime.skills`; vendored under qubit_runtime/ with a loadable SKILL.md for optional-skills/autonomous-ai-agents; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
 - `skill:optional-skills/blockchain` — **IMPLEMENTED**; backend `qubit_runtime.skills`; vendored under qubit_runtime/ with a loadable SKILL.md for optional-skills/blockchain; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
@@ -422,7 +422,7 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 - `skill:optional-skills/research` — **IMPLEMENTED**; backend `qubit_runtime.skills`; vendored under qubit_runtime/ with a loadable SKILL.md for optional-skills/research; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
 - `skill:optional-skills/security` — **IMPLEMENTED**; backend `qubit_runtime.skills`; vendored under qubit_runtime/ with a loadable SKILL.md for optional-skills/security; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
 - `skill:optional-skills/smart-home` — **IMPLEMENTED**; backend `qubit_runtime.skills`; vendored under qubit_runtime/ with a loadable SKILL.md for optional-skills/smart-home; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
-- `skill:optional-skills/social-media` — **GATED**; backend `—`; vendored skill path 'optional-skills/social-media' has no loadable SKILL.md (cache/asset directory), so no skill runtime surface exists.
+- `skill:optional-skills/social-media` — **IMPLEMENTED**; backend `qubit_runtime.skills`; vendored under qubit_runtime/ with a loadable SKILL.md for optional-skills/social-media; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
 - `skill:optional-skills/software-development` — **IMPLEMENTED**; backend `qubit_runtime.skills`; vendored under qubit_runtime/ with a loadable SKILL.md for optional-skills/software-development; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
 - `skill:optional-skills/web-development` — **IMPLEMENTED**; backend `qubit_runtime.skills`; vendored under qubit_runtime/ with a loadable SKILL.md for optional-skills/web-development; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
 - `skill:optional-skills/yuanbao` — **IMPLEMENTED**; backend `qubit_runtime.skills`; vendored under qubit_runtime/ with a loadable SKILL.md for optional-skills/yuanbao; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`

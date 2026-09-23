@@ -269,7 +269,7 @@ def _qubit_path_markers(qubit_home: Path, *, include_managed_bin: bool = False) 
 
 
 def remove_path_from_windows_registry(qubit_home: Path, *, include_managed_bin: bool = False) -> list[str]:
-    """Strip Qubit-owned entries from User-scope PATH in the registry (see ``_hermes_path_markers``)."""
+    """Strip Qubit-owned entries from User-scope PATH in the registry (see ``_qubit_path_markers``)."""
     markers = tuple(m.lower() for m in _qubit_path_markers(qubit_home, include_managed_bin=include_managed_bin))
 
     def edit(winreg, key, removed):

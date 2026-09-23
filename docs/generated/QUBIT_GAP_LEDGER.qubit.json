@@ -14,7 +14,7 @@
   "tests/ (AST caller evidence)",
   "frontend/qubit-app/plugins/*/manifest.json",
   "frontend/qubit-web/src/pages/*.tsx",
-  "docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json (direct source inventory, agent A)"
+  "docs/generated/QUBIT_SOURCE_INVENTORY.json (direct source inventory, agent A)"
  ],
  "generated_from": {
   "voice_commands.REGISTRY": 511,

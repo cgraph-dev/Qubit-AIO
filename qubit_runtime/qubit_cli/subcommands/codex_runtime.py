@@ -14,7 +14,7 @@ import json
 
 
 def cmd_codex_runtime_migrate(args: argparse.Namespace) -> int:
-    """Project Hermes MCP servers (+ codex plugins) into ~/.codex/config.toml; 1 on any error."""
+    """Project Qubit MCP servers (+ codex plugins) into ~/.codex/config.toml; 1 on any error."""
     from qubit_cli.codex_runtime_plugin_migration import migrate
     from qubit_cli.config import load_config
 
@@ -34,12 +34,12 @@ def build_codex_runtime_parser(subparsers) -> None:
         "codex-runtime", help="Manage the optional codex app-server runtime (migrate MCP config)",
         description="Noninteractive counterpart of the /codex-runtime slash command. Toggling the "
             "runtime itself stays in the chat command (`/codex-runtime on|off`); `migrate` "
-            "re-projects Hermes' mcp_servers + installed codex plugins into the managed block of "
+            "re-projects Qubit's mcp_servers + installed codex plugins into the managed block of "
             "~/.codex/config.toml for the selected profile.")
     actions = parser.add_subparsers(dest="codex_runtime_action")
     migrate_parser = actions.add_parser(
         "migrate", help="Regenerate the hermes-managed block in codex's config.toml",
-        description="Idempotent: replaces the managed block, keeps user text verbatim, skips Hermes "
+        description="Idempotent: replaces the managed block, keeps user text verbatim, skips Qubit "
             "servers whose name the user already declares outside the block, validates the result "
             "as TOML before writing atomically.")
     migrate_parser.add_argument(

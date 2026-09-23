@@ -1,4 +1,4 @@
-"""Billing and subscription handlers for the interactive CLI (mixed into ``HermesCLI``).
+"""Billing and subscription handlers for the interactive CLI (mixed into ``QubitCLI``).
 cli.py symbols are imported LAZILY inside methods — never at module load (import cycle)."""
 
 from __future__ import annotations

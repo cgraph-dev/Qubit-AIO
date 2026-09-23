@@ -1768,7 +1768,7 @@ def _provider_env_base_url(pconfig: ProviderConfig) -> str:
 
 
 def _provider_is_keyless(provider_id: str) -> bool:
-    """HermesOverlay keyless flag — the same source the provider catalog and GUI contract tests use."""
+    """QubitOverlay keyless flag — the same source the provider catalog and GUI contract tests use."""
     try:
         from qubit_cli.providers import QUBIT_OVERLAYS
         return bool(getattr(QUBIT_OVERLAYS.get(provider_id), "keyless", False))

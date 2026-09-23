@@ -19,11 +19,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 FORK = REPO_ROOT / "qubit_runtime"
-PIN = "2237be355906fbe6065ce1815711eee52b2d646e"
-# The docs reorg (2026-09-21) moved the source manifest under the archive while
-# the installed destination (read by qubit_runtime from <site-packages>/docs/)
-# is unchanged.
-MANIFEST_SOURCE_REL = "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"
+PIN = "d337b736aa1e8ebecfab043842d13e4a2d2f48a3"
+# Canonical location (docs/generated/); the frozen archive is read-only lineage.
+MANIFEST_SOURCE_REL = "docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json"
 MANIFEST_INSTALLED_REL = "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"
 
 WHEEL_PREFIX = "voicebridge/_data/qubit_runtime"

@@ -1,11 +1,11 @@
 """Model picker, /model switch application, runtime snapshot/restore, and codex runtime handling for the interactive CLI
 
-Mixin split out of ``cli.py``; bound onto ``HermesCLI`` via the MRO. cli.py-internal
+Mixin split out of ``cli.py``; bound onto ``QubitCLI`` via the MRO. cli.py-internal
 symbols are imported LAZILY inside each method (``from cli import ...``) — the mixin
 never imports ``cli`` at module load time (import cycle).
 
 Tests drive the switch paths with bare stubs lacking most mixin methods, so shared steps are
-module-level functions taking ``cli`` and siblings are called as ``HermesCLI.<name>(self, ...)``.
+module-level functions taking ``cli`` and siblings are called as ``QubitCLI.<name>(self, ...)``.
 """
 
 from __future__ import annotations

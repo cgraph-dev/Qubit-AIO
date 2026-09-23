@@ -1,7 +1,7 @@
 """Informational views and reload flows for the interactive CLI: banner, help, tools, usage,
 insights, MCP/skills reload, bang shell.
 
-Mixin split out of ``cli.py``; bound onto ``HermesCLI`` via the MRO. cli.py-internal symbols are
+Mixin split out of ``cli.py``; bound onto ``QubitCLI`` via the MRO. cli.py-internal symbols are
 imported LAZILY inside each method — the mixin never imports ``cli`` at module load time (cycle).
 """
 

@@ -52,7 +52,7 @@ ARTIFACT_ONLY_TESTS = {
     "test_compat_handler_reachability.py",
     "test_route_ownership_matrix.py",
     # Guards the generated config/env binding manifest
-    # (scripts/config_binding_manifest.py -> docs/archive/2026-09-21/QUBIT_CONFIG_BINDING_MANIFEST.json)
+    # (scripts/config_binding_manifest.py -> docs/generated/QUBIT_CONFIG_BINDING_MANIFEST.json)
     # by loading the generator by path; it does not import production modules.
     "test_config_binding_manifest_d3.py",
     # Loads the differential-parity runner (scripts/differential_parity.py) by

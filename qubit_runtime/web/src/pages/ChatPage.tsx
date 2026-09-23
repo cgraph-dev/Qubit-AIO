@@ -310,13 +310,15 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
 
   // Collapse toggle for the desktop chat side panel (model + sessions),
   // persisted in localStorage so the choice survives reloads.
-  const [chatPanelCollapsed, setChatPanelCollapsed] = useState(
-    () => localStorage.getItem("hermes-chat-panel-collapsed") === "1",
-  );
+  const [chatPanelCollapsed, setChatPanelCollapsed] = useState(() => {
+    const current = localStorage.getItem("qubit-chat-panel-collapsed");
+    if (current !== null) return current === "1";
+    return localStorage.getItem("hermes-chat-panel-collapsed") === "1";
+  });
   const toggleChatPanel = useCallback(() => {
     setChatPanelCollapsed((prev) => {
       const next = !prev;
-      localStorage.setItem("hermes-chat-panel-collapsed", next ? "1" : "0");
+      localStorage.setItem("qubit-chat-panel-collapsed", next ? "1" : "0");
       return next;
     });
   }, []);
@@ -896,7 +898,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         term.loadAddon(webgl);
       } catch (err) {
         console.warn(
-          "[hermes-chat] WebGL renderer unavailable; falling back to default",
+          "[qubit-chat] WebGL renderer unavailable; falling back to default",
           err,
         );
       }
@@ -1839,7 +1841,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         >
           <div
             ref={hostRef}
-            className="hermes-chat-xterm-host min-h-0 min-w-0 flex-1"
+            className="qubit-chat-xterm-host min-h-0 min-w-0 flex-1"
           />
 
           {showReconnectOverlay && (

@@ -1,5 +1,5 @@
 """Terminal repaint/resize recovery, input-mode healing, and clipboard helpers for the interactive
-CLI. Mixin on ``HermesCLI``; cli.py symbols are imported lazily inside methods (import cycle)."""
+CLI. Mixin on ``QubitCLI``; cli.py symbols are imported lazily inside methods (import cycle)."""
 
 from __future__ import annotations
 
@@ -213,7 +213,7 @@ class CLITerminalMixin:
         Same-width SIGWINCH (tmux attach, GNOME tab bar, focus) and the first signal
         without a seeded baseline are left alone — 2J+replay against preserved scrollback
         duplicates ``_OUTPUT_HISTORY`` (#65293). tmux-attach's stale previous_screen is
-        handled by ``_hermes_call_output_screen_diff`` (#83874). Suppression is cleared by
+        handled by ``_qubit_call_output_screen_diff`` (#83874). Suppression is cleared by
         a debounced timer so the bar returns during idle; next-submit stays a fast path.
         """
         from cli import _replay_output_history

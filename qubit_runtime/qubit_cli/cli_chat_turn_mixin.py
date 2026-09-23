@@ -1,6 +1,6 @@
 """chat() and its per-turn phases: image routing, staging, agent thread, interrupt monitor, rendering.
 
-Mixin bound onto ``HermesCLI`` via the MRO. cli.py-internal symbols are imported LAZILY
+Mixin bound onto ``QubitCLI`` via the MRO. cli.py-internal symbols are imported LAZILY
 inside each method — importing ``cli`` at module load time would be a cycle.
 """
 
