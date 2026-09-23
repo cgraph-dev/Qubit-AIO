@@ -264,8 +264,19 @@ def boards_create(cfg: Any, slug: str, name: str = "",
         conn.close()
 
 
-def boards_list(cfg: Any) -> Dict[str, Any]:
-    """List boards with per-status counts (read-only)."""
+def boards_list(cfg: Any, *, limit: int = 0,
+                offset: int = 0) -> Dict[str, Any]:
+    """List boards with per-status counts (read-only, optionally pageable).
+
+    The reference returns every board (``hermes_cli/kanban_db.py:627
+    list_boards`` has no limit); ``limit=0`` keeps that default. A positive
+    ``limit`` plus ``offset`` is the additive Qubit paging extension, and
+    ``total``/``has_more`` stay honest for either mode.
+    """
+    if isinstance(offset, bool) or not isinstance(offset, int) or offset < 0:
+        raise KanbanError(BAD_INPUT_CODE, "offset must be a non-negative integer")
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 0:
+        raise KanbanError(BAD_INPUT_CODE, "limit must be a non-negative integer")
     conn = _connect(cfg)
     try:
         _migrate(conn)
@@ -280,7 +291,13 @@ def boards_list(cfg: Any) -> Dict[str, Any]:
                         "name": redact_spec(brow["name"]),
                         "project_slug": brow["project_slug"],
                         "counts": counts})
-        return {"state": "OK", "boards": out}
+        total = len(out)
+        if limit > 0:
+            page = out[offset:offset + min(limit, LIST_MAX)]
+        else:
+            page = out[offset:]
+        return {"state": "OK", "boards": page, "offset": offset,
+                "total": total, "has_more": offset + len(page) < total}
     finally:
         conn.close()
 
@@ -369,13 +386,21 @@ def create(cfg: Any, title: str, *, board: str = "main", body: str = "",
 
 
 def list_tasks(cfg: Any, *, board: str = "", status: str = "",
-               limit: int = LIST_DEFAULT) -> Dict[str, Any]:
-    """List tasks newest-first (read-only, bounded)."""
+               limit: int = LIST_DEFAULT, offset: int = 0) -> Dict[str, Any]:
+    """List tasks newest-first (read-only, bounded, pageable).
+
+    ``limit`` mirrors the reference's bounded listing
+    (``hermes_cli/kanban_db.py:1514 list_tasks`` — ``LIMIT`` only); ``offset``
+    is an additive Qubit extension so a dashboard can page a board without
+    changing the reference ordering (``id DESC``). ``total``/``has_more`` are
+    computed from the same filter so the caller never has to guess.
+    """
     limit = max(1, min(int(limit or LIST_DEFAULT), LIST_MAX))
+    if isinstance(offset, bool) or not isinstance(offset, int) or offset < 0:
+        raise KanbanError(BAD_INPUT_CODE, "offset must be a non-negative integer")
     conn = _connect(cfg)
     try:
         _migrate(conn)
-        query = "SELECT * FROM tasks"
         clauses, params = [], []
         if board:
             clauses.append("board=?")
@@ -388,13 +413,16 @@ def list_tasks(cfg: Any, *, board: str = "", status: str = "",
             params.append(status)
         else:
             clauses.append("status!='archived'")
-        if clauses:
-            query += " WHERE " + " AND ".join(clauses)
-        query += " ORDER BY id DESC LIMIT ?"
-        params.append(limit)
-        rows = conn.execute(query, params).fetchall()
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        total = conn.execute(
+            f"SELECT COUNT(*) c FROM tasks{where}", params).fetchone()["c"]
+        query = (f"SELECT * FROM tasks{where} ORDER BY id DESC "
+                 "LIMIT ? OFFSET ?")
+        rows = conn.execute(query, [*params, limit, offset]).fetchall()
         return {"state": "OK",
-                "tasks": [_task_dict(r) for r in rows], "limit": limit}
+                "tasks": [_task_dict(r) for r in rows], "limit": limit,
+                "offset": offset, "total": int(total),
+                "has_more": offset + len(rows) < int(total)}
     finally:
         conn.close()
 

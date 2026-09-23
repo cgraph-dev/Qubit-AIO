@@ -56,15 +56,15 @@ Every new or modernised skill — bundled, optional, or contributed — meets al
 
 No `offset`/`limit` pagination on skill-loading tools — the agent must read a skill fully (root).
 The salvage/modernisation checklist for external skill PRs is `references/new-skill-pr-salvage.md`
-in the `hermes-agent-dev` skill.
+in the `qubit-agent` skill.
 
 ## Curator (skill lifecycle)
 
 Background maintenance that tracks usage on agent-created skills and auto-archives stale ones;
-archives go to `~/.hermes/skills/.archive/` and are restorable. Core `agent/curator.py` (review
+archives go to `$QUBIT_HOME/skills/.archive/` and are restorable. Core `agent/curator.py` (review
 loop, auto-transitions, LLM review prompt) + `agent/curator_backup.py` (pre-run tar.gz snapshots);
 CLI `qubit_cli/curator.py` → `qubit curator status|run|pause|resume|pin|unpin|archive|restore|
-prune|backup|rollback`; telemetry `tools/skill_usage.py` owns `~/.hermes/skills/.usage.json`
+prune|backup|rollback`; telemetry `tools/skill_usage.py` owns `$QUBIT_HOME/skills/.usage.json`
 (`use_count`, `view_count`, `patch_count`, `last_activity_at`, `state` active/stale/archived,
 `pinned`). Config `curator:` — `enabled, interval_hours, min_idle_hours, stale_after_days,
 archive_after_days, backup.*`; its LLM calls route through `auxiliary` (`agent/AGENTS.md`).

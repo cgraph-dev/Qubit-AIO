@@ -47,15 +47,20 @@ def _show(active, pid=4242):
 def test_status_reads_systemd_and_port():
     from voicebridge import gateway_supervisor as GS
 
+    # Owner Decision #16: the gateway supervisor reports the messaging-gateway
+    # DAEMON unit (default qubit-gateway.service), not the web-UI unit named by
+    # gateway.service_unit.
     cfg = _Cfg({"gateway": {"service_unit": "qubit-voicebridge.service"},
                 "webui": {"host": "127.0.0.1", "port": 8890}})
     st = GS.status(cfg, runner=lambda argv, t: _show(True),
-                   probe=lambda h, p: True)
+                   probe=lambda h, p: True,
+                   daemon_reader=lambda: None, control_query=lambda: None)
     assert st["available"] is True
     assert st["running"] is True
     assert st["pid"] == 4242
     assert st["port_in_use"] is True
-    assert st["service_unit"] == "qubit-voicebridge.service"
+    assert st["service_unit"] == "qubit-gateway.service"
+    assert GS.service_unit(cfg) == "qubit-voicebridge.service"
 
 
 def test_start_is_idempotent_and_real_when_inactive():

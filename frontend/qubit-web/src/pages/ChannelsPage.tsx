@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   AlertTriangle,
   Bot,
@@ -24,8 +31,9 @@ import { Label } from "@nous-research/ui/ui/components/label";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Switch } from "@nous-research/ui/ui/components/switch";
 import { Toast } from "@nous-research/ui/ui/components/toast";
+import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
 import { useToast } from "@nous-research/ui/hooks/use-toast";
-import { api } from "@/lib/api";
+import { api, ConfirmRequiredError } from "@/lib/api";
 import type {
   MessagingPlatform,
   MessagingPlatformEnvVar,
@@ -60,51 +68,23 @@ function stateBadge(state: string) {
 }
 
 const TELEGRAM_USER_ID_RE = /^\d+$/;
-const TELEGRAM_BOT_TOKEN_RE = /^\d+:[A-Za-z0-9_-]{30,}$/;
-const SLACK_MEMBER_ID_RE = /^[UW][A-Z0-9]{2,}$/;
-const SLACK_TOKEN_PREFIXES: Record<string, string> = {
-  SLACK_BOT_TOKEN: "xoxb-",
-  SLACK_APP_TOKEN: "xapp-",
-};
 
-function validateMessagingEnvField(field: MessagingPlatformEnvVar, value: string): string | null {
+// Qubit keeps channel credentials reference-only: the backend accepts only
+// `env:` / `vault:` / `file:` references and answers a raw secret with a typed
+// 403 `CHANNEL_ENV_REFERENCE_ONLY` (voicebridge/qubit_compat.py msg_update).
+// Mirror that contract here so the form never offers a write the backend will
+// refuse.
+const CHANNEL_REF_RE = /^(env|vault|file):.+/;
+
+/** Client-side mirror of the backend's reference-only channel credential
+ *  policy. Returns an operator-facing message, or null when the value is a
+ *  valid reference (or blank). */
+function validateChannelRef(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
-
-  if (field.key === "TELEGRAM_BOT_TOKEN" && !TELEGRAM_BOT_TOKEN_RE.test(trimmed)) {
-    return "Paste the complete token from @BotFather (for example, 123456789:ABC…).";
+  if (!CHANNEL_REF_RE.test(trimmed)) {
+    return "Credentials are stored as references, never raw secrets. Use env:NAME, vault:NAME, or file:/path (a raw value is refused with CHANNEL_ENV_REFERENCE_ONLY).";
   }
-
-  if (field.key === "TELEGRAM_ALLOWED_USERS") {
-    const invalid = trimmed
-      .split(",")
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .find((part) => !TELEGRAM_USER_ID_RE.test(part));
-    if (invalid) {
-      return `${invalid} is not a numeric Telegram user ID.`;
-    }
-  }
-
-  const expectedPrefix = SLACK_TOKEN_PREFIXES[field.key];
-  if (expectedPrefix && !trimmed.startsWith(expectedPrefix)) {
-    return `${field.prompt || field.key} must start with ${expectedPrefix}`;
-  }
-
-  if (field.key === "SLACK_ALLOWED_USERS") {
-    // Mirror the gateway's parse (gateway/platforms/slack.py): drop empty
-    // entries so a trailing/interior comma isn't rejected here. "*" is the
-    // allow-all wildcard the gateway honors.
-    const parts = trimmed
-      .split(",")
-      .map((part) => part.trim())
-      .filter(Boolean);
-    const invalid = parts.find((part) => part !== "*" && !SLACK_MEMBER_ID_RE.test(part));
-    if (invalid) {
-      return `${invalid} does not look like a Slack member ID. Use IDs like U01ABC2DEF3.`;
-    }
-  }
-
   return null;
 }
 
@@ -158,6 +138,32 @@ export default function ChannelsPage() {
   const [restartNeeded, setRestartNeeded] = useState(false);
   const [restarting, setRestarting] = useState(false);
 
+  // Broker-confirmation dialog. `msg_update` stages every channel change as a
+  // typed 409 CONFIRM_REQUIRED carrying a real confirmation_id; the shared
+  // runMutationWithConfirm round-trip re-issues the PUT with that id only after
+  // the operator confirms here (or the pending-approvals banner settles it).
+  const [brokerConfirm, setBrokerConfirm] = useState<{
+    title: string;
+    description: string;
+  } | null>(null);
+  const confirmResolverRef = useRef<((ok: boolean) => void) | null>(null);
+
+  const askBrokerConfirm = useCallback(
+    (title: string, description: string) =>
+      new Promise<boolean>((resolve) => {
+        confirmResolverRef.current = resolve;
+        setBrokerConfirm({ title, description });
+      }),
+    [],
+  );
+
+  const settleBrokerConfirm = useCallback((ok: boolean) => {
+    const resolve = confirmResolverRef.current;
+    confirmResolverRef.current = null;
+    setBrokerConfirm(null);
+    resolve?.(ok);
+  }, []);
+
   const gatewayRunning = platforms.length > 0 && platforms[0].gateway_running;
 
   const load = useCallback(() => {
@@ -206,7 +212,7 @@ export default function ChannelsPage() {
     }
     const nextFieldErrors: Record<string, string> = {};
     editing.env_vars.forEach((field) => {
-      const message = validateMessagingEnvField(field, draftEnv[field.key] || "");
+      const message = validateChannelRef(draftEnv[field.key] || "");
       if (message) nextFieldErrors[field.key] = message;
     });
     if (Object.keys(nextFieldErrors).length > 0) {
@@ -217,13 +223,25 @@ export default function ChannelsPage() {
     setSaving(true);
     try {
       const body: MessagingPlatformUpdate = { env, enabled: true };
-      await api.updateMessagingPlatform(editing.id, body);
+      const result = await api.updateMessagingPlatform(
+        editing.id,
+        body,
+        (detail) =>
+          askBrokerConfirm(
+            `Save ${editing.name}`,
+            `${detail}\n\nStore these credential references and enable ${editing.name}?`,
+          ),
+      );
       showToast(`${editing.name} saved`, "success");
       setEditing(null);
-      setRestartNeeded(true);
+      if (!result.hot_served) setRestartNeeded(true);
       await load();
     } catch (e) {
-      showToast(`Failed to save: ${e}`, "error");
+      if (e instanceof ConfirmRequiredError) {
+        showToast(`${editing.name} save cancelled`, "error");
+      } else {
+        showToast(`Failed to save: ${e}`, "error");
+      }
     } finally {
       setSaving(false);
     }
@@ -233,7 +251,15 @@ export default function ChannelsPage() {
     const next = !platform.enabled;
     setTogglingId(platform.id);
     try {
-      await api.updateMessagingPlatform(platform.id, { enabled: next });
+      await api.updateMessagingPlatform(
+        platform.id,
+        { enabled: next },
+        (detail) =>
+          askBrokerConfirm(
+            `${next ? "Enable" : "Disable"} ${platform.name}`,
+            `${detail}\n\n${next ? "Enable" : "Disable"} ${platform.name}?`,
+          ),
+      );
       setPlatforms((prev) =>
         prev.map((p) =>
           p.id === platform.id
@@ -243,7 +269,11 @@ export default function ChannelsPage() {
       );
       setRestartNeeded(true);
     } catch (e) {
-      showToast(`Error: ${e}`, "error");
+      if (e instanceof ConfirmRequiredError) {
+        showToast(`${platform.name} unchanged — confirmation cancelled`, "error");
+      } else {
+        showToast(`Error: ${e}`, "error");
+      }
     } finally {
       setTogglingId(null);
     }
@@ -416,7 +446,18 @@ export default function ChannelsPage() {
                       <code className="mx-1 font-courier text-xs">/newbot</code>, and
                       follow its prompts.
                     </li>
-                    <li>Copy the complete bot token BotFather gives you.</li>
+                    <li>
+                      Store the complete bot token BotFather gives you in an
+                      environment variable or vault entry — Qubit never stores raw
+                      secrets.
+                    </li>
+                    <li>
+                      Enter its reference below (for example{" "}
+                      <code className="font-courier text-xs">
+                        env:TELEGRAM_BOT_TOKEN
+                      </code>
+                      ).
+                    </li>
                     <li>
                       Message <span className="text-foreground">@userinfobot</span> to
                       find your numeric Telegram user ID, then add it below for
@@ -450,13 +491,25 @@ export default function ChannelsPage() {
               <p className="text-xs text-muted-foreground">
                 {rebrand(editing.description)}
               </p>
+              <p className="text-xs text-muted-foreground">
+                Channel credentials are stored as references —{" "}
+                <code className="font-courier">env:NAME</code>,{" "}
+                <code className="font-courier">vault:NAME</code>, or{" "}
+                <code className="font-courier">file:/path</code>. Raw secret
+                values are refused by policy (CHANNEL_ENV_REFERENCE_ONLY).
+              </p>
               {editing.env_vars.map((field: MessagingPlatformEnvVar) => (
                 <div className="grid gap-1.5" key={field.key}>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <Label htmlFor={`field-${field.key}`}>
                       {field.prompt || field.key}
                       {field.required ? " *" : ""}
                     </Label>
+                    {field.is_set && (
+                      <Badge tone="success" className="text-xs">
+                        reference stored
+                      </Badge>
+                    )}
                     {field.help && (
                       <span
                         aria-label={rebrand(field.help)}
@@ -479,8 +532,8 @@ export default function ChannelsPage() {
                     className="text-base leading-6 sm:text-xs sm:leading-4"
                     placeholder={
                       field.is_set
-                        ? field.redacted_value || "•••••• (set — leave blank to keep)"
-                        : field.key
+                        ? "reference stored — leave blank to keep"
+                        : "env:NAME, vault:NAME, or file:/path"
                     }
                     value={draftEnv[field.key] ?? ""}
                     aria-invalid={Boolean(fieldErrors[field.key])}
@@ -635,6 +688,18 @@ export default function ChannelsPage() {
           );
         })}
       </div>
+
+      <ConfirmDialog
+        open={brokerConfirm !== null}
+        onCancel={() => settleBrokerConfirm(false)}
+        onConfirm={() => settleBrokerConfirm(true)}
+        title={brokerConfirm?.title ?? "Confirm channel change"}
+        description={
+          brokerConfirm?.description ??
+          "This channel change requires explicit confirmation."
+        }
+        confirmLabel="Confirm"
+      />
     </div>
   );
 }
@@ -1301,7 +1366,8 @@ function TelegramOnboardingPanel({
           </span>
           <p className="text-xs text-muted-foreground">
             Create a bot with @BotFather, or connect one you already have, by
-            entering its token and choosing who can use it.
+            entering its <code className="font-courier">env:NAME</code> token
+            reference and choosing who can use it.
           </p>
           <Button
             size="sm"

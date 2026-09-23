@@ -59,6 +59,11 @@ CORRUPT_CODE = "PAIRING_STORE_CORRUPT"
 
 _LABEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.-]{0,63}$")
 _SCOPE_RE = re.compile(r"^[a-z][a-z0-9_.:-]{0,63}$")
+#: A ``code_id`` (the pairing store's request id, ``pair_`` + 16 hex) or a bare
+#: 16-hex request id. The reference ``PairingStore.looks_like_request_id`` uses
+#: the 16-hex shape (``qubit_runtime/gateway/pairing.py:500-505``); Qubit's
+#: store prefixes it with ``pair_`` so the same string is safe to expose.
+_REQUEST_ID_RE = re.compile(r"^(?:pair_)?[0-9a-fA-F]{16}$")
 
 
 class PairingError(Exception):
@@ -198,12 +203,28 @@ def _audit(op: str, actor: str, detail: Dict[str, Any]) -> None:
         pass
 
 
+def looks_like_request_id(value: Any) -> bool:
+    """True when *value* is shaped like a pairing request/code id.
+
+    Mirrors the reference ``PairingStore.looks_like_request_id``
+    (``qubit_runtime/gateway/pairing.py:500-505``): the dashboard lists a
+    ``request_id`` and sends it back on Approve, so a caller accepting either a
+    one-time code or an id can dispatch on this shape. Pairing *codes* are 8
+    unambiguous chars, so the shapes never collide.
+    """
+    return bool(_REQUEST_ID_RE.match(str(value or "").strip()))
+
+
 def _public(rec: Dict[str, Any]) -> Dict[str, Any]:
-    return {"id": rec["id"], "label": rec["label"],
+    # ``approved`` mirrors ``used`` for the dashboard wire shape (the compat
+    # read handler splits pending vs approved on it); ``request_id`` is the
+    # code id the SPA sends back on approve/revoke.
+    return {"id": rec["id"], "request_id": rec["id"], "label": rec["label"],
             "scopes": list(rec.get("scopes", [])),
             "account": rec.get("account", ""),
             "expires_at": rec.get("expires_at"),
             "used": bool(rec.get("used", False)),
+            "approved": bool(rec.get("used", False)),
             "revoked": bool(rec.get("revoked", False)),
             "attempts": int(rec.get("attempts", 0)),
             "grant_id": rec.get("grant_id") or "",
@@ -237,6 +258,10 @@ def create(cfg: Any, label: str, scopes: List[str], *, account: str = "",
            ttl_s: float = DEFAULT_TTL_S, requested_by: str = "cli:user",
            confirmed: bool = False) -> Dict[str, Any]:
     """Issue a one-time pairing code (shown once, stored hashed)."""
+    if estop_engaged(cfg):
+        raise PairingError(ESTOP_CODE,
+                           "the emergency stop is latched; reset it before "
+                           "creating a pairing code")
     if not confirmed:
         raise PairingError(CONFIRM_CODE,
                            "pairing create requires explicit --confirm")
@@ -294,17 +319,82 @@ def _find_live(state: Dict[str, Any]) -> List[Dict[str, Any]]:
             if not r.get("used") and not r.get("revoked")]
 
 
+def _issue_grant(cfg: Any, state: Dict[str, Any], rec: Dict[str, Any],
+                 requested_by: str) -> Dict[str, Any]:
+    """Consume an approved code record and issue its real scoped grant."""
+    from .permissions import permissions_store
+
+    now = _now()
+    store = permissions_store(cfg)
+    ttl = max(60.0, min(float(rec["expires_at"]) - now, MAX_TTL_S))
+    try:
+        grant = store.grant("gateway.access", requested_by=requested_by,
+                            confirmed=True, scopes=tuple(rec["scopes"]),
+                            ttl_s=ttl, note=f"pairing {rec['id']}")
+    except Exception as exc:
+        rec["attempts"] = int(rec.get("attempts", 0)) + 1
+        _save(cfg, state)
+        raise PairingError("PAIRING_GRANT_FAILED",
+                           f"grant issue failed: {exc}") from exc
+    rec["used"] = True
+    rec["grant_id"] = grant.id
+    _save(cfg, state)
+    _audit("approve", requested_by,
+           {"code_id": rec["id"], "grant_id": grant.id, "scopes": rec["scopes"]})
+    return {"state": "OK", "approved": rec["id"], "grant_id": grant.id,
+            "scopes": rec["scopes"], "account": rec.get("account", "")}
+
+
+def _approved_result(rec: Dict[str, Any]) -> Dict[str, Any]:
+    """The idempotent re-approve result for an already-approved record."""
+    return {"state": "OK", "approved": rec["id"],
+            "grant_id": rec.get("grant_id", ""),
+            "scopes": list(rec.get("scopes", [])),
+            "account": rec.get("account", ""), "already_approved": True}
+
+
 def approve(cfg: Any, code: str, *, requested_by: str = "cli:user",
             confirmed: bool = False) -> Dict[str, Any]:
-    """Verify a code (constant-time) and issue its scoped grant."""
+    """Approve a pairing request by its one-time code OR its request id.
+
+    Two shapes resolve, matching the reference admin surface
+    (``qubit_runtime/gateway/pairing.py`` ``approve_code``/``approve_request``):
+
+    * a one-time **code** — constant-time salted-hash compare among live codes;
+    * a **request id** (``pair_`` + 16 hex, or bare 16 hex) — the string the
+      dashboard lists and sends back on Approve.
+
+    Approving an already-approved request id is **idempotent**: it returns the
+    existing grant instead of minting a second one. A revoked record is a typed
+    ``PAIRING_REVOKED`` and an unknown id is ``PAIRING_NOT_FOUND``.
+    """
+    if estop_engaged(cfg):
+        raise PairingError(ESTOP_CODE,
+                           "the emergency stop is latched; reset it before "
+                           "approving a pairing code")
     if not confirmed:
         raise PairingError(CONFIRM_CODE,
                            "pairing approve requires explicit --confirm")
-    from .permissions import permissions_store
-
-    attempt = _extract_code(code).strip().upper().replace("-", "").replace(" ", "")
+    target = str(code or "").strip()
+    if not target:
+        raise PairingError(BAD_CODE, "a pairing code or request id is required")
     state = _load(cfg)
     now = _now()
+    if looks_like_request_id(target):
+        rec = state["codes"].get(target)
+        if rec is None:
+            raise PairingError(NOT_FOUND_CODE,
+                               f"no pairing request {target!r}")
+        if rec.get("used"):
+            if rec.get("revoked"):
+                raise PairingError(REVOKED_CODE, "pairing code was revoked")
+            return _approved_result(rec)
+        if rec.get("revoked"):
+            raise PairingError(REVOKED_CODE, "pairing code was revoked")
+        if now > float(rec.get("expires_at", 0)):
+            raise PairingError(EXPIRED_CODE, "pairing code expired")
+        return _issue_grant(cfg, state, rec, requested_by)
+    attempt = _extract_code(target).strip().upper().replace("-", "").replace(" ", "")
     match = None
     for rec in _find_live(state):
         import base64 as _b64
@@ -322,27 +412,7 @@ def approve(cfg: Any, code: str, *, requested_by: str = "cli:user",
         raise PairingError(LOCKED_CODE, "code locked after too many attempts")
     if now > float(match.get("expires_at", 0)):
         raise PairingError(EXPIRED_CODE, "pairing code expired")
-    store = permissions_store(cfg)
-    ttl = max(60.0, min(float(match["expires_at"]) - now, MAX_TTL_S))
-    try:
-        grant = store.grant("gateway.access", requested_by=requested_by,
-                            confirmed=True, scopes=tuple(match["scopes"]),
-                            ttl_s=ttl,
-                            note=f"pairing {match['id']}")
-    except Exception as exc:
-        match["attempts"] = int(match.get("attempts", 0)) + 1
-        _save(cfg, state)
-        raise PairingError("PAIRING_GRANT_FAILED",
-                           f"grant issue failed: {exc}") from exc
-    match["used"] = True
-    match["grant_id"] = grant.id
-    _save(cfg, state)
-    _audit("approve", requested_by,
-           {"code_id": match["id"], "grant_id": grant.id,
-            "scopes": match["scopes"]})
-    return {"state": "OK", "approved": match["id"],
-            "grant_id": grant.id, "scopes": match["scopes"],
-            "account": match.get("account", "")}
+    return _issue_grant(cfg, state, match, requested_by)
 
 
 def accept(cfg: Any, setup: Any, *, requested_by: str = "cli:user",
@@ -428,18 +498,61 @@ def list_codes(cfg: Any) -> Dict[str, Any]:
     return {"state": "OK", "codes": [_public(r) for r in recs]}
 
 
+def _resolve_record(state: Dict[str, Any], target: str
+                    ) -> Any:
+    """Resolve a request id, code id, or one-time code to its record (or None)."""
+    text = str(target or "").strip()
+    if not text:
+        return None
+    if looks_like_request_id(text):
+        rec = state["codes"].get(text)
+        if rec is not None:
+            return rec
+        suffix = text.lower()
+        for rec in state["codes"].values():
+            if str(rec.get("id", "")).lower().endswith(suffix):
+                return rec
+        return None
+    attempt = _extract_code(text).strip().upper().replace("-", "").replace(" ", "")
+    for rec in state["codes"].values():
+        if rec.get("revoked"):
+            continue
+        import base64 as _b64
+
+        try:
+            salt = _b64.b64decode(rec["salt_b64"])
+        except Exception:
+            continue
+        if hmac.compare_digest(_hash(salt, attempt), rec["verifier"]):
+            return rec
+    return None
+
+
 def revoke(cfg: Any, code_id: str, *, requested_by: str = "cli:user",
            confirmed: bool = False) -> Dict[str, Any]:
-    """Tombstone a code and revoke its grant (confirmed, audited)."""
+    """Tombstone a code and revoke its grant (confirmed, audited, idempotent).
+
+    Accepts the record id (the dashboard's ``user_id``/``request_id``), a bare
+    16-hex request id, or the one-time code itself. Revoking an already-revoked
+    record is a no-op success (``already_revoked``); an unknown target is a
+    typed ``PAIRING_NOT_FOUND``.
+    """
+    if estop_engaged(cfg):
+        raise PairingError(ESTOP_CODE,
+                           "the emergency stop is latched; reset it before "
+                           "revoking a pairing code")
     if not confirmed:
         raise PairingError(CONFIRM_CODE,
                            "pairing revoke requires explicit --confirm")
     from .permissions import permissions_store
 
     state = _load(cfg)
-    rec = state["codes"].get((code_id or "").strip())
+    rec = _resolve_record(state, code_id)
     if rec is None:
         raise PairingError(NOT_FOUND_CODE, f"no pairing {code_id!r}")
+    if rec.get("revoked"):
+        return {"state": "OK", "revoked": rec["id"],
+                "grant_gone": not rec.get("grant_id"), "already_revoked": True}
     rec["revoked"] = True
     grant_gone = not rec.get("grant_id")
     if rec.get("grant_id"):

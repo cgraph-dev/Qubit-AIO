@@ -1,0 +1,35 @@
+[Unit]
+Description=Qubit messaging-gateway daemon (platform adapters, sessions, cron)
+# The daemon is the Qubit-owned multi-platform messaging gateway. It is distinct
+# from qubit-voicebridge.service (the push-to-talk voice bridge / web UI): this
+# unit runs the real vendored gateway loop via voicebridge.gateway_daemon, which
+# pins a Qubit-owned QUBIT_HOME before importing the runtime.
+After=network-online.target
+Wants=network-online.target
+# Bounded restart-storm guard: at most 5 starts per 5 minutes, then the unit
+# stays failed (visible, typed) until an operator/`qubit gateway recover`.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# __PROJECT_DIR__ is replaced with the actual path by scripts/install_systemd_unit.sh
+ExecStart=__PROJECT_DIR__/.venv/bin/python -m voicebridge.gateway_daemon
+WorkingDirectory=__PROJECT_DIR__
+# SIGUSR1 is the vendored gateway's in-process restart signal (restart without a
+# process replacement). SIGTERM/SIGINT drive its graceful drain/teardown.
+ExecReload=/bin/kill -USR1 $MAINPID
+# Replace the whole cgroup on stop/restart so a wedged non-daemon worker thread
+# cannot strand a half-shut-down gateway (the loop force-exits after teardown).
+KillMode=mixed
+Restart=always
+RestartSec=3
+# Explicit Qubit-owned home. The entry point re-pins the same value
+# defensively, but systemd is the authority for the daemon's process env.
+Environment=QUBIT_HOME=%h/.local/state/qubit-voicebridge/runtime
+# Secret/config source is the Qubit-owned env file (optional); no external
+# operator home is ever loaded.
+# EnvironmentFile=-%h/.config/qubit-voicebridge/.env
+
+[Install]
+WantedBy=default.target

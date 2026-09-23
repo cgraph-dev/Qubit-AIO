@@ -43,8 +43,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 
-HERMES_PIN = "2237be355906fbe6065ce1815711eee52b2d646e"
-HERMES_TAG = "v2026.9.7"
+HERMES_PIN = "d337b736aa1e8ebecfab043842d13e4a2d2f48a3"
+HERMES_TAG = "v0.21.4"
 HERMES_REPO = "https://github.com/NousResearch/hermes-agent"
 OPENCLAW_PIN = "3a9d69db306cd7f081e06254cb89c4bcc14a7107"
 OPENCLAW_TAG = "v2026.9.4"
@@ -68,7 +68,7 @@ DEFAULT_OPENCLAW = "/tmp/opencode/pinned/openclaw"
 
 # Directories/files excluded from the byte diff, matching
 # scripts/hermes_vendor_manifest.py so counts reconcile.
-_BYTE_SKIP_PARTS = {"__pycache__", ".git", ".pytest_cache"}
+_BYTE_SKIP_PARTS = {"__pycache__", ".git", ".pytest_cache", ".pytest-cache"}
 _BYTE_SKIP_SUFFIX = (".pyc", ".pyo")
 
 # Categories whose items are cross-cutting evidence rather than a capability
@@ -1771,6 +1771,34 @@ def render_omissions(inv: dict) -> str:
 # main
 # ---------------------------------------------------------------------------
 
+def _carried_openclaw_items(repo: Path) -> list[dict]:
+    """OpenClaw items carried forward from the canonical inventory.
+
+    The pinned OpenClaw source is a build-time input that can be absent in a
+    given environment. The OpenClaw surface is stable and independent of the
+    Hermes sync, so rather than dropping the section (which would make the
+    artifact internally inconsistent), the last canonical OpenClaw item set is
+    carried forward read-only. Derived classification fields are stripped so
+    they are recomputed against the current ledger.
+    """
+    path = repo / "docs" / "generated" / "QUBIT_SOURCE_INVENTORY.json"
+    if not path.is_file():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    derived = ("parent_id", "coverage", "parent_resolved", "parent_status",
+               "parent_covered", "fork_disposition", "ledger_match",
+               "ledger_source", "ledger_status")
+    out: list[dict] = []
+    for it in data.get("items", []):
+        if it.get("source") != "openclaw":
+            continue
+        out.append({k: v for k, v in it.items() if k not in derived})
+    return out
+
+
 def build_inventory(repo: Path, hermes: Path, openclaw: Path,
                     ledger_rev: str | None = LEDGER_REV,
                     vendor_manifest: Path | None = None) -> dict:
@@ -1793,6 +1821,8 @@ def build_inventory(repo: Path, hermes: Path, openclaw: Path,
         it.setdefault("ledger_status", None)
 
     openclaw_items = extract_openclaw_extensions(openclaw, OPENCLAW_PIN)
+    if not openclaw_items:
+        openclaw_items = _carried_openclaw_items(repo)
 
     audit_text = ""
     for doc in ("AUDIT_OPENCLAW_2026-09-11.md",

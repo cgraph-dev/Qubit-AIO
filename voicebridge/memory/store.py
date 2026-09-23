@@ -367,9 +367,19 @@ class MemoryStore:
 
     def search(self, query: str, *, scope: Optional[str] = None,
                tier: Optional[str] = None, limit: int = 20,
+               offset: int = 0,
                include_tombstoned: bool = False) -> List[Dict[str, Any]]:
         """FTS5 full-text search (stdlib), tombstone/expiry filtered.
-        Falls back to a deterministic LIKE scan when FTS5 is unavailable."""
+
+        ``offset`` pages the deterministic result order (the same
+        ``ORDER BY f.rowid DESC`` the unpaged query used), so a caller can walk
+        a large result set without changing what counts as a match. Falls back
+        to a deterministic LIKE scan when FTS5 is unavailable.
+        """
+        if isinstance(offset, bool) or not isinstance(offset, int) or offset < 0:
+            raise MemoryStoreError("offset must be a non-negative integer")
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 0:
+            raise MemoryStoreError("limit must be a non-negative integer")
         now = time.time()
         with self._lock:
             if self._fts5:
@@ -390,8 +400,8 @@ class MemoryStore:
                 if tier is not None:
                     q += " AND m.tier=?"
                     params.append(tier)
-                q += " ORDER BY f.rowid DESC LIMIT ?"
-                params.append(int(limit))
+                q += " ORDER BY f.rowid DESC LIMIT ? OFFSET ?"
+                params.extend([int(limit), int(offset)])
                 rows = self._conn.execute(q, params).fetchall()
             else:
                 q = ["SELECT * FROM memories"]
@@ -403,7 +413,7 @@ class MemoryStore:
                         and (r["expires_at"] is None or r["expires_at"] > now)
                         and (scope is None or r["scope"] == scope)
                         and (tier is None or r["tier"] == tier)]
-                rows = rows[:limit]
+                rows = rows[offset:offset + limit]
             return [self._row_to_dict(r) for r in rows]
 
     def correct(self, old_text: str, new_text: str, *,
@@ -440,6 +450,85 @@ class MemoryStore:
                           {"supersedes": target["id"]})
             self._conn.commit()
             return self.get(mid)
+
+    def update(self, memory_id: int, *, text: Optional[str] = None,
+               tier: Optional[str] = None,
+               confidence: Optional[float] = None,
+               source: str = "user",
+               reason: Optional[str] = None) -> Dict[str, Any]:
+        """In-place partial update of one active record by id.
+
+        Ported from the reference memory update path (holographic
+        ``update_fact`` / Mem0 ``_backend.update``): fields are changed on the
+        existing row (no supersede copy) and the append-only history records an
+        ``update`` entry. Scope is preserved exactly as stored, so the update
+        can never move a record across a permission boundary; a content change
+        re-derives the normalized dedup identity and refuses to collide with a
+        different active record. Secret-shaped content is rejected at the same
+        write boundary ``remember``/``correct`` use.
+        """
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM memories WHERE id=? AND tombstoned=0",
+                (memory_id,)).fetchone()
+            if row is None:
+                raise MemoryStoreError(f"no active memory id {memory_id}")
+            scope = row["scope"]
+            sets: List[str] = []
+            params: list = []
+            new_text: Optional[str] = None
+            if text is not None:
+                new_text = str(text)
+                if not new_text.strip():
+                    raise MemoryStoreError("cannot update to empty text")
+                for shape in _SECRET_SHAPES:
+                    if re.search(shape, new_text):
+                        raise SecretRejectedError(
+                            "secret-shaped content rejected")
+                new_hash = norm_hash(new_text)
+                new_key = scoped_key(scope, new_hash)
+                clash = self._conn.execute(
+                    "SELECT id FROM memories WHERE mkey=? AND scope=? "
+                    "AND tombstoned=0 AND id!=?",
+                    (new_key, scope, memory_id)).fetchone()
+                if clash is not None:
+                    raise MemoryStoreError(
+                        "another active memory already has that content")
+                sets.extend(("text=?", "norm_hash=?", "mkey=?"))
+                params.extend((new_text, new_hash, new_key))
+            if tier is not None:
+                if tier not in TIERS:
+                    raise MemoryStoreError(f"unknown tier: {tier}")
+                sets.append("tier=?")
+                params.append(tier)
+            if confidence is not None:
+                sets.append("confidence=?")
+                params.append(_validate_numeric("confidence", confidence))
+            if not sets:
+                raise MemoryStoreError("nothing to update")
+            sets.append("updated_at=?")
+            params.append(time.time())
+            try:
+                self._conn.execute(
+                    f"UPDATE memories SET {', '.join(sets)} WHERE id=?",
+                    (*params, memory_id))
+            except sqlite3.IntegrityError:
+                # The dedup identity is UNIQUE across scopes' tombstones too;
+                # surface a typed store error instead of a raw sqlite failure.
+                raise MemoryStoreError(
+                    "another memory already has that content") from None
+            if new_text is not None or tier is not None:
+                self._unindex_fts(memory_id)
+                self._index_fts(memory_id, tier or row["tier"], scope,
+                                new_text if new_text is not None
+                                else row["text"])
+            self._history(memory_id, "update",
+                          {"source": source, "reason": reason,
+                           "fields": sorted(
+                               {c.split("=")[0] for c in sets
+                                if c != "updated_at=?"})})
+            self._conn.commit()
+            return self.get(memory_id)
 
     def forget(self, memory_id: int, *, reason: str = "user-forget") -> None:
         """Soft delete: tombstone + unindex; history preserved."""

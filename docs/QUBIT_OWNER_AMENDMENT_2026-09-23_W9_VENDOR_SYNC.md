@@ -1,7 +1,7 @@
 # Qubit Owner Amendment (DRAFT) — W9 Vendor Sync Pin Change
 
 Date: 2026-09-23
-Status: **OWNER-SELECTED TARGET `d337b736aa…` (2026-09-23). PIN MOVE PENDING WORKTREE FREEZE (see §8).**
+Status: **AUTHORIZED — PIN MOVE PERMITTED (2026-09-23). Target `d337b736aa…`; worktree frozen at `42d64b84` (branch `freeze/wave12-2026-09-23`).**
 
 This document is a **request for owner approval**, prepared read-only. It does
 **not** change any pin, does not authorize a sync, and does not claim any
@@ -159,11 +159,13 @@ wave; `git` cannot produce a clean three-way base). Freeze first.
 OWNER DECISION:            [x] APPROVED (pin target)  [ ] REJECTED  [ ] DEFERRED
 NEW PIN APPROVED:          d337b736aa1e8ebecfab043842d13e4a2d2f48a3  (v0.21.4 release)
 TAG STABILITY ACCEPTED:    [x] yes (release commit preferred; no local tags)
-PRECONDITION 1 (freeze):   [ ] acknowledged — STILL REQUIRED before any sync
+PRECONDITION 1 (freeze):   [x] satisfied — worktree frozen at `42d64b84`
+                               (branch `freeze/wave12-2026-09-23`, clean tree, not pushed)
 PRECONDITION 2 (pristine): [x] done (/tmp/opencode/pinned/hermes-agent-0.21.4/, 14,966 files)
 DATA MIGRATION:            separate (W-MIG from the live ~/.hermes) — not a code pin
 SCOPE LIMITS:              code pin to d337b736aa; deep identifier rename folded into the sync
-RECORD:                    owner chat 2026-09-23 — "d337b736 we will choose this cos its more stable"
+RECORD:                    owner chat 2026-09-23 — "d337b736 we will choose this cos its more stable";
+                           freeze authorized and executed 2026-09-23 (branch `freeze/wave12-2026-09-23`)
 ```
 
 > Recorded from the owner's chat instruction; the owner may replace this with a

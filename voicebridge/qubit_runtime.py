@@ -166,7 +166,14 @@ def runtime_root() -> Path:
 
 
 def manifest_path() -> Path:
-    """Per-file provenance manifest for the fork (checkout path)."""
+    """Per-file provenance manifest for the fork (checkout path).
+
+    Canonical location is ``docs/generated/``; the frozen archive copy is a
+    read-only fallback for checkouts that predate the canonical move.
+    """
+    canonical = _REPO_ROOT / "docs/generated" / "QUBIT_HERMES_VENDOR_MANIFEST.json"
+    if canonical.is_file():
+        return canonical
     return _REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_HERMES_VENDOR_MANIFEST.json"
 
 

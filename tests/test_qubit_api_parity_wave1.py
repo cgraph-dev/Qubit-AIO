@@ -84,11 +84,13 @@ def _seed_receipt(cfg, rid="wave1-rec"):
     return rid
 
 
-def _seed_principal(cfg, name="wave1"):
-    from voicebridge import brain as B
+def _seed_profile(cfg, name="wave1"):
+    """Seed a real reference profile — the one registry ``/api/profiles`` serves."""
+    from voicebridge import qubit_compat as HC
 
-    B.principal_add(cfg, name, "person", name, requested_by="t",
-                    confirmed=True)
+    P = HC._profiles_module(cfg)
+    if not P.profile_exists(name):
+        P.create_profile(name, no_skills=True)
     return name
 
 
@@ -216,7 +218,8 @@ WAVE1_DISPATCH = [
     ("PUT", "/api/profiles/wave1/description",
      {}, {"confirm": True, "value": "wave1 description"}),
     ("PUT", "/api/profiles/wave1/model",
-     {}, {"confirm": True, "model": "qubit-brain4"}),
+     {}, {"confirm": True, "provider": "opencode-go",
+          "model": "deepseek-v4-flash"}),
     ("PUT", "/api/profiles/wave1/soul",
      {}, {"confirm": True, "value": "wave1 soul"}),
     ("GET", "/api/sessions/empty/count", {}, {}),
@@ -247,7 +250,7 @@ def test_wave1_dispatch_non_refusal_success(tmp_path, monkeypatch):
     _seed_skill(cfg)
     _seed_skill(cfg, "wave1-toggle.plugin")
     _seed_receipt(cfg)
-    _seed_principal(cfg)
+    _seed_profile(cfg)
     _seed_account(cfg)
 
     for method, path, q, b in WAVE1_DISPATCH:

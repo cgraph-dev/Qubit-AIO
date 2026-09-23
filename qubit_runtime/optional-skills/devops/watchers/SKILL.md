@@ -62,11 +62,11 @@ python $QUBIT_HOME/skills/devops/watchers/scripts/watch_rss.py \
   --name hn --url https://news.ycombinator.com/rss --max 5
 ```
 
-Watch a GitHub repo (set `GITHUB_TOKEN` in `${QUBIT_HOME:-~/.hermes}/.env` to avoid the 60 req/hr anonymous rate limit):
+Watch a GitHub repo (set `GITHUB_TOKEN` in `$QUBIT_HOME/.env` to avoid the 60 req/hr anonymous rate limit):
 
 ```bash
 python $QUBIT_HOME/skills/devops/watchers/scripts/watch_github.py \
-  --name hermes-issues --repo NousResearch/hermes-agent --scope issues
+  --name qubit-watch-issues --repo NousResearch/hermes-agent --scope issues
 ```
 
 Poll an arbitrary JSON API:

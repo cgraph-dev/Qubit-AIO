@@ -26,7 +26,7 @@ Qubit facts: `qubit_compat.ROUTES` 415 (94 `GATED`) · `dashboard_ops` 562+35
 
 ## 1. Core runtime — M1 (each proven by command + output)
 
-- [x] Service starts. *(systemctl active, ExecMainStatus=0)* · [x] Qubit gateway supervised. *(real `qubit gateway status`; no Hermes authority — STATUS §15)*
+- [x] Service starts. *(systemctl active, ExecMainStatus=0)* · [x] Qubit gateway supervised. *(Owner #16 daemon installed+running: `qubit-gateway.service` MainPID real, `daemon_live:true`, stays alive NRestarts=0; confirm-gated start/stop/restart — STATUS §25)*
 - [x] `qubit agent -z "…"` returns a real model turn. *(`QUBIT_OK`)*
 - [x] `/chat` opens the real terminal runtime.
 - [x] `/chat` loads the real provider. *(opencode-go/deepseek-v4-flash · 200k)*
@@ -58,7 +58,7 @@ Qubit facts: `qubit_compat.ROUTES` 415 (94 `GATED`) · `dashboard_ops` 562+35
 
 ## 4. HTTP route parity (~245 reference routes)
 
-- [ ] Every reference route has a working Qubit counterpart. *(MISSING 33→6 after W4 CLI ports + wave-12 P0 routes; the 6 all need 0.21.4 modules absent from the vendored 0.21.1 → W9-blocked — STATUS §23)*
+- [~] Every reference route has a working Qubit counterpart. *(wave 14: **MISSING = 0** — 1377 rows 1248 PORTED / 129 GATED; the 129 GATED are typed policy refusals with working counterparts or voice/interface gaps, not missing — STATUS §26)*
 - [~] All **94 `GATED`** routes dispositioned: refusal + working counterpart
       (owner-confirmed) **or** implemented. *(W4 report: 125 refusal-with-counterpart / 40 genuine gaps / 7 operator-owned; genuine W4 items listed in STATUS §14)*
 - [ ] No legacy-brand route paths (`/api/hermes/update.*`).

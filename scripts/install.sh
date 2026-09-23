@@ -350,6 +350,8 @@ fi
 if [ "${1:-}" = "--with-systemd" ] || [ "${1:-}" = "-s" ]; then
   echo "==> installing systemd user service"
   "$PROJECT_DIR/scripts/install_systemd_unit.sh" "$PROJECT_DIR"
+  echo "==> installing systemd messaging-gateway unit (qubit-gateway.service)"
+  "$PROJECT_DIR/scripts/install_gateway_unit.sh" "$PROJECT_DIR"
 else
   echo
   echo "==> done. Run:"

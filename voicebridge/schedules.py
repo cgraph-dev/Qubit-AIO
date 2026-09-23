@@ -39,11 +39,13 @@ rewriting). Provenance and the deliberate divergence are recorded in
 """
 from __future__ import annotations
 
+import os
 import re
 import sqlite3
 import time
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 CONFIRM_CODE = "SCHEDULES_CONFIRM_REQUIRED"
 ESTOP_CODE = "SCHEDULES_ESTOP"
@@ -57,6 +59,41 @@ MAX_TASK_LEN = 2000
 MIN_INTERVAL_MIN = 5
 MAX_INTERVAL_MIN = 10080  # one week
 LIST_MAX = 100
+
+# --- timezone (ports the upstream configured-zone schedule semantics) --------
+# The upstream scheduler evaluates wall-clock schedules in a configured IANA
+# timezone (``hermes_time.py:91 get_timezone`` / ``cron/jobs.py:1137
+# compute_next_run``); ``QUBIT_TIMEZONE`` mirrors the upstream env override.
+# Resolution order: env, then the configured ``timezone`` key, then
+# server-local. An invalid zone degrades to server-local (never a crash) and is
+# still reported truthfully.
+TZ_ENV = "QUBIT_TIMEZONE"
+
+# --- bounded automatic re-run ladder for unreachable dispatches -------------
+# Ported from the upstream cron retry ladder (reference
+# ``cron/unreachable_retry.py:32 RETRY_DELAYS_SECONDS``): a recurring job whose
+# run failed transiently (never reached the model) is re-armed after
+# 5, 15, then 30 minutes before falling back to its natural occurrence. Off
+# with ``cron.retry_unreachable: false`` (upstream default ON).
+RETRY_DELAYS_SECONDS: Tuple[int, ...] = (300, 900, 1800)
+RETRY_REACHED_MODEL = "reached-model"
+RETRY_DISABLED = "disabled"
+RETRY_ONESHOT = "one-shot"
+RETRY_NOT_TRANSIENT = "not-transient"
+RETRY_EXHAUSTED = "exhausted"
+RETRY_NATURAL_SOONER = "natural-sooner"
+
+# Transient transport/DNS needles, ported from the upstream classifier
+# (reference ``cron/scheduler_preflight.py:27-38, _is_transient_provider_resolve_error``).
+# Qubit executors cannot observe an agent's API-call counter, so a retry is
+# scheduled only when the typed failure text is transient network-shaped — an
+# honest narrowing of the upstream "zero API calls" predicate.
+TRANSIENT_NEEDLES = (
+    "nodename nor servname", "name or service not known",
+    "temporary failure in name resolution", "network is unreachable",
+    "connection refused", "timed out", "timeout", "connecterror",
+    "connecttimeout", "readtimeout", "networkerror", "dns",
+)
 
 # The monitor's self-fire tick actor (audit attribution) and the hard cap on
 # jobs any single tick may claim, so a backlog can never monopolize a pass.
@@ -100,7 +137,10 @@ CREATE TABLE IF NOT EXISTS jobs (
   last_run_at REAL NOT NULL DEFAULT 0,
   last_state TEXT NOT NULL DEFAULT '',
   run_count INTEGER NOT NULL DEFAULT 0,
-  deliver_to TEXT NOT NULL DEFAULT ''
+  deliver_to TEXT NOT NULL DEFAULT '',
+  retry_at REAL NOT NULL DEFAULT 0,
+  retry_attempt INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS runs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -171,6 +211,253 @@ def _now() -> float:
     return time.time()
 
 
+def _cfg_lookup(cfg: Any, *path: str) -> Any:
+    """Read a nested config value from a Config/dict, never raising."""
+    if cfg is None:
+        return None
+    try:
+        node: Any = cfg
+        for part in path:
+            if isinstance(node, dict):
+                if part not in node:
+                    return None
+                node = node[part]
+            elif hasattr(node, "get"):
+                node = node.get(part, default=None)
+                if node is None:
+                    return None
+            else:
+                return None
+        return node
+    except Exception:  # noqa: BLE001 — config shape must never break a tick
+        return None
+
+
+def _tz_name(cfg: Any) -> str:
+    """Configured IANA timezone name (``""`` = server-local).
+
+    Mirrors the upstream resolution order (``hermes_time.py:45
+    _resolve_timezone_name``): env override first, then the configured
+    ``timezone``, then server-local. ``schedules.timezone`` is also honored so a
+    Qubit-specific pin does not have to shadow the top-level key.
+    """
+    env = ""
+    try:
+        env = os.environ.get(TZ_ENV, "").strip()
+    except Exception:  # noqa: BLE001
+        env = ""
+    if env:
+        return env
+    for path in (("timezone",), ("schedules", "timezone")):
+        value = _cfg_lookup(cfg, *path)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def _zone(cfg: Any) -> Tuple[Any, str]:
+    """``(ZoneInfo | None, configured_name)``; invalid/blank -> server-local."""
+    name = _tz_name(cfg)
+    if not name:
+        return None, ""
+    try:
+        from zoneinfo import ZoneInfo
+
+        return ZoneInfo(name), name
+    except Exception:  # noqa: BLE001 — invalid zone degrades, never crashes
+        return None, name
+
+
+def _local(now: float, zone: Any) -> datetime:
+    """Wall-clock datetime for ``now`` in ``zone`` (or server-local)."""
+    if zone is not None:
+        return datetime.fromtimestamp(now, zone)
+    return datetime.fromtimestamp(now)
+
+
+def _daily_target(job: Dict[str, Any], now: float, zone: Any) -> float:
+    """Epoch of the most recent ``hour:minute`` wall-clock target <= ``now``.
+
+    Daily schedules express wall-clock intent, so the target is computed in the
+    configured zone (``datetime`` re-resolves DST for the constructed local
+    time) instead of the epoch-day arithmetic that implicitly meant UTC.
+    """
+    local = _local(now, zone)
+    target = local.replace(hour=int(job["hour"]), minute=int(job["minute"]),
+                           second=0, microsecond=0)
+    if target > local:
+        target = target - timedelta(days=1)
+    return target.timestamp()
+
+
+def _natural_next_run_at(job: Dict[str, Any], *, cfg: Any = None,
+                         now: Optional[float] = None) -> Optional[float]:
+    """The schedule's own next due epoch, ignoring any pending retry."""
+    moment = now if now is not None else _now()
+    kind = str(job.get("kind", "") or "")
+    zone, _name = _zone(cfg)
+    if kind == "interval":
+        try:
+            base = float(job.get("last_run_at") or job.get("created_at") or 0.0)
+            step = float(job.get("interval_min") or 0) * 60.0
+        except (TypeError, ValueError):
+            return None
+        if step <= 0:
+            return None
+        return (base or moment) + step
+    if kind == "daily":
+        try:
+            hour = int(job.get("hour", -1))
+            minute = int(job.get("minute", 0))
+        except (TypeError, ValueError):
+            return None
+        if hour < 0:
+            return None
+        local = _local(moment, zone)
+        target = local.replace(hour=hour, minute=minute, second=0,
+                               microsecond=0)
+        if target <= local:
+            target = target + timedelta(days=1)
+        return target.timestamp()
+    if kind == "once":
+        try:
+            at = float(job.get("at_ts") or 0.0)
+            base = float(job.get("last_run_at") or 0.0)
+        except (TypeError, ValueError):
+            return None
+        return at if at > 0 and base <= 0 else None
+    return None
+
+
+def next_run_at(job: Dict[str, Any], *, cfg: Any = None,
+                now: Optional[float] = None) -> Optional[float]:
+    """Projected next due epoch for a job (``None`` = never/no more runs).
+
+    Ported from the upstream ``cron/jobs.py:1137 compute_next_run`` shape:
+    recurring kinds anchor on ``last_run_at`` so a restart does not re-anchor;
+    intervals add in UTC so a DST change never alters the duration; daily
+    targets use the configured wall clock; a one-shot is eligible only until it
+    has run. A pending automatic re-run is folded in the way upstream
+    ``cron/unreachable_retry.py:117 plan_retry`` pulls ``next_run_at`` earlier to
+    the ladder instant, so the projection never hides a sooner retry.
+    """
+    if not job.get("enabled", True):
+        return None
+    moment = now if now is not None else _now()
+    natural = _natural_next_run_at(job, cfg=cfg, now=moment)
+    try:
+        retry_at = float(job.get("retry_at") or 0.0)
+    except (TypeError, ValueError):
+        retry_at = 0.0
+    if retry_at > moment and (natural is None or retry_at < natural):
+        return retry_at
+    return natural
+
+
+def retry_enabled(cfg: Any) -> bool:
+    """``cron.retry_unreachable`` (upstream default ON), ``schedules.retry_backoff``.
+
+    Ported from the reference ``cron/unreachable_retry.py:39 retry_enabled``:
+    only an explicit ``False`` disables the ladder.
+    """
+    cron = _cfg_lookup(cfg, "cron")
+    if isinstance(cron, dict) and "retry_unreachable" in cron:
+        return cron.get("retry_unreachable") is not False
+    sched = _cfg_lookup(cfg, "schedules")
+    if isinstance(sched, dict) and "retry_backoff" in sched:
+        return sched.get("retry_backoff") is not False
+    return True
+
+
+def _is_transient_failure(outcome: Dict[str, Any]) -> bool:
+    """True when a failed run looks like a transient transport/DNS failure.
+
+    Ports the upstream classifier's needle set (reference
+    ``cron/scheduler_preflight.py:27-77``) over the typed outcome Qubit
+    executors return. Only a non-OK state is eligible, so a successful turn can
+    never be re-run.
+    """
+    state = str(outcome.get("state", "") or "").upper()
+    if state in ("", "OK"):
+        return False
+    if outcome.get("retryable") is True:
+        return True
+    blob = (str(outcome.get("code", "") or "") + " "
+            + str(outcome.get("detail", "") or "")).lower()
+    return any(needle in blob for needle in TRANSIENT_NEEDLES)
+
+
+def _clear_retry(conn: sqlite3.Connection, job_id: int,
+                 last_error: str = "") -> None:
+    conn.execute(
+        "UPDATE jobs SET retry_at=0, retry_attempt=0, last_error=?, "
+        "updated_at=? WHERE id=?",
+        (last_error[:500], _now(), int(job_id)))
+
+
+def _plan_retry(cfg: Any, conn: sqlite3.Connection, job: Dict[str, Any],
+                outcome: Dict[str, Any], moment: float,
+                requested_by: str) -> Dict[str, Any]:
+    """Apply the bounded re-run ladder after one run (reference
+    ``cron/unreachable_retry.py:85 plan_retry``).
+
+    Clears the ladder on any run that reached the model (success or a
+    non-transient failure) and on one-shots; otherwise pulls ``retry_at`` to the
+    next ladder instant when that is sooner than the job's natural occurrence.
+    Returns a truthful receipt (never fabricates a scheduled retry).
+    """
+    state = str(outcome.get("state", "") or "").upper()
+    if state == "OK":
+        _clear_retry(conn, job["id"], "")
+        conn.commit()
+        return {"scheduled": False, "reason": RETRY_REACHED_MODEL}
+    err = str(outcome.get("detail", "") or outcome.get("code", "") or "")
+    err = redact_spec(err)
+    attempt = int(job.get("retry_attempt") or 0)
+    if job.get("kind") == "once":
+        _clear_retry(conn, job["id"], err)
+        conn.commit()
+        return {"scheduled": False, "reason": RETRY_ONESHOT}
+    if not retry_enabled(cfg):
+        _clear_retry(conn, job["id"], err)
+        conn.commit()
+        return {"scheduled": False, "reason": RETRY_DISABLED}
+    if not _is_transient_failure(outcome):
+        _clear_retry(conn, job["id"], err)
+        conn.commit()
+        return {"scheduled": False, "reason": RETRY_NOT_TRANSIENT}
+    if attempt >= len(RETRY_DELAYS_SECONDS):
+        # Ladder exhausted: fall back to the natural schedule and reset so the
+        # next occurrence gets a fresh ladder if the network is still down.
+        _clear_retry(conn, job["id"], err)
+        conn.commit()
+        return {"scheduled": False, "reason": RETRY_EXHAUSTED,
+                "attempts": attempt}
+    delay = RETRY_DELAYS_SECONDS[attempt]
+    retry_at = moment + float(delay)
+    view = dict(job)
+    view["last_run_at"] = moment
+    # Compare against the schedule's own next occurrence (not the retry-folded
+    # projection) — the same natural-vs-ladder test upstream ``plan_retry`` uses.
+    natural = _natural_next_run_at(view, cfg=cfg, now=moment)
+    if natural is not None and natural <= retry_at:
+        # The schedule fires again sooner than the ladder would — the natural
+        # occurrence IS the retry, so do not consume an attempt.
+        _clear_retry(conn, job["id"], err)
+        conn.commit()
+        return {"scheduled": False, "reason": RETRY_NATURAL_SOONER}
+    conn.execute(
+        "UPDATE jobs SET retry_at=?, retry_attempt=?, last_error=?, "
+        "updated_at=? WHERE id=?",
+        (retry_at, attempt + 1, err[:500], _now(), job["id"]))
+    conn.commit()
+    _audit("retry", requested_by,
+           {"job_id": str(job["id"]), "attempt": str(attempt + 1),
+            "delay_s": str(delay), "state": state})
+    return {"scheduled": True, "attempt": attempt + 1, "delay": delay,
+            "at": retry_at, "reason": "unreachable"}
+
+
 def _db_path(cfg: Any) -> Path:
     return Path(cfg.state_dir()) / "schedules.db"
 
@@ -195,6 +482,15 @@ def _migrate(conn: sqlite3.Connection) -> None:
     if "deliver_to" not in cols:
         conn.execute("ALTER TABLE jobs ADD COLUMN deliver_to TEXT "
                      "NOT NULL DEFAULT ''")
+    if "retry_at" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN retry_at REAL "
+                     "NOT NULL DEFAULT 0")
+    if "retry_attempt" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN retry_attempt INTEGER "
+                     "NOT NULL DEFAULT 0")
+    if "last_error" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN last_error TEXT "
+                     "NOT NULL DEFAULT ''")
 
 
 def _audit(op: str, actor: str, detail: Dict[str, Any]) -> None:
@@ -218,7 +514,18 @@ def _job_dict(row: sqlite3.Row) -> Dict[str, Any]:
             "last_run_at": row["last_run_at"],
             "last_state": row["last_state"],
             "run_count": row["run_count"],
-            "deliver_to": row["deliver_to"]}
+            "deliver_to": row["deliver_to"],
+            "retry_at": row["retry_at"],
+            "retry_attempt": row["retry_attempt"],
+            "last_error": row["last_error"]}
+
+
+def _job_view(cfg: Any, job: Dict[str, Any],
+              now: Optional[float] = None) -> Dict[str, Any]:
+    """Job dict plus the derived ``next_run_at`` projection (real, not null)."""
+    view = dict(job)
+    view["next_run_at"] = next_run_at(view, cfg=cfg, now=now)
+    return view
 
 
 def _check_name(name: str) -> str:
@@ -361,18 +668,22 @@ def _missed_windows(job: Dict[str, Any], now: float) -> int:
     return 0
 
 
-def _due(job: Dict[str, Any], now: float) -> bool:
+def _due(job: Dict[str, Any], now: float, cfg: Any = None) -> bool:
     if not job["enabled"]:
         return False
+    # A pending retry re-arms the job at the ladder instant regardless of the
+    # natural schedule (reference cron/unreachable_retry.plan_retry pulls
+    # next_run_at earlier; here retry_at is the explicit re-arm).
+    retry_at = float(job.get("retry_at") or 0.0)
+    if retry_at > 0:
+        return now >= retry_at
     kind = job["kind"]
     if kind == "interval":
         base = job["last_run_at"] or job["created_at"]
         return now >= base + job["interval_min"] * 60.0
     if kind == "daily":
-        day_start = now - (now % 86400.0)
-        target = day_start + job["hour"] * 3600.0 + job["minute"] * 60.0
-        if target > now:
-            target -= 86400.0
+        zone, _name = _zone(cfg)
+        target = _daily_target(job, now, zone)
         return job["last_run_at"] < target <= now
     if kind == "once":
         return job["last_run_at"] <= 0 < job["at_ts"] <= now
@@ -564,8 +875,10 @@ def list_jobs(cfg: Any, *, include_disabled: bool = True,
             query += " WHERE enabled=1"
         query += " ORDER BY id DESC LIMIT ?"
         rows = conn.execute(query, (limit,)).fetchall()
+        _zone_obj, tz_name = _zone(cfg)
         return {"state": "OK",
-                "jobs": [_job_dict(r) for r in rows], "limit": limit}
+                "jobs": [_job_view(cfg, _job_dict(r)) for r in rows],
+                "limit": limit, "timezone": tz_name}
     finally:
         conn.close()
 
@@ -592,7 +905,7 @@ def get_job(cfg: Any, job_id: int) -> Dict[str, Any]:
         runs = conn.execute(
             "SELECT * FROM runs WHERE job_id=? ORDER BY id DESC LIMIT 10",
             (row["id"],)).fetchall()
-        job = _job_dict(row)
+        job = _job_view(cfg, _job_dict(row))
         job["recent_runs"] = [
             {"id": r["id"], "started_at": r["started_at"],
              "finished_at": r["finished_at"], "state": r["state"],
@@ -622,8 +935,8 @@ def _set_enabled(cfg: Any, job_id: int, enabled: bool, *,
                      (1 if enabled else 0, _now(), int(job_id)))
         conn.commit()
         _audit(op, requested_by, {"job_id": str(int(job_id))})
-        return {"state": "OK", "job": _job_dict(
-            _get(conn, job_id))}
+        return {"state": "OK", "job": _job_view(
+            cfg, _job_dict(_get(conn, job_id)))}
     finally:
         conn.close()
 
@@ -1114,12 +1427,12 @@ def run_due(cfg: Any, *, requested_by: str = "cli:user",
         claimed: List[Dict[str, Any]] = []
         for row in rows:
             job = _job_dict(row)
-            if not force and not _due(job, moment):
+            if not force and not _due(job, moment, cfg):
                 continue
             if len(claimed) >= max(1, min(int(limit or 10), 25)):
                 break
             cur = conn.execute(
-                "UPDATE jobs SET last_run_at=?, updated_at=? "
+                "UPDATE jobs SET last_run_at=?, updated_at=?, retry_at=0 "
                 "WHERE id=? AND last_run_at=?",
                 (moment, moment, job["id"], job["last_run_at"]))
             if cur.rowcount != 1:
@@ -1163,13 +1476,16 @@ def run_due(cfg: Any, *, requested_by: str = "cli:user",
             _audit("run", requested_by,
                    {"job_id": str(job["id"]), "state": state, "code": code,
                     "catch_up": str(catch_up)})
+            # A transient failure that never reached the model re-arms the job
+            # on the bounded ladder; any run that reached the model resets it.
+            retry = _plan_retry(cfg, conn, job, outcome, moment, requested_by)
             # Delivery is downstream of a durable run receipt: it may fail,
             # degrade, or be unavailable without touching the run outcome.
             delivery = _deliver_result(cfg, conn, job, run_id, outcome, stop,
                                        requested_by)
             results.append({"job_id": job["id"], "name": job["name"],
                             "state": state, "code": code,
-                            "catch_up": catch_up,
+                            "catch_up": catch_up, "retry": retry,
                             "delivery": delivery})
         return {"state": "OK", "ran": len(results), "results": results,
                 "catch_up": sum(int(r.get("catch_up", 0)) for r in results)}
@@ -1208,17 +1524,23 @@ def scheduler_status(cfg: Any, *, now: Optional[float] = None) -> Dict[str, Any]
         _migrate(conn)
         rows = conn.execute(
             "SELECT * FROM jobs ORDER BY id").fetchall()
+        _zone_obj, tz_name = _zone(cfg)
         jobs = []
         for row in rows:
             job = _job_dict(row)
             jobs.append({"id": job["id"], "name": job["name"],
                          "kind": job["kind"], "enabled": job["enabled"],
-                         "due": _due(job, moment),
+                         "due": _due(job, moment, cfg),
                          "missed_windows": _missed_windows(job, moment),
                          "last_run_at": job["last_run_at"],
                          "last_state": job["last_state"],
-                         "run_count": job["run_count"]})
-        return {"state": "OK", "now": moment, "jobs": jobs,
+                         "run_count": job["run_count"],
+                         "next_run_at": next_run_at(job, cfg=cfg, now=moment),
+                         "retry_at": job["retry_at"],
+                         "retry_attempt": job["retry_attempt"],
+                         "last_error": job["last_error"]})
+        return {"state": "OK", "now": moment, "timezone": tz_name,
+                "retry_enabled": retry_enabled(cfg), "jobs": jobs,
                 "due_count": sum(1 for j in jobs if j["due"]),
                 "catch_up_total": sum(j["missed_windows"] for j in jobs)}
     finally:

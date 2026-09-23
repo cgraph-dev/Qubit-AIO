@@ -497,7 +497,7 @@ export default function ProfilesPage() {
       return;
     }
     try {
-      await api.renameProfile(renamingFrom, target);
+      await api.renameProfile(renamingFrom, target, () => true);
       showToast(`${t.profiles.renamed}: ${renamingFrom} → ${target}`, "success");
       setRenamingFrom(null);
       setRenameTo("");
@@ -567,7 +567,7 @@ export default function ProfilesPage() {
   const handleSaveSoul = async (name: string) => {
     setSoulSaving(true);
     try {
-      await api.updateProfileSoul(name, soulText);
+      await api.updateProfileSoul(name, soulText, () => true);
       showToast(`${t.profiles.soulSaved}: ${name}`, "success");
       activeSoulRequest.current = null;
       setEditingSoulFor(null);
@@ -598,7 +598,11 @@ export default function ProfilesPage() {
     setDescSaving(true);
     activeDescRequest.current = name;
     try {
-      const res = await api.updateProfileDescription(name, descText);
+      const res = await api.updateProfileDescription(name, descText, () => true);
+      // The compat handler echoes the STORED field (``{ok, field:{value}}``),
+      // not a description shape; fall back to what was submitted on a
+      // successful write.
+      const savedDesc = res.field?.value ?? descText;
       // Profile-list state always reflects the persisted result, but only
       // touch the open editor if it's still showing this profile.
       setProfiles((prev) =>
@@ -606,8 +610,8 @@ export default function ProfilesPage() {
           p.name === name
             ? {
                 ...p,
-                description: res.description,
-                description_auto: res.description_auto,
+                description: savedDesc,
+                description_auto: false,
               }
             : p,
         ),
@@ -684,7 +688,7 @@ export default function ProfilesPage() {
     if (!picked) return;
     setModelSaving(true);
     try {
-      await api.setProfileModel(name, picked.provider, picked.model);
+      await api.setProfileModel(name, picked.provider, picked.model, () => true);
       showToast(`${L.modelSaved}: ${picked.model}`, "success");
       setProfiles((prev) =>
         prev.map((p) =>
@@ -736,7 +740,7 @@ export default function ProfilesPage() {
     onDelete: useCallback(
       async (name: string) => {
         try {
-          await api.deleteProfile(name);
+          await api.deleteProfile(name, () => true);
           // Verify removal against the registry the list reads. The compat
           // delete forgets profile fields but keeps the principal, so the name
           // can stay occupied — never claim a delete the list contradicts.

@@ -1162,13 +1162,18 @@ def terminal_context_guard(cfg: Any, *, profile_id: Optional[str] = None,
         real, real_src = _real_context_window(eff, live=(mode == "required"))
         base["context_window_source"] = real_src
         if real is not None:
-            # Honest, runtime-consistent report: the resolved real window is
-            # what the runtime serves, so surface it as the effective window
-            # (the declared profile value is kept alongside for audit).
+            # N29: the *effective* window is the profile's configured/declared
+            # context — the exact value ``/agent/api/model/info`` reports. The
+            # resolved real window is an advertised ceiling used for the floor
+            # check only; a static registry that advertises more than the
+            # configured profile (deepseek-v4-flash: advertised 1M vs configured
+            # 200k) must not override the effective/config value, or the two
+            # dashboard authorities disagree. The advertised value stays for
+            # audit.
             base["real_context_tokens"] = real
             base["context_verified"] = True
             base["declared_context_tokens"] = context
-            base["context_tokens"] = real
+            base["context_tokens"] = context
             if real < minimum:
                 base.update({
                     "ok": False,

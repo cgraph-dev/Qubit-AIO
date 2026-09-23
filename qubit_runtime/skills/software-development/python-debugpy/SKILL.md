@@ -149,7 +149,7 @@ For long-lived processes: Qubit gateway, tui_gateway, a daemon, a process that's
 ### Setup
 
 ```bash
-source <hermes-agent-repo>/.venv/bin/activate
+source <qubit-agent-repo>/.venv/bin/activate
 pip install debugpy
 ```
 
@@ -246,7 +246,7 @@ This is fine for one-off automation but painful as an interactive UX.
   "connect": { "host": "127.0.0.1", "port": 5678 },
   "justMyCode": false,
   "pathMappings": [
-    { "localRoot": "${workspaceFolder}", "remoteRoot": "<hermes-agent-repo>" }
+    { "localRoot": "${workspaceFolder}", "remoteRoot": "<qubit-agent-repo>" }
   ]
 }
 ```

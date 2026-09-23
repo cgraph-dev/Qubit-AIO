@@ -289,6 +289,47 @@ def token_show(cfg: Any, token_id: str) -> Dict[str, Any]:
     return {"state": "OK", "token": _token_public(rec)}
 
 
+def token_summary(cfg: Any) -> Dict[str, Any]:
+    """Counts of device tokens by status (never a token/verifier)."""
+    tokens = token_list(cfg).get("tokens", [])
+    counts = {"pending": 0, "active": 0, "revoked": 0}
+    for rec in tokens:
+        status = str(rec.get("status", "pending"))
+        counts[status] = counts.get(status, 0) + 1
+    return {"state": "OK", "total": len(tokens), **counts}
+
+
+def inventory(cfg: Any) -> Dict[str, Any]:
+    """The canonical device inventory: enrollment + tokens (redacted).
+
+    This is the one read surface behind the dashboard ``/devices``/
+    ``/api/device/*`` routes (``voicebridge/webui.py``) and the CLI
+    ``qubit device`` subcommands. It composes :func:`profile` (machine id,
+    enrollment, capability snapshot) with :func:`token_list` (every
+    device-scoped token, redacted) — no token value, verifier, or salt is ever
+    present in the result.
+    """
+    prof = profile(cfg)
+    tokens = token_list(cfg).get("tokens", [])
+    return {
+        "schema": "qubit-device-inventory/1",
+        "state": "OK",
+        "machine_id": prof.get("machine_id"),
+        "enrolled": bool(prof.get("enrolled", False)),
+        "enrolled_at": prof.get("enrolled_at"),
+        "model_alias": prof.get("model_alias"),
+        "capabilities": dict(prof.get("capabilities") or {}),
+        "tokens": tokens,
+        "token_summary": token_summary(cfg),
+        "authority": "voicebridge.device.profile + token_list (references only)",
+    }
+
+
+def status(cfg: Any) -> Dict[str, Any]:
+    """Alias for :func:`inventory` (the dashboard's device status surface)."""
+    return inventory(cfg)
+
+
 def token_issue(cfg: Any, *, device_id: str, scopes: Any,
                 label: str = "", ttl_s: float = TOKEN_DEFAULT_TTL_S,
                 requested_by: str = "cli:user",

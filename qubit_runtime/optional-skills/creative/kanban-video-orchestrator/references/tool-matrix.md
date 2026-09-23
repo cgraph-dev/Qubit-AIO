@@ -1,13 +1,13 @@
 # Tool Matrix — Skills + Toolsets per Role
 
 Maps each role archetype to the Qubit skills it should `always_load` and the
-toolsets it needs. Only references skills that ship in the public hermes-agent
+toolsets it needs. Only references skills that ship in the public qubit-agent
 repository (under `skills/` or `optional-skills/`). External APIs and CLIs are
 called from the terminal toolset; they don't appear in `always_load`.
 
 ## Qubit skills relevant to video production
 
-### Visual / rendering skills (`hermes-agent/skills/creative/`)
+### Visual / rendering skills (`qubit-agent/skills/creative/`)
 
 | Skill | What it does | Best fit for |
 |-------|--------------|--------------|
@@ -22,7 +22,7 @@ called from the terminal toolset; they don't appear in `always_load`.
 | `baoyu-infographic` | Infographic generation | Renderer for data-driven explainer scenes |
 | `meme-generation` *(optional)* | Generate meme images by overlaying text on templates | Generator for satirical/social content; meme-style stills |
 
-### Design / pre-production skills (`hermes-agent/skills/creative/`)
+### Design / pre-production skills (`qubit-agent/skills/creative/`)
 
 | Skill | What it does | Best fit for |
 |-------|--------------|--------------|
@@ -37,7 +37,7 @@ called from the terminal toolset; they don't appear in `always_load`.
 | `creative-ideation` | Constraint-driven project ideation | Director / cinematographer when the brief is wide-open and needs framing |
 | `humanizer` | Strip AI-isms from text, add real voice | Writer / copywriter post-process to avoid AI-tells in scripts and VO copy |
 
-### Audio / media skills (`hermes-agent/skills/creative/` + `skills/media/`)
+### Audio / media skills (`qubit-agent/skills/creative/` + `skills/media/`)
 
 | Skill | What it does | Best fit for |
 |-------|--------------|--------------|
@@ -266,7 +266,7 @@ skills:
 ## API key requirements
 
 Track these in the project setup. The setup script should verify each required
-key is present in `${QUBIT_HOME:-~/.hermes}/.env` (or macOS Keychain) before firing the kanban.
+key is present in `$QUBIT_HOME/.env` (or macOS Keychain) before firing the kanban.
 
 | Service | Env var | Used by |
 |---------|---------|---------|
@@ -283,7 +283,7 @@ key is present in `${QUBIT_HOME:-~/.hermes}/.env` (or macOS Keychain) before fir
 | Anthropic | `ANTHROPIC_API_KEY` | every Qubit profile (Claude) |
 
 If a key is missing, prompt the user to add it. Storage methods, in order of
-preference: macOS Keychain → `${QUBIT_HOME:-~/.hermes}/.env` → environment variable.
+preference: macOS Keychain → `$QUBIT_HOME/.env` → environment variable.
 
 ## Skill version pinning
 

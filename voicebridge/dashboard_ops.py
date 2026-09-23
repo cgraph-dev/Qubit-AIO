@@ -762,10 +762,11 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
     (so a settle can never report fabricated success). ``config.write``
     re-enters the SAME ``config_save`` handler the Settings PUT uses, with the
     secret-filtered scalar payload recorded at stage time and ``confirm`` set
-    so the write applies exactly once. ``memory.reset`` and the hooks
-    ``declare``/``remove``/``update`` actions re-enter the same compat handlers
-    with the staged payload, so the pending-approvals banner's id-only Confirm
-    executes the real backend exactly once.
+    so the write applies exactly once. ``memory.reset``, the hooks
+    ``declare``/``remove``/``update`` actions, and ``messaging.platform_update``
+    re-enter the same compat handlers with the staged payload, so the
+    pending-approvals banner's id-only Confirm executes the real backend exactly
+    once.
     """
     if action == "config.write":
         def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
@@ -804,6 +805,21 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
 
             return HC.h_hooks_update(cfg, {}, {**dict(payload or {}),
                                                "confirm": True}, {})
+        return _run
+    if action == "messaging.platform_update":
+        def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
+            from . import qubit_compat as HC
+
+            staged = dict(payload or {})
+            body: Dict[str, Any] = {"confirm": True}
+            if isinstance(staged.get("enabled"), bool):
+                body["enabled"] = staged["enabled"]
+            if isinstance(staged.get("env"), dict):
+                body["env"] = dict(staged["env"])
+            if isinstance(staged.get("clear_env"), list):
+                body["clear_env"] = list(staged["clear_env"])
+            return HC.msg_update(cfg, {}, body,
+                                 {"id": str(staged.get("id", "") or "")})
         return _run
     return None
 

@@ -8,6 +8,9 @@ this process. No host service is ever started, stopped, or restarted.
 Owner Decision #10: every lifecycle transition runs through the shared durable
 confirmation authority, so the transition tests present ``{"confirm": true}``
 (``test_control_without_confirmation_is_refused`` proves the bare-flag refusal).
+Owner Decision #16: ``qubit gateway`` control targets the messaging-gateway
+DAEMON unit (default ``qubit-gateway.service``), so ``gateway.service_unit`` in
+the config names the web-UI unit and the control argv carries the daemon unit.
 """
 import os
 import sys
@@ -16,7 +19,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-UNIT = "qubit-voicebridge.service"
+UNIT = "qubit-gateway.service"
+WEB_UNIT = "qubit-voicebridge.service"
 
 # Test double: records argv, emits plausible `show` output, flips a state file.
 _FAKE_SYSTEMCTL = """#!/bin/sh
@@ -50,7 +54,7 @@ def _cfg(tmp_path, monkeypatch):
     p = tmp_path / "voice.yaml"
     p.write_text(f"logging:\n  jsonl: false\nwebui:\n  token: t\n"
                  f"  host: 127.0.0.1\n  port: 48999\n"
-                 f"gateway:\n  service_unit: {UNIT}\n  system_scope: user\n")
+                 f"gateway:\n  service_unit: {WEB_UNIT}\n  system_scope: user\n")
     from voicebridge.config import Config
 
     return Config.load(p)

@@ -312,13 +312,14 @@ def _rank(pool: List[Dict[str, Any]], min_score: float, cap: int
 
 
 def recall(cfg: Any, query: str, *, session: str = "",
-           limit: Optional[int] = None) -> Dict[str, Any]:
+           limit: Optional[int] = None, offset: int = 0) -> Dict[str, Any]:
     """Active recall over the existing MemoryStore.
 
     Applies the session policy scope, a bounded score threshold, dedupe, and a
-    hard item cap, and returns only redacted snippets. Returns a typed EMPTY
-    result when nothing qualifies, and a typed gate when disabled / estoped /
-    corrupt / unavailable.
+    hard item cap, and returns only redacted snippets. ``offset`` pages the
+    ranked result set (the pool is widened to cover the page, so paging never
+    changes the ordering). Returns a typed EMPTY result when nothing qualifies,
+    and a typed gate when disabled / estoped / corrupt / unavailable.
     """
     if estop_engaged(cfg):
         return _refuse_estop("recall")
@@ -337,11 +338,15 @@ def recall(cfg: Any, query: str, *, session: str = "",
         if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
             return _refuse(BAD_INPUT_CODE, "BAD_INPUT",
                            "limit must be a positive integer")
+    if isinstance(offset, bool) or not isinstance(offset, int) or offset < 0:
+        return _refuse(BAD_INPUT_CODE, "BAD_INPUT",
+                       "offset must be a non-negative integer")
     cap = policy["max_items"]
     if limit is not None:
         cap = min(cap, limit)
     scope = _scope_for(policy, session)
-    pool_limit = min(MAX_POOL, max(cap * 8, cap + 16))
+    need = offset + cap
+    pool_limit = min(MAX_POOL, max(need * 8, need + 16))
     try:
         store = _open_store(cfg)
         try:
@@ -353,14 +358,16 @@ def recall(cfg: Any, query: str, *, session: str = "",
     except Exception as exc:
         return _refuse(UNAVAILABLE_CODE, "UNAVAILABLE",
                        f"memory store unavailable: {exc}")
-    results = _rank(pool, float(policy["min_score"]), cap)
+    ranked = _rank(pool, float(policy["min_score"]), need)
+    results = ranked[offset:offset + cap]
     if not results:
         return {"state": "EMPTY", "code": EMPTY_CODE,
-                "query": _redact(query), "scope": scope,
+                "query": _redact(query), "scope": scope, "offset": offset,
                 "results": [], "count": 0}
     return {"state": "OK", "code": "", "query": _redact(query),
             "scope": scope, "min_score": policy["min_score"],
-            "max_items": cap, "results": results, "count": len(results)}
+            "max_items": cap, "offset": offset, "results": results,
+            "count": len(results)}
 
 
 def resolve(cfg: Any, query: str, *, session: str = "") -> Dict[str, Any]:
@@ -462,6 +469,91 @@ def escalate(cfg: Any, memory_id: int, *, reason: str,
             "previous_tier": current_tier, "tier": new_tier,
             "confidence": round(new_confidence, 4),
             "refs": [f"memory:{memory_id}@{rec.get('scope')}"]}
+
+
+def update(cfg: Any, memory_id: int, *, text: Optional[str] = None,
+           tier: Optional[str] = None, confidence: Optional[float] = None,
+           reason: str = "", session: str = "",
+           confirmed: bool = False) -> Dict[str, Any]:
+    """Confirmation-gated in-place update of one active memory.
+
+    Ports the missing reference update path over the same store the recall
+    surface reads. Scope and permission boundaries are preserved: when the
+    policy is session-scoped, only a record in the caller's scope can be
+    updated (anything else is a typed NOT_FOUND, so the surface never reveals
+    or mutates another scope's records). The mutation is recorded in the
+    append-only store history (``update``) and is estop / disabled gated like
+    every other write.
+    """
+    if estop_engaged(cfg):
+        return _refuse_estop("update")
+    policy, health = _load_policy(cfg)
+    if health["state"] != "ok":
+        return _refuse(CORRUPT_CODE, "CORRUPT", health["detail"])
+    if not policy["enabled"]:
+        return _refuse(UNAVAILABLE_CODE, "DISABLED",
+                       "active recall is disabled by policy")
+    if not confirmed:
+        return _refuse(CONFIRM_CODE, "CONFIRM_REQUIRED",
+                       "updating a memory requires confirmed=True")
+    if isinstance(memory_id, bool) or not isinstance(memory_id, int) \
+            or memory_id <= 0:
+        return _refuse(BAD_INPUT_CODE, "BAD_INPUT",
+                       "memory_id must be a positive integer")
+    if text is None and tier is None and confidence is None:
+        return _refuse(BAD_INPUT_CODE, "BAD_INPUT",
+                       "update needs text, tier, or confidence")
+    if text is not None and (not isinstance(text, str)
+                             or not text.strip()):
+        return _refuse(BAD_INPUT_CODE, "BAD_INPUT",
+                       "text must be a non-empty string")
+    if not isinstance(reason, str) or not reason.strip():
+        return _refuse(BAD_INPUT_CODE, "BAD_INPUT", "reason must not be empty")
+    if len(reason) > MAX_REASON_CHARS:
+        return _refuse(BAD_INPUT_CODE, "BAD_INPUT",
+                       f"reason exceeds {MAX_REASON_CHARS} characters")
+    try:
+        store = _open_store(cfg)
+    except sqlite3.DatabaseError as exc:
+        return _refuse(CORRUPT_CODE, "CORRUPT", f"memory store corrupt: {exc}")
+    except Exception as exc:
+        return _refuse(UNAVAILABLE_CODE, "UNAVAILABLE",
+                       f"memory store unavailable: {exc}")
+    try:
+        rec = store.get(memory_id)
+    except MemoryStoreError:
+        store.close()
+        return _refuse(NOT_FOUND_CODE, "NOT_FOUND",
+                       f"no memory with id {memory_id}")
+    if rec.get("tombstoned"):
+        store.close()
+        return _refuse(NOT_FOUND_CODE, "NOT_FOUND",
+                       f"no active memory with id {memory_id}")
+    allowed_scope = _scope_for(policy, session)
+    if allowed_scope is not None and rec.get("scope") != allowed_scope:
+        store.close()
+        return _refuse(NOT_FOUND_CODE, "NOT_FOUND",
+                       f"no memory with id {memory_id} in this session scope")
+    try:
+        updated = store.update(memory_id, text=text, tier=tier,
+                               confidence=confidence, source="user",
+                               reason=_redact(reason))
+    except MemoryStoreError as exc:
+        store.close()
+        code = (NOT_FOUND_CODE if "no active memory" in str(exc)
+                else BAD_INPUT_CODE)
+        return _refuse(code, "BAD_INPUT" if code == BAD_INPUT_CODE
+                       else "NOT_FOUND", _redact(str(exc)))
+    finally:
+        try:
+            store.close()
+        except Exception:
+            pass
+    return {"state": "OK", "code": "", "id": memory_id,
+            "memory": {"id": updated.get("id"), "tier": updated.get("tier"),
+                       "scope": updated.get("scope"),
+                       "confidence": updated.get("confidence")},
+            "refs": [f"memory:{memory_id}@{updated.get('scope')}"]}
 
 
 # ------------------------------------------------------------------ status

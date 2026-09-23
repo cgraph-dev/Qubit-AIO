@@ -248,6 +248,25 @@ _COMPACTION_TAIL_MARKER = "_compaction_tail"
 PROACTIVE_PRUNE_REARM_MODEL_CONFIG_KEY = "_proactive_prune_rearm_tokens"
 
 _NO_USER_TASK_SENTINEL = "None. This session contains no user-authored turns."
+
+
+def _is_checkpoint_item(item: Any) -> bool:
+    return isinstance(item, dict) and item.get("type") == "compaction"
+
+
+def _newest_checkpoint_carrier(messages: List[Dict[str, Any]], key: str) -> int:
+    """Index of the last assistant message carrying a ``type: "compaction"`` item under *key*, or -1.
+    Transcript-side mirror of ``native_compaction.prune_pre_checkpoint_items``' newest-run-wins rule:
+    the wire builder drops every checkpoint before the last one, so this is the only carrier whose
+    checkpoint can still reach a request."""
+    for i in range(len(messages) - 1, -1, -1):
+        msg = messages[i]
+        if not isinstance(msg, dict) or msg.get("role") != "assistant":
+            continue
+        items = msg.get(key)
+        if isinstance(items, list) and any(_is_checkpoint_item(item) for item in items):
+            return i
+    return -1
 COMPRESSION_CONTINUATION_USER_CONTENT = (
     "Continue from the compressed conversation context above. "
     "This marker exists because no human user turn was available."

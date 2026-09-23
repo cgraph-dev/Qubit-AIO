@@ -137,7 +137,7 @@ actual = str(n.width) + 'x' + str(n.height)
 
 ### Config location
 
-`$QUBIT_HOME/config.yaml` (defaults to `~/.hermes/config.yaml` when `QUBIT_HOME` is unset)
+`$QUBIT_HOME/config.yaml` (defaults to `$QUBIT_HOME/config.yaml` when `QUBIT_HOME` is unset)
 
 ### MCP entry format
 

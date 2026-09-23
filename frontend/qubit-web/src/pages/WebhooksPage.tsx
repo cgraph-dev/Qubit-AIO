@@ -3,8 +3,12 @@ import {
   AlertTriangle,
   Check,
   Copy,
+  History,
+  KeyRound,
   Plus,
+  RefreshCw,
   RotateCw,
+  Send,
   Trash2,
   Webhook,
   X,
@@ -14,7 +18,11 @@ import { Button } from "@nous-research/ui/ui/components/button";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { H2 } from "@nous-research/ui/ui/components/typography/h2";
 import { api } from "@/lib/api";
-import type { WebhookRoute, WebhooksResponse } from "@/lib/api";
+import type {
+  WebhookDelivery,
+  WebhookRoute,
+  WebhooksResponse,
+} from "@/lib/api";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useToast } from "@nous-research/ui/hooks/use-toast";
@@ -85,6 +93,18 @@ export default function WebhooksPage() {
   const [secretRef, setSecretRef] = useState("");
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState<CreatedWebhook | null>(null);
+
+  // Per-subscription operations (rotate/test/deliveries/retry). ``actionBusy``
+  // keys the in-flight action as ``<name>:<action>`` so only that button spins.
+  const [actionBusy, setActionBusy] = useState<string | null>(null);
+  const [deliveriesFor, setDeliveriesFor] = useState<string | null>(null);
+  const [deliveries, setDeliveries] = useState<WebhookDelivery[]>([]);
+  const [deliveriesLoading, setDeliveriesLoading] = useState(false);
+  const closeDeliveries = useCallback(() => setDeliveriesFor(null), []);
+  const deliveriesModalRef = useModalBehavior({
+    open: deliveriesFor !== null,
+    onClose: closeDeliveries,
+  });
 
   const closeCreateModal = useCallback(() => {
     setCreateModalOpen(false);
@@ -251,6 +271,89 @@ export default function WebhooksPage() {
       }
     },
     [loadWebhooks, showToast],
+  );
+
+  const handleRotateSecret = useCallback(
+    async (sub: WebhookRoute) => {
+      setActionBusy(`${sub.name}:rotate`);
+      try {
+        const res = await api.rotateWebhookSecret(sub.name, () => true);
+        showToast(
+          `Rotated signing secret for "${sub.name}" → ${res.reference_kind ?? "file:"}`,
+          "success",
+        );
+        loadWebhooks();
+      } catch (e) {
+        showToast(`Rotate failed: ${e}`, "error");
+      } finally {
+        setActionBusy(null);
+      }
+    },
+    [loadWebhooks, showToast],
+  );
+
+  const handleTestDelivery = useCallback(
+    async (sub: WebhookRoute) => {
+      setActionBusy(`${sub.name}:test`);
+      try {
+        const res = await api.testWebhook(sub.name, () => true);
+        if (res.verdict === "DELIVERED") {
+          showToast(
+            `Test delivered to "${sub.name}" (HTTP ${res.http_status ?? "—"})`,
+            "success",
+          );
+        } else {
+          showToast(
+            `Test ${res.verdict ?? "FAILED"}: ${res.error ?? "delivery failed"}`,
+            "error",
+          );
+        }
+      } catch (e) {
+        showToast(`Test failed: ${e}`, "error");
+      } finally {
+        setActionBusy(null);
+      }
+    },
+    [showToast],
+  );
+
+  const handleRetryDelivery = useCallback(
+    async (sub: WebhookRoute) => {
+      setActionBusy(`${sub.name}:retry`);
+      try {
+        const res = await api.retryWebhook(sub.name, () => true);
+        if (res.verdict === "DELIVERED") {
+          showToast(`Retry delivered for "${sub.name}"`, "success");
+        } else {
+          showToast(
+            `Retry ${res.verdict ?? "FAILED"}: ${res.error ?? "delivery failed"}`,
+            "error",
+          );
+        }
+      } catch (e) {
+        showToast(`Retry failed: ${e}`, "error");
+      } finally {
+        setActionBusy(null);
+      }
+    },
+    [showToast],
+  );
+
+  const openDeliveries = useCallback(
+    async (sub: WebhookRoute) => {
+      setDeliveriesFor(sub.name);
+      setDeliveries([]);
+      setDeliveriesLoading(true);
+      try {
+        const res = await api.getWebhookDeliveries(sub.name);
+        setDeliveries(res.deliveries);
+      } catch (e) {
+        showToast(`Could not load deliveries: ${e}`, "error");
+      } finally {
+        setDeliveriesLoading(false);
+      }
+    },
+    [showToast],
   );
 
   const webhookDelete = useConfirmDelete({
@@ -445,6 +548,91 @@ export default function WebhooksPage() {
         </div>
       )}
 
+      {/* Delivery receipts modal (redacted) */}
+      {deliveriesFor && (
+        <div
+          ref={deliveriesModalRef}
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/85 p-4"
+          onClick={(e) => e.target === e.currentTarget && closeDeliveries()}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="webhook-deliveries-title"
+        >
+          <div
+            className={cn(
+              themedBody,
+              "relative w-full max-w-2xl border border-border bg-card shadow-2xl flex flex-col max-h-[90vh]",
+            )}
+          >
+            <Button
+              ghost
+              size="icon"
+              onClick={closeDeliveries}
+              className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+              aria-label="Close"
+            >
+              <X />
+            </Button>
+            <header className="p-5 pb-3 border-b border-border">
+              <h2
+                id="webhook-deliveries-title"
+                className="font-mondwest text-display text-base tracking-wider"
+              >
+                Deliveries — {deliveriesFor}
+              </h2>
+            </header>
+            <div className="p-5 overflow-y-auto">
+              {deliveriesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Spinner className="text-xl text-primary" />
+                </div>
+              ) : deliveries.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No delivery receipts on record.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {deliveries.map((d, i) => (
+                    <div
+                      key={`${d.ts ?? "d"}-${i}`}
+                      className="flex items-start gap-3 border border-border bg-background/40 px-3 py-2 text-xs"
+                    >
+                      <Badge
+                        tone={
+                          d.verdict === "DELIVERED"
+                            ? "success"
+                            : d.verdict === "FAILED"
+                              ? "destructive"
+                              : "secondary"
+                        }
+                      >
+                        {d.verdict ?? "UNKNOWN"}
+                      </Badge>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
+                          <span className="font-mono">
+                            {d.event ?? "—"}
+                          </span>
+                          {typeof d.status === "number" && (
+                            <span>HTTP {d.status}</span>
+                          )}
+                          {d.ts && <span>{d.ts}</span>}
+                        </div>
+                        {d.error && (
+                          <p className="mt-1 text-destructive break-words">
+                            {d.error}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {!enabled && (
         <Card className="border-warning/50">
           <CardContent className="flex flex-col gap-4 py-6 text-sm sm:flex-row sm:items-center sm:justify-between">
@@ -569,6 +757,53 @@ export default function WebhooksPage() {
               </div>
 
               <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  ghost
+                  size="icon"
+                  title="Rotate signing secret"
+                  aria-label="Rotate signing secret"
+                  disabled={actionBusy === `${sub.name}:rotate`}
+                  onClick={() => handleRotateSecret(sub)}
+                >
+                  {actionBusy === `${sub.name}:rotate` ? (
+                    <Spinner />
+                  ) : (
+                    <KeyRound />
+                  )}
+                </Button>
+                <Button
+                  ghost
+                  size="icon"
+                  title="Send test delivery"
+                  aria-label="Send test delivery"
+                  disabled={actionBusy === `${sub.name}:test` || !sub.enabled}
+                  onClick={() => handleTestDelivery(sub)}
+                >
+                  {actionBusy === `${sub.name}:test` ? <Spinner /> : <Send />}
+                </Button>
+                <Button
+                  ghost
+                  size="icon"
+                  title="Delivery history"
+                  aria-label="Delivery history"
+                  onClick={() => openDeliveries(sub)}
+                >
+                  <History />
+                </Button>
+                <Button
+                  ghost
+                  size="icon"
+                  title="Retry last failed delivery"
+                  aria-label="Retry last failed delivery"
+                  disabled={actionBusy === `${sub.name}:retry` || !sub.enabled}
+                  onClick={() => handleRetryDelivery(sub)}
+                >
+                  {actionBusy === `${sub.name}:retry` ? (
+                    <Spinner />
+                  ) : (
+                    <RefreshCw />
+                  )}
+                </Button>
                 <Button
                   ghost
                   size="sm"

@@ -554,7 +554,15 @@ def discover(cfg: Any, name: str, *, persist: bool = False,
 
 
 def set_auth_ref(cfg: Any, name: str, ref: str) -> Dict[str, Any]:
-    """Record a credential REFERENCE for a server (never a raw secret)."""
+    """Record a credential REFERENCE for a server (never a raw secret).
+
+    The reference is stored under ``env.MCP_AUTH`` and surfaces verbatim
+    (reference only) through :func:`list_servers`, so the write and the read
+    round-trip. The canonical client resolves ``env:``/``file:`` references;
+    ``vault:`` is carried honestly but has no Qubit-side resolver
+    (``voicebridge.mcp_client._resolve_ref``), so the connect fails closed
+    rather than spoofing a credential.
+    """
     clean = _check_name(name)
     data = _load(cfg)
     rec = data["servers"].get(clean)
@@ -571,7 +579,35 @@ def set_auth_ref(cfg: Any, name: str, ref: str) -> Dict[str, Any]:
     rec["auth"] = "header"
     rec["updated_at"] = time.time()
     _save(cfg, data)
-    return {"state": "OK", "name": clean, "reference": value}
+    return {"state": "OK", "name": clean, "reference": value,
+            "reference_set": True, "auth": "header"}
+
+
+def auth_status(cfg: Any, name: str) -> Dict[str, Any]:
+    """Read-only credential-reference status for one server (never a value).
+
+    Resolves through the canonical registry so the read matches the write. The
+    ``resolvable`` flag is honest: ``env:``/``file:`` resolve at connect time;
+    ``vault:``/``ref:`` are carried but have no Qubit-side resolver.
+    """
+    clean = _check_name(name)
+    row = next((s for s in list_servers(cfg).get("servers", [])
+                if s.get("name") == clean), None)
+    if row is None:
+        raise McpServerError(INVOKE_NOT_FOUND_CODE,
+                             f"no registered server {clean!r}")
+    ref = str((row.get("env") or {}).get("MCP_AUTH", "") or "")
+    resolvable = False
+    if ref:
+        try:
+            from . import env_store as ES
+
+            resolvable = ES.is_resolvable_reference(ref)
+        except Exception:  # noqa: BLE001 - status read never fails hard
+            resolvable = False
+    return {"state": "OK", "name": clean, "auth": row.get("auth", "none"),
+            "reference_set": bool(ref), "reference": ref or None,
+            "resolvable": resolvable}
 
 
 # ---------------------------------------------------------------------------

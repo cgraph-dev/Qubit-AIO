@@ -28,7 +28,13 @@ if sys.platform == "win32":
 else:
     import fcntl
 
-_GATEWAY_KIND = "hermes-gateway"
+_GATEWAY_KIND = "qubit-gateway"
+# N26: the pre-de-brand ``kind`` value. Still accepted when reading a record an
+# older daemon wrote (read-old/write-new), so a live upgrade never orphans state.
+_LEGACY_GATEWAY_KIND = "hermes-gateway"
+_HOME_KEY = "qubit_home"
+# N26: the pre-de-brand home key; still accepted when reading legacy records.
+_LEGACY_HOME_KEY = "hermes_home"
 _RUNTIME_STATUS_FILE = "gateway_state.json"
 _LOCKS_DIRNAME = "gateway-locks"
 _IS_WINDOWS = sys.platform == "win32"
@@ -44,6 +50,31 @@ _gateway_running_pid_cache_lock = threading.Lock()
 _gateway_running_pid_cache: dict[tuple[str, bool, bool], tuple[float, tuple, Optional[int]]] = {}
 
 logger = logging.getLogger(__name__)
+
+
+def gateway_kind_matches(value: Any) -> bool:
+    """True for the current Qubit gateway ``kind`` or the pre-de-brand legacy value.
+
+    The legacy value is accepted so a record written by an older daemon (before
+    the N26 service-name de-brand) still identifies as a gateway.
+    """
+    return value in (_GATEWAY_KIND, _LEGACY_GATEWAY_KIND)
+
+
+def record_home(record: Optional[dict[str, Any]]) -> Optional[str]:
+    """QUBIT_HOME from a gateway identity record.
+
+    Reads the current ``qubit_home`` key first, then falls back to the
+    pre-de-brand ``hermes_home`` key, so a record written by an older daemon
+    still resolves (non-destructive read-old/write-new).
+    """
+    if not isinstance(record, dict):
+        return None
+    for key in (_HOME_KEY, _LEGACY_HOME_KEY):
+        value = record.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return None
 
 
 class StormInfo(NamedTuple):
@@ -108,9 +139,9 @@ def recorded_gateway_home_conflicts(
 ) -> bool:
     """True when a persisted gateway record names a DIFFERENT QUBIT_HOME (cross-profile kill guard:
     profile B's stop must never SIGTERM profile A). ``expected_home`` overrides the comparison base.
-    Legacy records without ``hermes_home`` prove nothing -> False; a comparison failure fails
+    Legacy records without a home stamp prove nothing -> False; a comparison failure fails
     closed -> True."""
-    recorded_home = record.get("hermes_home") if isinstance(record, dict) else None
+    recorded_home = record_home(record)
     if not isinstance(recorded_home, str) or not recorded_home.strip():
         return False
     try:
@@ -144,13 +175,13 @@ def _profile_label_for_home(home: Path | str) -> Optional[str]:
 
 def scoped_lock_owner_label(record: Optional[dict[str, Any]]) -> Optional[str]:
     """Profile label of a scoped-lock owner (None: PID-only wording): the validated ``profile``
-    field stamped by :func:`acquire_scoped_lock`, else inferred from ``hermes_home`` (old locks)."""
+    field stamped by :func:`acquire_scoped_lock`, else inferred from the home stamp (old locks)."""
     if not isinstance(record, dict):
         return None
     profile = record.get("profile")
     if isinstance(profile, str) and _PROFILE_LABEL_RE.match(profile.strip()):
         return profile.strip()
-    home = record.get("hermes_home")
+    home = record_home(record)
     return _profile_label_for_home(home) if isinstance(home, str) and home.strip() else None
 
 
@@ -325,7 +356,8 @@ def _gateway_command_subcommand(command: str | None) -> str | None:
     # Gateway-dedicated entrypoints carry no subcommand to inspect.
     if any(t == "gateway/run.py" or t.endswith("/gateway/run.py") for t in tokens):
         return "run"
-    if any(b in ("hermes-gateway", "hermes-gateway.exe") for b in basenames):
+    if any(b in ("qubit-gateway", "qubit-gateway.exe",
+                 "hermes-gateway", "hermes-gateway.exe") for b in basenames):
         return "run"
     joined = " ".join(tokens)
     if "qubit_cli.main" not in joined and "qubit_cli/main.py" not in joined and not any(
@@ -370,7 +402,7 @@ def _looks_like_gateway_process(pid: int) -> bool:
 def _record_looks_like_gateway(record: dict[str, Any]) -> bool:
     """Validate gateway identity from PID-file metadata when cmdline is unavailable."""
     argv = record.get("argv")
-    if record.get("kind") != _GATEWAY_KIND or not isinstance(argv, list) or not argv:
+    if not gateway_kind_matches(record.get("kind")) or not isinstance(argv, list) or not argv:
         return False
     return looks_like_gateway_runtime_command_line(" ".join(str(part) for part in argv))
 
@@ -391,13 +423,15 @@ def _command_line_belongs_to_profile(command: str, profile_home: Path) -> bool:
     if profile_name is not None and profile_name != "default":
         profile_lc = profile_name.lower()
         return any(needle in command_lc for needle in (
-            f"--profile {profile_lc}", f"-p {profile_lc}", f"hermes_home={home_lc}"
+            f"--profile {profile_lc}", f"-p {profile_lc}",
+            f"qubit_home={home_lc}", f"hermes_home={home_lc}"
         ))
     # Default profile: accept unless argv names another profile or a conflicting explicit
     # QUBIT_HOME= (its absence is not disqualifying -- QUBIT_HOME usually arrives via the env).
     if "--profile " in command_lc or " -p " in command_lc:
         return False
-    return not ("hermes_home=" in command_lc and f"hermes_home={home_lc}" not in command_lc)
+    assignments = [t for t in ("qubit_home=", "hermes_home=") if t in command_lc]
+    return all(f"{t}{home_lc}" in command_lc for t in assignments)
 
 
 def _record_matches_live_gateway_pid(
@@ -420,7 +454,7 @@ def _build_pid_record() -> dict:
         "start_time": _get_process_start_time(os.getpid()),
         # Scoped locks are machine-global; the owner's home lets a cross-profile
         # --replace place its takeover marker where the target will read it.
-        "hermes_home": str(_canonical_qubit_home(_get_process_qubit_home())),
+        _HOME_KEY: str(_canonical_qubit_home(_get_process_qubit_home())),
     }
 
 
@@ -442,12 +476,12 @@ def _get_code_identity_fields() -> dict[str, Any]:
 
 
 def _pid_record_belongs_to_current_profile(record: Optional[dict[str, Any]]) -> bool:
-    """True when the record's ``hermes_home`` matches the current process (legacy records: True);
+    """True when the record's home stamp matches the current process (legacy records: True);
     another QUBIT_HOME's record must be ignored or the default gateway assumes its identity."""
     if not isinstance(record, dict):
         return False
-    record_home = record.get("hermes_home")
-    return not record_home or _same_qubit_home(record_home, _get_process_qubit_home())
+    home_value = record_home(record)
+    return not home_value or _same_qubit_home(home_value, _get_process_qubit_home())
 
 
 def _build_runtime_status_record() -> dict[str, Any]:
@@ -811,8 +845,10 @@ def write_runtime_status(
             k: v for k, v in platforms.items() if not isinstance(k, str) or ":" not in k
         }
     # Re-stamp identity + code fields on every write: the file can outlive its creator and the
-    # top-level record must describe the CURRENT writer.
-    payload.update({key: current_record[key] for key in ("kind", "pid", "argv", "start_time")})
+    # top-level record must describe the CURRENT writer. The home key is migrated to the current
+    # ``qubit_home`` name and the pre-de-brand key dropped (read-old/write-new).
+    payload.update({key: current_record[key] for key in ("kind", "pid", "argv", "start_time", _HOME_KEY)})
+    payload.pop(_LEGACY_HOME_KEY, None)
     payload["updated_at"] = _utc_now_iso()
     payload.update(_get_code_identity_fields())
     _apply_set_fields(payload, (
@@ -984,7 +1020,7 @@ def get_runtime_status_running_pid(
     pid = _live_pid_from_record(payload)
     if pid is None:
         return None
-    # Active-profile context: the record's hermes_home must match this process so a stale record
+    # Active-profile context: the record's home stamp must match this process so a stale record
     # cannot lend another profile's identity.
     if expected_home is None and not _pid_record_belongs_to_current_profile(payload):
         return None
@@ -1242,7 +1278,7 @@ def _validated_scoped_lock_gateway_owner(record: dict[str, Any]) -> Optional[tup
         return None
     owner_pid = _pid_from_record(record)
     owner_start_time = record.get("start_time")
-    raw_home = record.get("hermes_home")
+    raw_home = record_home(record)
     if (
         owner_pid is None or owner_pid <= 0 or owner_pid == os.getpid()
         or not isinstance(owner_start_time, int) or isinstance(owner_start_time, bool)
@@ -1258,7 +1294,7 @@ def _validated_scoped_lock_gateway_owner(record: dict[str, Any]) -> Optional[tup
         return None
     # The target home's own PID record must corroborate the claim.
     pid_record = _read_json_file(target_home / "gateway.pid") or {}
-    pid_record_home = pid_record.get("hermes_home")
+    pid_record_home = record_home(pid_record)
     if (
         not _record_looks_like_gateway(pid_record)
         or _pid_from_record(pid_record) != owner_pid

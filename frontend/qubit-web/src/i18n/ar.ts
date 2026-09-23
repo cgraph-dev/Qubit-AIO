@@ -288,8 +288,8 @@ export const ar = defineLocale({
     providersHint:
       "يكتب memory.provider (فارغ = مدمج) و context.engine إلى config.yaml. يسري في الجلسة التالية.",
     refreshDashboard: "إعادة فحص امتدادات لوحة التحكم",
-    removeConfirm: "إزالة هذا المكوِّن الإضافي من ~/.qubit/plugins/؟",
-    removeHint: "يمكن إزالة المكوِّنات المثبتة من المستخدم تحت ~/.qubit/plugins فقط.",
+    removeConfirm: "إزالة هذا المكوِّن الإضافي من $QUBIT_HOME/plugins/؟",
+    removeHint: "يمكن إزالة المكوِّنات المثبتة من المستخدم تحت $QUBIT_HOME/plugins فقط.",
     rescanHeading: "سجل مكوِّنات SPA",
     rescanHint: "أعد الفحص بعد إضافة ملفات على القرص لتمكن الشريط الجانبي من التقاط المخطوطات الجديدة.",
     runtimeHeading: "وقت تشغيل البوابة (مكوِّنات YAML)",

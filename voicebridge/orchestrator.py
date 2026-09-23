@@ -158,20 +158,6 @@ def _attach_router_pipeline(classifier, cfg) -> None:
         classifier.attach_router(None)
 
 
-_LEGACY_ENV_WARNED: set = set()
-
-
-def _warn_legacy_env_once(path: str) -> None:
-    """Loud one-time migration warning for the legacy key file (no values)."""
-    if path in _LEGACY_ENV_WARNED:
-        return
-    _LEGACY_ENV_WARNED.add(path)
-    log_event("config.legacy_env",
-              path=path,
-              detail="keys still load from the legacy env file; move them "
-                     "to ~/.config/qubit-voicebridge/.env")
-
-
 def _legacy_default_model() -> str:
     """Read the default model name, preferring the Qubit runtime config.
     Returns '' when unavailable."""
@@ -2689,9 +2675,10 @@ class VoiceOrchestrator:
         """Read a KEY from the canonical Qubit env file (or environment).
 
         Canonical: ``~/.config/qubit-voicebridge/.env`` (or the configured
-        ``intent.deepseek_env`` path). A legacy ``~/.hermes/.env`` is still
-        honored when the canonical file is absent, with a loud one-time
-        migration warning — never silently. Values are never logged.
+        ``intent.deepseek_env`` path), plus ``os.environ``. The operator's
+        legacy ``~/.hermes/.env`` is **never** consulted — ``~/.hermes`` is
+        read-only migration input, never a runtime credential fallback
+        (DECISIONS #9/#17). Values are never logged.
         """
         candidates = []
         configured = str(self.cfg.get("intent", "deepseek_env", default="") or "")
@@ -2699,10 +2686,7 @@ class VoiceOrchestrator:
             candidates.append(configured.strip())
         else:
             candidates.append("~/.config/qubit-voicebridge/.env")
-        legacy = "~/.hermes/.env"
-        if legacy not in candidates:
-            candidates.append(legacy)
-        for index, candidate in enumerate(candidates):
+        for candidate in candidates:
             env_path = Path(candidate).expanduser()
             try:
                 lines = env_path.read_text(errors="replace").splitlines()
@@ -2711,8 +2695,6 @@ class VoiceOrchestrator:
             for line in lines:
                 line = line.strip()
                 if line.startswith(name + "="):
-                    if index > 0:
-                        _warn_legacy_env_once(str(env_path))
                     return line.split("=", 1)[1].strip().strip('"').strip("'")
         return os.environ.get(name, "")
 

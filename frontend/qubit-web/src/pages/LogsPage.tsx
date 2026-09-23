@@ -5,11 +5,13 @@ import {
   useCallback,
   useRef,
 } from "react";
-import { FileText, RefreshCw } from "lucide-react";
+import { Download, FileText, RefreshCw, Search, X } from "lucide-react";
+import { useSearchParams } from "react-router";
 import { api } from "@/lib/api";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Button } from "@nous-research/ui/ui/components/button";
 import { FilterGroup, Segmented } from "@nous-research/ui/ui/components/segmented";
+import { Input } from "@nous-research/ui/ui/components/input";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Switch } from "@nous-research/ui/ui/components/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
@@ -46,13 +48,29 @@ const filterGroupClass =
 const segmentedClass =
   "w-fit max-w-full flex-wrap justify-start self-start";
 
+type LogFile = (typeof FILES)[number];
+
+function isLogFile(value: string | null): value is LogFile {
+  return (FILES as readonly string[]).includes(value ?? "");
+}
+
 export default function LogsPage() {
-  const [file, setFile] = useState<(typeof FILES)[number]>("agent");
+  // `?file=gateway` deep link (System page "Open logs" next to a failed
+  // gateway). Ported from the reference LogsPage.tsx:9,57-62.
+  const [searchParams] = useSearchParams();
+  const requestedFile = searchParams.get("file");
+  const [file, setFile] = useState<LogFile>(() =>
+    isLogFile(requestedFile) ? requestedFile : "agent",
+  );
   const [level, setLevel] = useState<(typeof LEVELS)[number]>("ALL");
   const [component, setComponent] =
     useState<(typeof COMPONENTS)[number]>("all");
   const [lineCount, setLineCount] = useState<(typeof LINE_COUNTS)[number]>(100);
   const [autoRefresh, setAutoRefresh] = useState(false);
+  // Free-text filter, server-side post-filtered by the vendored status router
+  // (`?search=`). Debounced so typing does not spam the tail reader.
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
   const [lines, setLines] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,11 +78,16 @@ export default function LogsPage() {
   const { t } = useI18n();
   const { setAfterTitle, setEnd } = usePageHeader();
 
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   const fetchLogs = useCallback(() => {
     setLoading(true);
     setError(null);
     api
-      .getLogs({ file, lines: lineCount, level, component })
+      .getLogs({ file, lines: lineCount, level, component, search })
       .then((resp) => {
         setLines(resp.lines);
         setTimeout(() => {
@@ -75,7 +98,23 @@ export default function LogsPage() {
       })
       .catch((err) => setError(String(err)))
       .finally(() => setLoading(false));
-  }, [file, lineCount, level, component]);
+  }, [file, lineCount, level, component, search]);
+
+  // Download the exact lines currently shown (the server tail + filters are the
+  // source of truth; no second backend fetch is invented).
+  const exportLogs = useCallback(() => {
+    const blob = new Blob([lines.join("\n")], {
+      type: "text/plain;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${file}${search ? `-${search.replace(/[^a-z0-9._-]+/gi, "_")}` : ""}.log`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, [lines, file, search]);
 
   useLayoutEffect(() => {
     setAfterTitle(
@@ -84,6 +123,18 @@ export default function LogsPage() {
           {formatFilterLabel(file)} · {formatFilterLabel(level)} ·{" "}
           {formatFilterLabel(component)}
         </Badge>
+        <Button
+          type="button"
+          ghost
+          size="icon"
+          className="text-muted-foreground hover:text-foreground"
+          onClick={exportLogs}
+          disabled={lines.length === 0}
+          aria-label="Export log lines"
+          title="Download the lines currently shown"
+        >
+          <Download />
+        </Button>
         <Button
           type="button"
           ghost
@@ -133,6 +184,8 @@ export default function LogsPage() {
     t.common.refresh,
     t.logs.autoRefresh,
     fetchLogs,
+    exportLogs,
+    lines.length,
   ]);
 
   useEffect(() => {
@@ -192,6 +245,31 @@ export default function LogsPage() {
               label: String(n),
             }))}
           />
+        </FilterGroup>
+
+        <FilterGroup label="Search" className={filterGroupClass}>
+          <div className="relative flex w-full min-w-0 items-center sm:w-64">
+            <Search className="pointer-events-none absolute left-2 h-3.5 w-3.5 text-text-tertiary" />
+            <Input
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder="Filter lines…"
+              aria-label="Search log lines"
+              className="h-9 min-w-0 pl-7 pr-7 font-mono text-xs"
+            />
+            {searchInput && (
+              <Button
+                type="button"
+                ghost
+                size="icon"
+                aria-label="Clear search"
+                onClick={() => setSearchInput("")}
+                className="absolute right-0 h-8 w-8 text-text-tertiary hover:text-foreground"
+              >
+                <X />
+              </Button>
+            )}
+          </div>
         </FilterGroup>
       </div>
 

@@ -1,7 +1,7 @@
 {
  "schema": "qubit-gap-ledger-section/1",
  "source": "hermes",
- "upstream_pin": "2237be355906fbe6065ce1815711eee52b2d646e",
+ "upstream_pin": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
  "generated": "2026-09-12",
  "method": "Evidence-based regeneration. API rows re-extract the pinned upstream route decorators and classify them from voicebridge.qubit_compat.match disposition plus the handler's real behaviour (a handler whose normal exits are typed gates/refusals is GATED; a real read/write is IMPLEMENTED; a wire-shape stub is PARTIAL). IMPLEMENTED additionally requires an on-disk tests/ function that dispatches the route, calls the handler, or calls the same downstream production module (AST scan), so no row is IMPLEMENTED on a phantom caller. cli / cli-subcommand rows derive status from the live voicebridge.cli build_parser tree plus voicebridge.cli_qubit_forward.FORWARD_TABLE and an AST scan of tests/ for the exercising caller. Plugin-fleet rows are declared explicitly and are IMPLEMENTED only when tests/test_qubit_plugins.py dispatches the registered compat handler over real local state. The full vendored plugin fleet is audited from voicebridge.qubit_plugins.plugin_fleet_audit (which plugin ships a dashboard/manifest.json) and embedded as the plugin_fleet metadata. No status is hand-flipped.",
  "sources_reconciled": [
@@ -118,8 +118,8 @@
  "counts": {
   "total": 573,
   "by_status": {
-   "IMPLEMENTED": 467,
-   "SAFE_EQUIVALENT": 106
+   "IMPLEMENTED": 472,
+   "SAFE_EQUIVALENT": 101
   },
   "by_area": {
    "analytics-config": 4,
@@ -2466,13 +2466,13 @@
    "area": "provider-oauth",
    "capability": "GET /api/providers/oauth",
    "upstream_ref": "qubit_runtime/qubit_cli/web_routers/oauth.py:495",
-   "qubit_backend": "voicebridge/qubit_asgi.py:proxy",
+   "qubit_backend": "voicebridge/qubit_compat.py:h_providers_oauth",
    "cli": "qubit auth login/logout",
    "dashboard": "hermes-dist Keys/Config",
    "voice": "voice auth",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_ingress_confinement8u.py::test_fork_declared_reads_are_served_by_the_fork",
-   "note": "Served redacted by the Qubit-owned vendored Hermes runtime via the ingress proxy; OAuth mutations stay on the Qubit gate.",
+   "proving_test": "tests/test_route_parity_p0_wave13.py::test_providers_oauth_is_redacted_and_shaped",
+   "note": "Real Qubit handler: serves the provider catalog with every secret-like field (token_preview/access_token/refresh_token/id_token/api_key/client_secret/password) stripped and legacy host URLs blanked. Kept off the fork proxy (safe_to_proxy=False).",
    "needs": "creds"
   },
   {
@@ -2522,13 +2522,13 @@
    "area": "provider-oauth",
    "capability": "GET /api/providers/oauth/{provider_id}/poll/{session_id}",
    "upstream_ref": "qubit_runtime/qubit_cli/web_routers/oauth.py:627",
-   "qubit_backend": "voicebridge/qubit_asgi.py:proxy",
+   "qubit_backend": "voicebridge/qubit_compat.py:_NO_OAUTH",
    "cli": "qubit auth login/logout",
    "dashboard": "hermes-dist Keys/Config",
    "voice": "voice auth",
-   "status": "IMPLEMENTED",
-   "proving_test": "tests/test_ingress_confinement8u.py::test_fork_declared_reads_are_served_by_the_fork",
-   "note": "Served by the Qubit-owned vendored Hermes runtime via the ingress proxy; the flow mutation stays on the Qubit gate.",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_route_parity_p0_wave13.py::test_oauth_poll_is_manual_handoff_refusal",
+   "note": "Remote OAuth dance stays gated: the poll only serves sessions created by POST /start, which Qubit refuses; the counterpart is `qubit auth login`.",
    "needs": "creds"
   },
   {
@@ -3086,10 +3086,10 @@
    "cli": "qubit profile * / brain *",
    "dashboard": "hermes-dist Profiles",
    "voice": "voice profile/brain",
-   "status": "SAFE_EQUIVALENT",
+   "status": "IMPLEMENTED",
    "proving_test": "tests/test_packet7d.py::test_api_profiles_check",
-   "note": "Typed policy gate PERSONA_IMMUTABLE_ID via compat dispatcher.",
-   "needs": "owner"
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:DELETE /api/profiles/{name}",
@@ -3170,10 +3170,10 @@
    "cli": "qubit profile * / brain *",
    "dashboard": "hermes-dist Profiles",
    "voice": "voice profile/brain",
-   "status": "SAFE_EQUIVALENT",
-   "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
-   "note": "Typed policy gate DESCRIBE_AUTO_MANUAL via compat dispatcher.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_profile_describe_auto_wave17.py::test_describe_auto_runs_the_real_describer",
+   "note": "Real ported handler: validates the profile, resolves its home, and runs the auxiliary-LLM describer (an unavailable aux LLM is reported inline as ok:false, never a refusal or a 5xx).",
+   "needs": "none"
   },
   {
    "id": "api:POST /api/profiles/{name}/export",
@@ -3250,28 +3250,28 @@
    "area": "sessions",
    "capability": "POST /api/sessions/bulk-delete",
    "upstream_ref": "qubit_runtime/qubit_cli/web_routers/sessions.py:392",
-   "qubit_backend": "voicebridge/qubit_compat.py:__gate__",
+   "qubit_backend": "voicebridge/qubit_compat.py:sessions_bulk_delete",
    "cli": "qubit sessions / memory",
    "dashboard": "hermes-dist Sessions",
    "voice": "voice sessions",
-   "status": "SAFE_EQUIVALENT",
-   "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
-   "note": "Typed policy gate SESSIONS_RECEIPT_STORE via compat dispatcher.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_sessions_mutations_wave18.py::test_bulk_delete_validates_and_confirms",
+   "note": "Real confirmed multi-row delete (500-id cap, unknown ids skipped, children orphaned).",
+   "needs": "none"
   },
   {
    "id": "api:POST /api/sessions/import",
    "area": "sessions",
    "capability": "POST /api/sessions/import",
    "upstream_ref": "qubit_runtime/qubit_cli/web_routers/sessions.py:409",
-   "qubit_backend": "voicebridge/qubit_compat.py:__gate__",
+   "qubit_backend": "voicebridge/qubit_compat.py:sessions_import",
    "cli": "qubit sessions / memory",
    "dashboard": "hermes-dist Sessions",
    "voice": "voice sessions",
-   "status": "SAFE_EQUIVALENT",
-   "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
-   "note": "Typed policy gate SESSIONS_RECEIPT_STORE via compat dispatcher.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_sessions_mutations_wave18.py::test_import_validates_and_is_additive",
+   "note": "Real additive bulk import into the canonical session store (re-imports skipped, not destructive, so no confirmation).",
+   "needs": "none"
   },
   {
    "id": "api:GET /api/sessions/empty/count",
@@ -3292,14 +3292,14 @@
    "area": "sessions",
    "capability": "DELETE /api/sessions/empty",
    "upstream_ref": "qubit_runtime/qubit_cli/web_routers/sessions.py:440",
-   "qubit_backend": "voicebridge/qubit_compat.py:__gate__",
+   "qubit_backend": "voicebridge/qubit_compat.py:sessions_empty_delete",
    "cli": "qubit sessions / memory",
    "dashboard": "hermes-dist Sessions",
    "voice": "voice sessions",
-   "status": "SAFE_EQUIVALENT",
-   "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
-   "note": "Typed policy gate SESSIONS_RECEIPT_STORE via compat dispatcher.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_sessions_mutations_wave18.py::test_empty_delete_confirms",
+   "note": "Real confirmed delete of every empty session.",
+   "needs": "none"
   },
   {
    "id": "api:GET /api/sessions/stats",
@@ -3418,14 +3418,14 @@
    "area": "sessions",
    "capability": "POST /api/sessions/prune",
    "upstream_ref": "qubit_runtime/qubit_cli/web_routers/sessions.py:690",
-   "qubit_backend": "voicebridge/qubit_compat.py:__gate__",
+   "qubit_backend": "voicebridge/qubit_compat.py:sessions_prune",
    "cli": "qubit sessions / memory",
    "dashboard": "hermes-dist Sessions",
    "voice": "voice sessions",
-   "status": "SAFE_EQUIVALENT",
-   "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
-   "note": "Typed policy gate SESSIONS_RECEIPT_STORE via compat dispatcher.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_sessions_mutations_wave18.py::test_prune_requires_confirmation_then_prunes",
+   "note": "Real confirmed prune of ended, non-archived sessions; dry_run reports the match set without deleting.",
+   "needs": "none"
   },
   {
    "id": "api:POST /api/skills/hub/install",
@@ -4333,7 +4333,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_wiring.py::test_gateway_supervision_and_discovery",
+   "proving_test": "tests/test_gateway_daemon_cli_wave16.py::test_gateway_install_confirmed_writes_into_temp_unit_dir",
    "note": "Gateway records/run; process supervision gated.",
    "needs": "none"
   },
@@ -6293,7 +6293,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_wiring.py::test_gateway_supervision_and_discovery",
+   "proving_test": "tests/test_gateway_daemon_cli_wave16.py::test_gateway_install_confirmed_writes_into_temp_unit_dir",
    "note": "Subcommand-surface gap inside the gateway family.",
    "needs": "none"
   },
@@ -6377,7 +6377,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_wiring.py::test_gateway_supervision_and_discovery",
+   "proving_test": "tests/test_gateway_daemon_cli_wave16.py::test_gateway_install_confirmed_writes_into_temp_unit_dir",
    "note": "Subcommand-surface gap inside the gateway family.",
    "needs": "none"
   },

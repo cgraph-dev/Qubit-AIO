@@ -1421,123 +1421,171 @@ def h_model_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         "detail": _redact(out.get("speech", out.get("detail", "")))[:400]}
 
 
+def _profiles_module(cfg: Any):
+    """Return the vendored reference profile registry, Qubit-home bound.
+
+    The profile authority is the reference ``hermes_cli.profiles`` (renamed
+    ``qubit_cli.profiles``) — the real per-profile home directories the
+    ``qubit agent profile`` CLI manages. Binding the Qubit runtime home first
+    guarantees the registry can never resolve the external ``~/.hermes``
+    (independence rule).
+    """
+    from . import qubit_runtime
+
+    qubit_runtime.ensure_path()
+    try:
+        qubit_runtime.use_qubit_home(cfg)
+    except Exception:  # noqa: BLE001 - a resolution miss must not 500 the read
+        pass
+    from qubit_cli import profiles as P  # type: ignore
+    return P
+
+
+def _profile_wire(info: Any) -> Dict[str, Any]:
+    """Map a ``qubit_cli.profiles.ProfileInfo`` to the dashboard wire shape.
+
+    Ported from the reference ``web_routers/profiles.py:_profile_to_dict``
+    (``:79``); the absolute profile directory is replaced by the profile id
+    (PRB-09: no absolute runtime paths on the served surface).
+    """
+    name = str(getattr(info, "name", "") or "")
+    return {
+        "name": name,
+        "path": name,
+        "is_default": bool(getattr(info, "is_default", False)),
+        "model": getattr(info, "model", None),
+        "provider": getattr(info, "provider", None),
+        "has_env": bool(getattr(info, "has_env", False)),
+        "skill_count": int(getattr(info, "skill_count", 0) or 0),
+        "gateway_running": bool(getattr(info, "gateway_running", False)),
+        "description": getattr(info, "description", "") or "",
+        "description_auto": bool(getattr(info, "description_auto", False)),
+        "display_name": getattr(info, "display_name", "") or "",
+        "distribution_name": getattr(info, "distribution_name", None),
+        "distribution_version": getattr(info, "distribution_version", None),
+        "distribution_source": getattr(info, "distribution_source", None),
+        "has_alias": getattr(info, "alias_path", None) is not None,
+    }
+
+
+def _profile_dir_or_error(P: Any, name: str
+                          ) -> Tuple[Optional[Path],
+                                     Optional[Tuple[int, Dict[str, Any]]]]:
+    """Validate *name* and resolve its home directory, or return a typed error."""
+    try:
+        canon = P.normalize_profile_name(name)
+        P.validate_profile_name(canon)
+    except ValueError as exc:
+        return None, (400, {"ok": False, "code": "PROFILE_BAD_NAME",
+                            "detail": _redact(str(exc))[:300],
+                            "qubit_counterpart": "CLI `qubit agent profile list`"})
+    except Exception as exc:  # noqa: BLE001 - never 500 on a read
+        return None, _fail(exc)
+    try:
+        prof_dir = P.get_profile_dir(canon)
+    except Exception as exc:  # noqa: BLE001
+        return None, _fail(exc)
+    if not prof_dir.is_dir():
+        return None, (404, {"ok": False, "code": "PROFILE_NOT_FOUND",
+                            "detail": f"no profile {name!r}",
+                            "qubit_counterpart": "CLI `qubit agent profile list`"})
+    return prof_dir, None
+
+
 def h_profiles(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """GET /api/profiles -> the registry the profile ROW ACTIONS target.
+    """GET /api/profiles -> the reference profile registry (one authority).
 
-    The dashboard profile list and every row action (rename/model/description/
-    soul/delete/active) must address the SAME store, or the list shows rows
-    whose controls cannot resolve. Qubit's principal registry
-    (``voicebridge.brain`` — the store ``qubit brain principal-add``, the
-    dashboard create, and the row actions all write) is therefore the single
-    profile authority. Each row's model/provider/description are read from that
-    principal's real profile fields (never a fabricated ``ollama-local``); a
-    principal without them reports null. Absolute filesystem paths are never
-    served (``path`` is the display name only).
+    Ported from the reference ``web_routers/profiles.py:list_profiles_endpoint``
+    (``:685``) / ``hermes_cli/profiles.py:list_profiles`` (``:926``). The list,
+    the create, and every row action (rename / model / description / SOUL /
+    delete / active) address the SAME registry — the real per-profile home
+    directories ``qubit agent profile`` manages — so no row shows a control that
+    cannot resolve. The active marker is the sticky ``qubit agent profile use``
+    selection. Absolute filesystem paths are never served (PRB-09).
     """
-    from . import brain as B
-    from .permissions import permissions_store
-
     try:
-        state = B._load(cfg)
+        P = _profiles_module(cfg)
+        infos = P.list_profiles()
     except Exception as exc:
         return _fail(exc)
-    principals = state.get("principals", {}) if isinstance(state, dict) else {}
-    stored_profiles = state.get("profiles", {}) if isinstance(state, dict) else {}
     try:
-        skill_count = len(permissions_store(cfg).skills())
-    except Exception:
-        skill_count = 0
-    # The canonical active selection: the explicit persona, else the resolved
-    # chat model profile. Resolved from the provider resolver (never a path).
-    default_id = _persona_active(cfg)
-    active_model = active_provider = ""
+        active = P.get_active_profile() or "default"
+    except Exception:  # noqa: BLE001 - never fail the read
+        active = "default"
     try:
-        from .providers import resolver as _R
-
-        _eff = _R.resolve(cfg, role=_R.DEFAULT_ROLE)
-        if not default_id:
-            default_id = str(_eff.profile_id or "")
-        active_model = str(_eff.model or "")
-        active_provider = str(_eff.provider or "")
-    except Exception:  # noqa: BLE001 - never fail the profile read
-        pass
+        current = P.get_active_profile_name() or "default"
+    except Exception:  # noqa: BLE001
+        current = "default"
     kind = (p.get("kind") or "").strip()
     if kind == "active":
         # ActiveProfileInfo wire shape.
-        return _ok(active=default_id, current=default_id)
-
-    def _stored_value(pid: str, key: str) -> str:
-        pkey = B._profile_key(pid, "default")
-        fields = (stored_profiles.get(pkey) or {}).get("fields", {}) or {}
-        field = fields.get(key) or {}
-        return str(field.get("value", "") or "")
-
-    active_payload = {"id": default_id, "brain": default_id,
-                      "model": active_model, "provider": active_provider}
-    items = []
-    for pid in sorted(principals):
-        rec = principals.get(pid)
-        rec = rec if isinstance(rec, dict) else {}
-        model = _stored_value(pid, "model") or None
-        provider = _stored_value(pid, "provider") or None
-        description = _stored_value(pid, "description")
-        items.append({
-            "name": pid, "path": "", "is_default": pid == default_id,
-            "model": model, "provider": provider,
-            "has_env": False, "skill_count": skill_count,
-            "gateway_running": False,
-            "description": description[:200],
-            "description_auto": False,
-            "display_name": str(rec.get("label") or pid),
-            "distribution_name": None,
-            "distribution_version": None, "distribution_source": None,
-            "has_alias": False,
-        })
+        return _ok(active=active, current=current)
+    items = [_profile_wire(i) for i in infos]
+    active_row = next((i for i in items if i["name"] == active), None) or {}
+    active_payload = {"id": active, "brain": active,
+                      "model": active_row.get("model") or "",
+                      "provider": active_row.get("provider") or ""}
     # {profiles: ProfileInfo[]} wire shape (+ the canonical active selection).
     return _ok(profiles=items, active=active_payload)
 
 
 def h_profile_soul(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    from . import brain as B
+    """GET /api/profiles/{name}/soul -> the profile's own ``SOUL.md``.
+
+    Ported from the reference ``web_routers/profiles.py:get_profile_soul``
+    (``:876``): the same registry the list and the SOUL editor share, so a saved
+    SOUL reads back verbatim.
+    """
     name = str(p.get("name", "") or "")
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "profile name required"}
     try:
-        res = B.profile_show(cfg, name)
+        P = _profiles_module(cfg)
     except Exception as exc:
         return _fail(exc)
-    if isinstance(res, dict) and res.get("ok") is False:
-        return 404, {"ok": False, "code": "NOT_FOUND",
-                     "detail": f"no profile {name!r}"}
-    text = ""
-    if isinstance(res, dict):
-        text = str(res.get("profile", res.get("soul", "")) or "")
+    prof_dir, err = _profile_dir_or_error(P, name)
+    if err is not None:
+        return err
+    soul = prof_dir / "SOUL.md"
+    try:
+        text = soul.read_text(encoding="utf-8") if soul.is_file() else ""
+    except OSError as exc:
+        return _fail(exc)
     return _ok(content=text, exists=bool(text))
 
 
 def h_profile_setup_command(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """GET setup-command -> real command for the registered principal."""
-    from . import brain as B
-    name = str(p.get("name", "") or "")
+    """GET setup-command -> the real ``qubit agent profile`` setup command.
+
+    Ported from the reference ``web_routers/profiles.py:_profile_setup_command``
+    (``:98``): ``qubit setup`` for the default profile, ``<name> setup`` for a
+    named one.
+    """
+    name = str(p.get("name", "") or "").strip()
     if not name:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "profile name required",
-                     "qubit_counterpart": "CLI `qubit brain principal-add`"}
+                     "qubit_counterpart": "CLI `qubit agent profile`"}
     try:
-        state = B._load(cfg)
-        principals = state.get("principals", {})
+        P = _profiles_module(cfg)
+        canon = P.normalize_profile_name(name)
+    except ValueError as exc:
+        return 400, {"ok": False, "code": "PROFILE_BAD_NAME",
+                     "detail": _redact(str(exc))[:300],
+                     "qubit_counterpart": "CLI `qubit agent profile`"}
     except Exception as exc:
         return _fail(exc)
-    if name not in principals:
-        return _ok(command=f"qubit brain principal-add {name} --kind person "
-                           f"--label {name}",
-                   principal=name, registered=False,
-                   detail="profile is not a registered Qubit principal",
-                   qubit_counterpart="CLI `qubit brain principal-add`")
-    return _ok(command=f"qubit brain profile-show {name}",
-               principal=name, registered=True,
-               qubit_counterpart="CLI `qubit brain principal-add`")
+    command = "qubit setup" if canon == "default" else f"{canon} setup"
+    try:
+        registered = bool(P.profile_exists(canon))
+    except Exception:  # noqa: BLE001
+        registered = False
+    return _ok(command=command, principal=canon, registered=registered,
+               qubit_counterpart="CLI `qubit agent profile`")
 
 
 def h_skills(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -2023,6 +2071,139 @@ def h_logs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(file=fname, lines=lines)
 
 
+def _log_paths(cfg: Any) -> Dict[str, Path]:
+    """Canonical log-file map (name -> path), ported from the reference logs
+    router (``hermes_cli/web_routers/status.py:794`` -> ``qubit_cli.logs.LOG_FILES``)."""
+    from . import qubit_runtime as HR
+    HR.ensure_path()
+    from qubit_cli.logs import LOG_FILES  # type: ignore
+
+    base = Path(cfg.state_dir()) / "logs"
+    return {name: base / fname for name, fname in LOG_FILES.items()}
+
+
+def _read_log_lines(cfg: Any, log_file: str, *, lines: int = 100,
+                    level: str = "", component: str = "",
+                    search: str = "") -> Tuple[Optional[str], Optional[str],
+                                              List[str]]:
+    """Read the tail of one log file with the reference filter surface.
+
+    Returns ``(err_code, err_detail, lines)``. Ported from the reference
+    ``get_logs`` (``hermes_cli/web_routers/status.py:794``): ``level`` maps to
+    ``_read_tail``'s ``min_level``, ``component`` to ``COMPONENT_PREFIXES``, and
+    ``search`` is a case-insensitive post-filter. Unknown file/component are
+    typed errors, never an app-level 500.
+    """
+    from . import qubit_runtime as HR
+    HR.ensure_path()
+    from qubit_cli.logs import _read_tail  # type: ignore
+
+    paths = _log_paths(cfg)
+    if log_file not in paths:
+        return ("LOGS_UNKNOWN_FILE",
+                f"Unknown log file: {log_file}. Available: "
+                f"{', '.join(sorted(paths))}", [])
+    path = paths[log_file]
+    if not path.exists():
+        return (None, None, [])
+    try:
+        from qubit_logging import COMPONENT_PREFIXES  # type: ignore
+    except Exception:
+        COMPONENT_PREFIXES = {}
+    min_level = level if level and level.upper() != "ALL" else None
+    comp_prefixes = None
+    if component and component.lower() != "all":
+        comp_prefixes = COMPONENT_PREFIXES.get(component)
+        if comp_prefixes is None:
+            return ("LOGS_UNKNOWN_COMPONENT",
+                    f"Unknown component: {component}. Available: "
+                    f"{', '.join(sorted(COMPONENT_PREFIXES))}", [])
+    try:
+        want = max(1, min(int(lines), 2000))
+    except (TypeError, ValueError):
+        want = 100
+    out = _read_tail(
+        path, want if not search else 2000,
+        has_filters=bool(min_level or comp_prefixes or search),
+        min_level=min_level, component_prefixes=comp_prefixes)
+    if search:
+        needle = str(search).lower()
+        out = [l for l in out if needle in l.lower()][-min(want, 500):]
+    return (None, None, [_redact(l) for l in out])
+
+
+def h_logs_files(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/logs/files -> the available log files (name/size/existence)."""
+    try:
+        paths = _log_paths(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    files = []
+    for name, path in paths.items():
+        try:
+            exists = path.exists()
+            size = path.stat().st_size if exists else 0
+        except OSError:
+            exists, size = False, 0
+        files.append({"name": name, "file": path.name, "exists": exists,
+                      "size": size})
+    return _ok(files=files)
+
+
+def h_logs_export(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/logs/export -> redacted log lines for download.
+
+    The reference ``get_logs`` returns the tail; a "detail/export" need was
+    unmet by the SPA. This serves the same filtered tail plus a joined text
+    body so the page can offer a redacted download. Secret material is stripped
+    by the shared redactor, always.
+    """
+    log_file = str(q.get("file", "agent") or "agent")
+    try:
+        lines_arg = int(q.get("lines", "500") or "500")
+    except ValueError:
+        lines_arg = 500
+    err, detail, rows = _read_log_lines(
+        cfg, log_file, lines=lines_arg, level=q.get("level", ""),
+        component=q.get("component", ""), search=q.get("search", ""))
+    if err:
+        return (400 if err.startswith("LOGS_") else 500), {
+            "ok": False, "code": err, "detail": detail}
+    content = "".join(rows)
+    return _ok(ok=True, file=log_file, redacted=True, count=len(rows),
+               content=content, lines=rows)
+
+
+def h_logs_detail(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/logs/detail -> one line with its severity classification."""
+    log_file = str(q.get("file", "agent") or "agent")
+    try:
+        index = int(q.get("index", "0") or "0")
+    except ValueError:
+        index = 0
+    err, detail, rows = _read_log_lines(
+        cfg, log_file, lines=max(index + 1, 1), level=q.get("level", ""),
+        component=q.get("component", ""), search=q.get("search", ""))
+    if err:
+        return 400, {"ok": False, "code": err, "detail": detail}
+    if index < 0 or index >= len(rows):
+        return 404, {"ok": False, "code": "LOGS_NOT_FOUND",
+                     "detail": f"no line {index} in {log_file}.log"}
+    line = rows[index]
+    severity = "INFO"
+    upper = line.upper()
+    for token, label in (("ERROR", "ERROR"), ("WARN", "WARNING"),
+                         ("DEBUG", "DEBUG")):
+        if token in upper:
+            severity = label
+            break
+    return _ok(ok=True, file=log_file, index=index, line=line,
+               severity=severity, total=len(rows))
+
+
 def h_system_stats(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     import os
@@ -2107,46 +2288,67 @@ def h_mcp_servers(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 def h_mcp_catalog_live(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """GET /api/mcp/catalog -> real local MCP inventory as the catalog.
+    """GET /api/mcp/catalog -> the canonical catalog, installed-state reconciled.
 
-    No remote catalog is fetched (network probe refused by policy); the
-    catalog is the configured local inventory from
-    ``integration_status.mcp_status``, each entry flagged as self-hosted and
-    inventory-only, with the refusal recorded as a diagnostic.
+    The MCP page read a 65-entry catalog from the vendored runtime's reviewed
+    optional-mcps manifests while the server list came from the Qubit registry
+    (``voicebridge.mcp_servers``): two stores whose ``installed``/``enabled``
+    flags contradicted (every catalog entry said installed:false and
+    ``cgraph-graft`` was absent). This serves BOTH from one authority — the
+    catalog manifests are the "available" set, and each entry's installed/
+    enabled state is resolved against the SAME Qubit registry the list and
+    writes use. Registry servers absent from the manifests are appended, so the
+    page can never hide an installed server. No remote catalog is fetched.
     """
     from . import mcp_servers as MS
     try:
-        listing = MS.list_servers(cfg)
+        registry = MS.list_servers(cfg)
     except Exception as exc:
         return _fail(exc)
-    # B-08D: emit the COMPLETE ``McpCatalogEntry`` wire shape (the SPA reads
-    # ``entry.bootstrap.length`` / ``entry.required_env`` unconditionally). The
-    # rows carry real registry transport fields where recorded; absent detail is
-    # an honest empty/null value, never a missing key.
-    entries = [{
-        "name": str(s.get("name")), "title": str(s.get("name")),
-        "description": "",
-        "source": str(s.get("source", "qubit-registry")),
-        "transport": str(s.get("transport", "stdio")),
-        "auth_type": str(s.get("auth", "none")), "required_env": [],
-        "command": s.get("command"), "args": list(s.get("args") or []),
-        "url": s.get("url"),
-        "install_url": None, "install_ref": None, "bootstrap": [],
-        "default_enabled": None, "post_install": "",
-        "needs_install": False, "installed": True,
-        "enabled": bool(s.get("enabled")),
-        "on_disk": True, "install_action": None,
-        "policy": "config registry; no unauthenticated mount",
-    } for s in listing.get("servers", [])]
-    return _ok(entries=entries, total=len(entries),
-               diagnostics=[{
-                   "name": "catalog",
-                   "kind": "info",
-                   "level": "info",
-                   "message": "remote catalog fetch refused; serving the "
-                              "reviewed local inventory only"}],
-               mount_policy="no unauthenticated MCP mounting; research-only "
-                            "use stays separately authorized and broker-gated")
+    reg = {str(s.get("name")): s for s in registry.get("servers", [])}
+    entries: List[Dict[str, Any]] = []
+    diags: List[Dict[str, Any]] = []
+    cataloged: set = set()
+    try:
+        from . import qubit_runtime as HR
+        HR.ensure_path()
+        from qubit_cli import mcp_catalog  # type: ignore
+        from qubit_cli.web_routers.mcp import (  # type: ignore
+            _catalog_entry_json)
+        for entry in mcp_catalog.list_catalog():
+            row = reg.get(entry.name)
+            cataloged.add(entry.name)
+            entries.append(_catalog_entry_json(
+                entry, bool(row), bool(row.get("enabled")) if row else False))
+        diags = [{"name": n, "kind": k, "message": m}
+                 for (n, k, m) in mcp_catalog.catalog_diagnostics()]
+    except Exception:
+        diags = [{
+            "name": "catalog", "kind": "info", "level": "info",
+            "message": "reviewed catalog manifests unavailable; serving the "
+                       "Qubit registry inventory"}]
+    # Any locally registered server the manifests don't list is still a real
+    # row: append it installed so available-vs-installed is never contradictory.
+    for name, row in sorted(reg.items()):
+        if name in cataloged:
+            continue
+        entries.append({
+            "name": name, "description": "",
+            "source": str(row.get("source", "qubit-registry")),
+            "transport": str(row.get("transport", "stdio")),
+            "auth_type": str(row.get("auth", "none")), "required_env": [],
+            "command": row.get("command"), "args": list(row.get("args") or []),
+            "url": row.get("url"),
+            "install_url": None, "install_ref": None, "bootstrap": [],
+            "default_enabled": None, "post_install": "",
+            "suggest": None,
+            "needs_install": False, "installed": True,
+            "enabled": bool(row.get("enabled")),
+        })
+    return _ok(entries=entries, total=len(entries), diagnostics=diags,
+               mount_policy="no unauthenticated MCP mounting; the catalog is a "
+                            "reviewed local manifestation inventory and each "
+                            "entry's installed state is the Qubit registry")
 
 
 def h_mcp_test_local(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -2172,6 +2374,47 @@ def h_mcp_test_local(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                probe=str(out.get("probe", "local-validation")),
                network_probe=bool(out.get("network_probe", False)),
                detail=out["detail"])
+
+
+def mcp_invoke(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/mcp/servers/{name}/invoke -> real, confirm-gated tool call.
+
+    The dashboard had no invocation surface: ``/mcp`` could list and test a
+    server but never call a tool. This wires the SAME canonical entry point the
+    CLI (``qubit mcp invoke``) and voice use — ``voicebridge.mcp_servers.invoke``
+    — so the dashboard, CLI, and voice share one e-stop + shared-journal
+    confirmation + capability/allowlist + brokered-transport path. An
+    unconfirmed call stages a real single-use approval (409); a refused or
+    uninvocable server returns its typed, fail-closed disposition — never a
+    fabricated success. Output is redacted by the client transport.
+    """
+    from . import mcp_servers as MS
+    name = str(p.get("name", p.get("id", "")) or b.get("name", "") or "")
+    tool = str(b.get("tool") or b.get("tool_name") or "").strip()
+    if not name:
+        return 400, {"ok": False, "code": "MCP_BAD_INPUT",
+                     "detail": "server name required"}
+    if not tool:
+        return 400, {"ok": False, "code": "MCP_BAD_INPUT",
+                     "detail": "tool name required"}
+    raw_args = b.get("args")
+    args = raw_args if isinstance(raw_args, dict) else {}
+    confirmed = _truthy(b.get("confirm"))
+    cid = str(b.get("confirmation_id") or q.get("confirmation_id") or "").strip()
+    try:
+        out = MS.invoke(cfg, name, tool=tool, args=args, confirmed=confirmed,
+                        confirmation_id=cid, requested_by="dashboard:user")
+    except Exception as exc:
+        code = str(getattr(exc, "code", "") or "")
+        if code == MS.INVOKE_CONFIRM_CODE:
+            return _staged(
+                str(getattr(exc, "detail", exc)),
+                "")
+        return _mcp_error(exc)
+    state = str(out.get("state", "") or "")
+    ok = state in ("OK", "INVOCABLE")
+    return (200 if ok else 403), {"ok": ok, **out}
 
 
 def h_pairing_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -2233,6 +2476,56 @@ def _pairing_error(exc: Exception) -> Tuple[int, Dict[str, Any]]:
     return status, {"ok": False, "code": code, "detail": detail}
 
 
+def _pairing_approve_request(cfg: Any, code_id: str,
+                             requested_by: str = "dashboard:user"
+                             ) -> Dict[str, Any]:
+    """Approve a pending pairing request by its opaque ``code_id``.
+
+    Ports the reference's request-id approve path
+    (``hermes_cli/web_routers/ops.py:87``: ``store.approve_request(platform,
+    request_id)``) onto the Qubit ``voicebridge.pairing`` store. The one-time
+    code is shown once and stored only as a salted hash, so a dashboard admin
+    who listed a pending request can only approve it by the request id the list
+    surfaced; hashing makes code-verification impossible without the secret
+    code. This issues the SAME scoped ``gateway.access`` grant, marks the record
+    used, and audits ``pairing.approve`` — identical to the code path, reached
+    by request id.
+    """
+    from . import pairing as P
+    from .permissions import permissions_store
+
+    state = P._load(cfg)
+    rec = state.get("codes", {}).get((code_id or "").strip())
+    if not isinstance(rec, dict):
+        raise P.PairingError(P.BAD_CODE, "unknown or consumed pairing code")
+    if rec.get("used") or rec.get("revoked"):
+        raise P.PairingError(P.BAD_CODE, "unknown or consumed pairing code")
+    now = P._now()
+    if now > float(rec.get("expires_at", 0) or 0):
+        raise P.PairingError(P.EXPIRED_CODE, "pairing code expired")
+    store = permissions_store(cfg)
+    ttl = max(60.0, min(float(rec["expires_at"]) - now, P.MAX_TTL_S))
+    try:
+        grant = store.grant("gateway.access", requested_by=requested_by,
+                            confirmed=True,
+                            scopes=tuple(rec.get("scopes", []) or []),
+                            ttl_s=ttl, note=f"pairing {rec['id']}")
+    except Exception as exc:
+        rec["attempts"] = int(rec.get("attempts", 0)) + 1
+        P._save(cfg, state)
+        raise P.PairingError("PAIRING_GRANT_FAILED",
+                             f"grant issue failed: {exc}") from exc
+    rec["used"] = True
+    rec["grant_id"] = grant.id
+    P._save(cfg, state)
+    P._audit("approve", requested_by,
+             {"code_id": rec["id"], "grant_id": grant.id,
+              "scopes": rec.get("scopes", []), "by_request_id": True})
+    return {"state": "OK", "approved": rec["id"], "grant_id": grant.id,
+            "scopes": list(rec.get("scopes", []) or []),
+            "account": rec.get("account", ""), "approved_by_request_id": True}
+
+
 def h_pairing_mutate(fn_name: str, cfg: Any, q: Dict[str, str],
                      b: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/pairing[/approve|/revoke] -> confirmed, typed pairing mutation.
@@ -2241,6 +2534,11 @@ def h_pairing_mutate(fn_name: str, cfg: Any, q: Dict[str, str],
     sends ``user_id``) as aliases, requires the shared confirmation (e-stop +
     journal) like every other mutation, and maps the canonical ``PairingError``
     codes to typed 4xx/429 statuses instead of collapsing them to a 500.
+
+    Approving by ``request_id`` resolves the pending request id the list
+    surfaced (:func:`_pairing_approve_request`); approving by the one-time
+    ``code`` verifies the hash via ``pairing.approve`` — the same two paths the
+    reference ``approve_pairing`` exposes.
     """
     from . import pairing as P
     guard = _compat_confirm(
@@ -2256,9 +2554,17 @@ def h_pairing_mutate(fn_name: str, cfg: Any, q: Dict[str, str],
                            account=str(b.get("account", "")),
                            requested_by="dashboard:user", confirmed=True)
         elif fn_name == "approve":
+            request_id = str(b.get("request_id") or "").strip()
             target = str(b.get("code") or b.get("request_id") or "")
-            res = P.approve(cfg, target, requested_by="dashboard:user",
-                            confirmed=True)
+            if request_id and request_id.startswith("pair_"):
+                # Reference semantics: an admin surface approves by the request
+                # id it listed; a request-id-shaped value in the older ``code``
+                # field routes to the same request path (never a bogus 404).
+                res = _pairing_approve_request(cfg, request_id,
+                                               requested_by="dashboard:user")
+            else:
+                res = P.approve(cfg, target, requested_by="dashboard:user",
+                                confirmed=True)
         elif fn_name == "revoke":
             target = str(b.get("code_id") or b.get("id")
                          or b.get("user_id") or "")
@@ -2437,17 +2743,324 @@ def h_webhooks_mutate(fn_name: str, cfg: Any, q: Dict[str, str],
     return (200 if ok else 400), {"ok": ok, "result": res}
 
 
-def h_platforms(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
-                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+# ---------------------------------------------------------------------------
+# Channels (/api/messaging/platforms) — the REAL connectable platform catalog
+# ---------------------------------------------------------------------------
+# Ported from the vendored runtime: the catalog is built by
+# ``qubit_cli.web_server_messaging._messaging_platform_catalog`` (``:229``,
+# built-ins from ``gateway.config.Platform`` + the platform-plugin registry) and
+# the served payload shape follows ``web_routers/messaging.py:_platform_payloads``
+# (``:266``) / ``_messaging_platform_payload`` (``:196``). Qubit supplies the
+# per-platform state from its own reference-only store and account/link registry
+# instead of the fork's ``.env``/gateway state, so GET and PUT share ONE store.
+# Credentials stay reference-only: ``env:``/``vault:``/``file:`` references are
+# accepted; a raw secret is a typed ``CHANNEL_ENV_REFERENCE_ONLY`` refusal.
+_MSG_PLATFORM_STORE = "msg-platforms.json"
+_MSG_PLATFORM_SCHEMA = "qubit-msg-platforms/1"
+_MSG_REF_PREFIXES = ("env:", "vault:", "ref:", "file:")
+# Account ``provider`` ids whose catalog platform id differs (the catalog uses
+# the gateway ``Platform`` enum spelling).
+_ACCOUNT_PROVIDER_TO_PLATFORM = {
+    "whatsapp-cloud": "whatsapp_cloud",
+    "msteams": "teams",
+    "imessage": "bluebubbles",
+}
+_LINK_RANK = {"LINKED": 4, "DEGRADED": 3, "UNAVAILABLE": 2,
+              "NO_CREDENTIAL": 1, "NO_ACCOUNT": 0}
+_PLATFORM_CATALOG_CACHE: Optional[List[Dict[str, Any]]] = None
+_OPTIONAL_ENV_VARS_CACHE: Optional[Dict[str, Any]] = None
+
+
+def _optional_env_vars() -> Dict[str, Any]:
+    """The vendored OPTIONAL_ENV_VARS catalog (cached; empty on import failure)."""
+    global _OPTIONAL_ENV_VARS_CACHE
+    if _OPTIONAL_ENV_VARS_CACHE is None:
+        try:
+            from . import qubit_runtime as HR
+            HR.ensure_path()
+            from qubit_cli.config import OPTIONAL_ENV_VARS  # type: ignore
+            _OPTIONAL_ENV_VARS_CACHE = dict(OPTIONAL_ENV_VARS)
+        except Exception:
+            _OPTIONAL_ENV_VARS_CACHE = {}
+    return _OPTIONAL_ENV_VARS_CACHE
+
+
+def _platform_catalog() -> List[Dict[str, Any]]:
+    """The vendored connectable-platform catalog (raw entries, cached)."""
+    global _PLATFORM_CATALOG_CACHE
+    if _PLATFORM_CATALOG_CACHE is not None:
+        return _PLATFORM_CATALOG_CACHE
+    entries: List[Dict[str, Any]] = []
+    try:
+        from . import qubit_runtime as HR
+        HR.ensure_path()
+        from qubit_cli.web_server_messaging import (  # type: ignore
+            _messaging_platform_catalog)
+        entries = [dict(e) for e in _messaging_platform_catalog()]
+    except Exception:
+        entries = []
+    if not entries:
+        # Honest fallback: the real Qubit provider-capability set, never a
+        # hand-invented platform list.
+        return _fallback_platform_catalog()
+    _PLATFORM_CATALOG_CACHE = entries
+    return entries
+
+
+def _fallback_platform_catalog() -> List[Dict[str, Any]]:
+    from . import messaging as M
+    rows = M.provider_catalog().get("providers", [])
+    out: List[Dict[str, Any]] = []
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict):
+            continue
+        pid = str(row.get("provider", "")).replace("-", "_")
+        if not pid:
+            continue
+        out.append({"id": pid, "name": str(row.get("label", pid) or pid),
+                    "description": str(row.get("detail", "") or ""),
+                    "docs_url": "", "env_vars": (), "required_env": ()})
+    return out
+
+
+def _debrand_platform_url(url: Any) -> str:
+    text = str(url or "").strip()
+    if "nousresearch.com" in text.lower() or "hermes" in text.lower():
+        return ""
+    return text
+
+
+def _platform_public_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
+    """De-brand one catalog entry: rebrand free text, blank legacy-host links."""
+    from .qubit_plugins import _rebrand_product
+    return {
+        "id": str(entry.get("id", "") or ""),
+        "name": _rebrand_product(entry.get("name", "")),
+        "description": _rebrand_product(entry.get("description", "")),
+        "docs_url": _debrand_platform_url(entry.get("docs_url", "")),
+        "env_vars": tuple(str(k) for k in entry.get("env_vars", ()) or ()),
+        "required_env": tuple(str(k) for k in entry.get("required_env", ()) or ()),
+    }
+
+
+def _platform_env_info(key: str) -> Dict[str, Any]:
+    from .qubit_plugins import _rebrand_product
+    info = _optional_env_vars().get(key) or {}
+    if not isinstance(info, dict):
+        info = {}
+    return {
+        "description": _rebrand_product(info.get("description", "")),
+        "prompt": _rebrand_product(info.get("prompt", key)),
+        "help": _rebrand_product(info.get("help", "")),
+        "url": _debrand_platform_url(info.get("url")) or None,
+        "is_password": bool(info.get("password", False)),
+        "advanced": bool(info.get("advanced", False)),
+    }
+
+
+# Secret-shaped channel env names, as a fallback for keys the vendored
+# ``OPTIONAL_ENV_VARS`` catalog does not carry (it only covers a subset of the
+# per-platform vars). This mirrors the reference's per-field ``password``
+# metadata (``web_routers/messaging.py:_messaging_env_info`` -> ``is_password``,
+# sourced from ``OPTIONAL_ENV_VARS`` + ``_MESSAGING_ENV_FALLBACKS``): a field
+# flagged ``is_password`` OR whose name is credential-shaped is a secret. A
+# non-secret allowlist (``*_ALLOWED_USERS``) is not.
+_CHANNEL_SECRET_KEY_RE = re.compile(
+    r"(_TOKEN|_SECRET|_PASSWORD|_PASSWD|_API_KEY|_AUTH_KEY|_AES_KEY|"
+    r"_ENCODING_KEY|_PRIVATE_KEY|_CLIENT_SECRET|_BOT_TOKEN|_ACCESS_TOKEN|"
+    r"_WEBHOOK_SECRET|_AUTH_TOKEN)$",
+    re.IGNORECASE)
+
+
+def _platform_env_is_secret(key: str) -> bool:
+    """True when a channel env field is credential-shaped (reference-only).
+
+    Uses the same per-field metadata the reference serves (``is_password``),
+    falling back to the credential name shape for keys absent from the
+    catalog. Non-secret fields (allowlists, URLs, account ids) return False so
+    they stay directly configurable, as the reference allows.
+    """
+    name = str(key or "")
+    info = _optional_env_vars().get(name)
+    if isinstance(info, dict) and info.get("password"):
+        return True
+    return bool(_CHANNEL_SECRET_KEY_RE.search(name))
+
+
+def _platform_env_value_ok(key: str, value: Any) -> bool:
+    """A stored channel field value is displayable when it is an accepted
+    reference (any kind) OR the field is non-secret (a literal allowlist/URL)."""
+    if _platform_allowed_ref(value):
+        return True
+    return not _platform_env_is_secret(key)
+
+
+def _platform_store(cfg: Any) -> Dict[str, Any]:
+    raw = _load_json_store(_store_path(cfg, _MSG_PLATFORM_STORE))
+    plats = raw.get("platforms")
+    if not isinstance(plats, dict):
+        plats = {}
+    return {"schema": _MSG_PLATFORM_SCHEMA, "platforms": plats}
+
+
+def _platform_record(store: Dict[str, Any], platform_id: str) -> Dict[str, Any]:
+    rec = store.get("platforms", {}).get(platform_id)
+    return dict(rec) if isinstance(rec, dict) else {}
+
+
+def _platform_store_update(cfg: Any, platform_id: str, *, enabled: Optional[bool],
+                           env: Optional[Dict[str, Any]] = None,
+                           clear: Optional[List[Any]] = None) -> None:
+    """Persist one platform's enable flag + credential REFERENCES (never values)."""
+    store = _platform_store(cfg)
+    plats = store["platforms"]
+    rec = plats.get(platform_id)
+    rec = dict(rec) if isinstance(rec, dict) else {}
+    refs = rec.get("refs") if isinstance(rec.get("refs"), dict) else {}
+    refs = dict(refs)
+    if enabled is not None:
+        rec["enabled"] = bool(enabled)
+    for key, value in (env or {}).items():
+        refs[str(key)] = str(value)
+    for key in (clear or ()):
+        refs.pop(str(key), None)
+    rec["refs"] = refs
+    rec["updated_at"] = time.time()
+    rec["updated_by"] = "dashboard:user"
+    plats[platform_id] = rec
+    store["platforms"] = plats
+    _save_json_store(_store_path(cfg, _MSG_PLATFORM_STORE), store)
+
+
+def _platform_allowed_ref(value: Any) -> bool:
+    text = str(value or "").strip()
+    return any(text.startswith(p) and len(text) > len(p)
+               for p in _MSG_REF_PREFIXES)
+
+
+def _platform_resolve(cfg: Any, platform_id: str
+                      ) -> Tuple[Optional[str], Dict[str, Any], Dict[str, Any]]:
+    """Resolve a route id to a catalog platform or a Qubit account."""
+    for entry in _platform_catalog():
+        if str(entry.get("id", "")) == platform_id:
+            return "catalog", _platform_public_entry(entry), {}
+    try:
+        from . import messaging as M
+        for account in M.account_list(cfg).get("accounts", []):
+            if isinstance(account, dict) and \
+                    str(account.get("id", "")) == platform_id:
+                return "account", {}, account
+    except Exception:
+        pass
+    return None, {}, {}
+
+
+def _platform_account_link(cfg: Any, account: Dict[str, Any]) -> Dict[str, Any]:
     from . import messaging as M
     try:
-        res = M.account_list(cfg)
-    except Exception as exc:
-        return _fail(exc)
-    accounts = res.get("accounts", []) if isinstance(res, dict) else []
-    # Link-state -> wire state. Never report a fabricated "connected": an
-    # account with no credential is unconfigured, and a channel with no Qubit
-    # transport adapter is honestly unavailable (typed code attached).
+        return M.link(cfg, str(account.get("id", "")))
+    except Exception:
+        return {"state": "UNAVAILABLE", "code": M.UNAVAILABLE_CODE,
+                "detail": "link probe failed"}
+
+
+def _best_account_link(cfg: Any,
+                       accounts: List[Dict[str, Any]]) -> Dict[str, Any]:
+    best: Dict[str, Any] = {}
+    for account in accounts:
+        link = _platform_account_link(cfg, account)
+        if not best or _LINK_RANK.get(str(link.get("state", "")), -1) > \
+                _LINK_RANK.get(str(best.get("state", "")), -1):
+            best = link
+    return best
+
+
+def _platform_state(enabled: bool, configured: bool, link: Dict[str, Any]
+                    ) -> Tuple[str, Optional[str], Optional[str]]:
+    """Honest wire state. ``connected`` is only ever derived from a real
+    ``messaging.link`` LINKED probe — Qubit never fabricates a connection."""
+    link_state = str(link.get("state", "") or "")
+    if not enabled:
+        return "disabled", None, None
+    if not configured:
+        return "not_configured", "MSG_NO_CREDENTIAL", \
+               "credential reference is not set"
+    if link_state == "LINKED":
+        return "connected", None, None
+    if link_state == "DEGRADED":
+        return "degraded", str(link.get("code") or "LINK_DEGRADED"), \
+               (str(link.get("detail") or "")[:160] or None)
+    # Configured from references but no Qubit transport is proven: report the
+    # honest unavailable state rather than a fabricated "connected".
+    return "unavailable", str(link.get("code") or "MSG_TRANSPORT_UNAVAILABLE"), \
+        (str(link.get("detail") or "")[:160]
+         or "no Qubit transport adapter for this channel")
+
+
+def _platform_env_payload(entry: Dict[str, Any], refs: Dict[str, str],
+                          required: Tuple[str, ...], account_ok: bool
+                          ) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for key in entry.get("env_vars", ()) or ():
+        is_required = key in required
+        rows.append({
+            "key": key, "required": is_required,
+            "is_set": bool(refs.get(key)) or (account_ok and is_required),
+            "redacted_value": None, **_platform_env_info(key),
+        })
+    return rows
+
+
+def _platform_payload(cfg: Any, entry: Dict[str, Any], rec: Dict[str, Any],
+                      accounts: List[Dict[str, Any]], gateway_running: bool
+                      ) -> Dict[str, Any]:
+    pub = _platform_public_entry(entry)
+    pid = pub["id"]
+    required = pub["required_env"]
+    refs_raw = rec.get("refs") if isinstance(rec.get("refs"), dict) else {}
+    refs = {str(k): str(v) for k, v in refs_raw.items()
+            if _platform_env_value_ok(str(k), v)}
+    link = _best_account_link(cfg, accounts) if accounts else {}
+    account_ok = bool(accounts) and str(link.get("state", "")) not in (
+        "NO_ACCOUNT", "NO_CREDENTIAL", "")
+    ref_complete = (all(refs.get(k) for k in required) if required
+                    else bool(refs))
+    configured = bool(ref_complete or account_ok)
+    store_enabled = rec.get("enabled")
+    if isinstance(store_enabled, bool):
+        enabled = store_enabled
+    elif accounts:
+        enabled = any(bool(a.get("enabled", True)) for a in accounts)
+    else:
+        enabled = False
+    state, error_code, error_message = _platform_state(
+        enabled, configured, link)
+    payload: Dict[str, Any] = {
+        "id": pid, "name": pub["name"], "description": pub["description"],
+        "docs_url": pub["docs_url"], "enabled": enabled,
+        "configured": configured, "gateway_running": gateway_running,
+        "state": state, "error_code": error_code,
+        "error_message": error_message, "updated_at": rec.get("updated_at"),
+        "home_channel": None,
+        "env_vars": _platform_env_payload(entry, refs, required, account_ok),
+    }
+    if pid == "whatsapp":
+        payload["whatsapp_setup"] = {
+            "mode": "",
+            "allowed_users_set": bool(refs.get("WHATSAPP_ALLOWED_USERS")),
+            "home_channel_set": False,
+        }
+    return payload
+
+
+def _account_platform_payload(cfg: Any, account: Dict[str, Any],
+                              rec: Dict[str, Any], gateway_running: bool
+                              ) -> Dict[str, Any]:
+    """A Qubit account that is not a catalog platform (legacy CLI account row)."""
+    from . import messaging as M
+    aid = str(account.get("id", ""))
+    provider = str(account.get("provider", ""))
+    link = _platform_account_link(cfg, account)
     link_map = {
         "LINKED": ("connected", True, None, None),
         "DEGRADED": ("degraded", True, "LINK_DEGRADED", None),
@@ -2457,34 +3070,91 @@ def h_platforms(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         "UNAVAILABLE": ("unavailable", True, M.UNAVAILABLE_CODE,
                         "no Qubit transport adapter for this channel"),
     }
-    platforms = []
-    for a in accounts if isinstance(accounts, list) else []:
-        if not isinstance(a, dict):
+    st, configured, code, msg = link_map.get(
+        str(link.get("state", "")),
+        ("unavailable", False, link.get("code") or M.UNAVAILABLE_CODE,
+         link.get("detail")))
+    store_enabled = rec.get("enabled")
+    enabled = (store_enabled if isinstance(store_enabled, bool)
+               else bool(account.get("enabled", True)))
+    if not enabled:
+        st = "disabled"
+    return {
+        "id": aid, "name": str(account.get("label", aid) or aid),
+        "description": f"{provider} account reference (vault-only credential)",
+        "docs_url": "", "enabled": enabled, "configured": configured,
+        "gateway_running": gateway_running, "state": st, "error_code": code,
+        "error_message": (str(msg)[:160] if msg else None),
+        "updated_at": rec.get("updated_at"), "home_channel": None,
+        "whatsapp_setup": None, "env_vars": [],
+    }
+
+
+def _platform_rows(cfg: Any) -> List[Dict[str, Any]]:
+    from . import messaging as M
+    entries = _platform_catalog()
+    store = _platform_store(cfg)
+    catalog_ids = {str(e.get("id", "")) for e in entries}
+    try:
+        accounts = M.account_list(cfg).get("accounts", [])
+    except Exception:
+        accounts = []
+    if not isinstance(accounts, list):
+        accounts = []
+    by_platform: Dict[str, List[Dict[str, Any]]] = {}
+    extra: List[Dict[str, Any]] = []
+    for account in accounts:
+        if not isinstance(account, dict):
             continue
-        aid = str(a.get("account_id", a.get("id", "")))
-        provider = str(a.get("provider", ""))
-        try:
-            linked = M.link(cfg, aid)
-        except Exception:  # noqa: BLE001 — typed degraded, never fabricated
-            linked = {"state": "UNAVAILABLE", "code": M.UNAVAILABLE_CODE}
-        st, configured, code, msg = link_map.get(
-            str(linked.get("state", "")),
-            ("unavailable", False, linked.get("code") or M.UNAVAILABLE_CODE,
-             linked.get("detail")))
-        platforms.append({
-            "id": aid, "name": str(a.get("label", aid) or aid),
-            "description": f"{provider} account reference (vault-only credential)",
-            "docs_url": "", "enabled": bool(a.get("enabled", True)),
-            "configured": configured, "gateway_running": False,
-            "state": st,
-            "error_code": code,
-            "error_message": (str(msg)[:160] if msg else None),
-            "updated_at": None, "home_channel": None,
-            "whatsapp_setup": None, "env_vars": [],
-        })
-    return _ok(env_path="~/.qubit/.env",
+        provider = str(account.get("provider", ""))
+        target = (provider if provider in catalog_ids
+                  else _ACCOUNT_PROVIDER_TO_PLATFORM.get(provider, ""))
+        if target and target in catalog_ids:
+            by_platform.setdefault(target, []).append(account)
+        else:
+            extra.append(account)
+    try:
+        from . import gateway_supervisor as GS
+        gateway_running = bool(GS.status(cfg).get("running"))
+    except Exception:
+        gateway_running = False
+    rows = [
+        _platform_payload(cfg, entry,
+                          _platform_record(store, str(entry.get("id", ""))),
+                          by_platform.get(str(entry.get("id", "")), []),
+                          gateway_running)
+        for entry in entries
+    ]
+    for account in extra:
+        aid = str(account.get("id", ""))
+        rows.append(_account_platform_payload(
+            cfg, account, _platform_record(store, aid), gateway_running))
+    return rows
+
+
+def h_platforms(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/messaging/platforms -> the real connectable platform catalog.
+
+    Ported from the vendored ``web_routers/messaging.py:get_messaging_platforms``
+    (``:765``), whose payload shape comes from ``_platform_payloads`` (``:266``)
+    over ``_messaging_platform_catalog`` (``web_server_messaging.py:229``).
+    Qubit serves the same real catalog but sources each platform's state from
+    its own reference-only store and account/link registry — the SAME store
+    :func:`msg_update` writes — so read and write never split-brain.
+    """
+    try:
+        rows = _platform_rows(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    try:
+        from . import qubit_runtime as HR
+        env_path = str(HR.runtime_home_for_cfg(cfg) / ".env")
+    except Exception:
+        env_path = ""
+    return _ok(env_path=env_path,
                gateway_start_command="qubit gateway start",
-               platforms=platforms)
+               platforms=rows)
 
 
 def h_memory(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -2647,8 +3317,13 @@ def h_gateway(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     # reason only when this host genuinely cannot supervise a service.
     supervision = "" if st.get("available") else (
         f"{GS.UNAVAILABLE_CODE}: {st.get('detail', '')}")
+    # Owner Decision #16: ``process`` reports the Qubit messaging-gateway daemon
+    # (``qubit-gateway.service``) with its live runtime + control-socket answer
+    # merged in. The web-UI/voice unit is named separately (read-only; no second
+    # systemctl call), so the card tells the two apart truthfully.
     return _ok(gateway=_res(out), state=out.get("state"),
-               supervision=supervision, process=st)
+               supervision=supervision, process=st,
+               web_ui_service_unit=GS.service_unit(cfg))
 
 
 def h_gateway_drain(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -2943,16 +3618,20 @@ def h_env(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             "is_password": True, "tools": [], "advanced": False,
             "channel_managed": False, "custom": False,
         }
-    refs = _load_json_store(_env_refs_path(cfg))
     # ``is_set`` must reflect the REAL presence of a key, not only the
     # vault-reference registry: Qubit's own runtime ``.env`` (and the process
     # env it was loaded into) hold provider keys that were reported as unset.
-    # Names only — a value is never read, cached, or returned.
+    # Names only — a value is never read, cached, or returned. Reads the SAME
+    # canonical store ``env_write``/``env_delete`` write (legacy-name fallback
+    # included), so every accepted kind (``env:``/``vault:``/``file:``)
+    # round-trips to ``is_set``.
     try:
-        from .env_store import present_names as _present_names
+        from . import env_store as _env_store
 
-        present_names = set(_present_names(cfg)) | set(os.environ.keys())
+        refs = _env_store.load(cfg)
+        present_names = set(_env_store.present_names(cfg)) | set(os.environ.keys())
     except Exception:
+        refs = _load_json_store(_env_refs_path(cfg))
         present_names = set(refs) | set(os.environ.keys())
     for key, ref in sorted(refs.items()):
         env[str(key)] = {
@@ -5264,61 +5943,138 @@ def h_profiles_projects_tree(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 def h_profile_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """POST /api/profiles -> real confirm-gated principal registration.
+    """POST /api/profiles -> create a real reference profile (one registry).
 
-    Registers the profile in the same ``brain`` principal registry the CLI
-    (``qubit brain principal-add``) and voice use. Without ``confirm`` it
-    stages a typed 409 on the shared journal carrying a REAL single-use
-    ``confirmation_id`` (settleable by re-issue or the approvals banner); with
-    it the principal is created (audited) and a duplicate is a typed 400. It
-    never fabricates success.
+    Ported from the reference ``web_routers/profiles.py:create_profile_endpoint``
+    (``:690``): creates the per-profile home (cloning config/skills/SOUL when
+    asked), seeds bundled skills, and writes the submitted description/model
+    into the new profile's own files. Confirm-gated through the shared journal
+    with a REAL single-use ``confirmation_id``; a duplicate is a typed 400,
+    never a fabricated success.
     """
-    from . import brain as B
     name = str(b.get("name", "") or "").strip()
     if not name:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "profile name required",
-                     "qubit_counterpart": "CLI `qubit brain principal-add`"}
+                     "qubit_counterpart": "CLI `qubit agent profile create`"}
     guard = _compat_confirm(
         cfg, "profile_create",
-        f"profile {_redact(name)!r} creation stages through the Qubit "
-        "principal registry; re-POST with {\"confirm\": true}", q, b)
+        f"profile {_redact(name)!r} creation writes a new profile home; "
+        "re-POST with {\"confirm\": true}", q, b)
     if guard is not None:
         return guard
-    kind = str(b.get("kind", "person") or "person")
-    label = str(b.get("label", name) or name)
     try:
-        res = B.principal_add(cfg, name, kind, label,
-                              requested_by="dashboard:user", confirmed=True)
+        P = _profiles_module(cfg)
     except Exception as exc:
-        code = getattr(exc, "code", None) or type(exc).__name__
-        return 400, {"ok": False, "code": code,
+        return _fail(exc)
+    # Clone semantics, exactly like the reference endpoint.
+    explicit_source = str(b.get("clone_from") or "").strip()
+    clone_all = bool(b.get("clone_all"))
+    if explicit_source:
+        clone_from, clone_config = explicit_source, not clone_all
+    elif clone_all:
+        clone_from, clone_config = "default", False
+    else:
+        clone_from = "default" if b.get("clone_from_default") else None
+        clone_config = clone_from is not None
+    clone = clone_from is not None
+    no_skills = bool(b.get("no_skills"))
+    description = str(b.get("description", "") or "").strip()
+    try:
+        path = P.create_profile(
+            name=name, clone_from=clone_from, clone_all=clone_all,
+            clone_config=clone_config, no_skills=no_skills,
+            description=description or None)
+    except FileExistsError as exc:
+        return 400, {"ok": False, "code": "PROFILE_EXISTS",
                      "detail": _redact(str(exc))[:300],
-                     "qubit_counterpart": "CLI `qubit brain principal-add`"}
-    # Honor the fields the builder submitted (description/provider/model) by
-    # writing them as real profile fields on the just-created principal — the
-    # SAME store the list and the row editors read. They used to be dropped,
-    # so the created row came back empty.
-    stored: Dict[str, Any] = {"model": "", "provider": "", "description": ""}
-    for key in ("description", "model", "provider"):
-        value = str(b.get(key, "") or "").strip()
-        if not value:
-            continue
+                     "qubit_counterpart": "CLI `qubit agent profile create`"}
+    except ValueError as exc:
+        return 400, {"ok": False, "code": "PROFILE_BAD_NAME",
+                     "detail": _redact(str(exc))[:300],
+                     "qubit_counterpart": "CLI `qubit agent profile create`"}
+    except Exception as exc:
+        return _fail(exc)
+    canon = P.normalize_profile_name(name)
+    # Fresh (non-clone) profiles get the bundled skills; clones already copied
+    # the source's. Best-effort, exactly like the reference.
+    if not clone:
         try:
-            B.profile_set(cfg, name, key, value,
-                          requested_by="dashboard:user", confirmed=True)
-        except Exception as exc:
-            code = getattr(exc, "code", None) or type(exc).__name__
-            return 400, {"ok": False, "code": code,
-                         "detail": _redact(str(exc))[:300],
-                         "qubit_counterpart": "CLI `qubit brain profile-set`"}
-        # model/provider/description are not secret-class: echo the value that
-        # was just persisted (the write succeeded), not the masked listing form.
-        stored[key] = value
-    return _ok(ok=True, name=name, principal=res.get("principal"),
-               model=stored["model"], provider=stored["provider"],
-               description=stored["description"],
-               qubit_counterpart="CLI `qubit brain principal-add`")
+            P.seed_profile_skills(path, quiet=True)
+        except Exception:  # noqa: BLE001 - profile already exists
+            pass
+    # The CLI wrapper (~/.local/bin/<name>) is a reference convenience for
+    # shell use; skip it under test so a focused test never writes the
+    # operator's bin dir.
+    try:
+        from . import qubit_runtime
+        if not qubit_runtime.under_test() and not P.check_alias_collision(canon):
+            P.create_wrapper_script(canon)
+    except Exception:  # noqa: BLE001
+        pass
+    provider = str(b.get("provider", "") or "").strip()
+    model = str(b.get("model", "") or "").strip()
+    model_set = False
+    model_error = ""
+    if provider and model:
+        try:
+            from qubit_cli.web_routers.profiles import _write_profile_model
+            _write_profile_model(path, provider, model)
+            model_set = True
+        except Exception as exc:  # noqa: BLE001 - reported, not fatal
+            model_error = _redact(str(exc))[:200]
+    skills_disabled = 0
+    keep_skills = b.get("keep_skills")
+    if isinstance(keep_skills, list) and keep_skills:
+        try:
+            from qubit_cli.web_routers.profiles import _disable_unselected_skills
+            skills_disabled = _disable_unselected_skills(
+                path, [str(s) for s in keep_skills])
+        except Exception:  # noqa: BLE001
+            skills_disabled = 0
+    # MCP servers submitted by the builder step (reference
+    # ``_write_profile_mcp_servers``): written into the new profile's own
+    # config.yaml. Best-effort, never fatal (the profile already exists).
+    mcp_written = 0
+    mcp_in = b.get("mcp_servers")
+    if isinstance(mcp_in, list) and mcp_in:
+        try:
+            from qubit_cli.web_models import MCPServerCreate
+            from qubit_cli.web_server_profiles import _write_profile_mcp_servers
+            allowed = {"name", "url", "command", "args", "env", "auth",
+                       "bearer_token", "profile"}
+            models = [MCPServerCreate(**{k: v for k, v in s.items()
+                                         if k in allowed})
+                      for s in mcp_in if isinstance(s, dict)]
+            mcp_written = _write_profile_mcp_servers(path, models)
+        except Exception:  # noqa: BLE001 - reported as 0, never fatal
+            mcp_written = 0
+    # Hub skills submitted by the builder step: spawned async, scoped via
+    # ``-p <name>`` exactly like the reference; the pid goes back for the UI
+    # to poll. Best-effort (a spawn failure leaves pid null).
+    hub_installs: List[Dict[str, Any]] = []
+    hub_in = b.get("hub_skills")
+    if isinstance(hub_in, list):
+        for ident in (str(i or "").strip() for i in hub_in):
+            if not ident:
+                continue
+            pid = None
+            try:
+                from qubit_cli.web_server_gateway import _spawn_qubit_action
+                from qubit_cli.web_server_profiles import _hub_action_name
+                pid = _spawn_qubit_action(
+                    ["-p", canon, "skills", "install", ident, "--yes"],
+                    _hub_action_name("install", ident)).pid
+            except Exception:  # noqa: BLE001 - best-effort
+                pid = None
+            hub_installs.append({"identifier": ident, "pid": pid})
+    _audit("profile.create", "dashboard:user",
+           {"name": canon, "clone": clone, "model_set": model_set,
+            "mcp_written": mcp_written, "hub_installs": len(hub_installs)})
+    return _ok(ok=True, name=canon, path=canon, model_set=model_set,
+               model_error=model_error, mcp_written=mcp_written,
+               hub_installs=hub_installs, skills_disabled=skills_disabled,
+               qubit_counterpart="CLI `qubit agent profile create`")
 
 
 def h_profile_export(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -6065,6 +6821,29 @@ _NO_AUDIO_STREAM = _g("AUDIO_STREAM_LOCAL",
                       "Streaming PCM TTS is served by the local voice "
                       "pipeline, not as a compat WebSocket.",
                       "classic Qubit voice playback + Qubit Chat")
+# GPT-Live session creation is the one reference audio route that performs a
+# DIRECT vendor call (POST https://api.openai.com/v1/live/sessions) with a
+# project key. Qubit forbids direct vendor calls from the dashboard and never
+# exports the key, so the POST is a typed refusal; the non-secret readiness
+# read (GET /api/audio/voice-live/status) IS served.
+_GATE_VOICE_LIVE_SESSION = _g(
+    "VOICE_LIVE_VENDOR_DIRECT",
+    "GPT-Live session creation exchanges an SDP offer with the vendor's "
+    "/v1/live/sessions using a direct project key; Qubit makes no direct "
+    "vendor call from the dashboard and never exports the key.",
+    "GET /api/audio/voice-live/status (read-only readiness) + the chained "
+    "local voice pipeline (classic /api/audio/* relay + Qubit Chat voice)")
+# Backend retirement is a process-owned admission fence. Qubit never
+# prepares/commits retirement for its own backend from the dashboard; the
+# module is ported (used by the idle probe) but the route stays operator-owned.
+_GATE_HEALTH_RETIREMENT = _g(
+    "RETIREMENT_OPERATOR_OWNED",
+    "Backend retirement freezes process admission and permanently closes "
+    "admission on commit; it is operator-owned and never driven from the "
+    "dashboard. GET /api/health/idle stays a read-only diagnostic.",
+    "operator-run `qubit gateway stop --confirm` (supervisor e-stop -> "
+    "confirmation -> audit)",
+    rollback="nothing changed; no admission fence opened")
 _NO_NETWORK_PROBE = _g("NETWORK_PROBE_BLOCKED",
                        "Live endpoint/credential probes open outbound sockets "
                        "from the dashboard; Qubit verifies providers through "
@@ -6132,6 +6911,9 @@ _GATE_OAUTH_DELETE = {
 _r("GET", r"/api/status", "h_status")
 _r("GET", r"/api/runtime", "h_runtime")
 _r("GET", r"/api/health", "h_health")
+# Token-gated diagnostic work snapshot (reference status.py:139); the mutating
+# retirement route is an operator-owned typed refusal in the GATED table.
+_r("GET", r"/api/health/idle", "h_health_idle")
 _r("GET", r"/api/auth/me", "h_auth_me")
 _r("GET", r"/api/events", "h_events")
 _r("GET", r"/api/sessions", "h_sessions_list")
@@ -6140,6 +6922,11 @@ _r("GET", r"/api/sessions/search", "h_sessions_list")
 _r("GET", r"/api/sessions/(?P<id>[^/]+)/export", "h_session_show")
 _r("GET", r"/api/sessions/(?P<id>[^/]+)/latest-descendant", "h_session_show")
 _r("GET", r"/api/sessions/(?P<id>[^/]+)/messages", "h_session_messages")
+# Durable timeline jump surface (reference sessions.py:619/641), served over
+# the canonical Qubit session DB by the W9 slice-0 ``qubit_state_timeline``.
+_r("GET", r"/api/sessions/(?P<id>[^/]+)/timeline", "h_session_timeline")
+_r("GET", r"/api/sessions/(?P<id>[^/]+)/messages/around",
+   "h_session_messages_around")
 # Negative lookahead keeps the dedicated /api/sessions/shares collection from
 # being captured as a session id by the generic show route below. The specific
 # ``/api/sessions/empty[*]`` read (pinned bulk empty-session listing) must
@@ -6147,6 +6934,14 @@ _r("GET", r"/api/sessions/(?P<id>[^/]+)/messages", "h_session_messages")
 # as a session named ``empty``.
 _r("GET", r"/api/sessions/empty.*", "sess_empty")
 _r("GET", r"/api/sessions/(?!shares$)(?P<id>[^/]+)", "h_session_show")
+# Bulk session maintenance (reference parity: import/prune/bulk-delete/empty).
+# Registered ahead of the generic id patterns and the GATED table so the real
+# handlers own them; each mutating route is e-stop + confirmation gated and
+# writes only the one canonical ``state.db``.
+_r("POST", r"/api/sessions/import", "sessions_import")
+_r("POST", r"/api/sessions/prune", "sessions_prune")
+_r("POST", r"/api/sessions/bulk-delete", "sessions_bulk_delete")
+_r("DELETE", r"/api/sessions/empty", "sessions_empty_delete")
 _r("GET", r"/api/config", "h_config")
 _r("GET", r"/api/config/schema", "h_config_schema")
 _r("GET", r"/api/config/defaults", "h_config_defaults")
@@ -6211,6 +7006,10 @@ _r("PUT", r"/api/mcp/servers/(?P<id>[^/]+)/enabled", "mcp_set_enabled")
 _r("GET", r"/api/mcp/servers/(?P<id>[^/]+)/auth", "mcp_auth_status")
 _r("POST", r"/api/mcp/servers/(?P<id>[^/]+)/auth", "mcp_auth")
 _r("GET", r"/api/mcp/catalog", "h_mcp_catalog_live")
+# Real, confirm-gated tool invocation from the dashboard (the same canonical
+# entry point the CLI/voice use). Placed with the other MCP sub-routes so it is
+# never shadowed by a generic server pattern.
+_r("POST", r"/api/mcp/servers/(?P<name>[^/]+)/invoke", "mcp_invoke")
 _r("POST", r"/api/pub", "h_pub")
 _r("WEBSOCKET", r"/api/pub", "h_pub")
 _r("GET", r"/api/pairing", "h_pairing_list")
@@ -6222,6 +7021,13 @@ _r("GET", r"/api/webhooks", "h_webhooks_list")
 _r("POST", r"/api/webhooks", "webhooks_add")
 _r("POST", r"/api/webhooks/enable", "webhooks_enable")
 _r("PUT", r"/api/webhooks/(?P<id>[^/]+)/enabled", "webhooks_enabled")
+# Delivery maintenance (reference store carries the per-route signing secret;
+# Qubit realizes rotate/test/deliveries/retry against its own reference-only
+# store). Registered before the generic id routes so they own their suffixes.
+_r("POST", r"/api/webhooks/(?P<id>[^/]+)/rotate", "webhooks_rotate")
+_r("POST", r"/api/webhooks/(?P<id>[^/]+)/test", "webhooks_test")
+_r("GET", r"/api/webhooks/(?P<id>[^/]+)/deliveries", "webhooks_deliveries")
+_r("POST", r"/api/webhooks/(?P<id>[^/]+)/retry", "webhooks_retry")
 _r("DELETE", r"/api/webhooks/(?P<id>[^/]+)", "webhooks_delete")
 _r("GET", r"/api/webhooks/(?P<id>[^/]+)", "webhooks_show")
 _r("POST", r"/api/webhooks/(?P<id>[^/]+)", "webhooks_mutate")
@@ -6419,6 +7225,9 @@ _r("GET", r"/api/audio/status", "h_audio_status")
 _r("GET", r"/api/audio/list", "h_audio_devices")
 _r("GET", r"/api/audio/devices", "h_audio_devices")
 _r("GET", r"/api/audio/voice-config", "h_audio_voice_config")
+# Non-secret GPT-Live readiness (reference audio.py:167); the session-creation
+# POST stays a typed vendor-direct refusal in the GATED table.
+_r("GET", r"/api/audio/voice-live/status", "h_audio_voice_live_status")
 _r("POST", r"/api/audio/transcribe", "h_audio_transcribe")
 _r("POST", r"/api/audio/speak", "h_audio_speak")
 
@@ -6694,15 +7503,11 @@ GATED: List[Dict[str, Any]] = [
         "GET /api/skills + CLI `qubit skills list`")),
     ("GET", r"/api/cron/blueprints", "blueprints"),
     ("GET", r"/api/cron/delivery-targets", "delivery"),
-    ("POST", r"/api/sessions/import", _GATE_SESSIONS_RECEIPT),
-    ("POST", r"/api/sessions/prune", _GATE_SESSIONS_RECEIPT),
-    ("POST", r"/api/sessions/bulk-delete", _GATE_SESSIONS_RECEIPT),
-    # ``DELETE /api/sessions/empty`` is the pinned bulk "delete every empty
-    # session" endpoint (backing ``api.deleteEmptySessions``), not a session
-    # named ``empty``. It must precede the generic id pattern or it is
-    # misrouted to the single-session delete. Qubit receipts are append-only,
-    # so the bulk sweep is the same typed gate as POST /api/sessions/bulk-delete.
-    ("DELETE", r"/api/sessions/empty", _GATE_SESSIONS_RECEIPT),
+    # ``POST /api/sessions/import|prune|bulk-delete`` and ``DELETE
+    # /api/sessions/empty`` are real, confirmation-gated handlers registered
+    # in the implemented table ahead of this GATED pass (the earlier
+    # ``_GATE_SESSIONS_RECEIPT`` refusals had a false "append-only" rationale
+    # and contradicted the single-session rename/archive/delete surface).
     ("DELETE", r"/api/sessions/(?P<id>[^/]+)", "h_session_delete"),
     ("PATCH", r"/api/sessions/(?P<id>[^/]+)", "h_session_patch"),
     ("POST", r"/api/sessions/(?P<id>[^/]+)/resume", "h_session_resume"),
@@ -6771,6 +7576,11 @@ GATED: List[Dict[str, Any]] = [
     ("POST", r"/api/audio/tts-lease", _NO_AUDIO_LEASE),
     ("GET", r"/api/audio/speak-stream", _NO_AUDIO_STREAM),
     ("POST", r"/api/audio/speak-stream", _NO_AUDIO_STREAM),
+    # GPT-Live session creation is direct-vendor-key only; typed refusal. The
+    # read-only readiness route is implemented above.
+    ("POST", r"/api/audio/voice-live/session", _GATE_VOICE_LIVE_SESSION),
+    # Backend retirement: operator-owned admission fence, never dashboard-driven.
+    ("POST", r"/api/health/retirement", _GATE_HEALTH_RETIREMENT),
     # --- Packet 8U closure: provider/profile/tool/learning writes + the
     # remaining wrong-verb gates (audit §1B). Specific paths precede any
     # parameterized row so re.fullmatch resolves deterministically.
@@ -6832,15 +7642,233 @@ def h_delivery_targets(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(delivery_targets=res)
 
 
+def _chat_session_db(cfg: Any) -> Tuple[Any, Any, Any]:
+    """``(store, db, sessions_dir)`` for the canonical chat-session store.
+
+    Returns ``(None, None, None)`` when the store cannot be opened. ``db`` is
+    the vendored ``qubit_state.SessionDB`` the adapter wraps — the same object
+    the reference's bulk maintenance operates on; ``sessions_dir`` is the
+    transcript sidecar directory beside the DB (``None`` when absent), so prune
+    and the empty sweep can remove on-disk transcripts exactly like upstream.
+    """
+    try:
+        cs: Any = _chat_session_store(cfg)
+    except Exception:
+        return None, None, None
+    db = getattr(cs, "_db", None)
+    path = getattr(cs, "_path", None)
+    sessions_dir = None
+    if path is not None:
+        try:
+            cand = Path(path).parent / "sessions"
+            sessions_dir = cand if cand.exists() else None
+        except Exception:
+            sessions_dir = None
+    return cs, db, sessions_dir
+
+
 def h_sess_empty(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """Real read: receipts whose detail is empty (no recorded activity)."""
+    """GET /api/sessions/empty[/count] -> the empty-session sweep size.
+
+    The "Delete empty (N)" button and its confirm dialog must agree with what
+    ``DELETE /api/sessions/empty`` actually sweeps, so the count is the
+    canonical chat store's own ``count_empty_sessions`` (empty, ended,
+    non-archived — the exact predicate the vendored sweep uses), not a
+    receipt-store heuristic that never matches the sweep.
+    """
+    _cs, db, _dir = _chat_session_db(cfg)
+    if db is not None:
+        try:
+            count = int(db.count_empty_sessions())
+        except Exception:
+            count = 0
+        return _ok(count=count, sessions=[],
+                   store_authority=CHAT_SESSION_AUTHORITY)
+    # Fall back to the receipt life-cycle count only when the canonical store
+    # is unavailable (never fabricate a positive count).
     res = _receipt_session_store(cfg).list(100)
-    empty = [r for r in res.get("sessions", []) if not (r.get("detail") or "").strip()]
+    empty = [r for r in res.get("sessions", [])
+             if not (r.get("detail") or "").strip()]
     return _ok(count=len(empty),
                sessions=[{"id": r.get("receipt_id") or r.get("action_id"),
                           "created_at": r.get("created_at")} for r in empty],
                store_authority=RECEIPT_SESSION_AUTHORITY)
+
+
+def h_sessions_import(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/sessions/import -> real bulk import into the canonical store.
+
+    Ported from the reference ``import_sessions_endpoint``
+    (``hermes_cli/web_routers/sessions.py:418`` -> ``SessionDB.import_sessions``),
+    which the vendored runtime carries as
+    ``qubit_runtime/qubit_state_portability.py:571``. Additive (existing ids are
+    skipped), so it is not destructive; every accepted row is written through
+    the one canonical ``state.db`` and the run is audited. Malformed payloads
+    and over-limit batches are typed 400s — never a fabricated success.
+    """
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; session import refused"}
+    sessions = b.get("sessions")
+    if not isinstance(sessions, list) or not sessions:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "sessions must be a non-empty list"}
+    _cs, db, _dir = _chat_session_db(cfg)
+    if db is None:
+        return _fail(RuntimeError("canonical session store unavailable"))
+    try:
+        res = db.import_sessions(sessions)
+    except ValueError as exc:
+        return 400, {"ok": False, "code": "SESSION_IMPORT_REJECTED",
+                     "detail": _redact(str(exc))[:300]}
+    except Exception as exc:
+        return _fail(exc)
+    if not isinstance(res, dict) or not res.get("ok", False):
+        detail = res.get("errors") if isinstance(res, dict) else res
+        return 400, {"ok": False, "code": "SESSION_IMPORT_REJECTED",
+                     "detail": _redact(json.dumps(detail))[:300]}
+    _audit("session.import", "dashboard:user",
+           {"imported": int(res.get("imported", 0) or 0),
+            "skipped": int(res.get("skipped", 0) or 0)})
+    return _ok(ok=True, imported=int(res.get("imported", 0) or 0),
+               skipped=int(res.get("skipped", 0) or 0),
+               detached=int(res.get("detached", 0) or 0),
+               imported_ids=list(res.get("imported_ids", []) or []),
+               skipped_ids=list(res.get("skipped_ids", []) or []),
+               store_authority=CHAT_SESSION_AUTHORITY)
+
+
+def h_sessions_prune(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/sessions/prune -> confirmed destructive prune of old sessions.
+
+    Ported from the reference ``_prune_sessions``
+    (``hermes_cli/web_routers/sessions.py:71``) onto the vendored
+    ``qubit_state`` maintainer (``qubit_runtime/qubit_state_maintenance.py:272``:
+    ``prune_sessions`` / ``count_open_prune_matches`` / ``list_prune_candidates``).
+    Only ended, non-archived sessions outside the window are removed; a live
+    (un-ended) session is always skipped and reported. Confirmation, e-stop and
+    audit all run before any row is touched. ``dry_run`` reports the real match
+    set without deleting.
+    """
+    try:
+        days = float(b.get("older_than_days", 90) or 90)
+    except (TypeError, ValueError):
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "older_than_days must be numeric"}
+    if days < 1:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "older_than_days must be >= 1"}
+    source = str(b.get("source") or q.get("source") or "").strip() or None
+    _cs, db, sessions_dir = _chat_session_db(cfg)
+    if db is None:
+        return _fail(RuntimeError("canonical session store unavailable"))
+    filters = {"older_than_days": days, "source": source, "archived": False}
+    if _truthy(b.get("dry_run")):
+        try:
+            rows = db.list_prune_candidates(**filters)
+            skipped_open = int(db.count_open_prune_matches(**filters))
+        except Exception as exc:
+            return _fail(exc)
+        return _ok(ok=True, removed=0, matched=len(rows),
+                   skipped_open=skipped_open, dry_run=True,
+                   sessions=[{"id": r.get("id"), "source": r.get("source"),
+                              "title": r.get("title"), "model": r.get("model"),
+                              "started_at": r.get("started_at"),
+                              "last_active": r.get("last_active"),
+                              "message_count": r.get("message_count")}
+                             for r in rows],
+                   store_authority=CHAT_SESSION_AUTHORITY)
+    guard = _compat_confirm(
+        cfg, "sessions.prune",
+        f"pruning sessions with no activity for {days:g}+ days is destructive; "
+        "re-POST with {\"confirm\": true}", q, b,
+        payload={"older_than_days": days, "source": source or ""})
+    if guard is not None:
+        return guard
+    try:
+        skipped_open = int(db.count_open_prune_matches(**filters))
+        removed = int(db.prune_sessions(sessions_dir=sessions_dir, **filters))
+    except Exception as exc:
+        return _fail(exc)
+    _audit("session.prune", "dashboard:user",
+           {"older_than_days": days, "source": source or "",
+            "removed": removed, "skipped_open": skipped_open})
+    return _ok(ok=True, removed=removed, skipped_open=skipped_open,
+               store_authority=CHAT_SESSION_AUTHORITY)
+
+
+def h_sessions_bulk_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/sessions/bulk-delete -> confirmed delete of selected sessions.
+
+    Ported from the reference ``bulk_delete_sessions_endpoint``
+    (``hermes_cli/web_routers/sessions.py:400``) onto the vendored
+    ``SessionDB.delete_sessions`` (``qubit_runtime/qubit_state_sessions.py:1586``):
+    one transaction, unknown ids skipped, children orphaned (never cascade-killed).
+    The 500-id hard cap mirrors upstream. Confirmation is required first so a
+    hand-picked multi-row delete is never implicit.
+    """
+    ids = b.get("ids")
+    if not isinstance(ids, list) or not ids:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "ids must be a non-empty list"}
+    if len(ids) > 500:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "ids must contain at most 500 entries"}
+    clean_ids = [str(i) for i in ids if str(i or "").strip()][:500]
+    if not clean_ids:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "ids must contain at least one session id"}
+    _cs, db, sessions_dir = _chat_session_db(cfg)
+    if db is None:
+        return _fail(RuntimeError("canonical session store unavailable"))
+    guard = _compat_confirm(
+        cfg, "sessions.bulk_delete",
+        f"deleting {len(clean_ids)} selected session(s) is destructive; "
+        "re-POST with {\"confirm\": true}", q, b,
+        payload={"ids": clean_ids})
+    if guard is not None:
+        return guard
+    try:
+        removed = int(db.delete_sessions(clean_ids, sessions_dir=sessions_dir))
+    except Exception as exc:
+        return _fail(exc)
+    _audit("session.bulk_delete", "dashboard:user",
+           {"requested": len(clean_ids), "deleted": removed})
+    return _ok(ok=True, deleted=removed, requested=len(clean_ids),
+               store_authority=CHAT_SESSION_AUTHORITY)
+
+
+def h_sessions_empty_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """DELETE /api/sessions/empty -> confirmed one-transaction empty sweep.
+
+    Ported from the reference ``delete_empty_sessions_endpoint``
+    (``hermes_cli/web_routers/sessions.py:449``) onto the vendored
+    ``SessionDB.delete_empty_sessions`` (``qubit_runtime/qubit_state_sessions.py:1628``).
+    "Empty" means NO ``messages`` rows at all — active (un-ended) and archived
+    rows are skipped, so a live agent is never yanked and a deliberately
+    archived row is never swept. Confirmation is required first.
+    """
+    _cs, db, sessions_dir = _chat_session_db(cfg)
+    if db is None:
+        return _fail(RuntimeError("canonical session store unavailable"))
+    guard = _compat_confirm(
+        cfg, "sessions.delete_empty",
+        "deleting every empty session is destructive; re-DELETE with "
+        "{\"confirm\": true}", q, b)
+    if guard is not None:
+        return guard
+    try:
+        removed = int(db.delete_empty_sessions(sessions_dir=sessions_dir))
+    except Exception as exc:
+        return _fail(exc)
+    _audit("session.delete_empty", "dashboard:user", {"deleted": removed})
+    return _ok(ok=True, deleted=removed, store_authority=CHAT_SESSION_AUTHORITY)
 
 
 def h_mem_reset_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -7430,6 +8458,58 @@ def record_action_status(name: str, out: Dict[str, Any]) -> None:
         _ACTION_STATUS.pop(next(iter(_ACTION_STATUS)))
 
 
+def _supervision_action_status(cfg: Any, name: str) -> Optional[Dict[str, Any]]:
+    """Derive a supervision action's status from its durable control record.
+
+    Ported from the reference ``GET /api/actions/{name}/status``
+    (``web_routers/actions.py:get_action_status``), which reports a completed
+    action from durable evidence (the action log + ``_ACTION_RESULTS``) rather
+    than only an in-memory process registry. Qubit's equivalent durable record
+    is written by :func:`voicebridge.gateway_supervisor._record_control_status`;
+    the live systemd state resolves a detached restart/stop to its real
+    terminal outcome. Returns ``None`` when no control was ever dispatched.
+    """
+    from . import gateway_supervisor as GS
+
+    action = name[len("gateway-"):] if name.startswith("gateway-") else name
+    rec = GS.control_status(cfg, action)
+    if rec is None:
+        return None
+    try:
+        live = GS.status(cfg)
+    except Exception:  # noqa: BLE001 - never fail the status read
+        live = {}
+    state = str(rec.get("state") or "")
+    detail = str(rec.get("detail") or "")
+    code = str(rec.get("code") or "")
+    active_state = str(live.get("active_state") or "unknown")
+    pid = live.get("pid")
+    running, exit_code, status_state = False, None, state
+    if state in ("RESTARTING", "STOPPING"):
+        age = time.time() - float(rec.get("updated_at") or 0.0)
+        if age < GS.DETACH_DELAY_S + 1.0:
+            running, status_state = True, "in_progress"
+        elif active_state in ("activating", "deactivating", "reloading"):
+            running, status_state = True, "in_progress"
+        elif live.get("failed") or active_state == "failed":
+            exit_code, status_state = 1, "failed"
+        else:
+            exit_code, status_state = 0, "completed"
+    elif state == "OK":
+        exit_code, status_state = 0, "completed"
+    elif state in ("FAILED", "TIMEOUT", "UNAVAILABLE"):
+        exit_code, status_state = 1, "failed"
+    lines = [line for line in (
+        detail,
+        f"code: {code}" if code else "",
+        f"unit: {live.get('service_unit', '')}",
+        f"active_state: {active_state} pid: {pid}",
+    ) if line]
+    return _ok(name=name, running=running, exit_code=exit_code, pid=pid,
+               state=status_state or "unknown", lines=lines,
+               recorded_at=rec.get("updated_at"), detail=detail or None)
+
+
 def h_action_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/actions/<name>/status -> the recorded real outcome."""
@@ -7440,14 +8520,16 @@ def h_action_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     rec = _ACTION_STATUS.get(name)
     if rec is None:
         if name in _SUPERVISION_ACTION_NAMES:
-            # Known action, no recorded outcome in *this* process: a gateway
-            # restart replaces the dashboard process, so the new listener has
-            # an empty registry. Report the upstream not-running shape (the UI
-            # polls it) instead of the untracked-name 404.
+            # Known action, no in-memory outcome: a gateway restart replaces
+            # the serving process, so the new listener's registry is empty.
+            # Report the durable control outcome (the reference's action-log
+            # equivalent) instead of a permanent ``unknown``.
+            durable = _supervision_action_status(cfg, name)
+            if durable is not None:
+                return durable
             return _ok(name=name, running=False, exit_code=None, pid=None,
                        state="unknown", lines=[],
-                       detail="no outcome recorded in this process; a gateway "
-                              "restart replaces the dashboard process")
+                       detail="no gateway control dispatched on this host yet")
         return _gate(
             "ACTION_NOT_TRACKED",
             f"no action named {name!r} has run on this listener",
@@ -7594,15 +8676,43 @@ def h_profiles_active(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 def profiles_active_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    name = str(b.get("active", b.get("name", "")) or "")
+    """POST /api/profiles/active -> the sticky reference active profile.
+
+    Ported from the reference ``web_routers/profiles.py:set_active_profile_endpoint``
+    (``:782``) / ``hermes_cli/profiles.py:set_active_profile`` (``:1356``):
+    ``qubit agent profile use``. The name must be an existing profile (or the
+    built-in ``default``); anything else is a typed 404, so the badge can never
+    move to a name the registry does not hold. The write is the reference's own
+    atomic ``active_profile`` pointer — no invented persona store.
+    """
+    name = str(b.get("active", b.get("name", "")) or "").strip()
     if not name:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "active profile name required"}
     try:
-        _persona_save(cfg, name)
+        P = _profiles_module(cfg)
+        canon = P.normalize_profile_name(name)
+    except ValueError as exc:
+        return 400, {"ok": False, "code": "PROFILE_BAD_NAME",
+                     "detail": _redact(str(exc))[:300],
+                     "qubit_counterpart": "CLI `qubit agent profile use`"}
     except Exception as exc:
         return _fail(exc)
-    return _ok(ok=True, active=name)
+    if canon != "default":
+        try:
+            exists = bool(P.profile_exists(canon))
+        except Exception:  # noqa: BLE001
+            exists = False
+        if not exists:
+            return 404, {"ok": False, "code": "PROFILE_NOT_FOUND",
+                         "detail": f"no profile {name!r}",
+                         "qubit_counterpart": "CLI `qubit agent profile list`"}
+    try:
+        P.set_active_profile(canon)
+    except Exception as exc:
+        return _fail(exc)
+    _audit("profile.active", "dashboard:user", {"name": canon})
+    return _ok(ok=True, active=canon)
 
 
 def _profile_field_value(b: Dict[str, Any], key: str) -> Any:
@@ -7619,128 +8729,245 @@ def _profile_field_value(b: Dict[str, Any], key: str) -> Any:
     return ""
 
 
-def _profile_field(cfg: Any, b: Dict[str, Any], p: Dict[str, str],
-                   key: str) -> Tuple[int, Dict[str, Any]]:
-    from . import brain as B
+def profile_soul_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT /api/profiles/{name}/soul -> atomic ``SOUL.md`` write.
+
+    Ported from the reference ``web_routers/profiles.py:update_profile_soul``
+    (``:892``): a temp-file + fsync + replace write of the profile's own
+    ``SOUL.md`` so an interrupted save cannot truncate the file. Confirm-gated.
+    """
     name = str(p.get("name", "") or "")
-    value = _profile_field_value(b, key)
+    content = str(_profile_field_value(b, "soul") or "")
     if not name:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "profile name required"}
-    if not b.get("confirm"):
-        return _need_confirm(f"profile {key} update")
+    guard = _compat_confirm(
+        cfg, "profile_soul",
+        f"profile {_redact(name)!r} SOUL.md update; re-POST with "
+        "{\"confirm\": true}", q, b)
+    if guard is not None:
+        return guard
     try:
-        res = B.profile_set(cfg, name, key, str(value or ""),
-                            requested_by="dashboard:user", confirmed=True)
+        P = _profiles_module(cfg)
     except Exception as exc:
-        code = getattr(exc, "code", None) or type(exc).__name__
-        return 400, {"ok": False, "code": code,
-                     "detail": _redact(str(exc))[:300]}
-    return _ok(ok=True, field=res.get("field", {}))
-
-
-def profile_soul_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
-                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    return _profile_field(cfg, b, p, "soul")
+        return _fail(exc)
+    prof_dir, err = _profile_dir_or_error(P, name)
+    if err is not None:
+        return err
+    try:
+        from utils import atomic_write_text  # type: ignore
+        atomic_write_text(prof_dir / "SOUL.md", content,
+                          preserve_mode=True, create_mode=0o644)
+    except Exception as exc:
+        return _fail(exc)
+    _audit("profile.soul", "dashboard:user", {"name": name})
+    return _ok(ok=True, field={"key": "soul"})
 
 
 def profile_desc(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    return _profile_field(cfg, b, p, "description")
+    """PUT /api/profiles/{name}/description -> ``profile.yaml`` description.
+
+    Ported from the reference ``web_routers/profiles.py:update_profile_description_endpoint``
+    (``:914``) / ``hermes_cli/profiles.py:write_profile_meta`` (``:832``): stored
+    user-authored (``description_auto: false``) so an auto-describer cannot
+    overwrite it. Confirm-gated.
+    """
+    name = str(p.get("name", "") or "")
+    text = str(_profile_field_value(b, "description") or "").strip()
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "profile name required"}
+    guard = _compat_confirm(
+        cfg, "profile_description",
+        f"profile {_redact(name)!r} description update; re-POST with "
+        "{\"confirm\": true}", q, b)
+    if guard is not None:
+        return guard
+    try:
+        P = _profiles_module(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    prof_dir, err = _profile_dir_or_error(P, name)
+    if err is not None:
+        return err
+    try:
+        P.write_profile_meta(prof_dir, description=text,
+                             description_auto=False)
+    except Exception as exc:
+        return _fail(exc)
+    _audit("profile.description", "dashboard:user", {"name": name})
+    return _ok(ok=True, description=text, description_auto=False,
+               field={"key": "description", "value": text})
 
 
 def profile_model(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """PUT /api/profiles/{name}/model -> persist provider + model, return stored.
+    """PUT /api/profiles/{name}/model -> the profile's own config model.
 
-    The editor submits ``{provider, model, confirm}``. Both fields are written
-    into the principal's profile and the response echoes the STORED values
-    (never a hardcoded ``ollama-local``/request echo).
+    Ported from the reference ``web_routers/profiles.py:update_profile_model_endpoint``
+    (``:928``) / ``_write_profile_model`` (``:104``): requires provider AND
+    model, writes them into THIS profile's ``config.yaml`` (never the
+    dashboard's), and returns the STORED values — never a fabricated
+    ``ollama-local`` or a request echo. Confirm-gated.
     """
-    from . import brain as B
     name = str(p.get("name", "") or "")
+    provider = str(b.get("provider", "") or "").strip()
+    model = str(b.get("model", b.get("value", "")) or "").strip()
     if not name:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "profile name required"}
-    model = str(b.get("model", b.get("value", "")) or "")
-    provider = str(b.get("provider", "") or "")
-    if not model:
+    if not provider or not model:
         return 400, {"ok": False, "code": "MALFORMED",
-                     "detail": "model required"}
-    if not b.get("confirm"):
-        return _need_confirm("profile model update")
-    stored: Dict[str, Any] = {}
+                     "detail": "provider and model are required",
+                     "qubit_counterpart": "CLI `qubit agent profile model`"}
+    guard = _compat_confirm(
+        cfg, "profile_model",
+        f"profile {_redact(name)!r} model assignment; re-POST with "
+        "{\"confirm\": true}", q, b)
+    if guard is not None:
+        return guard
     try:
-        B.profile_set(cfg, name, "model", model,
-                      requested_by="dashboard:user", confirmed=True)
-        # model/provider are not secret-class: echo the values just persisted
-        # (the write succeeded), never a masked placeholder or a hardcoded
-        # ``ollama-local``.
-        stored["model"] = model
-        if provider:
-            B.profile_set(cfg, name, "provider", provider,
-                          requested_by="dashboard:user", confirmed=True)
-            stored["provider"] = provider
+        P = _profiles_module(cfg)
     except Exception as exc:
-        code = getattr(exc, "code", None) or type(exc).__name__
-        return 400, {"ok": False, "code": code,
-                     "detail": _redact(str(exc))[:300]}
-    return _ok(ok=True, model=stored.get("model", model),
-               provider=stored.get("provider", provider))
+        return _fail(exc)
+    prof_dir, err = _profile_dir_or_error(P, name)
+    if err is not None:
+        return err
+    try:
+        from qubit_cli.web_routers.profiles import _write_profile_model
+        _write_profile_model(prof_dir, provider, model)
+    except Exception as exc:
+        return _fail(exc)
+    _audit("profile.model", "dashboard:user",
+           {"name": name, "provider": provider, "model": model})
+    return _ok(ok=True, provider=provider, model=model,
+               qubit_counterpart="CLI `qubit agent profile model`")
 
 
 def profile_describe_auto(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    return _gate("DESCRIBE_AUTO_MANUAL",
-                 "Model-generated profile copy is not offered; write the "
-                 "description explicitly so it stays reviewable.",
-                 "PUT /api/profiles/{name}/description with {\"confirm\": true}")
+    """POST /api/profiles/{name}/describe-auto -> real auxiliary-LLM description.
+
+    Ported from the reference ``web_routers/profiles.py:describe_profile_auto_endpoint``
+    (``:943``) / ``qubit_cli/profile_describer.py:describe_profile`` (``:112``).
+    A failed generation is ``ok: false`` with the reason (never an HTTP error),
+    so the UI can surface it inline and let the operator retry.
+    """
+    name = str(p.get("name", "") or "")
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "profile name required"}
+    try:
+        P = _profiles_module(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    _prof_dir, err = _profile_dir_or_error(P, name)
+    if err is not None:
+        return err
+    try:
+        from qubit_cli import profile_describer  # type: ignore
+        outcome = profile_describer.describe_profile(
+            name, overwrite=bool(b.get("overwrite")))
+    except Exception as exc:  # noqa: BLE001 - reported, not 500
+        return _ok(ok=False, reason=_redact(str(exc))[:300],
+                   description=None, description_auto=False)
+    ok = bool(getattr(outcome, "ok", False))
+    return _ok(ok=ok, reason=str(getattr(outcome, "reason", "") or ""),
+               description=getattr(outcome, "description", None),
+               description_auto=ok)
 
 
 def profile_rename(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    return _gate("PERSONA_IMMUTABLE_ID",
-                 "Persona identities are immutable once created (memory "
-                 "provenance keys on them); create a new principal instead.",
-                 "CLI `qubit brain principal-add` (same Brain store)", 501)
+    """PATCH /api/profiles/{name} -> rename the reference profile.
+
+    Ported from the reference ``web_routers/profiles.py:rename_profile_endpoint``
+    (``:836``) / ``hermes_cli/profiles.py:rename_profile`` (``:1655``): renames
+    the profile directory, wrapper, gateway service, and the sticky active
+    pointer. The default profile's "rename" is a presentation-only display_name
+    (its id is reserved). Confirm-gated; a collision is a typed 400.
+    """
+    old = str(p.get("name", "") or "")
+    new_raw = str(b.get("new_name", b.get("name", "")) or "").strip()
+    if not old or not new_raw:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "rename needs the current and new name"}
+    guard = _compat_confirm(
+        cfg, "profile_rename",
+        f"profile rename {_redact(old)!r} -> {_redact(new_raw)!r}; re-POST "
+        "with {\"confirm\": true}", q, b)
+    if guard is not None:
+        return guard
+    try:
+        P = _profiles_module(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    try:
+        P.rename_profile(old, new_raw)
+    except FileNotFoundError as exc:
+        return 404, {"ok": False, "code": "PROFILE_NOT_FOUND",
+                     "detail": _redact(str(exc))[:300],
+                     "qubit_counterpart": "CLI `qubit agent profile list`"}
+    except FileExistsError as exc:
+        return 400, {"ok": False, "code": "PROFILE_EXISTS",
+                     "detail": _redact(str(exc))[:300]}
+    except ValueError as exc:
+        return 400, {"ok": False, "code": "PROFILE_BAD_NAME",
+                     "detail": _redact(str(exc))[:300]}
+    except Exception as exc:
+        return _fail(exc)
+    old_canon = P.normalize_profile_name(old)
+    if old_canon == "default":
+        return _ok(ok=True, name="default", display_name=new_raw, path="default",
+                   qubit_counterpart="CLI `qubit agent profile rename`")
+    new_canon = P.normalize_profile_name(new_raw)
+    _audit("profile.rename", "dashboard:user",
+           {"from": old_canon, "to": new_canon})
+    return _ok(ok=True, name=new_canon, path=new_canon, renamed_from=old_canon,
+               qubit_counterpart="CLI `qubit agent profile rename`")
 
 
 def profile_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """DELETE /api/profiles/{name} -> remove the principal record it claims to.
+    """DELETE /api/profiles/{name} -> delete the reference profile.
 
-    ``brain.profile_forget`` only clears a principal's scoped profile fields;
-    the principal row survives and its name stays occupied (a re-create then
-    400s ``BRAIN_EXISTS``). A dashboard delete must remove the record the list
-    showed, so the principal is removed from the same store and the removal is
-    audited. The profile-field forget runs first (idempotent, audited).
+    Ported from the reference ``web_routers/profiles.py:delete_profile_endpoint``
+    (``:855``) / ``hermes_cli/profiles.py:delete_profile`` (``:1158``): stops
+    the profile's gateway, removes its directory and wrapper, and retargets the
+    sticky active pointer. The dashboard confirms in its own dialog, so
+    ``yes=True``; confirm-gated through the shared journal. The default profile
+    cannot be deleted (typed 400).
     """
-    from . import brain as B
     name = str(p.get("name", "") or "")
-    if not b.get("confirm"):
-        return _need_confirm("profile delete")
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "profile name required"}
+    guard = _compat_confirm(
+        cfg, "profile_delete",
+        f"profile {_redact(name)!r} deletion removes its home; re-POST with "
+        "{\"confirm\": true}", q, b)
+    if guard is not None:
+        return guard
     try:
-        res = B.profile_forget(cfg, name, requested_by="dashboard:user",
-                               confirmed=True)
+        P = _profiles_module(cfg)
     except Exception as exc:
-        code = getattr(exc, "code", None) or type(exc).__name__
-        return 400, {"ok": False, "code": code,
-                     "detail": _redact(str(exc))[:300]}
+        return _fail(exc)
     try:
-        state = B._load(cfg)
-        pid = B._check_id(name, "principal")
-        B._get_principal(state, pid)
-        state["principals"].pop(pid, None)
-        B._save(cfg, state)
-        B._audit("principal.remove", "dashboard:user", {"principal": pid})
-    except B.BrainError as exc:
-        code = getattr(exc, "code", None) or type(exc).__name__
-        return 400, {"ok": False, "code": code,
+        P.delete_profile(name, yes=True)
+    except ValueError as exc:
+        return 400, {"ok": False, "code": "PROFILE_BAD_NAME",
+                     "detail": _redact(str(exc))[:300]}
+    except FileNotFoundError as exc:
+        return 404, {"ok": False, "code": "PROFILE_NOT_FOUND",
                      "detail": _redact(str(exc))[:300]}
     except Exception as exc:
         return _fail(exc)
-    return 200, {"ok": True, "removed": True,
-                 "forgotten_profiles": (res or {}).get("forgotten_profiles", [])}
+    canon = P.normalize_profile_name(name)
+    _audit("profile.delete", "dashboard:user", {"name": canon})
+    return _ok(ok=True, removed=True, name=canon, path=canon,
+               qubit_counterpart="CLI `qubit agent profile delete`")
 
 
 _SCHEDULE_SHORTHAND = re.compile(
@@ -8165,7 +9392,21 @@ def mcp_set_enabled(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 def mcp_auth(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """POST /api/mcp/servers/{id}/auth -> record a credential reference."""
+    """POST /api/mcp/servers/{id}/auth -> record a credential reference.
+
+    The SPA's "Authenticate" button posts an empty body when the server's
+    ``auth`` is ``oauth``. Answering every such call with the same 403
+    ``OAUTH_MANUAL_HANDOFF`` made the button a dead end with no path forward.
+    The reference ``auth_mcp_server`` starts a live OAuth flow and hands the
+    browser the authorization URL
+    (``qubit_runtime/qubit_cli/web_routers/mcp.py:194``); Qubit's
+    reference-only credential policy has no server-side token store to receive
+    one, so this returns an actionable **200 manual handoff** (state
+    ``MANUAL_HANDOFF``) carrying the server's real registered endpoint and the
+    exact CLI reference to enroll — never a 403 dead end and never a fabricated
+    "authenticated". A ``vault:/env:/file:`` reference in the body still writes
+    the credential reference through the confirmed path.
+    """
     from . import mcp_servers as MS
     name = str(p.get("id", "") or b.get("name", "") or "")
     if not name:
@@ -8173,10 +9414,25 @@ def mcp_auth(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      "detail": "server name required"}
     ref = str(b.get("reference", b.get("token", b.get("value", ""))) or "")
     if not ref:
-        return _gate("OAUTH_MANUAL_HANDOFF",
-                     "No live MCP OAuth flow is performed; pass a "
-                     "vault:/env:/file: credential reference instead.",
-                     "CLI `qubit auth login` + `qubit mcp servers`")
+        row = next((s for s in MS.list_servers(cfg).get("servers", [])
+                    if s.get("name") == name), None)
+        if row is None:
+            return 404, {"ok": False, "code": "MCP_NOT_FOUND",
+                         "detail": f"no registered server {name!r}"}
+        auth_mode = str(row.get("auth") or "none")
+        endpoint = str(row.get("url") or "") or None
+        return 200, {
+            "ok": True, "state": "MANUAL_HANDOFF",
+            "code": "MCP_OAUTH_MANUAL_HANDOFF",
+            "name": name, "auth": auth_mode, "endpoint": endpoint,
+            "reference_required": True,
+            "reference_kinds": ["vault:", "env:", "file:"],
+            "detail": "Qubit performs no server-side OAuth token dance; enroll "
+                      "the credential out-of-band and POST a "
+                      "vault:/env:/file: reference here.",
+            "qubit_counterpart": "CLI `qubit auth login` + "
+                                 "`qubit mcp servers` (references only)",
+        }
     guard = _compat_confirm(
         cfg, "mcp_server_auth",
         f"recording a credential reference for {name!r} requires explicit "
@@ -8273,54 +9529,172 @@ def webhooks_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(ok=True, name=sub_id)
 
 
-def msg_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
-               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """PUT /api/messaging/platforms/{id} -> confirmed account toggle.
+def webhooks_rotate(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/webhooks/{id}/rotate -> confirmed signing-secret rotation.
 
-    The canonical Qubit channel model is the account registry
-    (``voicebridge.messaging``): a platform is enabled by enabling its account.
-    The id from the SPA is the platform/account id. Without a matching account
-    the toggle is a typed ``MSG_NOT_FOUND`` naming the CLI that registers one —
-    never a fabricated enable.
+    Realizes the reference's per-route secret rotation against Qubit's
+    reference-only store: a fresh secret is written to a Qubit-owned ``file:``
+    reference and the subscription is repointed there (value never returned).
     """
-    from . import messaging as M
-    aid = str(p.get("id", "") or "")
+    from . import webhooks as W
+    sub_id = str(p.get("id", "") or b.get("id", "") or "")
     guard = _compat_confirm(
-        cfg, "messaging_account_update",
-        f"changing messaging channel {aid!r} requires explicit confirmation: "
-        "re-PUT with {\"confirm\": true}", q, b)
+        cfg, "webhook_rotate",
+        f"rotating the signing secret for {_redact(sub_id)!r} requires explicit "
+        "confirmation: re-POST with {\"confirm\": true}", q, b,
+        payload={"id": sub_id})
     if guard is not None:
         return guard
-    # B-08: the dashboard channel form posts credentials in ``env`` (and
-    # ``clear_env``). The canonical account store never holds credential
-    # material and has no env-write path, so silently dropping them would be a
-    # fake "saved" success. Return a typed refusal instead.
-    if b.get("env") or b.get("clear_env"):
+    try:
+        res = W.rotate_secret(cfg, sub_id, requested_by="dashboard:user",
+                              confirmed=True)
+    except Exception as exc:
+        return _webhook_error(exc)
+    return _ok(ok=True, **res)
+
+
+def webhooks_test(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/webhooks/{id}/test -> confirmed real signed test delivery."""
+    from . import webhooks as W
+    sub_id = str(p.get("id", "") or b.get("id", "") or "")
+    guard = _compat_confirm(
+        cfg, "webhook_test",
+        f"sending a real signed test delivery to {_redact(sub_id)!r} requires "
+        "explicit confirmation: re-POST with {\"confirm\": true}", q, b,
+        payload={"id": sub_id})
+    if guard is not None:
+        return guard
+    try:
+        res = W.test_delivery(cfg, sub_id, requested_by="dashboard:user",
+                              confirmed=True)
+    except Exception as exc:
+        return _webhook_error(exc)
+    return _ok(ok=True, **res)
+
+
+def webhooks_deliveries(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/webhooks/{id}/deliveries -> redacted delivery receipts."""
+    from . import webhooks as W
+    sub_id = str(p.get("id", "") or "")
+    try:
+        limit = int(q.get("limit", "50") or "50")
+    except ValueError:
+        limit = 50
+    try:
+        res = W.deliveries(cfg, sub_id, limit=limit)
+    except Exception as exc:
+        return _webhook_error(exc)
+    return _ok(ok=True, **res)
+
+
+def webhooks_retry(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/webhooks/{id}/retry -> confirmed re-delivery of a failure."""
+    from . import webhooks as W
+    sub_id = str(p.get("id", "") or b.get("id", "") or "")
+    guard = _compat_confirm(
+        cfg, "webhook_retry",
+        f"retrying the last failed delivery for {_redact(sub_id)!r} requires "
+        "explicit confirmation: re-POST with {\"confirm\": true}", q, b,
+        payload={"id": sub_id})
+    if guard is not None:
+        return guard
+    try:
+        res = W.retry_delivery(cfg, sub_id, requested_by="dashboard:user",
+                               confirmed=True)
+    except Exception as exc:
+        return _webhook_error(exc)
+    return _ok(ok=True, **res)
+
+
+def msg_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT /api/messaging/platforms/{id} -> confirmed, audited channel update.
+
+    Ported from the vendored ``web_routers/messaging.py:update_messaging_platform``
+    (``:826``): the id is a catalog platform id (``_require_platform``) and the
+    body is ``MessagingPlatformUpdate`` (``enabled`` + ``env``/``clear_env``).
+    Qubit keeps credentials reference-only, so ``env`` values must be
+    ``env:``/``vault:``/``file:`` references (a raw secret is a typed
+    ``CHANNEL_ENV_REFERENCE_ONLY`` refusal) and the write lands in the SAME
+    store :func:`h_platforms` reads (``msg-platforms.json``). A Qubit account
+    id (legacy CLI shape) still routes to ``messaging.account_update`` but has
+    no env-write path.
+    """
+    from . import messaging as M
+    pid = str(p.get("id", "") or "")
+    env_in: Dict[str, Any] = b.get("env") if isinstance(b.get("env"), dict) else {}
+    clear_in: List[Any] = b.get("clear_env") if isinstance(b.get("clear_env"), list) else []
+    enabled = b.get("enabled") if isinstance(b.get("enabled"), bool) else None
+    kind, entry, account = _platform_resolve(cfg, pid)
+    if kind is None:
+        return 404, {
+            "ok": False, "code": "MSG_NOT_FOUND",
+            "detail": f"no channel {pid!r}",
+            "qubit_counterpart": "GET /api/messaging/platforms (catalog) / "
+                                 "CLI `qubit messaging accounts`"}
+    if kind == "account" and (env_in or clear_in):
+        return 400, {
+            "ok": False, "code": "MSG_BAD_INPUT",
+            "detail": "an account's credential reference is fixed at account "
+                      "creation; it cannot be changed by the channel toggle",
+            "qubit_counterpart": "CLI `qubit messaging accounts` "
+                                 "(remove + re-add to change the reference)"}
+    allowed_keys = set(entry.get("env_vars", ()) or ()) if kind == "catalog" else set()
+    bad_keys = sorted(k for k in env_in if k not in allowed_keys)
+    bad_clear = sorted(k for k in clear_in if k not in allowed_keys)
+    if bad_keys or bad_clear:
+        return 400, {
+            "ok": False, "code": "MSG_BAD_INPUT",
+            "detail": "env keys are not configurable for this platform: "
+                      + ", ".join(bad_keys + bad_clear),
+            "qubit_counterpart": "GET /api/messaging/platforms (env_vars)"}
+    # Credential policy: secret-shaped fields are references only, never a raw
+    # secret value. Non-secret fields (allowlists, URLs, account ids) are
+    # directly configurable, mirroring the reference's per-field secret
+    # metadata (``is_password``); an accepted reference is fine for any field.
+    raw_keys = sorted(
+        k for k, v in env_in.items()
+        if _platform_env_is_secret(k) and not _platform_allowed_ref(v))
+    if raw_keys:
         return _gate(
             "CHANNEL_ENV_REFERENCE_ONLY",
-            "Channel credentials are secret references and are not written by "
-            "the dashboard account form; configure the channel's env reference "
-            "through the Qubit credential store.",
-            "CLI `qubit messaging accounts` / `qubit auth login` (reference-only)")
+            "Channel credential fields are secret references and are never "
+            "written by the dashboard; store env:/vault:/file: references "
+            "instead.",
+            "CLI `qubit messaging accounts` / `qubit auth login` "
+            "(reference-only)")
+    detail = (f"changing messaging channel {pid!r} requires explicit "
+              "confirmation: re-PUT with {\"confirm\": true}")
+    guard = _compat_confirm(
+        cfg, "messaging.platform_update", detail, q, b,
+        payload={"id": pid, "enabled": enabled,
+                 "env": {str(k): str(v) for k, v in env_in.items()},
+                 "clear_env": [str(k) for k in clear_in]})
+    if guard is not None:
+        return guard
     try:
-        M.account_update(cfg, aid,
-                         label=str(b.get("label", b.get("name", "")) or ""),
-                         enabled=b.get("enabled") if "enabled" in b else None,
-                         requested_by="dashboard:user", confirmed=True)
+        _platform_store_update(cfg, pid, enabled=enabled, env=env_in,
+                               clear=clear_in)
+        if kind == "account":
+            M.account_update(cfg, pid,
+                             label=str(b.get("label", b.get("name", "")) or ""),
+                             enabled=enabled,
+                             requested_by="dashboard:user", confirmed=True)
     except Exception as exc:
         code = getattr(exc, "code", None) or type(exc).__name__
-        if code == "MSG_NOT_FOUND":
-            return 404, {
-                "ok": False, "code": "MSG_NOT_FOUND",
-                "detail": _redact(str(exc))[:300],
-                "qubit_counterpart": "CLI `qubit messaging accounts` "
-                                     "(register the channel account/credential "
-                                     "reference first; the dashboard toggle "
-                                     "enables a registered account)"}
         return 400, {"ok": False, "code": code,
                      "detail": _redact(str(exc))[:300]}
-    return _ok(ok=True, platform=aid,
-               qubit_counterpart="CLI `qubit messaging accounts`")
+    _audit("msg.platform_update", "dashboard:user",
+           {"platform": pid, "enabled": enabled,
+            "ref_keys": sorted(str(k) for k in env_in),
+            "clear_keys": sorted(str(k) for k in clear_in)})
+    return _ok(ok=True, platform=pid,
+               qubit_counterpart="CLI `qubit messaging accounts` / "
+                                 "`qubit channels catalog`")
 
 
 def h_analytics_models(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -9269,13 +10643,19 @@ def config_save(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 def env_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """PUT/DELETE /api/env -> real confirm-gated vault-reference registry.
+    """PUT/DELETE /api/env -> real confirm-gated reference registry.
 
-    Only *references* enter ``<state_dir>/qubit_env_refs.json``: a value must
-    be a vault reference name (``vault:...``/``ref:...``), never a raw secret.
-    DELETE removes a reference. Both are confirm-gated, e-stop-gated, and
-    audited; they never write a secret value or fabricate success.
+    Only *references* enter the ONE canonical store
+    (``<state_dir>/qubit_env_refs.json`` via :mod:`voicebridge.env_store`): a
+    value must be ``env:NAME``/``vault:NAME``/``file:PATH`` (``ref:`` the
+    legacy vault alias), never a raw secret. This mirrors the operator model
+    :mod:`voicebridge.env_store` validates and the channel surfaces accept, so
+    the Keys page can round-trip every reference kind the CLI/voice already
+    store. DELETE removes a reference. Both are confirm-gated, e-stop-gated,
+    and audited; they never write a secret value or fabricate success.
     """
+    from . import env_store
+
     bad = _unsupported_fields(
         b, frozenset({"key", "name", "value", "ref", "confirm", "delete"}))
     if bad[0] != 200:
@@ -9287,33 +10667,36 @@ def env_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         "with {\"confirm\": true}", q, b)
     if guard is not None:
         return guard
-    path = _env_refs_path(cfg)
     name = str(b.get("name", b.get("key", "")) or "")
     if not name:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "env reference name required"}
-    try:
-        store = _load_json_store(path)
-    except Exception as exc:
-        return _fail(exc)
     if deleting:
-        existed = name in store
-        store.pop(name, None)
-        _save_json_store(path, store)
-        return _ok(ok=True, name=name, removed=existed, count=len(store),
+        try:
+            res = env_store.remove_ref(cfg, name)
+        except Exception as exc:
+            return _fail(exc)
+        return _ok(ok=True, name=name, removed=res["removed"],
+                   count=res["count"],
                    qubit_counterpart="CLI `qubit auth status` (names only)")
     value = str(b.get("value", b.get("ref", "")) or "")
     if not value:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "env reference value required"}
-    if not re.match(r"^(vault|ref):", value):
+    if not env_store.is_reference(value):
         return _gate("SECRET_WRITE_REFUSED",
-                     "Env writes accept vault references only, never secret "
-                     "values; store the secret in the OS keyring/manager.",
+                     "Env writes accept env:/vault:/file: references only, "
+                     "never secret values; store the secret in the OS "
+                     "keyring/manager.",
                      "CLI `qubit auth login` (manual-handoff enrollment)")
-    store[name] = value
-    _save_json_store(path, store)
-    return _ok(ok=True, name=name, value=value, count=len(store),
+    try:
+        res = env_store.set_ref(cfg, name, value)
+    except ValueError as exc:
+        return _gate("SECRET_WRITE_REFUSED", _redact(str(exc))[:300],
+                     "CLI `qubit auth login` (manual-handoff enrollment)")
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(ok=True, name=name, value=value, count=res["count"],
                qubit_counterpart="CLI `qubit auth status` (names only)")
 
 
@@ -9340,16 +10723,13 @@ def env_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if not name:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "env reference name required"}
-    path = _env_refs_path(cfg)
+    from . import env_store
+
     try:
-        store = _load_json_store(path)
+        res = env_store.remove_ref(cfg, name)
     except Exception as exc:
         return _fail(exc)
-    existed = name in store
-    if existed:
-        store.pop(name, None)
-        _save_json_store(path, store)
-    return _ok(ok=True, name=name, removed=existed, count=len(store),
+    return _ok(ok=True, name=name, removed=res["removed"], count=res["count"],
                qubit_counterpart="CLI `qubit auth status` (names only)")
 
 
@@ -9393,31 +10773,32 @@ def toolset_env_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return _staged(
             "toolset env change requires explicit confirmation: re-PUT with "
             "{\"confirm\": true}", "")
-    path = _env_refs_path(cfg)
-    try:
-        store = _load_json_store(path)
-    except Exception as exc:
-        return _fail(exc)
+    from . import env_store
+
     saved: List[str] = []
     rejected: List[str] = []
     for key, value in env.items():
-        ref = str(value or "")
-        if re.match(r"^(vault|ref):", ref):
-            store[str(key)] = ref
+        if env_store.is_reference(str(value or "")):
             saved.append(str(key))
         else:
             rejected.append(str(key))
     if rejected:
         return _gate("SECRET_WRITE_REFUSED",
-                     "Toolset env writes accept vault references only, never "
-                     "secret values: " + ", ".join(sorted(rejected)[:5]),
-                     "CLI `qubit auth login` (vault references, manual handoff)")
+                     "Toolset env writes accept env:/vault:/file: references "
+                     "only, never secret values: "
+                     + ", ".join(sorted(rejected)[:5]),
+                     "CLI `qubit auth login` (references, manual handoff)")
     if not saved:
         return _gate("ENV_NO_FIELDS",
                      "toolset env carried no reference to persist",
                      "dashboard Env page + CLI `qubit auth status`")
-    _save_json_store(path, store)
-    return _ok(ok=True, name=name, saved=sorted(saved), count=len(store),
+    try:
+        for key in saved:
+            env_store.set_ref(cfg, key, str(env[key]))
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(ok=True, name=name, saved=sorted(saved),
+               count=len(env_store.load(cfg)),
                profile=str(b.get("profile", "") or ""),
                qubit_counterpart="CLI `qubit auth status` (names only)")
 
@@ -11415,6 +12796,139 @@ def h_agents(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                          "runtime adapters, agent profile, and sessions")
 
 
+def _resolve_timeline_session(db: Any, session_id: str) -> Optional[str]:
+    """Resolve a timeline jump target to the live tip of the compression chain.
+
+    Exact id first, else the single unambiguous prefix (the same resolution the
+    session show/messages routes use); then follow ``resolve_resume_session_id``
+    so a jump lands where the messages actually are. ``None`` when unknown —
+    never a fabricated id.
+    """
+    try:
+        sid = db.resolve_session_id(str(session_id or ""))
+    except Exception:
+        sid = None
+    if not sid:
+        return None
+    try:
+        return db.resolve_resume_session_id(sid)
+    except Exception:
+        return sid
+
+
+def h_session_timeline(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/sessions/{id}/timeline -> prompt metadata index (read-only).
+
+    Ported from reference ``web_routers/sessions.py:619`` ->
+    ``qubit_state_timeline.get_session_timeline`` (vendored by W9 slice-0) over
+    the canonical Qubit session DB (``state.db``). Prompt metadata only,
+    including compacted display history; no transcript-wide payload hydration.
+    """
+    try:
+        limit = max(1, min(int(q.get("limit", "500") or "500"), 500))
+    except (TypeError, ValueError):
+        limit = 500
+    try:
+        after = max(0, int(q.get("after_row_id", "0") or "0"))
+    except (TypeError, ValueError):
+        after = 0
+    _cs, db, _dir = _chat_session_db(cfg)
+    if db is None:
+        return _fail(RuntimeError("canonical session store unavailable"))
+    sid = _resolve_timeline_session(db, p.get("id", ""))
+    if not sid:
+        return 404, {"ok": False, "code": "SESSION_NOT_FOUND",
+                     "detail": "Session not found"}
+    try:
+        _vendored_runtime(cfg)
+        from qubit_state_timeline import get_session_timeline as read_timeline  # type: ignore
+        out = read_timeline(db, sid, limit=limit, after_row_id=after)
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(session_id=sid, store_authority=CHAT_SESSION_AUTHORITY, **out)
+
+
+def h_session_messages_around(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/sessions/{id}/messages/around -> bounded display page.
+
+    Ported from reference ``web_routers/sessions.py:641`` ->
+    ``qubit_state_timeline.get_session_messages_around``: read at most *limit*
+    display rows starting at an exact human prompt (``row_id`` from the
+    timeline), no intervening payloads. Read-only; reuses the same display
+    projection (``_rebrand_chat_messages``) as ``h_session_messages``.
+    """
+    try:
+        row_id = int(q.get("row_id", "") or "0")
+    except (TypeError, ValueError):
+        row_id = 0
+    if row_id < 1:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "row_id must be a positive integer"}
+    try:
+        limit = max(1, min(int(q.get("limit", "120") or "120"), 120))
+    except (TypeError, ValueError):
+        limit = 120
+    _cs, db, _dir = _chat_session_db(cfg)
+    if db is None:
+        return _fail(RuntimeError("canonical session store unavailable"))
+    sid = _resolve_timeline_session(db, p.get("id", ""))
+    if not sid:
+        return 404, {"ok": False, "code": "SESSION_NOT_FOUND",
+                     "detail": "Session not found"}
+    try:
+        _vendored_runtime(cfg)
+        from qubit_state_timeline import get_session_messages_around as read_around  # type: ignore
+        page = read_around(db, sid, row_id, limit=limit)
+    except Exception as exc:
+        return _fail(exc)
+    if page is None:
+        return 404, {"ok": False, "code": "PROMPT_NOT_FOUND",
+                     "detail": "Prompt not found"}
+    return _ok(session_id=sid, store_authority=CHAT_SESSION_AUTHORITY,
+               messages=_rebrand_chat_messages(page["messages"]),
+               pagination=page["pagination"])
+
+
+def h_audio_voice_live_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/audio/voice-live/status -> non-secret GPT-Live readiness.
+
+    Ported from reference ``web_routers/audio.py:167`` ->
+    ``tools.voice_live.resolve_gpt_live_status`` (ported with the rename map).
+    Reports the selected voice chat mode and whether GPT-Live can start (a key
+    resolves); it NEVER returns a key. Read-only.
+    """
+    try:
+        _vendored_runtime(cfg)
+        from tools.voice_live import resolve_gpt_live_status  # type: ignore
+        out = resolve_gpt_live_status()
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(**out)
+
+
+def h_health_idle(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/health/idle -> token-gated diagnostic work snapshot (read-only).
+
+    Ported from reference ``web_routers/status.py:139`` ->
+    ``qubit_cli.web_server_idle_proof.idle_proof``. ``idle`` is True only when
+    no turn is in flight (session table AND cron ledger) and nothing waits on a
+    human; an indeterminate probe is reported as ``None`` honestly, never
+    coerced to True. This snapshot is NOT a retirement permit. Served on the
+    same authenticated dashboard channel as every other ``/agent/api/*`` read.
+    """
+    try:
+        _vendored_runtime(cfg)
+        from qubit_cli.web_server_idle_proof import idle_proof  # type: ignore
+        out = idle_proof()
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(**out)
+
+
 def h_credentials_pool(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/qubit/credentials/pool -> redacted provider/entry inventory.
@@ -11507,6 +13021,10 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "h_session_delete": h_session_delete,
     "h_session_resume": h_session_resume,
     "sess_empty": lambda cfg, q, b, p: h_sess_empty(cfg, q, b, p),
+    "sessions_import": h_sessions_import,
+    "sessions_prune": h_sessions_prune,
+    "sessions_bulk_delete": h_sessions_bulk_delete,
+    "sessions_empty_delete": h_sessions_empty_delete,
     "mem_reset": h_mem_reset,
     "mem_reset_status": h_mem_reset_status,
     "mem_prov": h_mem_provider,
@@ -11545,9 +13063,14 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "mcp_set_enabled": mcp_set_enabled,
     "mcp_auth": mcp_auth,
     "mcp_auth_status": mcp_auth_status,
+    "mcp_invoke": mcp_invoke,
     "webhooks_enable": webhooks_enable,
     "webhooks_enabled": webhooks_enabled,
     "webhooks_delete": webhooks_delete,
+    "webhooks_rotate": webhooks_rotate,
+    "webhooks_test": webhooks_test,
+    "webhooks_deliveries": webhooks_deliveries,
+    "webhooks_retry": webhooks_retry,
     "msg_update": msg_update,
     "h_analytics_models": h_analytics_models,
     "h_files_read": h_files_read,
@@ -11749,6 +13272,8 @@ HANDLERS: Dict[str, Handler] = {
     "h_health": h_health, "h_egress_status": h_egress_status,
     "h_sessions_list": h_sessions_list, "h_sessions_stats": h_sessions_stats,
     "h_session_show": h_session_show, "h_session_messages": h_session_messages,
+    "h_session_timeline": h_session_timeline,
+    "h_session_messages_around": h_session_messages_around,
     "h_config": h_config, "h_config_defaults": h_config_defaults,
     "h_config_schema": h_config_schema, "h_model_info": h_model_info,
     "h_model_recommended_default": h_model_recommended_default,
@@ -11800,6 +13325,8 @@ HANDLERS: Dict[str, Handler] = {
     "h_fs_git_root": h_fs_git_root, "h_fs_default_cwd": h_fs_default_cwd,
     "h_audio_status": h_audio_status, "h_audio_devices": h_audio_devices,
     "h_audio_voice_config": h_audio_voice_config,
+    "h_audio_voice_live_status": h_audio_voice_live_status,
+    "h_health_idle": h_health_idle,
     "h_audio_transcribe": h_audio_transcribe,
     "h_audio_speak": h_audio_speak,
 }

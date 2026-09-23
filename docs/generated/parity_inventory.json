@@ -14,9 +14,9 @@
         "total": 562
       },
       "reference": {
-        "gated": 80,
-        "missing": 6,
-        "ported": 729,
+        "gated": 78,
+        "missing": 0,
+        "ported": 737,
         "total": 815
       }
     },
@@ -34,9 +34,9 @@
         "total": 599
       },
       "route": {
-        "gated": 60,
-        "missing": 6,
-        "ported": 206,
+        "gated": 58,
+        "missing": 0,
+        "ported": 214,
         "total": 272
       },
       "tool": {
@@ -46,9 +46,9 @@
         "total": 122
       }
     },
-    "gated": 131,
-    "missing": 6,
-    "ported": 1240,
+    "gated": 129,
+    "missing": 0,
+    "ported": 1248,
     "total": 1377
   },
   "e2e_verified": false,
@@ -108,7 +108,7 @@
     ]
   },
   "known_gaps": [
-    "routes: 6 reference routes have no qubit_compat counterpart (see MISSING rows).",
+    "routes: 0 reference routes have no qubit_compat counterpart (see MISSING rows).",
     "cli: 0 reference commands/subcommands absent; 10 are typed refusals on the Qubit-native surface.",
     "controls: Qubit dashboard_ops catalog rows lacking a voice interface are GATED under voice-for-everything.",
     "tools: 0 reference tool(s) absent; 10 toolset(s) present but disabled in the Qubit cli scope.",
@@ -120,8 +120,8 @@
     "dashboard_ops.catalog": 562,
     "page_coverage_rows": 0,
     "qubit_agent_top": 71,
-    "qubit_compat.GATED": 71,
-    "qubit_compat.ROUTES": 433,
+    "qubit_compat.GATED": 69,
+    "qubit_compat.ROUTES": 444,
     "qubit_voice_top": 113,
     "reference_cli_sub": 313,
     "reference_cli_top": 71,
@@ -17434,14 +17434,14 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=sessions_empty_delete",
         "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:449"
       },
       "id": "DELETE /api/sessions/empty",
       "method": "DELETE",
-      "qubit_counterpart": "DELETE /api/sessions/empty -> __gate__",
+      "qubit_counterpart": "DELETE /api/sessions/empty -> sessions_empty_delete",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit sessions",
@@ -17546,14 +17546,14 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "MISSING",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES: no match",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_audio_voice_live_status",
         "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/audio.py:167"
       },
       "id": "GET /api/audio/voice-live/status",
       "method": "GET",
-      "qubit_counterpart": null,
+      "qubit_counterpart": "GET /api/audio/voice-live/status -> h_audio_voice_live_status",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit audio",
@@ -18148,14 +18148,14 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "MISSING",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES: no match",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_health_idle",
         "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:139"
       },
       "id": "GET /api/health/idle",
       "method": "GET",
-      "qubit_counterpart": null,
+      "qubit_counterpart": "GET /api/health/idle -> h_health_idle",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit status",
@@ -18890,28 +18890,28 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "MISSING",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES: no match",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_session_messages_around",
         "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:641"
       },
       "id": "GET /api/sessions/{session_id}/messages/around",
       "method": "GET",
-      "qubit_counterpart": null,
+      "qubit_counterpart": "GET /api/sessions/(?P<id>[^/]+)/messages/around -> h_session_messages_around",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit sessions",
       "voice_intent_verified": false
     },
     {
-      "classification": "MISSING",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES: no match",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_session_timeline",
         "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:619"
       },
       "id": "GET /api/sessions/{session_id}/timeline",
       "method": "GET",
-      "qubit_counterpart": null,
+      "qubit_counterpart": "GET /api/sessions/(?P<id>[^/]+)/timeline -> h_session_timeline",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit sessions",
@@ -19226,14 +19226,14 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "MISSING",
+      "classification": "GATED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES: no match",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
         "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/audio.py:177"
       },
       "id": "POST /api/audio/voice-live/session",
       "method": "POST",
-      "qubit_counterpart": null,
+      "qubit_counterpart": "POST /api/audio/voice-live/session -> __gate__",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit guard shares resolve",
@@ -19716,14 +19716,14 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "MISSING",
+      "classification": "GATED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES: no match",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
         "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:147"
       },
       "id": "POST /api/health/retirement",
       "method": "POST",
-      "qubit_counterpart": null,
+      "qubit_counterpart": "POST /api/health/retirement -> __gate__",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit status",
@@ -20402,28 +20402,28 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=sessions_bulk_delete",
         "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:400"
       },
       "id": "POST /api/sessions/bulk-delete",
       "method": "POST",
-      "qubit_counterpart": "POST /api/sessions/bulk-delete -> __gate__",
+      "qubit_counterpart": "POST /api/sessions/bulk-delete -> sessions_bulk_delete",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit autonomy revoke",
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=sessions_import",
         "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:418"
       },
       "id": "POST /api/sessions/import",
       "method": "POST",
-      "qubit_counterpart": "POST /api/sessions/import -> __gate__",
+      "qubit_counterpart": "POST /api/sessions/import -> sessions_import",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit import state voice",
@@ -20444,14 +20444,14 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=sessions_prune",
         "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:789"
       },
       "id": "POST /api/sessions/prune",
       "method": "POST",
-      "qubit_counterpart": "POST /api/sessions/prune -> __gate__",
+      "qubit_counterpart": "POST /api/sessions/prune -> sessions_prune",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit sessions",

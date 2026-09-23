@@ -3,9 +3,16 @@
 ONE store behind every environment/config-reference surface. The dashboard
 ``GET/PUT/DELETE /api/env`` handlers, the CLI ``qubit auth status`` projection,
 and the voice ``auth_status`` intent all read and write this single JSON store
-(``<state_dir>/qubit_env_refs.json``). A value must be a vault reference
-(``vault:``/``ref:``); a raw secret is never accepted, so the store never holds
-secret material itself.
+(``<state_dir>/qubit_env_refs.json``). A value must be a credential *reference*
+(``env:``/``vault:``/``file:``, with ``ref:`` retained as the vault alias); a raw
+secret is never accepted, so the store never holds secret material itself.
+
+The accepted kinds mirror the operator model the channel/credential surfaces
+already use (``env:VAR`` -> process/runtime ``.env`` variable, ``file:PATH`` ->
+a file outside git, ``vault:NAME`` -> an external secret-manager entry). Only
+reference strings are ever stored or returned; a value is resolved server-side
+by the consumer (see :func:`voicebridge.providers.credentials.resolve_key`),
+never read into this module.
 
 This module deliberately has no dependency on :mod:`voicebridge.qubit_compat`
 so :mod:`voicebridge.auth_status` can read it without an import cycle.
@@ -22,9 +29,15 @@ STORE_NAME = "qubit_env_refs.json"
 #: pre-rename name; read once when only it exists, never written again.
 LEGACY_STORE_NAME = "hermes_env_refs.json"
 STORE_SCHEMA = "qubit-env-refs/1"
-REF_RE = re.compile(r"^(vault|ref):")
-#: accepted reference prefixes (the only values the store will hold)
-REF_KINDS: Tuple[str, ...] = ("vault", "ref")
+#: accepted reference prefixes (the only values the store will hold). ``ref:``
+#: is retained as the legacy alias of ``vault:`` so pre-existing entries keep
+#: resolving after the operator model widened to ``env:``/``file:``.
+REF_RE = re.compile(r"^(env|vault|ref|file):")
+REF_KINDS: Tuple[str, ...] = ("env", "vault", "ref", "file")
+#: reference kinds the MCP/runtime client can actually resolve to a value.
+RESOLVABLE_REF_KINDS: Tuple[str, ...] = ("env", "file")
+MAX_REF_CHARS = 512
+_ENV_VAR_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def _base(cfg: Any) -> Path:
@@ -127,9 +140,83 @@ def _save(cfg: Any, data: Dict[str, str]) -> None:
     os.replace(tmp, path)
 
 
+def reference_kind(value: str) -> str:
+    """The reference kind of *value* (``env``/``vault``/``ref``/``file``), or "".
+
+    A value with no recognized prefix is a raw secret (or malformed) and is
+    never accepted by the store.
+    """
+    text = str(value or "").strip()
+    if ":" not in text:
+        return ""
+    kind = text.split(":", 1)[0].lower()
+    return kind if kind in REF_KINDS else ""
+
+
+def validate_reference(value: str) -> Tuple[bool, str]:
+    """Validate a credential reference; returns ``(ok, detail)``.
+
+    Accepts ``env:NAME``, ``vault:NAME``, ``file:PATH`` and the legacy
+    ``ref:NAME`` alias. The shape of each kind is checked (env var name, file
+    path) and file references are refused when they point at browser or agent
+    private credential stores, mirroring :mod:`voicebridge.providers.credentials`.
+    A raw secret value never validates.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return False, "an env reference is required"
+    if len(text) > MAX_REF_CHARS:
+        return False, "reference too long"
+    if any(ch in text for ch in "\n\r\t\x00"):
+        return False, "reference must not contain control characters"
+    kind = reference_kind(text)
+    if not kind:
+        return False, (
+            "env writes accept env:/vault:/file: references only, never secret "
+            "values; store the secret in the OS keyring/manager")
+    body = text.split(":", 1)[1].strip()
+    if not body:
+        return False, f"{kind}: reference is missing a name/path"
+    if kind == "env":
+        if not _ENV_VAR_RE.match(body):
+            return False, (
+                "env: reference must name a variable matching "
+                "^[A-Za-z_][A-Za-z0-9_]*$")
+    elif kind == "file":
+        low = body.replace("\\", "/")
+        if not (low.startswith("/") or low.startswith("~")):
+            return False, "file: reference must be an absolute path or ~/ path"
+        if "/../" in low or low.endswith("/..") or low.startswith("../"):
+            return False, "file: reference must not traverse parent directories"
+        try:
+            from .providers.credentials import (
+                looks_like_browser_secret,
+                looks_like_opencode_private_db,
+            )
+            if looks_like_browser_secret(low) or \
+                    looks_like_opencode_private_db(low):
+                return False, (
+                    "file: reference must not point at browser or agent "
+                    "private credential stores")
+        except Exception:  # noqa: BLE001 - validator stays fail-closed on shape
+            pass
+    return True, ""
+
+
 def is_reference(value: str) -> bool:
-    """True when *value* is a vault/ref reference, never a raw secret."""
-    return bool(REF_RE.match(str(value or "")))
+    """True when *value* is a valid credential reference, never a raw secret."""
+    return validate_reference(value)[0]
+
+
+def is_resolvable_reference(value: str) -> bool:
+    """True when *value* is a reference the runtime client can resolve.
+
+    ``env:``/``file:`` resolve locally; ``vault:``/``ref:`` name an external
+    secret manager entry with no Qubit-side resolver, so a consumer that must
+    pass a concrete value to a child (the MCP client) cannot use them.
+    """
+    ok, _ = validate_reference(value)
+    return ok and reference_kind(value) in RESOLVABLE_REF_KINDS
 
 
 def set_ref(cfg: Any, name: str, ref: str) -> Dict[str, Any]:
@@ -137,10 +224,10 @@ def set_ref(cfg: Any, name: str, ref: str) -> Dict[str, Any]:
     clean = str(name or "").strip()
     if not clean:
         raise ValueError("env reference name required")
-    value = str(ref or "")
-    if not is_reference(value):
-        raise ValueError(
-            "env writes accept vault:/ref: references only, never secret values")
+    value = str(ref or "").strip()
+    ok, detail = validate_reference(value)
+    if not ok:
+        raise ValueError(detail)
     data = load(cfg)
     data[clean] = value
     _save(cfg, data)

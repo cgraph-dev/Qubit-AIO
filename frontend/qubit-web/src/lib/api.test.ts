@@ -593,6 +593,263 @@ describe("settleConfirmation", () => {
     expect(url).toBe("/agent/api/ops/confirm");
     expect(JSON.parse(String(init?.body))).toEqual({ confirmation_id: "cnf-42" });
   });
+
+  // The ops-confirm envelope fabricates ok:true/state:executed while the real
+  // outcome rides under receipt.result.state (AI8 D-5/D-9). Settling must
+  // surface the failure, not report a fake success.
+  it("rejects a 200 envelope whose receipt reports a failed result", async () => {
+    vi.stubGlobal(
+      "fetch",
+      jsonFetchMock({
+        ok: true,
+        state: "executed",
+        detail: "That failed: MISSING.",
+        receipt: {
+          result: {
+            state: "MISSING",
+            detail: "unknown brain profile 'deepseek-v4-flash'",
+          },
+        },
+      }),
+    );
+
+    await expect(settleConfirmation("cnf-fab")).rejects.toThrow(
+      /MISSING: unknown brain profile/,
+    );
+  });
+
+  it("rejects a 200 envelope that says ok:false", async () => {
+    vi.stubGlobal(
+      "fetch",
+      jsonFetchMock({ ok: false, code: "REFUSED", detail: "nope" }),
+    );
+
+    await expect(settleConfirmation("cnf-no")).rejects.toThrow(/REFUSED: nope/);
+  });
+});
+
+describe("api.getLogs", () => {
+  it("sends the backend search filter only when non-blank", async () => {
+    const fetchMock = jsonFetchMock({ file: "agent", lines: [] });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await api.getLogs({ file: "agent", lines: 100, search: "  timeout  " });
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/agent/api/logs?file=agent&lines=100&search=timeout",
+    );
+
+    await api.getLogs({ file: "agent", lines: 100, search: "   " });
+    expect(fetchMock.mock.calls[1][0]).toBe("/agent/api/logs?file=agent&lines=100");
+  });
+});
+
+describe("api.setProfileModel honesty guard", () => {
+  it("rejects a fabricated provider echo (AI8 D-3)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      jsonFetchMock({
+        ok: true,
+        provider: "ollama-local",
+        model: "deepseek-v4-flash",
+      }),
+    );
+
+    await expect(
+      api.setProfileModel("qubit-brain4", "opencode-go", "deepseek-v4-flash"),
+    ).rejects.toThrow(/PROFILE_MODEL_NOT_APPLIED/);
+  });
+
+  it("accepts the applied provider/model", async () => {
+    vi.stubGlobal(
+      "fetch",
+      jsonFetchMock({
+        ok: true,
+        provider: "opencode-go",
+        model: "deepseek-v4-flash",
+      }),
+    );
+
+    await expect(
+      api.setProfileModel("qubit-brain4", "opencode-go", "deepseek-v4-flash"),
+    ).resolves.toMatchObject({ provider: "opencode-go" });
+  });
+});
+
+describe("api per-subscription webhook operations", () => {
+  function confirmThenOk(first: unknown, second: unknown) {
+    const fetchMock = vi.fn<typeof fetch>();
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(first), {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(second), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  const gate = {
+    ok: false,
+    code: "CONFIRM_REQUIRED",
+    state: "NEEDS_CONFIRMATION",
+    detail: "requires confirmation",
+  };
+
+  it("rotates the signing secret through the confirm round-trip", async () => {
+    const fetchMock = confirmThenOk(gate, {
+      ok: true,
+      reference_kind: "file:",
+    });
+    const res = await api.rotateWebhookSecret("hook", () => true);
+    expect(res.reference_kind).toBe("file:");
+    expect(fetchMock.mock.calls[0][0]).toBe("/agent/api/webhooks/hook/rotate");
+    expect(String(fetchMock.mock.calls[1][0])).toContain(
+      "/agent/api/webhooks/hook/rotate",
+    );
+    expect(String(fetchMock.mock.calls[1][0])).toContain("confirm=true");
+  });
+
+  it("sends a test delivery and surfaces the honest verdict", async () => {
+    const fetchMock = confirmThenOk(gate, {
+      ok: true,
+      verdict: "FAILED",
+      error: "connection refused",
+    });
+    const res = await api.testWebhook("hook", () => true);
+    expect(res.verdict).toBe("FAILED");
+    expect(res.error).toBe("connection refused");
+    expect(String(fetchMock.mock.calls[1][0])).toContain(
+      "/agent/api/webhooks/hook/test",
+    );
+  });
+
+  it("retries the last failed delivery", async () => {
+    confirmThenOk(gate, { ok: true, verdict: "DELIVERED" });
+    const res = await api.retryWebhook("hook", () => true);
+    expect(res.verdict).toBe("DELIVERED");
+  });
+
+  it("reads delivery receipts with the requested limit", async () => {
+    const fetchMock = jsonFetchMock({
+      ok: true,
+      deliveries: [{ verdict: "DELIVERED" }],
+      count: 1,
+      subscription: "hook",
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await api.getWebhookDeliveries("hook", 25);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/agent/api/webhooks/hook/deliveries?limit=25",
+    );
+    expect(res.count).toBe(1);
+  });
+});
+
+describe("api MCP tool invocation", () => {
+  it("invokes through the confirm round-trip with tool + args", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ok: false,
+            code: "CONFIRM_REQUIRED",
+            state: "NEEDS_CONFIRMATION",
+            detail: "invoke requires confirmation",
+          }),
+          { status: 409, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true, state: "OK" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await api.invokeMcpTool(
+      "cgraph-graft",
+      "graft_find_code",
+      { query: "x" },
+      () => true,
+    );
+    expect(res.state).toBe("OK");
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/agent/api/mcp/servers/cgraph-graft/invoke",
+    );
+    const body = JSON.parse(
+      String((fetchMock.mock.calls[1][1] as RequestInit).body),
+    );
+    expect(body).toMatchObject({
+      tool: "graft_find_code",
+      args: { query: "x" },
+      confirm: true,
+    });
+  });
+});
+
+describe("api profile row-action confirm wiring", () => {
+  it("settles a staged rename by re-issuing the PATCH with confirm", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ok: false,
+            code: "CONFIRM_REQUIRED",
+            state: "NEEDS_CONFIRMATION",
+            detail: "profile rename requires confirmation",
+          }),
+          { status: 409, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true, name: "new" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await api.renameProfile("old", "new", () => true);
+    expect(res.name).toBe("new");
+    const body = JSON.parse(
+      String((fetchMock.mock.calls[1][1] as RequestInit).body),
+    );
+    expect(body).toMatchObject({ new_name: "new", confirm: true });
+  });
+
+  it("settles a staged delete via the query string", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ok: false,
+            code: "CONFIRM_REQUIRED",
+            state: "NEEDS_CONFIRMATION",
+            detail: "profile delete requires confirmation",
+          }),
+          { status: 409, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true, removed: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await api.deleteProfile("gone", () => true);
+    expect(res.removed).toBe(true);
+    expect(String(fetchMock.mock.calls[1][0])).toContain("confirm=true");
+  });
 });
 
 describe("withApiPrefix", () => {
@@ -770,5 +1027,57 @@ describe("normalizeSessionMessage", () => {
   it("leaves a message without meta unchanged", () => {
     const msg = { role: "user" as const, content: "hi" };
     expect(normalizeSessionMessage(msg)).toEqual(msg);
+  });
+});
+
+describe("api.uploadFile", () => {
+  // Ported from the upstream dashboard (web/src/lib/api.ts:543-557): raw bytes
+  // stream as multipart/form-data to /api/files/upload-stream. The old path
+  // read the file as lossy UTF-8 text and POSTed JSON, which mangled binary
+  // payloads yet still reported success.
+  it("POSTs multipart/form-data with path, overwrite, and the file bytes", async () => {
+    const fetchMock = jsonFetchMock({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const file = new File(["hello bytes"], "probe.txt", { type: "text/plain" });
+    await api.uploadFile("/tmp/project/probe.txt", file, true);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/agent/api/files/upload-stream");
+    expect(init.method).toBe("POST");
+    expect(init.body).toBeInstanceOf(FormData);
+    const form = init.body as FormData;
+    expect(form.get("path")).toBe("/tmp/project/probe.txt");
+    expect(form.get("overwrite")).toBe("true");
+    const sent = form.get("file") as File;
+    expect(sent.name).toBe("probe.txt");
+    // No explicit Content-Type: the browser must add the multipart boundary.
+    const headers = new Headers(init.headers);
+    expect(headers.has("Content-Type")).toBe(false);
+  });
+
+  it("surfaces the typed FILES_BINARY refusal instead of faking success", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(
+        async () =>
+          new Response(
+            JSON.stringify({
+              ok: false,
+              state: "UNAVAILABLE",
+              code: "FILES_BINARY",
+              detail:
+                "Binary uploads are not stored; Qubit serves bounded UTF-8 text writes through the confined file broker.",
+              qubit_counterpart: "POST /api/fs/write-text (text only)",
+            }),
+            { status: 403, headers: { "Content-Type": "application/json" } },
+          ),
+      ),
+    );
+
+    const file = new File([new Uint8Array([0, 159, 146, 150])], "pic.bin");
+    await expect(api.uploadFile("/tmp/project/pic.bin", file, true)).rejects.toThrow(
+      /FILES_BINARY/,
+    );
   });
 });

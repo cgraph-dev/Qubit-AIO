@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
-  Eye,
-  EyeOff,
   ExternalLink,
   KeyRound,
   MessageSquare,
@@ -18,7 +16,6 @@ import {
 import { api } from "@/lib/api";
 import type { EnvVarInfo } from "@/lib/api";
 import { removeDeletedEnvVarFromState } from "@/lib/env-state";
-import { refusalOrError } from "@/lib/policy-refusal";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { useConfirmDelete } from "@nous-research/ui/hooks/use-confirm-delete";
@@ -109,11 +106,9 @@ function EnvVarRow({
   info,
   edits,
   setEdits,
-  revealed,
   saving,
   onSave,
   onClear,
-  onReveal,
   onCancelEdit,
   clearDialogOpen = false,
   compact = false,
@@ -122,21 +117,18 @@ function EnvVarRow({
   info: EnvVarInfo;
   edits: Record<string, string>;
   setEdits: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  revealed: Record<string, string>;
   saving: string | null;
   onSave: (key: string) => void;
   onClear: (key: string) => void;
-  onReveal: (key: string) => void;
   onCancelEdit: (key: string) => void;
   clearDialogOpen?: boolean;
   compact?: boolean;
 }) {
   const { t } = useI18n();
   const isEditing = edits[varKey] !== undefined;
-  const isRevealed = !!revealed[varKey];
-  const displayValue = isRevealed
-    ? revealed[varKey]
-    : (info.redacted_value ?? "---");
+  // Qubit never serves secret values (SECRET_NEVER_SERVED), so there is no
+  // Reveal affordance; only the redacted placeholder / reference name shows.
+  const displayValue = info.redacted_value ?? "---";
 
   // Compact inline row for unset, non-editing keys (used inside provider groups)
   if (compact && !info.is_set && !isEditing) {
@@ -250,27 +242,9 @@ function EnvVarRow({
 
       {!isEditing && (
         <div className="flex items-center gap-2">
-          <div
-            className={`flex-1 border border-border px-3 py-2 font-mono-ui text-xs ${
-              isRevealed
-                ? "bg-background text-foreground select-all"
-                : "bg-muted/30 text-muted-foreground"
-            }`}
-          >
+          <div className="flex-1 border border-border bg-muted/30 px-3 py-2 font-mono-ui text-xs text-muted-foreground">
             {info.is_set ? displayValue : "---"}
           </div>
-
-          {info.is_set && (
-            <Button
-              ghost
-              size="icon"
-              onClick={() => onReveal(varKey)}
-              title={isRevealed ? t.env.hideValue : t.env.showValue}
-              aria-label={isRevealed ? `Hide ${varKey}` : `Reveal ${varKey}`}
-            >
-              {isRevealed ? <EyeOff /> : <Eye />}
-            </Button>
-          )}
 
           <Button
             size="sm"
@@ -345,22 +319,18 @@ function ProviderGroupCard({
   group,
   edits,
   setEdits,
-  revealed,
   saving,
   onSave,
   onClear,
-  onReveal,
   onCancelEdit,
   clearDialogOpen = false,
 }: {
   group: ProviderGroup;
   edits: Record<string, string>;
   setEdits: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  revealed: Record<string, string>;
   saving: string | null;
   onSave: (key: string) => void;
   onClear: (key: string) => void;
-  onReveal: (key: string) => void;
   onCancelEdit: (key: string) => void;
   clearDialogOpen?: boolean;
 }) {
@@ -439,11 +409,9 @@ function ProviderGroupCard({
               compact
               edits={edits}
               setEdits={setEdits}
-              revealed={revealed}
               saving={saving}
               onSave={onSave}
               onClear={onClear}
-              onReveal={onReveal}
               onCancelEdit={onCancelEdit}
               clearDialogOpen={clearDialogOpen}
             />
@@ -457,11 +425,9 @@ function ProviderGroupCard({
               compact
               edits={edits}
               setEdits={setEdits}
-              revealed={revealed}
               saving={saving}
               onSave={onSave}
               onClear={onClear}
-              onReveal={onReveal}
               onCancelEdit={onCancelEdit}
               clearDialogOpen={clearDialogOpen}
             />
@@ -475,11 +441,9 @@ function ProviderGroupCard({
               compact
               edits={edits}
               setEdits={setEdits}
-              revealed={revealed}
               saving={saving}
               onSave={onSave}
               onClear={onClear}
-              onReveal={onReveal}
               onCancelEdit={onCancelEdit}
               clearDialogOpen={clearDialogOpen}
             />
@@ -501,11 +465,9 @@ function CustomKeysCard({
   entries,
   edits,
   setEdits,
-  revealed,
   saving,
   onSave,
   onClear,
-  onReveal,
   onCancelEdit,
   onAddKey,
   clearDialogOpen = false,
@@ -513,11 +475,9 @@ function CustomKeysCard({
   entries: [string, EnvVarInfo][];
   edits: Record<string, string>;
   setEdits: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  revealed: Record<string, string>;
   saving: string | null;
   onSave: (key: string) => void;
   onClear: (key: string) => void;
-  onReveal: (key: string) => void;
   onCancelEdit: (key: string) => void;
   onAddKey: (key: string) => void;
   clearDialogOpen?: boolean;
@@ -532,11 +492,9 @@ function CustomKeysCard({
   const rowProps = {
     edits,
     setEdits,
-    revealed,
     saving,
     onSave,
     onClear,
-    onReveal,
     onCancelEdit,
     clearDialogOpen,
   };
@@ -615,7 +573,6 @@ function CustomKeysCard({
 export default function EnvPage() {
   const [vars, setVars] = useState<Record<string, EnvVarInfo> | null>(null);
   const [edits, setEdits] = useState<Record<string, string>>({});
-  const [revealed, setRevealed] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(true); // Show all providers by default
   const { toast, showToast } = useToast();
@@ -705,11 +662,6 @@ export default function EnvPage() {
         delete n[key];
         return n;
       });
-      setRevealed((prev) => {
-        const n = { ...prev };
-        delete n[key];
-        return n;
-      });
       showToast(`${key} ${t.common.save.toLowerCase()}d`, "success");
     } catch (e) {
       showToast(`${t.config.failedToSave} ${key}: ${e}`, "error");
@@ -730,11 +682,6 @@ export default function EnvPage() {
             delete n[key];
             return n;
           });
-          setRevealed((prev) => {
-            const n = { ...prev };
-            delete n[key];
-            return n;
-          });
           showToast(`${key} ${t.common.removed}`, "success");
         } catch (e) {
           showToast(`${t.common.failedToRemove} ${key}: ${e}`, "error");
@@ -746,23 +693,6 @@ export default function EnvPage() {
       [showToast, t.common.removed, t.common.failedToRemove],
     ),
   });
-
-  const handleReveal = async (key: string) => {
-    if (revealed[key]) {
-      setRevealed((prev) => {
-        const n = { ...prev };
-        delete n[key];
-        return n;
-      });
-      return;
-    }
-    try {
-      const resp = await api.revealEnvVar(key);
-      setRevealed((prev) => ({ ...prev, [key]: resp.value }));
-    } catch (error) {
-      showToast(refusalOrError(error, `${t.common.failedToReveal} ${key}`), "error");
-    }
-  };
 
   const cancelEdit = (key: string) => {
     setEdits((prev) => {
@@ -956,11 +886,9 @@ export default function EnvPage() {
               group={group}
               edits={edits}
               setEdits={setEdits}
-              revealed={revealed}
               saving={saving}
               onSave={handleSave}
               onClear={keyClear.requestDelete}
-              onReveal={handleReveal}
               onCancelEdit={cancelEdit}
               clearDialogOpen={keyClear.isOpen}
             />
@@ -975,11 +903,9 @@ export default function EnvPage() {
             section={section}
             edits={edits}
             setEdits={setEdits}
-            revealed={revealed}
             saving={saving}
             onSave={handleSave}
             onClear={keyClear.requestDelete}
-            onReveal={handleReveal}
             onCancelEdit={cancelEdit}
             clearDialogOpen={keyClear.isOpen}
           />
@@ -989,11 +915,9 @@ export default function EnvPage() {
         entries={customEntries}
         edits={edits}
         setEdits={setEdits}
-        revealed={revealed}
         saving={saving}
         onSave={handleSave}
         onClear={keyClear.requestDelete}
-        onReveal={handleReveal}
         onCancelEdit={cancelEdit}
         onAddKey={handleAddKey}
         clearDialogOpen={keyClear.isOpen}
@@ -1011,11 +935,9 @@ function EnvCategoryCard({
   section,
   edits,
   setEdits,
-  revealed,
   saving,
   onSave,
   onClear,
-  onReveal,
   onCancelEdit,
   clearDialogOpen = false,
 }: {
@@ -1030,11 +952,9 @@ function EnvCategoryCard({
   };
   edits: Record<string, string>;
   setEdits: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  revealed: Record<string, string>;
   saving: string | null;
   onSave: (key: string) => void;
   onClear: (key: string) => void;
-  onReveal: (key: string) => void;
   onCancelEdit: (key: string) => void;
   clearDialogOpen?: boolean;
 }) {
@@ -1046,11 +966,9 @@ function EnvCategoryCard({
   const rowProps = {
     edits,
     setEdits,
-    revealed,
     saving,
     onSave,
     onClear,
-    onReveal,
     onCancelEdit,
     clearDialogOpen,
   };

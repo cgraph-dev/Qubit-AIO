@@ -57,7 +57,7 @@ from voicebridge import cli_qubit_forward as _fwd  # noqa: E402
 from voicebridge import qubit_compat as _hc  # noqa: E402
 from voicebridge import qubit_plugins as _hp  # noqa: E402
 
-PIN = "2237be355906fbe6065ce1815711eee52b2d646e"
+PIN = "d337b736aa1e8ebecfab043842d13e4a2d2f48a3"
 QH = "qubit_runtime/"
 GENERATED = "2026-09-12"
 OUT_PATH = ROOT / "docs/generated" / "QUBIT_GAP_LEDGER.hermes.json"
@@ -335,12 +335,12 @@ ROUTE_EVIDENCE: Dict[Tuple[str, str], Dict[str, str]] = {
     # journal (409 + confirmation_id) and only deletes on ``confirm``. The
     # ledger must record the implementation and its real on-disk proof.
     ("GET", "/api/memory/reset"): dict(
-        status="IMPLEMENTED", backend="voicebridge/qubit_compat.py:mem_reset",
-        test="tests/test_qubit_routes_parity8u.py::"
-             "test_memory_reset_confirms_and_deletes",
-        note=("Real Qubit-backed reset: 409 + confirmation_id, then deletes "
-              "local semantic memories / markdown workspace notes and returns "
-              "the deleted list.")),
+        status="IMPLEMENTED", backend="voicebridge/qubit_compat.py:mem_reset_status",
+        test="tests/test_dashboard_matrix9u.py::"
+             "test_memory_reset_get_is_a_read_only_status",
+        note=("Read-only status: reports the destructive target set and "
+              "confirm_required without staging a mutation. The destructive "
+              "path is POST /api/memory/reset (409 + confirmation_id).")),
     ("POST", "/api/memory/reset"): dict(
         status="IMPLEMENTED", backend="voicebridge/qubit_compat.py:mem_reset",
         test="tests/test_qubit_routes_parity8u.py::"
@@ -348,6 +348,42 @@ ROUTE_EVIDENCE: Dict[Tuple[str, str], Dict[str, str]] = {
         note=("Real Qubit-backed reset: 409 + confirmation_id, then deletes "
               "local semantic memories / markdown workspace notes and returns "
               "the deleted list.")),
+    # Session mutations are real confirm-gated handlers over the canonical
+    # QubitSessionStore (wave 18); proven by the sessions-mutation suite.
+    ("POST", "/api/sessions/prune"): dict(
+        status="IMPLEMENTED", backend="voicebridge/qubit_compat.py:sessions_prune",
+        test="tests/test_sessions_mutations_wave18.py::"
+             "test_prune_requires_confirmation_then_prunes",
+        note=("Real confirmed prune of ended, non-archived sessions; dry_run "
+              "reports the match set without deleting.")),
+    ("POST", "/api/sessions/bulk-delete"): dict(
+        status="IMPLEMENTED",
+        backend="voicebridge/qubit_compat.py:sessions_bulk_delete",
+        test="tests/test_sessions_mutations_wave18.py::"
+             "test_bulk_delete_validates_and_confirms",
+        note=("Real confirmed multi-row delete (500-id cap, unknown ids "
+              "skipped, children orphaned).")),
+    ("POST", "/api/sessions/import"): dict(
+        status="IMPLEMENTED",
+        backend="voicebridge/qubit_compat.py:sessions_import",
+        test="tests/test_sessions_mutations_wave18.py::"
+             "test_import_validates_and_is_additive",
+        note=("Real additive bulk import into the canonical session store "
+              "(re-imports skipped, not destructive, so no confirmation).")),
+    ("DELETE", "/api/sessions/empty"): dict(
+        status="IMPLEMENTED",
+        backend="voicebridge/qubit_compat.py:sessions_empty_delete",
+        test="tests/test_sessions_mutations_wave18.py::"
+             "test_empty_delete_confirms",
+        note="Real confirmed delete of every empty session."),
+    ("POST", "/api/profiles/{name}/describe-auto"): dict(
+        status="IMPLEMENTED",
+        backend="voicebridge/qubit_compat.py:profile_describe_auto",
+        test="tests/test_profile_describe_auto_wave17.py::"
+             "test_describe_auto_runs_the_real_describer",
+        note=("Real ported handler: validates the profile, resolves its home, "
+              "and runs the auxiliary-LLM describer (an unavailable aux LLM is "
+              "reported inline as ok:false, never a refusal or a 5xx).")),
     ("GET", "/api/cron/jobs/{job_id}"): dict(
         test="tests/test_route_wiring_fixes8u.py::"
              "test_cron_read_and_write_share_one_store",
@@ -358,15 +394,21 @@ ROUTE_EVIDENCE: Dict[Tuple[str, str], Dict[str, str]] = {
     # policy proxies to it is a real Qubit backend path, not the old dead
     # Qubit stub. The dashboard depends on these returning real data.
     ("GET", "/api/providers/oauth"): dict(
-        status="IMPLEMENTED", backend="voicebridge/qubit_asgi.py:proxy",
-        test="tests/test_ingress_confinement8u.py::test_fork_declared_reads_are_served_by_the_fork",
-        note=("Served redacted by the Qubit-owned vendored Hermes runtime via "
-              "the ingress proxy; OAuth mutations stay on the Qubit gate.")),
+        status="IMPLEMENTED", backend="voicebridge/qubit_compat.py:h_providers_oauth",
+        test="tests/test_route_parity_p0_wave13.py::"
+             "test_providers_oauth_is_redacted_and_shaped",
+        note=("Real Qubit handler: serves the provider catalog with every "
+              "secret-like field (token_preview/access_token/refresh_token/"
+              "id_token/api_key/client_secret/password) stripped and legacy "
+              "host URLs blanked. Kept off the fork proxy (safe_to_proxy=False).")),
     ("GET", "/api/providers/oauth/{provider_id}/poll/{session_id}"): dict(
-        status="IMPLEMENTED", backend="voicebridge/qubit_asgi.py:proxy",
-        test="tests/test_ingress_confinement8u.py::test_fork_declared_reads_are_served_by_the_fork",
-        note=("Served by the Qubit-owned vendored Hermes runtime via the "
-              "ingress proxy; the flow mutation stays on the Qubit gate.")),
+        status="GATED", code="OAUTH_MANUAL_HANDOFF",
+        backend="voicebridge/qubit_compat.py:_NO_OAUTH",
+        test="tests/test_route_parity_p0_wave13.py::"
+             "test_oauth_poll_is_manual_handoff_refusal",
+        note=("Remote OAuth dance stays gated: the poll only serves sessions "
+              "created by POST /start, which Qubit refuses; the counterpart is "
+              "`qubit auth login`.")),
     ("GET", "/api/credentials/pool"): dict(
         status="GATED", code="SECRET_NEVER_SERVED",
         backend="voicebridge/qubit_compat.py:_NO_SECRET",

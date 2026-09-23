@@ -343,8 +343,8 @@ export const ru: Translations = {
     providersHint:
       "Записывает memory.provider (пусто = встроенный) и context.engine в config.yaml. Применяется со следующей сессии.",
     refreshDashboard: "Пересканировать расширения панели",
-    removeConfirm: "Удалить этот плагин из ~/.qubit/plugins/?",
-    removeHint: "Удалять можно только плагины, установленные пользователем в ~/.qubit/plugins.",
+    removeConfirm: "Удалить этот плагин из $QUBIT_HOME/plugins/?",
+    removeHint: "Удалять можно только плагины, установленные пользователем в $QUBIT_HOME/plugins.",
     rescanHeading: "Реестр SPA-плагинов",
     rescanHint: "Пересканируйте после добавления файлов на диск, чтобы боковая панель подхватила новые манифесты.",
     runtimeHeading: "Рантайм шлюза (YAML-плагины)",

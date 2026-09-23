@@ -343,8 +343,8 @@ export const af: Translations = {
     providersHint:
       "Skryf memory.provider (leeg = ingebou) en context.engine na config.yaml. Tree volgende sessie in werking.",
     refreshDashboard: "Herskandeer dashboard-uitbreidings",
-    removeConfirm: "Verwyder hierdie inprop uit ~/.qubit/plugins/?",
-    removeHint: "Slegs gebruiker-geïnstalleerde inproppe onder ~/.qubit/plugins kan verwyder word.",
+    removeConfirm: "Verwyder hierdie inprop uit $QUBIT_HOME/plugins/?",
+    removeHint: "Slegs gebruiker-geïnstalleerde inproppe onder $QUBIT_HOME/plugins kan verwyder word.",
     rescanHeading: "SPA-inprop-register",
     rescanHint: "Herskandeer ná die byvoeg van lêers op skyf sodat die dashboard-sybalk nuwe manifeste optel.",
     runtimeHeading: "Gateway-looptyd (YAML-inproppe)",

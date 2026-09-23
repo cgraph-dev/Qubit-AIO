@@ -896,9 +896,14 @@ QUBIT_READ_AUTHORITY: tuple = (
     # upstream branding in the served doc).
     "/openapi.json",
     # PRB-01: the canonical MCP server registry (voicebridge.mcp_servers) backs
-    # GET/POST/DELETE/test/auth; the read must come from the same store the
-    # writes use, not the fork's ``config.yaml mcp_servers`` via the proxy.
+    # GET/POST/DELETE/test/auth/invoke; the read must come from the same store
+    # the writes use, not the fork's ``config.yaml mcp_servers`` via the proxy.
     "/api/mcp/servers",
+    # The catalog must be served by the Qubit handler so its installed/enabled
+    # flags are reconciled against the Qubit registry. Proxied to the fork, the
+    # 65-entry manifest catalog reported every entry installed:false and omitted
+    # the installed ``cgraph-graft`` — a catalogue/list split-brain (audit D-5).
+    "/api/mcp/catalog",
     # PRB-03: the canonical webhook subscription registry
     # (voicebridge.webhooks) backs GET/POST/DELETE/enable; without this the
     # read is served by the fork proxy's empty store while enable/add/delete

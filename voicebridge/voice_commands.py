@@ -889,6 +889,29 @@ def _b_mcp(ctx, args):
     return {"mcp": mcp_status(ctx.cfg)}
 
 
+def _b_mcp_catalog(ctx, args):
+    """Reviewed MCP catalog with installed/enabled state reconciled.
+
+    Dispatches the EXACT ``qubit_compat`` read route the dashboard page calls
+    (``GET /api/mcp/catalog`` -> :func:`h_mcp_catalog_live`); no remote catalog
+    is fetched and no server is mounted. A non-2xx route raises the typed
+    :class:`PluginFleetError`, so a refused/estop route can never be reported
+    as success.
+    """
+    from . import qubit_compat as HC
+
+    code, payload = HC.dispatch(ctx.cfg, "GET", "/api/mcp/catalog",
+                                query={}, actor=ctx.actor)
+    if int(code) >= 400:
+        code_str = detail = ""
+        if isinstance(payload, dict):
+            code_str = str(payload.get("code") or "")
+            detail = str(payload.get("detail") or "")
+        raise PluginFleetError(int(code), code_str, detail or "/api/mcp/catalog")
+    return {"mcp_catalog": {"state": "OK", "http_status": int(code),
+                            "data": payload}}
+
+
 def _b_worker(ctx, args):
     from .integration_status import worker_status
 
@@ -4661,6 +4684,7 @@ _BACKENDS: Dict[str, Callable] = {
     "auth_verify": _b_auth_verify,
     "auth_logout": _b_auth_logout,
     "mcp": _b_mcp,
+    "mcp_catalog": _b_mcp_catalog,
     "worker": _b_worker,
     "memory": _b_memory,
     "skills": _b_skills,
@@ -9484,6 +9508,227 @@ _CB("cli_brain", "Brain principals",
     ("rx:^brain$",), "brain", fixed=(("action", "principals"),),
     examples=("qubit, brain",),
     help="Brain principal registry (read-only).")
+
+
+# ----------------------------------- wave 13: CLI-family read bridges, cont.
+# The wave-12 block above bridged the CLI families whose intent is the bare
+# family word (``logs``, ``config`` …). This block closes the NEXT tranche the
+# parity inventory names — the ``qubit <family> <read-sub>`` intents (``qubit
+# runtime history``, ``qubit actions list``, ``qubit sessions stats`` …) — onto
+# the SAME read-only backend the CLI/dashboard already call. No new backend,
+# no stub, no fabricated success.
+#
+# Contract (same as wave 12):
+# * every alias is an ANCHORED ``rx:`` match, never a bare single word. The
+#   anchor is what keeps the bridge honest: ``rx:^actions( list)?$`` resolves
+#   the read but leaves ``qubit actions execute foo`` unresolved (visible as a
+#   gap) instead of misrouting a mutating intent to a list read;
+# * a bridge carries a fixed ``action`` (and nothing else), so the backend
+#   lands on its read branch. Where the read needs a value (a session name, a
+#   path), that value is a required arg — it is only ever read;
+# * every entry below is list/status/show/catalog/kinds/history — a read. None
+#   takes a confirm, none mutates, none is a typed refusal bound as success.
+#   Mutating subcommands (``tools enable``, ``themes set``, ``plugins install``,
+#   runtime install/upgrade/rollback, session rename/delete, config set …)
+#   stay UNBOUND: the registry's own mutating entries or a guard cover them;
+#   binding the read alias must not silently widen to the mutation.
+#
+# These live in ``CLI_BRIDGE_REGISTRY``, so the frozen wave-1..3 ``REGISTRY``
+# example table ``tests/test_voice_commands8tf.py`` pins exactly is untouched.
+_CB("cli_resume", "Resume after emergency stop",
+    ("rx:^resume$",), "resume", confirm=True,
+    examples=("qubit, resume",),
+    help="Clear the latched emergency stop (the canonical e-stop reset the "
+         "upstream `resume` CLI command performs; confirmed).")
+_CB("cli_auth", "Credential references",
+    ("rx:^auth( list)?$",), "auth_status",
+    examples=("qubit, auth",),
+    help="Credential references by name only (read-only; same reader the CLI "
+         "`auth` family uses; never values).")
+_CB("cli_worker", "Worker status",
+    ("rx:^worker$",), "worker",
+    examples=("qubit, worker",),
+    help="Background worker/integration status (read-only).")
+_CB("cli_monitoring", "Monitoring status",
+    ("rx:^monitoring$",), "worker",
+    examples=("qubit, monitoring",),
+    help="Background worker/integration status (same reader the CLI "
+         "`monitoring` family uses; read-only).")
+_CB("cli_model", "Model/frontier status",
+    ("rx:^model$",), "frontier",
+    examples=("qubit, model",),
+    help="Effective model/frontier policy status (read-only).")
+_CB("cli_security", "Security status",
+    ("rx:^security$",), "security",
+    examples=("qubit, security",),
+    help="Static security verification (same reader the CLI `security` command "
+         "uses; read-only).")
+_CB("cli_diagnostics", "Diagnostic bundle",
+    ("rx:^diagnostics$",), "diagnostics",
+    examples=("qubit, diagnostics",),
+    help="Diagnostic bundle (same reader the CLI `diagnostics` command uses; "
+         "read-only).")
+_CB("cli_prompt_size", "Prompt budget",
+    ("rx:^prompt[- ]size$",), "prompt_budget",
+    examples=("qubit, prompt size",),
+    help="Resolved prompt-size budget alias and context window (read-only).")
+_CB("cli_profile_check", "Profile preflight",
+    ("rx:^profile check( brain| stt| tts| voice| audio)?$",), "config_profiles",
+    args=(_C("kind", ("brain", "stt", "tts", "voice", "audio"),
+             required=False),),
+    fixed=(("action", "check"),),
+    examples=("qubit, profile check brain",),
+    help="Provider/model profile preflight for one component kind "
+         "(brain/stt/tts/voice/audio; defaults to the active brain profile; "
+         "read-only — the same `profile_check` the CLI `profile check` runs).")
+_CB("cli_runtime_history", "Runtime update history",
+    ("rx:^runtime history$",), "runtime", fixed=(("action", "history"),),
+    examples=("qubit, runtime history",),
+    help="Pinned-runtime update history (read-only).")
+_CB("cli_runtime_repair", "Runtime repair",
+    ("rx:^runtime repair$",), "runtime", fixed=(("action", "repair"),),
+    confirm=True,
+    examples=("qubit, runtime repair",),
+    help="Repair the pinned runtime image (confirmed; same repair the CLI "
+         "`runtime repair` runs).")
+_CB("cli_actions_list", "List actions",
+    ("rx:^actions( list)?$",), "actions", fixed=(("action", "list"),),
+    examples=("qubit, actions",),
+    help="Broker action inventory (read-only).")
+_CB("cli_action_receipts", "Action receipts",
+    ("rx:^actions (receipts|receipt history)$",), "actions",
+    fixed=(("action", "receipts"),),
+    examples=("qubit, action receipts",),
+    help="Recent broker action receipts (read-only).")
+_CB("cli_checkpoints", "List checkpoints",
+    ("rx:^checkpoints( list)?$",), "checkpoints", fixed=(("action", "list"),),
+    examples=("qubit, checkpoints",),
+    help="Checkpoint records (read-only).")
+_CB("cli_experiments_list", "List experiments",
+    ("rx:^experiments( list)?$",), "experiments", fixed=(("action", "list"),),
+    examples=("qubit, experiments",),
+    help="Experiment-store records (read-only).")
+_CB("cli_verified_list", "List verified skills",
+    ("rx:^verified( skills)?$",), "verified", fixed=(("action", "list"),),
+    examples=("qubit, verified",),
+    help="Verified-skill curator records (read-only).")
+_CB("cli_opencode_list", "List coding actions",
+    ("rx:^opencode( list)?$",), "opencode", fixed=(("action", "list"),),
+    examples=("qubit, opencode",),
+    help="Supervised OpenCode action capabilities (read-only).")
+_CB("cli_ghost_list", "List Ghost actions",
+    ("rx:^(ghost|ghost list)$",), "ghost", fixed=(("action", "list"),),
+    examples=("qubit, ghost",),
+    help="Supervised Ghost adapter capabilities (read-only).")
+_CB("cli_transfers_list", "List node files",
+    ("rx:^transfers list( .+)?$",), "file_transfer",
+    fixed=(("action", "list"),), split="path",
+    examples=("qubit, transfers list /tmp/work",),
+    help="Node-host directory listing (read-only; a path arg is optional, "
+         "defaulting to the configured node root).")
+_CB("cli_transfers_status", "File transfer status",
+    ("rx:^transfers( status)?$",), "file_transfer",
+    fixed=(("action", "status"),),
+    examples=("qubit, transfers",),
+    help="Node-host file-transfer status (read-only).")
+_CB("cli_shares_list", "List session shares",
+    ("rx:^shares( list)?$",), "session_share", fixed=(("action", "list"),),
+    examples=("qubit, shares",),
+    help="Active session-share records (read-only; tokens never rendered).")
+_CB("cli_documents_extract", "Extract a document",
+    ("rx:^documents? extract( .+)?$",), "doc_extract",
+    args=(_R("path"),), fixed=(("action", "extract"),), confirm=True,
+    split="path",
+    examples=("qubit, documents extract /tmp/notes.txt",),
+    help="Bounded document text extraction (confirmed; same extract the "
+         "CLI `documents extract` performs).")
+_CB("cli_questions_pending", "Pending questions",
+    ("rx:^questions pending$",), "question_prompt",
+    fixed=(("action", "pending"),),
+    examples=("qubit, questions pending",),
+    help="Pending structured question prompts (read-only).")
+_CB("cli_branding_verify", "Branding verification",
+    ("rx:^branding verify$",), "branding", fixed=(("action", "verify"),),
+    examples=("qubit, branding verify",),
+    help="Branding/rebrand verification (same reader the CLI `branding verify` "
+         "uses; read-only).")
+_CB("cli_sessions_stats", "Session statistics",
+    ("rx:^sessions? stats$",), "sessions", fixed=(("action", "list"),),
+    examples=("qubit, sessions stats",),
+    help="Session count/state statistics (read-only).")
+_CB("cli_session_rename", "Rename a session",
+    ("rx:^sessions? rename\\b",), "sessions", args=(_I("session_id"),
+                                                    _R("name")),
+    fixed=(("action", "rename"),), confirm=True, split="int-rest",
+    examples=("qubit, sessions rename 12 invoices",),
+    help="Rename one session (confirmed; same rename the CLI "
+         "`sessions rename` performs).")
+_CB("cli_mcp_list", "List MCP servers",
+    ("rx:^mcp( list)?$",), "mcp",
+    examples=("qubit, mcp",),
+    help="MCP server inventory (read-only; never mounts).")
+_CB("cli_mcp_catalog", "MCP catalog",
+    ("rx:^mcp catalog$",), "mcp_catalog",
+    examples=("qubit, mcp catalog",),
+    help="Reviewed MCP catalog with installed/enabled state reconciled "
+         "(read-only; no remote catalog is fetched).")
+_CB("cli_plugins_list", "List plugins",
+    ("rx:^plugins( list)?$",), "plugin_runtime", fixed=(("action", "list"),),
+    examples=("qubit, plugins",),
+    help="Registered plugin-runtime records (read-only).")
+_CB("cli_plugins_catalog", "Plugin catalog",
+    ("rx:^plugins catalog$",), "plugin_runtime",
+    fixed=(("action", "catalog"),),
+    examples=("qubit, plugins catalog",),
+    help="Installable plugin catalog (read-only; remote entries stay typed).")
+_CB("cli_peer_list", "List gateway peers",
+    ("rx:^peers?( list)?$",), "peer", fixed=(("action", "list"),),
+    examples=("qubit, peers",),
+    help="Registered gateway peers (read-only).")
+_CB("cli_msg_accounts", "List message accounts",
+    ("rx:^msg accounts$",), "msg", fixed=(("action", "accounts"),),
+    examples=("qubit, msg accounts",),
+    help="Configured messaging accounts (read-only; secrets never returned).")
+_CB("cli_projects_list", "List projects",
+    ("rx:^projects? list$",), "projects", fixed=(("action", "list"),),
+    examples=("qubit, project list",),
+    help="Registered projects (read-only).")
+_CB("cli_project_use", "Switch project",
+    ("rx:^projects? use\\b",), "projects", args=(_R("project"),),
+    fixed=(("action", "use"),), confirm=True,
+    examples=("qubit, project use shop",),
+    help="Switch the active project (confirmed; same use the CLI "
+         "`project use` performs).")
+_CB("cli_kanban_boards", "List boards",
+    ("rx:^kanban boards$",), "kanban", fixed=(("action", "boards"),),
+    examples=("qubit, kanban boards",),
+    help="Kanban boards (read-only).")
+_CB("cli_kanban_create", "Create a task",
+    ("rx:^kanban create\\b",), "kanban", args=(_R("title"),),
+    fixed=(("action", "create"),), confirm=True,
+    examples=("qubit, kanban create buy milk",),
+    help="Create a kanban task (confirmed; same create the CLI "
+         "`kanban create` performs).")
+_CB("cli_autonomy_list", "List autonomy profiles",
+    ("rx:^autonomy list$",), "autonomy_list",
+    examples=("qubit, autonomy list",),
+    help="Owner-scoped autonomy profiles (read-only).")
+_CB("cli_files_inspect", "Inspect a file",
+    ("rx:^files? inspect\\b",), "files", args=(_R("path"),),
+    fixed=(("action", "inspect"),), split="path",
+    examples=("qubit, files inspect /tmp/x.log",),
+    help="Read-only file inspection (same reader the CLI `files inspect` uses).")
+_CB("cli_web_fetch", "Fetch a web page",
+    ("rx:^web fetch\\b",), "websites", args=(_R("url"),),
+    fixed=(("action", "fetch"),),
+    examples=("qubit, web fetch https://example.com",),
+    help="Brokered single-page fetch (read-only; the same egress-checked "
+         "broker path `web_fetch` uses).")
+_CB("cli_env", "Environment references",
+    ("rx:^env$",), "secrets",
+    examples=("qubit, env",),
+    help="Configured environment variable references by name only (read-only; "
+         "never values).")
 
 
 # ------------------------------------------------- wave 4: plugin fleet

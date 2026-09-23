@@ -8,7 +8,7 @@ platforms: [linux, macos]
 metadata:
   qubit:
     tags: [MCP, OAuth, PKCE, Remote-Deployment]
-    related_skills: [hermes-agent, mcporter, fastmcp]
+    related_skills: [qubit-agent, mcporter, fastmcp]
 ---
 
 # MCP OAuth on a Remote Qubit Gateway

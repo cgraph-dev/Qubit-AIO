@@ -343,8 +343,8 @@ export const de: Translations = {
     providersHint:
       "Schreibt memory.provider (leer = eingebaut) und context.engine in config.yaml. Wirkt sich auf die nächste Sitzung aus.",
     refreshDashboard: "Dashboard-Erweiterungen erneut scannen",
-    removeConfirm: "Dieses Plugin aus ~/.qubit/plugins/ entfernen?",
-    removeHint: "Nur vom Benutzer installierte Plugins unter ~/.qubit/plugins können entfernt werden.",
+    removeConfirm: "Dieses Plugin aus $QUBIT_HOME/plugins/ entfernen?",
+    removeHint: "Nur vom Benutzer installierte Plugins unter $QUBIT_HOME/plugins können entfernt werden.",
     rescanHeading: "SPA-Plugin-Registry",
     rescanHint: "Nach dem Hinzufügen von Dateien auf dem Datenträger erneut scannen, damit die Sidebar neue Manifeste erkennt.",
     runtimeHeading: "Gateway-Laufzeit (YAML-Plugins)",

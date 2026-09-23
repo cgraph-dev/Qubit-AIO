@@ -32,15 +32,24 @@ deterministically unit-testable without touching the host.
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import socket
 import subprocess
+import sys
 import threading
 import time
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 DEFAULT_UNIT = "qubit-voicebridge.service"
+# Owner Decision #16: the "gateway" this supervisor reports/controls is the
+# Qubit-owned *messaging-gateway daemon* (``qubit-gateway.service``), not the web
+# UI / voice-bridge unit (``qubit-voicebridge.service``). The daemon unit is the
+# default; a config key may still override it, and ``DEFAULT_UNIT`` remains the
+# web-UI unit name where a caller explicitly wants it.
+DEFAULT_DAEMON_UNIT = "qubit-gateway.service"
 DEFAULT_PORT = 8890
 TIMEOUT_S = 15.0
 STATUS_TIMEOUT_S = 5.0
@@ -79,6 +88,26 @@ def _get(cfg: Any, *path: str, default: Any = None) -> Any:
 def service_unit(cfg: Any) -> str:
     unit = str(_get(cfg, "gateway", "service_unit", default="") or "").strip()
     return unit or DEFAULT_UNIT
+
+
+def daemon_service_unit(cfg: Any) -> str:
+    """The systemd unit that supervises the Qubit messaging-gateway daemon.
+
+    Owner Decision #16: ``qubit gateway status/start/stop/restart`` target the
+    daemon unit (``qubit-gateway.service`` by default). An explicit
+    ``gateway.daemon_service_unit`` config key wins; otherwise any configured
+    ``gateway.service_unit`` — an operator's own daemon unit name — is honored;
+    the hard default is :data:`DEFAULT_DAEMON_UNIT`.
+    """
+    explicit = str(
+        _get(cfg, "gateway", "daemon_service_unit", default="") or "").strip()
+    if explicit:
+        return explicit
+    configured = str(
+        _get(cfg, "gateway", "service_unit", default="") or "").strip()
+    if configured and configured != DEFAULT_UNIT:
+        return configured
+    return DEFAULT_DAEMON_UNIT
 
 
 def system_scope(cfg: Any) -> str:
@@ -160,16 +189,158 @@ def _int_prop(props: Dict[str, str], key: str) -> int:
         return 0
 
 
+def _safe_int(value: Any) -> Optional[int]:
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_daemon_read(
+        daemon_reader: Optional[Callable[[], Optional[Dict[str, Any]]]]
+) -> Optional[Dict[str, Any]]:
+    """Call the injected/real daemon runtime reader, swallowing every failure.
+
+    An injected reader lets tests supply a temp ``gateway_state.json`` without
+    importing the fork. Any error (or a non-dict) is ``None`` — never fabricated.
+    """
+    try:
+        reader = daemon_reader or daemon_runtime_status
+        record = reader()
+        return record if isinstance(record, dict) else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _safe_control_query(
+        control_query: Optional[Callable[[], Optional[Dict[str, Any]]]]
+) -> Optional[Dict[str, Any]]:
+    """Call the injected/real control-socket query, swallowing every failure."""
+    try:
+        query = control_query or query_daemon_control
+        answer = query()
+        return answer if isinstance(answer, dict) else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _daemon_home(home: Optional[Any] = None) -> Path:
+    """Resolve the daemon's QUBIT_HOME for identity-file reads.
+
+    Mirrors the vendored gateway's own resolution (``QUBIT_HOME`` env first,
+    then the Qubit-owned default): the daemon writes ``gateway_state.json`` /
+    ``gateway.sock`` under the home it was launched with, which the unit pins
+    via ``Environment=QUBIT_HOME=...``.
+    """
+    if home is not None:
+        return Path(home)
+    env_home = os.environ.get("QUBIT_HOME", "").strip()
+    if env_home:
+        return Path(env_home)
+    from . import qubit_runtime as QR
+
+    return QR.default_home()
+
+
+def daemon_runtime_status(home: Optional[Any] = None) -> Optional[Dict[str, Any]]:
+    """Read the vendored gateway's live ``gateway_state.json`` (read-only).
+
+    Owner Decision #16: the daemon wrote this file; reporting it (platform
+    connection state, ``gateway_state``, active agents) is honest first-party
+    evidence of the daemon's own view of itself. Returns ``None`` when the
+    runtime is absent/unreadable — never a fabricated record.
+    """
+    try:
+        resolved = _daemon_home(home)
+    except Exception:  # noqa: BLE001
+        return None
+    record: Optional[Dict[str, Any]] = None
+    try:
+        saved_path = list(sys.path)
+        try:
+            # ensure_path() appends the fork root; restore afterwards so a plain
+            # status read never leaves the fork's top-level packages importable.
+            from . import qubit_runtime as QR
+
+            QR.ensure_path()
+            from gateway.status import read_runtime_status  # type: ignore
+
+            record = read_runtime_status(Path(resolved) / "gateway_state.json")
+        finally:
+            sys.path[:] = saved_path
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(record, dict):
+        return None
+    platforms = record.get("platforms")
+    platforms = platforms if isinstance(platforms, dict) else {}
+    connected = sum(
+        1 for v in platforms.values()
+        if isinstance(v, dict)
+        and str(v.get("state") or v.get("status") or "").lower()
+        in ("connected", "running", "ok"))
+    pid = record.get("pid")
+    try:
+        pid = int(pid) if pid is not None else None
+    except (TypeError, ValueError):
+        pid = None
+    return {
+        "gateway_state": record.get("gateway_state"),
+        "exit_reason": record.get("exit_reason"),
+        "pid": pid,
+        "updated_at": record.get("updated_at"),
+        "platforms": len(platforms),
+        "connected_platforms": connected,
+        "active_agents": record.get("active_agents"),
+    }
+
+
+def query_daemon_control(home: Optional[Any] = None, verb: str = "status"
+                         ) -> Optional[Dict[str, Any]]:
+    """Ask the live daemon a control-socket verb (read-only), or ``None``.
+
+    The daemon owns ``$QUBIT_HOME/gateway.sock``; a well-formed answer IS
+    liveness. Any failure (no/stale socket, timeout, malformed) returns ``None``
+    so callers fall back to the state-file/PID layer. Never raises.
+    """
+    try:
+        resolved = _daemon_home(home)
+    except Exception:  # noqa: BLE001
+        return None
+    try:
+        saved_path = list(sys.path)
+        try:
+            from . import qubit_runtime as QR
+
+            QR.ensure_path()
+            from gateway.control_socket import query_gateway_control  # type: ignore
+
+            return query_gateway_control(Path(resolved), verb)
+        finally:
+            sys.path[:] = saved_path
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def status(cfg: Any, *, runner: Optional[Runner] = None,
-           probe: Optional[Callable[[str, int], bool]] = None) -> Dict[str, Any]:
+           probe: Optional[Callable[[str, int], bool]] = None,
+           daemon_reader: Optional[Callable[[], Optional[Dict[str, Any]]]] = None,
+           control_query: Optional[Callable[[], Optional[Dict[str, Any]]]] = None
+           ) -> Dict[str, Any]:
     """Read-only gateway/service status. Never raises.
 
-    Reports the real systemd state plus failure fields (``exec_main_status``,
+    Reports the real systemd state of the Qubit messaging-gateway daemon unit
+    (Owner Decision #16) plus failure fields (``exec_main_status``,
     ``n_restarts``) and a bounded TCP health probe. ``state`` is ``OK`` when the
     unit is active and the port answers, ``FAILED`` when the unit failed, and a
     typed ``UNAVAILABLE``/``NOT_INSTALLED``/``DEGRADED`` otherwise.
+
+    Two honest, first-party daemon views are merged in read-only (never
+    fabricated): ``daemon`` is the vendored ``gateway_state.json`` snapshot, and
+    ``control`` is the live ``gateway.sock`` answer (liveness). Both are
+    best-effort; absence is reported as absent.
     """
-    unit = service_unit(cfg)
+    unit = daemon_service_unit(cfg)
     host, port = _host_port(cfg)
     run = runner or _default_runner
     check_port = probe or _port_in_use
@@ -180,8 +351,22 @@ def status(cfg: Any, *, runner: Optional[Runner] = None,
         "sub_state": "unknown", "started_at": None, "port_in_use": False,
         "exec_main_status": 0, "n_restarts": 0, "failed": False,
         "failure": None, "healthy": False, "health": "UNKNOWN",
-        "health_detail": "", "detail": "",
+        "health_detail": "", "detail": "", "daemon": None, "control": None,
     }
+    out["daemon"] = _safe_daemon_read(daemon_reader)
+    control = _safe_control_query(control_query)
+    out["control"] = control
+    # A live control-socket answer is direct daemon liveness and outranks a
+    # systemd read that could be stale/misconfigured.
+    if control is not None:
+        out["daemon_live"] = True
+        out["daemon_pid"] = _safe_int(control.get("pid"))
+        out["daemon_state"] = control.get("gateway_state")
+    else:
+        daemon = out["daemon"] if isinstance(out["daemon"], dict) else {}
+        out["daemon_live"] = False
+        out["daemon_pid"] = _safe_int(daemon.get("pid"))
+        out["daemon_state"] = daemon.get("gateway_state")
     if not out["available"]:
         out["state"] = "UNAVAILABLE"
         out["health"] = "UNKNOWN"
@@ -296,6 +481,79 @@ def _redact(text: Any) -> str:
         return redact_text(str(text if text is not None else ""))
     except Exception:  # noqa: BLE001
         return str(text if text is not None else "")
+
+
+# --------------------------------------------------------------------------
+# Durable control status (ported from the reference action log)
+# --------------------------------------------------------------------------
+# The reference ``GET /api/actions/{name}/status`` tails a durable action log
+# (``web_routers/actions.py:get_action_status``) so a status poll survives the
+# action replacing its own process. A Qubit gateway restart replaces the daemon
+# process, so an in-memory-only outcome record is lost; this persists the last
+# control outcome per action to ``<state_dir>/gateway_control_status.json`` so
+# the dashboard's ``gateway-restart/status`` poll reports the real result
+# instead of a permanent ``unknown``.
+CONTROL_STATUS_NAME = "gateway_control_status.json"
+CONTROL_STATUS_SCHEMA = "qubit-gateway-control-status/1"
+
+
+def _control_status_path(cfg: Any) -> Path:
+    try:
+        base = Path(cfg.state_dir())
+    except Exception:  # noqa: BLE001
+        base = _daemon_home()
+    return base / CONTROL_STATUS_NAME
+
+
+def _record_control_status(cfg: Any, action: str, out: Dict[str, Any]) -> None:
+    """Persist one control outcome (durable, redacted, best-effort; never raises)."""
+    name = str(action or "").strip().lower()
+    if not name or not isinstance(out, dict):
+        return
+    try:
+        path = _control_status_path(cfg)
+        store: Dict[str, Any] = {}
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(raw, dict) and raw.get("schema") == CONTROL_STATUS_SCHEMA:
+                store = raw
+        except (OSError, ValueError):
+            store = {}
+        actions = store.get("actions")
+        actions = dict(actions) if isinstance(actions, dict) else {}
+        receipt = out.get("receipt")
+        actions[name] = {
+            "action": name, "state": str(out.get("state") or ""),
+            "ok": bool(out.get("ok")), "code": str(out.get("code") or ""),
+            "detail": _redact(str(out.get("detail") or ""))[:300],
+            "detached": bool(out.get("detached")), "noop": bool(out.get("noop")),
+            "updated_at": time.time(),
+            "receipt": receipt if isinstance(receipt, dict) else None,
+        }
+        store = {"schema": CONTROL_STATUS_SCHEMA, "actions": actions}
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(json.dumps(store, indent=2, sort_keys=True),
+                       encoding="utf-8")
+        os.replace(tmp, path)
+    except Exception:  # noqa: BLE001 - the durable record is best-effort
+        pass
+
+
+def control_status(cfg: Any, action: str) -> Optional[Dict[str, Any]]:
+    """Read the durable last-control record for *action*, or ``None`` (never raises)."""
+    name = str(action or "").strip().lower()
+    if not name:
+        return None
+    try:
+        raw = json.loads(_control_status_path(cfg).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(raw, dict) or raw.get("schema") != CONTROL_STATUS_SCHEMA:
+        return None
+    actions = raw.get("actions")
+    rec = actions.get(name) if isinstance(actions, dict) else None
+    return dict(rec) if isinstance(rec, dict) else None
 
 
 # --------------------------------------------------------------------------
@@ -444,6 +702,28 @@ def control(cfg: Any, action: str, *, confirmed: bool = False,
             spawner: Optional[Spawner] = None,
             probe: Optional[Callable[[str, int], bool]] = None
             ) -> Dict[str, Any]:
+    """Perform an authorized gateway lifecycle transition and record its outcome.
+
+    Thin wrapper over :func:`_control_impl` that persists the real terminal /
+    in-progress outcome durably (:func:`_record_control_status`) so the
+    dashboard's action-status poll reports the truth after the restart replaces
+    the serving process. The authorization and execution semantics are
+    unchanged.
+    """
+    out = _control_impl(cfg, action, confirmed=confirmed,
+                        confirmation_id=confirmation_id, source=source,
+                        actor=actor, runner=runner, spawner=spawner,
+                        probe=probe)
+    _record_control_status(cfg, action, out)
+    return out
+
+
+def _control_impl(cfg: Any, action: str, *, confirmed: bool = False,
+                  confirmation_id: str = "", source: str = "user",
+                  actor: str = "dashboard:user", runner: Optional[Runner] = None,
+                  spawner: Optional[Spawner] = None,
+                  probe: Optional[Callable[[str, int], bool]] = None
+                  ) -> Dict[str, Any]:
     """Perform an authorized gateway lifecycle transition.
 
     Authorization runs through the one authority path (e-stop latch probe ->
@@ -461,10 +741,11 @@ def control(cfg: Any, action: str, *, confirmed: bool = False,
                 "detail": f"action must be one of {ACTIONS}"}
     if _estop(cfg):
         _audit("control.refused", actor,
-               {"unit": service_unit(cfg), "action": clean, "code": ESTOP_CODE})
+               {"unit": daemon_service_unit(cfg), "action": clean,
+                "code": ESTOP_CODE})
         return {"ok": False, "code": ESTOP_CODE, "state": "UNAVAILABLE",
                 "detail": "emergency stop is latched; gateway control refused"}
-    unit = service_unit(cfg)
+    unit = daemon_service_unit(cfg)
     refusal, receipt = _authorize_control(
         cfg, unit, clean, actor, confirmed=confirmed,
         confirmation_id=str(confirmation_id or ""), source=source)
@@ -552,6 +833,20 @@ def recover(cfg: Any, *, confirmed: bool = False, confirmation_id: str = "",
             spawner: Optional[Spawner] = None,
             probe: Optional[Callable[[str, int], bool]] = None
             ) -> Dict[str, Any]:
+    """Recover a failed gateway and record the durable outcome (see :func:`control`)."""
+    out = _recover_impl(cfg, confirmed=confirmed,
+                        confirmation_id=confirmation_id, source=source,
+                        actor=actor, runner=runner, spawner=spawner, probe=probe)
+    _record_control_status(cfg, "recover", out)
+    return out
+
+
+def _recover_impl(cfg: Any, *, confirmed: bool = False, confirmation_id: str = "",
+                  source: str = "user", actor: str = "dashboard:user",
+                  runner: Optional[Runner] = None,
+                  spawner: Optional[Spawner] = None,
+                  probe: Optional[Callable[[str, int], bool]] = None
+                  ) -> Dict[str, Any]:
     """Recover a failed gateway: ``reset-failed`` then ``start``.
 
     A real recovery action, not a status flag. It is authorized through the
@@ -560,12 +855,12 @@ def recover(cfg: Any, *, confirmed: bool = False, confirmation_id: str = "",
     """
     if _estop(cfg):
         _audit("control.refused", actor,
-               {"unit": service_unit(cfg), "action": "recover",
+               {"unit": daemon_service_unit(cfg), "action": "recover",
                 "code": ESTOP_CODE})
         return {"ok": False, "code": ESTOP_CODE, "state": "UNAVAILABLE",
                 "action": "recover",
                 "detail": "emergency stop is latched; recovery refused"}
-    unit = service_unit(cfg)
+    unit = daemon_service_unit(cfg)
     refusal, receipt = _authorize_control(
         cfg, unit, "recover", actor, confirmed=confirmed,
         confirmation_id=str(confirmation_id or ""), source=source)
@@ -609,7 +904,89 @@ def recover(cfg: Any, *, confirmed: bool = False, confirmation_id: str = "",
             "detail": detail, "status": after, "receipt": receipt}
 
 
-__all__ = ["DEFAULT_UNIT", "DEFAULT_PORT", "CONFIRM_CODE", "ESTOP_CODE",
+def install_unit_plan(cfg: Any, *, repo_root: Optional[Any] = None,
+                      unit_dir: Optional[Any] = None, force: bool = False
+                      ) -> Dict[str, Any]:
+    """Describe the daemon unit install (read-only; never runs the installer).
+
+    Owner Decision #16: ``qubit gateway install`` renders
+    ``systemd/qubit-gateway.service`` into the user unit dir with the shared
+    atomic/idempotent/backup semantics of ``scripts/install_systemd_unit.sh``.
+    This builds the exact argv the CLI executes after the authority gate; the
+    installer itself is invoked by the caller (never run implicitly here), so
+    the host unit dir is untouched by a dry call.
+    """
+    root = Path(repo_root) if repo_root is not None else _repo_root()
+    installer = root / "scripts" / "install_gateway_unit.sh"
+    argv = ["sh", str(installer), str(root)]
+    return {
+        "service_unit": daemon_service_unit(cfg),
+        "template": str(root / "systemd" / DEFAULT_DAEMON_UNIT),
+        "installer": str(installer),
+        "unit_dir": str(Path(unit_dir) if unit_dir is not None else "default"),
+        "force": bool(force),
+        "argv": argv,
+        "detail": ("installs the Qubit gateway systemd user unit atomically; "
+                   "an existing divergent unit is backed up (or preserved "
+                   "unless --force); never enables or starts the unit"),
+    }
+
+
+def _repo_root() -> Path:
+    """The Qubit checkout root (parent of the ``voicebridge`` package)."""
+    return Path(__file__).resolve().parents[1]
+
+
+def install_unit(cfg: Any, *, repo_root: Optional[Any] = None,
+                 unit_dir: Optional[Any] = None, force: bool = False,
+                 runner: Optional[Runner] = None) -> Dict[str, Any]:
+    """Install the daemon unit via the shared installer (caller-gated).
+
+    The authority gate (e-stop → confirmation → audit) is performed by the CLI
+    before this call; this function performs only the render/install and reports
+    the installer's real output. ``unit_dir`` is passed through as
+    ``SYSTEMD_UNIT_DIR`` (a temp dir in tests), and ``runner`` is injectable so
+    the behavior is testable without touching the host.
+    """
+    plan = install_unit_plan(cfg, repo_root=repo_root, unit_dir=unit_dir,
+                             force=force)
+    run = runner or _default_runner
+    argv = list(plan["argv"])
+    env: Dict[str, str] = {}
+    if unit_dir is not None:
+        env["SYSTEMD_UNIT_DIR"] = str(unit_dir)
+    if force:
+        env["INSTALL_FORCE_UNIT"] = "1"
+    try:
+        if env:
+            saved = dict(os.environ)
+            os.environ.update(env)
+            try:
+                rc, stdout, stderr = _run(run, argv, TIMEOUT_S)
+            finally:
+                os.environ.clear()
+                os.environ.update(saved)
+        else:
+            rc, stdout, stderr = _run(run, argv, TIMEOUT_S)
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "code": FAILED_CODE, "state": "FAILED",
+                "action": "install", "unit": plan["service_unit"],
+                "detail": _redact(str(exc))[:300], "plan": plan}
+    ok = rc == 0
+    state = "OK" if ok else ("TIMEOUT" if rc == 124 else "FAILED")
+    code = "" if ok else (TIMEOUT_CODE if rc == 124 else FAILED_CODE)
+    detail = "" if ok else _redact(
+        stderr or f"installer exited {rc}").strip()[:300]
+    return {"ok": ok, "state": state, "action": "install", "code": code,
+            "unit": plan["service_unit"], "rc": rc,
+            "detail": detail or plan["detail"], "stdout": _redact(stdout)[:400],
+            "plan": plan}
+
+
+__all__ = ["DEFAULT_UNIT", "DEFAULT_DAEMON_UNIT", "DEFAULT_PORT",
+           "CONFIRM_CODE", "ESTOP_CODE",
            "UNAVAILABLE_CODE", "FAILED_CODE", "TIMEOUT_CODE", "BAD_INPUT_CODE",
            "ACTIONS", "GATEWAY_CONTROL_CAPABILITY", "service_unit",
+           "daemon_service_unit", "daemon_runtime_status", "query_daemon_control",
+           "install_unit_plan", "install_unit",
            "system_scope", "status", "failure", "control", "recover"]

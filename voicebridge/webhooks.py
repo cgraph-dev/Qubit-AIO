@@ -32,9 +32,12 @@ import hmac
 import json
 import os
 import re
+import secrets
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 SCHEMA = "qubit-webhooks/1"
@@ -321,6 +324,190 @@ def test_plan(cfg: Any, sub_id: str) -> Dict[str, Any]:
                             "secret reference resolution (kind only here)"],
             "would_execute": "nothing: verified deliveries record receipts only",
             "note": "dry-run: no secret resolved, no network touched"}
+
+
+# ------------------------------------------------- delivery maintenance
+# The reference dashboard's webhook surface is create/list/enable/delete
+# (``hermes_cli/web_routers/ops.py:132``); its store also carries the per-route
+# signing secret. Qubit keeps only a reference (never a value), so the
+# maintenance operations below are the Qubit-native realizations of the same
+# capability: rotate the signing secret to a fresh Qubit-owned ``file:``
+# reference, send a real signed test delivery, read the delivery receipts, and
+# retry the last failed delivery. Every mutation is confirm-gated + audited and
+# every delivery is a real HMAC-signed HTTP request (never a fabricated
+# "delivered").
+SECRET_DIR = "webhook-secrets"
+DELIVERY_TIMEOUT_S = 8.0
+
+
+def _secret_dir(cfg: Any) -> Path:
+    return Path(cfg.state_dir()) / SECRET_DIR
+
+
+def _deliver(cfg: Any, rec: Dict[str, Any], *, body: Dict[str, Any], event: str,
+             requested_by: str, timeout_s: float = DELIVERY_TIMEOUT_S
+             ) -> Dict[str, Any]:
+    """Send one real HMAC-SHA256-signed delivery; record a redacted receipt."""
+    from .providers.credentials import resolve_key
+
+    key, code = resolve_key("webhook", rec.get("secret_ref", ""))
+    if code or not key:
+        raise WebhookError(AUTH_CODE,
+                           "signing secret unresolvable (check the env:/file: "
+                           "reference)")
+    ts = _now()
+    raw = json.dumps(body, sort_keys=True).encode("utf-8")
+    signature = hmac.new(key.encode("utf-8"), f"{ts}.".encode() + raw,
+                         hashlib.sha256).hexdigest()
+    req = urllib.request.Request(
+        rec["url"], data=raw, method="POST",
+        headers={"Content-Type": "application/json",
+                 "X-Qubit-Signature": f"sha256={signature}",
+                 "X-Qubit-Timestamp": str(ts),
+                 "X-Qubit-Delivery": f"{rec['id']}-{secrets.token_hex(8)}",
+                 "User-Agent": "qubit-webhook/1"})
+    status: Optional[int] = None
+    err = ""
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+            status = int(getattr(resp, "status", 0) or 0)
+    except urllib.error.HTTPError as exc:
+        status = int(getattr(exc, "code", 0) or 0)
+        err = f"http {status}"
+    except Exception as exc:  # noqa: BLE001 - network failures are typed states
+        err = str(exc)[:200]
+    delivered = status is not None and 200 <= status < 300
+    verdict = "DELIVERED" if delivered else "FAILED"
+    _receipt(cfg, rec["id"], verdict, f"status={status} {err}".strip())
+    _audit("delivery", requested_by,
+           {"id": rec["id"], "event": event, "verdict": verdict,
+            "status": status})
+    return {"state": "OK", "delivered": delivered, "verdict": verdict,
+            "http_status": status, "error": err or None,
+            "subscription": rec["id"], "event": event, "timestamp": ts,
+            "note": "real HMAC-signed delivery; receipts are redacted"}
+
+
+def rotate_secret(cfg: Any, sub_id: str, *, requested_by: str = "cli:user",
+                  confirmed: bool = False) -> Dict[str, Any]:
+    """Rotate a subscription's signing secret to a fresh ``file:`` reference.
+
+    The new 32-byte secret is written 0600 into Qubit's own
+    ``state/webhook-secrets/<id>.secret``; the subscription is then pointed at
+    that ``file:`` reference. The value is never returned or logged — only the
+    reference kind. Confirmed + audited.
+    """
+    if not confirmed:
+        raise WebhookError(CONFIRM_CODE,
+                           "secret rotation requires explicit --confirm")
+    state = _load(cfg)
+    rec = _get(state, sub_id)
+    directory = _secret_dir(cfg)
+    path = directory / f"{rec['id']}.secret"
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(f"{path.name}.tmp.{os.getpid()}")
+        tmp.write_text(secrets.token_hex(32), encoding="utf-8")
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, path)
+    except OSError as exc:
+        raise WebhookError(CORRUPT_CODE,
+                           f"secret rotation write failed: {exc}") from exc
+    rec["secret_ref"] = f"file:{path}"
+    rec["secret_rotated_at"] = _now()
+    state["subscriptions"][rec["id"]] = rec
+    _save(cfg, state)
+    _audit("rotate", requested_by, {"id": rec["id"]})
+    out = _public(rec)
+    return {"state": "OK", "subscription": out,
+            "reference_kind": _secret_kind(rec["secret_ref"]),
+            "rotated_at": rec["secret_rotated_at"],
+            "note": "new signing secret written to a Qubit-owned file "
+                    "reference; the value is never returned"}
+
+
+def deliveries(cfg: Any, sub_id: str = "", *, limit: int = 50
+               ) -> Dict[str, Any]:
+    """Recent delivery receipts (redacted) for one or every subscription."""
+    path = Path(cfg.state_dir()) / LOG_NAME
+    rows: List[Dict[str, Any]] = []
+    if path.exists():
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            lines = []
+        for line in lines[-MAX_LOG_LINES:]:
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(rec, dict):
+                continue
+            if sub_id and rec.get("subscription") != sub_id:
+                continue
+            rows.append(rec)
+    try:
+        cap = max(1, min(int(limit or 50), 500))
+    except (TypeError, ValueError):
+        cap = 50
+    rows = rows[-cap:]
+    return {"state": "OK", "deliveries": rows, "count": len(rows),
+            "subscription": sub_id or None}
+
+
+def test_delivery(cfg: Any, sub_id: str, *, requested_by: str = "cli:user",
+                  confirmed: bool = False,
+                  timeout_s: float = DELIVERY_TIMEOUT_S) -> Dict[str, Any]:
+    """Send a real signed test delivery to the subscription's URL."""
+    if not confirmed:
+        raise WebhookError(CONFIRM_CODE,
+                           "a test delivery sends a real signed request; "
+                           "explicit --confirm required")
+    state = _load(cfg)
+    rec = _get(state, sub_id)
+    if not bool(rec.get("enabled", True)):
+        raise WebhookError(BAD_INPUT_CODE,
+                           f"subscription {rec['id']!r} is disabled")
+    if not is_enabled(cfg):
+        raise WebhookError(BAD_INPUT_CODE,
+                           "webhook delivery is disabled at the store level")
+    body = {"event": "webhook.test", "subscription": rec["id"],
+            "test": True, "sent_at": _now()}
+    out = _deliver(cfg, rec, body=body, event="webhook.test",
+                   requested_by=requested_by, timeout_s=timeout_s)
+    out["mode"] = "test"
+    return out
+
+
+def retry_delivery(cfg: Any, sub_id: str, *, requested_by: str = "cli:user",
+                   confirmed: bool = False,
+                   timeout_s: float = DELIVERY_TIMEOUT_S) -> Dict[str, Any]:
+    """Re-issue a signed delivery when a prior delivery failed.
+
+    Receipts are redacted and the original payload is not retained, so a retry
+    re-sends a fresh signed delivery envelope for the subscription. If no failed
+    delivery is on record there is nothing to retry (typed ``WEBHOOK_NOT_FOUND``
+    — never a fabricated retry).
+    """
+    if not confirmed:
+        raise WebhookError(CONFIRM_CODE,
+                           "retrying a delivery sends a real signed request; "
+                           "explicit --confirm required")
+    state = _load(cfg)
+    rec = _get(state, sub_id)
+    history = deliveries(cfg, rec["id"], limit=200).get("deliveries", [])
+    failed = [r for r in history if isinstance(r, dict)
+              and r.get("verdict") == "FAILED"]
+    if not failed:
+        raise WebhookError(NOT_FOUND_CODE,
+                           f"no failed delivery to retry for {rec['id']!r}")
+    body = {"event": "webhook.retry", "subscription": rec["id"],
+            "retry": True, "sent_at": _now()}
+    out = _deliver(cfg, rec, body=body, event="webhook.retry",
+                   requested_by=requested_by, timeout_s=timeout_s)
+    out["mode"] = "retry"
+    out["retried_after_ts"] = failed[-1].get("ts")
+    return out
 
 
 # ---------------------------------------------------------------- verify

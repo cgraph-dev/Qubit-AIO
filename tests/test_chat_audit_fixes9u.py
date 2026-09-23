@@ -265,8 +265,10 @@ def test_when_available_resolves_the_real_window(tmp_path, monkeypatch):
     assert out["context_window_source"] == "resolved"
     assert out["real_context_tokens"] == 1000000
     assert out["declared_context_tokens"] == 200000
-    # The effective window is the runtime's real window, not the stale declared.
-    assert out["context_tokens"] == 1000000
+    # N29: the effective window is the configured/declared profile value — the
+    # same one /agent/api/model/info reports — not the advertised registry value
+    # (the advertised value stays in ``real_context_tokens`` for audit).
+    assert out["context_tokens"] == 200000
 
 
 def test_cache_hit_skips_the_live_probe(tmp_path, monkeypatch):
@@ -287,7 +289,8 @@ def test_cache_hit_skips_the_live_probe(tmp_path, monkeypatch):
     out = R.terminal_context_guard(cfg, profile_id="qubit-go")
     assert out["ok"] is True
     assert out["context_window_source"] == "cache"
-    assert out["context_tokens"] == 500000
+    assert out["real_context_tokens"] == 500000
+    assert out["context_tokens"] == 200000
 
 
 def test_generic_fallback_stays_unverified(tmp_path, monkeypatch):

@@ -4645,7 +4645,8 @@ def _replace_target_belongs_to_other_profile(existing_pid: int) -> bool:
     try:
         from gateway.status import (
             _get_pid_path, _get_process_qubit_home, _get_process_start_time, _pid_from_record,
-            _read_pid_record, _record_looks_like_gateway, _read_process_cmdline, _same_qubit_home)
+            _read_pid_record, _record_looks_like_gateway, _read_process_cmdline, _same_qubit_home,
+            record_home)
         our_home = _get_process_qubit_home()
 
         def refuse(msg: str, *args, level=logging.WARNING) -> bool:
@@ -4665,9 +4666,9 @@ def _replace_target_belongs_to_other_profile(existing_pid: int) -> bool:
         if _get_process_start_time(existing_pid) != recorded_start:
             return refuse("pid record start-time does not match the live process %s (stale/PID-reuse record).",
                           existing_pid)
-        recorded_home = record.get("hermes_home")
+        recorded_home = record_home(record)
         if not isinstance(recorded_home, str) or not recorded_home.strip():
-            return refuse("pid record predates hermes_home stampings; ownership of PID %s unprovable.",
+            return refuse("pid record predates qubit_home stampings; ownership of PID %s unprovable.",
                           existing_pid)
         if not _same_qubit_home(recorded_home, our_home):
             return refuse("pid record belongs to a different QUBIT_HOME (%s, ours %s). Remove the stale PID "

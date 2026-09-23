@@ -344,8 +344,8 @@ export const pt: Translations = {
     providersHint:
       "Escreve memory.provider (vazio = incorporado) e context.engine no config.yaml. Aplicado na próxima sessão.",
     refreshDashboard: "Re-analisar extensões do dashboard",
-    removeConfirm: "Remover este plugin de ~/.qubit/plugins/?",
-    removeHint: "Apenas plugins instalados pelo utilizador em ~/.qubit/plugins podem ser removidos.",
+    removeConfirm: "Remover este plugin de $QUBIT_HOME/plugins/?",
+    removeHint: "Apenas plugins instalados pelo utilizador em $QUBIT_HOME/plugins podem ser removidos.",
     rescanHeading: "Registo de plugins SPA",
     rescanHint: "Re-analise depois de adicionar ficheiros em disco para que a barra lateral detete novos manifestos.",
     runtimeHeading: "Runtime do gateway (plugins YAML)",

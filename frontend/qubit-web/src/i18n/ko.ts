@@ -342,8 +342,8 @@ export const ko: Translations = {
     providersHint:
       "memory.provider (비어 있으면 = 내장)와 context.engine을 config.yaml에 기록합니다. 다음 세션부터 적용됩니다.",
     refreshDashboard: "대시보드 확장 재스캔",
-    removeConfirm: "~/.qubit/plugins/에서 이 플러그인을 제거하시겠습니까?",
-    removeHint: "~/.qubit/plugins 아래에 사용자가 설치한 플러그인만 제거할 수 있습니다.",
+    removeConfirm: "$QUBIT_HOME/plugins/에서 이 플러그인을 제거하시겠습니까?",
+    removeHint: "$QUBIT_HOME/plugins 아래에 사용자가 설치한 플러그인만 제거할 수 있습니다.",
     rescanHeading: "SPA 플러그인 레지스트리",
     rescanHint: "디스크에 파일을 추가한 후 재스캔하여 대시보드 사이드바가 새 매니페스트를 인식하도록 합니다.",
     runtimeHeading: "게이트웨이 런타임 (YAML 플러그인)",

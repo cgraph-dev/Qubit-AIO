@@ -81,6 +81,46 @@ archived contract is preserved, not edited.
     (`/tmp/opencode/pinned/hermes-agent-0.21.4/`, 14,966 files). See
     `docs/QUBIT_OWNER_AMENDMENT_2026-09-23_W9_VENDOR_SYNC.md` §8.
 
+## Owner decisions in force (2026-09-23)
+
+15. **W9 pin move AUTHORIZED + worktree FROZEN.** Move the vendored runtime pin
+    from 0.21.1 (`2237be35…`) to the stable v0.21.4 release commit
+    `d337b736aa1e8ebecfab043842d13e4a2d2f48a3`. The mid-flight worktree is frozen
+    at `42d64b84` on branch `freeze/wave12-2026-09-23` (clean tree, **not
+    pushed**). The sync is **slice-by-slice**, starting with slice-0
+    (`qubit_state*`), using the pristine source
+    `/tmp/opencode/pinned/hermes-agent-0.21.4/` and the extended rename map;
+    regenerate evidence into `docs/generated/` (never the frozen archive) and
+    re-prove boot. `docs/QUBIT_OWNER_AMENDMENT_2026-09-23_W9_VENDOR_SYNC.md` §8
+    is now satisfied.
+16. **M1 items 2/12 — implement a real Qubit-owned messaging-gateway daemon.**
+    The owner **rejected** the naming/disposition resolution. M1 items 2/12 stay
+    **OPEN** until a Qubit-owned gateway daemon exists and is behaviorally proven
+    (status/start/stop/restart through the one broker/policy/audit/confirmation/
+    e-stop path). No M1 ratification until then.
+17. **N17 — remove the `~/.hermes/.env` credential fallback.** `DECISIONS` #9
+    governs: `~/.hermes` is never a runtime fallback. The canonical credential
+    source is `~/.config/qubit-voicebridge/.env` (or the configured
+    `intent.deepseek_env`) plus the process environment; the legacy
+    `~/.hermes/.env` candidate is removed from `orchestrator._env_key` and
+    `tts/openai_tts._read_key`, and the pinning test is updated accordingly.
+18. **#16 satisfied — daemon installed and running (2026-09-23).** The owner
+    authorized the operator install in their place. `qubit gateway
+    install --confirm` installed `qubit-gateway.service`; `qubit gateway start
+    --confirm` started it (real `voicebridge.gateway_daemon`, MainPID,
+    `daemon_live:true`, stays alive NRestarts=0); `stop`/`restart` are
+    confirm-gated and the restart is real. **M1 items 2/12 are behaviorally
+    PASS** (no `M1` milestone claimed until owner ratification; items 3/4 remain
+    PARTIAL). See `docs/STATUS.md` §25.
+18. **#16 satisfied — daemon installed and running (2026-09-23).** The owner
+    authorized the operator install in their place. `qubit gateway
+    install --confirm` installed `qubit-gateway.service`; `qubit gateway start
+    --confirm` started it (real `voicebridge.gateway_daemon`, MainPID,
+    `daemon_live:true`, stays alive NRestarts=0); `stop`/`restart` are
+    confirm-gated and the restart is real. **M1 items 2/12 are behaviorally
+    PASS** (no `M1` milestone claimed until owner ratification; items 3/4 remain
+    PARTIAL). See `docs/STATUS.md` §25.
+
 ## Preserved (do not edit)
 
 - Frozen records: `docs/archive/2026-09-21/` (contracts, owner amendments,

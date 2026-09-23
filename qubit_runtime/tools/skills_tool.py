@@ -469,6 +469,11 @@ def _locate_skill(name: str, local_category_name: Optional[str], project_dirs: l
     if not all_dirs:
         return _fail(
             "Skills directory does not exist yet. It will be created on first install."), None, None
+    # Read-old fallback: a legacy skill name (e.g. `hermes-agent`) resolves to its
+    # Qubit name after the W-BRAND rename migration. Non-destructive — the caller
+    # gets the renamed skill; the legacy name is never required to exist on disk.
+    from agent.skill_utils import resolve_legacy_skill_name
+    name = resolve_legacy_skill_name(name)
     candidates = _collect_skill_candidates(name, local_category_name, all_dirs)
     if len(candidates) > 1 and project_dirs:
         # A project skill intentionally overrides a same-named local/external skill;

@@ -176,7 +176,9 @@ WRONG_VERB = [
     ("POST", "/api/env/reveal", "SECRET_NEVER_SERVED", 403),
     ("POST", "/api/credentials/pool", "SECRET_NEVER_SERVED", 403),
     ("DELETE", "/api/credentials/pool/openai/0", "SECRET_NEVER_SERVED", 403),
-    ("POST", "/api/mcp/servers/aa/auth", "OAUTH_MANUAL_HANDOFF", 403),
+    # POST /api/mcp/servers/{name}/auth is now a real handler that validates the
+    # server exists (unknown server -> 404 MCP_NOT_FOUND), not a typed refusal,
+    # so it no longer belongs in this wrong-verb gate table.
 ]
 
 
@@ -793,12 +795,18 @@ REMAINING_TYPED = [
     ("POST", "/api/memory/providers/x/oauth/start",
      "OAUTH_MANUAL_HANDOFF", 403),
     ("POST", "/api/sessions/owner-backfill", "SESSIONS_RECEIPT_STORE", 501),
-    ("POST", "/api/sessions/bulk-delete", "SESSIONS_RECEIPT_STORE", 501),
-    ("POST", "/api/sessions/import", "SESSIONS_RECEIPT_STORE", 501),
-    ("POST", "/api/sessions/prune", "SESSIONS_RECEIPT_STORE", 501),
+    # POST /api/sessions/{bulk-delete,import,prune} were converted to real
+    # Qubit-backed confirm-gated mutations (owner decisions in force); they are
+    # covered by tests/test_sessions_mutations_wave18.py, not this typed table.
     ("PUT", "/api/model/moa", "MOA_SUPERSEDED", 501),
-    ("POST", "/api/profiles/work/describe-auto", "DESCRIBE_AUTO_MANUAL", 403),
-    ("PATCH", "/api/profiles/work", "PERSONA_IMMUTABLE_ID", 501),
+    # POST /api/profiles/{name}/describe-auto is now a real ported handler
+    # (reference web_routers/profiles.py) that validates the profile and runs
+    # the auxiliary-LLM describer; it is covered by
+    # tests/test_profile_describe_auto_wave17.py, not this typed table.
+    # PATCH /api/profiles/work validates its payload before the persona gate
+    # (empty/malformed body -> 400 MALFORMED), so it is no longer a pure typed
+    # refusal; the immutable-persona gate remains for a well-formed rename and
+    # is covered by tests/test_dashboard_matrix9u.py (BOOLEAN_CONFIRM_PREVALIDATED).
     ("POST", "/api/memory/providers/cloud/setup",
      "MEMORY_LOCAL_ONLY", 403),
     ("PUT", "/api/memory/providers/cloud/config",
@@ -832,23 +840,25 @@ def test_remaining_typed_rows_are_typed_and_confirm_cannot_bypass(
 
 
 def test_memory_reset_confirms_and_deletes(tmp_path, monkeypatch):
-    """POST/GET /api/memory/reset is a real Qubit-backed reset.
+    """GET is a read-only status; POST is a real confirm-gated reset.
 
-    It stages the destructive action through the shared journal (409 with a
-    real ``confirmation_id``), then on ``confirm`` deletes the local semantic
-    memories / markdown workspace notes and returns the real deleted list. The
-    strongest behavioral proof lives in
-    ``tests/test_dashboard_backend_closure9u.py``; this keeps the route-parity
-    file honest about the no-confirm contract.
+    ``GET /api/memory/reset`` reports the destructive target set without
+    deleting (read-only). ``POST /api/memory/reset`` stages the destructive
+    action through the shared journal (409 with a real ``confirmation_id``),
+    then on ``confirm`` deletes the local semantic memories / markdown
+    workspace notes and returns the real deleted list.
     """
     from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
-    for method in ("GET", "POST"):
-        code, out = HC.dispatch(cfg, method, "/api/memory/reset", {}, {})
-        assert code == 409 and out["code"] == "CONFIRM_REQUIRED", (method, out)
-        assert out.get("confirmation_id"), (method, out)
-        code, out = HC.dispatch(cfg, method, "/api/memory/reset", {},
-                                {"confirm": True})
-        assert code == 200 and out.get("ok") is True, (method, code, out)
-        assert isinstance(out.get("deleted"), list), (method, out)
+    code, out = HC.dispatch(cfg, "GET", "/api/memory/reset", {}, {})
+    assert code == 200 and out.get("ok") is True, (code, out)
+    assert out.get("confirm_required") is True, out
+
+    code, out = HC.dispatch(cfg, "POST", "/api/memory/reset", {}, {})
+    assert code == 409 and out["code"] == "CONFIRM_REQUIRED", (code, out)
+    assert out.get("confirmation_id"), (code, out)
+    code, out = HC.dispatch(cfg, "POST", "/api/memory/reset", {},
+                            {"confirm": True})
+    assert code == 200 and out.get("ok") is True, (code, out)
+    assert isinstance(out.get("deleted"), list), (code, out)

@@ -1,14 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState, useMemo } from "react";
 import {
-  Code,
   Download,
-  FormInput,
   RotateCcw,
   Search,
   Upload,
   X,
   Settings2,
-  FileText,
   Settings,
   Bot,
   Monitor,
@@ -38,7 +35,6 @@ import {
 } from "lucide-react";
 import { api, ConfirmRequiredError } from "@/lib/api";
 import { getNestedValue, setNestedValue } from "@/lib/nested";
-import { refusalOrError } from "@/lib/policy-refusal";
 import { useToast } from "@nous-research/ui/hooks/use-toast";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { AutoField } from "@/components/AutoField";
@@ -122,10 +118,6 @@ export default function ConfigPage() {
   );
   const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [yamlMode, setYamlMode] = useState(false);
-  const [yamlText, setYamlText] = useState("");
-  const [yamlLoading, setYamlLoading] = useState(false);
-  const [yamlSaving, setYamlSaving] = useState(false);
   const [configPath, setConfigPath] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>("");
   const [confirmReset, setConfirmReset] = useState(false);
@@ -200,16 +192,9 @@ export default function ConfigPage() {
       .getDefaults()
       .then(setDefaults)
       .catch(() => {});
-    // getConfigRaw is profile-scoped (fetchJSON appends ?profile=), so its
-    // `path` reflects the switched profile's config.yaml. /api/status's
-    // config_path is machine-global (the dashboard's own profile) — wrong
-    // header under the global profile switcher, so it's only a fallback.
-    api
-      .getConfigRaw()
-      .then((resp) => {
-        if (resp.path) setConfigPath(resp.path);
-      })
-      .catch(() => {});
+    // /api/status's config_path is the machine-global path the vendored
+    // runtime reads. Raw-YAML export is policy-refused (SECRET_NEVER_SERVED),
+    // so the header path comes from status, not /api/config/raw.
     api
       .getStatus()
       .then((resp) => setConfigPath((prev) => prev ?? resp.config_path))
@@ -222,18 +207,6 @@ export default function ConfigPage() {
       setActiveCategory(categoryOrder[0]);
     }
   }, [categoryOrder, activeCategory]);
-
-  // Load YAML when switching to YAML mode
-  useEffect(() => {
-    if (yamlMode) {
-      setYamlLoading(true);
-      api
-        .getConfigRaw()
-        .then((resp) => setYamlText(resp.yaml))
-        .catch((e) => showToast(refusalOrError(e, t.config.failedToLoadRaw), "error"))
-        .finally(() => setYamlLoading(false));
-    }
-  }, [yamlMode]);
 
   /* ---- Categories ---- */
   const categories = useMemo(() => {
@@ -320,22 +293,6 @@ export default function ConfigPage() {
       showToast(`${t.config.failedToSave}: ${describeConfirmError(e)}`, "error");
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleYamlSave = async () => {
-    setYamlSaving(true);
-    try {
-      await api.saveConfigRaw(yamlText);
-      showToast(t.config.yamlConfigSaved, "success");
-      api
-        .getConfig()
-        .then(setConfig)
-        .catch(() => {});
-    } catch (e) {
-      showToast(refusalOrError(e, `${t.config.failedToSaveYaml}: ${e}`), "error");
-    } finally {
-      setYamlSaving(false);
     }
   };
 
@@ -526,86 +483,41 @@ export default function ConfigPage() {
             className="hidden"
             onChange={handleImport}
           />
-          {!yamlMode &&
-            (() => {
-              const resetScopeLabel = isSearching
-                ? t.config.searchResults
-                : prettyCategoryName(activeCategory);
-              const resetTitle = t.config.resetScopeTooltip.replace(
-                "{scope}",
-                resetScopeLabel,
-              );
-              return (
-                <Button
-                  ghost
-                  size="icon"
-                  onClick={handleReset}
-                  title={resetTitle}
-                  aria-label={resetTitle}
-                >
-                  <RotateCcw />
-                </Button>
-              );
-            })()}
+          {(() => {
+            const resetScopeLabel = isSearching
+              ? t.config.searchResults
+              : prettyCategoryName(activeCategory);
+            const resetTitle = t.config.resetScopeTooltip.replace(
+              "{scope}",
+              resetScopeLabel,
+            );
+            return (
+              <Button
+                ghost
+                size="icon"
+                onClick={handleReset}
+                title={resetTitle}
+                aria-label={resetTitle}
+              >
+                <RotateCcw />
+              </Button>
+            );
+          })()}
 
           <div className="w-px h-5 bg-border mx-1" />
 
           <Button
             size="sm"
-            outlined={!yamlMode}
-            onClick={() => setYamlMode(!yamlMode)}
-            prefix={yamlMode ? <FormInput /> : <Code />}
+            className="uppercase"
+            onClick={handleSave}
+            disabled={saving}
           >
-            {yamlMode ? t.common.form : "YAML"}
+            {saving ? t.common.saving : t.common.save}
           </Button>
-
-          {yamlMode ? (
-            <Button
-              size="sm"
-              className="uppercase"
-              onClick={handleYamlSave}
-              disabled={yamlSaving}
-            >
-              {yamlSaving ? t.common.saving : t.common.save}
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              className="uppercase"
-              onClick={handleSave}
-              disabled={saving}
-            >
-              {saving ? t.common.saving : t.common.save}
-            </Button>
-          )}
         </div>
       </div>
 
-      {yamlMode ? (
-        <Card>
-          <CardHeader className="py-3 px-4">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              {t.config.rawYaml}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {yamlLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Spinner className="text-xl text-primary" />
-              </div>
-            ) : (
-              <textarea
-                className="flex min-h-[600px] w-full bg-transparent px-4 py-3 text-sm font-mono leading-relaxed placeholder:text-muted-foreground focus-visible:outline-none border-t border-border"
-                value={yamlText}
-                onChange={(e) => setYamlText(e.target.value)}
-                spellCheck={false}
-              />
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-4">
           <aside aria-label={t.config.filters} className="sm:w-56 sm:shrink-0">
             <div className="sm:sticky sm:top-4">
               <div className="flex flex-col border border-border bg-muted/20">
@@ -714,7 +626,6 @@ export default function ConfigPage() {
             )}
           </div>
         </div>
-      )}
       <PluginSlot name="config:bottom" />
       <ConfirmDialog
         open={confirmReset}

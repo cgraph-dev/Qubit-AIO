@@ -20,7 +20,7 @@ class TestGatewayPidState:
 
         payload = json.loads((tmp_path / "gateway.pid").read_text())
         assert payload["pid"] == os.getpid()
-        assert payload["kind"] == "hermes-gateway"
+        assert payload["kind"] == "qubit-gateway"
         assert isinstance(payload["argv"], list)
         assert payload["argv"]
 

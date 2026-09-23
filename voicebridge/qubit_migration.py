@@ -44,6 +44,19 @@ _SOURCE_DBS = ("state.db", "projects.db", "shared-state.db", "kanban.db",
                "sessions/state.db")
 _VISIBLE_ROLES = ("user", "assistant", "system", "tool")
 
+# Safe, non-secret user-state stores ported read-old/write-new (skip-existing).
+# These never carry credential material. The CLI history (``.hermes_history``),
+# request dumps, pairing, and gateway runtime state are deliberately excluded:
+# the history holds pasted ``sk-`` credentials, the dumps hold raw prompts, and
+# pairing/gateway files are Qubit-owned live state.
+_SAFE_STATE_DIRS = ("memories", "checkpoints")
+_SAFE_STATE_FILES = ("channel_directory.json",)
+# Every remaining item is inventoried read-only for the coverage report so the
+# import decision (and the omission) is explicit and reviewable.
+_STATE_ITEM_DIRS = ("memories", "checkpoints", "pairing")
+_STATE_ITEM_FILES = ("channel_directory.json", "gateway_state.json",
+                     ".hermes_history")
+
 
 # ---------------------------------------------------------------------------
 # source resolution
@@ -82,6 +95,59 @@ def _scalar(conn: sqlite3.Connection, sql: str) -> int:
 # ---------------------------------------------------------------------------
 # read-only inventory
 # ---------------------------------------------------------------------------
+def _state_item_report(home: Path) -> Dict[str, Any]:
+    """Read-only present/count inventory of the remaining user-state items.
+
+    Counts only — file contents and secret values are never read or returned.
+    ``_SAFE_STATE_DIRS``/``_SAFE_STATE_FILES`` are the subset Qubit imports; the
+    rest are reported so the omission is explicit and reviewable.
+    """
+    def _files(root: Path) -> int:
+        if not root.is_dir():
+            return 0
+        return sum(1 for p in root.rglob("*")
+                   if p.is_file() and not p.name.endswith(".lock"))
+
+    def _lines(p: Path) -> int:
+        if not p.is_file():
+            return 0
+        try:
+            with p.open("r", encoding="utf-8", errors="replace") as fh:
+                return sum(1 for _ in fh)
+        except OSError:
+            return 0
+
+    items: Dict[str, Any] = {}
+    for name in _STATE_ITEM_DIRS:
+        d = home / name
+        items[name] = {"present": d.is_dir(), "files": _files(d)}
+    for name in _STATE_ITEM_FILES:
+        f = home / name
+        entry: Dict[str, Any] = {
+            "present": f.is_file(),
+            "bytes": f.stat().st_size if f.is_file() else 0,
+        }
+        if name == ".hermes_history":
+            entry["lines"] = _lines(f)
+        items[name] = entry
+    # kanban/projects row counts live in their SQLite stores; report them here
+    # so the coverage table is self-contained.
+    for rel, table in (("kanban.db", "tasks"), ("projects.db", "projects")):
+        p = home / rel
+        entry = {"present": p.is_file(), "rows": 0}
+        if p.is_file():
+            try:
+                conn = _connect_ro(p)
+                if table in _tables(conn):
+                    entry["rows"] = _scalar(conn,
+                                            f"select count(*) from {table}")
+                conn.close()
+            except sqlite3.Error:
+                entry["error"] = "unreadable"
+        items[rel] = entry
+    return items
+
+
 def inspect(cfg: Any = None, *, home: Optional[Path] = None) -> Dict[str, Any]:
     """Read-only inventory of the source home (no contents, no secret values)."""
     home = Path(home) if home else source_home(cfg)
@@ -157,6 +223,7 @@ def inspect(cfg: Any = None, *, home: Optional[Path] = None) -> Dict[str, Any]:
         if d.is_dir():
             out["dirs"][sub] = sum(1 for x in d.rglob("*") if not x.is_dir())
     out["mcp_servers"] = sorted(_source_mcp_servers(home).keys())
+    out["state_items"] = _state_item_report(home)
     return out
 
 
@@ -929,12 +996,19 @@ def catalog_report(cfg: Any, home: Path) -> Dict[str, Any]:
     }
 
 
-def _import_assets(cfg: Any, home: Path, bdir: Path) -> Dict[str, Any]:
+def _import_assets(cfg: Any, home: Path, bdir: Path, *,
+                   safe: bool = False) -> Dict[str, Any]:
     """Import profiles/model-provider, skills, plugins, hooks, schedules, MCP.
 
     Returns a journal fragment; destination files that can be modified are
     backed up under ``bdir/destination`` and mapped for rollback. Only
     ``env:`` secret references are created — never a plaintext key.
+
+    ``safe=True`` is the owner-approved non-secret subset: the reference
+    provider/model profile and the MCP registry are **not** imported (owner
+    decision #9 — the reference provider and its now-dead MCP servers must not
+    be re-introduced), while the safe user-state stores (``memories``,
+    ``checkpoints``, ``channel_directory.json``) are ported read-old/write-new.
     """
     dest_home = _qubit_home(cfg)
     restore_map: Dict[str, str] = {}
@@ -952,12 +1026,32 @@ def _import_assets(cfg: Any, home: Path, bdir: Path) -> Dict[str, Any]:
     _backup(dest_home / "cron" / "jobs.json")
     _backup(dest_home / "config.yaml")
 
-    model_result = _import_model_profile(cfg, home)
+    if safe:
+        model_result: Dict[str, Any] = {
+            "state": "SKIPPED", "code": "SAFE_MODE",
+            "detail": "reference provider/model profile not imported "
+                      "(owner decision #9: no reference provider config)"}
+    else:
+        model_result = _import_model_profile(cfg, home)
     added: List[str] = []
     # B-04: import projects, attachments, skills, plugins and hooks (not just
     # skills/plugins/hooks). Skip-existing, so no destination file is lost.
     for name in ("skills", "plugins", "hooks", "projects", "attachments"):
         added.extend(_copy_missing(home / name, dest_home / name))
+    # W-MIG wave 17: port the remaining safe, non-secret user-state stores
+    # read-old/write-new (skip-existing). ``memories``/``checkpoints`` are
+    # directories; ``channel_directory.json`` is a single non-secret file. The
+    # CLI history, request dumps, pairing, and gateway runtime state are never
+    # imported (secrets / Qubit-owned live state).
+    for name in _SAFE_STATE_DIRS:
+        added.extend(_copy_missing(home / name, dest_home / name))
+    for rel in _SAFE_STATE_FILES:
+        src = home / rel
+        target = dest_home / rel
+        if src.is_file() and not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, target)
+            added.append(str(target))
     # Objective B remainder: union the source skill-disabled state into the
     # destination runtime config.yaml (existing disabled entries preserved,
     # everything else untouched); rollback removes a config the import created.
@@ -974,8 +1068,16 @@ def _import_assets(cfg: Any, home: Path, bdir: Path) -> Dict[str, Any]:
         _backup(state_dir / "mcp_servers.json")
     mcp_existed = (state_dir is not None
                    and (state_dir / "mcp_servers.json").is_file())
-    mcp_result = _import_mcp_servers(cfg, home)
-    if (state_dir is not None and not mcp_existed
+    if safe:
+        mcp_result: Dict[str, Any] = {
+            "source_count": len(_source_mcp_servers(home)),
+            "imported": [], "skipped": [], "conflicts": [], "unsupported": [],
+            "state": "SKIPPED", "code": "SAFE_MODE",
+            "detail": "MCP registry not imported (safe subset: avoids "
+                      "re-introducing the reference's dead MCP servers)"}
+    else:
+        mcp_result = _import_mcp_servers(cfg, home)
+    if (not safe and state_dir is not None and not mcp_existed
             and (state_dir / "mcp_servers.json").is_file()):
         created_files.append(str(state_dir / "mcp_servers.json"))
     # Receipts/audit: copy any real standalone store rather than fabricating a
@@ -1111,8 +1213,15 @@ def _backup_dir(cfg: Any, backup_dir: Optional[Path], home: Path) -> Path:
 
 def apply(cfg: Any = None, *, confirm: bool = False,
           backup_dir: Optional[Path] = None,
-          home: Optional[Path] = None) -> Dict[str, Any]:
-    """Import source sessions/messages. Dry-run unless ``confirm``."""
+          home: Optional[Path] = None,
+          safe: bool = False) -> Dict[str, Any]:
+    """Import source sessions/messages. Dry-run unless ``confirm``.
+
+    ``safe=True`` restricts the asset import to the non-secret subset: the
+    reference provider/model profile and MCP registry are skipped (owner
+    decision #9) while safe user-state stores (memories, checkpoints,
+    channel_directory) are ported. Session/message import is unchanged.
+    """
     home = Path(home) if home else source_home(cfg)
     state_db = home / "state.db"
     if not state_db.is_file():
@@ -1194,7 +1303,7 @@ def apply(cfg: Any = None, *, confirm: bool = False,
     finally:
         conn.close()
 
-    assets = _import_assets(cfg, home, bdir)
+    assets = _import_assets(cfg, home, bdir, safe=safe)
 
     journal = {
         "schema": JOURNAL_SCHEMA,
@@ -1202,6 +1311,7 @@ def apply(cfg: Any = None, *, confirm: bool = False,
         "source_home": str(home),
         "destination": str(dest_path),
         "backup_dir": str(bdir),
+        "safe": bool(safe),
         "imported_sessions": imported_sessions,
         "skipped_sessions": skipped_sessions,
         "imported_messages": imported_messages,
@@ -1233,7 +1343,8 @@ def apply(cfg: Any = None, *, confirm: bool = False,
                 "skipped_roles", "secret_refs", "errors", "backup_dir",
                 "destination",
                 "model_profile", "cron", "mcp", "catalog", "receipts_audit",
-                "aux_dbs", "credentials_audit", "skill_state", "plugin_state")},
+                "aux_dbs", "credentials_audit", "skill_state", "plugin_state",
+                "safe")},
             "added_files": len(journal["added_files"])}
 
 
@@ -1311,3 +1422,364 @@ def rollback(cfg: Any = None, *, backup_dir: Path,
             "restored": dest_path.name, "destination": str(dest_path),
             "removed_files": removed, "restored_assets": restored_assets,
             "backup_dir": str(bdir)}
+
+
+# ---------------------------------------------------------------------------
+# Sanitized CLI-history import
+# ---------------------------------------------------------------------------
+# Owner decision: the reference CLI history ``.hermes_history`` may contain
+# pasted credentials (``sk-`` API keys). It must never be copied raw. This
+# importer reads the source read-only, replaces every secret-looking value with
+# a typed placeholder, emits a review report that carries counts and line
+# numbers only, backs the destination up before writing, and can be rolled
+# back. A final assertion refuses to write anything if the sanitized output
+# still matches a secret pattern.
+HISTORY_SCHEMA = "qubit-cli-history-import/1"
+HISTORY_PLACEHOLDER = "«REDACTED:SECRET»"
+
+# Conservative, explicit credential shapes. ``kind`` selects the replacement:
+# ``value`` masks the whole match; ``keyvalue`` keeps ``key=``/``key:`` and any
+# opening quote; ``bearer`` keeps the scheme word. Patterns are word-bounded and
+# length-floored so ordinary prose is never masked.
+_HISTORY_SECRET_PATTERNS: tuple = (
+    ("openai_sk", re.compile(r"\bsk-[A-Za-z0-9][A-Za-z0-9_-]{11,}\b"), "value"),
+    ("stripe_secret", re.compile(r"\bsk_live_[A-Za-z0-9]{10,}\b"), "value"),
+    ("github_token", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b"), "value"),
+    ("slack_token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"), "value"),
+    ("aws_access_key", re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"), "value"),
+    ("google_api_key", re.compile(r"\bAIza[0-9A-Za-z_\-]{35}\b"), "value"),
+    ("jwt", re.compile(
+        r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\b"),
+     "value"),
+    ("private_key_block", re.compile(
+        r"-----BEGIN [A-Z ]*PRIVATE KEY-----"), "value"),
+    ("bearer", re.compile(
+        r"(?i)\b(bearer|basic)\s+([A-Za-z0-9._~+/=+\-]{8,})"), "bearer"),
+    ("key_value", re.compile(
+        r"(?i)\b(api[_-]?key|apikey|access[_-]?token|refresh[_-]?token|"
+        r"auth[_-]?token|client[_-]?secret|private[_-]?key|password|passwd|"
+        r"pwd|secret|token)\b(\s*[=:]\s*)(\"?)([^\s\"'&,;]+)"), "keyvalue"),
+)
+
+# An unkeyed opaque token: base64/hex-ish, length-floored, at least three
+# character classes (lower + upper + digit) and Shannon entropy >= 3.5
+# bits/char. Plain lowercase hex (a git SHA) and single-case path fragments are
+# deliberately excluded, so safe history lines keep working.
+_HISTORY_ENTROPY_TOKEN = re.compile(r"[A-Za-z0-9_+=\-]{32,}")
+_HISTORY_ENTROPY_MIN = 3.5
+
+
+def _shannon_entropy(token: str) -> float:
+    import math
+    from collections import Counter
+
+    if not token:
+        return 0.0
+    counts = Counter(token)
+    n = len(token)
+    return -sum((c / n) * math.log2(c / n) for c in counts.values())
+
+
+def _high_entropy_token(token: str) -> bool:
+    """True for an opaque credential-shaped token, never for ordinary prose."""
+    if len(token) < 32:
+        return False
+    if not (re.search(r"[a-z]", token) and re.search(r"[A-Z]", token)
+            and re.search(r"[0-9]", token)):
+        return False
+    if len(set(token)) < 12:
+        return False
+    return _shannon_entropy(token) >= _HISTORY_ENTROPY_MIN
+
+
+def _apply_history_pattern(rx: "re.Pattern[str]", line: str, repl) -> tuple:
+    """Apply ``rx`` counting only replacements that actually changed text."""
+    count = 0
+
+    def _wrapped(match):
+        nonlocal count
+        try:
+            result = repl(match)
+        except Exception:  # noqa: BLE001 - a sanitizer never aborts the import
+            return match.group(0)
+        if result != match.group(0):
+            count += 1
+        return result
+
+    return rx.sub(_wrapped, line), count
+
+
+def _sanitize_history_line(line: str) -> tuple:
+    """Return ``(sanitized_line, count, {pattern_name: count})`` for one line."""
+    out = line
+    counts: Dict[str, int] = {}
+    total = 0
+    for name, rx, kind in _HISTORY_SECRET_PATTERNS:
+        if kind == "keyvalue":
+            def _repl(m):
+                if m.group(4) == HISTORY_PLACEHOLDER:
+                    return m.group(0)
+                return (f"{m.group(1)}{m.group(2)}{m.group(3)}"
+                        f"{HISTORY_PLACEHOLDER}")
+        elif kind == "bearer":
+            def _repl(m):
+                if m.group(2) == HISTORY_PLACEHOLDER:
+                    return m.group(0)
+                return f"{m.group(1)} {HISTORY_PLACEHOLDER}"
+        else:
+            def _repl(m):
+                return HISTORY_PLACEHOLDER
+
+        out, n = _apply_history_pattern(rx, out, _repl)
+        if n:
+            counts[name] = counts.get(name, 0) + n
+            total += n
+
+    def _entropy_repl(m):
+        return (HISTORY_PLACEHOLDER if _high_entropy_token(m.group(0))
+                else m.group(0))
+
+    out, n = _apply_history_pattern(_HISTORY_ENTROPY_TOKEN, out, _entropy_repl)
+    if n:
+        counts["high_entropy_token"] = counts.get("high_entropy_token", 0) + n
+        total += n
+    return out, total, counts
+
+
+def sanitize_cli_history(text: str) -> Dict[str, Any]:
+    """Sanitize a CLI-history blob; the report never carries secret text.
+
+    Returns the sanitized ``text`` plus a review report: the total
+    ``redactions``, the 1-based ``redacted_lines``, the source ``lines``, and
+    per-pattern ``patterns`` counts. Re-running the sanitizer on its own output
+    produces zero redactions (idempotent).
+    """
+    raw = text if isinstance(text, str) else str(text)
+    lines = raw.splitlines()
+    clean: List[str] = []
+    redacted_lines: List[int] = []
+    patterns: Dict[str, int] = {}
+    total = 0
+    for idx, line in enumerate(lines, 1):
+        out_line, n, counts = _sanitize_history_line(line)
+        if n:
+            redacted_lines.append(idx)
+            total += n
+            for name, c in counts.items():
+                patterns[name] = patterns.get(name, 0) + c
+        clean.append(out_line)
+    trailer = "\n" if raw.endswith("\n") else ""
+    return {
+        "schema": HISTORY_SCHEMA,
+        "text": "\n".join(clean) + trailer,
+        "lines": len(lines),
+        "redactions": total,
+        "redacted_lines": redacted_lines,
+        "patterns": patterns,
+    }
+
+
+def _history_source_path(home: Path) -> Path:
+    return Path(home) / ".hermes_history"
+
+
+def _history_dest_path(cfg: Any, dest: Optional[Path]) -> Path:
+    if dest is not None:
+        return Path(dest)
+    return _qubit_home(cfg) / ".hermes_history"
+
+
+def _history_backup_dir(cfg: Any, backup_dir: Optional[Path]) -> Path:
+    if backup_dir is not None:
+        return Path(backup_dir)
+    base = cfg.state_dir() if hasattr(cfg, "state_dir") else Path(".")
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    return Path(base) / "hermes-migration" / f"history-{stamp}"
+
+
+def _write_history_review(review: Dict[str, Any], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(review, indent=2, sort_keys=True),
+                    encoding="utf-8")
+
+
+def import_cli_history_sanitized(
+        cfg: Any = None, *, home: Optional[Path] = None,
+        dest: Optional[Path] = None, confirm: bool = False,
+        backup_dir: Optional[Path] = None,
+        review_path: Optional[Path] = None) -> Dict[str, Any]:
+    """Sanitized, reviewable, reversible import of the CLI history.
+
+    Dry-run/review by default: nothing is written unless ``confirm=True``. The
+    source is read read-only; secrets are replaced by
+    :data:`HISTORY_PLACEHOLDER`; a backup of any existing destination is
+    written under a timestamped directory; and the write is refused if the
+    sanitized output still matches a secret pattern. A re-run adds only new
+    lines (idempotent). ``review_path`` writes the review report (counts and
+    line numbers only) to a file.
+    """
+    src = _history_source_path(Path(home) if home else source_home(cfg))
+    dst = _history_dest_path(cfg, dest)
+    review: Dict[str, Any] = {
+        "schema": HISTORY_SCHEMA,
+        "source": str(src),
+        "destination": str(dst),
+        "source_present": src.is_file(),
+        "source_lines": 0,
+        "source_redacted_lines": [],
+        "redactions": 0,
+        "patterns": {},
+        "existing_lines": 0,
+        "added_lines": 0,
+        "destination_existed": dst.is_file(),
+        "dry_run": not confirm,
+    }
+    if not src.is_file():
+        review.update(state="MISSING",
+                      detail=f"no reference CLI history at {src}")
+        return review
+    try:
+        raw = src.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        review.update(state="UNREADABLE",
+                      detail=f"source unreadable ({type(exc).__name__}); "
+                             f"nothing written")
+        return review
+
+    sanitized = sanitize_cli_history(raw)
+    review["source_lines"] = sanitized["lines"]
+    review["source_redacted_lines"] = sanitized["redacted_lines"]
+    review["source_redactions"] = sanitized["redactions"]
+    review["redactions"] = sanitized["redactions"]
+    review["patterns"] = sanitized["patterns"]
+
+    existing: List[str] = []
+    if dst.is_file():
+        try:
+            existing = dst.read_text(encoding="utf-8",
+                                     errors="replace").splitlines()
+        except OSError as exc:
+            review.update(
+                state="UNREADABLE",
+                detail=f"destination unreadable ({type(exc).__name__}); "
+                       f"nothing written")
+            return review
+    review["existing_lines"] = len(existing)
+    seen = set(existing)
+    incoming = [ln for ln in sanitized["text"].splitlines() if ln not in seen]
+    review["added_lines"] = len(incoming)
+
+    # The pre-existing destination is sanitized too: a secret already present
+    # in Qubit's own history must never be preserved by the import. Then the
+    # merged text is the exact bytes about to be written.
+    existing_text = ("\n".join(existing) + "\n") if existing else ""
+    existing_sanitized = sanitize_cli_history(existing_text)
+    review["destination_redacted_lines"] = existing_sanitized["redacted_lines"]
+    review["destination_redactions"] = existing_sanitized["redactions"]
+    review["destination_patterns"] = existing_sanitized["patterns"]
+    review["redactions"] = (sanitized["redactions"]
+                            + existing_sanitized["redactions"])
+    final_lines = existing_sanitized["text"].splitlines() + incoming
+    merged = "\n".join(final_lines)
+    if final_lines:
+        merged += "\n"
+
+    # Fail closed: the text about to be written must contain zero secrets. A
+    # match here means the sanitizer missed a shape, so we write nothing.
+    if sanitize_cli_history(merged)["redactions"]:
+        review.update(
+            state="REFUSED", code="HISTORY_SECRET_ASSERT_FAILED",
+            detail="sanitized output still matched a secret pattern; nothing "
+                   "written")
+        return review
+
+    if not confirm:
+        review.update(state="DRY_RUN",
+                      detail="review only: no file written; pass --apply to "
+                             "write after a backup")
+        if review_path is not None:
+            _write_history_review(review, Path(review_path))
+            review["review_path"] = str(review_path)
+        return review
+
+    if not incoming and not existing_sanitized["redactions"]:
+        review.update(state="NOOP",
+                      detail="destination already contains every history line; "
+                             "nothing written")
+        return review
+
+    bdir = _history_backup_dir(cfg, backup_dir)
+    (bdir / "destination").mkdir(parents=True, exist_ok=True)
+    if dst.is_file():
+        shutil.copy2(dst, bdir / "destination" / dst.name)
+    review["backup_dir"] = str(bdir)
+
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dst.with_name(dst.name + ".qubit-tmp")
+    tmp.write_text(merged, encoding="utf-8")
+    os.replace(tmp, dst)
+
+    review.update(state="OK")
+    journal = dict(review)
+    journal["created_at"] = time.time()
+    (bdir / "journal.json").write_text(
+        json.dumps(journal, indent=2, sort_keys=True), encoding="utf-8")
+    _write_history_review(journal, bdir / "review.json")
+    log_event("migration.history.import", added_lines=len(incoming),
+              redactions=review["redactions"])
+    return {"schema": HISTORY_SCHEMA, "state": "OK", "dry_run": False, **review}
+
+
+def rollback_cli_history(cfg: Any = None, *, backup_dir: Path,
+                         confirm: bool = False) -> Dict[str, Any]:
+    """Restore the pre-import destination from a history-import backup.
+
+    Refuses (``HISTORY_NO_BACKUP``) when there is no journal, or when the
+    journal says the destination existed but no backup copy is present. A
+    destination the import created is removed. Dry-run unless ``confirm``.
+    """
+    bdir = Path(backup_dir)
+    journal_f = bdir / "journal.json"
+    if not journal_f.is_file():
+        return {"schema": HISTORY_SCHEMA, "state": "MISSING",
+                "code": "HISTORY_NO_BACKUP",
+                "detail": f"no history-import journal under {bdir}"}
+    try:
+        journal = json.loads(journal_f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"schema": HISTORY_SCHEMA, "state": "MISSING",
+                "code": "HISTORY_BACKUP_UNREADABLE",
+                "detail": f"history-import journal unreadable under {bdir}"}
+    dst = Path(str(journal.get("destination") or ""))
+    if not str(dst):
+        return {"schema": HISTORY_SCHEMA, "state": "MISSING",
+                "code": "HISTORY_BACKUP_INVALID",
+                "detail": "journal records no destination"}
+    existed = bool(journal.get("destination_existed"))
+    backup_file = bdir / "destination" / dst.name
+    if existed and not backup_file.is_file():
+        return {"schema": HISTORY_SCHEMA, "state": "MISSING",
+                "code": "HISTORY_NO_BACKUP",
+                "detail": "journal says the destination existed but no backup "
+                          "copy was found; refusing to guess"}
+    if not confirm:
+        return {"schema": HISTORY_SCHEMA, "state": "DRY_RUN",
+                "detail": (f"would restore {backup_file}" if existed
+                           else f"would remove created {dst}"),
+                "destination": str(dst), "backup_dir": str(bdir)}
+    if existed:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        tmp = dst.with_name(dst.name + ".restore-tmp")
+        shutil.copy2(backup_file, tmp)
+        os.replace(tmp, dst)
+        action = "restored"
+    else:
+        try:
+            dst.unlink()
+            action = "removed"
+        except FileNotFoundError:
+            action = "noop"
+    log_event("migration.history.rollback", backup_dir=str(bdir),
+              action=action)
+    return {"schema": HISTORY_SCHEMA, "state": "OK", "action": action,
+            "destination": str(dst), "backup_dir": str(bdir)}

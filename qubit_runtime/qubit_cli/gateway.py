@@ -136,7 +136,7 @@ def _get_service_pids(all_profiles: bool = False) -> set:
 
     # --- systemd (Linux): user and system scopes ---
     if supports_systemd_services():
-        pattern = "hermes-gateway*" if all_profiles else get_service_name()
+        pattern = "qubit-gateway*" if all_profiles else get_service_name()
         for scope_args in [["systemctl", "--user"], ["systemctl"]]:
             try:
                 # Belt-and-suspenders for the EXCLUDE use case (#74075): a bare ``launchctl list`` prefix
@@ -1932,7 +1932,7 @@ def _windows_gateway_breakaway_state() -> bool | None:
 # Service Configuration
 # =============================================================================
 
-_SERVICE_BASE = "hermes-gateway"
+_SERVICE_BASE = "qubit-gateway"
 SERVICE_DESCRIPTION = "Qubit Agent Gateway - Messaging Platform Integration"
 
 
@@ -1974,7 +1974,7 @@ def _profile_arg(qubit_home: str | None = None, default_root: str | Path | None 
 
 
 def get_service_name() -> str:
-    """Systemd service name: ``hermes-gateway`` for default QUBIT_HOME, ``hermes-gateway-<profile>``
+    """Systemd service name: ``qubit-gateway`` for default QUBIT_HOME, ``qubit-gateway-<profile>``
     or ``-<hash>`` otherwise."""
     suffix = _profile_suffix()
     return f"{_SERVICE_BASE}-{suffix}" if suffix else _SERVICE_BASE
@@ -4353,13 +4353,14 @@ def _guard_existing_gateway_process_conflict(replace: bool = False) -> None:
         # get_running_pid() filters by the current profile's QUBIT_HOME; warn if the PID file
         # belongs to another profile (user switched profiles while the old gateway still runs).
         try:
-            from gateway.status import _read_pid_record, _pid_record_belongs_to_current_profile
+            from gateway.status import (_pid_record_belongs_to_current_profile,
+                                        _read_pid_record, record_home)
             stale = _read_pid_record()
             if stale is not None and not _pid_record_belongs_to_current_profile(stale):
                 logger.warning(
-                    "PID file belongs to another profile (hermes_home=%s). "
+                    "PID file belongs to another profile (qubit_home=%s). "
                     "The old gateway may still be running under that profile.",
-                    stale.get("hermes_home", "<unknown>"),
+                    record_home(stale) or "<unknown>",
                 )
         except Exception:
             pass

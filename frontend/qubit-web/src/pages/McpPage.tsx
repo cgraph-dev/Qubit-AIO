@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
-import { KeyRound, Package, Power, Server, Trash2, X, Zap } from "lucide-react";
+import {
+  KeyRound,
+  Package,
+  Play,
+  Power,
+  Server,
+  Trash2,
+  X,
+  Zap,
+} from "lucide-react";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Button } from "@nous-research/ui/ui/components/button";
 import { Select, SelectOption } from "@nous-research/ui/ui/components/select";
@@ -79,6 +88,24 @@ export default function McpPage() {
   const [testResults, setTestResults] = useState<Record<string, McpTestResult>>(
     {},
   );
+
+  // Tool invocation (the canonical confirm-gated `POST /invoke`). The modal
+  // offers the server's declared capabilities as tools; args are a JSON object.
+  const [invokeFor, setInvokeFor] = useState<McpServer | null>(null);
+  const [invokeTool, setInvokeTool] = useState("");
+  const [invokeArgs, setInvokeArgs] = useState("{}");
+  const [invoking, setInvoking] = useState(false);
+  const [invokeResult, setInvokeResult] = useState<string | null>(null);
+  const [invokeError, setInvokeError] = useState<string | null>(null);
+  const closeInvokeModal = useCallback(() => {
+    setInvokeFor(null);
+    setInvokeResult(null);
+    setInvokeError(null);
+  }, []);
+  const invokeModalRef = useModalBehavior({
+    open: invokeFor !== null,
+    onClose: closeInvokeModal,
+  });
 
   // Enable/disable state
   const [togglingName, setTogglingName] = useState<string | null>(null);
@@ -183,6 +210,65 @@ export default function McpPage() {
     }
   };
 
+  const openInvoke = useCallback((server: McpServer) => {
+    setInvokeFor(server);
+    setInvokeTool(server.capabilities?.[0] ?? "");
+    setInvokeArgs("{}");
+    setInvokeResult(null);
+    setInvokeError(null);
+  }, []);
+
+  const handleInvoke = async () => {
+    if (!invokeFor) return;
+    const tool = invokeTool.trim();
+    if (!tool) {
+      showToast("Tool name required", "error");
+      return;
+    }
+    let parsedArgs: Record<string, unknown>;
+    try {
+      const parsed = invokeArgs.trim() ? JSON.parse(invokeArgs) : {};
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("args must be a JSON object");
+      }
+      parsedArgs = parsed as Record<string, unknown>;
+    } catch (e) {
+      showToast(
+        `Invalid args JSON: ${e instanceof Error ? e.message : e}`,
+        "error",
+      );
+      return;
+    }
+    setInvoking(true);
+    setInvokeError(null);
+    setInvokeResult(null);
+    try {
+      const res = await api.invokeMcpTool(
+        invokeFor.name,
+        tool,
+        parsedArgs,
+        () => true,
+      );
+      if (res.ok) {
+        setInvokeResult(
+          typeof res.result === "string"
+            ? res.result
+            : JSON.stringify(res.result ?? res, null, 2),
+        );
+        showToast(`${invokeFor.name}/${tool}: ${res.state ?? "OK"}`, "success");
+      } else {
+        const detail = `${res.code ?? "FAILED"}: ${res.detail ?? "invocation refused"}`;
+        setInvokeError(detail);
+        showToast(detail, "error");
+      }
+    } catch (e) {
+      setInvokeError(String(e));
+      showToast(`Invoke failed: ${e}`, "error");
+    } finally {
+      setInvoking(false);
+    }
+  };
+
   const handleAuthenticate = async (server: McpServer) => {
     setAuthenticating(server.name);
     try {
@@ -212,8 +298,12 @@ export default function McpPage() {
       setServers((prev) =>
         prev.map((s) => (s.name === server.name ? { ...s, enabled: next } : s)),
       );
+      // The invoke path reads the store per call, so the change is immediate
+      // for client invocation; only the agent's in-session tool list refreshes
+      // on the next session (AI5 D-8 — the old "needs a gateway restart" note
+      // was false).
       setRestartNote(
-        "Enable/disable takes effect on the next gateway restart.",
+        "Applies immediately to client invocation; the agent tool list refreshes on the next session.",
       );
     } catch (e) {
       showToast(refusalOrError(e, `Error: ${e}`), "error");
@@ -323,6 +413,7 @@ export default function McpPage() {
   diagnostics.forEach((d) => {
     (diagnosticsByName[d.name] ??= []).push(d);
   });
+  const installedCount = catalog.filter((e) => e.installed).length;
 
   return (
     <div className="flex flex-col gap-6">
@@ -589,6 +680,114 @@ export default function McpPage() {
         </div>
       )}
 
+      {/* Tool invocation modal (canonical confirm-gated POST /invoke) */}
+      {invokeFor && (
+        <div
+          ref={invokeModalRef}
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/85 p-4"
+          onClick={(e) => e.target === e.currentTarget && closeInvokeModal()}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="invoke-mcp-title"
+        >
+          <div
+            className={cn(
+              themedBody,
+              "relative w-full max-w-lg border border-border bg-card shadow-2xl flex flex-col max-h-[90vh]",
+            )}
+          >
+            <Button
+              ghost
+              size="icon"
+              onClick={closeInvokeModal}
+              className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+              aria-label="Close"
+            >
+              <X />
+            </Button>
+
+            <header className="p-5 pb-3 border-b border-border">
+              <h2
+                id="invoke-mcp-title"
+                className="font-mondwest text-display text-base tracking-wider"
+              >
+                Invoke — {invokeFor.name}
+              </h2>
+            </header>
+
+            <div className="p-5 grid gap-4 overflow-y-auto">
+              {!invokeFor.invocable && (
+                <p className="text-xs text-warning">
+                  This server is not currently invocable
+                  {invokeFor.invocation_code
+                    ? ` (${invokeFor.invocation_code})`
+                    : ""}
+                  . A call may be refused by policy.
+                </p>
+              )}
+
+              <div className="grid gap-2">
+                <Label htmlFor="invoke-tool">Tool</Label>
+                {invokeFor.capabilities && invokeFor.capabilities.length > 0 ? (
+                  <Select
+                    id="invoke-tool"
+                    value={invokeTool}
+                    onValueChange={(value) => setInvokeTool(value)}
+                  >
+                    {invokeFor.capabilities.map((cap) => (
+                      <SelectOption key={cap} value={cap}>
+                        {cap}
+                      </SelectOption>
+                    ))}
+                  </Select>
+                ) : (
+                  <Input
+                    id="invoke-tool"
+                    placeholder="tool name"
+                    value={invokeTool}
+                    onChange={(e) => setInvokeTool(e.target.value)}
+                  />
+                )}
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="invoke-args">Arguments (JSON object)</Label>
+                <textarea
+                  id="invoke-args"
+                  className="flex min-h-[100px] w-full border border-border bg-background/40 px-3 py-2 text-sm font-courier shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/30 focus-visible:border-foreground/25"
+                  placeholder="{}"
+                  value={invokeArgs}
+                  onChange={(e) => setInvokeArgs(e.target.value)}
+                />
+              </div>
+
+              {invokeError && (
+                <p className="text-xs text-destructive break-words">
+                  {invokeError}
+                </p>
+              )}
+              {invokeResult && (
+                <pre className="max-h-48 overflow-auto border border-border bg-background/40 p-2 text-xs font-mono whitespace-pre-wrap break-words">
+                  {invokeResult}
+                </pre>
+              )}
+
+              <div className="flex justify-end">
+                <Button
+                  className="uppercase"
+                  size="sm"
+                  onClick={handleInvoke}
+                  disabled={invoking}
+                  prefix={invoking ? <Spinner /> : <Play />}
+                >
+                  {invoking ? "Invoking…" : "Invoke"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Your MCP servers ── */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -640,6 +839,19 @@ export default function McpPage() {
                       </Badge>
                     )}
                     {!server.enabled && <Badge tone="outline">disabled</Badge>}
+                    {server.invocable ? (
+                      <Badge tone="success">invocable</Badge>
+                    ) : (
+                      server.invocation_code && (
+                        <Badge tone="warning">{server.invocation_code}</Badge>
+                      )
+                    )}
+                    {server.capabilities && server.capabilities.length > 0 && (
+                      <Badge tone="outline">
+                        {server.capabilities.length} tool
+                        {server.capabilities.length === 1 ? "" : "s"}
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
                     {server.transport === "http" ? (
@@ -716,6 +928,16 @@ export default function McpPage() {
                   <Button
                     ghost
                     size="icon"
+                    title="Invoke a tool"
+                    aria-label="Invoke a tool"
+                    onClick={() => openInvoke(server)}
+                  >
+                    <Play />
+                  </Button>
+
+                  <Button
+                    ghost
+                    size="icon"
                     title="Test connection"
                     aria-label="Test connection"
                     onClick={() => handleTest(server)}
@@ -755,6 +977,9 @@ export default function McpPage() {
 
         <p className="text-xs text-muted-foreground">
           Browse Qubit-approved MCP servers and install them with one click.
+          {" "}
+          {installedCount} installed ·{" "}
+          {Math.max(0, catalog.length - installedCount)} available.
         </p>
 
         {catalog.length === 0 && (

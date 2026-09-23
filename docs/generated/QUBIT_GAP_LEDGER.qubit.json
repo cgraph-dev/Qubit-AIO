@@ -21,8 +21,8 @@
   "dashboard_ops.catalog": 562,
   "dashboard_ops.EXTRA_OPS": 35,
   "voice_commands.CLI_COVERAGE": 114,
-  "qubit_compat.ROUTES": 433,
-  "qubit_compat.GATED": 97,
+  "qubit_compat.ROUTES": 444,
+  "qubit_compat.GATED": 95,
   "cli_families": 114,
   "source_inventory.items": 6775,
   "source_inventory.surface_items": 1818,
@@ -36,7 +36,7 @@
  "counts_by_status": {
   "IMPLEMENTED": 708,
   "OPERATOR_ONLY": 3,
-  "SAFE_EQUIVALENT": 34
+  "SAFE_EQUIVALENT": 36
  },
  "counts_by_area": {
   "acp": 3,
@@ -94,7 +94,7 @@
   "gateway": 10,
   "ghost": 20,
   "git": 4,
-  "hermes_gated": 28,
+  "hermes_gated": 30,
   "hermes_plugin": 9,
   "hermes_skill": 28,
   "hermes_tool": 73,
@@ -182,12 +182,12 @@
   "worktree": 1
  },
  "counts_by_source": {
-  "qubit-surface": 745
+  "qubit-surface": 747
  },
  "tri_surface": {
   "has-cli has-dashboard": 48,
   "has-cli has-dashboard has-voice": 506,
-  "has-dashboard": 63,
+  "has-dashboard": 65,
   "has-dashboard has-voice": 4,
   "no-surface": 124
  },
@@ -4135,7 +4135,7 @@
    "dashboard": "qubit-boards:/qubit-boards",
    "voice": "kanban_init",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_schedules8u.py::test_voice_schedule_this_task",
+   "proving_test": "tests/test_audit_wave_ai10_schedules_memory_boards.py::test_boards_list_pagination",
    "note": "Create the default board (confirmed).",
    "needs": "none"
   },
@@ -5689,7 +5689,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "pairing_approve",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_messaging8tf.py::test_whatsapp_pairing_linkage",
+   "proving_test": "tests/test_audit_wave_ai9_followup_refs_pairing_device.py::test_pairing_mutations_are_estop_gated",
    "note": "Verify a code, issue its grant (confirmed).",
    "needs": "creds"
   },
@@ -5703,7 +5703,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "pairing_create",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_messaging8tf.py::test_whatsapp_pairing_linkage",
+   "proving_test": "tests/test_audit_wave_ai9_followup_refs_pairing_device.py::test_pairing_mutations_are_estop_gated",
    "note": "One-time code (confirmed).",
    "needs": "creds"
   },
@@ -5717,7 +5717,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "pairing_list",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
+   "proving_test": "tests/test_audit_wave_ai9_followup_refs_pairing_device.py::test_pairing_mutations_are_estop_gated",
    "note": "Code records (redacted).",
    "needs": "creds"
   },
@@ -5731,7 +5731,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "pairing_revoke",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_pairing8tf.py::test_revoke_removes_grant",
+   "proving_test": "tests/test_audit_wave_ai9_followup_refs_pairing_device.py::test_pairing_mutations_are_estop_gated",
    "note": "Tombstone a code and its grant (confirmed).",
    "needs": "creds"
   },
@@ -5745,7 +5745,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "pairing_setup_code",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_messaging8tf.py::test_whatsapp_pairing_linkage",
+   "proving_test": "tests/test_audit_wave_ai9_followup_refs_pairing_device.py::test_pairing_mutations_are_estop_gated",
    "note": "One-time code + join URL/QR, shown once (confirmed).",
    "needs": "creds"
   },
@@ -7005,7 +7005,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "schedules_create",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_authority_unification8u.py::test_scheduled_directive_routes_through_run_op",
+   "proving_test": "tests/test_audit_wave_ai10_schedules_memory_boards.py::test_oneshot_never_retries",
    "note": "Schedule a task on interval/daily/once (confirmed).",
    "needs": "none"
   },
@@ -7033,7 +7033,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "schedules_history",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cron_webhook_pairing_confirm9u.py::test_cron_trigger_addresses_only_the_path_job",
+   "proving_test": "tests/test_audit_wave_ai10_schedules_memory_boards.py::test_transient_failure_schedules_bounded_retry_ladder",
    "note": "Run history, retained after delete.",
    "needs": "none"
   },
@@ -7047,7 +7047,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "schedules_list",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_authority_unification8u.py::test_scheduled_directive_routes_through_run_op",
+   "proving_test": "tests/test_audit_wave_ai10_schedules_memory_boards.py::test_oneshot_never_retries",
    "note": "Scheduled jobs with states (read-only).",
    "needs": "none"
   },
@@ -7089,7 +7089,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "schedules_run_due",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_authority_unification8u.py::test_scheduled_directive_routes_through_run_op",
+   "proving_test": "tests/test_audit_wave_ai10_schedules_memory_boards.py::test_oneshot_never_retries",
    "note": "Execute due jobs now, typed per-job results (confirmed).",
    "needs": "none"
   },
@@ -8746,6 +8746,20 @@
    "needs": "owner"
   },
   {
+   "id": "hermes_gate_retirement_operator_owned",
+   "area": "hermes_gated",
+   "capability": "Gated upstream route: RETIREMENT_OPERATOR_OWNED",
+   "upstream_ref": "hermes-agent",
+   "qubit_backend": "voicebridge.qubit_compat",
+   "cli": "",
+   "dashboard": "operator-run `qubit gateway stop --confirm` (supervisor e-stop -> confirmation -> audit)",
+   "voice": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
+   "note": "Backend retirement freezes process admission and permanently closes admission on commit; it is operator-owned and never driven from the dashboard. GET /api/health/idle stays a read-only diagnostic. routes=1",
+   "needs": "owner"
+  },
+  {
    "id": "hermes_gate_secret_never_served",
    "area": "hermes_gated",
    "capability": "Gated upstream route: SECRET_NEVER_SERVED",
@@ -8770,7 +8784,7 @@
    "voice": "",
    "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
-   "note": "Qubit sessions are append-only audit receipts; owner back-fill is not offered. Memory tombstones/corrections own forgetting. routes=5",
+   "note": "Qubit sessions are append-only audit receipts; owner back-fill is not offered. Memory tombstones/corrections own forgetting. routes=1",
    "needs": "owner"
   },
   {
@@ -8799,6 +8813,20 @@
    "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "In-place self-update from the dashboard is refused; upgrades are versioned, staged, and reversible. routes=3",
+   "needs": "owner"
+  },
+  {
+   "id": "hermes_gate_voice_live_vendor_direct",
+   "area": "hermes_gated",
+   "capability": "Gated upstream route: VOICE_LIVE_VENDOR_DIRECT",
+   "upstream_ref": "hermes-agent",
+   "qubit_backend": "voicebridge.qubit_compat",
+   "cli": "",
+   "dashboard": "GET /api/audio/voice-live/status (read-only readiness) + the chained local voice pipeline (classic /api/audio/* relay + Qubit Chat voice)",
+   "voice": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
+   "note": "GPT-Live session creation exchanges an SDP offer with the vendor's /v1/live/sessions using a direct project key; Qubit makes no direct vendor call from the dashboard and never exports the key. routes=1",
    "needs": "owner"
   },
   {

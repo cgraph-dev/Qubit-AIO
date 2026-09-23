@@ -34,7 +34,10 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
+# The web-UI/voice unit named by config; Owner Decision #16 makes the
+# messaging-gateway DAEMON unit the target of `qubit gateway` control.
 UNIT = "qubit-voicebridge.service"
+DAEMON_UNIT = "qubit-gateway.service"
 
 _FAKE_SYSTEMCTL = r"""#!/bin/sh
 printf '%s\n' "$*" >> "$QUBIT_FAKE_SYSTEMCTL_LOG"
@@ -149,7 +152,7 @@ def test_status_active_reports_running_pid_and_port(estop_clear):
     assert st["available"] is True
     assert st["active_state"] == "active" and st["running"] is True
     assert st["pid"] == 4242 and st["port_in_use"] is True
-    assert st["service_unit"] == UNIT
+    assert st["service_unit"] == DAEMON_UNIT
 
 
 def test_status_inactive_reports_not_running(estop_clear):
@@ -264,7 +267,7 @@ def test_stop_on_active_is_detached(estop_clear):
     assert out["ok"] is True and out["state"] == "STOPPING"
     assert out["detached"] is True
     assert len(spawned) == 1 and "stop" in spawned[0][-1]
-    assert UNIT in spawned[0][-1]
+    assert DAEMON_UNIT in spawned[0][-1]
 
 
 def test_restart_is_detached_and_returns_restarting(estop_clear):
@@ -278,7 +281,7 @@ def test_restart_is_detached_and_returns_restarting(estop_clear):
     assert out["ok"] is True and out["state"] == "RESTARTING"
     assert out["detached"] is True
     detached = " ".join(map(str, spawned[0]))
-    assert len(spawned) == 1 and "restart" in detached and UNIT in detached
+    assert len(spawned) == 1 and "restart" in detached and DAEMON_UNIT in detached
     assert "sleep" in detached
 
 
@@ -480,7 +483,7 @@ def test_dispatch_get_gateway_reports_real_process_state(tmp_path, monkeypatch,
     assert status == 200 and body["ok"] is True, (status, body)
     assert body["supervision"] == "", body["supervision"]
     assert body["process"]["available"] is True
-    assert body["process"]["service_unit"] == UNIT
+    assert body["process"]["service_unit"] == DAEMON_UNIT
 
 
 def test_dispatch_start_stop_restart_and_confirm(tmp_path, monkeypatch,

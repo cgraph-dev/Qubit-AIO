@@ -8,7 +8,7 @@ platforms: [macos, linux]
 metadata:
   qubit:
     tags: [Search, Knowledge-Base, RAG, Notes, MCP, Local-AI]
-    related_skills: [obsidian, hermes-agent, arxiv]
+    related_skills: [obsidian, qubit-agent, arxiv]
 ---
 
 # QMD — Query Markup Documents
@@ -226,7 +226,7 @@ without needing to load this skill.
 
 ### Option A: Stdio Mode (Simple)
 
-Add to `~/.hermes/config.yaml`:
+Add to `$QUBIT_HOME/config.yaml`:
 
 ```yaml
 mcp_servers:

@@ -404,8 +404,8 @@ export const en: Translations = {
     providersHint:
       "Writes memory.provider (empty = built-in) and context.engine to config.yaml. Takes effect next session.",
     refreshDashboard: "Rescan dashboard extensions",
-    removeConfirm: "Remove this plugin from ~/.qubit/plugins/?",
-    removeHint: "Only user-installed plugins under ~/.qubit/plugins can be removed.",
+    removeConfirm: "Remove this plugin from $QUBIT_HOME/plugins/?",
+    removeHint: "Only user-installed plugins under $QUBIT_HOME/plugins can be removed.",
     rescanHeading: "SPA plugin registry",
     rescanHint: "Rescan after adding files on disk so the dashboard sidebar picks up new manifests.",
     runtimeHeading: "Gateway runtime (YAML plugins)",

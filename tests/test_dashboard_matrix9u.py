@@ -494,9 +494,10 @@ BOOLEAN_CONFIRM_MATRIX = [
 # Boolean-confirm rows whose handler validates its payload *before* the
 # confirmation gate, so an empty body is a typed 400 MALFORMED rather than a
 # staged 409. The contract lives in voicebridge/qubit_compat.profile_model
-# (the model is required before the ``confirm`` flag is consulted).
+# (provider and model are required before the ``confirm`` flag is consulted,
+# mirroring the reference web_routers/profiles.py:update_profile_model_endpoint).
 BOOLEAN_CONFIRM_PREVALIDATED = {
-    ("PUT", "/api/profiles/probe/model"): "model required",
+    ("PUT", "/api/profiles/probe/model"): "provider and model are required",
 }
 
 

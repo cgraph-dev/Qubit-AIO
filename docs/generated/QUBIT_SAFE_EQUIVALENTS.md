@@ -259,3 +259,14 @@ lineage. Newly surfaced typed refusal codes that are not in the frozen copy:
   operator-owned mutation; the working counterpart is the CLI
   `qubit gateway migrate` (plan) and the dashboard confirm-gated
   gateway supervisor. Implemented in `voicebridge/qubit_compat.py`.
+
+### Wave 13 additions
+
+- `VOICE_LIVE_VENDOR_DIRECT` — `POST /api/audio/voice-live/session` would
+  open a remote GPT-Live WebRTC session with a direct vendor key; Qubit
+  refuses the direct vendor call and names the local voice path as the
+  counterpart (`GET /api/audio/voice-live/status` stays a real read-only
+  readiness probe).
+- `RETIREMENT_OPERATOR_OWNED` — `POST /api/health/retirement` is an
+  operator-owned backend retirement; the read-only `GET /api/health/idle`
+  diagnostic is the safe counterpart.

@@ -726,6 +726,9 @@ def build_parser() -> argparse.ArgumentParser:
              "(dry-run unless --apply; backs up first)")
     prod_hmigrate.add_argument("--apply", action="store_true",
                                help="perform the import (default dry-run)")
+    prod_hmigrate.add_argument("--safe", action="store_true",
+                               help="non-secret subset: skip the reference "
+                                    "provider/model profile and MCP registry")
     prod_hmigrate.add_argument("--home", type=Path, default=None)
     prod_hmigrate.add_argument("--backup-dir", type=Path, default=None)
     prod_hmigrate.add_argument("--json", action="store_true")
@@ -736,6 +739,29 @@ def build_parser() -> argparse.ArgumentParser:
     prod_hroll.add_argument("--apply", action="store_true",
                             help="perform the rollback (default dry-run)")
     prod_hroll.add_argument("--json", action="store_true")
+    # Sanitized CLI-history import: reads the reference ``.hermes_history``
+    # read-only, redacts secret-looking values, backs up before writing, and is
+    # reversible. Dry-run/review unless --apply.
+    prod_hist = prod_sub.add_parser(
+        "history-import", parents=[common],
+        help="sanitized import of the reference CLI history "
+             "(review unless --apply; secrets redacted; backs up first)")
+    prod_hist.add_argument("--apply", action="store_true",
+                           help="write the sanitized history (default: review "
+                                "only, nothing written)")
+    prod_hist.add_argument("--home", type=Path, default=None)
+    prod_hist.add_argument("--dest", type=Path, default=None)
+    prod_hist.add_argument("--backup-dir", type=Path, default=None)
+    prod_hist.add_argument("--review-out", type=Path, default=None,
+                           help="write the review report JSON here")
+    prod_hist.add_argument("--json", action="store_true")
+    prod_hroll2 = prod_sub.add_parser(
+        "history-rollback", parents=[common],
+        help="restore the pre-import CLI history from a history-import backup")
+    prod_hroll2.add_argument("--backup-dir", type=Path, required=True)
+    prod_hroll2.add_argument("--apply", action="store_true",
+                             help="perform the rollback (default dry-run)")
+    prod_hroll2.add_argument("--json", action="store_true")
     prod_svc = prod_sub.add_parser("service", parents=[common],
                                    help="service ownership contract (read-only)")
     prod_short = prod_sub.add_parser("shortcut", parents=[common],
@@ -1849,20 +1875,33 @@ def build_parser() -> argparse.ArgumentParser:
     gw_link = gw_sub.add_parser("link", parents=[common],
                                 help="typed link state (read-only)")
     gw_link.add_argument("gateway_id")
-    # Qubit-owned gateway control (Owner Decision #10): `status` is real; `start`/
-    # `stop`/`restart` drive the real Qubit gateway supervisor through the one
-    # authority path (e-stop → confirmation → audit). `run`/`install` stay
-    # operator-owned.
+    # Qubit-owned gateway control (Owner Decisions #10/#16): `status`/`start`/
+    # `stop`/`restart` drive the real Qubit messaging-gateway daemon through the
+    # one authority path (e-stop → confirmation → audit). `run` runs that daemon
+    # in the foreground; `install` installs its systemd unit (confirm-gated).
     gw_sub.add_parser("status", parents=[common],
-                      help="real Qubit gateway status (service, pid, health, restarts)")
+                      help="real Qubit gateway (daemon) status — unit, pid, "
+                           "health, restarts, live runtime + control socket")
     for _gw_ctl in ("start", "stop", "restart"):
         _gw_p = gw_sub.add_parser(
             _gw_ctl, parents=[common],
-            help="control the Qubit gateway service (confirm-gated)")
+            help="control the Qubit gateway daemon (confirm-gated)")
         _gw_p.add_argument("--confirm", action="store_true")
-    for _gw_no in ("run", "install"):
-        gw_sub.add_parser(_gw_no, parents=[common],
-                          help="refused: operator supervises gateway processes")
+    gw_run = gw_sub.add_parser(
+        "run", parents=[common],
+        help="run the Qubit messaging-gateway daemon in the foreground")
+    gw_run.add_argument("--check", action="store_true",
+                        help="validate QUBIT_HOME pinning + importability only "
+                             "(never starts the daemon)")
+    gw_run.add_argument("--json", action="store_true",
+                        help="emit the --check report as JSON")
+    gw_install = gw_sub.add_parser(
+        "install", parents=[common],
+        help="install the Qubit gateway systemd user unit (confirm-gated)")
+    gw_install.add_argument("--confirm", action="store_true")
+    gw_install.add_argument("--force", action="store_true",
+                            help="overwrite a divergent installed unit "
+                                 "(backed up first)")
     gw_sub.add_parser("protocol", parents=[common],
                       help="read-only gateway protocol + RPC method inventory")
     gw_neg = gw_sub.add_parser("negotiate", parents=[common],
@@ -5019,7 +5058,8 @@ def _cmd_product(cfg, args) -> int:
         from . import qubit_migration as HM
         out = HM.apply(cfg, confirm=bool(args.apply),
                        backup_dir=getattr(args, "backup_dir", None),
-                       home=getattr(args, "home", None))
+                       home=getattr(args, "home", None),
+                       safe=bool(getattr(args, "safe", False)))
         if getattr(args, "json", False):
             print(_json.dumps(out, indent=2, sort_keys=True))
         else:
@@ -5050,6 +5090,53 @@ def _cmd_product(cfg, args) -> int:
         out = HM.rollback(cfg, backup_dir=args.backup_dir,
                           confirm=bool(getattr(args, "apply", False)))
         print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] in ("OK", "DRY_RUN") else 1
+    if cmd == "history-import":
+        from . import qubit_migration as HM
+        out = HM.import_cli_history_sanitized(
+            cfg, home=getattr(args, "home", None),
+            dest=getattr(args, "dest", None),
+            confirm=bool(args.apply),
+            backup_dir=getattr(args, "backup_dir", None),
+            review_path=getattr(args, "review_out", None))
+        if getattr(args, "json", False):
+            print(_json.dumps(out, indent=2, sort_keys=True))
+        else:
+            print(f"history import: {out['state']}")
+            print(f"  source: {out.get('source')}")
+            print(f"  destination: {out.get('destination')}")
+            print(f"  source lines: {out.get('source_lines')}")
+            print(f"  redactions: {out.get('redactions')} "
+                  f"(source {out.get('source_redactions', 0)} on "
+                  f"{len(out.get('source_redacted_lines', []))} line(s) "
+                  f"{out.get('source_redacted_lines')}; destination "
+                  f"{out.get('destination_redactions', 0)} on "
+                  f"{out.get('destination_redacted_lines', [])})")
+            if out.get("patterns"):
+                print(f"  patterns: {out.get('patterns')}")
+            print(f"  new lines: {out.get('added_lines')} "
+                  f"(existing {out.get('existing_lines')})")
+            if out.get("backup_dir"):
+                print(f"  backup: {out.get('backup_dir')}")
+            if out.get("review_path"):
+                print(f"  review: {out.get('review_path')}")
+            print(f"  {out.get('detail', '')}")
+        return 0 if out["state"] in ("OK", "DRY_RUN", "NOOP") else 1
+    if cmd == "history-rollback":
+        from . import qubit_migration as HM
+        out = HM.rollback_cli_history(
+            cfg, backup_dir=args.backup_dir,
+            confirm=bool(getattr(args, "apply", False)))
+        if getattr(args, "json", False):
+            print(_json.dumps(out, indent=2, sort_keys=True))
+        else:
+            print(f"history rollback: {out['state']} — "
+                  f"{out.get('detail', '')}")
+            if out.get("action"):
+                print(f"  action: {out.get('action')} "
+                      f"{out.get('destination')}")
+            if out.get("backup_dir"):
+                print(f"  backup: {out.get('backup_dir')}")
         return 0 if out["state"] in ("OK", "DRY_RUN") else 1
     if cmd == "service":
         out = P.service_owner()
@@ -7312,8 +7399,48 @@ def _cmd_gateway(cfg, args) -> int:
             return {"GATEWAY_CONFIRM_REQUIRED": 3, "GATEWAY_ESTOP": 3,
                     "GATEWAY_SUPERVISION_UNAVAILABLE": 2}.get(code, 1)
         elif cmd in ("run", "install"):
-            print(_json.dumps(GW.refuse_supervision(cmd), indent=2))
-            return 2
+            if cmd == "run":
+                # Owner Decision #16: `qubit gateway run` runs the Qubit-owned
+                # messaging-gateway daemon in the foreground. `--check` is a
+                # read-only preflight only (never starts the loop).
+                if getattr(args, "check", False) or getattr(args, "json", False):
+                    from . import gateway_daemon as GD
+
+                    report = GD.preflight()
+                    if getattr(args, "json", False):
+                        print(_json.dumps(report, indent=2, sort_keys=True))
+                    else:
+                        print(f"{report['state']}: "
+                              f"{report.get('detail', '')}".rstrip(": "))
+                        print(f"  runtime_home={report.get('runtime_home')}")
+                        print(f"  importable={report.get('importable')}")
+                    return 0 if report["state"] == "OK" else 2
+                from . import gateway_daemon as GD
+
+                return GD.run_gateway(
+                    getattr(args, "gateway_run_args", None) or [])
+            # install: confirm-gated unit install via the shared authority path
+            # (e-stop → confirmation → audit), then the shared installer.
+            from . import gateway_supervisor as GS
+
+            if not confirm:
+                print(_json.dumps({
+                    "ok": False, "code": GS.CONFIRM_CODE,
+                    "state": "CONFIRM_REQUIRED", "action": "install",
+                    "detail": ("gateway install writes a systemd user unit; "
+                               "re-issue with --confirm")}, indent=2,
+                    sort_keys=True))
+                return 3
+            if GS._estop(cfg):
+                print(_json.dumps({"ok": False, "code": GS.ESTOP_CODE,
+                                   "state": "UNAVAILABLE", "action": "install",
+                                   "detail": "emergency stop is latched; "
+                                             "gateway install refused"},
+                                  indent=2, sort_keys=True))
+                return 3
+            out = GS.install_unit(cfg, force=bool(getattr(args, "force", False)))
+            print(_json.dumps(out, indent=2, sort_keys=True))
+            return 0 if out.get("ok") else 1
         elif cmd == "protocol":
             out = GW.protocol_doctor()
         elif cmd == "negotiate":
@@ -8943,6 +9070,19 @@ def _cmd_device(cfg, args) -> int:
         except Exception as exc:
             print(f"ERROR: {exc}")
             return 2
+        # Canonical audit receipt on the single audit path; the same
+        # ``device.enroll`` event the dashboard handler emits
+        # (webui.py:_device_enroll_impl). Enrollment itself remains the CLI's
+        # explicit authorization — only the missing audit is added here.
+        try:
+            from . import qubit_compat as HC
+
+            HC.audit_event("device.enroll", "cli:user", {
+                "machine_id": str(rec.get("machine_id", ""))[:64],
+                "model_alias": str(rec.get("model_alias", ""))[:80],
+                "via": "cli"})
+        except Exception:
+            pass
         print(_json.dumps(rec, indent=2, sort_keys=True))
         print("device enrolled (explicit authorization recorded)")
         return 0

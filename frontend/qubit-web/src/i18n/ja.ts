@@ -342,8 +342,8 @@ export const ja: Translations = {
     providersHint:
       "memory.provider (空 = 組み込み) と context.engine を config.yaml に書き込みます。次のセッションで有効になります。",
     refreshDashboard: "ダッシュボード拡張を再スキャン",
-    removeConfirm: "このプラグインを ~/.qubit/plugins/ から削除しますか？",
-    removeHint: "削除できるのは ~/.qubit/plugins 配下のユーザーがインストールしたプラグインのみです。",
+    removeConfirm: "このプラグインを $QUBIT_HOME/plugins/ から削除しますか？",
+    removeHint: "削除できるのは $QUBIT_HOME/plugins 配下のユーザーがインストールしたプラグインのみです。",
     rescanHeading: "SPA プラグインレジストリ",
     rescanHint: "ディスクにファイルを追加した後に再スキャンすると、ダッシュボードのサイドバーが新しいマニフェストを認識します。",
     runtimeHeading: "ゲートウェイランタイム (YAML プラグイン)",

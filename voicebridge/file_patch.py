@@ -77,6 +77,11 @@ MAX_PREVIEW_CHARS = 2000
 MAX_PATH_CHARS = 4096
 MAX_DELETE_BYTES = 1024 * 1024 * 1024
 MAX_DELETE_ENTRIES = 100_000
+# Binary upload ceiling, mirroring the upstream managed-files cap
+# (``hermes_cli/web_server.py:821`` ``_MANAGED_FILE_MAX_BYTES = 100 * 1024 *
+# 1024``) that ``POST /api/files/upload`` / ``/api/files/upload-stream`` enforce
+# (``hermes_cli/web_routers/files.py:280,531``).
+MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 
 BACKUP_VERSION = 1
 DELETE_ARCHIVE_VERSION = 1
@@ -667,6 +672,100 @@ def mkdir_path(cfg: Any, target_path: str, *,
         "trust": "confined-directory-create",
         "rollback": "remove the created directory (`rmdir`) to undo",
     }
+
+
+# -------------------------------------------------------------------- upload
+def _upload_receipt(state: str, target: Path, actor: str, before: bytes,
+                    after: bytes, backup: Optional[Path],
+                    confinement: str) -> Dict[str, Any]:
+    return {
+        "state": state,
+        "code": "FILES_UPLOADED" if state == "OK"
+                else "FILES_UPLOAD_NO_CHANGE",
+        "target": _redact(str(target))[:MAX_PATH_CHARS],
+        "requested_by": _redact(actor)[:120],
+        "before_sha256": _sha256(before),
+        "after_sha256": _sha256(after),
+        "bytes_before": len(before),
+        "bytes_after": len(after),
+        "backup": _redact(str(backup)) if backup is not None else "",
+        "confinement": _redact(confinement)[:160],
+        "trust": "untrusted-binary-content",
+        "rollback": "call file_patch.rollback(..., backup=...) to restore "
+                    "the prior bytes",
+    }
+
+
+def write_bytes(cfg: Any, target_path: str, data: bytes, *,
+                requested_by: str = "cli:user", confirmed: bool = False,
+                overwrite: bool = True,
+                project_root: str = "") -> Dict[str, Any]:
+    """Write raw bytes to one confined file; brokered and reversible.
+
+    Ports the upstream managed-files binary upload — ``POST /api/files/upload``
+    (JSON ``data_url``) and ``POST /api/files/upload-stream`` (multipart
+    ``file``), reference ``hermes_cli/web_routers/files.py:493-565`` streaming
+    into ``_resolve_managed_path`` under the ``_MANAGED_FILE_MAX_BYTES`` cap
+    (``hermes_cli/web_server.py:821``) — onto Qubit's ONE confined-write path.
+    It runs the SAME gate order as :func:`apply_patch` / :func:`mkdir_path` /
+    :func:`delete_path`: the durable emergency-stop / global-disable latch and
+    the shared confinement probe are checked BEFORE the target is resolved, and
+    without ``confirmed`` it raises typed ``FILE_PATCH_CONFIRM_REQUIRED``.
+
+    ``data`` is written verbatim (NUL bytes and non-UTF-8 sequences included);
+    no text decode ever touches the payload. The target must resolve inside an
+    approved project root (absolute escapes, ``..`` traversal, and a symlink
+    final component are typed refusals). An existing file is only replaced when
+    ``overwrite`` is true (typed ``FILE_PATCH_CONFLICT`` otherwise). The prior
+    bytes are written to a durable 0600 backup first, then the payload is
+    written via temp-file + fsync + ``os.replace`` + directory fsync, so the
+    upload is reversible with :func:`rollback`.
+    """
+    actor = str(requested_by or "unknown")[:120]
+    confinement_reason, _binary = _require_gates(cfg, confirmed)
+    if not isinstance(data, (bytes, bytearray)):
+        raise FilePatchError(BAD_INPUT_CODE, "binary content must be bytes")
+    payload = bytes(data)
+    if len(payload) > MAX_UPLOAD_BYTES:
+        raise FilePatchError(
+            TOO_LARGE_CODE,
+            f"upload is {len(payload)} bytes (limit {MAX_UPLOAD_BYTES})")
+    target = resolve_target(cfg, target_path, project_root=project_root)
+
+    existed = target.exists()
+    mode: Optional[int] = None
+    if existed:
+        if not overwrite:
+            raise FilePatchError(CONFLICT_CODE, "target already exists")
+        try:
+            before = target.read_bytes()
+            mode = target.stat().st_mode & 0o7777
+        except OSError as exc:
+            raise FilePatchError(IO_CODE, f"cannot read target ({exc})")
+    else:
+        before = b""
+
+    if payload == before:
+        receipt = _upload_receipt("NO_CHANGE", target, actor, before, payload,
+                                  backup=None, confinement=confinement_reason)
+        _audit("upload_noop", actor, {"target": str(target),
+                                      "sha256": receipt["after_sha256"]})
+        return receipt
+
+    backup_path = _write_backup(cfg, target, existed, before, mode)
+    try:
+        _atomic_write(target, payload, mode)
+    except OSError as exc:
+        raise FilePatchError(IO_CODE, f"cannot write target ({exc})")
+
+    receipt = _upload_receipt("OK", target, actor, before, payload,
+                              backup=backup_path,
+                              confinement=confinement_reason)
+    _audit("upload", actor, {
+        "target": str(target), "before": receipt["before_sha256"],
+        "after": receipt["after_sha256"], "backup": str(backup_path),
+        "bytes": str(len(payload))})
+    return receipt
 
 
 # -------------------------------------------------------------------- delete

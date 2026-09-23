@@ -136,24 +136,22 @@ def test_webhook_delete_settles_via_query_confirm(tmp_path, monkeypatch):
 
 
 def test_profile_create_stages_real_id_and_settles(tmp_path, monkeypatch):
-    from voicebridge import brain as B
     from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     code, staged = HC.dispatch(cfg, "POST", "/api/profiles", {},
-                               {"name": "phase9u-principal"})
+                               {"name": "phase9u-profile"})
     assert code == 409 and staged.get("code") == "CONFIRM_REQUIRED", staged
     cid = staged.get("confirmation_id")
     assert cid, ("empty confirmation id — not settleable", staged)
-    assert "phase9u-principal" not in {
-        p["id"] for p in B.principal_list(cfg)["principals"]}
+    P = HC._profiles_module(cfg)
+    assert not P.profile_exists("phase9u-profile"), "created before confirm"
 
     code, done = HC.dispatch(cfg, "POST", "/api/profiles", {},
-                             {"name": "phase9u-principal",
+                             {"name": "phase9u-profile",
                               "confirmation_id": cid})
     assert code == 200 and done.get("ok") is True, (code, done)
-    assert "phase9u-principal" in {
-        p["id"] for p in B.principal_list(cfg)["principals"]}
+    assert P.profile_exists("phase9u-profile"), "reference profile not created"
 
 
 def test_mcp_create_requires_transport_and_persists(tmp_path, monkeypatch):

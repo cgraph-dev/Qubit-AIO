@@ -34,7 +34,7 @@ import {
   ArchiveRestore,
   Brain,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, runMutationWithConfirm } from "@/lib/api";
 import { formatSessionPruneResult } from "@/lib/session-prune";
 import { shouldRefreshSessions } from "@/lib/session-refresh";
 import { refusalOrError } from "@/lib/policy-refusal";
@@ -1150,7 +1150,12 @@ export default function SessionsPage() {
       try {
         const text = await file.text();
         const importedSessions = parseImportSessions(text);
-        const result = await api.importSessions(importedSessions);
+        // The file picker is the operator action; settle any staged broker
+        // confirmation immediately rather than prompting a second time.
+        const result = await runMutationWithConfirm(
+          () => api.importSessions(importedSessions),
+          () => true,
+        );
         showToast(`Import complete: ${importSummary(result)}`, "success");
         clearSelection();
         loadSessions(page, true);
@@ -1465,9 +1470,15 @@ export default function SessionsPage() {
       // The selection comes from one listed page, so its rows share one
       // owning profile; a mixed selection falls back to the management profile.
       const owners = new Set(ids.map(rowProfile));
-      const resp = await api.bulkDeleteSessions(
-        ids,
-        owners.size === 1 ? [...owners][0] : undefined,
+      // The Delete-selected dialog the operator already accepted IS the human
+      // confirmation; settle any staged broker confirmation immediately.
+      const resp = await runMutationWithConfirm(
+        () =>
+          api.bulkDeleteSessions(
+            ids,
+            owners.size === 1 ? [...owners][0] : undefined,
+          ),
+        () => true,
       );
       showToast(
         t.sessions.selectedSessionsDeleted.replace(
@@ -1509,7 +1520,12 @@ export default function SessionsPage() {
   const handleDeleteEmpty = useCallback(async () => {
     setDeletingEmpty(true);
     try {
-      const resp = await api.deleteEmptySessions();
+      // The Delete-empty dialog the operator already accepted IS the human
+      // confirmation; settle any staged broker confirmation immediately.
+      const resp = await runMutationWithConfirm(
+        () => api.deleteEmptySessions(),
+        () => true,
+      );
       // Show count in the toast so users get confirmation of the actual
       // number removed (which may differ slightly from `emptyCount` if a
       // session entered/left the "empty" set between the count fetch and
@@ -1613,7 +1629,12 @@ export default function SessionsPage() {
     }
     setPruning(true);
     try {
-      const resp = await api.pruneSessions(days);
+      // The Prune-old-sessions dialog the operator already accepted IS the
+      // human confirmation; settle any staged broker confirmation immediately.
+      const resp = await runMutationWithConfirm(
+        () => api.pruneSessions(days),
+        () => true,
+      );
       showToast(formatSessionPruneResult(resp), "success");
       setPruneOpen(false);
       loadSessions(0);

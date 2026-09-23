@@ -12,14 +12,17 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from qubit_state_common import _RECOVERABLE_END_REASONS_SQL, _RESET_END_REASONS_SQL, _sql_session_last_active
+from qubit_state_common import (
+    _RECOVERABLE_END_REASONS_SQL, _RESET_CHILD_SQL, _RESET_END_REASONS_SQL, _sql_json_extract,
+    _sql_session_last_active)
 
 # Log-record parity with the origin module (caplog tests pin "qubit_state").
 logger = logging.getLogger("qubit_state")
 
 # Recursive CTE naming a session plus its compression ancestors (rows a
-# resume must keep on one routing peer); branch/delegate/tool rows stop it.
-_COMPRESSION_LINEAGE_CTE = """
+# resume must keep on one routing peer); branch/delegate/tool/reset rows stop it
+# (same membership rule as get_compression_lineage / _CHAIN_STEP_SQL, #114271).
+_COMPRESSION_LINEAGE_CTE = f"""
                     WITH RECURSIVE compression_lineage(id) AS (
                         SELECT ?
                         UNION
@@ -28,14 +31,9 @@ _COMPRESSION_LINEAGE_CTE = """
                         JOIN sessions child ON child.id = lineage.id
                         JOIN sessions parent ON parent.id = child.parent_session_id
                         WHERE parent.end_reason = 'compression'
-                          AND json_extract(
-                              COALESCE(child.model_config, '{}'),
-                              '$._branched_from'
-                          ) IS NULL
-                          AND json_extract(
-                              COALESCE(child.model_config, '{}'),
-                              '$._delegate_from'
-                          ) IS NULL
+                          AND {_sql_json_extract('child.model_config', '$._branched_from')} IS NULL
+                          AND {_sql_json_extract('child.model_config', '$._delegate_from')} IS NULL
+                          AND NOT ({_RESET_CHILD_SQL.format(a='child')})
                           AND COALESCE(child.source, '') != 'tool'
                     )
                 """
@@ -108,10 +106,8 @@ _ORPHANS_SQL = f"""
                   AND EXISTS (SELECT 1 FROM messages m
                                WHERE m.session_id = o.id)
                   AND COALESCE(o.source, '') != 'tool'
-                  AND json_extract(COALESCE(o.model_config, '{{}}'),
-                                   '$._branched_from') IS NULL
-                  AND json_extract(COALESCE(o.model_config, '{{}}'),
-                                   '$._delegate_from') IS NULL
+                  AND {_sql_json_extract('o.model_config', '$._branched_from')} IS NULL
+                  AND {_sql_json_extract('o.model_config', '$._delegate_from')} IS NULL
                 ORDER BY o.started_at ASC
                 """
 _ORPHAN_LINEAGE_DONOR_SQL = f"""
@@ -220,7 +216,8 @@ class SessionGatewayMixin:
     def record_gateway_session_peer(
         self, session_id: str, *, source: str, user_id: str = None, session_key: str = None,
         chat_id: str = None, chat_type: str = None, thread_id: str = None, display_name: str = None,
-        origin_json: str = None, include_compression_ancestors: bool = False) -> None:
+        origin_json: str = None, include_compression_ancestors: bool = False,
+        transport_profile: str = None) -> None:
         """Persist the gateway routing peer for an existing session row. ``display_name`` / ``origin_json``:
         ``None`` leaves the stored value untouched (consumers read routing data from state.db, not
         sessions.json). ``include_compression_ancestors`` keeps a compression lineage on one routing peer
@@ -234,7 +231,9 @@ class SessionGatewayMixin:
         """
         if not session_id or not session_key:
             return
-        identity = (session_key, source, user_id, chat_id, chat_type, thread_id, display_name, origin_json)
+        identity = (
+            session_key, source, user_id, chat_id, chat_type, thread_id, display_name, origin_json,
+            transport_profile)
         ancestors = include_compression_ancestors
         query_params = [session_id, *identity] if ancestors else [*identity, session_id]
         def _do(conn):
@@ -244,7 +243,8 @@ class SessionGatewayMixin:
                    SET session_key = ?, source = ?, user_id = ?, chat_id = ?,
                        chat_type = ?, thread_id = ?,
                        display_name = COALESCE(?, display_name),
-                       origin_json = COALESCE(?, origin_json)
+                       origin_json = COALESCE(?, origin_json),
+                       transport_profile = COALESCE(?, transport_profile)
                    {"WHERE id IN (SELECT id FROM compression_lineage)" if ancestors else "WHERE id = ?"}""",
                 query_params,
             )
@@ -256,20 +256,21 @@ class SessionGatewayMixin:
                     """INSERT INTO sessions (
                                id, source, user_id, session_key, chat_id,
                                chat_type, thread_id, display_name, origin_json,
-                               profile_name, started_at
+                               profile_name, transport_profile, started_at
                            )
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                            ON CONFLICT(id) DO UPDATE SET
                                session_key = COALESCE(sessions.session_key, excluded.session_key),
                                chat_id = COALESCE(sessions.chat_id, excluded.chat_id),
                                chat_type = COALESCE(sessions.chat_type, excluded.chat_type),
                                thread_id = COALESCE(sessions.thread_id, excluded.thread_id),
                                display_name = COALESCE(sessions.display_name, excluded.display_name),
-                               origin_json = COALESCE(sessions.origin_json, excluded.origin_json)""",
+                               origin_json = COALESCE(sessions.origin_json, excluded.origin_json),
+                               transport_profile = COALESCE(sessions.transport_profile, excluded.transport_profile)""",
                     # Same ownership stamp as _insert_session_row: an unowned (NULL) row
                     # vanishes from profile-keyed consumers.
                     (session_id, source, user_id, session_key, chat_id, chat_type, thread_id, display_name,
-                     origin_json, self._own_profile_name(), time.time()),
+                     origin_json, self._own_profile_name(), transport_profile, time.time()),
                 )
         self._execute_write(_do)
 
@@ -314,6 +315,10 @@ class SessionGatewayMixin:
         That is exactly the shape of a leaked test fixture (#82770) — and also of a chat that was routed but
         never answered.
         """
+        if older_than_days < 0:
+            raise ValueError(
+                f"older_than_days must be >= 0, got {older_than_days!r}: a negative "
+                "retention builds a future cutoff that matches every never-active keyed row.")
         cutoff = time.time() - (float(older_than_days) * 86400.0)
         rows = self._read_all(
             """
@@ -341,6 +346,18 @@ class SessionGatewayMixin:
             (cutoff,),
         )
         return [dict(r) for r in rows]
+
+    def gateway_routing_entry_for_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """The routing entry (any scope) whose current owner is *session_id*, or None. The id lives
+        only inside ``entry_json``, so matching is done in Python; an archived/rotated row has none."""
+        for row in self._read_all("SELECT entry_json FROM gateway_routing"):
+            try:
+                entry = json.loads(row["entry_json"] or "{}")
+            except Exception:
+                continue
+            if isinstance(entry, dict) and entry.get("session_id") == session_id:
+                return entry
+        return None
 
     def _delete_routing_entries_for_sessions(self, session_ids: Set[str]) -> int:
         """Drop ``gateway_routing`` rows pointing at any of *session_ids*; the target id
@@ -863,6 +880,10 @@ class SessionGatewayMixin:
             "UPDATE sessions SET handoff_state = 'running' WHERE id = ? AND handoff_state = 'pending'",
             (session_id,),
         ) > 0
+
+    def has_pending_handoffs(self) -> bool:
+        """Bounded existence probe for the handoff watcher's idle gate (the gate fails open on error)."""
+        return self._read_one("SELECT 1 FROM sessions WHERE handoff_state = 'pending' LIMIT 1") is not None
 
     def complete_handoff(self, session_id: str) -> None:
         """Mark a handoff as completed."""

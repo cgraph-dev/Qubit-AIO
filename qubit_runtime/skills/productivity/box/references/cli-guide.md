@@ -7,7 +7,7 @@ Run Box commands through Qubit' `terminal` tool. Prefer the documented command i
 Resolve one command runner before any Box operation:
 
 1. Check whether `box` already resolves in the runtime shell (`command -v box` on macOS/Linux or `Get-Command box` in PowerShell). If it does, use that command as-is, regardless of where Qubit or Box CLI was installed.
-2. If it does not resolve, install and verify an isolated CLI under a writable, persistent Qubit runtime directory. Prefer the current Qubit home at `tools/box-cli`; `QUBIT_HOME` is optional, and Qubit uses its platform default when it is unset (`~/.hermes` on macOS/Linux and `%LOCALAPPDATA%\qubit` on Windows).
+2. If it does not resolve, install and verify an isolated CLI under a writable, persistent Qubit runtime directory. Prefer the current Qubit home at `tools/box-cli`; `QUBIT_HOME` is optional, and Qubit uses its platform default when it is unset (`$QUBIT_HOME` on macOS/Linux and `%LOCALAPPDATA%\qubit` on Windows).
 3. If that directory is not writable, ask for a writable persistent directory in the runtime. Do not assume Qubit's source checkout, a global npm prefix, or a user home is writable. If a nonstandard existing CLI is not on `PATH`, ask for its executable path instead of scanning the machine.
 
 Only use `npm exec --prefix` after Qubit installed and verified that exact local copy. Run each installation block below as one terminal call, record the verified absolute prefix it prints, and use that literal path in later calls. Never depend on a shell variable surviving a separate Qubit terminal call, and never give the user an unverified `npm exec --prefix` command to run.
@@ -19,7 +19,7 @@ On macOS/Linux:
 ```bash
 node --version
 npm --version
-BOX_CLI_HOME="${QUBIT_HOME:-$HOME/.hermes}/tools/box-cli"
+BOX_CLI_HOME="$QUBIT_HOME/tools/box-cli"
 mkdir -p "$BOX_CLI_HOME"
 npm install --prefix "$BOX_CLI_HOME" @box/cli
 npm exec --prefix "$BOX_CLI_HOME" -- box --version

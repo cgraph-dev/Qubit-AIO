@@ -249,6 +249,54 @@ function reissueToSettle(
   return { url: `${url}${sep}${query}`, init: { ...init, body } };
 }
 
+/** Result states that mean the settled operation did NOT succeed, even though
+ *  the transport returned HTTP 200. The ops-confirm envelope fabricates
+ *  `ok:true/state:executed` while carrying the real outcome under
+ *  `receipt.result.state` (e.g. `MISSING`/`FAILED`/`REFUSED`). Treating that
+ *  as success is the dishonest "confirm says done but nothing changed" path
+ *  (AI8 D-5/D-9), so the settle helpers reject it with the real code+detail. */
+const FAILED_RESULT_STATES = new Set([
+  "FAILED",
+  "REFUSED",
+  "MISSING",
+  "ERROR",
+  "UNAVAILABLE",
+  "DENIED",
+  "CANCELLED",
+]);
+
+function rejectFabricatedSuccess(result: unknown): void {
+  if (!result || typeof result !== "object") return;
+  const env = result as Record<string, unknown>;
+  const receipt =
+    env.receipt && typeof env.receipt === "object"
+      ? (env.receipt as Record<string, unknown>)
+      : null;
+  const inner =
+    receipt?.result && typeof receipt.result === "object"
+      ? (receipt.result as Record<string, unknown>)
+      : null;
+  const innerState =
+    typeof inner?.state === "string" ? inner.state.toUpperCase() : "";
+  if (innerState && FAILED_RESULT_STATES.has(innerState)) {
+    const code = typeof inner?.code === "string" ? inner.code : innerState;
+    const detail =
+      typeof inner?.detail === "string"
+        ? inner.detail
+        : typeof env.detail === "string"
+          ? env.detail
+          : "operation failed";
+    throw new Error(`${code}: ${detail}`);
+  }
+  // A 2xx body that still says `ok:false` is a failure, not a success.
+  if (env.ok === false) {
+    const code = typeof env.code === "string" ? env.code : "FAILED";
+    const detail =
+      typeof env.detail === "string" ? env.detail : "operation failed";
+    throw new Error(`${code}: ${detail}`);
+  }
+}
+
 async function settleStagedConfirm<T>(
   url: string,
   init: RequestInit | undefined,
@@ -269,16 +317,20 @@ async function settleStagedConfirm<T>(
   // its own re-issue path.
   const retry = reissueToSettle(url, init, confirmationId);
   try {
-    return await fetchJSON<T>(retry.url, retry.init, options);
+    const result = await fetchJSON<T>(retry.url, retry.init, options);
+    rejectFabricatedSuccess(result);
+    return result;
   } catch (e) {
     if (!(e instanceof ConfirmRequiredError) || !confirmationId) throw e;
     // The re-issue re-staged: this was an ops-journal entry. Settle the
     // original stage on the shared journal instead.
-    return fetchJSON<T>("/api/ops/confirm", {
+    const result = await fetchJSON<T>("/api/ops/confirm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ confirmation_id: confirmationId }),
     });
+    rejectFabricatedSuccess(result);
+    return result;
   }
 }
 
@@ -397,14 +449,16 @@ export async function runMutationWithConfirm<T>(
  *  request, so it is only correct for entries that endpoint itself consumes.
  *  A compat-staged mutation settles by re-issuing its own request with the id
  *  (handled transparently by {@link ConfirmRequiredError.settle}). */
-export function settleConfirmation<T = unknown>(
+export async function settleConfirmation<T = unknown>(
   confirmationId: string,
 ): Promise<T> {
-  return fetchJSON<T>("/api/ops/confirm", {
+  const result = await fetchJSON<T>("/api/ops/confirm", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ confirmation_id: confirmationId }),
   });
+  rejectFabricatedSuccess(result);
+  return result;
 }
 
 export async function fetchJSON<T>(
@@ -1073,18 +1127,27 @@ export const api = {
     fetchJSON<ManagedFileReadResponse>(
       `/api/files/read?path=${encodeURIComponent(path)}`,
     ),
-  uploadFile: async (path: string, file: File, overwrite = true) => {
-    // The compat dispatcher only parses JSON bodies; multipart is rejected by
-    // the request reader before any handler ("bad json body"). Qubit serves
-    // bounded UTF-8 *text* writes through the confined file broker, so send the
-    // text content as JSON. The mutation is confirmation-staged by the broker
-    // (409 + confirmation_id): callers wrap this in runMutationWithConfirm so
-    // the request is re-issued with the id after human confirmation.
-    const content = await file.text();
-    return fetchJSON<ManagedFileWriteResponse>("/api/files/upload", {
+  uploadFile: (path: string, file: File, overwrite = true) => {
+    // Ported from the upstream dashboard (web/src/lib/api.ts:543-557): stream
+    // the raw bytes as multipart/form-data to /api/files/upload-stream. Do NOT
+    // set Content-Type — the browser adds the multipart boundary. The previous
+    // path read the file as UTF-8 text (`File.text()`, lossy) and POSTed it as
+    // JSON, so a genuinely-binary upload was silently mangled and reported as
+    // success. Qubit's compat dispatcher parses the multipart body
+    // (voicebridge/webui.py parse_multipart_form), and the handler
+    // (qubit_compat.h_files_upload) serves bounded UTF-8 *text* writes through
+    // the confined file broker; bytes that do not decode as UTF-8 answer a
+    // typed 403 FILES_BINARY refusal, which the caller surfaces honestly. The
+    // mutation is confirmation-staged by the broker (409 + confirmation_id):
+    // callers wrap this in runMutationWithConfirm so the request is re-issued
+    // with the id after human confirmation.
+    const form = new FormData();
+    form.append("path", path);
+    form.append("overwrite", String(overwrite));
+    form.append("file", file, file.name);
+    return fetchJSON<ManagedFileWriteResponse>("/api/files/upload-stream", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path, overwrite, content }),
+      body: form,
     });
   },
   createDirectory: (path: string) =>
@@ -1099,12 +1162,22 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path, recursive }),
     }),
-  getLogs: (params: { file?: string; lines?: number; level?: string; component?: string }) => {
+  getLogs: (params: {
+    file?: string;
+    lines?: number;
+    level?: string;
+    component?: string;
+    search?: string;
+  }) => {
     const qs = new URLSearchParams();
     if (params.file) qs.set("file", params.file);
     if (params.lines) qs.set("lines", String(params.lines));
     if (params.level && params.level !== "ALL") qs.set("level", params.level);
     if (params.component && params.component !== "all") qs.set("component", params.component);
+    // The vendored status router post-filters on a case-insensitive needle
+    // (`qubit_cli/web_routers/status.py` get_logs). Only send it when set so
+    // the unfiltered tail path is unchanged.
+    if (params.search && params.search.trim()) qs.set("search", params.search.trim());
     return fetchJSON<LogsResponse>(`/api/logs?${qs.toString()}`);
   },
   getAnalytics: (days: number, profile = getManagementProfile()) =>
@@ -1213,16 +1286,10 @@ export const api = {
         }),
       onConfirm,
     ),
-  getConfigRaw: (profile = getManagementProfile()) =>
-    fetchJSON<{ yaml: string; path?: string }>(
-      appendProfileParam("/api/config/raw", profile),
-    ),
-  saveConfigRaw: (yaml_text: string, profile = getManagementProfile()) =>
-    fetchJSON<{ ok: boolean }>(appendProfileParam("/api/config/raw", profile), {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ yaml_text }),
-    }),
+  // Raw YAML config read/write (`/api/config/raw`) is refused by Qubit policy
+  // (SECRET_NEVER_SERVED): the reference endpoint serves full plaintext secrets,
+  // so no wrapper is offered. The structured ConfigPage form (`PUT /api/config`)
+  // is the supported editor; secret values go through the Keys reference store.
   getEnvVars: () => fetchJSON<Record<string, EnvVarInfo>>("/api/env"),
   setEnvVar: (key: string, value: string) =>
     fetchJSON<{ ok: boolean }>("/api/env", {
@@ -1375,14 +1442,26 @@ export const api = {
         }),
       confirm,
     ),
-  updateProfileDescription: (name: string, description: string) =>
-    fetchJSON<{ ok: boolean; description: string; description_auto: boolean }>(
-      `/api/profiles/${encodeURIComponent(name)}/description`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description }),
-      },
+  // ``profile_desc`` (``_profile_field``) is confirm-gated: without ``confirm``
+  // it stages a typed 409; the shared round-trip re-issues with it. The handler
+  // echoes the stored field (``{ok, field:{key,value}}``), not a fabricated
+  // description shape.
+  updateProfileDescription: (
+    name: string,
+    description: string,
+    confirm?: (detail: string) => boolean | Promise<boolean>,
+  ) =>
+    runMutationWithConfirm(
+      () =>
+        fetchJSON<ProfileFieldResponse>(
+          `/api/profiles/${encodeURIComponent(name)}/description`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ description }),
+          },
+        ),
+      confirm,
     ),
   describeProfileAuto: (name: string, overwrite = true) =>
     fetchJSON<ProfileDescribeAutoResult>(
@@ -1393,28 +1472,66 @@ export const api = {
         body: JSON.stringify({ overwrite }),
       },
     ),
-  setProfileModel: (name: string, provider: string, model: string) =>
-    fetchJSON<{ ok: boolean; provider: string; model: string }>(
-      `/api/profiles/${encodeURIComponent(name)}/model`,
-      {
+  // ``profile_model`` is confirm-gated and persists into the principal's
+  // profile (``B.profile_set``); the round-trip re-issues with ``confirm``.
+  setProfileModel: (
+    name: string,
+    provider: string,
+    model: string,
+    confirm?: (detail: string) => boolean | Promise<boolean>,
+  ) =>
+    runMutationWithConfirm(async () => {
+      const res = await fetchJSON<{
+        ok: boolean;
+        provider: string;
+        model: string;
+      }>(`/api/profiles/${encodeURIComponent(name)}/model`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ provider, model }),
-      },
+      });
+      // Never claim success when the server reports a different provider than
+      // the one that was applied (the old hardcoded ``ollama-local`` bug).
+      if (res && res.provider && res.provider !== provider) {
+        throw new Error(
+          `PROFILE_MODEL_NOT_APPLIED: requested ${provider}/${model}, ` +
+            `server reported ${res.provider}/${res.model}`,
+        );
+      }
+      return res;
+    }, confirm),
+  // ``profile_rename`` is confirm-gated and renames the principal in the SAME
+  // registry the list reads; a collision is a typed 400, never a false success.
+  renameProfile: (
+    name: string,
+    newName: string,
+    confirm?: (detail: string) => boolean | Promise<boolean>,
+  ) =>
+    runMutationWithConfirm(
+      () =>
+        fetchJSON<{ ok: boolean; name: string; path: string }>(
+          `/api/profiles/${encodeURIComponent(name)}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ new_name: newName }),
+          },
+        ),
+      confirm,
     ),
-  renameProfile: (name: string, newName: string) =>
-    fetchJSON<{ ok: boolean; name: string; path: string }>(
-      `/api/profiles/${encodeURIComponent(name)}`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ new_name: newName }),
-      },
-    ),
-  deleteProfile: (name: string) =>
-    fetchJSON<{ ok: boolean }>(
-      `/api/profiles/${encodeURIComponent(name)}`,
-      { method: "DELETE" },
+  // ``profile_delete`` is confirm-gated; the round-trip re-issues the DELETE
+  // with the settle flag on the query string.
+  deleteProfile: (
+    name: string,
+    confirm?: (detail: string) => boolean | Promise<boolean>,
+  ) =>
+    runMutationWithConfirm(
+      () =>
+        fetchJSON<{ ok: boolean; removed?: boolean }>(
+          `/api/profiles/${encodeURIComponent(name)}`,
+          { method: "DELETE" },
+        ),
+      confirm,
     ),
   getProfileSetupCommand: (name: string) =>
     fetchJSON<{ command: string }>(
@@ -1424,14 +1541,23 @@ export const api = {
     fetchJSON<{ content: string; exists: boolean }>(
       `/api/profiles/${encodeURIComponent(name)}/soul`,
     ),
-  updateProfileSoul: (name: string, content: string) =>
-    fetchJSON<{ ok: boolean }>(
-      `/api/profiles/${encodeURIComponent(name)}/soul`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
-      },
+  // ``profile_soul_set`` is confirm-gated like the other profile fields.
+  updateProfileSoul: (
+    name: string,
+    content: string,
+    confirm?: (detail: string) => boolean | Promise<boolean>,
+  ) =>
+    runMutationWithConfirm(
+      () =>
+        fetchJSON<ProfileFieldResponse>(
+          `/api/profiles/${encodeURIComponent(name)}/soul`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content }),
+          },
+        ),
+      confirm,
     ),
 
   // Skills & Toolsets
@@ -1638,14 +1764,28 @@ export const api = {
   // Messaging platforms (gateway channels)
   getMessagingPlatforms: () =>
     fetchJSON<MessagingPlatformsResponse>("/api/messaging/platforms"),
-  updateMessagingPlatform: (id: string, body: MessagingPlatformUpdate) =>
-    fetchJSON<{ ok: boolean; platform: string }>(
-      `/api/messaging/platforms/${encodeURIComponent(id)}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      },
+  // `msg_update` stages a typed 409 CONFIRM_REQUIRED (shared approval journal)
+  // without an explicit confirm. The shared round-trip re-issues the SAME PUT
+  // with the staged `confirmation_id` (or settles it on the journal) once the
+  // human confirms — so Enable/Disable/Save actually complete instead of
+  // toasting a dead 409. `hot_served` is optional (the reference backend
+  // reports it; Qubit's compat layer does not).
+  updateMessagingPlatform: (
+    id: string,
+    body: MessagingPlatformUpdate,
+    confirm?: (detail: string) => boolean | Promise<boolean>,
+  ) =>
+    runMutationWithConfirm(
+      () =>
+        fetchJSON<{ ok: boolean; platform: string; hot_served?: boolean }>(
+          `/api/messaging/platforms/${encodeURIComponent(id)}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          },
+        ),
+      confirm,
     ),
   testMessagingPlatform: (id: string) =>
     fetchJSON<MessagingPlatformTestResult>(
@@ -1964,6 +2104,28 @@ export const api = {
         body: JSON.stringify({ name, env, enable }),
       },
     ),
+  // ``mcp_invoke`` is confirm-gated: without ``confirm`` it stages a real
+  // single-use approval (409); the shared round-trip re-issues with it. The
+  // same canonical entry point the CLI (`qubit mcp invoke`) and voice use, so
+  // the dashboard, CLI, and voice share one broker/policy/audit path.
+  invokeMcpTool: (
+    name: string,
+    tool: string,
+    args: Record<string, unknown> = {},
+    confirm?: (detail: string) => boolean | Promise<boolean>,
+  ) =>
+    runMutationWithConfirm(
+      () =>
+        fetchJSON<McpInvokeResult>(
+          `/api/mcp/servers/${encodeURIComponent(name)}/invoke`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tool, args }),
+          },
+        ),
+      confirm,
+    ),
 
   // ── Admin: Pairing ──────────────────────────────────────────────────
   // The mutating endpoints read the profile off the BODY, so the query-param
@@ -2039,6 +2201,50 @@ export const api = {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ enabled }),
           },
+        ),
+      confirm,
+    ),
+  // The four per-subscription operations the reference has no UI for but the
+  // canonical store exposes: rotate the signing secret, send a real signed
+  // test, read redacted delivery receipts, and retry the last failure. The
+  // three mutations are confirm-gated; the round-trip re-issues with it.
+  rotateWebhookSecret: (
+    name: string,
+    confirm?: (detail: string) => boolean | Promise<boolean>,
+  ) =>
+    runMutationWithConfirm(
+      () =>
+        fetchJSON<WebhookRotateResponse>(
+          `/api/webhooks/${encodeURIComponent(name)}/rotate`,
+          { method: "POST" },
+        ),
+      confirm,
+    ),
+  testWebhook: (
+    name: string,
+    confirm?: (detail: string) => boolean | Promise<boolean>,
+  ) =>
+    runMutationWithConfirm(
+      () =>
+        fetchJSON<WebhookDeliveryResult>(
+          `/api/webhooks/${encodeURIComponent(name)}/test`,
+          { method: "POST" },
+        ),
+      confirm,
+    ),
+  getWebhookDeliveries: (name: string, limit = 50) =>
+    fetchJSON<WebhookDeliveriesResponse>(
+      `/api/webhooks/${encodeURIComponent(name)}/deliveries?limit=${limit}`,
+    ),
+  retryWebhook: (
+    name: string,
+    confirm?: (detail: string) => boolean | Promise<boolean>,
+  ) =>
+    runMutationWithConfirm(
+      () =>
+        fetchJSON<WebhookDeliveryResult>(
+          `/api/webhooks/${encodeURIComponent(name)}/retry`,
+          { method: "POST" },
         ),
       confirm,
     ),
@@ -2527,6 +2733,17 @@ export interface McpServer {
   connected?: boolean;
   /** Backend status label (e.g. `configured-not-connected`). */
   status?: string;
+  /** The server's declared tool allowlist (`MS.list_servers`). An empty list is
+   *  honest — the record declares no tools. */
+  capabilities?: string[];
+  /** Whether the canonical store permits a client invocation right now. */
+  invocable?: boolean;
+  /** Typed reason when `invocable` is false (e.g. operator-required). */
+  invocation_code?: string | null;
+  /** Which store the row was read from (`qubit-registry`). */
+  source?: string;
+  /** The mount policy attached to the row (Qubit never auto-mounts). */
+  policy?: string;
 }
 
 export interface McpCatalogEntry {
@@ -2577,6 +2794,20 @@ export interface McpTestResult {
   ok: boolean;
   error?: string;
   tools: Array<{ name: string; description: string }>;
+}
+
+/** Result of a real, confirm-gated `POST /api/mcp/servers/{name}/invoke`.
+ *  `state` is the canonical store's verdict (`OK`/`INVOCABLE` = success); the
+ *  output is redacted by the client transport. */
+export interface McpInvokeResult {
+  ok: boolean;
+  state?: string;
+  code?: string;
+  detail?: string;
+  server?: string;
+  tool?: string;
+  result?: unknown;
+  duration_ms?: number;
 }
 
 export interface McpOAuthFlow {
@@ -2697,6 +2928,55 @@ export interface WebhookCreate {
   events: string[];
   /** Signing-secret reference: ``env:VAR`` or ``file:PATH`` (never a value). */
   secret_ref: string;
+}
+
+/** Redacted delivery receipt (``webhooks.deliveries``). The payload is never
+ *  retained; only the verdict/status/error are. */
+export interface WebhookDelivery {
+  subscription?: string;
+  event?: string;
+  verdict?: string;
+  status?: number | null;
+  error?: string | null;
+  ts?: string;
+  [key: string]: unknown;
+}
+
+export interface WebhookDeliveriesResponse {
+  ok: boolean;
+  state?: string;
+  deliveries: WebhookDelivery[];
+  count: number;
+  subscription: string | null;
+}
+
+/** Result of a real signed test/retry delivery (``webhooks.test_delivery`` /
+ *  ``retry_delivery``). `verdict` is the honest outcome — `DELIVERED` or
+ *  `FAILED` — never fabricated. */
+export interface WebhookDeliveryResult {
+  ok: boolean;
+  state?: string;
+  mode?: string;
+  delivered?: boolean;
+  verdict?: string;
+  http_status?: number | null;
+  error?: string | null;
+  subscription?: string;
+  event?: string;
+  timestamp?: string;
+  note?: string;
+  retried_after_ts?: string;
+}
+
+/** Result of a confirmed signing-secret rotation. The new value is written to a
+ *  Qubit-owned ``file:`` reference and never returned — only the kind. */
+export interface WebhookRotateResponse {
+  ok: boolean;
+  state?: string;
+  subscription?: WebhookRoute;
+  reference_kind?: string;
+  rotated_at?: string;
+  note?: string;
 }
 
 export interface CredentialPoolEntry {
@@ -3513,6 +3793,18 @@ export interface ProfileDescribeAutoResult {
   reason: string;
   description: string | null;
   description_auto: boolean;
+}
+
+/** ``_profile_field`` (description/SOUL) response: the stored field record,
+ *  never a fabricated description shape. */
+export interface ProfileFieldResponse {
+  ok: boolean;
+  field?: {
+    key?: string;
+    value?: string;
+    trust?: string;
+    updated_at?: string;
+  };
 }
 
 export interface ProfileInfo {

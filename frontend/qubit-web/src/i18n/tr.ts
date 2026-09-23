@@ -343,8 +343,8 @@ export const tr: Translations = {
     providersHint:
       "config.yaml'a memory.provider (boş = yerleşik) ve context.engine yazar. Bir sonraki oturumda etkili olur.",
     refreshDashboard: "Pano uzantılarını yeniden tara",
-    removeConfirm: "Bu eklenti ~/.qubit/plugins/ içinden kaldırılsın mı?",
-    removeHint: "Yalnızca ~/.qubit/plugins altındaki kullanıcı tarafından yüklenmiş eklentiler kaldırılabilir.",
+    removeConfirm: "Bu eklenti $QUBIT_HOME/plugins/ içinden kaldırılsın mı?",
+    removeHint: "Yalnızca $QUBIT_HOME/plugins altındaki kullanıcı tarafından yüklenmiş eklentiler kaldırılabilir.",
     rescanHeading: "SPA eklenti kayıt defteri",
     rescanHint: "Diske dosya ekledikten sonra yeniden tarayın, böylece pano kenar çubuğu yeni manifestleri algılar.",
     runtimeHeading: "Ağ geçidi çalışma zamanı (YAML eklentileri)",

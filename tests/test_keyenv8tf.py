@@ -1,8 +1,8 @@
 """Packet 8T-F paths — credential env files live under the Qubit tree.
 
-Proves the canonical `~/.config/qubit-voicebridge/.env` wins, the legacy
-operator-Hermes file is honored only when canonical is absent (with a loud
-one-time migration warning), and values never reach logs.
+Proves the canonical `~/.config/qubit-voicebridge/.env` wins, the operator's
+legacy `~/.hermes/.env` is **never** consulted (read-only migration input, not
+a credential fallback — DECISIONS #9/#17), and values never reach logs.
 """
 from __future__ import annotations
 
@@ -38,29 +38,19 @@ def test_canonical_wins_over_legacy(tmp_path, monkeypatch):
     assert read("DEEPSEEK_API_KEY") == "canonical-1"
 
 
-def test_legacy_fallback_warns_loudly(tmp_path, monkeypatch):
-    from voicebridge import orchestrator as ORCH
-    from voicebridge.logging_setup import setup
-
-    state = tmp_path / "state"
-    state.mkdir()
-    setup(level="INFO", jsonl=True, state_dir=state)
-    try:
-        ORCH._LEGACY_ENV_WARNED.clear()
-        read = _reader(monkeypatch, tmp_path)
-        _write(tmp_path / "home" / ".hermes" / ".env",
-               "DEEPSEEK_API_KEY=legacy-2\n")
-        assert read("DEEPSEEK_API_KEY") == "legacy-2"
-        blob = (state / "events.jsonl").read_text()
-        assert "config.legacy_env" in blob
-        assert "legacy-2" not in blob, "values never logged"
-        assert len(ORCH._LEGACY_ENV_WARNED) == 1, "warned once"
-        read("DEEPSEEK_API_KEY")
-        assert len(ORCH._LEGACY_ENV_WARNED) == 1
-    finally:
-        from voicebridge import logging_setup as LS
-
-        LS._EVENT_FILE = None
+def test_legacy_hermes_env_is_ignored(tmp_path, monkeypatch):
+    # The operator's legacy ~/.hermes/.env must never be a credential source.
+    # Canonical absent -> the env value (or "") is returned, never the legacy
+    # file's value (DECISIONS #9/#17).
+    read = _reader(monkeypatch, tmp_path)
+    _write(tmp_path / "home" / ".hermes" / ".env",
+           "DEEPSEEK_API_KEY=legacy-2\n")
+    # Not in os.environ, canonical absent -> legacy value must NOT be read.
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    assert read("DEEPSEEK_API_KEY") == ""
+    # Env is the only fallback that remains.
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "from-env")
+    assert read("DEEPSEEK_API_KEY") == "from-env"
 
 
 def test_env_and_missing_and_configured_override(tmp_path, monkeypatch):

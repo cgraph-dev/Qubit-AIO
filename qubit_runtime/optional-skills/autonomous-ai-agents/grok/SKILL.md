@@ -8,7 +8,7 @@ platforms: [linux, macos, windows]
 metadata:
   qubit:
     tags: [Coding-Agent, Grok, xAI, Code-Review, Refactoring, Automation]
-    related_skills: [codex, claude-code, hermes-agent]
+    related_skills: [codex, claude-code, qubit-agent]
 ---
 
 # Grok Build CLI — Qubit Orchestration Guide

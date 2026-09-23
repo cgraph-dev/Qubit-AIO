@@ -32,8 +32,8 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-PIN = "2237be355906fbe6065ce1815711eee52b2d646e"
-UPSTREAM_TAG = "v2026.9.7"
+PIN = "d337b736aa1e8ebecfab043842d13e4a2d2f48a3"
+UPSTREAM_TAG = "v0.21.4"
 UPSTREAM_REPO = "https://github.com/NousResearch/hermes-agent"
 UPSTREAM_LICENSE = "MIT License, Copyright (c) 2025 Nous Research"
 OPENCLAW_PIN = "3928bad9badfcb6c7d140530435e806fb8092190"
@@ -41,7 +41,7 @@ OPENCLAW_TAG = "v2026.9.2"
 OPENCLAW_REPO = "https://github.com/openclaw/openclaw"
 OPENCLAW_LICENSE = "MIT (Copyright (c) 2026 OpenClaw Foundation)"
 
-_SKIP_DIR_PARTS = {"__pycache__", ".git", ".pytest_cache"}
+_SKIP_DIR_PARTS = {"__pycache__", ".git", ".pytest_cache", ".pytest-cache"}
 _SKIP_SUFFIX = (".pyc", ".pyo")
 _UPSTREAM_SKIP_DIRS = _SKIP_DIR_PARTS
 # Disposable dependency/build/cache trees. A path under one of these is skipped
